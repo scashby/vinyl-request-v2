@@ -1,25 +1,32 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import Header from './components/Header';
-import EventsPage from './pages/events/EventsPage';
-import EventDetail from './pages/events/EventDetail';
-import BrowsePage from './pages/browse/BrowsePage';
-import AdminDashboard from './pages/admin/AdminDashboard';
-import NowPlayingPage from './pages/now-playing/NowPlayingPage';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import EventsPage from './pages/events/EventsPage'
+import EventDetail from './pages/events/EventDetail'
+import BrowsePage from './pages/browse/BrowsePage'
+import NowPlayingPage from './pages/now-playing/NowPlayingPage'
+import AdminDashboard from './pages/admin/AdminDashboard'
+import EditQueue from './pages/admin/EditQueue'
+import SetNowPlaying from './pages/admin/SetNowPlaying'
+import ImportDiscogs from './pages/admin/ImportDiscogs'
+import BlockSides from './pages/admin/BlockSides'
+import Header from './components/Header'
 
 function App() {
   return (
     <Router>
       <Header />
       <Routes>
-        <Route path="/" element={<Navigate to="/events" />} />
-        <Route path="/events" element={<EventsPage />} />
-        <Route path="/events/:id" element={<EventDetail />} />
-        <Route path="/admin" element={<AdminDashboard />} />
-        <Route path="/now-playing/:eventId" element={<NowPlayingPage />} />
+        <Route path="/" element={<EventsPage />} />
+        <Route path="/event/:id" element={<EventDetail />} />
         <Route path="/browse" element={<BrowsePage />} />
-        <Route path="*" element={<div>Not Found</div>} />
+        <Route path="/now-playing" element={<NowPlayingPage />} />
+        <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/admin/edit-queue" element={<EditQueue />} />
+        <Route path="/admin/set-now-playing" element={<SetNowPlaying />} />
+        <Route path="/admin/import-discogs" element={<ImportDiscogs />} />
+        <Route path="/admin/block-sides" element={<BlockSides />} />
       </Routes>
     </Router>
-  );
+  )
 }
-export default App;
+
+export default App
