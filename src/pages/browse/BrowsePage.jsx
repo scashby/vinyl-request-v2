@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '../../supabaseClient';
+import { supabase } from '../../lib/supabaseClient.js';
 
 export default function BrowsePage() {
   const [albums, setAlbums] = useState([]);

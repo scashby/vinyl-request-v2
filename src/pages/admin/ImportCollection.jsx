@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { parseDiscogsCSV } from '../../lib/csvUtils'
-import { supabase } from '../../lib/supabaseClient'
+import { parseDiscogsCSV } from '../../lib/csvUtils.js'
+import { supabase } from '../../lib/supabaseClient.js'
 import CSVPreviewTable from '../../components/CSVPreviewTable'
 
 export default function ImportCollection() {

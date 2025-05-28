@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { supabase } from '../lib/supabaseClient'
+import { supabase } from '../lib/supabaseClient.js'
 
 export default function RequestForm({ eventId }) {
   const [formData, setFormData] = useState({ artist: '', title: '', side: '', name: '', comment: '' })

@@ -8,7 +8,7 @@ import EditQueue from './pages/admin/EditQueue.jsx';
 import SetNowPlaying from './pages/admin/SetNowPlaying.jsx';
 import ImportDiscogs from './pages/admin/ImportDiscogs.jsx';
 import BlockSides from './pages/admin/BlockSides.jsx';
-import LoginPage from './pages/LoginPage.jsx';
+import LoginPage from './pages/admin/LoginPage.jsx';
 import { AuthProvider } from './auth/AuthProvider.jsx';
 import ProtectedRoute from './auth/ProtectedRoute.jsx';
 import Layout from './components/Layout.jsx';

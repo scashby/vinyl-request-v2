@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { supabase } from '../../lib/supabaseClient'
+import { supabase } from '../../lib/supabaseClient.js'
 
 export default function NowPlayingPage() {
   const [nowPlaying, setNowPlaying] = useState(null)
