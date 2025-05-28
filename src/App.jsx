@@ -1,17 +1,17 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import EventsPage from './pages/events/EventsPage';
-import EventDetail from './pages/events/EventDetail';
-import BrowsePage from './pages/browse/BrowsePage';
-import NowPlayingPage from './pages/now-playing/NowPlayingPage';
-import AdminDashboard from './pages/admin/AdminDashboard';
-import EditQueue from './pages/admin/EditQueue';
-import SetNowPlaying from './pages/admin/SetNowPlaying';
-import ImportDiscogs from './pages/admin/ImportDiscogs';
-import BlockSides from './pages/admin/BlockSides';
-import LoginPage from './pages/LoginPage';
-import { AuthProvider } from './auth/AuthProvider';
-import ProtectedRoute from './auth/ProtectedRoute';
-import Layout from './components/Layout';
+import EventsPage from './pages/events/EventsPage.jsx';
+import EventDetail from './pages/events/EventDetail.jsx';
+import BrowsePage from './pages/browse/BrowsePage.jsx';
+import NowPlayingPage from './pages/now-playing/NowPlayingPage.jsx';
+import AdminDashboard from './pages/admin/AdminDashboard.jsx';
+import EditQueue from './pages/admin/EditQueue.jsx';
+import SetNowPlaying from './pages/admin/SetNowPlaying.jsx';
+import ImportDiscogs from './pages/admin/ImportDiscogs.jsx';
+import BlockSides from './pages/admin/BlockSides.jsx';
+import LoginPage from './pages/LoginPage.jsx';
+import { AuthProvider } from './auth/AuthProvider.jsx';
+import ProtectedRoute from './auth/ProtectedRoute.jsx';
+import Layout from './components/Layout.jsx';
 
 export default function App() {
   return (
