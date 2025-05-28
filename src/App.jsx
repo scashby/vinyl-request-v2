@@ -9,6 +9,7 @@ import SetNowPlaying from './pages/admin/SetNowPlaying'
 import ImportDiscogs from './pages/admin/ImportDiscogs'
 import BlockSides from './pages/admin/BlockSides'
 import Header from './components/Header'
+import ImportCollection from './pages/admin/ImportCollection'
 
 function App() {
   return (
@@ -24,6 +25,7 @@ function App() {
         <Route path="/admin/set-now-playing" element={<SetNowPlaying />} />
         <Route path="/admin/import-discogs" element={<ImportDiscogs />} />
         <Route path="/admin/block-sides" element={<BlockSides />} />
+        <Route path="/admin/import" element={<ImportCollection />} />
       </Routes>
     </Router>
   )
