@@ -1,51 +1,72 @@
-import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
-import { supabase } from '../../lib/supabaseClient'
+import { useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom';
+import { supabase } from '../../supabaseClient';
 
 export default function EventDetail() {
-  const { id } = useParams()
-  const [requests, setRequests] = useState([])
+  const { id } = useParams();
+  const [collection, setCollection] = useState([]);
+  const [requests, setRequests] = useState([]);
 
   useEffect(() => {
-    const fetchRequests = async () => {
-      const { data, error } = await supabase
+    async function fetchData() {
+      const { data: albums } = await supabase.from('collection').select('*');
+      const { data: existingRequests } = await supabase
         .from('requests')
         .select('*')
-        .eq('event_id', id)
-        .order('votes', { ascending: false })
-
-      if (error) console.error('Error loading queue:', error)
-      else setRequests(data)
+        .eq('event_id', id);
+      setCollection(albums);
+      setRequests(existingRequests || []);
     }
+    fetchData();
+  }, [id]);
 
-    fetchRequests()
-    const interval = setInterval(fetchRequests, 10000)
-    return () => clearInterval(interval)
-  }, [id])
-
-  const upvote = async (reqId) => {
-    await supabase.rpc('increment_vote', { request_id: reqId })
-  }
+  const handleRequest = async (album, side) => {
+    const existing = requests.find(r => r.album_id === album.id && r.side === side);
+    if (existing) {
+      await supabase.from('requests').update({ votes: existing.votes + 1 }).eq('id', existing.id);
+    } else {
+      await supabase.from('requests').insert({
+        artist: album.artist,
+        title: album.title,
+        side,
+        name: 'Guest',
+        album_id: album.id,
+        event_id: id,
+        folder: album.folder,
+        year: album.year,
+        format: album.format,
+        votes: 1
+      });
+    }
+    const { data: updated } = await supabase.from('requests').select('*').eq('event_id', id);
+    setRequests(updated);
+  };
 
   return (
-    <div className="max-w-2xl mx-auto p-4">
-      <h1 className="text-xl font-bold mb-4">Current Queue</h1>
-      <ul className="space-y-4">
-        {requests.map((req) => (
-          <li key={req.id} className="border rounded-lg p-3 flex items-center justify-between">
-            <div>
-              <p className="font-semibold">{req.artist} — {req.title} (Side {req.side})</p>
-              <p className="text-sm text-gray-500">Requested by {req.name}</p>
-            </div>
-            <button
-              onClick={() => upvote(req.id)}
-              className="text-sm bg-blue-500 text-white px-2 py-1 rounded"
-            >
-              👍 {req.votes}
-            </button>
-          </li>
-        ))}
-      </ul>
+    <div>
+      <h1 className="text-3xl font-bold mb-4">Request Sides for Event</h1>
+      {collection.map(album => {
+        const sides = album.sides ? Object.keys(album.sides) : [];
+        return (
+          <div key={album.id} className="bg-gray-800 p-4 rounded shadow mb-4">
+            <h2 className="text-xl font-semibold">{album.artist} – {album.title}</h2>
+            {sides.map(side => {
+              const match = requests.find(r => r.album_id === album.id && r.side === side);
+              return (
+                <div key={side} className="flex justify-between mt-2 items-center">
+                  <span>Side {side}</span>
+                  <button
+                    className="bg-red-600 px-3 py-1 rounded hover:bg-red-700"
+                    onClick={() => handleRequest(album, side)}
+                  >
+                    {match ? `Upvote (${match.votes})` : 'Request'}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
     </div>
-  )
+  );
 }

@@ -1,39 +1,56 @@
-import { useEffect, useState } from 'react'
-import { supabase } from '../../lib/supabaseClient'
+import { useEffect, useState } from 'react';
+import { supabase } from '../../supabaseClient';
 
 export default function SetNowPlaying() {
-  const [queue, setQueue] = useState([])
+  const [requests, setRequests] = useState([]);
 
   useEffect(() => {
-    const load = async () => {
-      const { data } = await supabase.from('requests').select('*').eq('status', 'queued')
-      setQueue(data || [])
+    async function fetchRequests() {
+      const { data } = await supabase
+        .from('requests')
+        .select('*')
+        .order('votes', { ascending: false })
+        .order('timestamp', { ascending: true });
+      setRequests(data || []);
     }
-    load()
-  }, [])
+    fetchRequests();
+  }, []);
 
   const updateStatus = async (id, status) => {
-    await supabase.from('requests').update({ status }).eq('id', id)
-    alert(`${status.replace('_', ' ')} set.`)
-  }
+    await supabase.from('requests').update({ status }).eq('id', id);
+    const { data } = await supabase
+      .from('requests')
+      .select('*')
+      .order('votes', { ascending: false })
+      .order('timestamp', { ascending: true });
+    setRequests(data || []);
+  };
 
   return (
-    <div className="max-w-2xl mx-auto p-4">
-      <h2 className="text-xl font-bold mb-4">Set Now Playing / Up Next</h2>
-      <ul className="space-y-3">
-        {queue.map(req => (
-          <li key={req.id} className="border p-3 rounded flex justify-between items-center">
-            <div>
-              {req.artist} — {req.title} (Side {req.side})<br />
-              <span className="text-sm text-gray-500">Requested by {req.name}</span>
-            </div>
-            <div className="space-x-2">
-              <button onClick={() => updateStatus(req.id, 'now_playing')} className="px-2 py-1 bg-blue-500 text-white rounded">Now</button>
-              <button onClick={() => updateStatus(req.id, 'up_next')} className="px-2 py-1 bg-purple-500 text-white rounded">Next</button>
-            </div>
-          </li>
-        ))}
-      </ul>
+    <div>
+      <h1 className="text-3xl font-bold mb-4">Now Playing / Up Next</h1>
+      {requests.map(req => (
+        <div key={req.id} className="bg-gray-800 p-4 rounded mb-2 flex justify-between items-center">
+          <div>
+            <p className="text-lg">{req.artist} – {req.title} (Side {req.side})</p>
+            <p className="text-sm italic text-zinc-400">Status: {req.status || 'queued'}</p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              className="bg-green-600 px-3 py-1 rounded text-sm"
+              onClick={() => updateStatus(req.id, 'now-playing')}
+            >
+              Now Playing
+            </button>
+            <button
+              className="bg-yellow-500 px-3 py-1 rounded text-sm"
+              onClick={() => updateStatus(req.id, 'up-next')}
+            >
+              Up Next
+            </button>
+          </div>
+        </div>
+      ))}
     </div>
-  )
+  );
 }

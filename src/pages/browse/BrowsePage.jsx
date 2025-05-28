@@ -1,44 +1,32 @@
-import { useEffect, useState } from 'react'
-import { supabase } from '../../lib/supabaseClient'
+import { useEffect, useState } from 'react';
+import { supabase } from '../../supabaseClient';
 
 export default function BrowsePage() {
-  const [albums, setAlbums] = useState([])
-  const [filter, setFilter] = useState('')
+  const [albums, setAlbums] = useState([]);
 
   useEffect(() => {
-    const fetchAlbums = async () => {
-      const { data, error } = await supabase.from('collection').select('*')
-      if (error) console.error('Error fetching albums:', error)
-      else setAlbums(data)
+    async function fetchAlbums() {
+      const { data, error } = await supabase.from('collection').select('*');
+      if (error) console.error('Error fetching collection:', error);
+      else setAlbums(data);
     }
-    fetchAlbums()
-  }, [])
-
-  const filtered = albums.filter(album => {
-    const str = `${album.artist} ${album.title} ${album.format}`.toLowerCase()
-    return str.includes(filter.toLowerCase())
-  })
+    fetchAlbums();
+  }, []);
 
   return (
-    <div className="max-w-3xl mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Browse Collection</h1>
-      <input
-        type="text"
-        placeholder="Search artist, title, format..."
-        value={filter}
-        onChange={e => setFilter(e.target.value)}
-        className="w-full mb-4 p-2 border rounded"
-      />
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        {filtered.map(album => (
-          <div key={album.id} className="border rounded p-3">
-            <img src={album.image_url || '/placeholder.png'} alt={album.title} className="w-full h-40 object-cover mb-2" />
-            <p className="font-semibold">{album.artist}</p>
-            <p className="text-sm text-gray-700">{album.title} ({album.year})</p>
-            <p className="text-xs text-gray-500">Format: {album.format}</p>
+    <div>
+      <h1 className="text-3xl font-bold mb-4">Browse Collection</h1>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+        {albums.map(album => (
+          <div key={album.id} className="bg-gray-800 p-4 rounded shadow">
+            <h2 className="text-xl font-semibold">{album.artist}</h2>
+            <p className="italic">{album.title} ({album.year})</p>
+            {album.image_url && (
+              <img src={album.image_url} alt={album.title} className="mt-2 w-full h-48 object-cover" />
+            )}
           </div>
         ))}
       </div>
     </div>
-  )
+  );
 }
