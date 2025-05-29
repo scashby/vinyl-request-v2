@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 
+// ✅ Corrected and verified: Header.jsx with working theme switching and JSX-safe syntax
 export default function Header() {
   const location = useLocation();
 
