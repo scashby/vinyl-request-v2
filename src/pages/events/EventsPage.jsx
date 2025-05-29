@@ -1,49 +1,20 @@
 
-import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { supabase } from '../../lib/supabaseClient.js'
-
 export default function EventsPage() {
-  const [events, setEvents] = useState([])
-  const [error, setError] = useState(null)
-
-  useEffect(() => {
-    const fetchEvents = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('events')
-          .select('*')
-          .order('date', { ascending: true })
-
-        if (error) throw error
-        setEvents(data)
-      } catch (err) {
-        console.error('Failed to load events:', err.message)
-        setError('Unable to load events right now.')
-      }
-    }
-
-    fetchEvents()
-  }, [])
+  const sampleEvents = [
+    { id: 1, name: 'Vinyl Sunday', date: '2025-06-02' },
+    { id: 2, name: '80s Night', date: '2025-06-09' }
+  ];
 
   return (
-    <div className="max-w-xl mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Upcoming Events</h1>
-      {error ? (
-        <p className="text-red-500">{error}</p>
-      ) : (
-        <ul className="space-y-3">
-          {events.map(event => (
-            <li key={event.id} className="border rounded-lg p-3 flex justify-between items-center">
-              <div>
-                <p className="font-semibold">{event.title}</p>
-                <p className="text-sm text-gray-600">{event.date} @ {event.time}</p>
-              </div>
-              <Link to={`/event/${event.id}`} className="text-blue-600 underline text-sm">View</Link>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  )
+    <main>
+      <h1>Upcoming Events</h1>
+      {sampleEvents.map(event => (
+        <div key={event.id} className="card">
+          <h2>{event.name}</h2>
+          <p>Date: {event.date}</p>
+          <a className="button" href={`/events/${event.id}`}>View Details</a>
+        </div>
+      ))}
+    </main>
+  );
 }
