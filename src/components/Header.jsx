@@ -1,12 +1,25 @@
+import { Link, useLocation } from 'react-router-dom';
+
 export default function Header() {
+  const location = useLocation();
+
+  const navLink = (path, label) => (
+    <Link
+      to={path}
+      className={`nav-link ${location.pathname === path ? 'active' : ''}`}
+    >
+      {label}
+    </Link>
+  );
+
   return (
-    <header className="bg-black text-white py-4 px-6 shadow-md flex justify-between items-center">
-      <h1 className="text-2xl font-bold tracking-wide">Dead Wax Dialogues</h1>
-      <nav className="space-x-4">
-        <a href="/" className="hover:underline">Events</a>
-        <a href="/browse" className="hover:underline">Browse</a>
-        <a href="/now-playing" className="hover:underline">Now Playing</a>
-        <a href="/admin" className="hover:underline">Admin</a>
+    <header className="header-bar">
+      <h1 className="site-title">Dead Wax Dialogues</h1>
+      <nav className="nav-links">
+        {navLink('/', 'Events')}
+        {navLink('/browse', 'Browse')}
+        {navLink('/now-playing', 'Now Playing')}
+        {navLink('/admin', 'Admin')}
       </nav>
     </header>
   );
