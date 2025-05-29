@@ -1,0 +1,45 @@
+body {
+  background-color: #fafafa;
+  color: #111;
+  font-family: 'Space Grotesk', sans-serif;
+}
+
+.header-bar {
+  background-color: #ededed;
+  padding: 1.25rem 2rem;
+  text-align: center;
+  border-bottom: 2px solid #111;
+}
+
+.site-title {
+  font-size: 2.5rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08rem;
+  color: #111;
+}
+
+.nav-links {
+  margin-top: 0.75rem;
+  display: flex;
+  justify-content: center;
+  gap: 1.25rem;
+}
+
+.nav-link {
+  background-color: #111;
+  color: #fff;
+  text-decoration: none;
+  padding: 0.4rem 1rem;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.nav-link:hover {
+  background-color: #ff3399;
+  color: #fff;
+}
+
+.nav-link.active {
+  border: 2px dashed #ff3399;
+}

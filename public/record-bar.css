@@ -1,0 +1,45 @@
+body {
+  background-color: #14110f;
+  color: #f4f4f4;
+  font-family: 'Inter', sans-serif;
+}
+
+.header-bar {
+  background-color: #1e1a17;
+  padding: 1.5rem 2rem;
+  text-align: center;
+  border-bottom: 2px solid #ff4747;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.4);
+}
+
+.site-title {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #fdd835;
+  letter-spacing: 0.05em;
+  text-shadow: 1px 1px 3px #ff4747;
+}
+
+.nav-links {
+  margin-top: 0.5rem;
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+}
+
+.nav-link {
+  color: #f4f4f4;
+  text-decoration: none;
+  padding: 0.5rem 1rem;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.nav-link:hover {
+  background-color: #ff4747;
+  color: #14110f;
+}
+
+.nav-link.active {
+  border-bottom: 2px solid #fdd835;
+}

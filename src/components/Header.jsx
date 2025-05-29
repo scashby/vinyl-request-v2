@@ -1,15 +1,32 @@
-import { Link, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
+import { useEffect } from 'react';
 
 export default function Header() {
   const location = useLocation();
 
+  useEffect(() => {
+    const saved = localStorage.getItem('selectedTheme');
+    if (saved) {
+      const link = document.getElementById('theme-link');
+      if (link) link.href = '/' + saved;
+    }
+  }, []);
+
+  const handleThemeChange = (theme) => {
+    const link = document.getElementById('theme-link');
+    if (link) {
+      link.href = '/' + theme;
+      localStorage.setItem('selectedTheme', theme);
+    }
+  };
+
   const navLink = (path, label) => (
-    <Link
-      to={path}
+    <a
+      href={path}
       className={`nav-link ${location.pathname === path ? 'active' : ''}`}
     >
       {label}
-    </Link>
+    </a>
   );
 
   return (
@@ -21,6 +38,12 @@ export default function Header() {
         {navLink('/now-playing', 'Now Playing')}
         {navLink('/admin', 'Admin')}
       </nav>
+      <div className="theme-buttons" style={{ marginTop: '1rem' }}>
+        <button onClick={() => handleThemeChange('record-bar.css')}>🎷 Bar</button>
+        <button onClick={() => handleThemeChange('vinyl-stack.css')}>💿 Stack</button>
+        <button onClick={() => handleThemeChange('midnight-lounge.css')}>🌃 Lounge</button>
+        <button onClick={() => handleThemeChange('indie-label.css')}>🧷 Indie</button>
+      </div>
     </header>
   );
 }
