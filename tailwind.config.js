@@ -1,9 +1,11 @@
 
+import glob from 'glob';
+import path from 'path';
+
 export default {
   content: [
     './index.html',
-    './src/**/*.{js,ts,jsx,tsx}',
-    './src/**/*.jsx' // Ensures JSX files are matched even under ESM or tree-shaken builds
+    ...glob.sync(path.join(__dirname, 'src/**/*.{js,jsx,ts,tsx}'))
   ],
   theme: {
     extend: {},
