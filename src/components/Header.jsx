@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 
-// ✅ Corrected and verified: Header.jsx with working theme switching and JSX-safe syntax
+// ✅ Final fixed version: valid JSX + console logs
 export default function Header() {
   const location = useLocation();
 
@@ -14,6 +14,7 @@ export default function Header() {
   }, []);
 
   const handleThemeChange = (theme) => {
+    console.log(`🎨 Theme change requested: ${theme}`);
     const link = document.getElementById('theme-link');
     if (link) {
       link.href = '/' + theme;
