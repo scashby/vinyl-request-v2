@@ -1,25 +1,34 @@
-import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 
-// ✅ Final fixed version: valid JSX + console logs
 export default function Header() {
   const location = useLocation();
+  const [theme, setTheme] = useState('record-bar.css');
 
   useEffect(() => {
-    const saved = localStorage.getItem('selectedTheme');
-    const link = document.getElementById('theme-link');
-    if (saved && link) {
-      link.href = '/' + saved;
+    const savedTheme = localStorage.getItem('selectedTheme');
+    if (savedTheme) {
+      setTheme(savedTheme);
     }
   }, []);
 
-  const handleThemeChange = (theme) => {
-    console.log(`🎨 Theme change requested: ${theme}`);
-    const link = document.getElementById('theme-link');
-    if (link) {
-      link.href = '/' + theme;
-      localStorage.setItem('selectedTheme', theme);
+  useEffect(() => {
+    const existing = document.getElementById('theme-style');
+    if (existing) {
+      existing.remove();
     }
+
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.id = 'theme-style';
+    link.href = '/' + theme;
+    document.head.appendChild(link);
+  }, [theme]);
+
+  const handleThemeChange = (newTheme) => {
+    console.log(`🎨 Theme change requested: ${newTheme}`);
+    setTheme(newTheme);
+    localStorage.setItem('selectedTheme', newTheme);
   };
 
   const navLink = (path, label) => (
