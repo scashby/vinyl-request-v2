@@ -1,5 +1,6 @@
 
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import Header from './components/Header.jsx';
 import EventsPage from './pages/events/EventsPage.jsx';
 import EventDetail from './pages/events/EventDetail.jsx';
 import BrowsePage from './pages/browse/BrowsePage.jsx';
@@ -9,6 +10,7 @@ import AdminDashboard from './pages/admin/AdminDashboard.jsx';
 function App() {
   return (
     <Router>
+      <Header />
       <Routes>
         <Route path="/" element={<EventsPage />} />
         <Route path="/browse" element={<BrowsePage />} />
