@@ -1,14 +1,14 @@
-import { useLocation } from 'react-router-dom';
 import { useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 
 export default function Header() {
   const location = useLocation();
 
   useEffect(() => {
     const saved = localStorage.getItem('selectedTheme');
-    if (saved) {
-      const link = document.getElementById('theme-link');
-      if (link) link.href = '/' + saved;
+    const link = document.getElementById('theme-link');
+    if (saved && link) {
+      link.href = '/' + saved;
     }
   }, []);
 
