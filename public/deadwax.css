@@ -1,0 +1,70 @@
+/* Dead Wax Dialogues Theme - Vinyl Inspired */
+
+@import url('https://fonts.googleapis.com/css2?family=Rubik+Mono+One&family=Inter:wght@400;600&display=swap');
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #0e0e0e;
+  color: #f2f2f2;
+  font-family: 'Inter', sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.header-bar {
+  background-color: #1a1a1a;
+  border-bottom: 4px solid #b22222;
+  padding: 1rem 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.site-title {
+  font-family: 'Rubik Mono One', sans-serif;
+  font-size: 1.8rem;
+  letter-spacing: 0.05em;
+  color: #f5f5dc;
+  text-shadow: 1px 1px 0 #000;
+}
+
+.nav-links a {
+  margin-left: 1.5rem;
+  color: #ffcc00;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.nav-links a:hover,
+.nav-links a.active {
+  color: #ffffff;
+  border-bottom: 2px solid #ffcc00;
+}
+
+main {
+  padding: 2rem;
+  background: radial-gradient(ellipse at center, #1c1c1c 0%, #0e0e0e 100%);
+  min-height: 100vh;
+}
+
+h1, h2 {
+  font-family: 'Rubik Mono One', sans-serif;
+  color: #fefefe;
+}
+
+button {
+  background-color: #b22222;
+  color: white;
+  border: none;
+  padding: 0.6rem 1.2rem;
+  font-weight: 600;
+  font-size: 1rem;
+  margin: 0.5rem 0;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+button:hover {
+  background-color: #d62c2c;
+}
