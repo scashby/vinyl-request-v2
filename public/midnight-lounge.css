@@ -1,44 +1,13 @@
 body {
-  background-color: #0d0d1a;
-  color: #eaeaea;
-  font-family: 'Rubik', sans-serif;
+  background-color: #0d0d2b;
+  color: #e0e0ff;
+  font-family: 'Trebuchet MS', sans-serif;
 }
-
 .header-bar {
-  background: linear-gradient(to right, #1a1a40, #0d0d1a);
-  padding: 1.5rem 2rem;
-  text-align: center;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  background-color: #1c1c40;
+  padding: 1rem;
 }
-
 .site-title {
-  font-size: 2.5rem;
-  color: #ffccff;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-shadow: 0 0 4px #cc66ff;
-}
-
-.nav-links {
-  margin-top: 1rem;
-  display: flex;
-  justify-content: center;
-  gap: 1.5rem;
-}
-
-.nav-link {
-  color: #ccc;
-  text-decoration: none;
-  font-weight: 400;
-  padding: 0.4rem 0.8rem;
-  transition: all 0.3s ease;
-}
-
-.nav-link:hover {
-  color: #fff;
-  text-shadow: 0 0 6px #ffccff;
-}
-
-.nav-link.active {
-  border-bottom: 2px solid #ffccff;
+  font-size: 2rem;
+  color: #99ccff;
 }

@@ -1,45 +1,13 @@
 body {
-  background-color: #ffffff;
-  color: #1a1a1a;
-  font-family: 'Helvetica Neue', sans-serif;
+  background-color: #fff8f0;
+  color: #333;
+  font-family: 'Georgia', serif;
 }
-
 .header-bar {
-  background-color: #f4f4f4;
-  padding: 1.5rem 2rem;
-  text-align: center;
-  border-bottom: 3px solid #ff3366;
+  background-color: #e0d4c4;
+  padding: 1rem;
 }
-
 .site-title {
-  font-size: 2.25rem;
-  font-weight: 800;
-  color: #ff3366;
-  letter-spacing: -0.02em;
-}
-
-.nav-links {
-  margin-top: 0.75rem;
-  display: flex;
-  justify-content: center;
-  gap: 1rem;
-}
-
-.nav-link {
-  color: #1a1a1a;
-  text-decoration: none;
-  font-weight: 500;
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
-  background-color: #ffe6ea;
-}
-
-.nav-link:hover {
-  background-color: #ff3366;
-  color: white;
-}
-
-.nav-link.active {
-  background-color: #ff3366;
-  color: #fff;
+  font-size: 2rem;
+  color: #b33;
 }
