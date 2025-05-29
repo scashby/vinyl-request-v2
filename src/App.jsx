@@ -1,3 +1,5 @@
+import './index.css'; // 🛠 Ensure Tailwind styles are retained in production
+
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import EventsPage from './pages/events/EventsPage.jsx';
 import EventDetail from './pages/events/EventDetail.jsx';
