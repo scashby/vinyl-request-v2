@@ -1,12 +1,14 @@
+
 import { createContext, useContext, useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient.js';
-import { useNavigate } from 'react-router-dom';
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [session, setSession] = useState(null);
   const navigate = useNavigate();
+  const { pathname } = useLocation();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -15,13 +17,15 @@ export const AuthProvider = ({ children }) => {
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      if (!session) navigate('/login');
+      if (!session && pathname.startsWith('/admin')) {
+        navigate('/login');
+      }
     });
 
     return () => {
       listener.subscription.unsubscribe();
     };
-  }, [navigate]);
+  }, [navigate, pathname]);
 
   return (
     <AuthContext.Provider value={{ session }}>
