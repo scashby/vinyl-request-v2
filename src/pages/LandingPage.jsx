@@ -1,5 +1,5 @@
 
-import './landing.css';
+import '../styles/landing.css';
 import { useLocation } from 'react-router-dom';
 
 function LandingPage() {
