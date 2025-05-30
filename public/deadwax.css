@@ -1,0 +1,78 @@
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Times New Roman', serif;
+  background: linear-gradient(45deg, #ffe6f0, #e0f7fa);
+  color: #2e1a47;
+}
+
+.header-ripple {
+  padding: 2.5rem 1rem;
+  background: radial-gradient(circle at top left, #ffc8dd, #bde0fe);
+  border-bottom: 4px dotted #ffafcc;
+  border-top-right-radius: 100px;
+  font-family: 'Brush Script MT', cursive;
+  font-size: 2.25rem;
+  text-transform: lowercase;
+  text-align: left;
+  color: #740d67;
+}
+
+.menu-blobs {
+  display: flex;
+  justify-content: space-around;
+  padding: 1rem;
+  background-color: transparent;
+}
+
+.menu-blobs a {
+  text-decoration: none;
+  font-family: 'Georgia', serif;
+  background-color: #fcd5ce;
+  color: #6a0572;
+  padding: 1rem 2rem;
+  margin: 0.5rem;
+  border: 4px groove #e5989b;
+  border-radius: 999px;
+  font-size: 1.2rem;
+  transform: rotate(-2deg);
+  transition: all 0.2s ease;
+}
+
+.menu-blobs a:hover {
+  background-color: #fbb1bd;
+  transform: rotate(2deg) scale(1.05);
+}
+
+.bubble-section {
+  background: linear-gradient(to bottom right, #caffbf, #9bf6ff);
+  border-radius: 50px;
+  margin: 3rem auto;
+  padding: 2rem;
+  max-width: 90%;
+  text-align: center;
+  box-shadow: 0 0 25px rgba(0,0,0,0.1);
+}
+
+.bubble-section h2 {
+  font-family: 'Brush Script MT', cursive;
+  font-size: 2rem;
+  color: #6a0572;
+}
+
+.bubble-button {
+  background-color: #e0aaff;
+  color: #2e1a47;
+  border: 3px dashed #c77dff;
+  padding: 0.8rem 2rem;
+  font-size: 1rem;
+  border-radius: 50px;
+  font-family: 'Courier New', monospace;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.bubble-button:hover {
+  background-color: #ffb3c1;
+  transform: scale(1.1);
+}
