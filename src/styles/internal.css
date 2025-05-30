@@ -1,57 +1,33 @@
-
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;500&display=swap');
-
 body {
   margin: 0;
   font-family: 'Inter', sans-serif;
-  background: #fff;
+  background: white;
   color: #111;
-  width: 100%;
-}
-
-.internal-wrapper {
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
-  width: 100%;
-  background: #fff;
 }
 
 .event-hero {
   position: relative;
   height: 300px;
-  background: url('/images/event-header-still.jpg') center/cover no-repeat;
+  background: url('event-header-still.jpg') center/cover no-repeat;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .event-hero .overlay {
-  background-color: rgba(0, 0, 0, 0.6);
-  color: #fff;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 2rem 3rem;
+  color: white;
+  text-align: center;
 }
 
 .event-hero h1 {
-  font-size: 2.75rem;
+  font-size: 2.5rem;
   margin: 0;
 }
 
-.page-body {
-  flex-grow: 1;
-  padding: 2rem 0;
-  background: #fff;
-}
-
-.page-section {
-  width: 100%;
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 0 2rem;
+.event-body {
+  padding: 3rem 2rem;
 }
 
 .event-grid {
@@ -59,47 +35,44 @@ body {
   gap: 2rem;
   flex-wrap: wrap;
   justify-content: center;
-  margin-top: 2rem;
 }
 
 .event-card {
-  background: #fff;
-  border-radius: 10px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-  overflow: hidden;
-  width: 260px;
+  width: 240px;
   text-align: center;
-  transition: transform 0.2s ease;
+  background: #f9f9f9;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  transition: transform 0.3s ease;
 }
 
 .event-card:hover {
-  transform: scale(1.02);
+  transform: scale(1.05);
 }
 
 .event-card img {
   width: 100%;
-  height: auto;
+  height: 240px;
   object-fit: cover;
+  border-top-left-radius: 10px;
+  border-top-right-radius: 10px;
 }
 
-.event-card h3 {
-  margin-top: 1rem;
-  font-weight: 500;
-  font-size: 1.1rem;
-  color: #4b0082; /* purple */
+.event-card h2 {
+  margin: 1rem 0 0.5rem;
+  font-size: 1.2rem;
+  color: #6b3fa0; /* purple */
 }
 
 .event-card p {
-  margin: 0.5rem 0 1rem;
-  font-size: 0.9rem;
-  color: #444;
+  color: #2e4cb4; /* blue */
+  margin-bottom: 1rem;
 }
 
 .footer {
-  background: #f2f2f2;
-  color: #333;
   text-align: center;
-  padding: 1.5rem;
-  margin-top: 4rem;
-  font-size: 0.875rem;
+  padding: 2rem;
+  font-size: 0.9rem;
+  background: #f2f2f2;
+  color: #666;
 }
