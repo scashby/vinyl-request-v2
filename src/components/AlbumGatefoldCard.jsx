@@ -12,22 +12,25 @@ const AlbumGatefoldCard = () => {
         />
       </div>
       <div className="gatefold-right">
-        <h2>Hotel California</h2>
-        <p><strong>Side A:</strong></p>
-        <ul>
-          <li>Hotel California</li>
-          <li>New Kid in Town</li>
-          <li>Life in the Fast Lane</li>
-          <li>Wasted Time</li>
-        </ul>
-        <p><strong>Side B:</strong></p>
-        <ul>
-          <li>Wasted Time (Reprise)</li>
-          <li>Victim of Love</li>
-          <li>Pretty Maids All in a Row</li>
-          <li>Try and Love Again</li>
-          <li>The Last Resort</li>
-        </ul>
+        <h2 className="album-title">Hotel California</h2>
+        <p className="album-artist">Eagles</p>
+        <div className="album-sides">
+          <h3>Side A</h3>
+          <ul>
+            <li>Hotel California</li>
+            <li>New Kid in Town</li>
+            <li>Life in the Fast Lane</li>
+            <li>Wasted Time</li>
+          </ul>
+          <h3>Side B</h3>
+          <ul>
+            <li>Wasted Time (Reprise)</li>
+            <li>Victim of Love</li>
+            <li>Pretty Maids All in a Row</li>
+            <li>Try and Love Again</li>
+            <li>The Last Resort</li>
+          </ul>
+        </div>
       </div>
     </div>
   );

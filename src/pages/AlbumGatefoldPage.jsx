@@ -1,11 +1,13 @@
 import React from 'react';
-import PageLayout from '../layouts/PageLayout';
-import AlbumGatefoldCard from '../components/AlbumGatefoldCard';
+import PageLayout from '../../layouts/PageLayout';
+import AlbumGatefoldCard from '../../components/AlbumGatefoldCard';
 
-const AlbumGatefoldPage = () => (
-  <PageLayout>
-    <AlbumGatefoldCard />
-  </PageLayout>
-);
+const AlbumGatefoldPage = () => {
+  return (
+    <PageLayout>
+      <AlbumGatefoldCard />
+    </PageLayout>
+  );
+};
 
 export default AlbumGatefoldPage;
