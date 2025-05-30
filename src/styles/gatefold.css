@@ -1,17 +1,19 @@
+/* ✅ gatefold.css */
+
 .gatefold-container {
   display: flex;
   width: 100%;
-  height: auto;
+  height: 100vh;
   background-color: #ffffff;
-  font-family: 'Helvetica Neue', sans-serif;
+  font-family: sans-serif;
 }
 
 .gatefold-left {
   flex: 1;
-  padding: 0;
+  overflow: hidden;
 }
 
-.album-cover {
+.gatefold-image {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -20,33 +22,34 @@
 
 .gatefold-right {
   flex: 1;
-  padding: 2rem;
-  background-color: #f3f3f3; /* TODO: Replace with smart color from album cover */
-  color: #2c3eec;
+  padding: 3rem;
+  background-color: #f3f3f3;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
-.album-title {
-  font-size: 2rem;
-  font-weight: bold;
+.gatefold-title {
+  font-size: 2.5rem;
   color: #8246d9;
-  margin-bottom: 0.5rem;
-}
-
-.album-artist {
-  font-size: 1.25rem;
   margin-bottom: 1rem;
 }
 
-.album-sides h3 {
+.gatefold-artist {
+  font-size: 1.5rem;
+  color: #333;
+  margin-bottom: 2rem;
+}
+
+.gatefold-side-title {
+  font-size: 1.25rem;
   color: #2c3eec;
   margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
 }
 
-.album-sides ul {
-  list-style: none;
-  padding: 0;
-}
-
-.album-sides li {
-  margin-bottom: 0.25rem;
+.gatefold-track {
+  font-size: 1rem;
+  color: #2c3eec;
+  list-style-type: none;
 }
