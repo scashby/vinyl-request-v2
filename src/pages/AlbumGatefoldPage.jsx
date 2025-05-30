@@ -1,12 +1,10 @@
-import React from 'react';
+import PageLayout from '../layouts/PageLayout';
 import AlbumGatefoldCard from '../components/AlbumGatefoldCard';
 
-const AlbumGatefoldPage = () => {
+export default function AlbumGatefoldPage() {
   return (
-    <div className="page-body">
+    <PageLayout>
       <AlbumGatefoldCard />
-    </div>
+    </PageLayout>
   );
-};
-
-export default AlbumGatefoldPage;
+}
