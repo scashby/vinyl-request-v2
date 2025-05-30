@@ -6,12 +6,14 @@ body {
   font-family: 'Inter', sans-serif;
   background: #fff;
   color: #111;
+  width: 100%;
 }
 
 .internal-wrapper {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  width: 100%;
 }
 
 .event-hero {
@@ -41,11 +43,12 @@ body {
 .page-body {
   flex-grow: 1;
   background: #fff;
-  padding: 2rem;
+  padding: 2rem 4vw;
 }
 
 .page-section {
-  max-width: 1200px;
+  width: 100%;
+  max-width: 1400px;
   margin: 0 auto;
 }
 
@@ -59,12 +62,16 @@ body {
 
 .event-card {
   background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
   overflow: hidden;
-  max-width: 240px;
+  width: 260px;
   text-align: center;
-  padding: 1rem;
+  transition: transform 0.2s ease;
+}
+
+.event-card:hover {
+  transform: scale(1.02);
 }
 
 .event-card img {
@@ -76,12 +83,13 @@ body {
 .event-card h3 {
   margin-top: 1rem;
   font-weight: 500;
+  color: #111;
 }
 
 .event-card p {
-  margin: 0.5rem 0 0;
+  margin: 0.5rem 0 1rem;
   font-size: 0.9rem;
-  color: #555;
+  color: #444;
 }
 
 .footer {
@@ -89,4 +97,5 @@ body {
   color: #333;
   text-align: center;
   padding: 1rem;
+  margin-top: 2rem;
 }
