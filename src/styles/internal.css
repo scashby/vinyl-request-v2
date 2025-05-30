@@ -84,31 +84,8 @@ html, body {
   display: block;
 }
 
+
 .card-square {
   aspect-ratio: 1 / 1;
   object-fit: cover;
-}
-}
-
-.event-card h2 {
-  font-weight: 500;
-  font-size: 1.25rem;
-  color: #6a0dad;
-  margin: 1rem 0 0.5rem;
-  visibility: visible;
-  display: block;
-}
-
-.event-card p {
-  font-size: 0.9rem;
-  color: #1a73e8;
-  margin-bottom: 1.5rem;
-}
-
-.footer {
-  background: #f2f2f2;
-  color: #333;
-  text-align: center;
-  padding: 1.5rem;
-  font-size: 0.85rem;
 }
