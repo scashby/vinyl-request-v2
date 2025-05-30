@@ -28,7 +28,7 @@
 }
 
 .spotify-header-row {
-  background: #6a0dad;
+  background: #4b0082;
   font-weight: 600;
   color: white;
   border-radius: 8px;
@@ -51,4 +51,16 @@
   font-size: 1.2rem;
   cursor: pointer;
   color: white;
+}
+
+
+.queue-display {
+  margin: 0;
+  padding: 0;
+}
+
+.spotify-header-row {
+  border-radius: 0;
+  margin: 0 -1.5rem;
+  padding: 1rem 1.5rem;
 }
