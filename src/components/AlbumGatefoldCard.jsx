@@ -1,7 +1,7 @@
 // ✅ AlbumGatefoldCard.jsx
 
 import React from "react";
-import "./gatefold.css";
+import '../styles/gatefold.css';
 
 const AlbumGatefoldCard = ({ album }) => {
   const { title, artist, image, sides } = album;
