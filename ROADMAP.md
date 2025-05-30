@@ -9,6 +9,17 @@
 - Chunk 6: Discogs fallback metadata enrichment (this chunk)
 
 ## 🛠 Planned
+
+### Admin Features
+- Allow uploading a promotional image for each event (replacing placeholder)
+- Add event details: location, time, social links, and Google Maps directions
+- Toggle visibility of the vinyl queue (for BYOV nights)
+- Toggle visibility of the featured queue (for DJ-curated nights)
+
+### Public Features
+- Clicking an event card navigates to that event's browse queue page
+- Automatically move events to "Past Events" after event date passes (implement last)
+- Display only as many upcoming events as fit on screen, with "View More" toggle
 - Real-time updates
 - Request deduping logic
 - App-level settings + side metadata refresh
