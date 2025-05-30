@@ -81,9 +81,13 @@ html, body {
 
 .event-card img {
   width: 100%;
+  display: block;
+}
+
+.card-square {
   aspect-ratio: 1 / 1;
   object-fit: cover;
-  display: block;
+}
 }
 
 .event-card h2 {
