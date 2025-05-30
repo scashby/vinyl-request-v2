@@ -1,17 +1,16 @@
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import LandingLayout from "./layouts/LandingLayout";
-import LandingPage from "./pages/LandingPage";
-import EventsPage from "./pages/events/EventsPage";
-import BrowseQueue from "./pages/browse/BrowseQueue";
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import EventsPage from './pages/events/EventsPage';
+import AlbumGatefoldPage from './pages/AlbumGatefoldPage';
 
-export default function App() {
+function App() {
   return (
     <Router>
       <Routes>
-  <Route path="/events" element={<EventsPage />} />
-        <Route path="/" element={<LandingLayout><LandingPage /></LandingLayout>} />
-        <Route path="/browse-queue" element={<BrowseQueue />} />
+        <Route path="/events" element={<EventsPage />} />
+        <Route path="/album-demo" element={<AlbumGatefoldPage />} />
       </Routes>
     </Router>
   );
 }
+
+export default App;
