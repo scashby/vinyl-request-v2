@@ -87,11 +87,11 @@ html, body {
 }
 
 .event-card h2 {
-  display: block;
   font-weight: 500;
-  color: #6a0dad;
   font-size: 1.25rem;
+  color: #6a0dad;
   margin: 1rem 0 0.5rem;
+  visibility: visible;
   display: block;
 }
 
