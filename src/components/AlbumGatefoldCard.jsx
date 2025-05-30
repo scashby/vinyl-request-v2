@@ -1,6 +1,6 @@
 // ✅ AlbumGatefoldCard.jsx (Hardcoded Demo)
 import React from 'react';
-import '../../styles/gatefold.css';
+import '../styles/gatefold.css';
 
 const AlbumGatefoldCard = () => {
   return (
