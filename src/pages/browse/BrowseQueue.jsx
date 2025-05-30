@@ -1,6 +1,6 @@
 
 import React from 'react';
-import '../styles/internal.css';
+import '../../styles/internal.css';
 import '../../styles/browse-queue.css';
 
 
