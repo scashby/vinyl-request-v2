@@ -1,0 +1,58 @@
+.gatefold-wrapper {
+  display: flex;
+  background-color: #111;
+  color: white;
+  width: 100%;
+  max-width: 960px;
+  margin: 2rem auto;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 0 10px rgba(0,0,0,0.4);
+}
+
+.gatefold-cover {
+  flex: 1;
+  background: black;
+}
+
+.cover-art {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.gatefold-info {
+  flex: 1;
+  background: #1a1a1a;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.sides {
+  display: flex;
+  justify-content: space-between;
+  gap: 2rem;
+}
+
+.side ul {
+  list-style: none;
+  padding-left: 0;
+}
+
+.gatefold-actions {
+  margin-top: 2rem;
+  display: flex;
+  gap: 1rem;
+}
+
+.queue-button,
+.return-button {
+  padding: 0.5rem 1rem;
+  border: none;
+  color: white;
+  background-color: #5b2c6f;
+  cursor: pointer;
+  border-radius: 4px;
+}
