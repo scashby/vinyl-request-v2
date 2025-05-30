@@ -108,3 +108,10 @@ html, body {
   padding: 1.5rem;
   font-size: 0.85rem;
 }
+
+
+/* 🟦 Scoped square image rule */
+.card-square {
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+}
