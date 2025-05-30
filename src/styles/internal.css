@@ -1,20 +1,21 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;500&display=swap');
 
-body {
+html, body {
   margin: 0;
+  padding: 0;
   background: #ffffff;
   font-family: 'Inter', sans-serif;
   color: #111;
-  width: 100vw;
-  overflow-x: hidden;
+  min-height: 100vh;
 }
 
 .page-wrapper {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
   background: white;
   width: 100%;
-  margin: 0;
-  padding: 0;
 }
 
 .event-hero {
@@ -49,8 +50,9 @@ body {
 }
 
 .event-body {
-  background: white;
+  flex-grow: 1;
   padding: 4rem 2rem;
+  background: white;
   display: flex;
   justify-content: center;
 }
@@ -67,7 +69,7 @@ body {
   background: white;
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  max-width: 260px;
+  width: 260px;
   text-align: center;
   overflow: hidden;
   transition: transform 0.2s ease;
@@ -79,19 +81,22 @@ body {
 
 .event-card img {
   width: 100%;
+  height: auto;
   display: block;
 }
 
 .event-card h2 {
-  margin: 1rem 0 0.5rem;
   font-weight: 500;
   color: #6a0dad;
+  font-size: 1.25rem;
+  margin: 1rem 0 0.5rem;
+  display: block;
 }
 
 .event-card p {
-  margin-bottom: 1.5rem;
   font-size: 0.9rem;
   color: #1a73e8;
+  margin-bottom: 1.5rem;
 }
 
 .footer {
@@ -100,5 +105,4 @@ body {
   text-align: center;
   padding: 1.5rem;
   font-size: 0.85rem;
-  margin-top: 4rem;
 }
