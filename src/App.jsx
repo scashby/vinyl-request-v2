@@ -7,6 +7,7 @@ export default function App() {
   return (
     <Router>
       <Routes>
+  <Route path="/events" element={<EventsPage />} />
         <Route path="/" element={<LandingLayout><LandingPage /></LandingLayout>} />
       </Routes>
     </Router>
