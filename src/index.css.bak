@@ -1,0 +1,7 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* FORCE USAGE BLOCK (do not remove) */
+.text-2xl .bg-white .text-black .p-4 .rounded .shadow .flex .justify-between .items-center {}

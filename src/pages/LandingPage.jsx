@@ -1,16 +1,28 @@
-import React from "react";
-import "./LandingPage.css";
 
-export default function LandingPage() {
+import React from 'react';
+import '../styles/landing.css';
+
+const LandingPage = () => {
   return (
-    <div className="landing-container">
-      <video autoPlay muted loop playsInline className="background-video">
-        <source src="/hero-background.mp4" type="video/mp4" />
-      </video>
-      <div className="overlay-content">
-        <img src="/deadwax-logo.svg" alt="Dead Wax Dialogues" className="hero-logo" />
-        <h1>Drop the Needle</h1>
-      </div>
+    <div className="landing-page">
+      {/* Video Header Start */}
+      <header className="video-header">
+        <video autoPlay muted loop className="background-video">
+          <source src="/videos/header-video.mp4" type="video/mp4" />
+          Your browser does not support the video tag.
+        </video>
+        <div className="overlay-text">
+          <h1>Dead Wax Dialogues</h1>
+          <p>Full-side explorations, analog warmth, community vibes</p>
+        </div>
+      </header>
+      {/* Video Header End */}
+      <section className="landing-content">
+        <h2>Browse upcoming events or request vinyl sides</h2>
+        {/* TODO: Add routing buttons or promo callouts here */}
+      </section>
     </div>
   );
-}
+};
+
+export default LandingPage;
