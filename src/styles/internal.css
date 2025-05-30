@@ -1,14 +1,17 @@
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;500&display=swap');
+
 body {
   margin: 0;
   font-family: 'Inter', sans-serif;
-  background: white;
+  background: #ffffff !important;
   color: #111;
 }
 
 .event-hero {
   position: relative;
   height: 300px;
-  background: url('event-header-still.jpg') center/cover no-repeat;
+  background: url('/images/event-header-still.jpg') center/cover no-repeat;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -19,60 +22,66 @@ body {
   padding: 2rem 3rem;
   color: white;
   text-align: center;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .event-hero h1 {
-  font-size: 2.5rem;
+  font-size: 2.75rem;
   margin: 0;
 }
 
 .event-body {
-  padding: 3rem 2rem;
+  background: white;
+  padding: 4rem 2rem;
+  min-height: 60vh;
 }
 
 .event-grid {
   display: flex;
-  gap: 2rem;
   flex-wrap: wrap;
+  gap: 2rem;
   justify-content: center;
 }
 
 .event-card {
-  width: 240px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  max-width: 260px;
   text-align: center;
-  background: #f9f9f9;
-  border-radius: 10px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-  transition: transform 0.3s ease;
+  overflow: hidden;
+  transition: transform 0.2s ease;
 }
 
 .event-card:hover {
-  transform: scale(1.05);
+  transform: scale(1.02);
 }
 
 .event-card img {
   width: 100%;
-  height: 240px;
-  object-fit: cover;
-  border-top-left-radius: 10px;
-  border-top-right-radius: 10px;
+  display: block;
 }
 
-.event-card h2 {
+.event-card h3 {
   margin: 1rem 0 0.5rem;
-  font-size: 1.2rem;
-  color: #6b3fa0; /* purple */
+  font-weight: 500;
+  color: #6a0dad; /* Purple */
 }
 
 .event-card p {
-  color: #2e4cb4; /* blue */
-  margin-bottom: 1rem;
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+  color: #1a73e8; /* Blue */
 }
 
 .footer {
+  background: #f0f0f0;
+  color: #333;
   text-align: center;
-  padding: 2rem;
-  font-size: 0.9rem;
-  background: #f2f2f2;
-  color: #666;
+  padding: 1.5rem;
+  font-size: 0.85rem;
 }
