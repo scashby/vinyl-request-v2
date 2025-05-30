@@ -11,6 +11,8 @@ import BlockSides from './pages/admin/BlockSides';
 import ImportCollection from './pages/admin/ImportCollection';
 import AlbumGatefoldPage from './pages/AlbumGatefoldPage';
 import BrowseQueue from './pages/browse/BrowseQueue';
+import LandingPage from './pages/LandingPage';
+
 
 export default function App() {
   return (
