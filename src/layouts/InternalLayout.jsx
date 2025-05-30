@@ -1,17 +1,20 @@
-// ✅ InternalLayout.jsx — shared layout for internal pages
 import React from 'react';
 import '../styles/internal.css';
 
 const InternalLayout = ({ title, children }) => {
   return (
-    <div className="internal-page">
-      <header className="internal-header">
-        <img src="/images/event-header-still.jpg" alt="Event Header" className="header-image" />
-        <h1 className="header-title">{title}</h1>
+    <div className="internal-wrapper">
+      <header className="event-hero">
+        <div className="overlay">
+          <h1>{title}</h1>
+        </div>
       </header>
-      <main className="internal-content">
+      <main className="page-body">
         {children}
       </main>
+      <footer className="footer">
+        © 2025 Dead Wax Dialogues
+      </footer>
     </div>
   );
 };
