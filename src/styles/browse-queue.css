@@ -14,7 +14,7 @@
   flex: 3;
   background: #000;
   padding: 1.5rem;
-  border-radius: 12px;
+  border-radius: 0;
   font-family: 'Inter', sans-serif;
   color: white;
 }
@@ -57,7 +57,7 @@
 .queue-display {
   margin: 0;
   padding: 1.5rem;
-  border-radius: 12px;
+  border-radius: 0;
 }
 
 .spotify-header-row {
