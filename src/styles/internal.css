@@ -81,11 +81,13 @@ html, body {
 
 .event-card img {
   width: 100%;
-  height: auto;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
   display: block;
 }
 
 .event-card h2 {
+  display: block;
   font-weight: 500;
   color: #6a0dad;
   font-size: 1.25rem;
