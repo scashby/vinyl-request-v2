@@ -1,27 +1,25 @@
-
 import '../styles/landing.css';
-import { useLocation } from 'react-router-dom';
 
-function LandingPage() {
-  const location = useLocation();
-
+const LandingPage = () => {
   return (
-    <div className="header-container">
-      <div className="header-video-wrapper">
-        <video autoPlay muted loop className="header-video">
-          <source src="/videos/header-video.mp4" type="video/mp4" />
-        </video>
-        <div className="header-overlay"></div>
-        <div className="header-content">
-          <h1>Dead Wax Dialogues</h1>
-          <p>Full-side explorations, analog warmth, community vibes</p>
-        </div>
+    <header className="hero">
+      <video autoPlay muted loop playsInline className="hero-video">
+        <source src="/videos/header-video.mp4" type="video/mp4" />
+        Your browser does not support the video tag.
+      </video>
+      <div className="overlay"></div>
+      <div className="hero-content">
+        <h1>Dead Wax Dialogues</h1>
+        <p>Drop the needle. Let the side play.</p>
+        <nav className="hero-nav">
+          <a href="/events">Events</a>
+          <a href="/browse">Browse</a>
+          <a href="/now-playing">Now Playing</a>
+          <a href="/admin">Admin</a>
+        </nav>
       </div>
-      <section className="landing-content">
-        <h2>Browse upcoming events or request vinyl sides</h2>
-      </section>
-    </div>
+    </header>
   );
-}
+};
 
 export default LandingPage;
