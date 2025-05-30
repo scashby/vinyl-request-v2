@@ -14,6 +14,7 @@ body {
   flex-direction: column;
   min-height: 100vh;
   width: 100%;
+  background: #fff;
 }
 
 .event-hero {
@@ -36,20 +37,21 @@ body {
 }
 
 .event-hero h1 {
-  font-size: 2.5rem;
+  font-size: 2.75rem;
   margin: 0;
 }
 
 .page-body {
   flex-grow: 1;
+  padding: 2rem 0;
   background: #fff;
-  padding: 2rem 4vw;
 }
 
 .page-section {
   width: 100%;
   max-width: 1400px;
   margin: 0 auto;
+  padding: 0 2rem;
 }
 
 .event-grid {
@@ -83,7 +85,8 @@ body {
 .event-card h3 {
   margin-top: 1rem;
   font-weight: 500;
-  color: #111;
+  font-size: 1.1rem;
+  color: #4b0082; /* purple */
 }
 
 .event-card p {
@@ -96,6 +99,7 @@ body {
   background: #f2f2f2;
   color: #333;
   text-align: center;
-  padding: 1rem;
-  margin-top: 2rem;
+  padding: 1.5rem;
+  margin-top: 4rem;
+  font-size: 0.875rem;
 }
