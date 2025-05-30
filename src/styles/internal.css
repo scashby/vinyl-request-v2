@@ -1,99 +1,78 @@
-
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;500&display=swap');
-
 body {
   margin: 0;
   font-family: 'Inter', sans-serif;
-  background: #ffffff;
+  background: white;
   color: #111;
-  width: 100vw;
-  overflow-x: hidden;
 }
 
 .event-hero {
   position: relative;
-  width: 100%;
   height: 300px;
-  background: url('/images/event-header-still.jpg') center/cover no-repeat;
+  background: url('event-header-still.jpg') center/cover no-repeat;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .event-hero .overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  height: 100%;
-  width: 100%;
   background: rgba(0, 0, 0, 0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  padding: 2rem 3rem;
+  color: white;
+  text-align: center;
 }
 
 .event-hero h1 {
-  color: white;
-  font-size: 2.75rem;
-  font-weight: 500;
+  font-size: 2.5rem;
   margin: 0;
-  z-index: 1;
 }
 
 .event-body {
-  background: white;
-  padding: 4rem 2rem;
-  min-height: 60vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  padding: 3rem 2rem;
 }
 
 .event-grid {
   display: flex;
-  flex-wrap: wrap;
   gap: 2rem;
+  flex-wrap: wrap;
   justify-content: center;
-  margin-top: 2rem;
 }
 
 .event-card {
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  max-width: 260px;
+  width: 240px;
   text-align: center;
-  overflow: hidden;
-  transition: transform 0.2s ease;
+  background: #f9f9f9;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  transition: transform 0.3s ease;
 }
 
 .event-card:hover {
-  transform: scale(1.02);
+  transform: scale(1.05);
 }
 
 .event-card img {
   width: 100%;
-  display: block;
+  height: 240px;
+  object-fit: cover;
+  border-top-left-radius: 10px;
+  border-top-right-radius: 10px;
 }
 
-.event-card h3 {
+.event-card h2 {
   margin: 1rem 0 0.5rem;
-  font-weight: 500;
-  color: #6a0dad;
+  font-size: 1.2rem;
+  color: #6b3fa0; /* purple */
 }
 
 .event-card p {
-  margin-bottom: 1.5rem;
-  font-size: 0.9rem;
-  color: #1a73e8;
+  color: #2e4cb4; /* blue */
+  margin-bottom: 1rem;
 }
 
 .footer {
-  background: #f0f0f0;
-  color: #333;
   text-align: center;
-  padding: 1.5rem;
-  font-size: 0.85rem;
-  margin-top: auto;
-  width: 100%;
+  padding: 2rem;
+  font-size: 0.9rem;
+  background: #f2f2f2;
+  color: #666;
 }

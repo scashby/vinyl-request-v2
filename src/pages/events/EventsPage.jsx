@@ -12,16 +12,16 @@ const EventsPage = () => {
 
       <main className="event-body">
         <section className="event-grid">
-          <div className="event-card">
-            <img src="/images/event-header-still.jpg" alt="Vinyl Sunday" />
-            <h3>Vinyl Sunday</h3>
+          <article className="event-card">
+            <img src="/images/event-header-still.jpg" alt="Album Art" />
+            <h2>Vinyl Sunday</h2>
             <p>June 2, 2025</p>
-          </div>
-          <div className="event-card">
-            <img src="/images/event-header-still.jpg" alt="80s Night" />
-            <h3>80s Night</h3>
+          </article>
+          <article className="event-card">
+            <img src="/images/event-header-still.jpg" alt="Album Art" />
+            <h2>80s Night</h2>
             <p>June 9, 2025</p>
-          </div>
+          </article>
         </section>
       </main>
 
