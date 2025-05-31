@@ -29,7 +29,6 @@ export default function App() {
         <Route path="/import-discogs" element={<ImportDiscogs />} />
         <Route path="/block-sides" element={<BlockSides />} />
         <Route path="/import-collection" element={<ImportCollection />} />
-        <Route path="/album-demo" element={<AlbumGatefoldPage />} />
         <Route path="/browse-queue" element={<BrowseQueue />} />
       </Routes>
     </Router>
