@@ -1,65 +1,64 @@
-/* ✅ album-detail.css — Matches locked-in preview exactly */
 .album-detail {
   background-size: cover;
   background-position: center;
   min-height: 100vh;
-  padding: 2rem;
   color: white;
-  font-family: sans-serif;
 }
 
-.album-header {
+.album-overlay {
+  background-color: rgba(0, 0, 0, 0.7);
+  padding: 2rem;
   display: flex;
-  align-items: center;
-  gap: 2rem;
+  flex-direction: column;
+  align-items: flex-start;
 }
 
-.album-header img {
-  width: 180px;
-  height: 180px;
-  object-fit: cover;
+.album-art {
+  width: 200px;
   border-radius: 0.5rem;
 }
 
-.album-meta h1 {
-  font-size: 2rem;
-  margin-bottom: 0.2rem;
+.album-info {
+  margin-top: 1rem;
 }
 
-.album-meta .artist-year {
+.album-title {
+  font-size: 2rem;
+  font-weight: bold;
+}
+
+.album-meta {
   font-size: 1rem;
   color: #ccc;
 }
 
-.album-meta .badge {
-  margin-top: 0.5rem;
+.album-badge {
   background-color: #9333ea;
-  display: inline-block;
-  padding: 0.3rem 0.5rem;
-  font-size: 0.75rem;
-  font-weight: bold;
+  color: white;
+  padding: 0.25rem 0.5rem;
   border-radius: 0.25rem;
+  font-size: 0.75rem;
+  margin-top: 0.5rem;
+  display: inline-block;
+}
+
+.album-tracks {
+  margin-top: 0.5rem;
 }
 
 .tracklist {
   margin-top: 2rem;
-  background: rgba(0, 0, 0, 0.6);
-  padding: 1rem;
-  border-radius: 0.5rem;
-}
-
-.tracklist table {
   width: 100%;
   border-collapse: collapse;
-  color: white;
 }
 
-.tracklist th, .tracklist td {
-  text-align: left;
+.tracklist th,
+.tracklist td {
   padding: 0.5rem;
+  border-bottom: 1px solid #555;
 }
 
 .tracklist th {
-  font-size: 0.85rem;
-  color: #aaa;
+  text-align: left;
+  font-weight: bold;
 }

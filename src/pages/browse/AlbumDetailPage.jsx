@@ -1,67 +1,49 @@
 import React from 'react';
 import '../../styles/album-detail.css';
 
-export default function AlbumDetailPage() {
-  const album = {
-    title: 'British Steel',
-    artist: 'Judas Priest',
-    year: 1980,
-    format: 'Vinyl',
-    cover: '/images/british-steel.jpg',
-    tracks: [
-      'Rapid Fire',
-      'Metal Gods',
-      'Breaking the Law',
-      'Grinder',
-      'United',
-      'You Don’t Have to Be Old to Be Wise',
-      'Living After Midnight',
-      'The Rage',
-      'Steeler'
-    ],
-    durations: ['4:08', '4:00', '2:35', '3:58', '3:36', '5:04', '3:30', '4:44', '4:30']
-  };
+const album = {
+  title: 'British Steel',
+  artist: 'Judas Priest',
+  year: '1980',
+  image: '/images/british-steel.jpg',
+  format: 'Vinyl',
+  tracks: [
+    { side: 'A', number: 1, title: 'Rapid Fire', time: '4:08' },
+    { side: 'A', number: 2, title: 'Metal Gods', time: '4:00' },
+    { side: 'A', number: 3, title: 'Breaking the Law', time: '2:35' },
+    { side: 'A', number: 4, title: 'Grinder', time: '3:58' },
+    { side: 'B', number: 1, title: 'United', time: '3:36' },
+    { side: 'B', number: 2, title: 'You Don’t Have to Be Old to Be Wise', time: '5:04' },
+    { side: 'B', number: 3, title: 'Living After Midnight', time: '3:30' },
+    { side: 'B', number: 4, title: 'The Rage', time: '4:44' },
+    { side: 'B', number: 5, title: 'Steeler', time: '4:30' },
+  ],
+};
 
+export default function AlbumDetailPage() {
   return (
-    <div
-      className="album-detail bg-cover bg-center min-h-screen text-white"
-      style={{
-        backgroundImage: `url(${album.cover})`
-      }}
-    >
-      <div className="bg-black bg-opacity-70 min-h-screen p-6">
-        <div className="flex items-center gap-6 mb-6">
-          <img src={album.cover} alt={album.title} className="w-40 h-40 rounded shadow-lg" />
-          <div>
-            <h1 className="text-3xl font-bold">{album.title}</h1>
-            <p className="text-sm text-gray-300">{album.artist} • {album.year}</p>
-            <div className="inline-block mt-2 text-xs text-white px-2 py-1 rounded bg-purple-600">
-              {album.format}
-            </div>
-            <p className="text-sm text-gray-300 mt-1">9 TRACKS</p>
-          </div>
+    <div className="album-detail" style={{ backgroundImage: `url(${album.image})` }}>
+      <div className="album-overlay">
+        <img src={album.image} alt={album.title} className="album-art" />
+        <div className="album-info">
+          <h1 className="album-title">{album.title}</h1>
+          <p className="album-meta">{album.artist} • {album.year}</p>
+          <div className="album-badge">{album.format}</div>
+          <p className="album-tracks">{album.tracks.length} TRACKS</p>
         </div>
-        <table className="w-full text-sm bg-black bg-opacity-40 rounded">
+        <table className="tracklist">
           <thead>
-            <tr className="text-left border-b border-gray-600">
-              <th className="py-2 px-3">#</th>
-              <th className="py-2 px-3">Title</th>
-              <th className="py-2 px-3">Artist</th>
-              <th className="py-2 px-3">Time</th>
-            </tr>
+            <tr><th>#</th><th>Title</th><th>Artist</th><th>Time</th></tr>
           </thead>
           <tbody>
-            {album.tracks.map((track, index) => {
-              const trackNum = index < 4 ? `A${index + 1}` : `B${index - 3}`;
-              return (
-                <tr key={index} className="border-t border-gray-700">
-                  <td className="py-2 px-3">{trackNum}</td>
-                  <td className="py-2 px-3">{track}</td>
-                  <td className="py-2 px-3">{album.artist}</td>
-                  <td className="py-2 px-3">{album.durations[index]}</td>
-                </tr>
-              );
-            })}
+            {album.tracks.map((track, i) => (
+              <tr key={i}>
+                <td>{track.side}{track.number}</td>
+                <td>{track.title}</td>
+                <td>{album.artist}</td>
+                <td>{track.time}</td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>

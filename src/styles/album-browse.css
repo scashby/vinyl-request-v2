@@ -1,0 +1,61 @@
+:root {
+  --purple: #9333ea;
+  --green: #16a34a;
+  --red: #dc2626;
+  --teal: #0d9488;
+  --orange: #ea580c;
+  --blue: #2563eb;
+}
+
+.browse-container {
+  padding: 2rem;
+  background-color: #111;
+  color: white;
+}
+
+.browse-title {
+  font-size: 2rem;
+  font-weight: bold;
+}
+
+.album-grid {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.album-card {
+  background: white;
+  color: black;
+  border-radius: 0.5rem;
+  width: 200px;
+  padding: 1rem;
+  position: relative;
+}
+
+.album-image {
+  width: 100%;
+  border-radius: 0.5rem;
+}
+
+.badge {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  color: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: bold;
+}
+
+.album-title {
+  font-size: 1.1rem;
+  font-weight: bold;
+  color: var(--blue);
+}
+
+.album-meta {
+  font-size: 0.875rem;
+  color: #666;
+}
