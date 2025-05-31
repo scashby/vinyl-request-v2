@@ -1,5 +1,5 @@
 import React from "react";
-import "./gatefold.css";
+import "../gatefold.css";
 
 const AlbumGatefoldCard = ({ album }) => {
   if (!album) return null;
