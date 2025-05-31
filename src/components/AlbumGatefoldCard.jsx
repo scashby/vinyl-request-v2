@@ -1,26 +1,21 @@
-// ✅ Gatefold AlbumCard Component
+import React from 'react';
+import '../styles/gatefold.css';
 
-import React from "react";
-import "../styles/gatefold.css";
-
-const AlbumGatefoldCard = ({ album }) => {
-  if (!album) return null;
-  const { title, artist, image, sides } = album;
-
+const AlbumGatefoldCard = ({ title, artist, sides, image }) => {
   return (
-    <div className="gatefold-wrapper">
+    <div className="gatefold-container">
       <div className="gatefold-left">
-        <img src={image} alt={title} className="gatefold-artwork" />
+        <img src={image} alt={title} className="album-image" />
       </div>
       <div className="gatefold-right">
-        <h1 className="gatefold-title">{title}</h1>
-        <h2 className="gatefold-artist">{artist}</h2>
-        {sides?.map((side) => (
-          <div key={side.name} className="gatefold-side">
-            <h3 className="gatefold-side-name">{side.name}</h3>
-            <ul className="gatefold-tracklist">
-              {side.tracks.map((track, i) => (
-                <li key={i}>{track}</li>
+        <h1 className="title">{title}</h1>
+        <h2 className="artist">{artist}</h2>
+        {sides?.map((side, i) => (
+          <div key={i}>
+            <h3 className="side-label">Side {side.side}</h3>
+            <ul className="tracklist">
+              {side.tracks.map((track, idx) => (
+                <li key={idx}>{track}</li>
               ))}
             </ul>
           </div>
