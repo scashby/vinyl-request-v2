@@ -1,51 +1,63 @@
-.gatefold-container {
+/* ✅ Gatefold Layout CSS */
+
+.gatefold-wrapper {
   display: flex;
-  background-color: white;
+  flex-direction: row;
+  height: 100vh;
   width: 100%;
-  height: 100%;
-  min-height: 100vh;
-  font-family: sans-serif;
+  background-color: #ffffff;
+  overflow: hidden;
 }
 
 .gatefold-left {
   flex: 1;
+  padding: 0;
+  margin: 0;
 }
 
-.album-image {
+.gatefold-artwork {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  display: block;
 }
 
 .gatefold-right {
   flex: 1;
-  padding: 2rem;
-  background-color: #f3f3f3;
+  padding: 3rem;
+  background-color: #f3f3f3; /* TODO: smart color based on image */
+  color: #000;
   display: flex;
   flex-direction: column;
   justify-content: center;
 }
 
-.title {
-  font-size: 2rem;
-  font-weight: bold;
+.gatefold-title {
+  font-size: 2.5rem;
+  font-weight: 700;
   color: #8246d9;
+  margin-bottom: 1rem;
 }
 
-.artist {
-  font-size: 1.2rem;
-  font-weight: bold;
-  color: #333;
+.gatefold-artist {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 2rem;
 }
 
-.side {
-  font-size: 1.1rem;
-  font-weight: bold;
+.gatefold-side-name {
+  font-size: 1.25rem;
+  color: #2c3eec;
   margin-top: 1.5rem;
-  color: #2c3eec;
+  margin-bottom: 0.5rem;
 }
 
-.track {
-  font-size: 1rem;
-  color: #2c3eec;
+.gatefold-tracklist {
+  list-style: none;
+  padding-left: 0;
+  margin: 0 0 1rem 0;
+}
+
+.gatefold-tracklist li {
+  margin-bottom: 0.3rem;
 }

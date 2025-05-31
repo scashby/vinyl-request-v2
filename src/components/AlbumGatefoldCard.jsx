@@ -1,30 +1,30 @@
+// ✅ Gatefold AlbumCard Component
+
 import React from "react";
 import "../styles/gatefold.css";
 
 const AlbumGatefoldCard = ({ album }) => {
   if (!album) return null;
-
-  const { title, artist, imageUrl, tracksA = [], tracksB = [] } = album;
+  const { title, artist, image, sides } = album;
 
   return (
-    <div className="gatefold-container">
+    <div className="gatefold-wrapper">
       <div className="gatefold-left">
-        <img src={imageUrl} alt={title} className="album-image" />
+        <img src={image} alt={title} className="gatefold-artwork" />
       </div>
       <div className="gatefold-right">
-        <h1 className="title">{title}</h1>
-        <h2 className="artist">{artist}</h2>
-
-        <div className="tracklist">
-          <h3 className="side">Side A</h3>
-          {tracksA.map((track, index) => (
-            <p className="track" key={`A-${index}`}>{track}</p>
-          ))}
-          <h3 className="side">Side B</h3>
-          {tracksB.map((track, index) => (
-            <p className="track" key={`B-${index}`}>{track}</p>
-          ))}
-        </div>
+        <h1 className="gatefold-title">{title}</h1>
+        <h2 className="gatefold-artist">{artist}</h2>
+        {sides?.map((side) => (
+          <div key={side.name} className="gatefold-side">
+            <h3 className="gatefold-side-name">{side.name}</h3>
+            <ul className="gatefold-tracklist">
+              {side.tracks.map((track, i) => (
+                <li key={i}>{track}</li>
+              ))}
+            </ul>
+          </div>
+        ))}
       </div>
     </div>
   );
