@@ -9,6 +9,7 @@ import SetNowPlaying from './pages/admin/SetNowPlaying';
 import ImportDiscogs from './pages/admin/ImportDiscogs';
 import BlockSides from './pages/admin/BlockSides';
 import ImportCollection from './pages/admin/ImportCollection';
+import BrowseAlbumsPage from './pages/browse/BrowseAlbumsPage';
 
 import BrowseQueue from './pages/browse/BrowseQueue';
 import LandingPage from './pages/LandingPage';
