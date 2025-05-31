@@ -1,3 +1,5 @@
+import AlbumDetailPage from './pages/album/AlbumDetailPage';
+import BrowseAlbumsPage from './pages/browse/BrowseAlbumsPage';
 
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import EventsPage from './pages/events/EventsPage';
