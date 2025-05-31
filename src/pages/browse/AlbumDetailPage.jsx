@@ -1,54 +1,75 @@
 import React from 'react';
 import '../../styles/album-detail.css';
 
-const album = {
-  title: 'British Steel',
-  artist: 'Judas Priest',
-  year: 1980,
-  image: '/images/british-steel.jpg',
-  format: 'Vinyl',
-  tracks: [
-    { number: 'A1', title: 'Rapid Fire', time: '4:08' },
-    { number: 'A2', title: 'Metal Gods', time: '4:00' },
-    { number: 'A3', title: 'Breaking the Law', time: '2:35' },
-    { number: 'A4', title: 'Grinder', time: '3:58' },
-    { number: 'B1', title: 'United', time: '3:36' },
-    { number: 'B2', title: 'You Don’t Have to Be Old to Be Wise', time: '5:04' },
-    { number: 'B3', title: 'Living After Midnight', time: '3:30' },
-    { number: 'B4', title: 'The Rage', time: '4:44' },
-    { number: 'B5', title: 'Steeler', time: '4:30' },
-  ]
-};
+const AlbumDetailPage = () => {
+  const album = {
+    title: "British Steel",
+    artist: "Judas Priest",
+    year: 1980,
+    cover: "/images/judas-priest-british-steel.jpg",
+    format: "Vinyl",
+    sides: {
+      A: [
+        "Rapid Fire",
+        "Metal Gods",
+        "Breaking the Law",
+        "Grinder"
+      ],
+      B: [
+        "United",
+        "You Don’t Have to Be Old to Be Wise",
+        "Living After Midnight",
+        "The Rage",
+        "Steeler"
+      ]
+    }
+  };
 
-export default function AlbumDetailPage() {
+  const totalTracks = Object.values(album.sides).reduce((a, b) => a + b.length, 0);
+
   return (
-    <div className="album-detail">
-      <div className="background-blur" style={{ backgroundImage: `url(${album.image})` }}></div>
-      <div className="album-header">
-        <img className="album-art" src={album.image} alt={album.title} />
-        <div className="album-info">
-          <h1 className="title">{album.title}</h1>
-          <p className="artist">{album.artist} • {album.year}</p>
-          <span className="badge vinyl">Vinyl</span>
-          <p className="meta">Side A / B • {album.tracks.length} TRACKS</p>
-        </div>
-      </div>
-      <div className="tracklist">
-        <div className="tracklist-header">
-          <span>#</span>
-          <span>Title</span>
-          <span>Artist</span>
-          <span>Time</span>
-        </div>
-        {album.tracks.map((track, index) => (
-          <div className="track" key={index}>
-            <span>{track.number}</span>
-            <span>{track.title}</span>
-            <span>{album.artist}</span>
-            <span>{track.time}</span>
+    <div className="album-detail-page" style={{ backgroundImage: `url(${album.cover})` }}>
+      <div className="album-detail-overlay">
+        <div className="album-detail-content">
+          <img src={album.cover} alt={album.title} className="album-cover" />
+          <div className="album-info">
+            <h1 className="album-title">{album.title}</h1>
+            <h2 className="album-artist">{album.artist} • {album.year}</h2>
+            <span className="badge badge-vinyl">{album.format}</span>
+            <p style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>Side A / B • {totalTracks} TRACKS</p>
+            <div className="tracklist">
+              <table>
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Title</th>
+                    <th>Artist</th>
+                    <th>Time</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(album.sides).flatMap(([side, tracks], sideIndex) =>
+                    tracks.map((title, index) => {
+                      const trackNumber = `${side}${index + 1}`;
+                      const duration = ["4:08","4:00","2:35","3:58","3:36","5:04","3:30","4:44","4:30"][(sideIndex ? 4 : 0) + index];
+                      return (
+                        <tr key={trackNumber}>
+                          <td>{trackNumber}</td>
+                          <td>{title}</td>
+                          <td>{album.artist}</td>
+                          <td>{duration}</td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-        ))}
+        </div>
       </div>
     </div>
   );
-}
+};
+
+export default AlbumDetailPage;
