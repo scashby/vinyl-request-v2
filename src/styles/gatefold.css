@@ -1,62 +1,60 @@
-/* ✅ Gatefold Layout CSS */
-.gatefold-container {
+
+/* ✅ gatefold.css */
+.gatefold {
   display: flex;
-  background-color: white;
   height: 100vh;
+  width: 100vw;
   font-family: sans-serif;
+  background: #121212;
 }
 
-.gatefold-left, .gatefold-right {
+.left-panel {
   flex: 1;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: stretch;
 }
 
-.gatefold-cover {
+.left-panel img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.gatefold-right {
-  background-color: #f3f3f3;
-  padding: 2rem;
+.right-panel {
+  flex: 1;
+  padding: 60px;
+  background: #f4f4f4;
+  color: #2c3eec;
+  display: flex;
   flex-direction: column;
-  justify-content: flex-start;
-  align-items: flex-start;
-  overflow-y: auto;
+  justify-content: center;
 }
 
-.gatefold-text {
-  color: #2c3eec;
-  width: 100%;
-  max-width: 600px;
-}
-
-.album-title {
-  font-size: 2rem;
-  margin-bottom: 0.5rem;
-  color: #2c3eec;
-}
-
-.album-artist {
-  font-size: 1.5rem;
-  margin-bottom: 1rem;
+.right-panel h1 {
+  font-size: 2.5rem;
   color: #8246d9;
+  margin-bottom: 0.2em;
 }
 
-.side-block {
-  margin-bottom: 1.5rem;
+.right-panel h2 {
+  font-size: 1.5rem;
+  color: #333;
+  margin-bottom: 1em;
 }
 
-.side-label {
-  font-weight: bold;
-  margin-bottom: 0.25rem;
+.right-panel h3 {
+  font-size: 1.2rem;
+  color: #2c3eec;
+  margin-top: 1.5em;
 }
 
-.tracklist {
+.right-panel ul {
   list-style-type: none;
   padding-left: 0;
-  margin: 0;
+}
+
+.right-panel li {
+  font-size: 1rem;
+  line-height: 1.6;
+  color: #000;
 }
