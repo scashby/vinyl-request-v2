@@ -1,63 +1,51 @@
-import React from 'react';
-import '../../styles/album-detail.css';
+// ✅ AlbumDetailPage.jsx
+// Converted from album-detail.html — JSX conversion and Supabase integration needed
 
-const AlbumDetailPage = () => {
-  const album = {
-    title: "British Steel",
-    artist: "Judas Priest",
-    year: 1980,
-    cover: "/images/judas-priest-british-steel.jpg",
-    format: "Vinyl",
-    tracks: [
-      { id: "A1", title: "Rapid Fire", artist: "Judas Priest", time: "4:08" },
-      { id: "A2", title: "Metal Gods", artist: "Judas Priest", time: "4:00" },
-      { id: "A3", title: "Breaking the Law", artist: "Judas Priest", time: "2:35" },
-      { id: "A4", title: "Grinder", artist: "Judas Priest", time: "3:58" },
-      { id: "B1", title: "United", artist: "Judas Priest", time: "3:36" },
-      { id: "B2", title: "You Don’t Have to Be Old to Be Wise", artist: "Judas Priest", time: "5:04" },
-      { id: "B3", title: "Living After Midnight", artist: "Judas Priest", time: "3:30" },
-      { id: "B4", title: "The Rage", artist: "Judas Priest", time: "4:44" },
-      { id: "B5", title: "Steeler", artist: "Judas Priest", time: "4:30" },
-    ]
-  };
-
+export default function AlbumDetailPage() {
   return (
-    <div className="album-detail-page" style={{ backgroundImage: `url(${album.cover})` }}>
-      <div className="album-detail-overlay">
-        <div className="album-detail-content">
-          <img src={album.cover} alt={album.title} className="album-cover" />
-          <div className="album-info">
-            <h1 className="album-title">{album.title}</h1>
-            <h2 className="album-artist">{album.artist} • {album.year}</h2>
-            <span className="badge badge-vinyl">{album.format}</span>
-            <p className="track-count">{album.tracks.length} TRACKS</p>
-            <div className="tracklist">
-              <table>
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>Title</th>
-                    <th>Artist</th>
-                    <th>Time</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {album.tracks.map((track) => (
-                    <tr key={track.id}>
-                      <td>{track.id}</td>
-                      <td>{track.title}</td>
-                      <td>{track.artist}</td>
-                      <td>{track.time}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
+    <>
+      {/* BEGIN HTML */}
+      <div dangerouslySetInnerHTML={ { __html: `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>British Steel - Judas Priest</title>
+  <link rel="stylesheet" href="album-detail.css">
+</head>
+<body>
+  <div class="album-detail">
+    <div class="background-blur"></div>
+    <div class="album-header">
+      <img class="album-art" src="images/british-steel.jpg" alt="British Steel" />
+      <div class="album-info">
+        <h1 class="title">British Steel</h1>
+        <p class="artist">Judas Priest • 1980</p>
+        <span class="badge vinyl">Vinyl</span>
+        <p class="meta">9 TRACKS</p>
       </div>
     </div>
+    <div class="tracklist">
+      <div class="tracklist-header">
+        <span>#</span>
+        <span>Title</span>
+        <span>Artist</span>
+        <span>Time</span>
+      </div>
+      <div class="track"><span>A1</span><span>Rapid Fire</span><span>Judas Priest</span><span>4:08</span></div>
+      <div class="track"><span>A2</span><span>Metal Gods</span><span>Judas Priest</span><span>4:00</span></div>
+      <div class="track"><span>A3</span><span>Breaking the Law</span><span>Judas Priest</span><span>2:35</span></div>
+      <div class="track"><span>A4</span><span>Grinder</span><span>Judas Priest</span><span>3:58</span></div>
+      <div class="track"><span>B1</span><span>United</span><span>Judas Priest</span><span>3:36</span></div>
+      <div class="track"><span>B2</span><span>You Don’t Have to Be Old to Be Wise</span><span>Judas Priest</span><span>5:04</span></div>
+      <div class="track"><span>B3</span><span>Living After Midnight</span><span>Judas Priest</span><span>3:30</span></div>
+      <div class="track"><span>B4</span><span>The Rage</span><span>Judas Priest</span><span>4:44</span></div>
+      <div class="track"><span>B5</span><span>Steeler</span><span>Judas Priest</span><span>4:30</span></div>
+    </div>
+  </div>
+</body>
+</html>
+` } } />
+      {/* END HTML */}
+    </>
   );
-};
-
-export default AlbumDetailPage;
+}
