@@ -1,28 +1,40 @@
-// ✅ BrowseAlbumsPage.jsx
 import React from 'react';
 import '../../styles/browse-albums.css';
+
+const albums = [
+  {
+    id: 1,
+    title: "British Steel",
+    artist: "Judas Priest",
+    year: 1980,
+    cover: "/images/judas-priest-british-steel.jpg",
+    format: "vinyl"
+  },
+  {
+    id: 2,
+    title: "Love at First Sting",
+    artist: "Scorpions",
+    year: 1984,
+    cover: "/images/scorpions-love-at-first-sting.jpg",
+    format: "cassette"
+  }
+];
 
 const BrowseAlbumsPage = () => {
   return (
     <div className="album-browse-page">
       <h1 className="page-title">Browse Collection</h1>
       <div className="album-grid">
-        <div className="album-card">
-          <img src="/judas-priest-british-steel.jpg" alt="British Steel" className="album-image" />
-          <div className="album-info">
-            <h2>Judas Priest</h2>
-            <p>British Steel</p>
-            <span className="badge badge-vinyl">Vinyl</span>
+        {albums.map((album) => (
+          <div key={album.id} className="album-card">
+            <img src={album.cover} alt={album.title} className="album-image" />
+            <div className="album-info">
+              <h2>{album.title}</h2>
+              <p>{album.artist} • {album.year}</p>
+              <span className={`badge badge-${album.format}`}>{album.format.charAt(0).toUpperCase() + album.format.slice(1)}</span>
+            </div>
           </div>
-        </div>
-        <div className="album-card">
-          <img src="/scorpions-love-at-first-sting.jpg" alt="Love at First Sting" className="album-image" />
-          <div className="album-info">
-            <h2>Scorpions</h2>
-            <p>Love at First Sting</p>
-            <span className="badge badge-cassette">Cassette</span>
-          </div>
-        </div>
+        ))}
       </div>
     </div>
   );
