@@ -21,7 +21,7 @@ export default function BrowseAlbumsPage() {
     }
   ];
 
-  const formatColor = {
+  const formatColors = {
     Vinyl: 'purple-600',
     Cassette: 'green-600',
     '45s': 'red-600',
@@ -30,15 +30,15 @@ export default function BrowseAlbumsPage() {
   };
 
   return (
-    <div className="browse-wrapper">
-      <h1 className="browse-header">Browse Collection</h1>
-      <div className="album-grid">
+    <div className="browse-container">
+      <h1 className="browse-title">Browse Collection</h1>
+      <div className="album-list">
         {albums.map((album) => (
           <div key={album.id} className="album-card">
-            <div className={`media-badge bg-${formatColor[album.format]}`}>{album.format}</div>
-            <img className="album-img" src={album.cover} alt={album.title} />
-            <h2 className="album-title text-blue-600">{album.title}</h2>
-            <p className="album-meta">{album.artist} • {album.year}</p>
+            <div className={`media-badge bg-${formatColors[album.format]}`}>{album.format}</div>
+            <img src={album.cover} alt={album.title} className="album-image" />
+            <h2 className="album-name text-blue-600">{album.title}</h2>
+            <p className="album-info">{album.artist} • {album.year}</p>
           </div>
         ))}
       </div>
