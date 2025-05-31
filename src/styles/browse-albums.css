@@ -1,6 +1,6 @@
 .album-browse-page {
   padding: 2rem;
-  background: #f6f6f6;
+  background: #f7f7f7;
   font-family: system-ui, sans-serif;
 }
 
@@ -13,19 +13,19 @@
 .album-grid {
   display: flex;
   flex-wrap: wrap;
-  gap: 1.5rem;
+  gap: 2rem;
+  align-items: flex-start;
 }
 
 .album-card {
-  width: 200px;
-  background: white;
-  border-radius: 10px;
-  overflow: hidden;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  width: 180px;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  font-size: 0.9rem;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  overflow: hidden;
 }
 
 .album-thumb {
@@ -35,39 +35,40 @@
 
 .album-thumb img {
   width: 100%;
-  display: block;
-  aspect-ratio: 1 / 1;
+  aspect-ratio: 1/1;
   object-fit: cover;
+  display: block;
 }
 
-.badge {
+.album-thumb .badge {
   position: absolute;
-  top: 0.5rem;
-  left: 0.5rem;
-  padding: 0.2rem 0.5rem;
-  font-size: 0.7rem;
-  font-weight: bold;
-  border-radius: 6px;
+  top: 8px;
+  left: 8px;
+  font-size: 0.65rem;
+  background-color: purple;
   color: white;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-weight: 600;
 }
 
-.badge-vinyl { background-color: purple; }
 .badge-cassette { background-color: green; }
 
 .album-meta {
   padding: 0.75rem;
+  font-size: 0.875rem;
+  color: #333;
   text-align: left;
 }
 
 .album-meta h2 {
+  margin: 0 0 0.25rem;
   font-size: 1rem;
-  font-weight: bold;
-  margin: 0 0 0.3rem;
-  color: #000;
+  font-weight: 600;
+  color: #111;
 }
 
 .album-meta p {
   margin: 0;
   color: #666;
-  font-size: 0.85rem;
 }

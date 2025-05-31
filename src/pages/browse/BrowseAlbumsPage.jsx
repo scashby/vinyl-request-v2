@@ -25,7 +25,7 @@ const BrowseAlbumsPage = () => {
     <div className="album-browse-page">
       <h1 className="page-title">Browse Collection</h1>
       <div className="album-grid">
-        {albums.map(album => (
+        {albums.map((album) => (
           <div key={album.id} className="album-card">
             <div className="album-thumb">
               <img src={album.cover} alt={album.title} />
