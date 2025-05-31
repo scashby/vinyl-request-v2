@@ -1,4 +1,3 @@
-// ✅ BrowseAlbumsPage.jsx
 import React from 'react';
 import '../../styles/browse-albums.css';
 
@@ -22,26 +21,24 @@ export default function BrowseAlbumsPage() {
     }
   ];
 
-  const badgeColors = {
-    Vinyl: 'purple',
-    Cassette: 'green',
-    '45s': 'red',
-    CD: 'teal',
-    '8-Track': 'orange'
+  const formatColor = {
+    Vinyl: 'purple-600',
+    Cassette: 'green-600',
+    '45s': 'red-600',
+    CD: 'teal-600',
+    '8-Track': 'orange-600'
   };
 
   return (
     <div className="browse-wrapper">
       <h1 className="browse-header">Browse Collection</h1>
       <div className="album-grid">
-        {albums.map(album => (
+        {albums.map((album) => (
           <div key={album.id} className="album-card">
-            <div className={`media-badge ${badgeColors[album.format]}`}>{album.format}</div>
-            <img src={album.cover} alt={album.title} className="album-cover" />
-            <div className="album-text">
-              <h2 className="album-title">{album.title}</h2>
-              <p className="album-meta">{album.artist} • {album.year}</p>
-            </div>
+            <div className={`media-badge bg-${formatColor[album.format]}`}>{album.format}</div>
+            <img className="album-img" src={album.cover} alt={album.title} />
+            <h2 className="album-title text-blue-600">{album.title}</h2>
+            <p className="album-meta">{album.artist} • {album.year}</p>
           </div>
         ))}
       </div>
