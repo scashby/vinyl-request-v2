@@ -1,34 +1,31 @@
+// ✅ BrowseAlbumsPage.jsx
 import React from 'react';
-import '../../styles/album-browse.css';
-import { Link } from 'react-router-dom';
+import '../../styles/browse-albums.css';
 
-const albums = [
-  {
-    id: 1,
-    title: 'British Steel',
-    artist: 'Judas Priest',
-    year: 1980,
-    image: '/images/british-steel.jpg',
-    format: 'Vinyl',
-  },
-];
-
-export default function BrowseAlbumsPage() {
+const BrowseAlbumsPage = () => {
   return (
-    <div className="browse-page">
-      <h1>Browse Collection</h1>
+    <div className="album-browse-page">
+      <h1 className="page-title">Browse Collection</h1>
       <div className="album-grid">
-        {albums.map((album) => (
-          <Link to={`/album/${album.id}`} key={album.id} className="album-card">
-            <span className={`badge ${album.format.toLowerCase()}`}>{album.format}</span>
-            <img src={album.image} alt={album.title} />
-            <div className="info">
-              <p className="title">{album.title}</p>
-              <p className="artist">{album.artist} • {album.year}</p>
-            </div>
-          </Link>
-        ))}
+        <div className="album-card">
+          <img src="/judas-priest-british-steel.jpg" alt="British Steel" className="album-image" />
+          <div className="album-info">
+            <h2>Judas Priest</h2>
+            <p>British Steel</p>
+            <span className="badge badge-vinyl">Vinyl</span>
+          </div>
+        </div>
+        <div className="album-card">
+          <img src="/scorpions-love-at-first-sting.jpg" alt="Love at First Sting" className="album-image" />
+          <div className="album-info">
+            <h2>Scorpions</h2>
+            <p>Love at First Sting</p>
+            <span className="badge badge-cassette">Cassette</span>
+          </div>
+        </div>
       </div>
     </div>
   );
-}
+};
+
+export default BrowseAlbumsPage;
