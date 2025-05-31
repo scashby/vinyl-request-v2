@@ -1,61 +1,56 @@
-.browse-page {
-  padding: 2rem;
-  background-color: #fafafa;
-  color: #222;
-}
+
 .album-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 1rem;
+  justify-content: flex-start;
 }
+
 .album-card {
-  text-decoration: none;
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 1px 5px rgba(0,0,0,0.1);
-  transition: transform 0.2s ease;
-  background: white;
   position: relative;
+  width: 200px;
+  background: white;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  box-shadow: 0 0 6px rgba(0,0,0,0.1);
 }
+
 .album-card img {
   width: 100%;
-  aspect-ratio: 1;
-  object-fit: cover;
+  height: auto;
+  display: block;
 }
-.info {
+
+.album-info {
   padding: 0.5rem;
 }
-.title {
-  font-weight: bold;
-  color: #2563eb; /* blue-600 for titles */
+
+.album-title {
+  font-weight: 600;
+  font-size: 1rem;
+  color: #2563eb; /* Tailwind blue-600 */
 }
-.artist {
-  color: #666;
+
+.album-artist {
   font-size: 0.875rem;
+  color: #6b7280;
 }
+
 .badge {
   position: absolute;
-  top: 6px;
-  left: 6px;
-  font-size: 0.65rem;
-  padding: 2px 6px;
-  border-radius: 4px;
+  top: 0.25rem;
+  left: 0.25rem;
+  background: #9333ea;
+  color: white;
+  font-size: 0.75rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 0.25rem;
   font-weight: 600;
-  letter-spacing: 0.5px;
-  color: #fff;
+  z-index: 10;
 }
-.badge.vinyl {
-  background-color: #9333ea; /* purple-600 */
-}
-.badge.cassette {
-  background-color: #16a34a; /* green-600 */
-}
-.badge.cd {
-  background-color: #0d9488; /* teal-600 */
-}
-.badge.fortyfive {
-  background-color: #dc2626; /* red-600 */
-}
-.badge.eighttrack {
-  background-color: #ea580c; /* orange-600 */
-}
+
+.badge-cassette { background: #16a34a; }
+.badge-vinyl { background: #9333ea; }
+.badge-45s { background: #dc2626; }
+.badge-cd { background: #0d9488; }
+.badge-8track { background: #ea580c; }
