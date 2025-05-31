@@ -1,1 +1,45 @@
-PLACEHOLDER
+.album-browse-page {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 1rem;
+  padding: 2rem;
+  justify-items: start;
+}
+
+.album-card {
+  position: relative;
+  text-align: left;
+  text-decoration: none;
+}
+
+.album-image-container {
+  position: relative;
+  width: 100%;
+}
+
+.album-image {
+  width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+}
+
+.media-badge {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  color: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+}
+
+.album-title {
+  margin-top: 0.5rem;
+  font-weight: 600;
+}
+
+.album-meta,
+.track-count {
+  font-size: 0.875rem;
+  color: #555;
+}
