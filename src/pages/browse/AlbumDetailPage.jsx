@@ -23,35 +23,42 @@ export default function AlbumDetailPage() {
   };
 
   return (
-    <div className="album-detail" style={{ backgroundImage: `url(${album.cover})` }}>
-      <div className="overlay">
-        <div className="album-meta">
-          <img src={album.cover} alt={album.title} className="album-art" />
+    <div
+      className="album-detail bg-cover bg-center min-h-screen text-white"
+      style={{
+        backgroundImage: `url(${album.cover})`
+      }}
+    >
+      <div className="bg-black bg-opacity-70 min-h-screen p-6">
+        <div className="flex items-center gap-6 mb-6">
+          <img src={album.cover} alt={album.title} className="w-40 h-40 rounded shadow-lg" />
           <div>
-            <h1>{album.title}</h1>
-            <p>{album.artist} • {album.year}</p>
-            <div className="media-badge bg-purple-600">{album.format}</div>
-            <p className="track-meta">9 TRACKS</p>
+            <h1 className="text-3xl font-bold">{album.title}</h1>
+            <p className="text-sm text-gray-300">{album.artist} • {album.year}</p>
+            <div className="inline-block mt-2 text-xs text-white px-2 py-1 rounded bg-purple-600">
+              {album.format}
+            </div>
+            <p className="text-sm text-gray-300 mt-1">9 TRACKS</p>
           </div>
         </div>
-        <table className="track-table">
+        <table className="w-full text-sm bg-black bg-opacity-40 rounded">
           <thead>
-            <tr>
-              <th>#</th>
-              <th>Title</th>
-              <th>Artist</th>
-              <th>Time</th>
+            <tr className="text-left border-b border-gray-600">
+              <th className="py-2 px-3">#</th>
+              <th className="py-2 px-3">Title</th>
+              <th className="py-2 px-3">Artist</th>
+              <th className="py-2 px-3">Time</th>
             </tr>
           </thead>
           <tbody>
             {album.tracks.map((track, index) => {
-              const prefix = index < 4 ? `A${index + 1}` : `B${index - 3}`;
+              const trackNum = index < 4 ? `A${index + 1}` : `B${index - 3}`;
               return (
-                <tr key={index}>
-                  <td>{prefix}</td>
-                  <td>{track}</td>
-                  <td>{album.artist}</td>
-                  <td>{album.durations[index]}</td>
+                <tr key={index} className="border-t border-gray-700">
+                  <td className="py-2 px-3">{trackNum}</td>
+                  <td className="py-2 px-3">{track}</td>
+                  <td className="py-2 px-3">{album.artist}</td>
+                  <td className="py-2 px-3">{album.durations[index]}</td>
                 </tr>
               );
             })}
