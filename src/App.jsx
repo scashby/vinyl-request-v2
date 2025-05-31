@@ -1,5 +1,3 @@
-import AlbumDetailPage from './pages/album/AlbumDetailPage';
-import BrowseAlbumsPage from './pages/browse/BrowseAlbumsPage';
 
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import EventsPage from './pages/events/EventsPage';
@@ -32,7 +30,8 @@ export default function App() {
         <Route path="/import-collection" element={<ImportCollection />} />
         <Route path="/album-demo" element={<AlbumGatefoldPage />} />
         <Route path="/browse-queue" element={<BrowseQueue />} />
-      </Routes>
+        <Route path="/album/:id" element={<AlbumDetailPage />} />
+</Routes>
     </Router>
   );
 }
