@@ -1,7 +1,5 @@
-
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import EventsPage from './pages/events/EventsPage';
-
 import NowPlayingPage from './pages/now-playing/NowPlayingPage';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import EditQueue from './pages/admin/EditQueue';
@@ -10,10 +8,9 @@ import ImportDiscogs from './pages/admin/ImportDiscogs';
 import BlockSides from './pages/admin/BlockSides';
 import ImportCollection from './pages/admin/ImportCollection';
 import BrowseAlbumsPage from './pages/browse/BrowseAlbumsPage';
-
 import BrowseQueue from './pages/browse/BrowseQueue';
 import LandingPage from './pages/LandingPage';
-
+import AlbumDetailPage from './pages/browse/AlbumDetailPage'; // ✅ Added for album detail view
 
 export default function App() {
   return (
@@ -30,6 +27,7 @@ export default function App() {
         <Route path="/block-sides" element={<BlockSides />} />
         <Route path="/import-collection" element={<ImportCollection />} />
         <Route path="/browse-queue" element={<BrowseQueue />} />
+        <Route path="/album/:id" element={<AlbumDetailPage />} /> {/* ✅ Added dynamic route */}
       </Routes>
     </Router>
   );
