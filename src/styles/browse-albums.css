@@ -1,71 +1,73 @@
 .album-browse-page {
   padding: 2rem;
-  background: #f8f8f8;
-  min-height: 100vh;
+  background: #f6f6f6;
   font-family: system-ui, sans-serif;
 }
 
 .page-title {
   font-size: 2rem;
   margin-bottom: 1.5rem;
-  color: #222;
+  color: #111;
 }
 
 .album-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1.25rem;
-  justify-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
 }
 
 .album-card {
+  width: 200px;
   background: white;
   border-radius: 10px;
-  width: 180px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
   overflow: hidden;
-  text-align: center;
-  transition: transform 0.2s;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  font-size: 0.9rem;
 }
-.album-card:hover {
-  transform: scale(1.03);
-}
-.album-image {
+
+.album-thumb {
+  position: relative;
   width: 100%;
-  height: auto;
-  aspect-ratio: 1/1;
-  object-fit: cover;
+}
+
+.album-thumb img {
+  width: 100%;
   display: block;
-}
-
-.album-info {
-  padding: 0.75rem;
-}
-
-.album-info h2 {
-  font-size: 1rem;
-  font-weight: bold;
-  margin: 0.5rem 0 0.25rem;
-  color: #222;
-}
-
-.album-info p {
-  font-size: 0.875rem;
-  color: #555;
-  margin: 0;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
 }
 
 .badge {
-  display: inline-block;
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
   padding: 0.2rem 0.5rem;
   font-size: 0.7rem;
   font-weight: bold;
-  border-radius: 12px;
-  margin-top: 0.5rem;
+  border-radius: 6px;
   color: white;
 }
+
 .badge-vinyl { background-color: purple; }
 .badge-cassette { background-color: green; }
-.badge-45 { background-color: red; }
-.badge-cd { background-color: teal; }
-.badge-8track { background-color: brown; }
+
+.album-meta {
+  padding: 0.75rem;
+  text-align: left;
+}
+
+.album-meta h2 {
+  font-size: 1rem;
+  font-weight: bold;
+  margin: 0 0 0.3rem;
+  color: #000;
+}
+
+.album-meta p {
+  margin: 0;
+  color: #666;
+  font-size: 0.85rem;
+}

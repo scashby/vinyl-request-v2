@@ -25,13 +25,15 @@ const BrowseAlbumsPage = () => {
     <div className="album-browse-page">
       <h1 className="page-title">Browse Collection</h1>
       <div className="album-grid">
-        {albums.map((album) => (
+        {albums.map(album => (
           <div key={album.id} className="album-card">
-            <img src={album.cover} alt={album.title} className="album-image" />
-            <div className="album-info">
+            <div className="album-thumb">
+              <img src={album.cover} alt={album.title} />
+              <span className={`badge badge-${album.format}`}>{album.format.charAt(0).toUpperCase() + album.format.slice(1)}</span>
+            </div>
+            <div className="album-meta">
               <h2>{album.title}</h2>
               <p>{album.artist} • {album.year}</p>
-              <span className={`badge badge-${album.format}`}>{album.format.charAt(0).toUpperCase() + album.format.slice(1)}</span>
             </div>
           </div>
         ))}
