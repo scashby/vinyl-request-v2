@@ -1,7 +1,7 @@
 
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import EventsPage from './pages/events/EventsPage';
-import BrowsePage from './pages/browse/BrowsePage';
+
 import NowPlayingPage from './pages/now-playing/NowPlayingPage';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import EditQueue from './pages/admin/EditQueue';
@@ -9,7 +9,7 @@ import SetNowPlaying from './pages/admin/SetNowPlaying';
 import ImportDiscogs from './pages/admin/ImportDiscogs';
 import BlockSides from './pages/admin/BlockSides';
 import ImportCollection from './pages/admin/ImportCollection';
-
+import AlbumGatefoldPage from './pages/AlbumGatefoldPage';
 import BrowseQueue from './pages/browse/BrowseQueue';
 import LandingPage from './pages/LandingPage';
 
@@ -20,7 +20,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/events" element={<EventsPage />} />
-        <Route path="/browse" element={<BrowsePage />} />
+        <Route path="/browse" element={<BrowseAlbumsPage />} />
         <Route path="/now-playing" element={<NowPlayingPage />} />
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/edit-queue" element={<EditQueue />} />
