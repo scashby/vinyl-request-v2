@@ -1,43 +1,50 @@
 // ✅ BrowseAlbumsPage.jsx
-// Converted from browse-preview.html — JSX conversion and hook integration needed
+import React from 'react';
+import '../../styles/browse-albums.css';
 
 export default function BrowseAlbumsPage() {
+  const albums = [
+    {
+      id: 1,
+      title: 'British Steel',
+      artist: 'Judas Priest',
+      year: 1980,
+      format: 'Vinyl',
+      cover: '/images/british-steel.jpg'
+    },
+    {
+      id: 2,
+      title: 'Love at First Sting',
+      artist: 'Scorpions',
+      year: 1984,
+      format: 'Cassette',
+      cover: '/images/love-at-first-sting.jpg'
+    }
+  ];
+
+  const badgeColors = {
+    Vinyl: 'purple',
+    Cassette: 'green',
+    '45s': 'red',
+    CD: 'teal',
+    '8-Track': 'orange'
+  };
+
   return (
-    <>
-      {/* BEGIN HTML */}
-      <div dangerouslySetInnerHTML={ { __html: `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Browse Collection Preview</title>
-  <link rel="stylesheet" href="album-browse.css">
-</head>
-<body>
-  <div class="browse-page">
-    <h1>Browse Collection</h1>
-    <div class="album-grid">
-      <a class="album-card" href="#">
-        <span class="badge vinyl">Vinyl</span>
-        <img src="images/british-steel.jpg" alt="British Steel" />
-        <div class="info">
-          <p class="title">British Steel</p>
-          <p class="artist">Judas Priest • 1980</p>
-        </div>
-      </a>
-      <a class="album-card" href="#">
-        <span class="badge cassette">Cassette</span>
-        <img src="images/love-at-first-sting.jpg" alt="Love at First Sting" />
-        <div class="info">
-          <p class="title">Love at First Sting</p>
-          <p class="artist">Scorpions • 1984</p>
-        </div>
-      </a>
+    <div className="browse-wrapper">
+      <h1 className="browse-header">Browse Collection</h1>
+      <div className="album-grid">
+        {albums.map(album => (
+          <div key={album.id} className="album-card">
+            <div className={`media-badge ${badgeColors[album.format]}`}>{album.format}</div>
+            <img src={album.cover} alt={album.title} className="album-cover" />
+            <div className="album-text">
+              <h2 className="album-title">{album.title}</h2>
+              <p className="album-meta">{album.artist} • {album.year}</p>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
-  </div>
-</body>
-</html>
-` } } />
-      {/* END HTML */}
-    </>
   );
 }
