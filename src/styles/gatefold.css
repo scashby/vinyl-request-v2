@@ -1,49 +1,58 @@
+/* ✅ gatefold.css */
 .gatefold-container {
   display: flex;
-  flex-direction: row;
-  width: 100%;
   height: 100vh;
   background-color: #ffffff;
+  color: #2c3eec;
+  font-family: sans-serif;
 }
 
-.gatefold-left {
+.gatefold-left, .gatefold-right {
   flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   overflow: hidden;
 }
 
-.album-image {
+.gatefold-left {
+  padding: 0;
+  margin: 0;
+}
+
+.gatefold-image {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
 .gatefold-right {
-  flex: 1;
+  flex-direction: column;
   padding: 2rem;
   background-color: #f3f3f3;
   color: #2c3eec;
-  overflow-y: auto;
 }
 
-.title {
+.gatefold-title {
   font-size: 2.5rem;
   color: #8246d9;
+  margin-bottom: 0.5rem;
 }
 
-.artist {
+.gatefold-artist {
   font-size: 1.5rem;
-  color: #333;
-  font-weight: bold;
+  font-weight: 600;
+  margin-bottom: 2rem;
 }
 
-.side-label {
+.gatefold-side {
   font-size: 1.2rem;
+  font-weight: bold;
   margin-top: 1.5rem;
-  color: #2c3eec;
+  margin-bottom: 0.5rem;
 }
 
-.tracklist {
-  list-style-type: none;
-  padding-left: 0;
-  color: #2c3eec;
+.gatefold-track {
+  font-size: 1rem;
+  margin-left: 1rem;
 }
