@@ -1,45 +1,61 @@
-.album-browse-page {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 1rem;
+.browse-page {
   padding: 2rem;
-  justify-items: start;
+  background-color: #fafafa;
+  color: #222;
 }
-
+.album-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 1rem;
+}
 .album-card {
-  position: relative;
-  text-align: left;
   text-decoration: none;
-}
-
-.album-image-container {
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 5px rgba(0,0,0,0.1);
+  transition: transform 0.2s ease;
+  background: white;
   position: relative;
+}
+.album-card img {
   width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
 }
-
-.album-image {
-  width: 100%;
-  height: auto;
-  border-radius: 0.5rem;
+.info {
+  padding: 0.5rem;
 }
-
-.media-badge {
-  position: absolute;
-  top: 0.5rem;
-  left: 0.5rem;
-  color: white;
-  padding: 0.25rem 0.5rem;
-  border-radius: 0.25rem;
-  font-size: 0.75rem;
+.title {
+  font-weight: bold;
+  color: #2563eb; /* blue-600 for titles */
 }
-
-.album-title {
-  margin-top: 0.5rem;
-  font-weight: 600;
-}
-
-.album-meta,
-.track-count {
+.artist {
+  color: #666;
   font-size: 0.875rem;
-  color: #555;
+}
+.badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  font-size: 0.65rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: #fff;
+}
+.badge.vinyl {
+  background-color: #9333ea; /* purple-600 */
+}
+.badge.cassette {
+  background-color: #16a34a; /* green-600 */
+}
+.badge.cd {
+  background-color: #0d9488; /* teal-600 */
+}
+.badge.fortyfive {
+  background-color: #dc2626; /* red-600 */
+}
+.badge.eighttrack {
+  background-color: #ea580c; /* orange-600 */
 }
