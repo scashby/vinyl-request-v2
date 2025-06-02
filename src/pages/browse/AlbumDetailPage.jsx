@@ -18,7 +18,7 @@ function AlbumDetailPage() {
     <div className="album-detail">
       <div className="background-blur"></div>
       <div className="album-header">
-        <img className="album-art" src="/images/british-steel.jpg" alt="British Steel" />
+        <img className="album-art" src="/images/judas-priest-british-steel.jpg" alt="British Steel" />
         <div className="album-info">
           <h1 className="title text-white text-3xl font-bold">British Steel</h1>
           <p className="artist text-gray-200">Judas Priest • 1980</p>
