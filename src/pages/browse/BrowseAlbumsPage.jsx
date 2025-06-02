@@ -1,28 +1,35 @@
 import React from 'react';
-import '../../styles/album-browse.css';
+import AlbumCard from '../components/AlbumCard';
+import '../styles/album-browse.css';
 
-export default function BrowseAlbumsPage() {
+const albums = [
+  {{
+    title: 'British Steel',
+    artist: 'Judas Priest',
+    year: 1980,
+    mediaType: 'Vinyl',
+    image: 'british-steel.jpg'
+  }},
+  {{
+    title: 'Love at First Sting',
+    artist: 'Scorpions',
+    year: 1984,
+    mediaType: 'Cassette',
+    image: 'love-at-first-sting.jpg'
+  }}
+];
+
+function BrowseAlbumsPage() {{
   return (
-    <div className="browse-collection">
-      <h1 className="browse-heading">Browse Collection</h1>
+    <div className="browse-page">
+      <h1 className="text-3xl font-bold mb-6">Browse Collection</h1>
       <div className="album-grid">
-        <div className="album-card">
-          <div className="badge badge-vinyl">Vinyl</div>
-          <img src="/assets/images/british-steel.jpg" alt="British Steel" className="album-image" />
-          <div className="album-info">
-            <h2 className="album-title">British Steel</h2>
-            <p className="album-meta">Judas Priest • 1980</p>
-          </div>
-        </div>
-        <div className="album-card">
-          <div className="badge badge-cassette">Cassette</div>
-          <img src="/assets/images/love-at-first-sting.jpg" alt="Love at First Sting" className="album-image" />
-          <div className="album-info">
-            <h2 className="album-title">Love at First Sting</h2>
-            <p className="album-meta">Scorpions • 1984</p>
-          </div>
-        </div>
+        {{albums.map((album, index) => (
+          <AlbumCard key={index} album={{...album}} />
+        ))}}
       </div>
     </div>
   );
-}
+}}
+
+export default BrowseAlbumsPage;
