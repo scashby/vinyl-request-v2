@@ -18,6 +18,7 @@ import ImportDiscogs from './pages/admin/ImportDiscogs';
 import BlockSides from './pages/admin/BlockSides';
 import ImportCollection from './pages/admin/ImportCollection';
 import ManageEvents from './pages/admin/ManageEvents';
+import EditEventForm from './components/EditEventForm';
 
 function App() {
   return (
