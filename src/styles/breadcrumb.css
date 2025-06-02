@@ -3,6 +3,7 @@
   color: #666;
   margin-bottom: 1rem;
   font-family: sans-serif;
+  z-index: 1;
 }
 .breadcrumb a {
   text-decoration: none;
