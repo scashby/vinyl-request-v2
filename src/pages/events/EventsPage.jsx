@@ -1,37 +1,36 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
-import '../../styles/internal.css';
-import Breadcrumbs from '../../components/Breadcrumbs';
-import '../../styles/breadcrumb.css';
+import '../../styles/events.css';
 
+const EventsPage = () => {
+  const [events, setEvents] = useState([]);
 
-const EventsPage = () => (
-  <div className="page-wrapper">
-    <header className="event-hero">
-      <div className="overlay">
-        <h1>Upcoming Vinyl Nights</h1>
-      </div>
-    </header>
-<Breadcrumbs />
-    <main className="event-body">
-      <section className="event-grid">
-        <article className="event-card">
-          <img src="/images/event-header-still.jpg" alt="Vinyl Sunday" className="card-square" />
-          <h2>Vinyl Sunday</h2>
-          <p>June 2, 2025</p>
-        </article>
-        <article className="event-card">
-          <img src="/images/event-header-still.jpg" alt="80s Night" className="card-square" />
-          <h2>80s Night</h2>
-          <p>June 9, 2025</p>
-        </article>
-      </section>
-    </main>
+  useEffect(() => {
+    const fetchEvents = async () => {
+      const { data, error } = await supabase
+        .from('events')
+        .select('*')
+        .order('date', { ascending: true });
 
-    <footer className="footer">
-      © 2025 Dead Wax Dialogues
-    </footer>
-  </div>
-);
+      if (error) {
+        console.error('Error fetching events:', error);
+      } else {
+        console.log('Fetched events:', data);
+        setEvents(data);
+      }
+    };
+
+    fetchEvents();
+  }, []);
+
+  return (
+    <div className="events-page">
+      <h1 className="page-title">Debug: Supabase Events</h1>
+      <pre style={{ whiteSpace: 'pre-wrap', fontSize: '0.85rem', background: '#f4f4f4', padding: '1rem', borderRadius: '8px' }}>
+        {JSON.stringify(events, null, 2)}
+      </pre>
+    </div>
+  );
+};
 
 export default EventsPage;
