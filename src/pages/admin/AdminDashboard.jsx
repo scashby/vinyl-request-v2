@@ -1,15 +1,23 @@
-import { Link } from 'react-router-dom'
+import React from 'react';
+import '../../styles/internal.css';
 
-export default function AdminDashboard() {
+const AdminDashboard = () => {
   return (
-    <div className="max-w-xl mx-auto p-6 space-y-4">
-      <h1 className="text-2xl font-bold mb-4">Admin Dashboard</h1>
-      <ul className="space-y-2">
-        <li><Link to="/admin/edit-queue" className="text-blue-600 underline">Edit Queue</Link></li>
-        <li><Link to="/admin/set-now-playing" className="text-blue-600 underline">Set Now Playing / Up Next</Link></li>
-        <li><Link to="/admin/import-discogs" className="text-blue-600 underline">Import Discogs CSV</Link></li>
-        <li><Link to="/admin/block-sides" className="text-blue-600 underline">Block Damaged Sides</Link></li>
+    <div className="admin-dashboard" style={{ backgroundColor: '#f9f9f9', minHeight: '100vh', padding: '2rem' }}>
+      <h1 style={{ color: '#222', marginBottom: '1.5rem' }}>Admin Dashboard</h1>
+      <ul style={{ listStyle: 'none', padding: 0, fontSize: '1.1rem' }}>
+        <li style={{ marginBottom: '1rem' }}>
+          <a href="/admin/events" style={{ color: '#2563eb', textDecoration: 'none' }}>Manage Events</a>
+        </li>
+        <li style={{ marginBottom: '1rem' }}>
+          <a href="/admin/queue" style={{ color: '#2563eb', textDecoration: 'none' }}>Manage Queues</a>
+        </li>
+        <li style={{ marginBottom: '1rem' }}>
+          <a href="/admin/collection" style={{ color: '#2563eb', textDecoration: 'none' }}>Manage Collection</a>
+        </li>
       </ul>
     </div>
-  )
-}
+  );
+};
+
+export default AdminDashboard;
