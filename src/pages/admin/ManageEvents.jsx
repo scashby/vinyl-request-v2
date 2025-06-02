@@ -20,7 +20,7 @@ const ManageEvents = () => {
       {selectedEvent ? (
         <EditEventForm event={selectedEvent} onClose={() => setSelectedEvent(null)} />
       ) : (
-        <ul className="admin-event-list" style={{ listStyle: 'none', padding: 0, fontSize: '1rem' }}>
+        <ul className="admin-event-list" style={{ listStyle: 'none', padding: 0, fontSize: '1rem', color: '#000' }}>
           {events.map(event => (
             <li key={event.id} style={{ marginBottom: '1rem', background: '#fff', padding: '1rem', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
               <strong>{event.title}</strong> – {event.date} @ {event.location || 'TBD'}
