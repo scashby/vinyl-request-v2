@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabaseClient';
-import '../../styles/internal.css';
+import { supabase } from '../lib/supabaseClient';
+import '../styles/internal.css';
 
 const EditEventForm = ({ eventId, onSave }) => {
   const [event, setEvent] = useState({
