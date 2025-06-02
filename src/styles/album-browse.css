@@ -29,7 +29,7 @@
   font-weight: bold;
   color: #2563eb; /* blue-600 for titles */
 }
-.artist {
+.album-artist {
   color: #222;           /* deep black (not gray) */
   font-size: 0.75rem;    /* Tailwind's `text-sm`, or 12px */
   font-weight: 400;

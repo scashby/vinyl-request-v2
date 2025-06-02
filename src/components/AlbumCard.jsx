@@ -15,7 +15,7 @@ function AlbumCard({ album }) {
       </Link>
       <div className="info">
         <p className="album-title text-blue-600 font-semibold">{album.title}</p>
-        <p className="artist">{album.artist} • {album.year}</p>
+        <p className="album-artist">{album.artist} • {album.year}</p>
       </div>
     </div>
   );
