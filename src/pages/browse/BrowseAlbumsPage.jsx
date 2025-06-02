@@ -8,20 +8,20 @@ const albums = [
     artist: 'Judas Priest',
     year: 1980,
     mediaType: 'Vinyl',
-    image: 'british-steel.jpg'
+    image: 'judas-priest-british-steel.jpg'
   },
   {
     title: 'Love at First Sting',
     artist: 'Scorpions',
     year: 1984,
     mediaType: 'Cassette',
-    image: 'love-at-first-sting.jpg'
+    image: 'scorpions-love-at-first-sting.jpg'
   }
 ];
 
 function BrowseAlbumsPage() {
   return (
-    <div className="browse-page">
+    <div className="browse-page min-h-screen bg-[#fafafa]">
       <h1 className="text-3xl font-bold mb-6">Browse Collection</h1>
       <div className="album-grid">
         {albums.map((album, index) => (

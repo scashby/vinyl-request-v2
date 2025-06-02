@@ -15,7 +15,7 @@ function AlbumCard({ album }) {
       </span>
       <img src={`/images/${album.image}`} alt={album.title} />
       <div className="info">
-        <p className="title">{album.title}</p>
+        <p className="title text-blue-600 font-semibold">{album.title}</p>
         <p className="artist">{album.artist} • {album.year}</p>
       </div>
     </Link>
