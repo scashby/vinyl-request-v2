@@ -1,22 +1,18 @@
 .breadcrumb {
   font-size: 0.75rem;
   color: #666;
-  margin: 0 0 0.75rem 0;
+  margin: 0 0 0.5rem 0;
   font-family: sans-serif;
   text-transform: lowercase;
-  display: flex;
-  align-items: center;
 }
 
-.breadcrumb a {
-  text-decoration: none;
+.breadcrumb a,
+.breadcrumb span {
+  font-size: 0.75rem;
+  font-weight: normal;
   color: #666;
 }
 
 .breadcrumb a:hover {
   text-decoration: underline;
-}
-
-.dot-separator {
-  margin: 0 6px;
 }

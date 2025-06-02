@@ -10,15 +10,13 @@ const Breadcrumbs = () => {
       <Link to="/">home</Link>
       {segments.map((seg, idx) => {
         const path = '/' + segments.slice(0, idx + 1).join('/');
+        const label = seg.toLowerCase();
         const isLast = idx === segments.length - 1;
+
         return (
           <span key={path}>
-            {idx > 0 && <span className="dot-separator"> • </span>}
-            {isLast ? (
-              <span>{seg.toLowerCase()}</span>
-            ) : (
-              <Link to={path}>{seg.toLowerCase()}</Link>
-            )}
+            {' • '}
+            {isLast ? <span>{label}</span> : <Link to={path}>{label}</Link>}
           </span>
         );
       })}
