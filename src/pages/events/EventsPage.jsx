@@ -10,9 +10,8 @@ const EventsPage = () => (
       <div className="overlay">
         <h1>Upcoming Vinyl Nights</h1>
       </div>
-      <Breadcrumbs />
     </header>
-
+<Breadcrumbs />
     <main className="event-body">
       <section className="event-grid">
         <article className="event-card">
