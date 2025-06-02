@@ -1,63 +1,95 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabaseClient';
+import Breadcrumbs from '../../components/Breadcrumbs';
 import EditEventForm from '../../components/EditEventForm';
+import AddSeriesModal from '../../components/AddSeriesModal';
+import '../../styles/internal.css';
+import '../../styles/breadcrumb.css';
 
 const ManageEvents = () => {
   const [events, setEvents] = useState([]);
   const [selectedEvent, setSelectedEvent] = useState(null);
+  const [isCreating, setIsCreating] = useState(false);
+  const [showSeriesModal, setShowSeriesModal] = useState(false); // ensure git detects change
 
   useEffect(() => {
     const fetchEvents = async () => {
-      const { data, error } = await supabase.from('events').select('*').order('date', { ascending: true });
-      if (!error) setEvents(data);
+      const { data, error } = await supabase.from('events').select('*').order('date');
+      if (error) {
+        console.error('Error fetching events:', error.message);
+      } else {
+        setEvents(data);
+      }
     };
+
     fetchEvents();
   }, []);
 
-  return (
-    <div className="admin-wrapper" style={{ backgroundColor: '#f9f9f9', minHeight: '100vh', padding: '2rem' }}>
-      <h1 style={{ color: "#000" }}>Admin: Events</h1>
-      {selectedEvent ? (
-        <EditEventForm event={selectedEvent} onClose={() => setSelectedEvent(null)} />
-      ) : (
-        <ul className="admin-event-list" style={{ listStyle: 'none', padding: 0, fontSize: '1rem', color: '#000' }}>
-          {events.map(event => (
-            <li key={event.id} style={{ marginBottom: '1rem', background: '#fff', padding: '1rem', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-              <strong>{event.title}</strong> – {event.date} @ {event.location || 'TBD'}
-              <button onClick={() => setSelectedEvent(event)} style={{ marginLeft: '1rem', background: '#2563eb', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px' }}>Edit</button>
-            </li>
-          ))}
-        </ul>
-      )}
+  const handleEdit = (event) => {
+    setSelectedEvent(event);
+    setIsCreating(false);
+  };
 
-    {showSeriesModal && (
-      <AddSeriesModal
-        onClose={() => setShowSeriesModal(false)}
-        onAddSeries={({ startDate, endDate, dayOfWeek }) => {
-          const start = new Date(startDate);
-          const end = new Date(endDate);
-          const newEvents = [];
-          const targetDay = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'].indexOf(dayOfWeek);
-          for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-            if (d.getDay() === targetDay) {
-              newEvents.push({
-                title: 'Vinyl Sunday',
-                date: d.toISOString().split('T')[0],
-                time: '12-6pm',
-                info: '',
-                location: '',
-                image_url: '',
-                has_queue: false,
-                allowed_formats: null,
-              });
-            }
-          }
-          if (newEvents.length > 0) {
-            supabase.from('events').insert(newEvents).then(fetchEvents);
-          }
-        }}
-      />
-    )}
+  const handleCreate = () => {
+    setSelectedEvent(null);
+    setIsCreating(true);
+  };
+
+  const handleDuplicate = (event) => {
+    const clone = { ...event, id: null, title: `${event.title} (Copy)` };
+    setSelectedEvent(clone);
+    setIsCreating(true);
+  };
+
+  const handleAddSeries = () => {
+    setShowSeriesModal(true);
+  };
+
+  const handleCloseModal = () => {
+    setShowSeriesModal(false);
+  };
+
+  return (
+    <div className="page-wrapper">
+      <header className="internal-header">
+        <h1>Admin: Events</h1>
+      </header>
+      <Breadcrumbs />
+      <main className="internal-body">
+        <div className="admin-controls">
+          <button onClick={handleCreate}>Create New Event</button>
+          <button onClick={handleAddSeries}>Add Series</button>
+        </div>
+        {showSeriesModal && <AddSeriesModal onClose={handleCloseModal} />}
+        {isCreating || selectedEvent ? (
+          <EditEventForm
+            eventData={selectedEvent}
+            onCancel={() => {
+              setSelectedEvent(null);
+              setIsCreating(false);
+            }}
+          />
+        ) : (
+          <section className="admin-events">
+            {events.map((event) => (
+              <article key={event.id} className="admin-event-card">
+                <div className="admin-event-info">
+                  <h2>{event.title}</h2>
+                  <p>{event.date}</p>
+                  <p>{event.time}</p>
+                </div>
+                <div className="admin-event-actions">
+                  <button onClick={() => handleEdit(event)}>Edit</button>
+                  <button onClick={() => handleDuplicate(event)}>Duplicate</button>
+                </div>
+              </article>
+            ))}
+          </section>
+        )}
+      </main>
+      <footer className="footer">
+        © 2025 Dead Wax Dialogues
+      </footer>
     </div>
   );
 };
