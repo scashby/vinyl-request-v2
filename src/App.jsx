@@ -5,7 +5,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import LandingPage from './pages/LandingPage';
 import EventsPage from './pages/events/EventsPage';
 import EventDetail from './pages/events/EventDetail';
-import BrowsePage from './pages/browse/BrowseQueue';
+import BrowseQueue from './pages/browse/BrowseQueue';
 import NowPlayingPage from './pages/now-playing/NowPlayingPage';
 import BrowseAlbumsPage from './pages/browse/BrowseAlbumsPage';
 import AlbumDetailPage from './pages/browse/AlbumDetailPage';
