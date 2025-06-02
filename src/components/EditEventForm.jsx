@@ -32,7 +32,26 @@ const EditEventForm = ({ event, onClose }) => {
     setUploading(false);
   };
 
+  
   const handleSubmit = async (e) => {
+    const payload = {
+      title: eventData.title,
+      date: eventData.date,
+      time: eventData.time,
+      info: eventData.info,
+      location: eventData.location,
+      image_url: eventData.image_url,
+      has_queue: eventData.has_queue,
+      allowed_formats: eventData.has_queue ? eventData.allowed_formats : null,
+    };
+
+    let result;
+    if (eventData.id) {
+      result = await supabase.from('events').update(payload).eq('id', eventData.id);
+    } else {
+      result = await supabase.from('events').insert([payload]);
+    }
+
     e.preventDefault();
     await supabase.from('events').update(formData).eq('id', event.id);
     onClose();
