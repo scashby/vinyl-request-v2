@@ -25,10 +25,9 @@ function App() {
         {/* Public */}
         <Route path="/" element={<LandingPage />} />
         <Route path="/events" element={<EventsPage />} />
-        <Route path="/event/:id" element={<EventDetail />} />
-        <Route path="/browse" element={<BrowsePage />} />
+        <Route path="/browse" element={<BrowseAlbumsPage />} />
+        <Route path="/browse-queue" element={<BrowseQueue />} />
         <Route path="/now-playing" element={<NowPlayingPage />} />
-        <Route path="/albums" element={<BrowseAlbumsPage />} />
         <Route path="/album/:id" element={<AlbumDetailPage />} />
 
         {/* Admin */}

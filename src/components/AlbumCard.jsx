@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 
 const badgeColors = {
   Vinyl: 'bg-purple-600',
@@ -12,7 +13,7 @@ function AlbumCard({ album }) {
   const badgeClass = badgeColors[album.mediaType] || 'bg-gray-400';
 
   return (
-    <a className="album-card" href="#">
+    <Link className="album-card" to={`/album/${album.id}`}>
       <span className={`badge text-white text-xs px-2 py-1 rounded ${badgeClass}`}>
         {album.mediaType}
       </span>
@@ -21,7 +22,7 @@ function AlbumCard({ album }) {
         <p className="title text-blue-600 font-semibold">{album.title}</p>
         <p className="artist text-gray-700">{album.artist} • {album.year}</p>
       </div>
-    </a>
+    </Link>
   );
 }
 
