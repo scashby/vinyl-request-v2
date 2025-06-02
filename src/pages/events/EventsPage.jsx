@@ -1,50 +1,37 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { supabase } from '../../lib/supabaseClient';
-import '../../styles/events.css';
+import '../../styles/internal.css';
+import Breadcrumbs from '../../components/Breadcrumbs';
+import '../../styles/breadcrumb.css';
 
-const EventsPage = () => {
-  const [events, setEvents] = useState([]);
 
-  useEffect(() => {
-    const fetchEvents = async () => {
-      const { data, error } = await supabase
-        .from('events')
-        .select('*')
-        .order('date', { ascending: true });
-
-      if (error) {
-        console.error('Error fetching events:', error);
-      } else {
-        setEvents(data);
-      }
-    };
-
-    fetchEvents();
-  }, []);
-
-  return (
-    <div className="events-page">
-      <h1 className="page-title">Upcoming Events</h1>
-      <div className="event-list">
-        {events.map(event => (
-          <div className="event-card" key={event.id}>
-            <img
-              src={event.image_url || '/images/event-placeholder.jpg'}
-              alt={event.title}
-              className="event-image"
-            />
-            <div className="event-details">
-              <h2 className="event-title">{event.title}</h2>
-              <p className="event-date">{event.date} @ {event.time}</p>
-              {event.location && <p className="event-location">{event.location}</p>}
-              {event.has_queue && <span className="event-badge">Queue Enabled</span>}
-              {event.info && <p className="event-info">{event.info}</p>}
-            </div>
-          </div>
-        ))}
+const EventsPage = () => (
+  <div className="page-wrapper">
+    <header className="event-hero">
+      <div className="overlay">
+        <h1>Upcoming Vinyl Nights</h1>
       </div>
-    </div>
-  );
-};
+    </header>
+<Breadcrumbs />
+    <main className="event-body">
+      <section className="event-grid">
+        <article className="event-card">
+          <img src="/images/event-header-still.jpg" alt="Vinyl Sunday" className="card-square" />
+          <h2>Vinyl Sunday</h2>
+          <p>June 2, 2025</p>
+        </article>
+        <article className="event-card">
+          <img src="/images/event-header-still.jpg" alt="80s Night" className="card-square" />
+          <h2>80s Night</h2>
+          <p>June 9, 2025</p>
+        </article>
+      </section>
+    </main>
+
+    <footer className="footer">
+      © 2025 Dead Wax Dialogues
+    </footer>
+  </div>
+);
 
 export default EventsPage;
