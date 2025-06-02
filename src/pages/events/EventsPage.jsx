@@ -1,5 +1,8 @@
 import React from 'react';
 import '../../styles/internal.css';
+import Breadcrumbs from '../../components/Breadcrumbs';
+import '../../styles/breadcrumb.css';
+
 
 const EventsPage = () => (
   <div className="page-wrapper">
@@ -10,6 +13,7 @@ const EventsPage = () => (
     </header>
 
     <main className="event-body">
+      <Breadcrumbs />
       <section className="event-grid">
         <article className="event-card">
           <img src="/images/event-header-still.jpg" alt="Vinyl Sunday" className="card-square" />
