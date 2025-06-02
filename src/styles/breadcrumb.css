@@ -1,20 +1,12 @@
 .breadcrumb {
   font-size: 0.75rem;
   font-family: sans-serif;
-  text-transform: lowercase;
   color: #666;
+  text-transform: lowercase;
   margin: 0 0 0.5rem 0;
 }
 
-.crumb {
-  display: inline;
-  font-size: inherit;
-  font-weight: normal;
-  line-height: 1;
-  color: inherit;
-}
-
-.crumb-link {
+.breadcrumb-link {
   text-decoration: none;
   color: inherit;
   font-size: inherit;
