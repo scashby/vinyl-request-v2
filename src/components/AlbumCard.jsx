@@ -1,26 +1,22 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 
-const badgeColors = {
-  Vinyl: 'bg-purple-600',
-  Cassette: 'bg-green-600',
-  '45 RPM': 'bg-red-600',
-  CD: 'bg-teal-600',
-  '8-Track': 'bg-orange-600',
-};
-
 function AlbumCard({ album }) {
-  const badgeClass = badgeColors[album.mediaType] || 'bg-gray-400';
+  // Convert mediaType to lowercase and match class naming in CSS
+  const typeClass = album.mediaType
+    .toLowerCase()
+    .replace(/\s/g, '') // remove spaces
+    .replace(/-/g, '')  // remove dashes
 
   return (
     <Link className="album-card" to={`/album/${album.id}`}>
-      <span className={`badge text-white text-xs px-2 py-1 rounded ${badgeClass}`}>
+      <span className={`badge ${typeClass}`}>
         {album.mediaType}
       </span>
       <img src={`/images/${album.image}`} alt={album.title} />
       <div className="info">
-        <p className="title text-blue-600 font-semibold">{album.title}</p>
-        <p className="artist text-gray-700">{album.artist} • {album.year}</p>
+        <p className="title">{album.title}</p>
+        <p className="artist">{album.artist} • {album.year}</p>
       </div>
     </Link>
   );
