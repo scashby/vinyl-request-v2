@@ -11,9 +11,9 @@ const EventsPage = () => (
         <h1>Upcoming Vinyl Nights</h1>
       </div>
     </header>
+      <Breadcrumbs />
 
     <main className="event-body">
-      <Breadcrumbs />
       <section className="event-grid">
         <article className="event-card">
           <img src="/images/event-header-still.jpg" alt="Vinyl Sunday" className="card-square" />
