@@ -24,7 +24,6 @@ body, html {
   background-position: center;
   filter: blur(20px) brightness(0.4);
   z-index: 0;
-  opacity: 0.25;
   inset: 0;
 }
 
