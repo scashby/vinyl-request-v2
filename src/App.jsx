@@ -34,6 +34,7 @@ function App() {
         {/* Admin */}
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/admin/events" element={<ManageEvents />} />
+        <Route path="/admin/events/new" element={<EditEventForm />} />
         <Route path="/admin/edit-queue" element={<EditQueue />} />
         <Route path="/admin/set-now-playing" element={<SetNowPlaying />} />
         <Route path="/admin/import-discogs" element={<ImportDiscogs />} />
