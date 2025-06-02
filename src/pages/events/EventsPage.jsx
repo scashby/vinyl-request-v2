@@ -37,9 +37,16 @@ const EventsPage = () => {
       <main className="event-body">
         <section className="event-grid">
           {events.map((event) => {
-            const imageSrc = event.image_url && event.image_url.includes('dropbox.com')
-              ? event.image_url.replace('www.dropbox.com', 'dl.dropboxusercontent.com').replace('?dl=0', '').split('?')[0]
+            const imageSrc = event.image_url?.includes('dropbox.com')
+              ? event.image_url.replace('www.dropbox.com', 'dl.dropboxusercontent.com').split('.jpg')[0] + '.jpg'
               : event.image_url || '/images/event-header-still.jpg';
+
+            const formattedDate = new Date(event.date).toLocaleDateString('en-US', {
+              weekday: 'long',
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+            });
 
             return (
               <article className="event-card" key={event.id}>
@@ -60,8 +67,9 @@ const EventsPage = () => {
                     </a>
                   </p>
                 )}
-                <p>{event.date}</p>
-                <p>{event.time}</p>
+                <p className="datetime">
+                  {formattedDate} • {event.time}
+                </p>
               </article>
             );
           })}
