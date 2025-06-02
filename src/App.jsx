@@ -3,20 +3,20 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
 // Public Pages
 import LandingPage from './pages/LandingPage';
-import EventsPage from './pages/EventsPage';
-import EventDetail from './pages/EventDetail';
-import BrowsePage from './pages/BrowsePage';
-import NowPlayingPage from './pages/NowPlayingPage';
+import EventsPage from './pages/events/EventsPage';
+import EventDetail from './pages/events/EventDetail';
+import BrowsePage from './pages/browse/BrowseQueue';
+import NowPlayingPage from './pages/now-playing/NowPlayingPage';
 import BrowseAlbumsPage from './pages/browse/BrowseAlbumsPage';
 import AlbumDetailPage from './pages/browse/AlbumDetailPage';
 
 // Admin Pages
-import AdminDashboard from './pages/AdminDashboard';
-import EditQueue from './pages/EditQueue';
-import SetNowPlaying from './pages/SetNowPlaying';
-import ImportDiscogs from './pages/ImportDiscogs';
-import BlockSides from './pages/BlockSides';
-import ImportCollection from './pages/ImportCollection';
+import AdminDashboard from './pages/admin/AdminDashboard';
+import EditQueue from './pages/admin/EditQueue';
+import SetNowPlaying from './pages/admin/SetNowPlaying';
+import ImportDiscogs from './pages/admin/ImportDiscogs';
+import BlockSides from './pages/admin/BlockSides';
+import ImportCollection from './pages/admin/ImportCollection';
 
 function App() {
   return (
