@@ -1,15 +1,9 @@
-import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabaseClient';
-import DatePicker from 'react-multi-date-picker';
-import 'react-multi-date-picker/styles/colors/teal.css';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../../lib/supabaseClient';
+import '../../styles/internal.css';
 
-const EditEventForm = () => {
-  const { id } = useParams();
-  const isNew = !id;
-  const navigate = useNavigate();
-
-  const [eventData, setEventData] = useState({
+const EditEventForm = ({ eventId, onSave }) => {
+  const [event, setEvent] = useState({
     title: '',
     date: '',
     time: '',
@@ -17,106 +11,99 @@ const EditEventForm = () => {
     info: '',
     image_url: '',
     has_queue: false,
-    allowed_formats: ''
+    allowed_formats: '',
   });
 
-  const [repeatDates, setRepeatDates] = useState([]);
+  const [repeat, setRepeat] = useState(false);
+  const [repeatFrequency, setRepeatFrequency] = useState('weekly');
+  const [repeatDay, setRepeatDay] = useState('Sunday');
+  const [repeatEndDate, setRepeatEndDate] = useState('');
 
   useEffect(() => {
-    if (!isNew) {
-      supabase.from('events').select('*').eq('id', id).single().then(({ data }) => {
-        if (data) setEventData(data);
-      });
-    }
-  }, [id, isNew]);
+    const fetchEvent = async () => {
+      if (eventId) {
+        const { data, error } = await supabase.from('events').select('*').eq('id', eventId).single();
+        if (data) setEvent(data);
+      }
+    };
+    fetchEvent();
+  }, [eventId]);
 
-  const handleChange = (field, value) => {
-    setEventData(prev => ({ ...prev, [field]: value }));
+  const handleChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setEvent(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value,
+    }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (isNew) {
-      const formattedDates = repeatDates.length
-        ? repeatDates.map(d => d.format('YYYY-MM-DD'))
-        : [eventData.date];
-
-      const payload = formattedDates.map(date => ({
-        ...eventData,
-        date
-      }));
-
-      await supabase.from('events').insert(payload);
+    if (eventId) {
+      await supabase.from('events').update(event).eq('id', eventId);
     } else {
-      await supabase.from('events').update(eventData).eq('id', id);
+      await supabase.from('events').insert([event]);
     }
-    navigate('/admin/events');
-  };
-
-  const handleCopy = () => {
-    navigate('/admin/events/new', { state: { eventData } });
+    if (onSave) onSave();
   };
 
   return (
-    <div style={{ backgroundColor: '#f9f9f9', minHeight: '100vh', padding: '2rem' }}>
-      <h1 style={{ fontSize: '1.5rem', marginBottom: '1rem', color: '#000' }}>
-        {isNew ? 'Create Event' : 'Edit Event'}
-      </h1>
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxWidth: '600px' }}>
-        <label style={{ color: '#000' }}>
-          Title:
-          <input value={eventData.title} onChange={e => handleChange('title', e.target.value)} required />
+    <form className="edit-event-form" onSubmit={handleSubmit}>
+      <h2>{eventId ? 'Edit Event' : 'Create New Event'}</h2>
+      <label>Title:
+        <input type="text" name="title" value={event.title} onChange={handleChange} required />
+      </label>
+      <label>Date:
+        <input type="date" name="date" value={event.date} onChange={handleChange} required />
+      </label>
+      <label>Time:
+        <input type="text" name="time" value={event.time} onChange={handleChange} />
+      </label>
+      <label>Location:
+        <input type="text" name="location" value={event.location} onChange={handleChange} />
+      </label>
+      <label>Info:
+        <textarea name="info" value={event.info || ''} onChange={handleChange} />
+      </label>
+      <label>Image URL:
+        <input type="url" name="image_url" value={event.image_url || ''} onChange={handleChange} />
+      </label>
+      <label>
+        <input type="checkbox" name="has_queue" checked={event.has_queue} onChange={handleChange} />
+        Has Queue?
+      </label>
+      {event.has_queue && (
+        <label>Allowed Formats:
+          <input type="text" name="allowed_formats" value={event.allowed_formats || ''} onChange={handleChange} />
         </label>
-        {!isNew && (
-          <label style={{ color: '#000' }}>
-            Date:
-            <input type="date" value={eventData.date} onChange={e => handleChange('date', e.target.value)} required />
+      )}
+      <label>
+        <input type="checkbox" checked={repeat} onChange={() => setRepeat(!repeat)} />
+        Repeat
+      </label>
+      {repeat && (
+        <div className="repeat-options">
+          <label>Frequency:
+            <select value={repeatFrequency} onChange={e => setRepeatFrequency(e.target.value)}>
+              <option value="weekly">Every Week</option>
+              <option value="biweekly">Every 2 Weeks</option>
+              <option value="monthly">Every Month</option>
+            </select>
           </label>
-        )}
-        {isNew && (
-          <label style={{ color: '#000' }}>
-            Select Dates:
-            <DatePicker
-              multiple
-              value={repeatDates}
-              onChange={setRepeatDates}
-              format="YYYY-MM-DD"
-              className="teal"
-            />
+          <label>Day of Week:
+            <select value={repeatDay} onChange={e => setRepeatDay(e.target.value)}>
+              {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(day => (
+                <option key={day} value={day}>{day}</option>
+              ))}
+            </select>
           </label>
-        )}
-        <label style={{ color: '#000' }}>
-          Time:
-          <input value={eventData.time} onChange={e => handleChange('time', e.target.value)} />
-        </label>
-        <label style={{ color: '#000' }}>
-          Location:
-          <input value={eventData.location} onChange={e => handleChange('location', e.target.value)} />
-        </label>
-        <label style={{ color: '#000' }}>
-          Info:
-          <textarea value={eventData.info} onChange={e => handleChange('info', e.target.value)} />
-        </label>
-        <label style={{ color: '#000' }}>
-          Promo Image URL:
-          <input value={eventData.image_url} onChange={e => handleChange('image_url', e.target.value)} />
-        </label>
-        <label style={{ color: '#000' }}>
-          Has Queue:
-          <input type="checkbox" checked={eventData.has_queue} onChange={e => handleChange('has_queue', e.target.checked)} />
-        </label>
-        {eventData.has_queue && (
-          <label style={{ color: '#000' }}>
-            Allowed Formats:
-            <input value={eventData.allowed_formats} onChange={e => handleChange('allowed_formats', e.target.value)} />
+          <label>End Date:
+            <input type="date" value={repeatEndDate} onChange={e => setRepeatEndDate(e.target.value)} />
           </label>
-        )}
-        <div style={{ display: 'flex', gap: '1rem' }}>
-          <button type="submit">{isNew ? 'Create Event' : 'Update Event'}</button>
-          {!isNew && <button type="button" onClick={handleCopy}>Copy This Event</button>}
         </div>
-      </form>
-    </div>
+      )}
+      <button type="submit">Save Event</button>
+    </form>
   );
 };
 
