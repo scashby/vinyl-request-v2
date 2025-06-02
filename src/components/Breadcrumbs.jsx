@@ -8,9 +8,9 @@ const Breadcrumbs = () => {
 
   return (
     <nav className="breadcrumb">
-      <span>
+      <span className="breadcrumb-content">
         <Link to="/">home</Link>
-        {trail ? ` • ${trail}` : ''}
+        {trail ? <span> • {trail}</span> : ''}
       </span>
     </nav>
   );
