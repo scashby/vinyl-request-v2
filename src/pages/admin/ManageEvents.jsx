@@ -1,7 +1,10 @@
+
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
-import '../../styles/internal.css';
 import { useNavigate } from 'react-router-dom';
+import '../../styles/internal.css';
+import Breadcrumbs from '../../components/Breadcrumbs';
+import '../../styles/breadcrumb.css';
 
 const ManageEvents = () => {
   const [events, setEvents] = useState([]);
@@ -10,43 +13,40 @@ const ManageEvents = () => {
   useEffect(() => {
     const fetchEvents = async () => {
       const { data, error } = await supabase.from('events').select('*');
-      if (error) {
-        console.error('Error fetching events:', error);
-      } else {
-        setEvents(data);
-      }
+      if (!error) setEvents(data);
     };
-
     fetchEvents();
   }, []);
 
-  const handleEdit = (eventId) => {
-    navigate(`/admin/events/${eventId}`);
-  };
-
-  const handleAddNew = () => {
-    navigate('/admin/events/new');
-  };
-
   return (
-    <div className="admin-container">
-      <h1>Admin: Events</h1>
-      <button className="btn" onClick={handleAddNew}>
-        ➕ Add New Event
-      </button>
-      <div className="event-list">
-        {events.map((event) => (
-          <div key={event.id} className="event-tile">
-            <div>
-              <strong>{event.title}</strong>
-              <div>{event.date}</div>
+    <div className="page-wrapper">
+      <header className="internal-hero">
+        <div className="overlay">
+          <h1>Admin: Events</h1>
+        </div>
+      </header>
+      <Breadcrumbs />
+      <main className="internal-body">
+        <div className="admin-events-controls">
+          <button onClick={() => navigate('/admin/events/new')} className="blue-button">
+            Add New Event
+          </button>
+        </div>
+        <div className="admin-event-list">
+          {events.map((event) => (
+            <div key={event.id} className="admin-event-tile">
+              <div className="event-info">
+                <h2>{event.title}</h2>
+                <p>{event.date}</p>
+              </div>
+              <button onClick={() => navigate(`/admin/events/${event.id}`)} className="blue-button small">
+                Edit
+              </button>
             </div>
-            <button className="btn" onClick={() => handleEdit(event.id)}>
-              Edit
-            </button>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      </main>
+      <footer className="footer">© 2025 Dead Wax Dialogues</footer>
     </div>
   );
 };
