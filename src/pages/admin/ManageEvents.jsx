@@ -1,52 +1,72 @@
-
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
+import EditEventForm from '../../components/EditEventForm';
 import { useNavigate } from 'react-router-dom';
-import '../../styles/internal.css';
-import Breadcrumbs from '../../components/Breadcrumbs';
-import '../../styles/breadcrumb.css';
 
 const ManageEvents = () => {
   const [events, setEvents] = useState([]);
+  const [selectedEvent, setSelectedEvent] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
     const fetchEvents = async () => {
-      const { data, error } = await supabase.from('events').select('*');
+      const { data, error } = await supabase.from('events').select('*').order('date', { ascending: true });
       if (!error) setEvents(data);
     };
     fetchEvents();
   }, []);
 
   return (
-    <div className="page-wrapper">
-      <header className="internal-hero">
-        <div className="overlay">
-          <h1>Admin: Events</h1>
-        </div>
-      </header>
-      <Breadcrumbs />
-      <main className="internal-body">
-        <div className="admin-events-controls">
-          <button onClick={() => navigate('/admin/events/new')} className="blue-button">
-            Add New Event
-          </button>
-        </div>
-        <div className="admin-event-list">
-          {events.map((event) => (
-            <div key={event.id} className="admin-event-tile">
-              <div className="event-info">
-                <h2>{event.title}</h2>
-                <p>{event.date}</p>
-              </div>
-              <button onClick={() => navigate(`/admin/events/${event.id}`)} className="blue-button small">
+    <div className="admin-wrapper" style={{ backgroundColor: '#f9f9f9', minHeight: '100vh', padding: '2rem' }}>
+      <h1 style={{ color: "#000" }}>Admin: Events</h1>
+
+      <button
+        onClick={() => navigate('/admin/events/new')}
+        style={{
+          background: '#2563eb',
+          color: '#fff',
+          border: 'none',
+          padding: '0.5rem 1rem',
+          borderRadius: '4px',
+          marginBottom: '1rem'
+        }}
+      >
+        ➕ Add New Event
+      </button>
+
+      {selectedEvent ? (
+        <EditEventForm event={selectedEvent} onClose={() => setSelectedEvent(null)} />
+      ) : (
+        <ul className="admin-event-list" style={{ listStyle: 'none', padding: 0, fontSize: '1rem', color: '#000' }}>
+          {events.map(event => (
+            <li
+              key={event.id}
+              style={{
+                marginBottom: '1rem',
+                background: '#fff',
+                padding: '1rem',
+                borderRadius: '8px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+              }}
+            >
+              <strong>{event.title}</strong> – {event.date} @ {event.location || 'TBD'}
+              <button
+                onClick={() => setSelectedEvent(event)}
+                style={{
+                  marginLeft: '1rem',
+                  background: '#2563eb',
+                  color: '#fff',
+                  border: 'none',
+                  padding: '0.5rem 1rem',
+                  borderRadius: '4px'
+                }}
+              >
                 Edit
               </button>
-            </div>
+            </li>
           ))}
-        </div>
-      </main>
-      <footer className="footer">© 2025 Dead Wax Dialogues</footer>
+        </ul>
+      )}
     </div>
   );
 };
