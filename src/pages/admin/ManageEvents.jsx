@@ -16,7 +16,7 @@ const ManageEvents = () => {
 
   return (
     <div className="admin-wrapper" style={{ backgroundColor: '#f9f9f9', minHeight: '100vh', padding: '2rem' }}>
-      <h1>Admin: Events</h1>
+      <h1 style={{ color: "#000" }}>Admin: Events</h1>
       {selectedEvent ? (
         <EditEventForm event={selectedEvent} onClose={() => setSelectedEvent(null)} />
       ) : (
