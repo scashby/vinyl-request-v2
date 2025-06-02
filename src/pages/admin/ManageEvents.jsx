@@ -15,16 +15,16 @@ const ManageEvents = () => {
   }, []);
 
   return (
-    <div className="admin-wrapper">
+    <div className="admin-wrapper" style={{ backgroundColor: '#f9f9f9', minHeight: '100vh', padding: '2rem' }}>
       <h1>Admin: Events</h1>
       {selectedEvent ? (
         <EditEventForm event={selectedEvent} onClose={() => setSelectedEvent(null)} />
       ) : (
-        <ul className="admin-event-list">
+        <ul className="admin-event-list" style={{ listStyle: 'none', padding: 0, fontSize: '1rem' }}>
           {events.map(event => (
-            <li key={event.id}>
+            <li key={event.id} style={{ marginBottom: '1rem', background: '#fff', padding: '1rem', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
               <strong>{event.title}</strong> – {event.date} @ {event.location || 'TBD'}
-              <button onClick={() => setSelectedEvent(event)}>Edit</button>
+              <button onClick={() => setSelectedEvent(event)} style={{ marginLeft: '1rem', background: '#2563eb', color: '#fff', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px' }}>Edit</button>
             </li>
           ))}
         </ul>
