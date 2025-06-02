@@ -6,13 +6,9 @@
   text-transform: lowercase;
 }
 
-.breadcrumb a,
-.breadcrumb span {
+.breadcrumb span,
+.breadcrumb a {
   font-size: 0.75rem;
   font-weight: normal;
   color: #666;
-}
-
-.breadcrumb a:hover {
-  text-decoration: underline;
 }

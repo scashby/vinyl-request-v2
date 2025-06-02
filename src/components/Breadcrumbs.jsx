@@ -5,21 +5,17 @@ const Breadcrumbs = () => {
   const location = useLocation();
   const segments = location.pathname.split('/').filter(Boolean);
 
+  const crumbs = segments.map((seg, idx) => {
+    const label = seg.toLowerCase();
+    return ` • ${label}`;
+  });
+
   return (
     <nav className="breadcrumb">
-      <Link to="/">home</Link>
-      {segments.map((seg, idx) => {
-        const path = '/' + segments.slice(0, idx + 1).join('/');
-        const label = seg.toLowerCase();
-        const isLast = idx === segments.length - 1;
-
-        return (
-          <span key={path}>
-            {' • '}
-            {isLast ? <span>{label}</span> : <Link to={path}>{label}</Link>}
-          </span>
-        );
-      })}
+      <span>
+        <Link to="/">home</Link>
+        {crumbs}
+      </span>
     </nav>
   );
 };
