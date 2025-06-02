@@ -1,60 +1,94 @@
-import React, { useState } from 'react';
-import { supabase } from '../lib/supabaseClient';
 
-const EditEventForm = ({ event, onClose }) => {
-  const [formData, setFormData] = useState({ ...event });
-  const [uploading, setUploading] = useState(false);
+import React, { useEffect, useState } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { supabase } from '../../lib/supabaseClient';
 
-  const handleChange = e => {
-    const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value,
-    }));
-  };
+const EditEventForm = () => {
+  const { id } = useParams();
+  const isNew = useLocation().pathname.includes('/admin/events/new');
+  const navigate = useNavigate();
+  const [event, setEvent] = useState({
+    title: '',
+    date: '',
+    time: '',
+    location: '',
+    info: '',
+    image_url: '',
+    has_queue: false,
+    allowed_formats: ''
+  });
 
-  const handleImageUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setUploading(true);
+  const [extraDates, setExtraDates] = useState([]);
 
-    const { data, error } = await supabase.storage
-      .from('event-images')
-      .upload(`event-${event.id}-${file.name}`, file, { upsert: true });
-
-    if (!error) {
-      const publicUrl = supabase.storage
-        .from('event-images')
-        .getPublicUrl(data.path).data.publicUrl;
-      setFormData(prev => ({ ...prev, image_url: publicUrl }));
+  useEffect(() => {
+    if (!isNew && id) {
+      supabase.from('events').select('*').eq('id', id).single().then(({ data }) => {
+        if (data) setEvent(data);
+      });
     }
-
-    setUploading(false);
-  };
+  }, [id, isNew]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    await supabase.from('events').update(formData).eq('id', event.id);
-    onClose();
+    if (isNew) {
+      await supabase.from('events').insert([{ ...event }]);
+    } else {
+      await supabase.from('events').update({ ...event }).eq('id', id);
+    }
+    navigate('/admin/events');
+  };
+
+  const handleCopy = () => {
+    navigate('/admin/events/new', { state: { event } });
   };
 
   return (
-    <form className="event-edit-form" onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem", color: "#000", background: "#f9f9f9", padding: "2rem", borderRadius: "8px", maxWidth: "600px" }}>
-      <h2>Edit: {event.title}</h2>
-      <label style={{ display: "flex", flexDirection: "column", fontWeight: "bold", color: "#000", alignItems: "flex-start" }}>Title: <input name="title" value={formData.title} onChange={handleChange} /></label>
-      <label style={{ display: "flex", flexDirection: "column", fontWeight: "bold", color: "#000", alignItems: "flex-start" }}>Date: <input type="date" name="date" value={formData.date} onChange={handleChange} /></label>
-      <label style={{ display: "flex", flexDirection: "column", fontWeight: "bold", color: "#000", alignItems: "flex-start" }}>Time: <input name="time" value={formData.time} onChange={handleChange} /></label>
-      <label style={{ display: "flex", flexDirection: "column", fontWeight: "bold", color: "#000", alignItems: "flex-start" }}>Location: <input name="location" value={formData.location} onChange={handleChange} /></label>
-      <label style={{ display: "flex", flexDirection: "column", fontWeight: "bold", color: "#000", alignItems: "flex-start" }}>Info: <textarea name="info" value={formData.info} onChange={handleChange} /></label>
-      <label style={{ display: "flex", flexDirection: "column", fontWeight: "bold", color: "#000", alignItems: "flex-start" }}>Promo Image: <input type="file" onChange={handleImageUpload} disabled={uploading} /></label>
-      {formData.image_url && <img src={formData.image_url} alt="Promo" style={{ maxWidth: 200 }} />}
-      <label style={{ display: "flex", flexDirection: "column", fontWeight: "bold", color: "#000", alignItems: "flex-start" }}>Has Queue: <input type="checkbox" name="has_queue" checked={formData.has_queue} onChange={handleChange} /></label>
-      <label style={{ display: "flex", flexDirection: "column", fontWeight: "bold", color: "#000", alignItems: "flex-start" }}>Allowed Formats:
-        <input name="allowed_formats" value={formData.allowed_formats || ''} onChange={handleChange} placeholder="Vinyl, Cassette" />
-      </label>
-      <button type="submit">Save</button>
-      <button type="button" onClick={onClose}>Cancel</button>
-    </form>
+    <div className="admin-wrapper">
+      <h1>{isNew ? 'Create Event' : 'Edit Event'}</h1>
+      <form onSubmit={handleSubmit}>
+        <label>Title:</label>
+        <input value={event.title} onChange={e => setEvent({ ...event, title: e.target.value })} required />
+
+        <label>Date:</label>
+        <input type="date" value={event.date} onChange={e => setEvent({ ...event, date: e.target.value })} required />
+
+        {isNew && (
+          <>
+            <label>Repeat / Add More Dates:</label>
+            <input
+              type="text"
+              placeholder="Comma-separated dates"
+              onChange={e => setExtraDates(e.target.value.split(',').map(d => d.trim()))}
+            />
+          </>
+        )}
+
+        <label>Time:</label>
+        <input value={event.time} onChange={e => setEvent({ ...event, time: e.target.value })} />
+
+        <label>Location:</label>
+        <input value={event.location} onChange={e => setEvent({ ...event, location: e.target.value })} />
+
+        <label>Info:</label>
+        <textarea value={event.info} onChange={e => setEvent({ ...event, info: e.target.value })} />
+
+        <label>Promo Image URL:</label>
+        <input value={event.image_url} onChange={e => setEvent({ ...event, image_url: e.target.value })} />
+
+        <label>Has Queue:</label>
+        <input type="checkbox" checked={event.has_queue} onChange={e => setEvent({ ...event, has_queue: e.target.checked })} />
+
+        {event.has_queue && (
+          <>
+            <label>Allowed Formats:</label>
+            <input value={event.allowed_formats} onChange={e => setEvent({ ...event, allowed_formats: e.target.value })} />
+          </>
+        )}
+
+        <button type="submit">{isNew ? 'Create Event' : 'Update Event'}</button>
+        {!isNew && <button type="button" onClick={handleCopy}>Copy This Event</button>}
+      </form>
+    </div>
   );
 };
 
