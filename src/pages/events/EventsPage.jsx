@@ -69,8 +69,11 @@ const EventsPage = () => {
                     </a>
                   </p>
                 )}
-                <p className="event-date">{formattedDate}</p>
-                <p className="event-time">{event.time}</p>
+                <p className="event-date">
+                  {formattedDate}
+                  <br />
+                  <span className="event-time">{event.time}</span>
+                </p>
               </article>
             );
           })}
