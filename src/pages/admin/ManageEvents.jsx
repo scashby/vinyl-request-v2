@@ -10,7 +10,7 @@ const ManageEvents = () => {
   const [events, setEvents] = useState([]);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [isCreating, setIsCreating] = useState(false);
-  const [showSeriesModal, setShowSeriesModal] = useState(false); // ensure git detects change
+  const [showSeriesModal, setShowSeriesModal] = useState(false); // correctly declared
 
   useEffect(() => {
     const fetchEvents = async () => {
@@ -52,13 +52,13 @@ const ManageEvents = () => {
   return (
     <div className="page-wrapper">
       <header className="internal-header">
-        <h1>Admin: Events</h1>
+        <h1 style={{ color: '#000' }}>Admin: Events</h1>
       </header>
       <Breadcrumbs />
       <main className="internal-body">
         <div className="admin-controls">
-          <button onClick={handleCreate}>Create New Event</button>
-          <button onClick={handleAddSeries}>Add Series</button>
+          <button className="blue-button" onClick={handleCreate}>Create New Event</button>
+          <button className="blue-button" onClick={handleAddSeries}>Add Series</button>
         </div>
         {showSeriesModal && <AddSeriesModal onClose={handleCloseModal} />}
         {isCreating || selectedEvent ? (
@@ -70,17 +70,17 @@ const ManageEvents = () => {
             }}
           />
         ) : (
-          <section className="admin-events">
+          <section className="event-grid">
             {events.map((event) => (
-              <article key={event.id} className="admin-event-card">
+              <article key={event.id} className="event-card admin-event-card">
                 <div className="admin-event-info">
-                  <h2>{event.title}</h2>
-                  <p>{event.date}</p>
-                  <p>{event.time}</p>
+                  <h2 style={{ color: '#000' }}>{event.title}</h2>
+                  <p style={{ color: '#000' }}>{event.date}</p>
+                  <p style={{ color: '#000' }}>{event.time}</p>
                 </div>
                 <div className="admin-event-actions">
-                  <button onClick={() => handleEdit(event)}>Edit</button>
-                  <button onClick={() => handleDuplicate(event)}>Duplicate</button>
+                  <button className="blue-button" onClick={() => handleEdit(event)}>Edit</button>
+                  <button className="blue-button" onClick={() => handleDuplicate(event)}>Duplicate</button>
                 </div>
               </article>
             ))}
