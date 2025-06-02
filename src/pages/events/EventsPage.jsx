@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabaseClient';
-import './events.css';
+import { supabase } from '../../lib/supabaseClient';
+import '../../styles/events.css';
 
 const EventsPage = () => {
   const [events, setEvents] = useState([]);
