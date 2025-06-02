@@ -7,19 +7,17 @@ const Breadcrumbs = () => {
 
   return (
     <nav className="breadcrumb">
-      <Link to="/">Home</Link>
+      <Link to="/">home</Link>
       {segments.map((seg, idx) => {
         const path = '/' + segments.slice(0, idx + 1).join('/');
-        const label = seg.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
         const isLast = idx === segments.length - 1;
-
         return (
           <span key={path}>
-            {' / '}
+            {idx > 0 && <span className="dot-separator"> • </span>}
             {isLast ? (
-              <span>{label}</span>
+              <span>{seg.toLowerCase()}</span>
             ) : (
-              <Link to={path}>{label}</Link>
+              <Link to={path}>{seg.toLowerCase()}</Link>
             )}
           </span>
         );
