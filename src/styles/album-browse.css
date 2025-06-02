@@ -30,9 +30,12 @@
   color: #2563eb; /* blue-600 for titles */
 }
 .artist {
-  color: #666;
-  font-size: 0.875rem;
+  color: #222;           /* deep black (not gray) */
+  font-size: 0.75rem;    /* Tailwind's `text-sm`, or 12px */
+  font-weight: 400;
+  line-height: 1.2;
 }
+
 .badge {
   position: absolute;
   top: 6px;
