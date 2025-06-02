@@ -17,6 +17,7 @@ import SetNowPlaying from './pages/admin/SetNowPlaying';
 import ImportDiscogs from './pages/admin/ImportDiscogs';
 import BlockSides from './pages/admin/BlockSides';
 import ImportCollection from './pages/admin/ImportCollection';
+import ManageEvents from './pages/admin/ManageEvents';
 
 function App() {
   return (
@@ -32,6 +33,7 @@ function App() {
 
         {/* Admin */}
         <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/admin/events" element={<ManageEvents />} />
         <Route path="/admin/edit-queue" element={<EditQueue />} />
         <Route path="/admin/set-now-playing" element={<SetNowPlaying />} />
         <Route path="/admin/import-discogs" element={<ImportDiscogs />} />
