@@ -38,7 +38,9 @@ const EventsPage = () => {
         <section className="event-grid">
           {events.map((event) => {
             const imageSrc = event.image_url?.includes('dropbox.com')
-              ? event.image_url.replace('www.dropbox.com', 'dl.dropboxusercontent.com').split('.jpg')[0] + '.jpg'
+              ? event.image_url
+                  .replace('www.dropbox.com', 'dl.dropboxusercontent.com')
+                  .replace(/\?.*$/, '')
               : event.image_url || '/images/event-header-still.jpg';
 
             const formattedDate = new Date(event.date).toLocaleDateString('en-US', {
@@ -67,9 +69,8 @@ const EventsPage = () => {
                     </a>
                   </p>
                 )}
-                <p className="datetime">
-                  {formattedDate} • {event.time}
-                </p>
+                <p className="event-date">{formattedDate}</p>
+                <p className="event-time">{event.time}</p>
               </article>
             );
           })}

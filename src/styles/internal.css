@@ -116,8 +116,15 @@ html, body {
   object-fit: cover;
 }
 
-.datetime {
+
+.event-date {
   margin-top: 0.25rem;
   font-size: 0.9rem;
   color: #444;
+}
+
+.event-time {
+  font-size: 0.9rem;
+  color: #444;
+  margin-top: 0;
 }
