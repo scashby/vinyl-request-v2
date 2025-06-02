@@ -115,3 +115,9 @@ html, body {
   aspect-ratio: 1 / 1;
   object-fit: cover;
 }
+
+.datetime {
+  margin-top: 0.25rem;
+  font-size: 0.9rem;
+  color: #444;
+}
