@@ -1,7 +1,7 @@
 import React from 'react';
-import '../styles/album-detail.css';
+import '../../styles/album-detail.css';
 
-function AlbumDetailPage() {{
+function AlbumDetailPage() {
   const tracklist = [
     ['A1', 'Rapid Fire', 'Judas Priest', '4:08'],
     ['A2', 'Metal Gods', 'Judas Priest', '4:00'],
@@ -30,14 +30,14 @@ function AlbumDetailPage() {{
         <div className="tracklist-header font-bold text-sm border-b border-gray-600 pb-2 mb-2 grid grid-cols-4 gap-4">
           <span>#</span><span>Title</span><span>Artist</span><span>Time</span>
         </div>
-        {{tracklist.map(([num, title, artist, time]) => (
+        {tracklist.map(([num, title, artist, time]) => (
           <div key={num} className="track grid grid-cols-4 gap-4 py-1">
-            <span>{{num}}</span><span>{{title}}</span><span>{{artist}}</span><span>{{time}}</span>
+            <span>{num}</span><span>{title}</span><span>{artist}</span><span>{time}</span>
           </div>
-        ))}}
+        ))}
       </div>
     </div>
   );
-}}
+}
 
 export default AlbumDetailPage;
