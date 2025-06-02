@@ -4,14 +4,18 @@ import { Link, useLocation } from 'react-router-dom';
 const Breadcrumbs = () => {
   const location = useLocation();
   const segments = location.pathname.split('/').filter(Boolean);
-  const trail = segments.map(seg => seg.toLowerCase()).join(' • ');
 
   return (
     <nav className="breadcrumb">
-      <span className="breadcrumb-content">
-        <Link to="/">home</Link>
-        {trail ? <span> • {trail}</span> : ''}
+      <span className="crumb">
+        <Link to="/" className="crumb-link">home</Link>
       </span>
+      {segments.map((seg, idx) => (
+        <span key={idx} className="crumb">
+          {' • '}
+          <span>{seg.toLowerCase()}</span>
+        </span>
+      ))}
     </nav>
   );
 };
