@@ -20,6 +20,7 @@ const EventsPage = () => {
         setEvents(data);
       }
     };
+
     fetchEvents();
   }, []);
 
@@ -38,12 +39,18 @@ const EventsPage = () => {
           {events.map((event) => (
             <article className="event-card" key={event.id}>
               <img
-                src={event.image_url || '/images/event-header-still.jpg'}
+                src={
+                  event.image_url && event.image_url.includes('dropbox.com')
+                    ? event.image_url.replace('www.dropbox.com', 'dl.dropboxusercontent.com').split('?')[0]
+                    : event.image_url || '/images/event-header-still.jpg'
+                }
                 alt={event.title}
                 className="card-square"
               />
               <h2>{event.title}</h2>
+              {event.location && <p>{event.location}</p>}
               <p>{event.date}</p>
+              <p>{event.time}</p>
             </article>
           ))}
         </section>
