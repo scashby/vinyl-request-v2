@@ -70,8 +70,9 @@ const EditEventForm = () => {
         else break;
       }
 
-      console.log('Submitting repeating event payload:', events);
-      const { error } = await supabase.from('events').insert(events);
+      console.log('Submitting repeating event payload:', JSON.stringify(events, null, 2));
+      const { error, data } = await supabase.from('events').insert(events);
+      console.log('Insert response:', { error, data });
       if (error) alert('Error saving repeating events');
       else navigate('/admin/events');
     };
@@ -80,9 +81,10 @@ const EditEventForm = () => {
       await insertMultiple();
     } else {
       console.log('Submitting event payload:', JSON.stringify(formData, null, 2));
-      const { error } = id
+      const { error, data } = id
         ? await supabase.from('events').update(formData).eq('id', Number(id))
         : await supabase.from('events').insert([formData]);
+      console.log('Insert response:', { error, data });
       if (error) alert('Error saving event');
       else navigate('/admin/events');
     }
