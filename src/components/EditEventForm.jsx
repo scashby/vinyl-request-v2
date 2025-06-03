@@ -66,13 +66,23 @@ const EditEventForm = () => {
   };
 
   return (
-    <div style={{ padding: '2rem' }}>
-      <h2>{id ? 'Edit Event' : 'New Event'}</h2>
-      <form onSubmit={handleSubmit} style={{ maxWidth: '600px' }}>
-        <input name="title" value={eventData.title} onChange={handleChange} placeholder="Title" style={{ display: 'block', width: '100%', marginBottom: '0.5rem' }} />
-        <input name="date" value={eventData.date} onChange={handleChange} placeholder="Date (YYYY-MM-DD)" style={{ display: 'block', width: '100%', marginBottom: '0.5rem' }} />
-        <input name="time" value={eventData.time} onChange={handleChange} placeholder="Time (e.g. 8:00 PM)" style={{ display: 'block', width: '100%', marginBottom: '0.5rem' }} />
-        <input name="location" value={eventData.location} onChange={handleChange} placeholder="Location" style={{ display: 'block', width: '100%', marginBottom: '0.5rem' }} />
+    <div style={{
+      maxWidth: '640px',
+      margin: '2rem auto',
+      padding: '2rem',
+      backgroundColor: '#ffffff',
+      color: '#000000',
+      border: '1px solid #ddd',
+      borderRadius: '8px',
+      minHeight: '100vh',
+      boxShadow: '0 0 8px rgba(0,0,0,0.1)'
+    }}>
+      <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1.5rem' }}>{id ? 'Edit Event' : 'New Event'}</h2>
+      <form onSubmit={handleSubmit}>
+        <input name="title" value={eventData.title} onChange={handleChange} placeholder="Title" required style={{ display: 'block', width: '100%', marginBottom: '1rem' }} />
+        <input name="date" value={eventData.date} onChange={handleChange} placeholder="Date" style={{ display: 'block', width: '100%', marginBottom: '1rem' }} />
+        <input name="time" value={eventData.time} onChange={handleChange} placeholder="Time" style={{ display: 'block', width: '100%', marginBottom: '1rem' }} />
+        <input name="location" value={eventData.location} onChange={handleChange} placeholder="Location" style={{ display: 'block', width: '100%', marginBottom: '1rem' }} />
         <input name="image_url" value={eventData.image_url} onChange={handleChange} placeholder="Image URL" style={{ display: 'block', width: '100%', marginBottom: '0.5rem' }} />
         <a
           href="https://supabase.com/dashboard/project/bntoivaipesuovselglg/storage/buckets/event-images"
@@ -82,13 +92,15 @@ const EditEventForm = () => {
         >
           Upload image manually to Supabase
         </a>
-        <textarea name="info" value={eventData.info} onChange={handleChange} placeholder="Event Info" style={{ display: 'block', width: '100%', marginBottom: '0.5rem' }} />
-        <label style={{ display: 'block', marginBottom: '0.5rem' }}>
+        <textarea name="info" value={eventData.info} onChange={handleChange} placeholder="Event Info" style={{ display: 'block', width: '100%', marginBottom: '1rem' }} />
+        <label style={{ display: 'block', marginBottom: '1rem' }}>
           <input type="checkbox" name="has_queue" checked={eventData.has_queue} onChange={handleChange} />
           {' '}Has Queue
         </label>
         <input name="allowed_formats" value={eventData.allowed_formats} onChange={handleChange} placeholder="Allowed Formats (comma-separated)" style={{ display: 'block', width: '100%', marginBottom: '1rem' }} />
-        <button type="submit">Save</button>
+        <button type="submit" style={{ backgroundColor: '#2563eb', color: '#fff', padding: '0.5rem 1rem', border: 'none', borderRadius: '4px' }}>
+          Save
+        </button>
       </form>
     </div>
   );
