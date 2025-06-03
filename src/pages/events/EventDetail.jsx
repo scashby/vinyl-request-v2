@@ -41,12 +41,15 @@ export default function EventDetail() {
     has_queue
   } = event;
 
-  const formattedDate = new Date(date).toLocaleDateString('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
+  const formatDate = (dateString) => {
+    const [year, month, day] = dateString.split('-');
+    return new Date(`${month}/${day}/${year}`).toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+  };
 
   return (
     <div className="page-wrapper">
@@ -67,7 +70,7 @@ export default function EventDetail() {
               className="card-square"
             />
             <h2>{title}</h2>
-            <p>{formattedDate}</p>
+            <p>{formatDate(date)}</p>
             {time && <p>{time}</p>}
             {location && (
               <p>
@@ -80,24 +83,32 @@ export default function EventDetail() {
                 </a>
               </p>
             )}
-            {info && <p>{info}</p>}
           </article>
         </aside>
 
-        {has_queue && (
-          <section className="queue-display">
-            <h3 className="text-xl font-bold mb-4">Request Queue</h3>
-            <div className="tracklist text-black bg-white p-4 rounded shadow">
-              <div className="tracklist-header font-bold text-sm border-b border-gray-300 pb-2 mb-2 grid grid-cols-4 gap-4">
-                <span>Album</span><span>Artist</span><span>Side</span><span>Votes</span>
-              </div>
-              <div className="track grid grid-cols-4 gap-4 py-1">
-                <span>Sample Album</span><span>Sample Artist</span><span>A</span><span>★★★★☆</span>
-              </div>
+        <section className="event-info-area" style={{ flex: 2, marginLeft: '2rem' }}>
+          {info && (
+            <div className="event-info bg-white text-black p-4 mb-6 rounded shadow">
+              <h3 className="text-lg font-semibold mb-2">About This Event</h3>
+              <p className="text-sm leading-relaxed">{info}</p>
             </div>
-            <Link to="/browse" className="button mt-4 inline-block bg-purple-600 text-white px-4 py-2 rounded">Add to Queue</Link>
-          </section>
-        )}
+          )}
+
+          {has_queue && (
+            <section className="queue-display">
+              <h3 className="text-xl font-bold mb-4">Request Queue</h3>
+              <div className="tracklist text-black bg-white p-4 rounded shadow">
+                <div className="tracklist-header font-bold text-sm border-b border-gray-300 pb-2 mb-2 grid grid-cols-4 gap-4">
+                  <span>Album</span><span>Artist</span><span>Side</span><span>Votes</span>
+                </div>
+                <div className="track grid grid-cols-4 gap-4 py-1">
+                  <span>Sample Album</span><span>Sample Artist</span><span>A</span><span>★★★★☆</span>
+                </div>
+              </div>
+              <Link to="/browse" className="button mt-4 inline-block bg-purple-600 text-white px-4 py-2 rounded">Add to Queue</Link>
+            </section>
+          )}
+        </section>
       </main>
 
       <footer className="footer">
