@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from 'react-router-dom';
+import { supabase } from './lib/supabaseClient';
 import LandingPage from './pages/LandingPage';
 import EventsPage from './pages/events/EventsPage';
 import EventDetail from './pages/events/EventDetail';
