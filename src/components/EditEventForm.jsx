@@ -56,7 +56,7 @@ const EditEventForm = () => {
     const file = e.target.files[0];
     if (!file) return;
 
-    const filePath = `event-images/${Date.now()}_${file.name}`;
+    const filePath = `${Date.now()}_${file.name}`;
     setUploading(true);
 
     const { error } = await supabase.storage.from('event-images').upload(filePath, file);
