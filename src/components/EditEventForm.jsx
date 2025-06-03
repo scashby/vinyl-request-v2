@@ -59,9 +59,14 @@ const EditEventForm = () => {
     const filePath = `${Date.now()}_${file.name}`;
     setUploading(true);
 
-    const { error } = await supabase.storage.from('event-images').upload(filePath, file);
+    const { error } = await supabase.storage.from('event-images').upload(filePath, file, {
+      cacheControl: '3600',
+      upsert: true,
+      contentType: file.type
+    });
+
     if (error) {
-      alert('Upload failed.');
+      alert('Upload failed: ' + error.message);
       setUploading(false);
       return;
     }
