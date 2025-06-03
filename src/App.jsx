@@ -17,6 +17,7 @@ import ImportCollection from './pages/admin/ImportCollection';
 import ManageEvents from './pages/admin/ManageEvents';
 import EditEventForm from './components/EditEventForm';
 import LoginPage from './pages/admin/LoginPage';
+import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
   return (
@@ -25,6 +26,7 @@ function App() {
         {/* Public */}
         <Route path="/" element={<LandingPage />} />
         <Route path="/events" element={<EventsPage />} />
+        <Route path="/events/:id" element={<EventDetail />} />
         <Route path="/browse" element={<BrowseAlbumsPage />} />
         <Route path="/browse-queue" element={<BrowseQueue />} />
         <Route path="/now-playing" element={<NowPlayingPage />} />
