@@ -2,8 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 
-const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-
 const EditEventForm = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -19,19 +17,18 @@ const EditEventForm = () => {
     has_queue: false,
   });
 
-  const [repeatWeekly, setRepeatWeekly] = useState(false);
-  const [repeatDay, setRepeatDay] = useState('Thursday');
+  const [repeatOption, setRepeatOption] = useState('none');
+  const [repeatInterval, setRepeatInterval] = useState(1);
   const [repeatEndDate, setRepeatEndDate] = useState('');
 
   useEffect(() => {
-    if (id) {
-      const fetchEvent = async () => {
-        const { data, error } = await supabase.from('events').select('*').eq('id', id).single();
-        if (error) console.error('Fetch error:', error);
-        else setFormData(data);
-      };
-      fetchEvent();
-    }
+    const fetchEvent = async () => {
+      if (id) {
+        const { data, error } = await supabase.from('events').select('*').eq('id', Number(id)).single();
+        if (!error && data) setFormData(data);
+      }
+    };
+    fetchEvent();
   }, [id]);
 
   const handleChange = (e) => {
@@ -45,34 +42,50 @@ const EditEventForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (repeatWeekly && repeatEndDate && !id) {
+    const insertMultiple = async () => {
       const startDate = new Date(formData.date);
       const endDate = new Date(repeatEndDate);
-      const dayIndex = weekdays.indexOf(repeatDay);
+      const unit = repeatOption;
       const events = [];
+      let date = new Date(startDate);
 
-      for (let date = new Date(startDate); date <= endDate; date.setDate(date.getDate() + 1)) {
-        if (date.getDay() === dayIndex) {
-          events.push({ ...formData, date: date.toISOString().split('T')[0] });
-        }
+      while (date <= endDate) {
+        events.push({ ...formData, date: date.toISOString().split('T')[0] });
+        if (unit === 'daily') date.setDate(date.getDate() + repeatInterval);
+        else if (unit === 'weekly') date.setDate(date.getDate() + 7 * repeatInterval);
+        else if (unit === 'monthly') date.setMonth(date.getMonth() + repeatInterval);
+        else if (unit === 'yearly') date.setFullYear(date.getFullYear() + repeatInterval);
+        else break;
       }
 
       const { error } = await supabase.from('events').insert(events);
-      if (error) alert('Error saving repeating events');
-      else navigate('/admin/manage-events');
+      if (!error) navigate('/admin/manage-events');
+    };
+
+    if (!id && repeatOption !== 'none' && repeatEndDate) {
+      await insertMultiple();
     } else {
       const { error } = id
-        ? await supabase.from('events').update(formData).eq('id', id)
+        ? await supabase.from('events').update(formData).eq('id', Number(id))
         : await supabase.from('events').insert([formData]);
-      if (error) alert('Error saving event');
-      else navigate('/admin/manage-events');
+      if (!error) navigate('/admin/manage-events');
     }
   };
 
   return (
-    <div style={{ maxWidth: '600px', margin: '0 auto', padding: '1rem' }}>
-      <h2>{id ? 'Edit Event' : 'Create New Event'}</h2>
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+    <div style={{
+      maxWidth: '640px',
+      margin: '2rem auto',
+      padding: '2rem',
+      backgroundColor: '#ffffff',
+      color: '#000000',
+      border: '1px solid #ddd',
+      borderRadius: '8px',
+      minHeight: '100vh',
+      boxShadow: '0 0 8px rgba(0,0,0,0.1)'
+    }}>
+      <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1.5rem' }}>{id ? 'Edit Event' : 'Create New Event'}</h2>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
         <label>
           Title:
           <input type="text" name="title" value={formData.title} onChange={handleChange} required />
@@ -84,22 +97,25 @@ const EditEventForm = () => {
         {!id && (
           <>
             <label>
-              <input
-                type="checkbox"
-                checked={repeatWeekly}
-                onChange={(e) => setRepeatWeekly(e.target.checked)}
-              />{' '}
-              Repeat weekly
+              Repeat:
+              <select value={repeatOption} onChange={(e) => setRepeatOption(e.target.value)}>
+                <option value="none">None</option>
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+                <option value="yearly">Yearly</option>
+              </select>
             </label>
-            {repeatWeekly && (
+            {repeatOption !== 'none' && (
               <>
                 <label>
-                  Day of Week:
-                  <select value={repeatDay} onChange={(e) => setRepeatDay(e.target.value)}>
-                    {weekdays.map((day) => (
-                      <option key={day} value={day}>{day}</option>
-                    ))}
-                  </select>
+                  Every:
+                  <input
+                    type="number"
+                    min="1"
+                    value={repeatInterval}
+                    onChange={(e) => setRepeatInterval(Number(e.target.value))}
+                  /> {repeatOption === 'daily' ? 'day(s)' : repeatOption === 'weekly' ? 'week(s)' : repeatOption === 'monthly' ? 'month(s)' : 'year(s)'}
                 </label>
                 <label>
                   Repeat Until:
@@ -107,7 +123,7 @@ const EditEventForm = () => {
                     type="date"
                     value={repeatEndDate}
                     onChange={(e) => setRepeatEndDate(e.target.value)}
-                    required={repeatWeekly}
+                    required
                   />
                 </label>
               </>
@@ -130,14 +146,9 @@ const EditEventForm = () => {
           Image URL:
           <input type="text" name="image_url" value={formData.image_url} onChange={handleChange} />
           <small>
-            <a
-              href="https://supabase.com/dashboard/project/bntoivaipesuovselglg/storage/buckets/event-images"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
+            <a href="https://supabase.com/dashboard/project/bntoivaipesuovselglg/storage/buckets/event-images" target="_blank" rel="noopener noreferrer">
               Upload image to Supabase
-            </a>{' '}
-            and paste URL here.
+            </a> and paste URL here.
           </small>
         </label>
         <label>
@@ -155,7 +166,7 @@ const EditEventForm = () => {
         </label>
         <button
           type="submit"
-          style={{ backgroundColor: '#2563eb', color: 'white', padding: '0.5rem', border: 'none' }}
+          style={{ backgroundColor: '#2563eb', color: '#ffffff', padding: '0.75rem', border: 'none', cursor: 'pointer', fontWeight: 'bold', borderRadius: '4px' }}
         >
           Save Event
         </button>
