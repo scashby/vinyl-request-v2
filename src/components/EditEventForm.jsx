@@ -1,72 +1,104 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { supabase } from '../../lib/supabaseClient';
 
 const EditEventForm = () => {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  const [formData, setFormData] = useState({
-    title: '',
-    date: '',
-    time: '',
-    location: '',
-    info: '',
-    image_url: '',
-    allowed_form_: '',
-    has_queue: false,
-  });
+  const [title, setTitle] = useState('');
+  const [date, setDate] = useState('');
+  const [time, setTime] = useState('');
+  const [location, setLocation] = useState('');
+  const [info, setInfo] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
+  const [allowedFormats, setAllowedFormats] = useState('');
+  const [hasQueue, setHasQueue] = useState(false);
 
   useEffect(() => {
-    if (id) {
-      fetch(`/api/get-event?id=${id}`)
-        .then(res => res.json())
-        .then(({ data }) => {
-          if (data) setFormData(data);
-        });
-    }
-  }, [id]);
+    const fetchEvent = async () => {
+      if (!id) return;
 
-  const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value,
-    }));
-  };
+      const { data, error } = await supabase.from('events').select('*').eq('id', id).single();
+      if (error) {
+        console.error('Error fetching event:', error);
+      } else if (data) {
+        setTitle(data.title || '');
+        setDate(data.date || '');
+        setTime(data.time || '');
+        setLocation(data.location || '');
+        setInfo(data.info || '');
+        setImageUrl(data.image_url || '');
+        setAllowedFormats(data.allowed_formats || '');
+        setHasQueue(data.has_queue || false);
+      }
+    };
+
+    fetchEvent();
+  }, [id]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Submitting event payload:', formData);
 
-    const response = await fetch('/api/create-event', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(formData),
-    });
+    const payload = {
+      title,
+      date,
+      time,
+      location,
+      info,
+      image_url: imageUrl,
+      allowed_formats: allowedFormats,
+      has_queue: hasQueue,
+    };
 
-    const result = await response.json();
-    console.log('Insert result:', result);
+    console.log('Submitting event payload:', payload);
 
-    if (!response.ok) {
-      alert('Error saving event. Check console.');
+    let response;
+    if (id) {
+      response = await supabase.from('events').update(payload).eq('id', id);
     } else {
+      response = await supabase.from('events').insert([payload]);
+    }
+
+    if (response.error) {
+      console.error('Insert/Update error:', response.error);
+      alert('Error saving event: ' + response.error.message);
+    } else {
+      console.log('Success:', response.data);
       navigate('/admin/events');
     }
   };
 
   return (
-    <div style={{ backgroundColor: '#fff', padding: '2rem', maxWidth: '600px', margin: 'auto', minHeight: '100vh' }}>
-      <h2>{id ? 'Edit Event' : 'Create New Event'}</h2>
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        <input name="title" value={formData.title} onChange={handleChange} placeholder="Title" required />
-        <input name="date" type="date" value={formData.date} onChange={handleChange} required />
-        <input name="time" value={formData.time} onChange={handleChange} placeholder="Time" />
-        <input name="location" value={formData.location} onChange={handleChange} placeholder="Location" />
-        <textarea name="info" value={formData.info} onChange={handleChange} placeholder="Info" rows={3} />
-        <input name="image_url" value={formData.image_url} onChange={handleChange} placeholder="Image URL" />
-        <input name="allowed_form_" value={formData.allowed_form_} onChange={handleChange} placeholder="Allowed Formats" />
-        <label><input name="has_queue" type="checkbox" checked={formData.has_queue} onChange={handleChange} /> Enable Queue</label>
-        <button type="submit">Save Event</button>
+    <div style={{
+      maxWidth: '640px',
+      margin: '2rem auto',
+      padding: '2rem',
+      backgroundColor: '#ffffff',
+      color: '#000000',
+      border: '1px solid #ddd',
+      borderRadius: '8px',
+      minHeight: '100vh',
+      boxShadow: '0 0 8px rgba(0,0,0,0.1)'
+    }}>
+      <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1.5rem' }}>
+        {id ? 'Edit Event' : 'Create New Event'}
+      </h2>
+      <form onSubmit={handleSubmit}>
+        <label>Title<input type="text" value={title} onChange={(e) => setTitle(e.target.value)} required /></label><br />
+        <label>Date<input type="date" value={date} onChange={(e) => setDate(e.target.value)} required /></label><br />
+        <label>Time<input type="text" value={time} onChange={(e) => setTime(e.target.value)} /></label><br />
+        <label>Location<input type="text" value={location} onChange={(e) => setLocation(e.target.value)} /></label><br />
+        <label>Info<textarea value={info} onChange={(e) => setInfo(e.target.value)} /></label><br />
+        <label>Image URL<input type="text" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} /></label><br />
+        <label>Allowed Formats<input type="text" value={allowedFormats} onChange={(e) => setAllowedFormats(e.target.value)} /></label><br />
+        <label>
+          <input type="checkbox" checked={hasQueue} onChange={(e) => setHasQueue(e.target.checked)} />
+          Has Queue
+        </label><br /><br />
+        <button type="submit" style={{ backgroundColor: '#2563eb', color: '#fff', padding: '0.5rem 1rem', border: 'none', borderRadius: '4px' }}>
+          Save
+        </button>
       </form>
     </div>
   );
