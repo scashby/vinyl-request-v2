@@ -17,8 +17,23 @@ import ImportCollection from './pages/admin/ImportCollection';
 import ManageEvents from './pages/admin/ManageEvents';
 import EditEventForm from './components/EditEventForm';
 import LoginPage from './pages/admin/LoginPage';
-import ProtectedRoute from './auth/ProtectedRoute';
-import { AuthProvider } from './auth/AuthProvider';
+
+const ProtectedRoute = ({ children }) => {
+  const [loading, setLoading] = useState(true);
+  const [session, setSession] = useState(null);
+  const location = useLocation();
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setLoading(false);
+    });
+  }, []);
+
+  if (loading) return null;
+  if (!session) return <Navigate to="/admin/login" state={{ from: location }} replace />;
+  return children;
+};
 
 function App() {
   return (
@@ -32,10 +47,7 @@ function App() {
           <Route path="/browse-queue" element={<BrowseQueue />} />
           <Route path="/now-playing" element={<NowPlayingPage />} />
           <Route path="/album/:id" element={<AlbumDetailPage />} /> 
-        </Routes>
 
-      <AuthProvider>
-        <Routes>
           {/* Admin Login */}
           <Route path="/admin/login" element={<LoginPage />} />
           <Route path="/login" element={<LoginPage />} />
@@ -49,9 +61,8 @@ function App() {
           <Route path="/admin/set-now-playing" element={<ProtectedRoute><SetNowPlaying /></ProtectedRoute>} />
           <Route path="/admin/import-discogs" element={<ProtectedRoute><ImportDiscogs /></ProtectedRoute>} />
           <Route path="/admin/block-sides" element={<ProtectedRoute><BlockSides /></ProtectedRoute>} />
-          <Route path="/admin/import-collection" element={<ProtectedRoute><ImportCollection /></ProtectedRoute>} />
+          <Route path="/admin/import-collection" element={<ProtectedRoute><ImportCollection /></ProtectedRoute>} /> />
         </Routes>
-      </AuthProvider>
     </Router>
   );
 }
