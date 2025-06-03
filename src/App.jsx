@@ -1,19 +1,25 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-
-import LandingPage from './pages/public/LandingPage';
+import LandingPage from './pages/landingpage/LandingPage';
 import EventsPage from './pages/public/EventsPage';
-import EventDetail from './pages/events/EventDetail';
 import BrowseAlbumsPage from './pages/public/BrowseAlbumsPage';
 import BrowseQueue from './pages/public/BrowseQueue';
 import NowPlayingPage from './pages/public/NowPlayingPage';
 import AlbumDetailPage from './pages/public/AlbumDetailPage';
+import EventDetail from './pages/public/EventDetail';
 
+import LoginPage from './pages/admin/LoginPage';
+import AdminDashboard from './pages/admin/AdminDashboard';
 import ManageEvents from './pages/admin/ManageEvents';
 import EditEventForm from './components/EditEventForm';
-import LoginPage from './pages/admin/LoginPage';
+import EditQueue from './pages/admin/EditQueue';
+import SetNowPlaying from './pages/admin/SetNowPlaying';
+import ImportDiscogs from './pages/admin/ImportDiscogs';
+import BlockSides from './pages/admin/BlockSides';
+import ImportCollection from './pages/admin/ImportCollection';
+import ProtectedRoute from './components/ProtectedRoute';
 
-const App = () => {
+function App() {
   return (
     <Router>
       <Routes>
@@ -26,14 +32,22 @@ const App = () => {
         <Route path="/now-playing" element={<NowPlayingPage />} />
         <Route path="/album/:id" element={<AlbumDetailPage />} />
 
-        {/* Admin */}
-        <Route path="/admin" element={<LoginPage />} />
-        <Route path="/admin/events" element={<ManageEvents />} />
-        <Route path="/admin/events/new" element={<EditEventForm />} />
-        <Route path="/admin/events/:id" element={<EditEventForm />} />
+        {/* Admin Login */}
+        <Route path="/admin/login" element={<LoginPage />} />
+
+        {/* Protected Admin */}
+        <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
+        <Route path="/admin/events" element={<ProtectedRoute><ManageEvents /></ProtectedRoute>} />
+        <Route path="/admin/events/new" element={<ProtectedRoute><EditEventForm /></ProtectedRoute>} />
+        <Route path="/admin/events/:id" element={<ProtectedRoute><EditEventForm /></ProtectedRoute>} />
+        <Route path="/admin/edit-queue" element={<ProtectedRoute><EditQueue /></ProtectedRoute>} />
+        <Route path="/admin/set-now-playing" element={<ProtectedRoute><SetNowPlaying /></ProtectedRoute>} />
+        <Route path="/admin/import-discogs" element={<ProtectedRoute><ImportDiscogs /></ProtectedRoute>} />
+        <Route path="/admin/block-sides" element={<ProtectedRoute><BlockSides /></ProtectedRoute>} />
+        <Route path="/admin/import-collection" element={<ProtectedRoute><ImportCollection /></ProtectedRoute>} />
       </Routes>
     </Router>
   );
-};
+}
 
 export default App;
