@@ -70,15 +70,15 @@ const EditEventForm = () => {
   };
 
   return (
-    <div style={{ maxWidth: '600px', margin: '0 auto', padding: '1rem' }}>
-      <h2>{id ? 'Edit Event' : 'Create New Event'}</h2>
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+    <div style={{ maxWidth: '600px', margin: '2rem auto', padding: '2rem', backgroundColor: '#ffffff', color: '#000000', border: '1px solid #ddd' }}>
+      <h2 style={{ marginBottom: '1.5rem' }}>{id ? 'Edit Event' : 'Create New Event'}</h2>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
         <label>
-          Title:
+          Title:<br />
           <input type="text" name="title" value={formData.title} onChange={handleChange} required />
         </label>
         <label>
-          Date:
+          Date:<br />
           <input type="date" name="date" value={formData.date} onChange={handleChange} required />
         </label>
         {!id && (
@@ -88,13 +88,12 @@ const EditEventForm = () => {
                 type="checkbox"
                 checked={repeatWeekly}
                 onChange={(e) => setRepeatWeekly(e.target.checked)}
-              />{' '}
-              Repeat weekly
+              /> Repeat weekly
             </label>
             {repeatWeekly && (
               <>
                 <label>
-                  Day of Week:
+                  Day of Week:<br />
                   <select value={repeatDay} onChange={(e) => setRepeatDay(e.target.value)}>
                     {weekdays.map((day) => (
                       <option key={day} value={day}>{day}</option>
@@ -102,7 +101,7 @@ const EditEventForm = () => {
                   </select>
                 </label>
                 <label>
-                  Repeat Until:
+                  Repeat Until:<br />
                   <input
                     type="date"
                     value={repeatEndDate}
@@ -115,33 +114,32 @@ const EditEventForm = () => {
           </>
         )}
         <label>
-          Time:
+          Time:<br />
           <input type="text" name="time" value={formData.time} onChange={handleChange} placeholder="e.g. 5pm to 9pm" />
         </label>
         <label>
-          Location:
+          Location:<br />
           <input type="text" name="location" value={formData.location} onChange={handleChange} />
         </label>
         <label>
-          Info:
+          Info:<br />
           <textarea name="info" value={formData.info} onChange={handleChange} rows={3} />
         </label>
         <label>
-          Image URL:
+          Image URL:<br />
           <input type="text" name="image_url" value={formData.image_url} onChange={handleChange} />
-          <small>
-            <a
-              href="https://supabase.com/dashboard/project/bntoivaipesuovselglg/storage/buckets/event-images"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Upload image to Supabase
-            </a>{' '}
-            and paste URL here.
-          </small>
+          <br />
+          <a
+            href="https://supabase.com/dashboard/project/bntoivaipesuovselglg/storage/buckets/event-images"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ fontSize: '0.85rem', display: 'inline-block', marginTop: '0.25rem' }}
+          >
+            Upload image to Supabase
+          </a> and paste URL here.
         </label>
         <label>
-          Allowed Formats:
+          Allowed Formats:<br />
           <input
             type="text"
             name="allowed_formats"
@@ -155,7 +153,7 @@ const EditEventForm = () => {
         </label>
         <button
           type="submit"
-          style={{ backgroundColor: '#2563eb', color: 'white', padding: '0.5rem', border: 'none' }}
+          style={{ backgroundColor: '#2563eb', color: '#ffffff', padding: '0.75rem', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
         >
           Save Event
         </button>
