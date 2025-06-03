@@ -101,7 +101,7 @@ const EditEventForm = () => {
           Upload image manually to Supabase
         </a>
         
-        {uploading && <p style={{ marginBottom: '1rem' }}>Uploading...</p>}
+        
         <input name="allowed_formats" value={eventData.allowed_formats} onChange={handleChange} placeholder="Allowed Formats (comma-separated)" style={{ display: 'block', width: '100%', marginBottom: '1rem' }} />
         <label style={{ display: 'block', marginBottom: '1rem' }}>
           <input type="checkbox" name="has_queue" checked={eventData.has_queue} onChange={handleChange} />
