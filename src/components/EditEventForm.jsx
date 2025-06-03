@@ -2,8 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 
-const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-
 const EditEventForm = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -19,19 +17,22 @@ const EditEventForm = () => {
     has_queue: false,
   });
 
-  const [repeatWeekly, setRepeatWeekly] = useState(false);
-  const [repeatDay, setRepeatDay] = useState('Thursday');
+  const [repeatOption, setRepeatOption] = useState('none');
+  const [repeatInterval, setRepeatInterval] = useState(1);
   const [repeatEndDate, setRepeatEndDate] = useState('');
 
   useEffect(() => {
-    if (id) {
-      const fetchEvent = async () => {
+    const fetchEvent = async () => {
+      if (id) {
         const { data, error } = await supabase.from('events').select('*').eq('id', id).single();
-        if (error) console.error('Fetch error:', error);
-        else setFormData(data);
-      };
-      fetchEvent();
-    }
+        if (error) {
+          console.error('Fetch error:', error);
+        } else {
+          setFormData(data);
+        }
+      }
+    };
+    fetchEvent();
   }, [id]);
 
   const handleChange = (e) => {
@@ -45,21 +46,29 @@ const EditEventForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (repeatWeekly && repeatEndDate && !id) {
+    const insertMultiple = async () => {
       const startDate = new Date(formData.date);
       const endDate = new Date(repeatEndDate);
-      const dayIndex = weekdays.indexOf(repeatDay);
+      const unit = repeatOption;
       const events = [];
+      let date = new Date(startDate);
 
-      for (let date = new Date(startDate); date <= endDate; date.setDate(date.getDate() + 1)) {
-        if (date.getDay() === dayIndex) {
-          events.push({ ...formData, date: date.toISOString().split('T')[0] });
-        }
+      while (date <= endDate) {
+        events.push({ ...formData, date: date.toISOString().split('T')[0] });
+        if (unit === 'daily') date.setDate(date.getDate() + repeatInterval);
+        else if (unit === 'weekly') date.setDate(date.getDate() + 7 * repeatInterval);
+        else if (unit === 'monthly') date.setMonth(date.getMonth() + repeatInterval);
+        else if (unit === 'yearly') date.setFullYear(date.getFullYear() + repeatInterval);
+        else break;
       }
 
       const { error } = await supabase.from('events').insert(events);
       if (error) alert('Error saving repeating events');
       else navigate('/admin/manage-events');
+    };
+
+    if (!id && repeatOption !== 'none' && repeatEndDate) {
+      await insertMultiple();
     } else {
       const { error } = id
         ? await supabase.from('events').update(formData).eq('id', id)
@@ -84,21 +93,25 @@ const EditEventForm = () => {
         {!id && (
           <>
             <label>
-              <input
-                type="checkbox"
-                checked={repeatWeekly}
-                onChange={(e) => setRepeatWeekly(e.target.checked)}
-              /> Repeat weekly
+              Repeat:<br />
+              <select value={repeatOption} onChange={(e) => setRepeatOption(e.target.value)}>
+                <option value="none">None</option>
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+                <option value="yearly">Yearly</option>
+              </select>
             </label>
-            {repeatWeekly && (
+            {repeatOption !== 'none' && (
               <>
                 <label>
-                  Day of Week:<br />
-                  <select value={repeatDay} onChange={(e) => setRepeatDay(e.target.value)}>
-                    {weekdays.map((day) => (
-                      <option key={day} value={day}>{day}</option>
-                    ))}
-                  </select>
+                  Every:<br />
+                  <input
+                    type="number"
+                    min="1"
+                    value={repeatInterval}
+                    onChange={(e) => setRepeatInterval(Number(e.target.value))}
+                  /> {repeatOption === 'daily' ? 'day(s)' : repeatOption === 'weekly' ? 'week(s)' : repeatOption === 'monthly' ? 'month(s)' : 'year(s)'}
                 </label>
                 <label>
                   Repeat Until:<br />
@@ -106,7 +119,7 @@ const EditEventForm = () => {
                     type="date"
                     value={repeatEndDate}
                     onChange={(e) => setRepeatEndDate(e.target.value)}
-                    required={repeatWeekly}
+                    required
                   />
                 </label>
               </>
