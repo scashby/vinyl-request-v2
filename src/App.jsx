@@ -2,22 +2,22 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
 import LandingPage from './pages/LandingPage';
-import EventsPage from './pages/public/EventsPage';
-import BrowseAlbumsPage from './pages/public/BrowseAlbumsPage';
-import BrowseQueue from './pages/public/BrowseQueue';
-import NowPlayingPage from './pages/public/NowPlayingPage';
-import AlbumDetailPage from './pages/public/AlbumDetailPage';
-import EventDetail from './pages/public/EventDetail';
+import EventsPage from './pages/EventsPage';
+import BrowseAlbumsPage from './pages/BrowseAlbumsPage';
+import BrowseQueue from './pages/BrowseQueue';
+import NowPlayingPage from './pages/NowPlayingPage';
+import AlbumDetailPage from './pages/AlbumDetailPage';
 
 import LoginPage from './pages/admin/LoginPage';
 import AdminDashboard from './pages/admin/AdminDashboard';
-import ManageEvents from './pages/admin/ManageEvents';
+import ManageEvents from './components/ManageEvents';
 import EditEventForm from './components/EditEventForm';
-import EditQueue from './pages/admin/EditQueue';
-import SetNowPlaying from './pages/admin/SetNowPlaying';
-import ImportDiscogs from './pages/admin/ImportDiscogs';
-import BlockSides from './pages/admin/BlockSides';
-import ImportCollection from './pages/admin/ImportCollection';
+import EditQueue from './components/EditQueue';
+import SetNowPlaying from './components/SetNowPlaying';
+import ImportDiscogs from './components/ImportDiscogs';
+import BlockSides from './components/BlockSides';
+import ImportCollection from './components/ImportCollection';
+
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
@@ -27,7 +27,6 @@ function App() {
         {/* Public */}
         <Route path="/" element={<LandingPage />} />
         <Route path="/events" element={<EventsPage />} />
-        <Route path="/events/:id" element={<EventDetail />} />
         <Route path="/browse" element={<BrowseAlbumsPage />} />
         <Route path="/browse-queue" element={<BrowseQueue />} />
         <Route path="/now-playing" element={<NowPlayingPage />} />
