@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabaseClient';
 
 const ManageEvents = () => {
   const [events, setEvents] = useState([]);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchEvents = async () => {
@@ -15,6 +16,11 @@ const ManageEvents = () => {
     };
     fetchEvents();
   }, []);
+
+  const handleCopy = (event) => {
+    sessionStorage.setItem('copiedEvent', JSON.stringify(event));
+    navigate('/admin/events/new');
+  };
 
   return (
     <div style={{
@@ -61,14 +67,25 @@ const ManageEvents = () => {
             border: '1px solid #e0e0e0'
           }}>
             <span>{event.title} – {event.date}</span>
-            <Link to={`/admin/events/${event.id}`} style={{
-              color: '#2563eb',
-              marginLeft: '1rem',
-              textDecoration: 'underline',
-              fontWeight: '500'
-            }}>
-              Edit
-            </Link>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <Link to={`/admin/events/${event.id}`} style={{
+                color: '#2563eb',
+                textDecoration: 'underline',
+                fontWeight: '500'
+              }}>
+                Edit
+              </Link>
+              <button onClick={() => handleCopy(event)} style={{
+                background: 'none',
+                border: 'none',
+                color: '#2563eb',
+                cursor: 'pointer',
+                textDecoration: 'underline',
+                fontWeight: '500'
+              }}>
+                Copy
+              </button>
+            </div>
           </li>
         ))}
       </ul>
