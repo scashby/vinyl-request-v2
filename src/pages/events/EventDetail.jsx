@@ -27,9 +27,7 @@ export default function EventDetail() {
     fetchEvent();
   }, [id]);
 
-  if (!event) {
-    return <div>Loading...</div>;
-  }
+  if (!event) return <div>Loading...</div>;
 
   const {
     title,
@@ -51,6 +49,10 @@ export default function EventDetail() {
     });
   };
 
+  const imageSrc = image_url?.includes('dropbox.com')
+    ? image_url.replace('www.dropbox.com', 'dl.dropboxusercontent.com').replace(/\?.*$/, '')
+    : image_url || '/images/event-header-still.jpg';
+
   return (
     <div className="page-wrapper">
       <header className="event-hero">
@@ -61,17 +63,11 @@ export default function EventDetail() {
 
       <Breadcrumbs />
 
-      <main className="page-body browse-queue">
+      <main className="page-body browse-queue" style={{ display: 'flex', gap: '2rem' }}>
         <aside className="event-sidebar">
           <article className="event-card">
-            <img
-              src={image_url || '/images/event-header-still.jpg'}
-              alt={title}
-              className="card-square"
-            />
+            <img src={imageSrc} alt={title} className="card-square" />
             <h2>{title}</h2>
-            <p>{formatDate(date)}</p>
-            {time && <p>{time}</p>}
             {location && (
               <p>
                 <a
@@ -83,10 +79,15 @@ export default function EventDetail() {
                 </a>
               </p>
             )}
+            <p className="event-date">
+              {formatDate(date)}
+              <br />
+              {time && <span className="event-time">{time}</span>}
+            </p>
           </article>
         </aside>
 
-        <section className="event-info-area" style={{ flex: 2, marginLeft: '2rem' }}>
+        <section style={{ flex: 2 }}>
           {info && (
             <div className="event-info bg-white text-black p-4 mb-6 rounded shadow">
               <h3 className="text-lg font-semibold mb-2">About This Event</h3>
