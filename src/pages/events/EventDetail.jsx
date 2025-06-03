@@ -89,22 +89,19 @@ export default function EventDetail() {
         </aside>
 
         <section style={{ flex: 2 }}>
-          {info && (
-            <div className="event-info bg-white text-black p-4 mb-4 rounded shadow">
-              <h3 className="text-lg font-semibold mb-2">About This Event</h3>
-              <p className="text-sm leading-relaxed">{info}</p>
-            </div>
-          )}
-          {info_url && (
-            <div className="event-link mb-6">
-              <a
-                href={info_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 underline text-sm"
-              >
-                Event info page
-              </a>
+          {(info || info_url) && (
+            <div className="event-info-card">
+              <h3>About This Event</h3>
+              {info && <p>{info}</p>}
+              {info_url && (
+                <a
+                  href={info_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  View the event page
+                </a>
+              )}
             </div>
           )}
 
