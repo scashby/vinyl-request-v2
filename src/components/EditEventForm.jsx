@@ -79,7 +79,7 @@ const EditEventForm = () => {
     if (!id && repeatOption !== 'none' && repeatEndDate) {
       await insertMultiple();
     } else {
-      console.log('Submitting event payload:', formData);
+      console.log('Submitting event payload:', JSON.stringify(formData, null, 2));
       const { error } = id
         ? await supabase.from('events').update(formData).eq('id', Number(id))
         : await supabase.from('events').insert([formData]);
