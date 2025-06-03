@@ -18,7 +18,7 @@ import ManageEvents from './pages/admin/ManageEvents';
 import EditEventForm from './components/EditEventForm';
 import LoginPage from './pages/admin/LoginPage';
 import ProtectedRoute from './auth/ProtectedRoute';
-import AuthProvider from './auth/AuthProvider';
+import { AuthProvider } from './auth/AuthProvider';
 
 function App() {
   return (
@@ -41,7 +41,12 @@ function App() {
           <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
           <Route path="/admin/events" element={<ProtectedRoute><ManageEvents /></ProtectedRoute>} />
           <Route path="/admin/events/new" element={<ProtectedRoute><EditEventForm /></ProtectedRoute>} />
-          {/* etc... */}
+          <Route path="/admin/events/:id" element={<ProtectedRoute><EditEventForm /></ProtectedRoute>} />
+          <Route path="/admin/edit-queue" element={<ProtectedRoute><EditQueue /></ProtectedRoute>} />
+          <Route path="/admin/set-now-playing" element={<ProtectedRoute><SetNowPlaying /></ProtectedRoute>} />
+          <Route path="/admin/import-discogs" element={<ProtectedRoute><ImportDiscogs /></ProtectedRoute>} />
+          <Route path="/admin/block-sides" element={<ProtectedRoute><BlockSides /></ProtectedRoute>} />
+          <Route path="/admin/import-collection" element={<ProtectedRoute><ImportCollection /></ProtectedRoute>} />
         </Routes>
       </AuthProvider>
     </Router>
