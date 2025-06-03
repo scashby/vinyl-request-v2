@@ -23,7 +23,6 @@ import { AuthProvider } from './auth/AuthProvider';
 function App() {
   return (
     <Router>
-      <AuthProvider>
         <Routes>
           {/* Public */}
           <Route path="/" element={<LandingPage />} />
@@ -32,8 +31,11 @@ function App() {
           <Route path="/browse" element={<BrowseAlbumsPage />} />
           <Route path="/browse-queue" element={<BrowseQueue />} />
           <Route path="/now-playing" element={<NowPlayingPage />} />
-          <Route path="/album/:id" element={<AlbumDetailPage />} />
+          <Route path="/album/:id" element={<AlbumDetailPage />} /> 
+        </Routes>
 
+      <AuthProvider>
+        <Routes>
           {/* Admin Login */}
           <Route path="/admin/login" element={<LoginPage />} />
           <Route path="/login" element={<LoginPage />} />
