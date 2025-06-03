@@ -22,13 +22,25 @@ const EditEventForm = () => {
   const [repeatEndDate, setRepeatEndDate] = useState('');
 
   useEffect(() => {
-    const fetchEvent = async () => {
-      if (id) {
+    if (id) {
+      const fetchEvent = async () => {
         const { data, error } = await supabase.from('events').select('*').eq('id', Number(id)).single();
-        if (!error && data) setFormData(data);
+        if (!error) setFormData(data);
+      };
+      fetchEvent();
+    } else {
+      const copied = sessionStorage.getItem('copiedEvent');
+      if (copied) {
+        const copiedData = JSON.parse(copied);
+        const { id, created_at, ...cleaned } = copiedData;
+        setFormData({
+          ...cleaned,
+          title: `${cleaned.title} (Copy)`,
+          date: '',
+        });
+        sessionStorage.removeItem('copiedEvent');
       }
-    };
-    fetchEvent();
+    }
   }, [id]);
 
   const handleChange = (e) => {
@@ -59,7 +71,8 @@ const EditEventForm = () => {
       }
 
       const { error } = await supabase.from('events').insert(events);
-      if (!error) navigate('/admin/manage-events');
+      if (error) alert('Error saving repeating events');
+      else navigate('/admin/manage-events');
     };
 
     if (!id && repeatOption !== 'none' && repeatEndDate) {
@@ -68,36 +81,35 @@ const EditEventForm = () => {
       const { error } = id
         ? await supabase.from('events').update(formData).eq('id', Number(id))
         : await supabase.from('events').insert([formData]);
-      if (!error) navigate('/admin/manage-events');
+      if (error) alert('Error saving event');
+      else navigate('/admin/manage-events');
     }
   };
 
   return (
     <div style={{
-      maxWidth: '640px',
+      maxWidth: '600px',
       margin: '2rem auto',
       padding: '2rem',
       backgroundColor: '#ffffff',
       color: '#000000',
       border: '1px solid #ddd',
-      borderRadius: '8px',
-      minHeight: '100vh',
-      boxShadow: '0 0 8px rgba(0,0,0,0.1)'
+      minHeight: '100vh'
     }}>
-      <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1.5rem' }}>{id ? 'Edit Event' : 'Create New Event'}</h2>
+      <h2 style={{ marginBottom: '1.5rem' }}>{id ? 'Edit Event' : 'Create New Event'}</h2>
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
         <label>
-          Title:
+          Title:<br />
           <input type="text" name="title" value={formData.title} onChange={handleChange} required />
         </label>
         <label>
-          Date:
+          Date:<br />
           <input type="date" name="date" value={formData.date} onChange={handleChange} required />
         </label>
         {!id && (
           <>
             <label>
-              Repeat:
+              Repeat:<br />
               <select value={repeatOption} onChange={(e) => setRepeatOption(e.target.value)}>
                 <option value="none">None</option>
                 <option value="daily">Daily</option>
@@ -109,16 +121,16 @@ const EditEventForm = () => {
             {repeatOption !== 'none' && (
               <>
                 <label>
-                  Every:
+                  Every:<br />
                   <input
                     type="number"
                     min="1"
                     value={repeatInterval}
                     onChange={(e) => setRepeatInterval(Number(e.target.value))}
-                  /> {repeatOption === 'daily' ? 'day(s)' : repeatOption === 'weekly' ? 'week(s)' : repeatOption === 'monthly' ? 'month(s)' : 'year(s)'}
+                  /> {repeatOption}
                 </label>
                 <label>
-                  Repeat Until:
+                  Repeat Until:<br />
                   <input
                     type="date"
                     value={repeatEndDate}
@@ -131,28 +143,29 @@ const EditEventForm = () => {
           </>
         )}
         <label>
-          Time:
-          <input type="text" name="time" value={formData.time} onChange={handleChange} placeholder="e.g. 5pm to 9pm" />
+          Time:<br />
+          <input type="text" name="time" value={formData.time} onChange={handleChange} />
         </label>
         <label>
-          Location:
+          Location:<br />
           <input type="text" name="location" value={formData.location} onChange={handleChange} />
         </label>
         <label>
-          Info:
+          Info:<br />
           <textarea name="info" value={formData.info} onChange={handleChange} rows={3} />
         </label>
         <label>
-          Image URL:
+          Image URL:<br />
           <input type="text" name="image_url" value={formData.image_url} onChange={handleChange} />
-          <small>
-            <a href="https://supabase.com/dashboard/project/bntoivaipesuovselglg/storage/buckets/event-images" target="_blank" rel="noopener noreferrer">
-              Upload image to Supabase
-            </a> and paste URL here.
-          </small>
+          <br />
+          <a href="https://supabase.com/dashboard/project/bntoivaipesuovselglg/storage/buckets/event-images"
+            target="_blank" rel="noopener noreferrer"
+            style={{ fontSize: '0.85rem', display: 'inline-block', marginTop: '0.25rem' }}>
+            Upload image to Supabase
+          </a> and paste URL here.
         </label>
         <label>
-          Allowed Formats:
+          Allowed Formats:<br />
           <input
             type="text"
             name="allowed_formats"
@@ -166,7 +179,7 @@ const EditEventForm = () => {
         </label>
         <button
           type="submit"
-          style={{ backgroundColor: '#2563eb', color: '#ffffff', padding: '0.75rem', border: 'none', cursor: 'pointer', fontWeight: 'bold', borderRadius: '4px' }}
+          style={{ backgroundColor: '#2563eb', color: '#ffffff', padding: '0.75rem', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
         >
           Save Event
         </button>
