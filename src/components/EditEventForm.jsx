@@ -48,7 +48,7 @@ const EditEventForm = () => {
     e.preventDefault();
     const payload = {
       ...eventData,
-      allowed_formats: `{${(eventData.allowed_formats || '').split(',').map(f => f.trim()).join(',')}}`,
+      allowed_formats: `{${(Array.isArray(eventData.allowed_formats) ? eventData.allowed_formats : []).map(f => f.trim()).join(',')}}`,
     };
 
     let result;
@@ -97,7 +97,33 @@ const EditEventForm = () => {
           <input type="checkbox" name="has_queue" checked={eventData.has_queue} onChange={handleChange} />
           {' '}Has Queue
         </label>
-        <input name="allowed_formats" value={eventData.allowed_formats} onChange={handleChange} placeholder="Allowed Formats (comma-separated)" style={{ display: 'block', width: '100%', marginBottom: '1rem' }} />
+        
+        <fieldset style={{ marginBottom: '1rem' }}>
+          <legend>Allowed Formats</legend>
+          {['Vinyl', 'Cassette', '45s', 'CDs'].map((format) => (
+            <label key={format} style={{ display: 'block', marginBottom: '0.25rem' }}>
+              <input
+                type="checkbox"
+                name="allowed_formats"
+                value={format}
+                checked={Array.isArray(eventData.allowed_formats) ? eventData.allowed_formats.includes(format) : false}
+                onChange={(e) => {
+                  const { value, checked } = e.target;
+                  setEventData((prev) => {
+                    const formats = Array.isArray(prev.allowed_formats) ? [...prev.allowed_formats] : [];
+                    if (checked) {
+                      return { ...prev, allowed_formats: [...formats, value] };
+                    } else {
+                      return { ...prev, allowed_formats: formats.filter((f) => f !== value) };
+                    }
+                  });
+                }}
+              />
+              {' '}{format}
+            </label>
+          ))}
+        </fieldset>
+    
         <button type="submit" style={{ backgroundColor: '#2563eb', color: '#fff', padding: '0.5rem 1rem', border: 'none', borderRadius: '4px' }}>
           Save
         </button>
