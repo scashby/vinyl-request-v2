@@ -58,30 +58,34 @@ export default function EventDetail() {
 
       <Breadcrumbs />
 
-      <main className="page-body">
-        <section className="event-content">
-          <img
-            src={image_url || '/images/event-header-still.jpg'}
-            alt={title}
-            className="card-square"
-          />
-          <h2>{formattedDate} {time && `• ${time}`}</h2>
-          {location && (
-            <p>
-              <a
-                href={`https://www.google.com/maps/search/${encodeURIComponent(location)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                {location}
-              </a>
-            </p>
-          )}
-          {info && <p className="event-info">{info}</p>}
-        </section>
+      <main className="page-body browse-queue">
+        <aside className="event-sidebar">
+          <article className="event-card">
+            <img
+              src={image_url || '/images/event-header-still.jpg'}
+              alt={title}
+              className="card-square"
+            />
+            <h2>{title}</h2>
+            <p>{formattedDate}</p>
+            {time && <p>{time}</p>}
+            {location && (
+              <p>
+                <a
+                  href={`https://www.google.com/maps/search/${encodeURIComponent(location)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {location}
+                </a>
+              </p>
+            )}
+            {info && <p>{info}</p>}
+          </article>
+        </aside>
 
         {has_queue && (
-          <section className="queue-display mt-8">
+          <section className="queue-display">
             <h3 className="text-xl font-bold mb-4">Request Queue</h3>
             <div className="tracklist text-black bg-white p-4 rounded shadow">
               <div className="tracklist-header font-bold text-sm border-b border-gray-300 pb-2 mb-2 grid grid-cols-4 gap-4">
