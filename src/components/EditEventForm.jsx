@@ -66,8 +66,8 @@ const EditEventForm = () => {
       return;
     }
 
-    const { data: { publicUrl } } = supabase.storage.from('event-images').getPublicUrl(filePath);
-    setEventData((prev) => ({ ...prev, image_url: publicUrl }));
+    const { data } = supabase.storage.from('event-images').getPublicUrl(filePath);
+    setEventData((prev) => ({ ...prev, image_url: data.publicUrl }));
     setUploading(false);
   };
 
