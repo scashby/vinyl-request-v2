@@ -1,15 +1,11 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-
-// Public pages
 import LandingPage from './pages/landingpage/LandingPage';
-import EventsPage from './pages/events/EventsPage';
-import BrowseAlbumsPage from './pages/browse/BrowseAlbumsPage';
+import EventsPage from './pages/EventsPage';
+import BrowseAlbumsPage from './pages/BrowseAlbumsPage';
 import BrowseQueue from './pages/BrowseQueue';
 import NowPlayingPage from './pages/NowPlayingPage';
 import AlbumDetailPage from './pages/AlbumDetailPage';
-
-// Admin pages
 import LoginPage from './pages/admin/LoginPage';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import ManageEvents from './pages/admin/ManageEvents';
@@ -19,7 +15,6 @@ import SetNowPlaying from './pages/admin/SetNowPlaying';
 import ImportDiscogs from './pages/admin/ImportDiscogs';
 import BlockSides from './pages/admin/BlockSides';
 import ImportCollection from './pages/admin/ImportCollection';
-
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
@@ -33,7 +28,6 @@ function App() {
         <Route path="/browse-queue" element={<BrowseQueue />} />
         <Route path="/now-playing" element={<NowPlayingPage />} />
         <Route path="/album/:id" element={<AlbumDetailPage />} />
-        <Route path="/events/:id" element={<EventDetailPage />} />
 
         {/* Admin Login */}
         <Route path="/admin/login" element={<LoginPage />} />
