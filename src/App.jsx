@@ -61,7 +61,7 @@ function App() {
           <Route path="/admin/set-now-playing" element={<ProtectedRoute><SetNowPlaying /></ProtectedRoute>} />
           <Route path="/admin/import-discogs" element={<ProtectedRoute><ImportDiscogs /></ProtectedRoute>} />
           <Route path="/admin/block-sides" element={<ProtectedRoute><BlockSides /></ProtectedRoute>} />
-          <Route path="/admin/import-collection" element={<ProtectedRoute><ImportCollection /></ProtectedRoute>} /> />
+          <Route path="/admin/import-collection" element={<ProtectedRoute><ImportCollection /></ProtectedRoute>} />
         </Routes>
     </Router>
   );
