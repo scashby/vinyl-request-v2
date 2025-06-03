@@ -1,21 +1,22 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import LandingPage from './pages/landingpage/LandingPage';
-import EventsPage from './pages/EventsPage';
-import BrowseAlbumsPage from './pages/BrowseAlbumsPage';
-import BrowseQueue from './pages/BrowseQueue';
-import NowPlayingPage from './pages/NowPlayingPage';
-import AlbumDetailPage from './pages/AlbumDetailPage';
-import LoginPage from './pages/admin/LoginPage';
+import LandingPage from './pages/LandingPage';
+import EventsPage from './pages/events/EventsPage';
+import EventDetail from './pages/events/EventDetail';
+import BrowseQueue from './pages/browse/BrowseQueue';
+import NowPlayingPage from './pages/now-playing/NowPlayingPage';
+import BrowseAlbumsPage from './pages/browse/BrowseAlbumsPage';
+import AlbumDetailPage from './pages/browse/AlbumDetailPage';
+
 import AdminDashboard from './pages/admin/AdminDashboard';
-import ManageEvents from './pages/admin/ManageEvents';
-import EditEventForm from './components/EditEventForm';
 import EditQueue from './pages/admin/EditQueue';
 import SetNowPlaying from './pages/admin/SetNowPlaying';
 import ImportDiscogs from './pages/admin/ImportDiscogs';
 import BlockSides from './pages/admin/BlockSides';
 import ImportCollection from './pages/admin/ImportCollection';
-import ProtectedRoute from './components/ProtectedRoute';
+import ManageEvents from './pages/admin/ManageEvents';
+import EditEventForm from './components/EditEventForm';
+import LoginPage from './pages/admin/LoginPage';
 
 function App() {
   return (
