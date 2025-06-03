@@ -93,6 +93,7 @@ const EditEventForm = () => {
           Upload image manually to Supabase
         </a>
         <textarea name="info" value={eventData.info} onChange={handleChange} placeholder="Event Info" style={{ display: 'block', width: '100%', marginBottom: '1rem' }} />
+<input name="info_url" value={eventData.info_url || ''} onChange={handleChange} placeholder="Event Info URL (optional)" style={{ display: 'block', width: '100%', marginBottom: '1rem' }} />
         <label style={{ display: 'block', marginBottom: '1rem' }}>
           <input type="checkbox" name="has_queue" checked={eventData.has_queue} onChange={handleChange} />
           {' '}Has Queue
