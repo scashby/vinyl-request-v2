@@ -1,3 +1,12 @@
+## [1.0.1] — 2025-06-02
+### Changed
+- LandingPage updated: “Now Playing” → “Dialogues”, “Admin” → “About”
+- Removed Admin from nav; accessible only at `/admin`
+- Breadcrumbs added to Events page using dynamic route parsing
+- Breadcrumb spacing, font size, and separator corrected
+- AlbumCard artist font and title spacing fixed
+- Global style bleed from album-detail eliminated
+
 # CHANGELOG.md
 
 ## 0.6.0 – Chunk 6: Metadata Enrichment (2025-05-28)

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabaseClient'; // Correct import
 
 const EditEventForm = () => {
   const { id } = useParams();
@@ -19,9 +18,11 @@ const EditEventForm = () => {
 
   useEffect(() => {
     if (id) {
-      supabase.from('events').select('*').eq('id', Number(id)).single().then(({ data, error }) => {
-        if (data) setFormData(data);
-      });
+      fetch(`/api/get-event?id=${id}`)
+        .then(res => res.json())
+        .then(({ data }) => {
+          if (data) setFormData(data);
+        });
     }
   }, [id]);
 
@@ -37,15 +38,17 @@ const EditEventForm = () => {
     e.preventDefault();
     console.log('Submitting event payload:', formData);
 
-    const method = id
-      ? supabase.from('events').update(formData).eq('id', Number(id))
-      : supabase.from('events').insert([formData]);
+    const response = await fetch('/api/create-event', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(formData),
+    });
 
-    const { error, data } = await method;
-    console.log('Insert response:', { error, data });
+    const result = await response.json();
+    console.log('Insert result:', result);
 
-    if (error) {
-      alert('Insert failed. Check console.');
+    if (!response.ok) {
+      alert('Error saving event. Check console.');
     } else {
       navigate('/admin/events');
     }
