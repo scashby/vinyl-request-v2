@@ -5,34 +5,32 @@ import { supabase } from '../lib/supabaseClient';
 const EditEventForm = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [eventData, setEventData] = useState({
+
+  const [formData, setFormData] = useState({
     title: '',
     date: '',
     time: '',
     location: '',
-    image_url: '',
     info: '',
-    has_queue: false,
+    image_url: '',
     allowed_formats: '',
+    has_queue: false,
   });
 
   useEffect(() => {
-    const fetchEvent = async () => {
-      if (id) {
+    if (id) {
+      const fetchEvent = async () => {
         const { data, error } = await supabase.from('events').select('*').eq('id', id).single();
-        if (error) {
-          console.error('Error fetching event:', error.message);
-        } else {
-          setEventData(data);
-        }
-      }
-    };
-    fetchEvent();
+        if (error) console.error('Fetch error:', error);
+        else setFormData(data);
+      };
+      fetchEvent();
+    }
   }, [id]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setEventData((prev) => ({
+    setFormData((prev) => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value,
     }));
@@ -40,82 +38,56 @@ const EditEventForm = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (id) {
-      const { error } = await supabase.from('events').update(eventData).eq('id', id);
-      if (error) {
-        console.error('Error updating event:', error.message);
-      } else {
-        navigate('/admin/events');
-      }
-    } else {
-      const { error } = await supabase.from('events').insert([eventData]);
-      if (error) {
-        console.error('Error creating event:', error.message);
-      } else {
-        navigate('/admin/events');
-      }
-    }
-  };
-
-  const handleCopy = async () => {
-    const { error } = await supabase.from('events').insert([eventData]);
-    if (error) {
-      console.error('Error copying event:', error.message);
-    } else {
-      navigate('/admin/events');
-    }
+    const { error } = id
+      ? await supabase.from('events').update(formData).eq('id', id)
+      : await supabase.from('events').insert([formData]);
+    if (error) alert('Error saving event');
+    else navigate('/admin/manage-events');
   };
 
   return (
-    <div className="form-container">
-      <h2>{id ? 'Edit Event' : 'Add New Event'}</h2>
-      <form onSubmit={handleSubmit}>
+    <div style={{ maxWidth: '600px', margin: '0 auto', padding: '1rem' }}>
+      <h2>{id ? 'Edit Event' : 'Create New Event'}</h2>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         <label>
           Title:
-          <input type="text" name="title" value={eventData.title} onChange={handleChange} required />
+          <input type="text" name="title" value={formData.title} onChange={handleChange} required />
         </label>
         <label>
           Date:
-          <input type="date" name="date" value={eventData.date} onChange={handleChange} required />
+          <input type="date" name="date" value={formData.date} onChange={handleChange} required />
         </label>
         <label>
           Time:
-          <input type="text" name="time" value={eventData.time} onChange={handleChange} />
+          <input type="text" name="time" value={formData.time} onChange={handleChange} placeholder="e.g. 5pm to 9pm" />
         </label>
         <label>
           Location:
-          <input type="text" name="location" value={eventData.location} onChange={handleChange} />
-        </label>
-        <label>
-          Artwork URL:
-          <input type="text" name="image_url" value={eventData.image_url} onChange={handleChange} />
+          <input type="text" name="location" value={formData.location} onChange={handleChange} />
         </label>
         <label>
           Info:
-          <textarea name="info" value={eventData.info} onChange={handleChange}></textarea>
+          <textarea name="info" value={formData.info} onChange={handleChange} rows={3} />
         </label>
         <label>
-          <input
-            type="checkbox"
-            name="has_queue"
-            checked={eventData.has_queue}
-            onChange={handleChange}
-          />
-          Has Queue
+          Image URL:
+          <input type="text" name="image_url" value={formData.image_url} onChange={handleChange} />
+          <small>
+            <a href="https://supabase.com/dashboard/project/bntoivaipesuovselglg/storage/buckets/event-images" target="_blank" rel="noopener noreferrer">
+              Upload image to Supabase
+            </a> and paste URL here.
+          </small>
         </label>
-        {eventData.has_queue && (
-          <label>
-            Allowed Formats:
-            <input
-              type="text"
-              name="allowed_formats"
-              value={eventData.allowed_formats}
-              onChange={handleChange}
-            />
-          </label>
-        )}
-        <button type="submit">Save Event</button>
-        {id && <button type="button" onClick={handleCopy}>Copy This Event</button>}
+        <label>
+          Allowed Formats:
+          <input type="text" name="allowed_formats" value={formData.allowed_formats} onChange={handleChange} placeholder="vinyl, cassette, cd" />
+        </label>
+        <label>
+          <input type="checkbox" name="has_queue" checked={formData.has_queue} onChange={handleChange} /> Enable Request Queue
+        </label>
+        <button type="submit" style={{ backgroundColor: '#2563eb', color: 'white', padding: '0.5rem', border: 'none' }}>
+          Save Event
+        </button>
       </form>
     </div>
   );
