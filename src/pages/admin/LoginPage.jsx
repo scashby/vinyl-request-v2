@@ -29,7 +29,12 @@ const LoginPage = () => {
   };
 
   const handleGoogleLogin = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: 'https://deadwaxdialogues.com/admin'
+      }
+    });
     if (error) alert('Google login error: ' + error.message);
   };
 
