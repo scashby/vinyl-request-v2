@@ -24,6 +24,16 @@ const EventsPage = () => {
     fetchEvents();
   }, []);
 
+  const formatDate = (dateString) => {
+    const [year, month, day] = dateString.split('-');
+    return `${new Date(`${month}/${day}/${year}`).toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    })}`;
+  };
+
   return (
     <div className="page-wrapper">
       <header className="event-hero">
@@ -42,13 +52,6 @@ const EventsPage = () => {
                   .replace('www.dropbox.com', 'dl.dropboxusercontent.com')
                   .replace(/\?.*$/, '')
               : event.image_url || '/images/event-header-still.jpg';
-
-            const formattedDate = new Date(event.date).toLocaleDateString('en-US', {
-              weekday: 'long',
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric',
-            });
 
             return (
               <article className="event-card" key={event.id}>
@@ -70,7 +73,7 @@ const EventsPage = () => {
                   </p>
                 )}
                 <p className="event-date">
-                  {formattedDate}
+                  {formatDate(event.date)}
                   <br />
                   <span className="event-time">{event.time}</span>
                 </p>
