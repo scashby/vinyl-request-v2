@@ -72,7 +72,7 @@ const EditEventForm = () => {
 
       const { error } = await supabase.from('events').insert(events);
       if (error) alert('Error saving repeating events');
-      else navigate('/admin/manage-events');
+      else navigate('/admin/events');
     };
 
     if (!id && repeatOption !== 'none' && repeatEndDate) {
@@ -82,7 +82,7 @@ const EditEventForm = () => {
         ? await supabase.from('events').update(formData).eq('id', Number(id))
         : await supabase.from('events').insert([formData]);
       if (error) alert('Error saving event');
-      else navigate('/admin/manage-events');
+      else navigate('/admin/events');
     }
   };
 
