@@ -1,22 +1,24 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
-import LandingPage from './pages/LandingPage';
-import EventsPage from './pages/EventsPage';
-import BrowseAlbumsPage from './pages/BrowseAlbumsPage';
+// Public pages
+import LandingPage from './pages/landingpage/LandingPage';
+import EventsPage from './pages/events/EventsPage';
+import BrowseAlbumsPage from './pages/browse/BrowseAlbumsPage';
 import BrowseQueue from './pages/BrowseQueue';
 import NowPlayingPage from './pages/NowPlayingPage';
 import AlbumDetailPage from './pages/AlbumDetailPage';
 
+// Admin pages
 import LoginPage from './pages/admin/LoginPage';
 import AdminDashboard from './pages/admin/AdminDashboard';
-import ManageEvents from './components/ManageEvents';
+import ManageEvents from './pages/admin/ManageEvents';
 import EditEventForm from './components/EditEventForm';
-import EditQueue from './components/EditQueue';
-import SetNowPlaying from './components/SetNowPlaying';
-import ImportDiscogs from './components/ImportDiscogs';
-import BlockSides from './components/BlockSides';
-import ImportCollection from './components/ImportCollection';
+import EditQueue from './pages/admin/EditQueue';
+import SetNowPlaying from './pages/admin/SetNowPlaying';
+import ImportDiscogs from './pages/admin/ImportDiscogs';
+import BlockSides from './pages/admin/BlockSides';
+import ImportCollection from './pages/admin/ImportCollection';
 
 import ProtectedRoute from './components/ProtectedRoute';
 
@@ -31,6 +33,7 @@ function App() {
         <Route path="/browse-queue" element={<BrowseQueue />} />
         <Route path="/now-playing" element={<NowPlayingPage />} />
         <Route path="/album/:id" element={<AlbumDetailPage />} />
+        <Route path="/events/:id" element={<EventDetailPage />} />
 
         {/* Admin Login */}
         <Route path="/admin/login" element={<LoginPage />} />
