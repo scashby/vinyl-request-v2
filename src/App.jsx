@@ -17,7 +17,7 @@ import ImportCollection from './pages/admin/ImportCollection';
 import ManageEvents from './pages/admin/ManageEvents';
 import EditEventForm from './components/EditEventForm';
 import LoginPage from './pages/admin/LoginPage';
-import ProtectedRoute from './components/ProtectedRoute';
+import ProtectedRoute from './auth/ProtectedRoute';
 
 function App() {
   return (
