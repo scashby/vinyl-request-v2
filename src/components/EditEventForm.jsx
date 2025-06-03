@@ -13,7 +13,7 @@ const EditEventForm = () => {
     location: '',
     info: '',
     image_url: '',
-    allowed_formats: '',
+    allowed_form_: '',
     has_queue: false,
   });
 
@@ -170,8 +170,8 @@ const EditEventForm = () => {
           Allowed Formats:<br />
           <input
             type="text"
-            name="allowed_formats"
-            value={formData.allowed_formats}
+            name="allowed_form_"
+            value={formData.allowed_form_}
             onChange={handleChange}
             placeholder="vinyl, cassette, cd"
           />
