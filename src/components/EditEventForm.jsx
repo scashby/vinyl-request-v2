@@ -1,61 +1,54 @@
-import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 
 const EditEventForm = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const location = useLocation();
-  const [formTitle, setFormTitle] = useState(id ? 'Edit Event' : 'Create New Event');
   const [eventData, setEventData] = useState({
     title: '',
     date: '',
     time: '',
     location: '',
-    info: '',
     image_url: '',
+    info: '',
+    has_queue: false,
     allowed_formats: '',
-    has_queue: false
   });
-  
+
   useEffect(() => {
     const fetchEvent = async () => {
       if (id) {
-        const { data, error } = await supabase.from('events').select('*').eq('id', id).single();
-        if (!error && data) {
-          setEventData({
-            ...data,
-            allowed_formats: Array.isArray(data.allowed_formats)
-              ? data.allowed_formats.join(', ')
-              : data.allowed_formats
-          });
+        const { data, error } = await supabase
+          .from('events')
+          .select('*')
+          .eq('id', id)
+          .single();
+
+        if (error) {
+          console.error('Error fetching event:', error);
+        } else {
+          setEventData(data);
         }
-      } else if (location.state?.copyData) {
-        const copy = location.state.copyData;
-        setEventData({
-          ...copy,
-          allowed_formats: Array.isArray(copy.allowed_formats)
-            ? copy.allowed_formats.join(', ')
-            : copy.allowed_formats
-        });
       }
     };
+
     fetchEvent();
-  }, [id, location.state]);
+  }, [id]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setEventData((prevData) => ({
-      ...prevData,
-      [name]: type === 'checkbox' ? checked : value
+    setEventData((prev) => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value,
     }));
   };
 
-    const handleSubmit = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const payload = {
       ...eventData,
-      allowed_formats: `{${eventData.allowed_formats.split(',').map(f => f.trim()).join(',')}}`
+      allowed_formats: `{${(eventData.allowed_formats || '').split(',').map(f => f.trim()).join(',')}}`,
     };
 
     let result;
@@ -73,24 +66,13 @@ const EditEventForm = () => {
   };
 
   return (
-    <div style={{
-      maxWidth: '640px',
-      margin: '2rem auto',
-      padding: '2rem',
-      backgroundColor: '#ffffff',
-      color: '#000000',
-      border: '1px solid #ddd',
-      borderRadius: '8px',
-      minHeight: '100vh',
-      boxShadow: '0 0 8px rgba(0,0,0,0.1)'
-    }}>
-      <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1.5rem' }}>{formTitle}</h2>
-      <form onSubmit={handleSubmit}>
-        <input name="title" value={eventData.title} onChange={handleChange} placeholder="Title" required style={{ display: 'block', width: '100%', marginBottom: '1rem' }} />
-        <input name="date" type="date" value={eventData.date} onChange={handleChange} required style={{ display: 'block', width: '100%', marginBottom: '1rem' }} />
-        <input name="time" value={eventData.time} onChange={handleChange} placeholder="Time" style={{ display: 'block', width: '100%', marginBottom: '1rem' }} />
-        <input name="location" value={eventData.location} onChange={handleChange} placeholder="Location" style={{ display: 'block', width: '100%', marginBottom: '1rem' }} />
-        <textarea name="info" value={eventData.info} onChange={handleChange} placeholder="Info" style={{ display: 'block', width: '100%', marginBottom: '1rem' }} />
+    <div style={{ padding: '2rem' }}>
+      <h2>{id ? 'Edit Event' : 'New Event'}</h2>
+      <form onSubmit={handleSubmit} style={{ maxWidth: '600px' }}>
+        <input name="title" value={eventData.title} onChange={handleChange} placeholder="Title" style={{ display: 'block', width: '100%', marginBottom: '0.5rem' }} />
+        <input name="date" value={eventData.date} onChange={handleChange} placeholder="Date (YYYY-MM-DD)" style={{ display: 'block', width: '100%', marginBottom: '0.5rem' }} />
+        <input name="time" value={eventData.time} onChange={handleChange} placeholder="Time (e.g. 8:00 PM)" style={{ display: 'block', width: '100%', marginBottom: '0.5rem' }} />
+        <input name="location" value={eventData.location} onChange={handleChange} placeholder="Location" style={{ display: 'block', width: '100%', marginBottom: '0.5rem' }} />
         <input name="image_url" value={eventData.image_url} onChange={handleChange} placeholder="Image URL" style={{ display: 'block', width: '100%', marginBottom: '0.5rem' }} />
         <a
           href="https://supabase.com/dashboard/project/bntoivaipesuovselglg/storage/buckets/event-images"
@@ -100,16 +82,13 @@ const EditEventForm = () => {
         >
           Upload image manually to Supabase
         </a>
-        
-        
-        <input name="allowed_formats" value={eventData.allowed_formats} onChange={handleChange} placeholder="Allowed Formats (comma-separated)" style={{ display: 'block', width: '100%', marginBottom: '1rem' }} />
-        <label style={{ display: 'block', marginBottom: '1rem' }}>
+        <textarea name="info" value={eventData.info} onChange={handleChange} placeholder="Event Info" style={{ display: 'block', width: '100%', marginBottom: '0.5rem' }} />
+        <label style={{ display: 'block', marginBottom: '0.5rem' }}>
           <input type="checkbox" name="has_queue" checked={eventData.has_queue} onChange={handleChange} />
           {' '}Has Queue
         </label>
-        <button type="submit" style={{ backgroundColor: '#2563eb', color: '#fff', padding: '0.5rem 1rem', border: 'none', borderRadius: '4px' }}>
-          Save
-        </button>
+        <input name="allowed_formats" value={eventData.allowed_formats} onChange={handleChange} placeholder="Allowed Formats (comma-separated)" style={{ display: 'block', width: '100%', marginBottom: '1rem' }} />
+        <button type="submit">Save</button>
       </form>
     </div>
   );
