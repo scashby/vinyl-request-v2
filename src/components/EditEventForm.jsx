@@ -70,6 +70,7 @@ const EditEventForm = () => {
         else break;
       }
 
+      console.log('Submitting repeating event payload:', events);
       const { error } = await supabase.from('events').insert(events);
       if (error) alert('Error saving repeating events');
       else navigate('/admin/events');
@@ -78,6 +79,7 @@ const EditEventForm = () => {
     if (!id && repeatOption !== 'none' && repeatEndDate) {
       await insertMultiple();
     } else {
+      console.log('Submitting event payload:', formData);
       const { error } = id
         ? await supabase.from('events').update(formData).eq('id', Number(id))
         : await supabase.from('events').insert([formData]);
