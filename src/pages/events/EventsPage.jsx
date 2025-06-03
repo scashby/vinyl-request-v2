@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabaseClient';
 import '../../styles/internal.css';
 import Breadcrumbs from '../../components/Breadcrumbs';
 import '../../styles/breadcrumb.css';
+import { Link } from 'react-router-dom';
 
 const EventsPage = () => {
   const [events, setEvents] = useState([]);
@@ -17,7 +18,9 @@ const EventsPage = () => {
       if (error) {
         console.error('Error fetching events:', error);
       } else {
-        setEvents(data);
+        const today = new Date();
+        const filtered = data.filter(event => new Date(event.date) >= today);
+        setEvents(filtered);
       }
     };
 
@@ -55,11 +58,13 @@ const EventsPage = () => {
 
             return (
               <article className="event-card" key={event.id}>
-                <img
-                  src={imageSrc}
-                  alt={event.title}
-                  className="card-square"
-                />
+                <Link to={`/events/${event.id}`}>
+                  <img
+                    src={imageSrc}
+                    alt={event.title}
+                    className="card-square"
+                  />
+                </Link>
                 <h2>{event.title}</h2>
                 {event.location && (
                   <p>
