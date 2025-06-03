@@ -17,8 +17,7 @@ const EditEventForm = () => {
     allowed_formats: '',
     has_queue: false
   });
-  const [uploading, setUploading] = useState(false);
-
+  
   useEffect(() => {
     const fetchEvent = async () => {
       if (id) {
@@ -52,31 +51,7 @@ const EditEventForm = () => {
     }));
   };
 
-  const handleUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const filePath = `${Date.now()}_${file.name}`;
-    setUploading(true);
-
-    const { error } = await supabase.storage.from('event-images').upload(filePath, file, {
-      cacheControl: '3600',
-      upsert: true,
-      contentType: file.type
-    });
-
-    if (error) {
-      alert('Upload failed: ' + error.message);
-      setUploading(false);
-      return;
-    }
-
-    const { data } = supabase.storage.from('event-images').getPublicUrl(filePath);
-    setEventData(prev => ({ ...prev, image_url: data.publicUrl }));
-    setUploading(false);
-  };
-
-  const handleSubmit = async (e) => {
+    const handleSubmit = async (e) => {
     e.preventDefault();
     const payload = {
       ...eventData,
@@ -117,7 +92,15 @@ const EditEventForm = () => {
         <input name="location" value={eventData.location} onChange={handleChange} placeholder="Location" style={{ display: 'block', width: '100%', marginBottom: '1rem' }} />
         <textarea name="info" value={eventData.info} onChange={handleChange} placeholder="Info" style={{ display: 'block', width: '100%', marginBottom: '1rem' }} />
         <input name="image_url" value={eventData.image_url} onChange={handleChange} placeholder="Image URL" style={{ display: 'block', width: '100%', marginBottom: '0.5rem' }} />
-        <input type="file" accept="image/*" onChange={handleUpload} style={{ display: 'block', marginBottom: '1rem' }} />
+        <a
+          href="https://supabase.com/dashboard/project/bntoivaipesuovselglg/storage/buckets/event-images"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ display: 'block', marginBottom: '1rem', color: '#2563eb', textDecoration: 'underline' }}
+        >
+          Upload image manually to Supabase
+        </a>
+        
         {uploading && <p style={{ marginBottom: '1rem' }}>Uploading...</p>}
         <input name="allowed_formats" value={eventData.allowed_formats} onChange={handleChange} placeholder="Allowed Formats (comma-separated)" style={{ display: 'block', width: '100%', marginBottom: '1rem' }} />
         <label style={{ display: 'block', marginBottom: '1rem' }}>
