@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { supabase } from '../../../lib/supabaseClient';
+import { supabase } from '../../lib/supabaseClient';
 import { Link, useNavigate } from 'react-router-dom';
-import '../../../styles/internal.css';
+import '../../styles/internal.css';
 
 const ManageEvents = () => {
   const [events, setEvents] = useState([]);
