@@ -56,17 +56,9 @@ export default function QueueSection({ eventId }) {
 
   return (
     <div className="queue-section">
-      <div className="queue-header-row">
-        <div className="queue-index header">#</div>
-        <div className="queue-cover header"></div>
-        <div className="queue-info header">Album / Artist</div>
-        <div className="queue-side header">Side</div>
-        <div className="queue-votes header"></div>
-      </div>
       <div className="queue-grid">
-        {queue.map((item, index) => (
+        {queue.map(item => (
           <div key={item.id} className="queue-row">
-            <div className="queue-index">{index + 1}</div>
             <img
               src={item.album.image_url || "/placeholder.png"}
               alt="cover"
@@ -76,9 +68,8 @@ export default function QueueSection({ eventId }) {
               <div className="queue-title">{item.album.title || "(Unknown Title)"}</div>
               <div className="queue-artist">{item.album.artist || "(Unknown Artist)"}</div>
             </div>
-            <div className="queue-side">{item.side || "—"}</div>
+            <div className="queue-side">{item.side || "(Unknown Side)"}</div>
             <div className="queue-votes">
-              <span className="queue-plus">+</span>
               <span className="queue-heart">❤</span>
               <span className="queue-count">x{item.upvotes}</span>
             </div>
