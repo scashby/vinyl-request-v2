@@ -107,31 +107,32 @@ export default function EventDetail() {
 
           {has_queue && (
             <section className="queue-display-modern">
-              <h3>Request Queue</h3>
               <div className="tracklist-modern">
                 <div className="tracklist-modern-header">
-                  <span className="track-index">#</span>
+                  <span>#</span>
                   <span>Album</span>
                   <span>Artist</span>
                   <span>Side</span>
                   <span>Votes</span>
                 </div>
+
                 <div className="track-modern">
-                  <span className="track-index">1</span>
+                  <span>1</span>
                   <span>Sample Album</span>
                   <span>Sample Artist</span>
                   <span>A</span>
                   <span>★★★★☆</span>
                 </div>
               </div>
-              <Link
-                to="/browse"
-                className="button mt-4 inline-block bg-purple-600 text-white px-4 py-2 rounded"
-              >
-                Add to Queue
-              </Link>
+
+              <div style={{ padding: '1rem 0 0 0' }}>
+                <Link to="/browse" className="button">
+                  Add to Queue
+                </Link>
+              </div>
             </section>
           )}
+
         </section>
       </main>
 
