@@ -19,9 +19,9 @@ export default function QueueSection({ eventId }) {
 
       const albumIds = [...new Set(
         requests
-          .map(r => r.album_id)
-          .filter(id => typeof id === "string" && id.length === 36) // UUID check
-      )];
+            .map(r => r.album_id)
+            .filter(id => typeof id === "number" && !isNaN(id))
+        )];
 
       if (albumIds.length === 0) {
         console.warn("No valid album IDs found in requests.");
