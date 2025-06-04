@@ -30,7 +30,7 @@ export default function QueueSection({ eventId }) {
 
       const { data: albums, error: albumError } = await supabase
         .from("collection")
-        .select("id, artist, title, image, format")
+        .select("id, artist, title, image_url, format")
         .in("id", albumIds);
 
       if (albumError) {
@@ -60,7 +60,7 @@ export default function QueueSection({ eventId }) {
         {queue.map(item => (
           <div key={item.id} className="queue-row">
             <img
-              src={item.album.image || "/placeholder.png"}
+              src={item.album.image_url || "/placeholder.png"}
               alt="cover"
               className="queue-cover"
             />
