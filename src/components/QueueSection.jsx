@@ -17,7 +17,11 @@ export default function QueueSection({ eventId }) {
         return;
       }
 
-      const albumIds = [...new Set(requests.map(r => r.album_id))];
+        const albumIds = [...new Set(
+        requests
+            .map(r => r.album_id)
+            .filter(id => typeof id === "string" && id.length)
+        )];
       const { data: albums } = await supabase
         .from("collection")
         .select("id, artist, title, image, format")
