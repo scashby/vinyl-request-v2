@@ -242,3 +242,21 @@ html, body {
 .queue-side {
   text-align: center;
 }
+.queue-header {
+  font-size: 0.75rem;
+  font-weight: bold;
+  color: #888;
+  text-transform: uppercase;
+  border-bottom: 1px solid #333;
+  padding-bottom: 0.25rem;
+}
+
+.queue-header-col {
+  padding: 0.25rem 0;
+}
+
+.queue-plus {
+  color: #ccc;
+  font-size: 1.25rem;
+  cursor: pointer;
+}
