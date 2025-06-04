@@ -10,7 +10,7 @@
 .queue-header,
 .queue-row {
   display: grid;
-  grid-template-columns: 2rem 3rem 1fr 4rem 5rem;
+  grid-template-columns: 2rem 3rem 1fr 4rem 2rem 4rem;
   gap: 1rem;
   align-items: center;
 }
@@ -63,30 +63,28 @@
   line-height: 48px;
 }
 
-.queue-votes {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  justify-content: center;
-  gap: 0.25rem;
-  height: 48px;
+.queue-plus {
+  font-size: 1.25rem;
+  color: #ccc;
+  text-align: center;
+  cursor: pointer;
+  line-height: 48px;
 }
 
-.queue-plus {
-  font-size: 1rem;
-  color: #ccc;
-  line-height: 1;
-  margin-bottom: 0.1rem;
+.queue-votes {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.25rem;
+  line-height: 48px;
 }
 
 .queue-heart {
   font-size: 1.25rem;
   color: #dc2626;
-  line-height: 1;
 }
 
 .queue-count {
   font-size: 0.875rem;
   color: #ccc;
-  line-height: 1;
 }
