@@ -197,3 +197,54 @@ html, body {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* 🎵 Updated Queue Styling */
+.queue-display-modern {
+  background-color: #fff;
+  color: #111;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  border-radius: 0.75rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.queue-display-modern h3 {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.5rem;
+  color: #6a0dad;
+  margin-bottom: 1rem;
+}
+
+.tracklist-modern {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  font-size: 0.875rem;
+}
+
+.tracklist-modern-header,
+.track-modern {
+  display: grid;
+  grid-template-columns: 1fr 1fr 60px 80px;
+  gap: 1rem;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+}
+
+.tracklist-modern-header {
+  background: #f3f3f3;
+  font-weight: bold;
+  color: #333;
+  border: 1px solid #e0e0e0;
+}
+
+.track-modern {
+  background: #fafafa;
+  color: #111;
+  border: 1px solid #e5e5e5;
+  transition: background 0.2s ease;
+}
+
+.track-modern:hover {
+  background: #f0f0ff;
+}
