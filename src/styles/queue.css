@@ -20,14 +20,13 @@
   font-weight: bold;
   color: #888;
   text-transform: uppercase;
-  border-bottom: 1px solid #333;
   padding-bottom: 0.5rem;
   margin-bottom: 0.5rem;
+  border-bottom: 1px solid #333;
 }
 
 .queue-row {
   padding: 0.75rem 0;
-  border-top: 1px solid #333;
 }
 
 .queue-index {
@@ -61,13 +60,15 @@
   font-size: 0.875rem;
   color: #ccc;
   text-align: center;
+  line-height: 48px; /* center vertically to match image height */
 }
 
 .queue-votes {
-  display: flex;
+  display: grid;
+  grid-template-rows: auto auto auto;
+  justify-items: end;
   align-items: center;
-  justify-content: flex-end;
-  gap: 0.25rem;
+  height: 48px;
 }
 
 .queue-plus {
