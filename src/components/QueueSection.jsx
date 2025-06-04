@@ -56,17 +56,14 @@ export default function QueueSection({ eventId }) {
 
   return (
     <div className="queue-section">
+      <div className="queue-header-row">
+        <div className="queue-index header">#</div>
+        <div className="queue-cover header"></div>
+        <div className="queue-info header">Album / Artist</div>
+        <div className="queue-side header">Side</div>
+        <div className="queue-votes header"></div>
+      </div>
       <div className="queue-grid">
-        {/* HEADER ROW */}
-        <div className="queue-row queue-header">
-          <div className="queue-index">#</div>
-          <div className="queue-cover"></div>
-          <div className="queue-info queue-header-label">Album / Artist</div>
-          <div className="queue-side queue-header-label">Side</div>
-          <div className="queue-votes"></div>
-        </div>
-
-        {/* DATA ROWS */}
         {queue.map((item, index) => (
           <div key={item.id} className="queue-row">
             <div className="queue-index">{index + 1}</div>
