@@ -10,7 +10,7 @@ export default function QueueSection({ eventId }) {
         .from("requests")
         .select("*")
         .eq("event_id", eventId)
-        .order("created_at", { ascending: true });
+        .order("id", { ascending: true });
 
       if (error) {
         console.error("Error fetching requests:", error);
