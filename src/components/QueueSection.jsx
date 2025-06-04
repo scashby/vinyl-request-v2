@@ -56,20 +56,26 @@ export default function QueueSection({ eventId }) {
 
   return (
     <div className="queue-section">
+      <div className="queue-grid queue-header">
+        <div>#</div>
+        <div>TITLE</div>
+        <div>ARTIST</div>
+        <div>ALBUM</div>
+        <div>SIDE</div>
+        <div>FORMAT</div>
+        <div></div>
+      </div>
       <div className="queue-grid">
-        {queue.map(item => (
+        {queue.map((item, index) => (
           <div key={item.id} className="queue-row">
-            <img
-              src={item.album.image_url || "/placeholder.png"}
-              alt="cover"
-              className="queue-cover"
-            />
-            <div className="queue-info">
-              <div className="queue-title">{item.album.title || "(Unknown Title)"}</div>
-              <div className="queue-artist">{item.album.artist || "(Unknown Artist)"}</div>
-            </div>
-            <div className="queue-side">{item.side || "(Unknown Side)"}</div>
+            <div className="queue-index">{index + 1}</div>
+            <div className="queue-title">{item.album.title || "(Unknown Title)"}</div>
+            <div className="queue-artist">{item.album.artist || "(Unknown Artist)"}</div>
+            <div className="queue-album">{item.album.title || "(Unknown Album)"}</div>
+            <div className="queue-side">{item.side || "—"}</div>
+            <div className="queue-format">{item.album.format || "—"}</div>
             <div className="queue-votes">
+              <span className="queue-plus">+</span>
               <span className="queue-heart">❤</span>
               <span className="queue-count">x{item.upvotes}</span>
             </div>
