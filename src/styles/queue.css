@@ -60,29 +60,33 @@
   font-size: 0.875rem;
   color: #ccc;
   text-align: center;
-  line-height: 48px; /* center vertically to match image height */
+  line-height: 48px;
 }
 
 .queue-votes {
-  display: grid;
-  grid-template-rows: auto auto auto;
-  justify-items: end;
-  align-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 0.25rem;
   height: 48px;
 }
 
 .queue-plus {
-  color: #ccc;
   font-size: 1rem;
-  cursor: pointer;
+  color: #ccc;
+  line-height: 1;
+  margin-bottom: 0.1rem;
 }
 
 .queue-heart {
   font-size: 1.25rem;
   color: #dc2626;
+  line-height: 1;
 }
 
 .queue-count {
   font-size: 0.875rem;
   color: #ccc;
+  line-height: 1;
 }
