@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabaseClient';
 import '../../styles/internal.css';
 import '../../styles/breadcrumb.css';
 import Breadcrumbs from '../../components/Breadcrumbs';
-import QueueSection from "../components/QueueSection";
+import QueueSection from "../../components/QueueSection";
 
 export default function EventDetail() {
   const { id } = useParams();
