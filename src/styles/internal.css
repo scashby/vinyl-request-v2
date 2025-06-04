@@ -176,6 +176,20 @@ html, body {
   padding: 0.75rem 0;
 }
 
+.queue-header .queue-index,
+.queue-header-label {
+  font-size: 0.75rem;
+  font-weight: bold;
+  color: #888;
+  text-transform: uppercase;
+}
+
+.queue-index {
+  text-align: center;
+  color: #888;
+  font-size: 0.875rem;
+}
+
 .queue-cover {
   width: 48px;
   height: 48px;
@@ -189,7 +203,7 @@ html, body {
 
 .queue-title {
   font-weight: 600;
-  color: #2563eb; /* blue-600 */
+  color: #2563eb;
 }
 
 .queue-artist {
@@ -200,6 +214,7 @@ html, body {
 .queue-side {
   font-size: 0.875rem;
   color: #ccc;
+  text-align: center;
 }
 
 .queue-votes {
@@ -209,7 +224,7 @@ html, body {
 }
 
 .queue-heart {
-  color: #dc2626; /* red-600 */
+  color: #dc2626;
   font-size: 1.25rem;
 }
 
@@ -217,28 +232,9 @@ html, body {
   font-size: 0.875rem;
   color: #ccc;
 }
-.queue-header-row {
-  display: grid;
-  grid-template-columns: 2rem 48px 1fr auto auto;
-  gap: 1rem;
-  padding-bottom: 0.5rem;
-  font-size: 0.75rem;
-  color: #888;
-  text-transform: uppercase;
-}
-
-.queue-index {
-  color: #888;
-  font-size: 0.875rem;
-  text-align: center;
-}
 
 .queue-plus {
   color: #ccc;
   font-size: 1.25rem;
   cursor: pointer;
-}
-
-.queue-side {
-  text-align: center;
 }
