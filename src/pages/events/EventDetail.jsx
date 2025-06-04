@@ -125,7 +125,7 @@ export default function EventDetail() {
                 </div>
               </div>
 
-              <div style={{ padding: '1rem 0 0 0' }}>
+              <div style={{ paddingTop: '1.5rem' }}>
                 <Link to="/browse" className="button">
                   Add to Queue
                 </Link>
