@@ -10,25 +10,36 @@ export default function QueueSection({ eventId }) {
         .from("requests")
         .select("*")
         .eq("event_id", eventId)
-        .order("id", { ascending: true })
+        .order("id", { ascending: true });
 
       if (error) {
         console.error("Error fetching requests:", error);
         return;
       }
 
-        const albumIds = [...new Set(
+      const albumIds = [...new Set(
         requests
-            .map(r => r.album_id)
-            .filter(id => typeof id === "string" && id.length)
-        )];
-      const { data: albums } = await supabase
+          .map(r => r.album_id)
+          .filter(Boolean) // ensure no null/undefined/empty
+      )];
+
+      if (albumIds.length === 0) {
+        console.warn("No valid album IDs found in requests.");
+        return;
+      }
+
+      const { data: albums, error: albumError } = await supabase
         .from("collection")
         .select("id, artist, title, image, format")
         .in("id", albumIds);
 
+      if (albumError) {
+        console.error("Error fetching albums:", albumError);
+        return;
+      }
+
       const queueWithAlbumData = requests.map(req => {
-        const album = albums.find(a => a.id === req.album_id);
+        const album = (albums || []).find(a => a.id === req.album_id);
         return {
           id: req.id,
           side: req.side,
