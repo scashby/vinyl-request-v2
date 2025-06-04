@@ -163,6 +163,20 @@ html, body {
   border-radius: 0.5rem;
 }
 
+.queue-header-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  gap: 1rem;
+  align-items: center;
+  font-size: 0.75rem;
+  font-weight: bold;
+  color: #888;
+  text-transform: uppercase;
+  border-bottom: 1px solid #333;
+  padding-bottom: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
 .queue-grid {
   display: grid;
   grid-template-columns: auto 1fr auto auto;
@@ -174,20 +188,6 @@ html, body {
   display: contents;
   border-top: 1px solid #333;
   padding: 0.75rem 0;
-}
-
-.queue-header .queue-index,
-.queue-header-label {
-  font-size: 0.75rem;
-  font-weight: bold;
-  color: #888;
-  text-transform: uppercase;
-}
-
-.queue-index {
-  text-align: center;
-  color: #888;
-  font-size: 0.875rem;
 }
 
 .queue-cover {
@@ -221,6 +221,7 @@ html, body {
   display: flex;
   align-items: center;
   gap: 0.25rem;
+  justify-content: flex-end;
 }
 
 .queue-heart {
@@ -228,13 +229,19 @@ html, body {
   font-size: 1.25rem;
 }
 
+.queue-plus {
+  color: #ccc;
+  font-size: 1.25rem;
+  cursor: pointer;
+}
+
 .queue-count {
   font-size: 0.875rem;
   color: #ccc;
 }
 
-.queue-plus {
-  color: #ccc;
-  font-size: 1.25rem;
-  cursor: pointer;
+.queue-index {
+  color: #888;
+  font-size: 0.875rem;
+  text-align: center;
 }
