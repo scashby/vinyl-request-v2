@@ -107,6 +107,7 @@ export default function EventDetail() {
 
           {has_queue && (
             <section className="queue-display-modern">
+              <h3 className="queue-heading">Request Queue</h3>
               <div className="tracklist-modern">
                 <div className="tracklist-modern-header">
                   <span>#</span>
@@ -116,22 +117,18 @@ export default function EventDetail() {
                   <span>Side</span>
                   <span>Votes</span>
                 </div>
-
                 <div className="track-modern">
                   <span>1</span>
-                  <span><img src="https://via.placeholder.com/32" alt="cover" /></span>
+                  <span>
+                    <img src="https://via.placeholder.com/32" alt="cover" />
+                  </span>
                   <span>Sample Album</span>
                   <span>Sample Artist</span>
                   <span>A</span>
                   <span>★★★★☆</span>
                 </div>
               </div>
-
-              <div>
-                <Link to="/browse" className="button">
-                  Add to Queue
-                </Link>
-              </div>
+              <Link to="/browse" className="button">Add to Queue</Link>
             </section>
           )}
         </section>

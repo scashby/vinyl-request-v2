@@ -156,10 +156,12 @@ html, body {
 
 /* 🎧 Queue Display Styles – Tidal-style revision */
 .queue-display-modern {
-  margin-top: 2rem;
-  background-color: #000;
+  background-color: black;
+  padding: 2rem;
+  margin-bottom: 2rem;
+  border-radius: 0.5rem;
   color: white;
-  padding: 0;
+  width: 100%;
 }
 
 .tracklist-modern {
@@ -173,21 +175,21 @@ html, body {
 .tracklist-modern-header,
 .track-modern {
   display: grid;
-  grid-template-columns: 40px 3fr 3fr 1fr 1fr;
+  grid-template-columns: 1fr 48px 3fr 3fr 1fr 1fr;
   align-items: center;
   padding: 0.75rem 1rem;
 }
 
 .tracklist-modern-header {
+  font-weight: bold;
   color: #999;
-  font-size: 0.75rem;
-  font-weight: 500;
   text-transform: uppercase;
-  border-bottom: 1px solid #333;
+  font-size: 0.75rem;
+  border-bottom: 1px solid #444;
 }
 
 .track-modern {
-  border-bottom: 1px solid #222;
+  border-bottom: 1px solid #333;
   transition: background-color 0.2s;
 }
 
@@ -200,15 +202,15 @@ html, body {
   height: 32px;
   border-radius: 4px;
   object-fit: cover;
-  margin-right: 0.75rem;
+  display: block;
 }
 
 .queue-display-modern .button {
-  display: inline-block;
-  margin-top: 1rem;
+  margin-top: 1.5rem;
   background-color: #9333ea;
   color: white;
   font-weight: 500;
   border-radius: 0.375rem;
   padding: 0.5rem 1rem;
+  text-decoration: none;
 }
