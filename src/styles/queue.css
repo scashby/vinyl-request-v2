@@ -1,0 +1,87 @@
+.queue-wrapper {
+  background: #000;
+  color: #fff;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  margin-top: 2rem;
+  font-family: 'Inter', sans-serif;
+}
+
+.queue-header,
+.queue-row {
+  display: grid;
+  grid-template-columns: 2rem 3rem 1fr 4rem 5rem;
+  gap: 1rem;
+  align-items: center;
+}
+
+.queue-header {
+  font-size: 0.75rem;
+  font-weight: bold;
+  color: #888;
+  text-transform: uppercase;
+  border-bottom: 1px solid #333;
+  padding-bottom: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.queue-row {
+  padding: 0.75rem 0;
+  border-top: 1px solid #333;
+}
+
+.queue-index {
+  text-align: center;
+  color: #888;
+  font-size: 0.875rem;
+}
+
+.queue-cover {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+}
+
+.queue-meta {
+  display: flex;
+  flex-direction: column;
+}
+
+.queue-title {
+  font-weight: 600;
+  color: #2563eb;
+}
+
+.queue-artist {
+  font-size: 0.875rem;
+  color: #aaa;
+}
+
+.queue-side {
+  font-size: 0.875rem;
+  color: #ccc;
+  text-align: center;
+}
+
+.queue-votes {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.25rem;
+}
+
+.queue-plus {
+  color: #ccc;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.queue-heart {
+  font-size: 1.25rem;
+  color: #dc2626;
+}
+
+.queue-count {
+  font-size: 0.875rem;
+  color: #ccc;
+}

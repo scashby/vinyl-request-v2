@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
+import "../styles/queue.css";
 
 export default function QueueSection({ eventId }) {
   const [queue, setQueue] = useState([]);
@@ -10,20 +11,15 @@ export default function QueueSection({ eventId }) {
         .from("requests")
         .select("*")
         .eq("event_id", eventId)
-        .order("id", { ascending: true });
+        .order("inserted_at", { ascending: true });
 
       if (error) {
         console.error("Error fetching requests:", error);
         return;
       }
 
-      const albumIds = [...new Set(
-        requests
-          .map(r => r.album_id)
-          .filter(id => typeof id === "number" && !isNaN(id))
-      )];
-
-      if (albumIds.length === 0) {
+      const albumIds = requests.map(r => r.album_id).filter(Boolean);
+      if (!albumIds.length) {
         console.warn("No valid album IDs found in requests.");
         return;
       }
@@ -38,53 +34,50 @@ export default function QueueSection({ eventId }) {
         return;
       }
 
-      const queueWithAlbumData = requests.map(req => {
-        const album = (albums || []).find(a => a.id === req.album_id);
+      const mapped = requests.map((req, i) => {
+        const album = albums.find(a => a.id === req.album_id);
         return {
           id: req.id,
+          index: i + 1,
           side: req.side,
-          upvotes: typeof req.upvotes === "number" ? req.upvotes : 0,
+          upvotes: req.upvotes || 1,
           album: album || {}
         };
       });
 
-      setQueue(queueWithAlbumData);
+      setQueue(mapped);
     };
 
     fetchQueue();
   }, [eventId]);
 
+  if (!queue.length) return null;
+
   return (
-    <div className="queue-section">
-      <div className="queue-header-row">
-        <div className="queue-index">#</div>
-        <div className="queue-cover"></div>
-        <div className="queue-title">Album / Artist</div>
-        <div className="queue-side">Side</div>
-        <div className="queue-votes"></div>
+    <div className="queue-wrapper">
+      <div className="queue-header">
+        <div>#</div>
+        <div></div>
+        <div>Album / Artist</div>
+        <div>Side</div>
+        <div></div>
       </div>
-      <div className="queue-grid">
-        {queue.map((item, index) => (
-          <div key={item.id} className="queue-row">
-            <div className="queue-index">{index + 1}</div>
-            <img
-              src={item.album.image_url || "/placeholder.png"}
-              alt="cover"
-              className="queue-cover"
-            />
-            <div className="queue-info">
-              <div className="queue-title">{item.album.title || "(Unknown Title)"}</div>
-              <div className="queue-artist">{item.album.artist || "(Unknown Artist)"}</div>
-            </div>
-            <div className="queue-side">{item.side || "—"}</div>
-            <div className="queue-votes">
-              <span className="queue-plus">+</span>
-              <span className="queue-heart">❤</span>
-              <span className="queue-count">x{item.upvotes}</span>
-            </div>
+      {queue.map((item, idx) => (
+        <div key={item.id} className="queue-row">
+          <div className="queue-index">{item.index}</div>
+          <img src={item.album.image_url} alt="" className="queue-cover" />
+          <div className="queue-meta">
+            <div className="queue-title">{item.album.title}</div>
+            <div className="queue-artist">{item.album.artist}</div>
           </div>
-        ))}
-      </div>
+          <div className="queue-side">{item.side}</div>
+          <div className="queue-votes">
+            <span className="queue-plus">＋</span>
+            <span className="queue-heart">♥</span>
+            <span className="queue-count">x{item.upvotes}</span>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
