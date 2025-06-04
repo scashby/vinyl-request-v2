@@ -105,34 +105,7 @@ export default function EventDetail() {
             </div>
           )}
 
-          {has_queue && (
-            <section className="tidal-queue">
-              <h3 className="queue-heading">Request Queue</h3>
-              <table className="w-full text-sm text-left text-white">
-                <thead className="text-xs uppercase text-gray-400 border-b border-gray-700">
-                  <tr className="grid grid-cols-[2rem_64px_1.5fr_1.5fr_3rem_4rem] items-center gap-4 py-2">
-                    <th>#</th>
-                    <th>Cover</th>
-                    <th>Album</th>
-                    <th>Artist</th>
-                    <th>Side</th>
-                    <th>Votes</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="grid grid-cols-[2rem_64px_1.5fr_1.5fr_3rem_4rem] items-center gap-4 py-2 border-b border-gray-800 hover:bg-gray-900 transition">
-                    <td>1</td>
-                    <td><img src="/cover-placeholder.jpg" alt="cover" className="w-16 h-16 rounded object-cover" /></td>
-                    <td>Sample Album</td>
-                    <td>Sample Artist</td>
-                    <td>A</td>
-                    <td>★★★★☆</td>
-                  </tr>
-                </tbody>
-              </table>
-              <Link to="/browse" className="tidal-button">Add to Queue</Link>
-            </section>
-          )}
+          <div>placeholder for queue</div>
         </section>
       </main>
 
@@ -142,3 +115,4 @@ export default function EventDetail() {
     </div>
   );
 }
+
