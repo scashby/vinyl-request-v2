@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabaseClient';
 import '../../styles/internal.css';
 import '../../styles/breadcrumb.css';
 import Breadcrumbs from '../../components/Breadcrumbs';
+import QueueSection from "../components/QueueSection";
 
 export default function EventDetail() {
   const { id } = useParams();
@@ -104,8 +105,7 @@ export default function EventDetail() {
               )}
             </div>
           )}
-
-          <div>placeholder for queue</div>
+          {event.has_queue && <QueueSection eventId={event.id} />}
         </section>
       </main>
 
