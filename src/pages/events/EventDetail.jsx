@@ -106,32 +106,29 @@ export default function EventDetail() {
           )}
 
           {has_queue && (
-            <section className="queue-display-modern">
-              <h3 className="text-xl font-bold mb-4">Request Queue</h3>
-              <div className="tracklist-modern">
-                <div className="tracklist-modern-header">
+            <section className="tidal-queue">
+              <h3 className="queue-heading">Request Queue</h3>
+              <div className="tidal-tracklist">
+                <div className="tidal-header">
                   <span>#</span>
-                  <span></span> {/* cover image */}
+                  <span>Cover</span>
                   <span>Album</span>
                   <span>Artist</span>
                   <span>Side</span>
                   <span>Votes</span>
                 </div>
-                <div className="track-modern">
+                <div className="tidal-track">
                   <span>1</span>
-                  <span>
-                    <img src="/images/sample-cover.jpg" alt="Cover" />
-                  </span>
+                  <img src="/cover-placeholder.jpg" alt="cover" />
                   <span>Sample Album</span>
                   <span>Sample Artist</span>
                   <span>A</span>
                   <span>★★★★☆</span>
                 </div>
               </div>
-              <Link to="/browse" className="queue-button mt-4">Add to Queue</Link>
+              <Link to="/browse" className="tidal-button">Add to Queue</Link>
             </section>
           )}
-
         </section>
       </main>
 
