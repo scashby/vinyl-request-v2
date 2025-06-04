@@ -10,7 +10,7 @@ export default function QueueSection({ eventId }) {
         .from("requests")
         .select("*")
         .eq("event_id", eventId)
-        .order("id", { ascending: true });
+        .order("created_at", { ascending: true });
 
       if (error) {
         console.error("Error fetching requests:", error);
@@ -20,7 +20,7 @@ export default function QueueSection({ eventId }) {
       const albumIds = [...new Set(
         requests
           .map(r => r.album_id)
-          .filter(Boolean) // ensure no null/undefined/empty
+          .filter(id => typeof id === "string" && id.length === 36) // UUID check
       )];
 
       if (albumIds.length === 0) {
