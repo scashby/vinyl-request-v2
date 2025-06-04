@@ -125,6 +125,34 @@ html, body {
   margin-top: 0;
 }
 
+/* === Re-added About the Event section === */
+.event-info-card {
+  background-color: white;
+  color: black;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  border-radius: 0.5rem;
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.1);
+}
+
+.event-info-card h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.event-info-card p {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  margin-bottom: 0.5rem;
+}
+
+.event-info-card a {
+  color: #2563eb;
+  font-size: 0.875rem;
+  text-decoration: underline;
+}
+
 /* === Queue Section === */
 .queue-section {
   margin-top: 1.5rem;
@@ -215,32 +243,4 @@ html, body {
   color: #888;
   font-size: 0.875rem;
   text-align: center;
-}
-
-/* === Re-added About the Event section === */
-.event-info-card {
-  background-color: white;
-  color: black;
-  padding: 1rem;
-  margin-bottom: 1.5rem;
-  border-radius: 0.5rem;
-  box-shadow: 0 0 6px rgba(0, 0, 0, 0.1);
-}
-
-.event-info-card h3 {
-  font-size: 1.125rem;
-  font-weight: 600;
-  margin-bottom: 0.5rem;
-}
-
-.event-info-card p {
-  font-size: 0.875rem;
-  line-height: 1.5;
-  margin-bottom: 0.5rem;
-}
-
-.event-info-card a {
-  color: #2563eb;
-  font-size: 0.875rem;
-  text-decoration: underline;
 }

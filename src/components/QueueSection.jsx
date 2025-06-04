@@ -19,10 +19,7 @@ export default function QueueSection({ eventId }) {
       }
 
       const albumIds = requests.map(r => r.album_id).filter(Boolean);
-      if (!albumIds.length) {
-        console.warn("No valid album IDs found in requests.");
-        return;
-      }
+      if (!albumIds.length) return;
 
       const { data: albums, error: albumError } = await supabase
         .from("collection")
@@ -62,7 +59,7 @@ export default function QueueSection({ eventId }) {
         <div>Side</div>
         <div></div>
       </div>
-      {queue.map((item, idx) => (
+      {queue.map((item) => (
         <div key={item.id} className="queue-row">
           <div className="queue-index">{item.index}</div>
           <img src={item.album.image_url} alt="" className="queue-cover" />
@@ -72,9 +69,9 @@ export default function QueueSection({ eventId }) {
           </div>
           <div className="queue-side">{item.side}</div>
           <div className="queue-votes">
-            <span className="queue-plus">＋</span>
-            <span className="queue-heart">♥</span>
-            <span className="queue-count">x{item.upvotes}</span>
+            <div className="queue-plus">＋</div>
+            <div className="queue-heart">♥</div>
+            <div className="queue-count">x{item.upvotes}</div>
           </div>
         </div>
       ))}
