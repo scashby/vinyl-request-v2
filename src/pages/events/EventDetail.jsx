@@ -108,26 +108,23 @@ export default function EventDetail() {
           {has_queue && (
             <section className="queue-display">
               <h3 className="text-xl font-bold mb-4">Request Queue</h3>
-              <div className="tracklist-glass">
-                <div className="tracklist-header">
+              <div className="tracklist text-black bg-white p-4 rounded shadow">
+                <div className="tracklist-header font-bold text-sm border-b border-gray-300 pb-2 mb-2 grid grid-cols-4 gap-4">
                   <span>Album</span><span>Artist</span><span>Side</span><span>Votes</span>
                 </div>
-                <div className="track-row">
+                <div className="track grid grid-cols-4 gap-4 py-1">
                   <span>Sample Album</span><span>Sample Artist</span><span>A</span><span>★★★★☆</span>
                 </div>
               </div>
-              <Link
-                to="/browse"
-                className="button mt-4 inline-block bg-purple-600 text-white px-4 py-2 rounded"
-              >
-                Add to Queue
-              </Link>
+              <Link to="/browse" className="button mt-4 inline-block bg-purple-600 text-white px-4 py-2 rounded">Add to Queue</Link>
             </section>
           )}
         </section>
       </main>
 
-      <footer className="footer">© 2025 Dead Wax Dialogues</footer>
+      <footer className="footer">
+        © 2025 Dead Wax Dialogues
+      </footer>
     </div>
   );
 }
