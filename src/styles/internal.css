@@ -154,7 +154,6 @@ html, body {
   text-decoration: underline;
 }
 
-/* 🎧 Rebuilt Tidal-Style Queue */
 .tidal-queue {
   background-color: #000;
   color: #fff;
@@ -168,6 +167,11 @@ html, body {
   font-size: 1.25rem;
   font-weight: 600;
   margin-bottom: 1.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #aaa;
+  border-bottom: 1px solid #333;
+  padding-bottom: 0.5rem;
 }
 
 .tidal-tracklist {
@@ -176,7 +180,8 @@ html, body {
   gap: 1rem;
 }
 
-.tidal-header, .tidal-track {
+.tidal-header,
+.tidal-track {
   display: grid;
   grid-template-columns: 2rem 64px 1fr 1fr 3rem 4rem;
   align-items: center;
@@ -187,10 +192,10 @@ html, body {
 .tidal-header {
   font-size: 0.75rem;
   color: #aaa;
-  border-bottom: 1px solid #333;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   font-weight: 500;
+  border-bottom: 1px solid #333;
 }
 
 .tidal-track {
@@ -220,5 +225,3 @@ html, body {
   font-weight: 500;
   border-radius: 6px;
 }
-
-
