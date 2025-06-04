@@ -154,7 +154,7 @@ html, body {
   text-decoration: underline;
 }
 
-/* === Queue Section Styling === */
+/* === Queue Section (Tidal-style layout) === */
 .queue-section {
   margin-top: 1.5rem;
   background-color: #000;
@@ -163,67 +163,54 @@ html, body {
   border-radius: 0.5rem;
 }
 
-.queue-header-row,
-.queue-row {
-  display: flex;
+.queue-grid {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  gap: 1rem;
   align-items: center;
-  padding: 0.5rem 0;
-  border-bottom: 1px solid #333;
 }
 
-.queue-header-row {
-  font-size: 0.75rem;
-  font-weight: bold;
-  color: #aaa;
-  text-transform: uppercase;
+.queue-row {
+  display: contents;
+  border-top: 1px solid #333;
+  padding: 0.75rem 0;
 }
 
-.queue-header-col,
-.queue-index,
-.queue-title,
-.queue-artist,
-.queue-album,
-.queue-side,
-.queue-format,
-.queue-votes {
-  flex: 1;
+.queue-cover {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
 }
 
-.queue-index {
-  max-width: 2rem;
-  text-align: center;
-  color: #666;
-  font-size: 0.875rem;
+.queue-info {
+  display: flex;
+  flex-direction: column;
 }
 
 .queue-title {
-  color: #2563eb;
   font-weight: 600;
+  color: #2563eb; /* blue-600 */
 }
 
-.queue-artist,
-.queue-album,
-.queue-side,
-.queue-format {
+.queue-artist {
   font-size: 0.875rem;
   color: #aaa;
+}
+
+.queue-side {
+  font-size: 0.875rem;
+  color: #ccc;
 }
 
 .queue-votes {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
   gap: 0.25rem;
-  font-size: 1rem;
 }
 
 .queue-heart {
-  color: #dc2626;
-}
-
-.queue-plus {
-  color: #fff;
-  cursor: pointer;
+  color: #dc2626; /* red-600 */
+  font-size: 1.25rem;
 }
 
 .queue-count {
