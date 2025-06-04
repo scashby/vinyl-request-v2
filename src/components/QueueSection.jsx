@@ -40,33 +40,23 @@ export default function QueueSection({ eventId }) {
   }, [eventId]);
 
   return (
-    <div className="mt-6 bg-black text-white p-4 rounded-lg">
-      <div className="grid grid-cols-[auto_1fr_auto_auto] gap-4 items-center">
+    <div className="queue-section">
+      <div className="queue-grid">
         {queue.map(item => (
-          <div
-            key={item.id}
-            className="contents border-t border-gray-700 py-3"
-          >
+          <div key={item.id} className="queue-row">
             <img
               src={item.album.image}
               alt="cover"
-              className="w-12 h-12 object-cover"
+              className="queue-cover"
             />
-            <div>
-              <div className="font-semibold text-blue-600">{item.album.title}</div>
-              <div className="text-sm text-gray-400">{item.album.artist}</div>
+            <div className="queue-info">
+              <div className="queue-title">{item.album.title}</div>
+              <div className="queue-artist">{item.album.artist}</div>
             </div>
-            <div className="text-sm text-gray-300">{item.side}</div>
-            <div className="flex items-center gap-1">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="currentColor"
-                viewBox="0 0 24 24"
-                className="w-5 h-5 text-red-500"
-              >
-                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42..." />
-              </svg>
-              <span className="text-sm text-gray-300">x{item.upvotes || 1}</span>
+            <div className="queue-side">{item.side}</div>
+            <div className="queue-votes">
+              <span className="queue-heart">❤</span>
+              <span className="queue-count">x{item.upvotes || 1}</span>
             </div>
           </div>
         ))}

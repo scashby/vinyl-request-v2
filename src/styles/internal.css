@@ -154,3 +154,66 @@ html, body {
   text-decoration: underline;
 }
 
+/* === Queue Section (Tidal-style layout) === */
+.queue-section {
+  margin-top: 1.5rem;
+  background-color: #000;
+  color: #fff;
+  padding: 1rem;
+  border-radius: 0.5rem;
+}
+
+.queue-grid {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  gap: 1rem;
+  align-items: center;
+}
+
+.queue-row {
+  display: contents;
+  border-top: 1px solid #333;
+  padding: 0.75rem 0;
+}
+
+.queue-cover {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+}
+
+.queue-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.queue-title {
+  font-weight: 600;
+  color: #2563eb; /* blue-600 */
+}
+
+.queue-artist {
+  font-size: 0.875rem;
+  color: #aaa;
+}
+
+.queue-side {
+  font-size: 0.875rem;
+  color: #ccc;
+}
+
+.queue-votes {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.queue-heart {
+  color: #dc2626; /* red-600 */
+  font-size: 1.25rem;
+}
+
+.queue-count {
+  font-size: 0.875rem;
+  color: #ccc;
+}
