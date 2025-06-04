@@ -153,3 +153,47 @@ html, body {
   font-size: 0.875rem;
   text-decoration: underline;
 }
+
+/* 🔽 Queue styling */
+.queue-display {
+  background-color: white;
+  color: #111;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  border-radius: 0.5rem;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.queue-display h3 {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.75rem;
+  color: #6a0dad;
+  margin-bottom: 1rem;
+}
+
+.queue-tracklist {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: #fafafa;
+  border-radius: 0.5rem;
+}
+
+.queue-track {
+  display: grid;
+  grid-template-columns: 3fr 3fr 1fr 1fr;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #ddd;
+  font-size: 0.95rem;
+}
+
+.queue-track:last-child {
+  border-bottom: none;
+}
+
+.queue-track span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
