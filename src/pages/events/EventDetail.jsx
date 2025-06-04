@@ -110,6 +110,7 @@ export default function EventDetail() {
               <div className="tracklist-modern">
                 <div className="tracklist-modern-header">
                   <span>#</span>
+                  <span></span>
                   <span>Album</span>
                   <span>Artist</span>
                   <span>Side</span>
@@ -118,6 +119,7 @@ export default function EventDetail() {
 
                 <div className="track-modern">
                   <span>1</span>
+                  <span><img src="https://via.placeholder.com/32" alt="cover" /></span>
                   <span>Sample Album</span>
                   <span>Sample Artist</span>
                   <span>A</span>
@@ -125,14 +127,13 @@ export default function EventDetail() {
                 </div>
               </div>
 
-              <div style={{ paddingTop: '1.5rem' }}>
+              <div>
                 <Link to="/browse" className="button">
                   Add to Queue
                 </Link>
               </div>
             </section>
           )}
-
         </section>
       </main>
 
