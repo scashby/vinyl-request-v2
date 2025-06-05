@@ -134,9 +134,8 @@
 
 /* Heart + count */
 .queue-votes {
-  align-items: center;
+  display: block;
   padding-right: 0;
-  vertical-align: middle;
   text-align: right;
 }
 
@@ -156,4 +155,8 @@
   font-size: 0.875rem;
   color: #ccc;
   line-height: 1;
+}
+
+.queue-table td.queue-votes {
+  vertical-align: middle;
 }
