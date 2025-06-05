@@ -47,7 +47,8 @@ const [mediaFilter, setMediaFilter] = useState('');
 
 const normalizedFormats = allowedFormats?.map(f => f.toLowerCase()) || [];
 
-const filteredAlbums = albums.filter(album => {
+const filteredAlbums = (albums || []).filter(album => {
+  if (!album || !album.folder) return false;
   const folder = album.folder?.toLowerCase();
   console.log('Album folder:', folder);
 
