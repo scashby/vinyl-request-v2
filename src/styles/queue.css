@@ -75,7 +75,7 @@
 
 .queue-table th:nth-child(3),
 .queue-table td:nth-child(3) {
-  width: 60%;
+  width: auto;
 }
 
 .queue-meta {
@@ -135,7 +135,6 @@
 /* Heart + count */
 .queue-votes {
   align-items: center;
-  width: auto;
   padding-right: 0;
   vertical-align: middle;
   text-align: right;
