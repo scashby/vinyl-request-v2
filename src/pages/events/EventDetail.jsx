@@ -108,10 +108,11 @@ export default function EventDetail() {
           {event.has_queue && (
             <>
               <QueueSection eventId={event.id} />
+
               <Link
                 to={`/browse?eventId=${event.id}&formats=${encodeURIComponent(event.formats || '')}`}
                 state={{ trail: ['events', event.title, 'browse'] }}
-                className="button mt-6"
+                className="text-blue-600 underline mt-4 inline-block"
               >
                 Browse the Collection
               </Link>
