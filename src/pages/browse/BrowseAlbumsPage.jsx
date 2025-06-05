@@ -45,20 +45,21 @@ const [mediaFilter, setMediaFilter] = useState('');
     fetchAlbums();
   }, []);
 
-const filteredAlbums = albums.filter(album => {
-  const matchesSearch = (
-    album.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    album.artist.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
 const normalizedFormats = allowedFormats?.map(f => f.toLowerCase()) || [];
 
-const matchesFilter = allowedFormats
-  ? normalizedFormats.includes(album.mediaType.toLowerCase())
-  : mediaFilter === '' || album.mediaType === mediaFilter;
+const filteredAlbums = albums.filter(album => {
+  const folder = album.folder?.toLowerCase();
+  const matchesSearch =
+    album.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    album.artist.toLowerCase().includes(searchTerm.toLowerCase());
+
+  const matchesFilter = allowedFormats
+    ? normalizedFormats.includes(folder)
+    : mediaFilter === '' || folder === mediaFilter.toLowerCase();
 
   return matchesSearch && matchesFilter;
 });
+
 
   return (
     <div className="page-wrapper">
