@@ -6,7 +6,15 @@ function NavigationMenu() {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="nav-wrapper fixed top-4 left-4 z-50">
+    <div
+      className="nav-wrapper"
+      style={{
+        position: 'fixed',
+        top: '1rem',
+        left: '1rem',
+        zIndex: 1000
+      }}
+    >
       <button
         className="menu-toggle overlay"
         onClick={() => setOpen(!open)}
