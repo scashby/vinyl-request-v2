@@ -4,6 +4,7 @@ import AlbumCard from '../../components/AlbumCard';
 import '../../styles/album-browse.css';
 import '../../styles/internal.css';
 import { supabase } from '../../lib/supabaseClient';
+import { useLocation, useParams } from 'react-router-dom';
 
 // Supabase setup
 const supabaseUrl = 'https://bntoivaipesuovselglg.supabase.co';
@@ -12,7 +13,12 @@ const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 function BrowseAlbumsPage() {
   const [albums, setAlbums] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [mediaFilter, setMediaFilter] = useState('');
+  const location = useLocation();
+  const { eventID } = useParams();
+  const allowedFormats = location.state?.allowedFormats || null;
+
+const [mediaFilter, setMediaFilter] = useState('');
+
 
   useEffect(() => {
     async function fetchAlbums() {
@@ -43,7 +49,9 @@ const filteredAlbums = albums.filter(album => {
     album.artist.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const matchesFilter = mediaFilter === '' || album.mediaType === mediaFilter;
+  const matchesFilter = allowedFormats
+  ? allowedFormats.includes(album.mediaType)
+  : mediaFilter === '' || album.mediaType === mediaFilter;
 
   return matchesSearch && matchesFilter;
 });
