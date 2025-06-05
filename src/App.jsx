@@ -18,6 +18,7 @@ import ImportCollection from './pages/admin/ImportCollection';
 import ManageEvents from './pages/admin/ManageEvents';
 import EditEventForm from './components/EditEventForm';
 import LoginPage from './pages/admin/LoginPage';
+import NavigationMenu from './components/NavigationMenu';
 
 const ProtectedRoute = ({ children }) => {
   const [loading, setLoading] = useState(true);
@@ -39,6 +40,7 @@ const ProtectedRoute = ({ children }) => {
 function App() {
   return (
     <Router>
+        <NavigationMenu />
         <Routes>
           {/* Public */}
           <Route path="/" element={<LandingPage />} />
