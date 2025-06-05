@@ -1,9 +1,9 @@
-/* Hamburger icon wrapper */
+/* Icon stays fixed top-left */
 .nav-wrapper {
   z-index: 1000;
 }
 
-/* Top-left hamburger icon with tighter margins */
+/* Hamburger icon: top-left tight */
 .menu-toggle.overlay {
   background: none;
   border: none;
@@ -11,22 +11,22 @@
   font-size: 2.2rem;
   cursor: pointer;
   padding: 0.25rem 0.5rem;
-  margin: 0.25rem; /* Tighter top-left margin */
+  margin: 0.25rem;
 }
 
-/* Navigation dropdown panel */
+/* Dropdown panel appears offset below & right of icon */
 .nav-panel {
   position: absolute;
-  top: 100%;
-  left: 0;
-  width: 160px; /* Reduced width */
+  top: 2.5rem;       /* Push below hamburger */
+  left: 0.25rem;     /* Slight horizontal offset */
+  width: 160px;
   background: white;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  border-radius: 6px; /* Use consistent rounding */
-  padding: 0.5rem 0.75rem; /* Reduced padding */
+  border-radius: 6px;
+  padding: 0.5rem;   /* Trimmed padding */
 }
 
-/* Clean nav list */
+/* Link list styling */
 .nav-panel ul {
   list-style: none;
   padding: 0;
@@ -34,17 +34,19 @@
 }
 
 .nav-panel li {
-  margin: 0.35rem 0;
+  margin: 0.25rem 0;
 }
 
 .nav-panel a {
   text-decoration: none;
   color: black;
-  font-size: 0.875rem; /* ~14px, 4pt smaller than default */
+  font-size: 0.875rem;
   font-weight: 500;
   transition: color 0.2s ease;
+  padding: 0.25rem 0.5rem;  /* Tighter clickable area */
+  display: block;
 }
 
 .nav-panel a:hover {
-  color: #2563eb; /* Tailwind blue-600 */
+  color: #2563eb;
 }
