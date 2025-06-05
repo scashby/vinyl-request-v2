@@ -52,29 +52,38 @@ export default function QueueSection({ eventId }) {
 
   return (
     <div className="queue-wrapper">
-      <div className="queue-header">
-        <div>#</div>
-        <div></div>
-        <div>Album / Artist</div>
-        <div>Side</div>
-        <div></div>
-      </div>
-      {queue.map((item) => (
-        <div key={item.id} className="queue-row">
-          <div className="queue-index">{item.index}</div>
-          <img src={item.album.image_url} alt="" className="queue-cover" />
-          <div className="queue-meta">
-            <div className="queue-title">{item.album.title}</div>
-            <div className="queue-artist">{item.album.artist}</div>
-          </div>
-          <div className="queue-side">{item.side}</div>
-          <div className="queue-votes">
-            <div className="queue-plus">＋</div>
-            <div className="queue-heart">♥</div>
-            <div className="queue-count">x{item.upvotes}</div>
-          </div>
-        </div>
-      ))}
+      <table className="queue-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th></th>
+            <th>Album / Artist</th>
+            <th>Side</th>
+            <th></th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {queue.map(item => (
+            <tr key={item.id}>
+              <td className="queue-index">{item.index}</td>
+              <td>
+                <img src={item.album.image_url} alt="" className="queue-cover" />
+              </td>
+              <td className="queue-meta">
+                <div className="queue-title">{item.album.title}</div>
+                <div className="queue-artist">{item.album.artist}</div>
+              </td>
+              <td className="queue-side">{item.side}</td>
+              <td className="queue-plus">＋</td>
+              <td className="queue-votes">
+                <span className="queue-heart">♥</span>
+                <span className="queue-count">x{item.upvotes}</span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

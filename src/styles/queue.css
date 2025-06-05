@@ -5,34 +5,35 @@
   border-radius: 0.5rem;
   margin-top: 2rem;
   font-family: 'Inter', sans-serif;
+  overflow-x: auto;
 }
 
-.queue-header,
-.queue-row {
-  display: grid;
-  grid-template-columns: 2rem 3rem 1fr 4rem 2rem 4rem;
-  gap: 1rem;
-  align-items: center;
+.queue-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
 }
 
-.queue-header {
+.queue-table thead th {
+  text-align: left;
   font-size: 0.75rem;
   font-weight: bold;
   color: #888;
   text-transform: uppercase;
   padding-bottom: 0.5rem;
-  margin-bottom: 0.5rem;
   border-bottom: 1px solid #333;
 }
 
-.queue-row {
+.queue-table tbody td {
   padding: 0.75rem 0;
+  vertical-align: middle;
 }
 
 .queue-index {
-  text-align: center;
   color: #888;
   font-size: 0.875rem;
+  text-align: center;
+  width: 2rem;
 }
 
 .queue-cover {
@@ -60,7 +61,6 @@
   font-size: 0.875rem;
   color: #ccc;
   text-align: center;
-  line-height: 48px;
 }
 
 .queue-plus {
@@ -68,15 +68,13 @@
   color: #ccc;
   text-align: center;
   cursor: pointer;
-  line-height: 48px;
 }
 
 .queue-votes {
   display: flex;
+  gap: 0.25rem;
   align-items: center;
   justify-content: flex-end;
-  gap: 0.25rem;
-  line-height: 48px;
 }
 
 .queue-heart {
