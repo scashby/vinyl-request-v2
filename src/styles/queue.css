@@ -40,8 +40,8 @@
 /* Cover image */
 .queue-table td.queue-image {
   width: 3rem;
-  padding-left: 0.25rem;
-  padding-right: 0.25rem;
+  padding-left: 0.15rem;
+  padding-right: 0.15rem;
 }
 
 .queue-table td img.queue-cover {
@@ -53,7 +53,7 @@
 
 /* Album/Artist */
 .queue-table td.queue-meta {
-  width: 100%;
+  width: auto;
   padding-left: 0.25rem;
   padding-right: 0.25rem;
   min-width: 0;
@@ -89,7 +89,7 @@
   color: #fff;
   text-align: center;
   vertical-align: middle;
-  width: 2rem;
+  width: 1.75rem;
   padding: 0;
 }
 
@@ -98,7 +98,7 @@
   font-size: 1.25rem;
   color: #ccc;
   text-align: center;
-  width: 1.5rem;
+  width: 1.25rem;
   line-height: 48px;
   vertical-align: middle;
   padding: 0;
@@ -111,7 +111,7 @@
   justify-content: flex-end;
   gap: 0.25rem;
   height: 48px;
-  width: 3rem;
+  width: 2.75rem;
   padding-right: 0.25rem;
 }
 
