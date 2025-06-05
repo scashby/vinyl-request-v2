@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import AlbumCard from '../../components/AlbumCard';
 import '../../styles/album-browse.css';
