@@ -47,6 +47,7 @@ function App() {
           <Route path="/events" element={<EventsPage />} />
           <Route path="/events/:id" element={<EventDetail />} />
           <Route path="/browse" element={<BrowseAlbumsPage />} />
+          <Route path="/browse/:eventID" element={<BrowseAlbumsPage />} />
           <Route path="/browse-queue" element={<BrowseQueue />} />
           <Route path="/now-playing" element={<NowPlayingPage />} />
           <Route path="/album/:id" element={<AlbumDetailPage />} /> 
