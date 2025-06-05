@@ -4,9 +4,9 @@ import { Link } from 'react-router-dom';
 function AlbumCard({ album }) {
   const typeMap = {
   vinyl: 'vinyl',
-  cassette: 'cassette',
+  cassettes: 'cassette',
   cd: 'cd',
-  '45': 'fortyfive',
+  '45s': 'fortyfive',
   '8-track': 'eighttrack'
 };
 
