@@ -49,29 +49,27 @@ const EventsPage = () => {
 
       <main className="event-body">
         <section className="event-grid">
-          {events.map((event) => {
-            const imageSrc = event.image_url?.includes('dropbox.com')
-              ? event.image_url
-                  .replace('www.dropbox.com', 'dl.dropboxusercontent.com')
-                  .replace(/\?.*$/, '')
-              : event.image_url || '/images/event-header-still.jpg';
-
-            return (
-              <article className="event-card" key={event.id}>
-                <Link to={`/events/${event.id}`} state={{ trail: ['events'] }}>
-                  <div className="event-card">
-                    <img src={event.image_url} alt={event.title} />
-                    <div className="event-info">
-                      <h2>{event.title}</h2>
-                      <p>{event.date} • {event.time}</p>
-                    </div>
-                  </div>
-                </Link>
+        {events.map((event) => {
+          const imageSrc = event.image_url || "/images/placeholder.png";
+          return (
+            <Link
+              to={`/events/${event.id}`}
+              state={{ trail: ["events"] }}
+              key={event.id}
+            >
+              <article className="event-card">
+                <img
+                  src={imageSrc}
+                  alt={event.title}
+                  className="card-square"
+                />
                 <h2>{event.title}</h2>
                 {event.location && (
                   <p>
                     <a
-                      href={`https://www.google.com/maps/search/${encodeURIComponent(event.location)}`}
+                      href={`https://www.google.com/maps/search/${encodeURIComponent(
+                        event.location
+                      )}`}
                       target="_blank"
                       rel="noopener noreferrer"
                     >
@@ -85,8 +83,9 @@ const EventsPage = () => {
                   <span className="event-time">{event.time}</span>
                 </p>
               </article>
-            );
-          })}
+            </Link>
+          );
+        })}
         </section>
       </main>
 
