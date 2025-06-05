@@ -1,26 +1,37 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { createClient } from '@supabase/supabase-js';
 import AlbumCard from '../../components/AlbumCard';
 import '../../styles/album-browse.css';
 import '../../styles/internal.css';
 
-const albums = [
-  {
-    title: 'British Steel',
-    artist: 'Judas Priest',
-    year: 1980,
-    mediaType: 'Vinyl',
-    image: 'judas-priest-british-steel.jpg'
-  },
-  {
-    title: 'Love at First Sting',
-    artist: 'Scorpions',
-    year: 1984,
-    mediaType: 'Cassette',
-    image: 'scorpions-love-at-first-sting.jpg'
-  }
-];
+// Supabase setup
+const supabaseUrl = 'https://bntoivaipesuovselglg.supabase.co';
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 function BrowseAlbumsPage() {
+  const [albums, setAlbums] = useState([]);
+
+  useEffect(() => {
+    async function fetchAlbums() {
+      const { data, error } = await supabase.from('collection').select('*');
+      if (error) {
+        console.error('Error fetching albums:', error);
+      } else {
+        const parsed = data.map(album => ({
+          id: album.id,
+          title: album.title,
+          artist: album.artist,
+          year: album.year,
+          mediaType: album.format,
+          image: album.image_url || 'coverplaceholder.png'
+        }));
+        setAlbums(parsed);
+      }
+    }
+    fetchAlbums();
+  }, []);
+
   return (
     <div className="page-wrapper">
       <header className="event-hero">
@@ -31,8 +42,8 @@ function BrowseAlbumsPage() {
 
       <main className="page-body">
         <section className="album-grid">
-          {albums.map((album, index) => (
-            <AlbumCard key={index} album={album} />
+          {albums.map(album => (
+            <AlbumCard key={album.id} album={album} />
           ))}
         </section>
       </main>
