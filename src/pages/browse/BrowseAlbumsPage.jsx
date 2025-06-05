@@ -33,6 +33,7 @@ const [mediaFilter, setMediaFilter] = useState('');
           title: album.title,
           artist: album.artist,
           year: album.year,
+          folder: album.folder, // ← this is what was missing
           mediaType: album.folder,
           image:
             album.image_url && album.image_url.trim().toLowerCase() !== 'no'
