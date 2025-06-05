@@ -63,3 +63,15 @@
 .badge.eighttrack {
   background-color: rgba(234, 88, 12, 0.75);  /* orange-600 */
 }
+
+.search-filter-bar {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.search-filter-bar input,
+.search-filter-bar select {
+  padding: 0.5rem;
+  font-size: 1rem;
+}
