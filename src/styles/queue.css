@@ -104,15 +104,14 @@
   font-size: 1.25rem;
   color: #ccc;
   text-align: center;
-  width: 1rem;
-  line-height: 48px;
   vertical-align: middle;
   padding: 0;
-  margin-right: 0.25rem;
+  white-space: nowrap;
 }
+
 .queue-table td:nth-child(5) {
-  width: 1rem;
-  padding-right: 0.25rem;
+  width: 0.75rem;
+  padding-right: 0.1rem;
 }
 
 /* Heart + count */
@@ -122,6 +121,11 @@
   padding-right: 0;
   vertical-align: middle;
   text-align: right;
+}
+
+.queue-table td:last-child {
+  width: 1.25rem;
+  padding-left: 0.1rem;
 }
 
 .queue-heart {
