@@ -110,6 +110,10 @@
   padding: 0;
   margin-right: 0.25rem;
 }
+.queue-table td:nth-child(5) {
+  width: 1rem;
+  padding-right: 0.25rem;
+}
 
 /* Heart + count */
 .queue-votes {
