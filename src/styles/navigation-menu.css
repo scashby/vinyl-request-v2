@@ -1,12 +1,14 @@
 .menu-toggle {
   background: none;
-  border: none;
-  color: white;
+  border: 1px solid #888;    /* subtle outline */
+  color: #666;               /* medium grey for visibility   */
   font-size: 2rem;
   cursor: pointer;
   padding: 0.25rem;
   line-height: 1;
+  border-radius: 4px;
 }
+
 
 /* Precise alignment to right of icon, no white gap */
 .menu-panel {
