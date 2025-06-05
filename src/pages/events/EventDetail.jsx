@@ -113,7 +113,7 @@ export default function EventDetail() {
                 <Link
                   to={`/browse?eventId=${event.id}&formats=${encodeURIComponent(event.formats || '')}`}
                   state={{ trail: ['events', event.title, 'browse'] }}
-                  className="button"
+                  className="button mt-6"
                 >
                   Browse the Collection
                 </Link>
