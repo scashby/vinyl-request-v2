@@ -2,30 +2,31 @@
   z-index: 1000;
 }
 
-/* Hamburger icon: top-left anchored */
+/* Hamburger icon: fixed top-left, tight */
 .menu-toggle.overlay {
   background: none;
-  border: none;
+  border: 2px solid white;
+  border-radius: 4px;
   color: white;
   font-size: 2.2rem;
   cursor: pointer;
-  padding: 0.25rem 0.5rem;
+  padding: 0.2rem 0.4rem;
   margin: 0.25rem;
 }
 
-/* Offset nav panel just beside or below icon, no white-space drift */
+/* Navigation panel aligned to top right of icon */
 .nav-panel {
   position: absolute;
-  top: 2.25rem;       /* Just below icon */
-  left: 2.5rem;       /* Shifted slightly to the right of icon */
+  top: 0.3rem;        /* Now aligned almost flush with icon */
+  left: 2.8rem;       /* Offset to the right of icon */
   background: white;
-  width: 150px;
-  padding: 0.5rem;
+  width: 140px;       /* Slightly narrower */
+  padding: 0.4rem 0.5rem;  /* Tight padding (top-bottom, left-right) */
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
   border-radius: 6px;
 }
 
-/* Link list */
+/* Clean vertical nav list */
 .nav-panel ul {
   list-style: none;
   padding: 0;
@@ -33,15 +34,15 @@
 }
 
 .nav-panel li {
-  margin: 0.25rem 0;
+  margin: 0.15rem 0;
 }
 
 .nav-panel a {
   display: block;
-  padding: 0.25rem 0.5rem;
+  padding: 0.25rem 0.25rem;
   text-decoration: none;
   color: black;
-  font-size: 0.875rem;
+  font-size: 0.85rem;
   font-weight: 500;
   transition: color 0.2s ease;
 }
