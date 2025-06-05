@@ -128,7 +128,7 @@
 
 .queue-table th:nth-child(5),
 .queue-table td:nth-child(5) {
-  width: 7.5%;
+  width: 1.5rem;
   text-align: center;
 }
 
@@ -142,7 +142,7 @@
 
 .queue-table th:nth-child(6),
 .queue-table td:nth-child(6) {
-  width: 7.5%;
+  width: 1.5rem;
   text-align: right;
 }
 
