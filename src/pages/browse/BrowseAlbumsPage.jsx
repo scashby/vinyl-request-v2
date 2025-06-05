@@ -23,7 +23,7 @@ function BrowseAlbumsPage() {
           title: album.title,
           artist: album.artist,
           year: album.year,
-          mediaType: album.format,
+          mediaType: album.folder,
           image:
             album.image_url && album.image_url.trim().toLowerCase() !== 'no'
               ? album.image_url.trim()
