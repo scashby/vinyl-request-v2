@@ -2,11 +2,10 @@
   z-index: 1000;
 }
 
-/* Hamburger icon: fixed top-left, tight */
+/* Hamburger icon cleanly styled */
 .menu-toggle.overlay {
   background: none;
-  border: 2px solid white;
-  border-radius: 4px;
+  border: none;             /* REMOVE ghost artifact */
   color: white;
   font-size: 2.2rem;
   cursor: pointer;
@@ -14,19 +13,19 @@
   margin: 0.25rem;
 }
 
-/* Navigation panel aligned to top right of icon */
+/* Dropdown panel clean and aligned */
 .nav-panel {
   position: absolute;
-  top: 0.3rem;        /* Now aligned almost flush with icon */
-  left: 2.8rem;       /* Offset to the right of icon */
+  top: 0.2rem;              /* Nearly flush with icon */
+  left: 2.8rem;             /* Directly to the right */
   background: white;
-  width: 140px;       /* Slightly narrower */
-  padding: 0.4rem 0.5rem;  /* Tight padding (top-bottom, left-right) */
+  width: 160px;             /* Prevent "Browse Albums" from wrapping */
+  padding: 0.25rem 0.5rem;  /* Trimmed top padding, keeps space on right */
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
   border-radius: 6px;
 }
 
-/* Clean vertical nav list */
+/* Clean nav list */
 .nav-panel ul {
   list-style: none;
   padding: 0;
@@ -39,7 +38,7 @@
 
 .nav-panel a {
   display: block;
-  padding: 0.25rem 0.25rem;
+  padding: 0.2rem 0.25rem;      /* Smaller vertical spacing */
   text-decoration: none;
   color: black;
   font-size: 0.85rem;
