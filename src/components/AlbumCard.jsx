@@ -14,7 +14,7 @@ function AlbumCard({ album }) {
         state={album.trail ? { trail: album.trail } : undefined}
       >
         <span className={`badge ${typeClass}`}>{album.mediaType}</span>
-        <img src={`/images/${album.image}`} alt={album.title} />
+        <img src={album.image} alt={album.title} />
       </Link>
 
       <div className="info">
