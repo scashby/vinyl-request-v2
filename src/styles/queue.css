@@ -20,18 +20,17 @@
   font-weight: bold;
   color: #888;
   text-transform: uppercase;
-  padding-bottom: 0.25rem;
-  padding-top: 0;
+  padding: 0 0 0.25rem 0;
   border: none;
 }
 
-/* Data cells */
+/* Cell spacing */
 .queue-table tbody td {
-  padding: 0.35rem 0;
+  padding: 0.25rem 0;
   vertical-align: middle;
 }
 
-/* Column sizes and alignment */
+/* === Column Alignment === */
 .queue-table th:nth-child(1),
 .queue-table td.queue-index {
   width: 1.5rem;
@@ -42,8 +41,8 @@
 
 .queue-table td.queue-image {
   width: 3rem;
-  padding-left: 0.25rem;
-  padding-right: 0.25rem;
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
 }
 
 .queue-table td img.queue-cover {
@@ -53,23 +52,15 @@
   display: block;
 }
 
-.queue-table th:nth-child(3),
 .queue-table td.queue-meta {
-  min-width: 200px;
   vertical-align: top;
-  padding-left: 0;
+  padding-left: 0.25rem;
   padding-right: 0.5rem;
-}
-
-.queue-meta {
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-start;
 }
 
 .queue-title {
   font-weight: 600;
-  color: #2563eb;
+  color: #fff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -77,7 +68,7 @@
 
 .queue-artist {
   font-size: 0.875rem;
-  color: #aaa;
+  color: #fff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -85,7 +76,7 @@
 
 .queue-side {
   font-size: 0.875rem;
-  color: #ccc;
+  color: #fff;
   text-align: center;
   width: 2rem;
 }
@@ -97,6 +88,7 @@
   width: 1.5rem;
   line-height: 48px;
   vertical-align: middle;
+  padding: 0;
 }
 
 .queue-votes {
@@ -105,6 +97,7 @@
   justify-content: flex-end;
   gap: 0.25rem;
   height: 48px;
+  padding-right: 0.75rem;
 }
 
 .queue-heart {
