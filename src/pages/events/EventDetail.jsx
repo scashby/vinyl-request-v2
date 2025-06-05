@@ -108,7 +108,8 @@ export default function EventDetail() {
           {event.has_queue && (
             <div className="event-queue-block" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
               <QueueSection eventId={event.id} />
-              <div>
+
+              <div className="mt-6">
                 <Link
                   to={`/browse?eventId=${event.id}&formats=${encodeURIComponent(event.formats || '')}`}
                   state={{ trail: ['events', event.title, 'browse'] }}
@@ -117,6 +118,7 @@ export default function EventDetail() {
                   Browse the Collection
                 </Link>
               </div>
+
             </div>
           )}  
         </section>
