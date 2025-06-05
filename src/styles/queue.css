@@ -112,12 +112,11 @@
 
 /* Heart + count */
 .queue-votes {
-  display: flex;
   align-items: center;
-  justify-content: flex-end;
   width: auto;
   padding-right: 0;
   vertical-align: middle;
+  text-align: right;
 }
 
 .queue-heart {
