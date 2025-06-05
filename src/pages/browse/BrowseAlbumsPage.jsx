@@ -1,6 +1,9 @@
 import React from 'react';
 import AlbumCard from '../../components/AlbumCard';
 import '../../styles/album-browse.css';
+import '../../styles/internal.css';
+import '../../styles/breadcrumb.css';
+import Breadcrumbs from '../../components/Breadcrumbs';
 
 const albums = [
   {
@@ -21,13 +24,26 @@ const albums = [
 
 function BrowseAlbumsPage() {
   return (
-    <div className="browse-page min-h-screen bg-[#fafafa]">
-      <h1 className="text-3xl font-bold mb-6">Browse Collection</h1>
-      <div className="album-grid">
-        {albums.map((album, index) => (
-          <AlbumCard key={index} album={album} />
-        ))}
-      </div>
+    <div className="page-wrapper">
+      <header className="event-hero">
+        <div className="overlay">
+          <h1>Browse Collection</h1>
+        </div>
+      </header>
+
+      <Breadcrumbs />
+
+      <main className="page-body">
+        <section className="album-grid">
+          {albums.map((album, index) => (
+            <AlbumCard key={index} album={album} />
+          ))}
+        </section>
+      </main>
+
+      <footer className="footer">
+        © 2025 Dead Wax Dialogues
+      </footer>
     </div>
   );
 }
