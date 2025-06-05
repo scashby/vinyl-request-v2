@@ -27,14 +27,15 @@ function Breadcrumbs() {
   }, [id, pathname]);
 
   const renderTrail = () => {
-    if (stateTrail) {
-      return stateTrail.map((item, idx) => {
+    if (stateTrail && stateTrail.length > 0) {
+      return stateTrail.map((label, idx) => {
         const path = paths[idx] || '/';
+        const partialTrail = stateTrail.slice(0, idx + 1);
         return (
           <React.Fragment key={path}>
             {' / '}
-            <Link to={path} className="breadcrumb-link">
-              {item.toLowerCase()}
+            <Link to={path} state={{ trail: partialTrail }} className="breadcrumb-link">
+              {label.toLowerCase()}
             </Link>
           </React.Fragment>
         );
