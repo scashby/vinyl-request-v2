@@ -49,27 +49,25 @@ const EventsPage = () => {
 
       <main className="event-body">
         <section className="event-grid">
-        {events.map((event) => {
-          const imageSrc = event.image_url || "/images/placeholder.png";
-          return (
-            <Link
-              to={`/events/${event.id}`}
-              state={{ trail: ["events"] }}
-              key={event.id}
-            >
-              <article className="event-card">
-                <img
-                  src={imageSrc}
-                  alt={event.title}
-                  className="card-square"
-                />
+          {events.map((event) => {
+            const imageSrc = event.image_url || "/images/placeholder.png";
+            return (
+              <article className="event-card" key={event.id}>
+                <Link
+                  to={`/events/${event.id}`}
+                  state={{ trail: ["events"] }}
+                >
+                  <img
+                    src={imageSrc}
+                    alt={event.title}
+                    className="card-square"
+                  />
+                </Link>
                 <h2>{event.title}</h2>
                 {event.location && (
                   <p>
                     <a
-                      href={`https://www.google.com/maps/search/${encodeURIComponent(
-                        event.location
-                      )}`}
+                      href={`https://www.google.com/maps/search/${encodeURIComponent(event.location)}`}
                       target="_blank"
                       rel="noopener noreferrer"
                     >
@@ -83,9 +81,8 @@ const EventsPage = () => {
                   <span className="event-time">{event.time}</span>
                 </p>
               </article>
-            </Link>
-          );
-        })}
+            );
+          })}
         </section>
       </main>
 
