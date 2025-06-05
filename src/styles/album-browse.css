@@ -48,17 +48,17 @@
   color: #fff;
 }
 .badge.vinyl {
-  background-color: rgba(147, 51, 234, 0.85); /* purple-600 */
+  background-color: rgba(147, 51, 234, 0.75); /* purple-600 */
 }
 .badge.cassette {
-  background-color: rgba(22, 163, 74, 0.85);  /* green-600 */
+  background-color: rgba(22, 163, 74, 0.75);  /* green-600 */
 }
 .badge.cd {
-  background-color: rgba(13, 148, 136, 0.85); /* teal-600 */
+  background-color: rgba(13, 148, 136, 0.75); /* teal-600 */
 }
 .badge.fortyfive {
-  background-color: rgba(220, 38, 38, 0.85);  /* red-600 */
+  background-color: rgba(220, 38, 38, 0.75);  /* red-600 */
 }
 .badge.eighttrack {
-  background-color: rgba(234, 88, 12, 0.85);  /* orange-600 */
+  background-color: rgba(234, 88, 12, 0.75);  /* orange-600 */
 }
