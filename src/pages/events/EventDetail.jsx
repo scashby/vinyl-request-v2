@@ -106,12 +106,16 @@ export default function EventDetail() {
               <QueueSection eventId={event.id} />
 
               <Link
-                to={`/browse?eventId=${event.id}&formats=${encodeURIComponent(event.formats || '')}`}
-                state={{ trail: ['events', event.title, 'browse'] }}
+                to={`/browse/${event.id}`}
+                state={{
+                  allowedFormats: event.folders,
+                  trail: ['events', event.title, 'browse']
+                }}
                 className="text-blue-600 underline mt-4 inline-block"
               >
                 Browse the Collection
               </Link>
+
             </>
           )} 
         </section>
