@@ -53,9 +53,10 @@
 
 /* Album/Artist */
 .queue-table td.queue-meta {
-  padding-left: 0.5rem;
-  padding-right: 0.5rem;
-  min-width: 200px;
+  width: 100%;
+  padding-left: 0.25rem;
+  padding-right: 0.25rem;
+  min-width: 0;
   overflow: hidden;
   vertical-align: top;
 }
@@ -88,7 +89,8 @@
   color: #fff;
   text-align: center;
   vertical-align: middle;
-  width: 1.75rem;
+  width: 2rem;
+  padding: 0;
 }
 
 /* Plus button */
@@ -96,7 +98,7 @@
   font-size: 1.25rem;
   color: #ccc;
   text-align: center;
-  width: 1.25rem;
+  width: 1.5rem;
   line-height: 48px;
   vertical-align: middle;
   padding: 0;
