@@ -37,8 +37,9 @@
   font-size: 0.875rem;
 }
 
-.queue-table th:nth-child(1) {
-  width: 1.25rem;
+.queue-table th:nth-child(1),
+.queue-table td:nth-child(1) {
+  width: 5%;
   text-align: center;
 }
 
@@ -57,6 +58,11 @@
   display: block;
 }
 
+.queue-table th:nth-child(2),
+.queue-table td:nth-child(2) {
+  width: 10%;
+}
+
 /* Album/Artist */
 .queue-table td.queue-meta {
   width: auto;
@@ -65,6 +71,11 @@
   min-width: 0;
   overflow: hidden;
   vertical-align: top;
+}
+
+.queue-table th:nth-child(3),
+.queue-table td:nth-child(3) {
+  width: 60%;
 }
 
 .queue-meta {
@@ -99,6 +110,12 @@
   padding: 0;
 }
 
+.queue-table th:nth-child(4),
+.queue-table td:nth-child(4) {
+  width: 10%;
+  text-align: center;
+}
+
 /* Plus button */
 .queue-plus {
   font-size: 1.25rem;
@@ -109,10 +126,10 @@
   white-space: nowrap;
 }
 
+.queue-table th:nth-child(5),
 .queue-table td:nth-child(5) {
-  width: 0.5rem;
-  padding-right: 0;
-  padding-left: 0.25rem;
+  width: 7.5%;
+  text-align: center;
 }
 
 /* Heart + count */
@@ -124,14 +141,11 @@
   text-align: right;
 }
 
-.queue-table td:last-child {
+.queue-table th:nth-child(6),
+.queue-table td:nth-child(6) {
+  width: 7.5%;
   text-align: right;
-  width: 1.5rem;
-  padding-left: 0.25rem;
-  padding-right: 0;
-  vertical-align: middle;
 }
-
 
 .queue-heart {
   font-size: 1.25rem;
