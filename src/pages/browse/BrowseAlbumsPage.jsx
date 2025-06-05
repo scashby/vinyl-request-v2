@@ -18,17 +18,23 @@ function BrowseAlbumsPage() {
   const [allowedFormats, setAllowedFormats] = useState(null);
 
     useEffect(() => {
-      if (location.state?.eventData?.allowed_formats) {
-        const formats = location.state.eventData.allowed_formats.map(f => f.toLowerCase());
-        console.log("Allowed formats from event:", formats);
+      if (location.state?.eventData) {
+        const { eventData } = location.state;
+        setEventData(eventData);
+        const formats = Array.isArray(eventData.allowed_formats)
+          ? eventData.allowed_formats.map(f => f.trim().toLowerCase())
+          : [];
+        console.log("✓ Set allowedFormats from eventData:", formats);
         setAllowedFormats(formats);
+      } else {
+        console.warn("✗ No eventData in location.state");
+        setAllowedFormats([]);
       }
     }, [location.state]);
 
   const eventTitle = location.state?.trail?.[1] || null;
 
   const [mediaFilter, setMediaFilter] = useState('');
-
 
   useEffect(() => {
     async function fetchAlbums() {
