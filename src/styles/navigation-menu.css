@@ -1,57 +1,47 @@
-/* Base wrapper */
+/* Positioning */
 .nav-wrapper {
-  position: relative;
   z-index: 1000;
 }
 
-/* Hamburger icon */
-.menu-toggle {
+/* Hamburger icon for overlay */
+.menu-toggle.overlay {
   background: none;
   border: none;
-  font-size: 1.8rem;
-  cursor: pointer;
-  padding: 0.5rem 1rem;
-  z-index: 1100;
-  position: relative;
-  color: black; /* Default: for below header */
-}
-
-/* If placed on dark header background */
-.menu-toggle.overlay {
   color: white;
   font-size: 2.2rem;
+  cursor: pointer;
 }
 
-/* Expanded nav panel */
+/* Menu panel */
 .nav-panel {
   position: absolute;
   top: 100%;
   left: 0;
-  width: 200px;
+  width: 220px;
   background: white;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  border-radius: 0 0 4px 4px;
+  border-radius: 0 0 6px 6px;
   padding: 1rem;
 }
 
-/* Nav list */
+/* List styling */
 .nav-panel ul {
   list-style: none;
-  margin: 0;
   padding: 0;
+  margin: 0;
 }
 
 .nav-panel li {
-  margin: 0.5rem 0;
+  margin: 0.75rem 0;
 }
 
 .nav-panel a {
   text-decoration: none;
   color: black;
   font-weight: 500;
-  transition: color 0.2s;
+  transition: color 0.2s ease;
 }
 
 .nav-panel a:hover {
-  color: #2563eb; /* Tailwind's blue-600 */
+  color: #2563eb; /* Tailwind blue-600 */
 }

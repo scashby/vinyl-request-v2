@@ -6,9 +6,9 @@ function NavigationMenu() {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="nav-wrapper">
+    <div className="nav-wrapper fixed top-4 left-4 z-50">
       <button
-        className={`menu-toggle ${open ? 'open' : ''}`}
+        className="menu-toggle overlay"
         onClick={() => setOpen(!open)}
         aria-label="Toggle navigation menu"
       >
