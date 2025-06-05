@@ -115,10 +115,8 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 0.25rem;
-  height: 48px;
-  width: 2.75rem;
-  padding-right: 0.25rem;
+  width: auto;
+  padding-right: 0;
 }
 
 .queue-heart {
