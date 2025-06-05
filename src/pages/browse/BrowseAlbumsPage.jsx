@@ -62,25 +62,22 @@ function BrowseAlbumsPage() {
 
 const normalizedFormats = allowedFormats?.map(f => f.toLowerCase()) || [];
 
-const filteredAlbums = (albums || []).filter(album => {
-  if (!album || !album.folder) return false;
-  const folder = album.folder?.toLowerCase();
-  console.log('Album folder:', folder);
+const filteredAlbums = useMemo(() => {
+  const normalizedFormats = allowedFormats?.map(f => f.toLowerCase()) || [];
 
-  const matchesSearch =
-    album.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    album.artist.toLowerCase().includes(searchTerm.toLowerCase());
+  return albums.filter(album => {
+    const folder = album.folder?.toLowerCase();
+    const matchesSearch =
+      album.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      album.artist.toLowerCase().includes(searchTerm.toLowerCase());
 
-  const matchesFilter = allowedFormats
-    ? normalizedFormats.includes(folder)
-    : mediaFilter === '' || folder === mediaFilter.toLowerCase();
+    const matchesFilter = allowedFormats?.length
+      ? normalizedFormats.includes(folder)
+      : mediaFilter === '' || folder === mediaFilter.toLowerCase();
 
-  console.log('→ Allowed:', allowedFormats, '| Normalized:', normalizedFormats, '| Match:', matchesFilter);
-
-  return matchesSearch && matchesFilter;
-});
-
-
+    return matchesSearch && matchesFilter;
+  });
+}, [albums, searchTerm, mediaFilter, allowedFormats]);
 
   return (
     <div className="page-wrapper">
