@@ -11,25 +11,27 @@
 .queue-table {
   width: 100%;
   border-collapse: collapse;
-  table-layout: auto;
+  table-layout: fixed;
 }
 
+/* Header */
 .queue-table thead th {
-  text-align: left;
   font-size: 0.75rem;
   font-weight: bold;
   color: #888;
   text-transform: uppercase;
   padding-bottom: 0.25rem;
-  border-bottom: 1px solid #333;
+  padding-top: 0;
+  border: none;
 }
 
+/* Data cells */
 .queue-table tbody td {
-  padding: 0.5rem 0;
+  padding: 0.35rem 0;
   vertical-align: middle;
 }
 
-/* === Column-specific sizing === */
+/* Column sizes and alignment */
 .queue-table th:nth-child(1),
 .queue-table td.queue-index {
   width: 1.5rem;
@@ -38,22 +40,31 @@
   font-size: 0.875rem;
 }
 
+.queue-table td.queue-image {
+  width: 3rem;
+  padding-left: 0.25rem;
+  padding-right: 0.25rem;
+}
+
 .queue-table td img.queue-cover {
   width: 48px;
   height: 48px;
   object-fit: cover;
+  display: block;
 }
 
 .queue-table th:nth-child(3),
 .queue-table td.queue-meta {
-  min-width: 180px;
-  max-width: 100%;
-  word-wrap: break-word;
+  min-width: 200px;
+  vertical-align: top;
+  padding-left: 0;
+  padding-right: 0.5rem;
 }
 
 .queue-meta {
   display: flex;
   flex-direction: column;
+  justify-content: flex-start;
 }
 
 .queue-title {
@@ -76,7 +87,7 @@
   font-size: 0.875rem;
   color: #ccc;
   text-align: center;
-  width: 2.5rem;
+  width: 2rem;
 }
 
 .queue-plus {
@@ -84,7 +95,8 @@
   color: #ccc;
   text-align: center;
   width: 1.5rem;
-  cursor: pointer;
+  line-height: 48px;
+  vertical-align: middle;
 }
 
 .queue-votes {
@@ -98,9 +110,11 @@
 .queue-heart {
   font-size: 1.25rem;
   color: #dc2626;
+  line-height: 1;
 }
 
 .queue-count {
   font-size: 0.875rem;
   color: #ccc;
+  line-height: 1;
 }
