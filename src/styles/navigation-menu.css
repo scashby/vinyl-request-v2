@@ -1,57 +1,45 @@
-.nav-wrapper {
-  z-index: 1000;
-}
-
-/* Hamburger icon tight in corner */
-.menu-toggle.overlay {
+.menu-toggle {
   background: none;
   border: none;
   color: white;
-  font-size: 2.2rem;
+  font-size: 2rem;
   cursor: pointer;
-  padding: 0.2rem 0.4rem;
-  margin: 0.25rem;
-  line-height: 1; /* Prevent vertical stretching */
+  padding: 0.25rem;
+  line-height: 1;
 }
 
-/* Nav panel flush with icon */
-.nav-panel {
+/* Precise alignment to right of icon, no white gap */
+.menu-panel {
   position: absolute;
-  top: 0rem; /* Fully aligned to top of icon */
+  top: 0;
   left: 2.6rem;
-  background: white;
-  width: 160px;
-  padding: 0rem 0.5rem 0.4rem; /* No top padding at all */
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  background-color: white;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
   border-radius: 6px;
-  line-height: 1.2; /* Reduce spacing inside panel */
+  padding: 0.25rem 0.5rem;
+  width: 160px;
 }
 
-/* Strip all list margin/padding */
-.nav-panel ul {
+.menu-panel ul {
   list-style: none;
   margin: 0;
   padding: 0;
 }
 
-/* Remove item gaps completely */
-.nav-panel li {
+.menu-panel li {
   margin: 0;
-  padding: 0;
 }
 
-/* Clean link layout */
-.nav-panel a {
+.menu-panel a {
   display: block;
-  padding: 0.35rem 0.25rem 0.25rem;
-  text-decoration: none;
+  padding: 0.35rem 0.25rem;
+  font-size: 0.875rem;
   color: black;
-  font-size: 0.85rem;
-  font-weight: 500;
-  line-height: 1.1; /* Further reduce space above/below text */
+  text-decoration: none;
+  line-height: 1.2;
   transition: color 0.2s ease;
 }
 
-.nav-panel a:hover {
+.menu-panel a:hover {
   color: #2563eb;
 }
