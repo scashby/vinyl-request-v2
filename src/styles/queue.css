@@ -11,7 +11,7 @@
 .queue-table {
   width: 100%;
   border-collapse: collapse;
-  table-layout: fixed;
+  table-layout: auto;
 }
 
 .queue-table thead th {
@@ -20,26 +20,35 @@
   font-weight: bold;
   color: #888;
   text-transform: uppercase;
-  padding-bottom: 0.5rem;
+  padding-bottom: 0.25rem;
   border-bottom: 1px solid #333;
 }
 
 .queue-table tbody td {
-  padding: 0.75rem 0;
+  padding: 0.5rem 0;
   vertical-align: middle;
 }
 
-.queue-index {
+/* === Column-specific sizing === */
+.queue-table th:nth-child(1),
+.queue-table td.queue-index {
+  width: 1.5rem;
+  text-align: center;
   color: #888;
   font-size: 0.875rem;
-  text-align: center;
-  width: 2rem;
 }
 
-.queue-cover {
+.queue-table td img.queue-cover {
   width: 48px;
   height: 48px;
   object-fit: cover;
+}
+
+.queue-table th:nth-child(3),
+.queue-table td.queue-meta {
+  min-width: 180px;
+  max-width: 100%;
+  word-wrap: break-word;
 }
 
 .queue-meta {
@@ -50,31 +59,40 @@
 .queue-title {
   font-weight: 600;
   color: #2563eb;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .queue-artist {
   font-size: 0.875rem;
   color: #aaa;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .queue-side {
   font-size: 0.875rem;
   color: #ccc;
   text-align: center;
+  width: 2.5rem;
 }
 
 .queue-plus {
   font-size: 1.25rem;
   color: #ccc;
   text-align: center;
+  width: 1.5rem;
   cursor: pointer;
 }
 
 .queue-votes {
   display: flex;
-  gap: 0.25rem;
   align-items: center;
   justify-content: flex-end;
+  gap: 0.25rem;
+  height: 48px;
 }
 
 .queue-heart {
