@@ -49,6 +49,8 @@ const normalizedFormats = allowedFormats?.map(f => f.toLowerCase()) || [];
 
 const filteredAlbums = albums.filter(album => {
   const folder = album.folder?.toLowerCase();
+  console.log('Album folder:', folder);
+
   const matchesSearch =
     album.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
     album.artist.toLowerCase().includes(searchTerm.toLowerCase());
@@ -57,8 +59,11 @@ const filteredAlbums = albums.filter(album => {
     ? normalizedFormats.includes(folder)
     : mediaFilter === '' || folder === mediaFilter.toLowerCase();
 
+  console.log('→ Allowed:', allowedFormats, '| Normalized:', normalizedFormats, '| Match:', matchesFilter);
+
   return matchesSearch && matchesFilter;
 });
+
 
 
   return (
