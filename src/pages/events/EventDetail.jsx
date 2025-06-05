@@ -109,8 +109,8 @@ export default function EventDetail() {
             <>
               <QueueSection eventId={event.id} />
               <div className="mt-6">
-                <Link
-                  to={`/browse-albums?eventId=${event.id}&formats=${event.formats}`}
+                 <Link
+                  to={`/browse?eventId=${event.id}&formats=${event.formats}`}
                   className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
                 >
                   Browse the Collection
