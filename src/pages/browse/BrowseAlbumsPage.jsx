@@ -24,7 +24,10 @@ function BrowseAlbumsPage() {
           artist: album.artist,
           year: album.year,
           mediaType: album.format,
-          image: album.image_url?.trim() || '/images/coverplaceholder.png'
+          image:
+            album.image_url && album.image_url.trim().toLowerCase() !== 'no'
+              ? album.image_url.trim()
+              : '/images/coverplaceholder.png'
         }));
         setAlbums(parsed);
       }
