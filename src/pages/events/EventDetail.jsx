@@ -2,8 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabaseClient';
 import '../../styles/internal.css';
-import '../../styles/breadcrumb.css';
-import Breadcrumbs from '../../components/Breadcrumbs';
 import QueueSection from "../../components/QueueSection";
 
 export default function EventDetail() {
@@ -62,8 +60,6 @@ export default function EventDetail() {
           <h1>{title}</h1>
         </div>
       </header>
-
-      <Breadcrumbs />
 
       <main className="page-body browse-queue" style={{ display: 'flex', gap: '2rem' }}>
         <aside className="event-sidebar">

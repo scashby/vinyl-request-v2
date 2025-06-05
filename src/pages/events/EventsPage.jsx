@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import '../../styles/internal.css';
-import Breadcrumbs from '../../components/Breadcrumbs';
-import '../../styles/breadcrumb.css';
 import { Link } from 'react-router-dom';
 
 const EventsPage = () => {
@@ -44,8 +42,6 @@ const EventsPage = () => {
           <h1>Upcoming Vinyl Nights</h1>
         </div>
       </header>
-
-      <Breadcrumbs />
 
       <main className="event-body">
         <section className="event-grid">

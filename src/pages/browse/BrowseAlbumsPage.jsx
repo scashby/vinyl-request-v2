@@ -2,8 +2,6 @@ import React from 'react';
 import AlbumCard from '../../components/AlbumCard';
 import '../../styles/album-browse.css';
 import '../../styles/internal.css';
-import '../../styles/breadcrumb.css';
-import Breadcrumbs from '../../components/Breadcrumbs';
 
 const albums = [
   {
@@ -30,8 +28,6 @@ function BrowseAlbumsPage() {
           <h1>Browse Collection</h1>
         </div>
       </header>
-
-      <Breadcrumbs />
 
       <main className="page-body">
         <section className="album-grid">

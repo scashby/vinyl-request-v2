@@ -2327,7 +2327,6 @@
       - ._AdminEventEditor.jsx
       - ._AdminSidebar.jsx
       - ._AlbumCard.jsx
-      - ._Breadcrumbs.jsx
       - ._CSVPreviewTable.jsx
       - ._EditEventForm.jsx
       - ._Footer.jsx
@@ -2369,7 +2368,6 @@
         - ._NowPlayingPage.jsx
       - ._album-browse.css
       - ._album-detail.css
-      - ._breadcrumb.css
       - ._browse-albums.css
       - ._browse-queue.css
       - ._events.css
@@ -2413,7 +2411,6 @@
     - AdminEventEditor.jsx
     - AdminSidebar.jsx
     - AlbumCard.jsx
-    - Breadcrumbs.jsx
     - CSVPreviewTable.jsx
     - EditEventForm.jsx
     - Footer.jsx
@@ -2462,7 +2459,6 @@
   - styles
     - album-browse.css
     - album-detail.css
-    - breadcrumb.css
     - browse-albums.css
     - browse-queue.css
     - events.css
