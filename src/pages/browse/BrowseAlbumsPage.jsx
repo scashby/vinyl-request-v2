@@ -51,8 +51,10 @@ const filteredAlbums = albums.filter(album => {
     album.artist.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const matchesFilter = allowedFormats
-  ? allowedFormats.includes(album.mediaType)
+const normalizedFormats = allowedFormats?.map(f => f.toLowerCase()) || [];
+
+const matchesFilter = allowedFormats
+  ? normalizedFormats.includes(album.mediaType.toLowerCase())
   : mediaFilter === '' || album.mediaType === mediaFilter;
 
   return matchesSearch && matchesFilter;
