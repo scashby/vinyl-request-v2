@@ -101,7 +101,7 @@ const EditEventForm = () => {
         
         <fieldset style={{ marginBottom: '1rem' }}>
           <legend>Allowed Formats</legend>
-          {['Vinyl', 'Cassette', '45s', 'CDs'].map((format) => (
+          {['Vinyl', 'Cassettes', 'CD', '45s', '8-Track'].map((format) => (
             <label key={format} style={{ display: 'block', marginBottom: '0.25rem' }}>
               <input
                 type="checkbox"
