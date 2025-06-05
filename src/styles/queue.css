@@ -134,10 +134,14 @@
 
 /* Heart + count */
 .queue-votes {
-  display: block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
   padding-right: 0;
   text-align: right;
+  height: 48px;
 }
+
 
 .queue-table th:nth-child(6),
 .queue-table td:nth-child(6) {
