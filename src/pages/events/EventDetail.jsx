@@ -110,8 +110,9 @@ export default function EventDetail() {
               <QueueSection eventId={event.id} />
               <div className="mt-6">
                  <Link
-                  to={`/browse?eventId=${event.id}&formats=${event.formats}`}
-                  className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+                  to={`/browse?eventId=${event.id}&formats=${encodeURIComponent(event.formats || '')}`}
+                  state={{ trail: ['events', event.title, 'browse'] }}
+                  className="button"
                 >
                   Browse the Collection
                 </Link>

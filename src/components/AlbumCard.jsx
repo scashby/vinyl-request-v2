@@ -9,10 +9,14 @@ function AlbumCard({ album }) {
 
   return (
     <div className="album-card">
-      <Link to={`/album/${album.id}`}>
+      <Link
+        to={`/album/${album.id}${album.eventId ? `?eventId=${album.eventId}` : ''}`}
+        state={album.trail ? { trail: album.trail } : undefined}
+      >
         <span className={`badge ${typeClass}`}>{album.mediaType}</span>
         <img src={`/images/${album.image}`} alt={album.title} />
       </Link>
+
       <div className="info">
         <p className="album-title text-blue-600 font-semibold">{album.title}</p>
         <p className="album-artist">{album.artist} • {album.year}</p>

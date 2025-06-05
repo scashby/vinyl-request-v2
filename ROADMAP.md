@@ -6,7 +6,8 @@
 - Chunk 3: Browse page + Event side requests
 - Chunk 4: Admin queue editing + now playing control
 - Chunk 5: CSV import + validation
-- Chunk 6: Discogs fallback metadata enrichment (this chunk)
+- Chunk 6: Discogs fallback metadata enrichment
+- QueueSection rewritten for pixel-perfect layout
 
 ## 🛠 Planned
 
@@ -20,8 +21,7 @@
 - Clicking an event card navigates to that event's browse queue page
 - Automatically move events to "Past Events" after event date passes (implement last)
 - Display only as many upcoming events as fit on screen, with "View More" toggle
-- Real-time updates
-- Request deduping logic
+- Prevent multiple upvotes per side (via local state or client IP/session tracking)
 - App-level settings + side metadata refresh
 
 ### 📅 EVENTS PAGE

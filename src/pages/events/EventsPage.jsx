@@ -58,12 +58,14 @@ const EventsPage = () => {
 
             return (
               <article className="event-card" key={event.id}>
-                <Link to={`/events/${event.id}`}>
-                  <img
-                    src={imageSrc}
-                    alt={event.title}
-                    className="card-square"
-                  />
+                <Link to={`/events/${event.id}`} state={{ trail: ['events'] }}>
+                  <div className="event-card">
+                    <img src={event.image_url} alt={event.title} />
+                    <div className="event-info">
+                      <h2>{event.title}</h2>
+                      <p>{event.date} • {event.time}</p>
+                    </div>
+                  </div>
                 </Link>
                 <h2>{event.title}</h2>
                 {event.location && (

@@ -1,3 +1,21 @@
+# CHANGELOG.md
+
+## [1.0.2] — 2025-06-04
+### Added
+- Fully rebuilt QueueSection with table-based layout for pixel precision
+- Added dedicated `queue.css` stylesheet isolated from internal styles
+- Implemented grid with exact alignment: #, cover image, Album/Artist, Side, Plus, Heart
+- Album/Artist vertically aligned with center of image
+- Artist name styling changed to light gray; title remains blue
+- Side and index columns now centered under headers
+- Row spacing reduced to match TIDAL example
+
+### Fixed
+- Heart column now aligned right and vertically centered
+- Removed extra black space between Album/Artist and Side columns
+- Number column width reduced and centered under header
+- Ensured consistent padding between all columns
+
 ## [1.0.1] — 2025-06-02
 ### Changed
 - LandingPage updated: “Now Playing” → “Dialogues”, “Admin” → “About”
@@ -6,8 +24,6 @@
 - Breadcrumb spacing, font size, and separator corrected
 - AlbumCard artist font and title spacing fixed
 - Global style bleed from album-detail eliminated
-
-# CHANGELOG.md
 
 ## 0.6.0 – Chunk 6: Metadata Enrichment (2025-05-28)
 - Admin page lists albums with missing year/format/image
