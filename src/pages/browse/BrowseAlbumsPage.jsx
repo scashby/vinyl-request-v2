@@ -3,11 +3,11 @@ import { createClient } from '@supabase/supabase-js';
 import AlbumCard from '../../components/AlbumCard';
 import '../../styles/album-browse.css';
 import '../../styles/internal.css';
+import { supabase } from '../../lib/supabaseClient';
 
 // Supabase setup
 const supabaseUrl = 'https://bntoivaipesuovselglg.supabase.co';
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 function BrowseAlbumsPage() {
   const [albums, setAlbums] = useState([]);
@@ -24,7 +24,7 @@ function BrowseAlbumsPage() {
           artist: album.artist,
           year: album.year,
           mediaType: album.format,
-          image: album.image_url || 'coverplaceholder.png'
+          image: album.image_url?.trim() || '/images/coverplaceholder.png'
         }));
         setAlbums(parsed);
       }
