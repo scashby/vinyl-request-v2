@@ -9,6 +9,9 @@ import { supabase } from '../../lib/supabaseClient';
 const supabaseUrl = 'https://bntoivaipesuovselglg.supabase.co';
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
+const [searchTerm, setSearchTerm] = useState('');
+const [mediaFilter, setMediaFilter] = useState('');
+
 function BrowseAlbumsPage() {
   const [albums, setAlbums] = useState([]);
 
@@ -35,6 +38,17 @@ function BrowseAlbumsPage() {
     fetchAlbums();
   }, []);
 
+const filteredAlbums = albums.filter(album => {
+  const matchesSearch = (
+    album.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    album.artist.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const matchesFilter = mediaFilter === '' || album.mediaType === mediaFilter;
+
+  return matchesSearch && matchesFilter;
+});
+
   return (
     <div className="page-wrapper">
       <header className="event-hero">
@@ -44,8 +58,28 @@ function BrowseAlbumsPage() {
       </header>
 
       <main className="page-body">
+        <div className="search-filter-bar">
+          <input
+            type="text"
+            placeholder="Search by artist or title"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+          <select
+            value={mediaFilter}
+            onChange={(e) => setMediaFilter(e.target.value)}
+          >
+            <option value="">All Media Types</option>
+            <option value="Vinyl">Vinyl</option>
+            <option value="Cassettes">Cassettes</option>
+            <option value="CD">CD</option>
+            <option value="45s">45s</option>
+            <option value="8-Track">8-Track</option>
+          </select>
+        </div>
+
         <section className="album-grid">
-          {albums.map(album => (
+          {filteredAlbums.map((album) => (
             <AlbumCard key={album.id} album={album} />
           ))}
         </section>
