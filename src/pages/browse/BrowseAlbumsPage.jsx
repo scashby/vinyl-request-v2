@@ -16,6 +16,8 @@ function BrowseAlbumsPage() {
   const location = useLocation();
   const { eventID } = useParams();
   const allowedFormats = location.state?.allowedFormats || null;
+  const eventTitle = location.state?.trail?.[1] || null;
+
 
 const [mediaFilter, setMediaFilter] = useState('');
 
@@ -60,7 +62,9 @@ const filteredAlbums = albums.filter(album => {
     <div className="page-wrapper">
       <header className="event-hero">
         <div className="overlay">
-          <h1>Browse Collection</h1>
+          <h1>
+            Browse the Collection{eventTitle ? ` for ${eventTitle}` : ''}
+          </h1>
         </div>
       </header>
 
