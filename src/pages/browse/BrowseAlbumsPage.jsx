@@ -9,11 +9,10 @@ import { supabase } from '../../lib/supabaseClient';
 const supabaseUrl = 'https://bntoivaipesuovselglg.supabase.co';
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-const [searchTerm, setSearchTerm] = useState('');
-const [mediaFilter, setMediaFilter] = useState('');
-
 function BrowseAlbumsPage() {
   const [albums, setAlbums] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [mediaFilter, setMediaFilter] = useState('');
 
   useEffect(() => {
     async function fetchAlbums() {
