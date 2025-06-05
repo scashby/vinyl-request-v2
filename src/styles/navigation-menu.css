@@ -2,7 +2,7 @@
   z-index: 1000;
 }
 
-/* Hamburger icon */
+/* Hamburger icon tight in corner */
 .menu-toggle.overlay {
   background: none;
   border: none;
@@ -11,41 +11,44 @@
   cursor: pointer;
   padding: 0.2rem 0.4rem;
   margin: 0.25rem;
+  line-height: 1; /* Prevent vertical stretching */
 }
 
-/* Dropdown panel with zero top whitespace */
+/* Nav panel flush with icon */
 .nav-panel {
   position: absolute;
-  top: 0.2rem;
-  left: 2.8rem;
+  top: 0rem; /* Fully aligned to top of icon */
+  left: 2.6rem;
   background: white;
   width: 160px;
-  padding: 0rem 0.5rem 0.4rem 0.5rem;  /* Top padding is 0 */
+  padding: 0rem 0.5rem 0.4rem; /* No top padding at all */
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
   border-radius: 6px;
+  line-height: 1.2; /* Reduce spacing inside panel */
 }
 
-/* List has no margin or padding */
+/* Strip all list margin/padding */
 .nav-panel ul {
   list-style: none;
-  padding: 0;
   margin: 0;
+  padding: 0;
 }
 
-/* Each item stacked tightly */
+/* Remove item gaps completely */
 .nav-panel li {
   margin: 0;
   padding: 0;
 }
 
-/* Link styling with no extra padding */
+/* Clean link layout */
 .nav-panel a {
   display: block;
-  padding: 0.4rem 0.25rem 0.3rem;
+  padding: 0.35rem 0.25rem 0.25rem;
   text-decoration: none;
   color: black;
   font-size: 0.85rem;
   font-weight: 500;
+  line-height: 1.1; /* Further reduce space above/below text */
   transition: color 0.2s ease;
 }
 
