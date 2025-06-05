@@ -60,7 +60,7 @@
 
 .queue-table th:nth-child(2),
 .queue-table td:nth-child(2) {
-  width: 10%;
+  width: 3.2rem;
 }
 
 /* Album/Artist */
@@ -142,7 +142,7 @@
 
 .queue-table th:nth-child(6),
 .queue-table td:nth-child(6) {
-  width: 1.5rem;
+  width: 1.7rem;
   text-align: right;
 }
 
