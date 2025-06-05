@@ -2,10 +2,16 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 
 function AlbumCard({ album }) {
-  const typeClass = album.mediaType
-    .toLowerCase()
-    .replace(/\s/g, '')
-    .replace(/-/g, '');
+  const typeMap = {
+  vinyl: 'vinyl',
+  cassette: 'cassette',
+  cd: 'cd',
+  '45': 'fortyfive',
+  '8-track': 'eighttrack'
+};
+
+const typeClass = typeMap[album.mediaType?.toLowerCase()] || 'vinyl';
+
 
   return (
     <div className="album-card">
