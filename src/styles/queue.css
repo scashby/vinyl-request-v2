@@ -14,7 +14,6 @@
   table-layout: fixed;
 }
 
-/* Header */
 .queue-table thead th {
   font-size: 0.75rem;
   font-weight: bold;
@@ -22,16 +21,16 @@
   text-transform: uppercase;
   padding: 0 0 0.25rem 0;
   border: none;
+  text-align: left;
 }
 
-/* Cell spacing */
+/* Tight, even spacing */
 .queue-table tbody td {
   padding: 0.25rem 0;
-  vertical-align: middle;
+  vertical-align: top;
 }
 
-/* === Column Alignment === */
-.queue-table th:nth-child(1),
+/* # column */
 .queue-table td.queue-index {
   width: 1.5rem;
   text-align: center;
@@ -39,6 +38,7 @@
   font-size: 0.875rem;
 }
 
+/* Cover image */
 .queue-table td.queue-image {
   width: 3rem;
   padding-left: 0.5rem;
@@ -52,15 +52,23 @@
   display: block;
 }
 
+/* Album/Artist block */
 .queue-table td.queue-meta {
-  vertical-align: top;
-  padding-left: 0.25rem;
+  padding-left: 0.5rem;
   padding-right: 0.5rem;
+  min-width: 0;
+  overflow: hidden;
+  vertical-align: top;
+}
+
+.queue-meta {
+  display: flex;
+  flex-direction: column;
 }
 
 .queue-title {
   font-weight: 600;
-  color: #fff;
+  color: #2563eb;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -74,6 +82,7 @@
   text-overflow: ellipsis;
 }
 
+/* Right columns (tightened) */
 .queue-side {
   font-size: 0.875rem;
   color: #fff;
@@ -97,7 +106,8 @@
   justify-content: flex-end;
   gap: 0.25rem;
   height: 48px;
-  padding-right: 0.75rem;
+  width: 3.5rem;
+  padding-right: 0.25rem;
 }
 
 .queue-heart {
