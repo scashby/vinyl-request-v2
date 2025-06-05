@@ -104,10 +104,11 @@
   font-size: 1.25rem;
   color: #ccc;
   text-align: center;
-  width: 1.25rem;
+  width: 1rem;
   line-height: 48px;
   vertical-align: middle;
   padding: 0;
+  margin-right: 0.25rem;
 }
 
 /* Heart + count */
