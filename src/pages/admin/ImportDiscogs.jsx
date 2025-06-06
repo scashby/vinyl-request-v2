@@ -3,7 +3,7 @@ import Papa from 'papaparse';
 import { supabase } from '../../lib/supabaseClient.js';
 
 async function fetchDiscogsRelease(releaseId) {
-  const res = await fetch(`/api/discogsProxy.js?releaseId=${releaseId}`);
+  const res = await fetch(`/api/discogsProxy?releaseId=${releaseId}`);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
