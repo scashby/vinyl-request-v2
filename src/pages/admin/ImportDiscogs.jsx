@@ -50,7 +50,7 @@ export default function ImportDiscogs() {
         format: row.format,
         image_url: row.image,
         media_condition: row.media_condition,
-        tracklists: cleanTextOrJSON(row.tracklists),
+        tracklists: typeof row.tracklists === 'string' ? row.tracklists : JSON.stringify(row.tracklists),
         sides: safeParse(row.sides),
         discogs_master_id: row.discogs_master_id,
         discogs_release_id: row.discogs_release_id,
