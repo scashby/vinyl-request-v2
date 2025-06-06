@@ -65,7 +65,7 @@ export default function ImportDiscogs() {
         await supabase
           .from('collection')
           .update(record, { returning: 'minimal' })
-          .match({ artist: row.artist, title: row.title, year: row.year });
+          .match({ artist: row.artist, title: row.title, year: row.year, folder: row.folder });
           updated++;
       } else {
         await supabase.from('collection').insert([record], { returning: 'minimal' });
