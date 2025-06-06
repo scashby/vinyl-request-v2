@@ -97,7 +97,9 @@ export default function ImportDiscogs() {
           image = discogsData.images?.[0]?.uri || null;
           row.year = row.year || discogsData.year?.toString();
           row.format = row.format || discogsData.formats?.[0]?.name;
-          row.tracklists = row.tracklists || (discogsData.tracklist?.length ? JSON.stringify(discogsData.tracklist) : null);
+          if (!row.tracklists && Array.isArray(discogsData.tracklist)) {
+            row.tracklists = JSON.stringify(discogsData.tracklist);
+          }
         }
       } catch (err) {
         console.error('Fetch error:', err);
