@@ -8,13 +8,12 @@ export default async function handler(req, res) {
 
   try {
     const response = await fetch(`https://api.discogs.com/releases/${releaseId}`, {
-      headers: {
-        'User-Agent': 'vinyl-request-v2/1.0',
-      },
+      headers: { 'User-Agent': 'vinyl-request-v2/1.0' },
     });
 
-    if (!response.ok) {
-      return res.status(response.status).json({ error: 'Discogs API error' });
+    if (!response || !response.ok) {
+      const status = response?.status || 500;
+      return res.status(status).json({ error: 'Discogs API error' });
     }
 
     const data = await response.json();
