@@ -89,6 +89,7 @@ export default function ImportDiscogs() {
       try {
         const response = await fetch(`/api/discogsProxy?releaseId=${row.discogs_release_id}`);
         if (response.ok) {
+          console.log('Discogs tracklist:', discogsData.tracklist);
           const discogsData = await response.json();
           image = discogsData.images?.[0]?.uri || null;
           row.year = row.year || discogsData.year?.toString();
