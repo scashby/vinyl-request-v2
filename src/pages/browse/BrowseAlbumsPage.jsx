@@ -61,19 +61,17 @@ const normalizedFormats = allowedFormats?.map(f => f.toLowerCase()) || [];
 
 const filteredAlbums = useMemo(() => {
   return albums.filter(album => {
-    const folder = album.folder?.toLowerCase();
+    const folder = album.folder?.trim();
     const matchesSearch =
       album.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       album.artist.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesFilter = normalizedFormats.length > 0
-      ? normalizedFormats.includes(folder?.toLowerCase())
-      : (mediaFilter === '' || folder === mediaFilter.toLowerCase());
+    const isAllowed = !allowedFormats || allowedFormats.includes(folder);
+    const matchesFilter = !mediaFilter || folder === mediaFilter;
 
-    return matchesSearch && matchesFilter;
+    return matchesSearch && isAllowed && matchesFilter;
   });
-}, [albums, searchTerm, mediaFilter]);
-
+}, [albums, searchTerm, mediaFilter, allowedFormats]);
 
   return (
     <div className="page-wrapper">
