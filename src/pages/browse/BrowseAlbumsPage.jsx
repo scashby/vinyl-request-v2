@@ -16,21 +16,7 @@ function BrowseAlbumsPage() {
   const location = useLocation();
   const { eventID } = useParams();
   const [allowedFormats, setAllowedFormats] = useState(null);
-
-    useEffect(() => {
-      if (eventData?.allowed_formats) {
-        const formats = Array.isArray(eventData.allowed_formats)
-          ? eventData.allowed_formats.map(f => f.trim().toLowerCase())
-          : [];
-        console.log("✓ Set allowedFormats from eventData state:", formats);
-        setAllowedFormats(formats);
-      } else {
-        console.warn("✗ eventData or allowed_formats missing");
-        setAllowedFormats([]);
-      }
-    }, [eventData]);
-
-
+  const eventData = location.state?.eventData || null;
 
   const eventTitle = location.state?.trail?.[1] || null;
 
@@ -60,10 +46,8 @@ function BrowseAlbumsPage() {
     fetchAlbums();
   }, []);
 
-const normalizedFormats = allowedFormats?.map(f => f.toLowerCase()) || [];
-
 const filteredAlbums = useMemo(() => {
-  const normalizedFormats = allowedFormats?.map(f => f.toLowerCase()) || [];
+  const normalizedFormats = eventData?.allowed_formats?.map(f => f.trim().toLowerCase()) || [];
 
   return albums.filter(album => {
     const folder = album.folder?.toLowerCase();
