@@ -87,6 +87,10 @@ export default function ImportDiscogs() {
     if (row.discogs_release_id) {
       try {
         const discogsData = await fetchDiscogsRelease(row.discogs_release_id);
+        if (!discogsData || typeof discogsData !== 'object') {
+          console.error('Invalid Discogs response:', discogsData);
+          return row;
+        }
 
         // Update fields if missing or invalid
         if (!image && discogsData.images?.[0]?.uri) {
