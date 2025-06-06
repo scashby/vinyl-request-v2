@@ -1,9 +1,14 @@
 export default async function handler(req, res) {
   const { releaseId } = req.query;
-  const token = process.env.KVVAFUlIzOPCUFNhtVXZJenwBHhGmFrmkwYgzQXD; // Never NEXT_PUBLIC
+  const token = process.env.VITE_DISCOGS_TOKEN; // <-- USE ENV VAR
 
   if (!releaseId) {
     res.status(400).json({ error: 'Missing releaseId' });
+    return;
+  }
+
+  if (!token) {
+    res.status(500).json({ error: 'Discogs token missing from environment' });
     return;
   }
 
