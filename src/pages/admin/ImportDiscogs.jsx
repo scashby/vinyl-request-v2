@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import Papa from 'papaparse';
 import { supabase } from '../../lib/supabaseClient.js';
-import 'whatwg-fetch';
 
 export default function ImportDiscogs() {
   const [parsedData, setParsedData] = useState([]);
