@@ -14,7 +14,6 @@ import EditQueue from './pages/admin/EditQueue';
 import SetNowPlaying from './pages/admin/SetNowPlaying';
 import ImportDiscogs from './pages/admin/ImportDiscogs';
 import BlockSides from './pages/admin/BlockSides';
-import ImportCollection from './pages/admin/ImportCollection';
 import ManageEvents from './pages/admin/ManageEvents';
 import EditEventForm from './components/EditEventForm';
 import LoginPage from './pages/admin/LoginPage';
