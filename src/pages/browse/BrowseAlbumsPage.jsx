@@ -1,114 +1,76 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
+import supabase from '../../supabase';
 import AlbumCard from '../../components/AlbumCard';
 import '../../styles/album-browse.css';
-import '../../styles/internal.css';
-import { supabase } from '../../lib/supabaseClient';
-import { useLocation, useParams } from 'react-router-dom';
 
 function BrowseAlbumsPage() {
+  const location = useLocation();
+  const eventData = location.state?.eventData || null;
+
   const [albums, setAlbums] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [mediaFilter, setMediaFilter] = useState('');
   const [allowedFormats, setAllowedFormats] = useState(null);
-  const location = useLocation();
-  const { eventID } = useParams();
-
-  const eventData = location.state?.eventData || null;
-  const eventTitle = location.state?.trail?.[1] || null;
 
   useEffect(() => {
-    if (location.state?.allowedFormats) {
-      const formats = location.state.allowedFormats.map(f => f.trim().toLowerCase());
-      console.log('✓ allowedFormats from state:', formats);
-      setAllowedFormats(formats);
-    } else {
-      console.warn('✗ No allowedFormats found in location.state');
+    if (eventData?.allowed_formats?.length) {
+      setAllowedFormats(eventData.allowed_formats.map(f => f.toLowerCase()));
     }
-  }, [location.state]);
+  }, [eventData]);
 
   useEffect(() => {
-    async function fetchAlbums() {
+    const fetchAlbums = async () => {
       const { data, error } = await supabase.from('collection').select('*');
-      if (error) {
-        console.error('Error fetching albums:', error);
-      } else {
-        const parsed = data.map(album => ({
-          id: album.id,
-          title: album.title,
-          artist: album.artist,
-          year: album.year,
-          folder: album.folder,
-          mediaType: album.folder,
-          image:
-            album.image_url && album.image_url.trim().toLowerCase() !== 'no'
-              ? album.image_url.trim()
-              : '/images/coverplaceholder.png'
-        }));
-        setAlbums(parsed);
-      }
-    }
+      if (!error && data) setAlbums(data);
+    };
     fetchAlbums();
   }, []);
 
-  const normalizedFormats = allowedFormats || [];
+  const filteredAlbums = albums.filter(album => {
+    const matchesSearch = searchTerm === '' ||
+      album.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      album.artist?.toLowerCase().includes(searchTerm.toLowerCase());
 
-  const filteredAlbums = useMemo(() => {
-    return albums.filter(album => {
-      const folder = album.folder?.toLowerCase();
-      const matchesSearch =
-        album.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        album.artist.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesMedia = mediaFilter === '' ||
+      album.folder?.toLowerCase() === mediaFilter.toLowerCase();
 
-      const matchesFilter = normalizedFormats.length > 0
-        ? normalizedFormats.includes(folder)
-        : mediaFilter === '' || folder === mediaFilter.toLowerCase();
+    const matchesAllowed = !allowedFormats ||
+      allowedFormats.includes(album.folder?.toLowerCase());
 
-      return matchesSearch && matchesFilter;
-    });
-  }, [albums, searchTerm, mediaFilter, normalizedFormats]);
+    return matchesSearch && matchesMedia && matchesAllowed;
+  });
 
   return (
-    <div className="page-wrapper">
-      <header className="event-hero">
-        <div className="overlay">
-          <h1>
-            Browse the Collection{eventTitle ? ` for ${eventTitle}` : ''}
-          </h1>
+    <main>
+      <div className="overlay"></div>
+      <div className="internal-page">
+        <div className="internal-header">
+          <h1>Browse Collection{eventData?.title ? ` — ${eventData.title}` : ''}</h1>
         </div>
-      </header>
-
-      <main className="page-body">
-        <div className="search-filter-bar">
+        <div className="browse-controls">
           <input
             type="text"
-            placeholder="Search by artist or title"
+            placeholder="Search by title or artist"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
-          <select
-            value={mediaFilter}
-            onChange={(e) => setMediaFilter(e.target.value)}
-          >
-            <option value="">All Media Types</option>
+          <select value={mediaFilter} onChange={(e) => setMediaFilter(e.target.value)}>
+            <option value="">All</option>
             <option value="Vinyl">Vinyl</option>
             <option value="Cassettes">Cassettes</option>
-            <option value="CD">CD</option>
             <option value="45s">45s</option>
+            <option value="CD">CD</option>
             <option value="8-Track">8-Track</option>
           </select>
         </div>
-
         <section className="album-grid">
           {filteredAlbums.map((album) => (
             <AlbumCard key={album.id} album={album} />
           ))}
         </section>
-      </main>
-
-      <footer className="footer">
-        © 2025 Dead Wax Dialogues
-      </footer>
-    </div>
+      </div>
+    </main>
   );
 }
 
