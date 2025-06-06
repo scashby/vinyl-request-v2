@@ -87,16 +87,20 @@ export default function ImportDiscogs() {
 
     if (!image && row.discogs_release_id) {
       try {
+        console.warn('Fetching release ID:', row.discogs_release_id);
         const response = await fetch(`/api/discogsProxy?releaseId=${row.discogs_release_id}`);
-        if (response.ok) {
-          console.log('Discogs tracklist:', discogsData.tracklist);
+        if (!response.ok) {
+          console.error('Discogs fetch failed', response.status);
+        } else {
           const discogsData = await response.json();
+          console.log('Discogs tracklist:', discogsData.tracklist);
           image = discogsData.images?.[0]?.uri || null;
           row.year = row.year || discogsData.year?.toString();
           row.format = row.format || discogsData.formats?.[0]?.name;
           row.tracklists = row.tracklists || (discogsData.tracklist?.length ? JSON.stringify(discogsData.tracklist) : null);
         }
-      } catch {
+      } catch (err) {
+        console.error('Fetch error:', err);
         image = existing.image_url || null;
       }
     }
