@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import Papa from 'papaparse';
 import { supabase } from '../../lib/supabaseClient.js';
-import { fetchDiscogsRelease } from '../../api/discogsProxy.js';
 
 export default function ImportDiscogs() {
   const [parsedData, setParsedData] = useState([]);
@@ -88,10 +87,13 @@ export default function ImportDiscogs() {
 
     if (!image && row.discogs_release_id) {
       try {
-        const discogsData = await fetchDiscogsRelease(row.discogs_release_id);
-        image = discogsData.images?.[0]?.uri || null;
-        row.year = row.year || discogsData.year?.toString();
-        row.format = row.format || discogsData.formats?.[0]?.name;
+        const response = await fetch(`/api/discogsProxy?releaseId=${row.discogs_release_id}`);
+        if (response.ok) {
+          const discogsData = await response.json();
+          image = discogsData.images?.[0]?.uri || null;
+          row.year = row.year || discogsData.year?.toString();
+          row.format = row.format || discogsData.formats?.[0]?.name;
+        }
       } catch {
         image = existing.image_url || null;
       }
