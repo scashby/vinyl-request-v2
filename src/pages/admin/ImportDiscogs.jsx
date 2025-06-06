@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Papa from 'papaparse';
 import { supabase } from '../../lib/supabaseClient.js';
+import { fetchDiscogsRelease } from '../../api/discogsProxy.js';
 
 export default function ImportDiscogs() {
   const [parsedData, setParsedData] = useState([]);
@@ -48,14 +49,14 @@ export default function ImportDiscogs() {
         year: row.year,
         folder: row.folder,
         format: row.format,
-        image_url: row.image,
+        image_url: row.image_url,
         media_condition: row.media_condition,
-        tracklists: typeof row.tracklists === 'string' ? row.tracklists : JSON.stringify(row.tracklists),
+        tracklists: cleanTextOrJSON(row.tracklists),
         sides: safeParse(row.sides),
         discogs_master_id: row.discogs_master_id,
         discogs_release_id: row.discogs_release_id,
         is_box_set: parseBoolean(row.is_box_set),
-        parent_id: row.parent_id && row.parent_id !== 'None' ? row.parent_id : null,
+        parent_id: row.parent_id || null,
         blocked: parseBoolean(row.blocked),
         blocked_sides: parseArray(row.blocked_sides),
         child_album_ids: parseIntArray(row.child_album_ids)
@@ -68,9 +69,7 @@ export default function ImportDiscogs() {
           .match({ artist: row.artist, title: row.title, year: row.year, folder: row.folder });
         updated++;
       } else {
-        await supabase
-          .from('collection')
-          .insert([record], { returning: 'minimal', count: null });
+        await supabase.from('collection').insert([record], { returning: 'minimal', count: null });
         inserted++;
       }
 
@@ -85,29 +84,32 @@ export default function ImportDiscogs() {
     const existing = existingMap.get(keyFor(row)) || {};
     let image = row.image_url || existing.image_url;
 
-    if (!image && row.discogs_release_id) {
+    if (row.discogs_release_id) {
       try {
-        console.warn('Fetching release ID:', row.discogs_release_id);
-        const response = await fetch(`/api/discogsProxy?releaseId=${row.discogs_release_id}`);
-        if (!response.ok) {
-          console.error('Discogs fetch failed', response.status);
-        } else {
-          const discogsData = await response.json();
-          console.log('Discogs tracklist:', discogsData.tracklist);
-          image = discogsData.images?.[0]?.uri || null;
-          row.year = row.year || discogsData.year?.toString();
-          row.format = row.format || discogsData.formats?.[0]?.name;
-          if (!row.tracklists && Array.isArray(discogsData.tracklist)) {
-            row.tracklists = JSON.stringify(discogsData.tracklist);
-          }
+        const discogsData = await fetchDiscogsRelease(row.discogs_release_id);
+
+        // Update fields if missing or invalid
+        if (!image && discogsData.images?.[0]?.uri) {
+          image = discogsData.images[0].uri;
+        }
+
+        if (!row.year && discogsData.year) {
+          row.year = discogsData.year.toString();
+        }
+
+        if (!row.format && discogsData.formats?.[0]?.name) {
+          row.format = discogsData.formats[0].name;
+        }
+
+        if (!row.tracklists && Array.isArray(discogsData.tracklist)) {
+          row.tracklists = JSON.stringify(discogsData.tracklist);
         }
       } catch (err) {
-        console.error('Fetch error:', err);
-        image = existing.image_url || null;
+        console.error('Discogs enrichment failed:', err);
       }
     }
 
-    return { ...row, image };
+    return { ...row, image_url: image };
   }
 
   function normalizeRow(row) {
