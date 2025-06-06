@@ -13,7 +13,7 @@ const AdminDashboard = () => {
           <a href="/admin/queue" style={{ color: '#2563eb', textDecoration: 'none' }}>Manage Queues</a>
         </li>
         <li style={{ marginBottom: '1rem' }}>
-          <a href="/admin/collection" style={{ color: '#2563eb', textDecoration: 'none' }}>Manage Collection</a>
+          <a href="/admin/import-discogs" style={{ color: '#2563eb', textDecoration: 'none' }}>Manage Collection</a>
         </li>
       </ul>
     </div>
