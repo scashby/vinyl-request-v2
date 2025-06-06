@@ -18,6 +18,14 @@ export default function ImportDiscogs() {
     });
   };
 
+  function safeParse(input) {
+    try {
+      return typeof input === 'string' ? JSON.parse(input) : input;
+    } catch {
+      return null;
+    }
+  }
+
   const handleImport = async () => {
     if (parsedData.length === 0) return;
     setStatus('Importing...');
@@ -39,8 +47,8 @@ export default function ImportDiscogs() {
         format: row.format,
         image_url: row.image_url,
         media_condition: row.media_condition,
-        tracklists: row.tracklists,
-        sides: row.sides,
+        tracklists: row.tracklists ? JSON.stringify(row.tracklists) : null,
+        sides: row.sides ? safeParse(row.sides) : null,
         discogs_master_id: row.discogs_master_id,
         discogs_release_id: row.discogs_release_id
       };
