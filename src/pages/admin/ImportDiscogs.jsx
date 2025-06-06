@@ -36,6 +36,28 @@ export default function ImportDiscogs() {
     }
   }
 
+  function parseBoolean(input) {
+    return input === true || input === 'true' ? true : false;
+  }
+
+  function parseArray(input) {
+    if (!input || input === 'None') return null;
+    try {
+      return JSON.parse(input);
+    } catch {
+      return input.split(',').map(s => s.trim());
+    }
+  }
+
+  function parseIntArray(input) {
+    if (!input || input === 'None') return null;
+    try {
+      return JSON.parse(input).map(Number);
+    } catch {
+      return input.split(',').map(n => parseInt(n.trim(), 10)).filter(n => !isNaN(n));
+    }
+  }
+
   const handleImport = async () => {
     if (parsedData.length === 0) return;
     setStatus('Importing...');
@@ -60,7 +82,12 @@ export default function ImportDiscogs() {
         tracklists: cleanTextOrJSON(row.tracklists),
         sides: safeParse(row.sides),
         discogs_master_id: row.discogs_master_id,
-        discogs_release_id: row.discogs_release_id
+        discogs_release_id: row.discogs_release_id,
+        is_box_set: parseBoolean(row.is_box_set),
+        parent_id: row.parent_id || null,
+        blocked: parseBoolean(row.blocked),
+        blocked_sides: parseArray(row.blocked_sides),
+        child_album_ids: parseIntArray(row.child_album_ids)
       };
 
       if (existingMap.has(key)) {
