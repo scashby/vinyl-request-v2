@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import supabase from '../../supabase';
+import { supabase } from '../../supabase.js'
 import AlbumCard from '../../components/AlbumCard';
 import '../../styles/album-browse.css';
 
