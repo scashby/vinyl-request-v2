@@ -108,7 +108,7 @@ export default function EventDetail() {
               <Link
                 to={`/browse/${event.id}`}
                 state={{
-                  allowedFormats: event.folders,
+                  allowedFormats: event.allowed_formats,
                   trail: ['events', event.title, 'browse']
                 }}
                 className="text-blue-600 underline mt-4 inline-block"

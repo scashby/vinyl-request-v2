@@ -68,7 +68,7 @@ const filteredAlbums = useMemo(() => {
 
     const matchesFilter = normalizedFormats.length > 0
       ? normalizedFormats.includes(folder)
-      : mediaFilter === '' || folder === mediaFilter.toLowerCase();
+      : (mediaFilter === '' || folder === mediaFilter.toLowerCase());
 
     return matchesSearch && matchesFilter;
   });
@@ -96,6 +96,7 @@ const filteredAlbums = useMemo(() => {
           <select
             value={mediaFilter}
             onChange={(e) => setMediaFilter(e.target.value)}
+            disabled={allowedFormats?.length > 0}
           >
             <option value="">All Media Types</option>
             <option value="Vinyl">Vinyl</option>
