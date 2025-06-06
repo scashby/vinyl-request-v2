@@ -46,9 +46,10 @@ function BrowseAlbumsPage() {
     fetchAlbums();
   }, []);
 
-const filteredAlbums = useMemo(() => {
-  const normalizedFormats = eventData?.allowed_formats?.map(f => f.trim().toLowerCase()) || [];
+const normalizedFormats =
+  location.state?.allowedFormats?.map(f => f.trim().toLowerCase()) || [];
 
+const filteredAlbums = useMemo(() => {
   return albums.filter(album => {
     const folder = album.folder?.toLowerCase();
     const matchesSearch =
@@ -59,10 +60,10 @@ const filteredAlbums = useMemo(() => {
       ? normalizedFormats.includes(folder)
       : mediaFilter === '' || folder === mediaFilter.toLowerCase();
 
-
     return matchesSearch && matchesFilter;
   });
-}, [albums, searchTerm, mediaFilter, allowedFormats]);
+}, [albums, searchTerm, mediaFilter]);
+
 
   return (
     <div className="page-wrapper">
