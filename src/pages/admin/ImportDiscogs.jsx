@@ -28,23 +28,35 @@ export default function ImportDiscogs() {
   const keyFor = (row) => `${row.artist}|--|${row.title}|--|${row.year}|--|${row.folder}`;
 
   const handleImport = async () => {
+    const fetchImageFromDiscogs = async (releaseId) => {
+      if (!releaseId) return null;
+      try {
+        const response = await fetch(`https://api.discogs.com/releases/${releaseId}`);
+        const data = await response.json();
+        return data.images?.[0]?.uri || null;
+      } catch {
+        return null;
+      }
+    };
+
     if (parsedData.length === 0) return;
     setStatus('Importing...');
 
     const { data: existing } = await supabase.from('collection').select('*');
-    const existingKeys = new Set(existing.map(e => keyFor(e)));
+    const existingMap = new Map(existing.map(e => [keyFor(e), e]));
 
     let inserted = 0;
     let updated = 0;
 
     for (const row of parsedData) {
+      let image = row.image_url || existingMap.get(keyFor(row))?.image_url || await fetchImageFromDiscogs(row.discogs_release_id);
       const record = {
         artist: row.artist,
         title: row.title,
         year: row.year,
         folder: row.folder,
         format: row.format,
-        image_url: row.image_url,
+        image_url: image,
         media_condition: row.media_condition,
         tracklists: cleanTextOrJSON(row.tracklists),
         sides: safeParse(row.sides),
@@ -57,7 +69,7 @@ export default function ImportDiscogs() {
         child_album_ids: parseIntArray(row.child_album_ids)
       };
 
-      if (existingKeys.has(keyFor(row))) {
+      if (existingMap.has(keyFor(row))) {
         await supabase
           .from('collection')
           .update(record, { returning: 'minimal', count: null })
@@ -81,7 +93,7 @@ export default function ImportDiscogs() {
       year: row['Released'] || null,
       folder: row['CollectionFolder'] || null,
       format: row['Format'] || null,
-      image_url: null,
+      image_url: row.image_url || null,
       media_condition: row['Collection Media Condition'] || null,
       tracklists: row.tracklists || null,
       sides: row.sides || null,
