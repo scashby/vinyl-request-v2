@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Papa from 'papaparse';
 import { supabase } from '../../lib/supabaseClient.js';
+import { fetchDiscogsRelease } from '../../api/discogsProxy.js';
 
 export default function ImportDiscogs() {
   const [parsedData, setParsedData] = useState([]);
@@ -30,17 +31,6 @@ export default function ImportDiscogs() {
   const handleImport = async () => {
     const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-    const fetchImageFromDiscogs = async (releaseId) => {
-      if (!releaseId) return null;
-      try {
-        const response = await fetch(`https://api.discogs.com/releases/${releaseId}`);
-        const data = await response.json();
-        return data.images?.[0]?.uri || null;
-      } catch {
-        return null;
-      }
-    };
-
     if (parsedData.length === 0) return;
     setStatus(`Importing 0 of ${parsedData.length}...`);
 
@@ -51,13 +41,7 @@ export default function ImportDiscogs() {
     let updated = 0;
 
     for (let i = 0; i < parsedData.length; i++) {
-      const row = parsedData[i];
-
-      let image = row.image_url || existingMap.get(keyFor(row))?.image_url;
-      if (!image) {
-        await delay(200);
-        image = await fetchImageFromDiscogs(row.discogs_release_id);
-      }
+      const row = await enrichWithDiscogs(parsedData[i], existingMap);
 
       const record = {
         artist: row.artist,
@@ -65,7 +49,7 @@ export default function ImportDiscogs() {
         year: row.year,
         folder: row.folder,
         format: row.format,
-        image_url: image,
+        image_url: row.image,
         media_condition: row.media_condition,
         tracklists: cleanTextOrJSON(row.tracklists),
         sides: safeParse(row.sides),
@@ -92,10 +76,29 @@ export default function ImportDiscogs() {
       }
 
       setStatus(`Importing ${i + 1} of ${parsedData.length}...`);
+      await delay(200);
     }
 
     setStatus(`✅ ${inserted} inserted, ${updated} updated.`);
   };
+
+  async function enrichWithDiscogs(row, existingMap) {
+    const existing = existingMap.get(keyFor(row)) || {};
+    let image = row.image_url || existing.image_url;
+
+    if (!image && row.discogs_release_id) {
+      try {
+        const discogsData = await fetchDiscogsRelease(row.discogs_release_id);
+        image = discogsData.images?.[0]?.uri || null;
+        row.year = row.year || discogsData.year?.toString();
+        row.format = row.format || discogsData.formats?.[0]?.name;
+      } catch {
+        image = existing.image_url || null;
+      }
+    }
+
+    return { ...row, image };
+  }
 
   function normalizeRow(row) {
     return {
