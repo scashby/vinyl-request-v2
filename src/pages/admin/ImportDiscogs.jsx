@@ -20,6 +20,14 @@ export default function ImportDiscogs() {
 
   function safeParse(input) {
     try {
+      if (
+        input === null ||
+        input === undefined ||
+        input === '' ||
+        input === 'None'
+      ) {
+        return null;
+      }
       return typeof input === 'string' ? JSON.parse(input) : input;
     } catch {
       return null;
