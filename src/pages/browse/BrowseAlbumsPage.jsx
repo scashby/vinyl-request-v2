@@ -1,79 +1,55 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import React, { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
+import { supabase } from '../../lib/supabaseClient';
 import AlbumCard from '../../components/AlbumCard';
 import '../../styles/album-browse.css';
 import '../../styles/internal.css';
-import { supabase } from '../../lib/supabaseClient';
-import { useLocation, useParams } from 'react-router-dom';
-
-// Supabase setup
-const supabaseUrl = 'https://bntoivaipesuovselglg.supabase.co';
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 function BrowseAlbumsPage() {
+  const location = useLocation();
+  const eventData = location.state?.eventData;
   const [albums, setAlbums] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const location = useLocation();
-  const { eventID } = useParams();
-  const [allowedFormats, setAllowedFormats] = useState(null);
-  useEffect(() => {
-    if (location.state?.allowedFormats) {
-      const formats = location.state.allowedFormats.map(f => f.trim().toLowerCase());
-      console.log('✓ allowedFormats from state:', formats);
-      setAllowedFormats(formats);
-    } else {
-      console.warn('✗ No allowedFormats found in location.state');
-    }
-  }, [location.state]);
-
-
-  const eventData = location.state?.eventData || null;
-
-  const eventTitle = location.state?.trail?.[1] || null;
-
   const [mediaFilter, setMediaFilter] = useState('');
+  const [eventTitle, setEventTitle] = useState('');
 
   useEffect(() => {
-    async function fetchAlbums() {
+    if (eventData?.title) setEventTitle(eventData.title);
+  }, [eventData]);
+
+  useEffect(() => {
+    const fetchAlbums = async () => {
       const { data, error } = await supabase.from('collection').select('*');
       if (error) {
-        console.error('Error fetching albums:', error);
-      } else {
-        const parsed = data.map(album => ({
-          id: album.id,
-          title: album.title,
-          artist: album.artist,
-          year: album.year,
-          folder: album.folder, // ← this is what was missing
-          mediaType: album.folder,
-          image:
-            album.image_url && album.image_url.trim().toLowerCase() !== 'no'
-              ? album.image_url.trim()
-              : '/images/coverplaceholder.png'
-        }));
-        setAlbums(parsed);
+        console.error('Error fetching albums:', error.message);
+        return;
       }
-    }
+
+      let filtered = data;
+
+      if (eventData?.allowed_formats?.length) {
+        const allowed = eventData.allowed_formats.map(f => f.toLowerCase().trim());
+        filtered = filtered.filter(album =>
+          allowed.includes(album.folder?.toLowerCase().trim())
+        );
+      }
+
+      setAlbums(filtered);
+    };
+
     fetchAlbums();
-  }, []);
+  }, [eventData]);
 
-const normalizedFormats = allowedFormats || [];
-
-const filteredAlbums = useMemo(() => {
-  return albums.filter(album => {
-    const folder = album.folder?.toLowerCase();
+  const filteredAlbums = albums.filter(album => {
     const matchesSearch =
       album.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       album.artist.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesFilter = normalizedFormats.length > 0
-      ? normalizedFormats.includes(folder)
-      : mediaFilter === '' || folder === mediaFilter.toLowerCase();
+    const matchesMedia =
+      !mediaFilter || album.folder?.toLowerCase() === mediaFilter.toLowerCase();
 
-    return matchesSearch && matchesFilter;
+    return matchesSearch && matchesMedia;
   });
-}, [albums, searchTerm, mediaFilter]);
-
 
   return (
     <div className="page-wrapper">
