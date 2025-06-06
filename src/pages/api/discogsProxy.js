@@ -1,29 +1,25 @@
 export default async function handler(req, res) {
-  const { id } = req.query;
+  const { releaseId } = req.query;
 
-  if (!id) {
-    return res.status(400).json({ error: 'Missing release ID' });
-  }
+  if (!releaseId) return res.status(400).json({ error: 'Missing releaseId' });
 
   try {
-    const discogsRes = await fetch(`https://api.discogs.com/releases/${id}`, {
+    const discogsRes = await fetch(`https://api.discogs.com/releases/${releaseId}`, {
       headers: {
         'User-Agent': 'VinylRequestApp/1.0',
-        'Accept': 'application/json'
+        Accept: 'application/json'
       }
     });
 
-    const contentType = discogsRes.headers.get('content-type');
+    const contentType = discogsRes.headers.get('content-type') || '';
     if (!discogsRes.ok || !contentType.includes('application/json')) {
       const text = await discogsRes.text();
-      console.error(`Discogs fetch failed [${id}]:`, text.slice(0, 200));
-      return res.status(500).json({ error: 'Invalid JSON returned from Discogs' });
+      return res.status(502).json({ error: 'Non-JSON response', preview: text.slice(0, 200) });
     }
 
     const data = await discogsRes.json();
     return res.status(200).json(data);
   } catch (err) {
-    console.error('Discogs Proxy Error:', err);
-    return res.status(500).json({ error: 'Discogs fetch failed' });
+    return res.status(500).json({ error: 'Discogs fetch failed', detail: err.message });
   }
 }
