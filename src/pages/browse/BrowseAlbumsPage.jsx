@@ -16,6 +16,17 @@ function BrowseAlbumsPage() {
   const location = useLocation();
   const { eventID } = useParams();
   const [allowedFormats, setAllowedFormats] = useState(null);
+  useEffect(() => {
+    if (location.state?.allowedFormats) {
+      const formats = location.state.allowedFormats.map(f => f.trim().toLowerCase());
+      console.log('✓ allowedFormats from state:', formats);
+      setAllowedFormats(formats);
+    } else {
+      console.warn('✗ No allowedFormats found in location.state');
+    }
+  }, [location.state]);
+
+
   const eventData = location.state?.eventData || null;
 
   const eventTitle = location.state?.trail?.[1] || null;
