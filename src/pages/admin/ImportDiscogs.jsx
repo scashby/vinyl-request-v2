@@ -1,7 +1,12 @@
 import { useState } from 'react';
 import Papa from 'papaparse';
 import { supabase } from '../../lib/supabaseClient.js';
-import fetchDiscogsRelease from '/api/discogsProxy.js';
+
+async function fetchDiscogsRelease(releaseId) {
+  const res = await fetch(`/api/discogsProxy.js?releaseId=${releaseId}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
 
 export default function ImportDiscogs() {
   const [parsedData, setParsedData] = useState([]);
