@@ -55,9 +55,10 @@ const filteredAlbums = useMemo(() => {
       album.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       album.artist.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesFilter = allowedFormats?.length
+    const matchesFilter = normalizedFormats.length > 0
       ? normalizedFormats.includes(folder)
       : mediaFilter === '' || folder === mediaFilter.toLowerCase();
+
 
     return matchesSearch && matchesFilter;
   });
