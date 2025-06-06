@@ -93,11 +93,11 @@ export default function ImportDiscogs() {
       if (existingMap.has(key)) {
         await supabase
           .from('collection')
-          .update(record, { returning: 'minimal' })
+          .update(record, { returning: 'minimal', count: null })
           .match({ artist: row.artist, title: row.title, year: row.year, folder: row.folder });
           updated++;
       } else {
-        await supabase.from('collection').insert([record], { returning: 'minimal' });
+        await supabase.from('collection').insert([record], { returning: 'minimal', count: null });
         inserted++;
       }
     }
