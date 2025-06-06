@@ -1,27 +1,23 @@
-export async function fetchDiscogsRelease(releaseId) {
-  const token = process.env.NEXT_PUBLIC_DISCOGS_TOKEN;
+export default async function handler(req, res) {
+  const { releaseId } = req.query;
+  const token = process.env.KVVAFUlIzOPCUFNhtVXZJenwBHhGmFrmkwYgzQXD; // Never NEXT_PUBLIC
+
+  if (!releaseId) {
+    res.status(400).json({ error: 'Missing releaseId' });
+    return;
+  }
+
   const url = `https://api.discogs.com/masters/${releaseId}?token=${token}`;
 
   try {
-    const res = await fetch(url);
-
-    if (!res || typeof res.status !== 'number') {
-      throw new Error(`Discogs fetch failed: No response or invalid status`);
+    const apiRes = await fetch(url);
+    if (!apiRes.ok) {
+      res.status(apiRes.status).json({ error: 'Discogs API error' });
+      return;
     }
-
-    if (res.status !== 200) {
-      throw new Error(`Discogs fetch failed: ${res.status}`);
-    }
-
-    const data = await res.json();
-
-    if (!data || typeof data !== 'object') {
-      throw new Error('Discogs fetch returned empty or invalid data');
-    }
-
-    return data;
+    const data = await apiRes.json();
+    res.status(200).json(data);
   } catch (err) {
-    console.error('Discogs proxy error:', err);
-    return null;
+    res.status(500).json({ error: 'Server error', detail: err.message });
   }
 }
