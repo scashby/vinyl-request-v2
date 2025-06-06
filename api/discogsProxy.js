@@ -1,24 +1,27 @@
-export default async function handler(req, res) {
-  const url = new URL(req.url, 'http://localhost');
-  const releaseId = url.searchParams.get('releaseId');
-
-  if (!releaseId) {
-    return res.status(400).json({ error: 'Missing releaseId' });
-  }
+export async function fetchDiscogsRelease(releaseId) {
+  const token = process.env.NEXT_PUBLIC_DISCOGS_TOKEN;
+  const url = `https://api.discogs.com/masters/${releaseId}?token=${token}`;
 
   try {
-    const response = await fetch(`https://api.discogs.com/releases/${releaseId}`, {
-      headers: { 'User-Agent': 'vinyl-request-v2/1.0' },
-    });
+    const res = await fetch(url);
 
-    if (!response || !response.ok) {
-      const status = response?.status || 500;
-      return res.status(status).json({ error: 'Discogs API error' });
+    if (!res || typeof res.status !== 'number') {
+      throw new Error(`Discogs fetch failed: No response or invalid status`);
     }
 
-    const data = await response.json();
-    res.status(200).json(data);
+    if (res.status !== 200) {
+      throw new Error(`Discogs fetch failed: ${res.status}`);
+    }
+
+    const data = await res.json();
+
+    if (!data || typeof data !== 'object') {
+      throw new Error('Discogs fetch returned empty or invalid data');
+    }
+
+    return data;
   } catch (err) {
-    res.status(500).json({ error: 'Fetch failed', details: err.message });
+    console.error('Discogs proxy error:', err);
+    return null;
   }
 }
