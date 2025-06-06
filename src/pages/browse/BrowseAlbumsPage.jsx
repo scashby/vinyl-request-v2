@@ -57,8 +57,7 @@ function BrowseAlbumsPage() {
     fetchAlbums();
   }, []);
 
-const normalizedFormats =
-  location.state?.allowedFormats?.map(f => f.trim().toLowerCase()) || [];
+const normalizedFormats = allowedFormats || [];
 
 const filteredAlbums = useMemo(() => {
   return albums.filter(album => {
