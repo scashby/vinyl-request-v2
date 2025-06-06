@@ -4,7 +4,6 @@ import { supabase } from '../../lib/supabaseClient.js';
 
 export default function ImportDiscogs() {
   const [parsedData, setParsedData] = useState([]);
-  const [duplicates, setDuplicates] = useState([]);
   const [status, setStatus] = useState('');
 
   const handleFile = async (e) => {
@@ -15,15 +14,6 @@ export default function ImportDiscogs() {
       complete: async function (results) {
         const csvData = results.data;
         setParsedData(csvData);
-
-        // Fetch existing collection to find duplicates
-        const { data: existing } = await supabase.from('collection').select('*');
-        const existingKeys = new Set(existing.map(e => `${e.artist}|--|${e.title}|--|${e.year}`));
-
-        const dupeRows = csvData.filter(row =>
-          existingKeys.has(`${row.artist}|--|${row.title}|--|${row.year}`)
-        );
-        setDuplicates(dupeRows);
       }
     });
   };
@@ -33,28 +23,41 @@ export default function ImportDiscogs() {
     setStatus('Importing...');
 
     const { data: existing } = await supabase.from('collection').select('*');
-    const existingKeys = new Set(existing.map(e => `${e.artist}|--|${e.title}|--|${e.year}`));
+    const matchKey = (r) => `${r.artist}|--|${r.title}|--|${r.year}`;
+    const existingMap = new Map(existing.map(e => [matchKey(e), e]));
 
-    const toInsert = parsedData.filter(row =>
-      !existingKeys.has(`${row.artist}|--|${row.title}|--|${row.year}`)
-    );
+    let updated = 0;
+    let inserted = 0;
 
-    const toUpdate = parsedData.filter(row =>
-      existingKeys.has(`${row.artist}|--|${row.title}|--|${row.year}`)
-    );
+    for (const row of parsedData) {
+      const key = matchKey(row);
+      const record = {
+        artist: row.artist,
+        title: row.title,
+        year: row.year,
+        folder: row.folder,
+        format: row.format,
+        image_url: row.image_url,
+        media_condition: row.media_condition,
+        tracklists: row.tracklists,
+        sides: row.sides,
+        discogs_master_id: row.discogs_master_id,
+        discogs_release_id: row.discogs_release_id
+      };
 
-    for (const row of toUpdate) {
-      await supabase
-        .from('collection')
-        .update(row)
-        .match({ artist: row.artist, title: row.title, year: row.year });
+      if (existingMap.has(key)) {
+        await supabase
+          .from('collection')
+          .update(record)
+          .match({ artist: row.artist, title: row.title, year: row.year });
+        updated++;
+      } else {
+        await supabase.from('collection').insert([record]);
+        inserted++;
+      }
     }
 
-    if (toInsert.length > 0) {
-      await supabase.from('collection').insert(toInsert);
-    }
-
-    setStatus(`${toInsert.length} inserted, ${toUpdate.length} updated.`);
+    setStatus(`${inserted} inserted, ${updated} updated.`);
   };
 
   return (
@@ -74,7 +77,7 @@ export default function ImportDiscogs() {
               </thead>
               <tbody>
                 {parsedData.map((row, idx) => (
-                  <tr key={idx} className={duplicates.includes(row) ? 'bg-red-900' : 'bg-gray-800'}>
+                  <tr key={idx} className="bg-gray-800">
                     {Object.values(row).map((val, i) => (
                       <td key={i} className="px-4 py-2">{val}</td>
                     ))}
