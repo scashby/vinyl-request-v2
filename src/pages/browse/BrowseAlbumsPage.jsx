@@ -96,14 +96,16 @@ const filteredAlbums = useMemo(() => {
           <select
             value={mediaFilter}
             onChange={(e) => setMediaFilter(e.target.value)}
-            disabled={allowedFormats?.length > 0}
           >
             <option value="">All Media Types</option>
-            <option value="Vinyl">Vinyl</option>
-            <option value="Cassettes">Cassettes</option>
-            <option value="CD">CD</option>
-            <option value="45s">45s</option>
-            <option value="8-Track">8-Track</option>
+            {(allowedFormats?.length > 0
+              ? allowedFormats
+              : ['Vinyl', 'Cassettes', 'CD', '45s', '8-Track']
+            ).map((format) => (
+              <option key={format} value={format}>
+                {format}
+              </option>
+            ))}
           </select>
         </div>
 
