@@ -1,6 +1,6 @@
 export default async function handler(req, res) {
-  const { searchParams } = new URL(req.url, `http://${req.headers.host}`);
-  const releaseId = searchParams.get('releaseId');
+  const url = new URL(req.url, 'http://localhost');
+  const releaseId = url.searchParams.get('releaseId');
 
   if (!releaseId) {
     return res.status(400).json({ error: 'Missing releaseId' });
