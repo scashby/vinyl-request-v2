@@ -18,20 +18,18 @@ function BrowseAlbumsPage() {
   const [allowedFormats, setAllowedFormats] = useState(null);
 
     useEffect(() => {
-      const incomingState = location?.state || {};
-      const incomingEvent = incomingState.eventData || null;
-
-      if (incomingEvent) {
-        const formats = Array.isArray(incomingEvent.allowed_formats)
-          ? incomingEvent.allowed_formats.map(f => f.trim().toLowerCase())
+      if (eventData?.allowed_formats) {
+        const formats = Array.isArray(eventData.allowed_formats)
+          ? eventData.allowed_formats.map(f => f.trim().toLowerCase())
           : [];
-        console.log("✓ Set allowedFormats from incomingEvent:", formats);
+        console.log("✓ Set allowedFormats from eventData state:", formats);
         setAllowedFormats(formats);
       } else {
-        console.warn("✗ No incomingEvent found");
+        console.warn("✗ eventData or allowed_formats missing");
         setAllowedFormats([]);
       }
-    }, [location.state]);
+    }, [eventData]);
+
 
 
   const eventTitle = location.state?.trail?.[1] || null;
