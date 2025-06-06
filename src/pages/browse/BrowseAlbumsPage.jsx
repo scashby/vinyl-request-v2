@@ -18,7 +18,7 @@ function BrowseAlbumsPage() {
   const [allowedFormats, setAllowedFormats] = useState(null);
   useEffect(() => {
     if (location.state?.allowedFormats) {
-      const formats = location.state.allowedFormats.map(f => f.trim().toLowerCase());
+      const formats = location.state.allowedFormats.map(f => f.trim());
       console.log('✓ allowedFormats from state:', formats);
       setAllowedFormats(formats);
     } else {
@@ -57,7 +57,7 @@ function BrowseAlbumsPage() {
     fetchAlbums();
   }, []);
 
-const normalizedFormats = allowedFormats || [];
+const normalizedFormats = allowedFormats?.map(f => f.toLowerCase()) || [];
 
 const filteredAlbums = useMemo(() => {
   return albums.filter(album => {
@@ -67,7 +67,7 @@ const filteredAlbums = useMemo(() => {
       album.artist.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesFilter = normalizedFormats.length > 0
-      ? normalizedFormats.includes(folder)
+      ? normalizedFormats.includes(folder?.toLowerCase())
       : (mediaFilter === '' || folder === mediaFilter.toLowerCase());
 
     return matchesSearch && matchesFilter;
