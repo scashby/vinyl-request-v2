@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabaseClient.js';
 
 export default function ImportDiscogs() {
   const [parsedData, setParsedData] = useState([]);
+  const [duplicates, setDuplicates] = useState([]);
   const [status, setStatus] = useState('');
 
   const handleFile = async (e) => {
@@ -12,65 +13,31 @@ export default function ImportDiscogs() {
       header: true,
       skipEmptyLines: true,
       complete: async function (results) {
-        const csvData = results.data;
+        const csvData = results.data.map(normalizeRow);
         setParsedData(csvData);
+
+        const { data: existing } = await supabase.from('collection').select('*');
+        const existingKeys = new Set(existing.map(e => keyFor(e)));
+
+        const dupeRows = csvData.filter(row => existingKeys.has(keyFor(row)));
+        setDuplicates(dupeRows);
       }
     });
   };
 
-  function safeParse(input) {
-    try {
-      if (!input || input === 'None') return null;
-      return typeof input === 'string' ? JSON.parse(input) : input;
-    } catch {
-      return null;
-    }
-  }
-
-  function cleanTextOrJSON(input) {
-    if (!input || input === 'None') return null;
-    try {
-      return JSON.stringify(JSON.parse(input)); // valid JSON string
-    } catch {
-      return input; // fall back to string as-is
-    }
-  }
-
-  function parseBoolean(input) {
-    return input === true || input === 'true' ? true : false;
-  }
-
-  function parseArray(input) {
-    if (!input || input === 'None') return null;
-    try {
-      return JSON.parse(input);
-    } catch {
-      return input.split(',').map(s => s.trim());
-    }
-  }
-
-  function parseIntArray(input) {
-    if (!input || input === 'None') return null;
-    try {
-      return JSON.parse(input).map(Number);
-    } catch {
-      return input.split(',').map(n => parseInt(n.trim(), 10)).filter(n => !isNaN(n));
-    }
-  }
+  const keyFor = (row) => `${row.artist}|--|${row.title}|--|${row.year}|--|${row.folder}`;
 
   const handleImport = async () => {
     if (parsedData.length === 0) return;
     setStatus('Importing...');
 
     const { data: existing } = await supabase.from('collection').select('*');
-    const matchKey = (r) => `${r.artist}|--|${r.title}|--|${r.year}`;
-    const existingMap = new Map(existing.map(e => [matchKey(e), e]));
+    const existingKeys = new Set(existing.map(e => keyFor(e)));
 
-    let updated = 0;
     let inserted = 0;
+    let updated = 0;
 
     for (const row of parsedData) {
-      const key = matchKey(row);
       const record = {
         artist: row.artist,
         title: row.title,
@@ -84,20 +51,22 @@ export default function ImportDiscogs() {
         discogs_master_id: row.discogs_master_id,
         discogs_release_id: row.discogs_release_id,
         is_box_set: parseBoolean(row.is_box_set),
-        parent_id: row.parent_id || null,
+        parent_id: row.parent_id && row.parent_id !== 'None' ? row.parent_id : null,
         blocked: parseBoolean(row.blocked),
         blocked_sides: parseArray(row.blocked_sides),
         child_album_ids: parseIntArray(row.child_album_ids)
       };
 
-      if (existingMap.has(key)) {
+      if (existingKeys.has(keyFor(row))) {
         await supabase
           .from('collection')
           .update(record, { returning: 'minimal', count: null })
           .match({ artist: row.artist, title: row.title, year: row.year, folder: row.folder });
-          updated++;
+        updated++;
       } else {
-        await supabase.from('collection').insert([record], { returning: 'minimal', count: null });
+        await supabase
+          .from('collection')
+          .insert([record], { returning: 'minimal', count: null });
         inserted++;
       }
     }
@@ -105,41 +74,76 @@ export default function ImportDiscogs() {
     setStatus(`${inserted} inserted, ${updated} updated.`);
   };
 
+  function normalizeRow(row) {
+    return {
+      artist: row['Artist'] || null,
+      title: row['Title'] || null,
+      year: row['Released'] || null,
+      folder: row['CollectionFolder'] || null,
+      format: row['Format'] || null,
+      image_url: null,
+      media_condition: row['Collection Media Condition'] || null,
+      tracklists: row.tracklists || null,
+      sides: row.sides || null,
+      discogs_master_id: row.discogs_master_id || row.release_id || null,
+      discogs_release_id: row.release_id || null,
+      is_box_set: row.is_box_set || false,
+      parent_id: row.parent_id || null,
+      blocked: row.blocked || false,
+      blocked_sides: row.blocked_sides || null,
+      child_album_ids: row.child_album_ids || null
+    };
+  }
+
+  function safeParse(input) {
+    try {
+      if (!input || input === 'None') return null;
+      return typeof input === 'string' ? JSON.parse(input) : input;
+    } catch {
+      return null;
+    }
+  }
+
+  function cleanTextOrJSON(input) {
+    if (!input || input === 'None') return null;
+    try {
+      return JSON.stringify(JSON.parse(input));
+    } catch {
+      return input;
+    }
+  }
+
+  function parseBoolean(input) {
+    return input === true || input === 'true';
+  }
+
+  function parseArray(input) {
+    if (!input || input === 'None') return null;
+    try {
+      return JSON.parse(input);
+    } catch {
+      return input.split(',').map(s => s.trim());
+    }
+  }
+
+  function parseIntArray(input) {
+    if (!input || input === 'None' || input === 'null') return null;
+    try {
+      const parsed = JSON.parse(input);
+      if (!Array.isArray(parsed)) return null;
+      return parsed.map(n => parseInt(n, 10)).filter(n => !isNaN(n));
+    } catch {
+      return input.split(',').map(n => parseInt(n.trim(), 10)).filter(n => !isNaN(n));
+    }
+  }
+
   return (
     <div>
-      <h1 className="text-3xl font-bold mb-4">Import Discogs CSV</h1>
-      <input type="file" accept=".csv" onChange={handleFile} className="mb-4" />
-      {parsedData.length > 0 && (
-        <>
-          <div className="overflow-x-auto border rounded mb-4">
-            <table className="min-w-full text-sm text-left text-white">
-              <thead className="bg-gray-700 text-xs uppercase">
-                <tr>
-                  {Object.keys(parsedData[0]).map(key => (
-                    <th key={key} className="px-4 py-2">{key}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {parsedData.map((row, idx) => (
-                  <tr key={idx} className="bg-gray-800">
-                    {Object.values(row).map((val, i) => (
-                      <td key={i} className="px-4 py-2">{val}</td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <button
-            className="bg-green-600 px-4 py-2 rounded hover:bg-green-700"
-            onClick={handleImport}
-          >
-            Confirm Import
-          </button>
-          {status && <p className="mt-2 text-sm italic text-zinc-300">{status}</p>}
-        </>
-      )}
+      <h2>Import Discogs Collection</h2>
+      <input type="file" accept=".csv" onChange={handleFile} />
+      <button onClick={handleImport}>Import</button>
+      <p>{status}</p>
+      <p>Duplicates Detected: {duplicates.length}</p>
     </div>
   );
 }
