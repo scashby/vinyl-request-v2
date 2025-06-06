@@ -64,11 +64,11 @@ export default function ImportDiscogs() {
       if (existingMap.has(key)) {
         await supabase
           .from('collection')
-          .update(record)
+          .update(record, { returning: 'minimal' })
           .match({ artist: row.artist, title: row.title, year: row.year });
-        updated++;
+          updated++;
       } else {
-        await supabase.from('collection').insert([record]);
+        await supabase.from('collection').insert([record], { returning: 'minimal' });
         inserted++;
       }
     }
