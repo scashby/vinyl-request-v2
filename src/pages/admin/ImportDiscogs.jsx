@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Papa from 'papaparse';
 import { supabase } from '../../lib/supabaseClient.js';
+import 'whatwg-fetch';
 
 export default function ImportDiscogs() {
   const [parsedData, setParsedData] = useState([]);
@@ -28,6 +29,8 @@ export default function ImportDiscogs() {
   const keyFor = (row) => `${row.artist}|--|${row.title}|--|${row.year}|--|${row.folder}`;
 
   const handleImport = async () => {
+    const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
     const fetchImageFromDiscogs = async (releaseId) => {
       if (!releaseId) return null;
       try {
@@ -40,7 +43,7 @@ export default function ImportDiscogs() {
     };
 
     if (parsedData.length === 0) return;
-    setStatus('Importing...');
+    setStatus(`Importing 0 of ${parsedData.length}...`);
 
     const { data: existing } = await supabase.from('collection').select('*');
     const existingMap = new Map(existing.map(e => [keyFor(e), e]));
@@ -48,8 +51,15 @@ export default function ImportDiscogs() {
     let inserted = 0;
     let updated = 0;
 
-    for (const row of parsedData) {
-      let image = row.image_url || existingMap.get(keyFor(row))?.image_url || await fetchImageFromDiscogs(row.discogs_release_id);
+    for (let i = 0; i < parsedData.length; i++) {
+      const row = parsedData[i];
+
+      let image = row.image_url || existingMap.get(keyFor(row))?.image_url;
+      if (!image) {
+        await delay(200);
+        image = await fetchImageFromDiscogs(row.discogs_release_id);
+      }
+
       const record = {
         artist: row.artist,
         title: row.title,
@@ -81,9 +91,11 @@ export default function ImportDiscogs() {
           .insert([record], { returning: 'minimal', count: null });
         inserted++;
       }
+
+      setStatus(`Importing ${i + 1} of ${parsedData.length}...`);
     }
 
-    setStatus(`${inserted} inserted, ${updated} updated.`);
+    setStatus(`✅ ${inserted} inserted, ${updated} updated.`);
   };
 
   function normalizeRow(row) {
