@@ -1,21 +1,21 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { createClient } from '@supabase/supabase-js';
 import AlbumCard from '../../components/AlbumCard';
 import '../../styles/album-browse.css';
 import '../../styles/internal.css';
 import { supabase } from '../../lib/supabaseClient';
 import { useLocation, useParams } from 'react-router-dom';
 
-// Supabase setup
-const supabaseUrl = 'https://bntoivaipesuovselglg.supabase.co';
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
 function BrowseAlbumsPage() {
   const [albums, setAlbums] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [mediaFilter, setMediaFilter] = useState('');
+  const [allowedFormats, setAllowedFormats] = useState(null);
   const location = useLocation();
   const { eventID } = useParams();
-  const [allowedFormats, setAllowedFormats] = useState(null);
+
+  const eventData = location.state?.eventData || null;
+  const eventTitle = location.state?.trail?.[1] || null;
+
   useEffect(() => {
     if (location.state?.allowedFormats) {
       const formats = location.state.allowedFormats.map(f => f.trim().toLowerCase());
@@ -25,13 +25,6 @@ function BrowseAlbumsPage() {
       console.warn('✗ No allowedFormats found in location.state');
     }
   }, [location.state]);
-
-
-  const eventData = location.state?.eventData || null;
-
-  const eventTitle = location.state?.trail?.[1] || null;
-
-  const [mediaFilter, setMediaFilter] = useState('');
 
   useEffect(() => {
     async function fetchAlbums() {
@@ -44,7 +37,7 @@ function BrowseAlbumsPage() {
           title: album.title,
           artist: album.artist,
           year: album.year,
-          folder: album.folder, // ← this is what was missing
+          folder: album.folder,
           mediaType: album.folder,
           image:
             album.image_url && album.image_url.trim().toLowerCase() !== 'no'
@@ -57,23 +50,22 @@ function BrowseAlbumsPage() {
     fetchAlbums();
   }, []);
 
-const normalizedFormats = allowedFormats || [];
+  const normalizedFormats = allowedFormats || [];
 
-const filteredAlbums = useMemo(() => {
-  return albums.filter(album => {
-    const folder = album.folder?.toLowerCase();
-    const matchesSearch =
-      album.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      album.artist.toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredAlbums = useMemo(() => {
+    return albums.filter(album => {
+      const folder = album.folder?.toLowerCase();
+      const matchesSearch =
+        album.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        album.artist.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesFilter = normalizedFormats.length > 0
-      ? normalizedFormats.includes(folder)
-      : mediaFilter === '' || folder === mediaFilter.toLowerCase();
+      const matchesFilter = normalizedFormats.length > 0
+        ? normalizedFormats.includes(folder)
+        : mediaFilter === '' || folder === mediaFilter.toLowerCase();
 
-    return matchesSearch && matchesFilter;
-  });
-}, [albums, searchTerm, mediaFilter]);
-
+      return matchesSearch && matchesFilter;
+    });
+  }, [albums, searchTerm, mediaFilter, normalizedFormats]);
 
   return (
     <div className="page-wrapper">
