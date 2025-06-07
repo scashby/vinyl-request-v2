@@ -31,7 +31,23 @@ export default function ImportDiscogs() {
     });
   };
 
-  const keyFor = (row) => `${row.artist}|--|${row.title}|--|${row.year}|--|${row.folder}`;
+  // Add this to the top, replace old keyFor and cleanArtist
+  const cleanArtist = artist =>
+    (artist || "")
+      .replace(/\s*\(\d+\)$/, "") // removes trailing " (1)", " (2)" etc.
+      .trim()
+      .toLowerCase();
+
+  const keyFor = row =>
+    [
+      row.discogs_release_id,
+      row.discogs_master_id,
+      row.folder,
+      row.media_condition,
+      cleanArtist(row.artist),
+      (row.title || "").trim().toLowerCase(),
+      (row.year || "").trim().toLowerCase()
+    ].join('|--|');
 
   const handleImport = async () => {
     const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -48,18 +64,27 @@ export default function ImportDiscogs() {
     for (let i = 0; i < parsedData.length; i++) {
       const row = await enrichWithDiscogs(parsedData[i], existingMap);
 
+      // skip if this duplicate already has image_url and tracklists
+      if (
+        existingMap.has(keyFor(row)) &&
+        existingMap.get(keyFor(row)).image_url &&
+        existingMap.get(keyFor(row)).tracklists
+      ) {
+        continue;
+      }
+
       const record = {
-        artist: row.artist,
-        title: row.title,
-        year: row.year,
-        folder: row.folder,
-        format: row.format,
-        image_url: row.image_url,
-        media_condition: row.media_condition,
+        artist: row.artist || null,
+        title: row.title || null,
+        year: row.year || null,
+        folder: row.folder || null,
+        format: row.format || null,
+        image_url: row.image_url || null,
+        media_condition: row.media_condition || null,
         tracklists: cleanTextOrJSON(row.tracklists),
         sides: safeParse(row.sides),
-        discogs_master_id: row.discogs_master_id,
-        discogs_release_id: row.discogs_release_id,
+        discogs_master_id: row.discogs_master_id || null,
+        discogs_release_id: row.discogs_release_id || null,
         is_box_set: parseBoolean(row.is_box_set),
         parent_id: row.parent_id || null,
         blocked: parseBoolean(row.blocked),
@@ -71,7 +96,15 @@ export default function ImportDiscogs() {
         await supabase
           .from('collection')
           .update(record, { returning: 'minimal', count: null })
-          .match({ artist: row.artist, title: row.title, year: row.year, folder: row.folder });
+          .match({ 
+            discogs_release_id: row.discogs_release_id,
+            discogs_master_id: row.discogs_master_id,
+            folder: row.folder,
+            media_condition: row.media_condition,
+            artist: row.artist,
+            title: row.title,
+            year: row.year
+          });
         updated++;
       } else {
         await supabase.from('collection').insert([record], { returning: 'minimal', count: null });
@@ -81,6 +114,7 @@ export default function ImportDiscogs() {
       setStatus(`Importing ${i + 1} of ${parsedData.length}...`);
       await delay(1100);
     }
+
 
     setStatus(`✅ ${inserted} inserted, ${updated} updated.`);
   };
