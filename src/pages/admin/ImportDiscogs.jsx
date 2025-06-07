@@ -79,7 +79,7 @@ export default function ImportDiscogs() {
       }
 
       setStatus(`Importing ${i + 1} of ${parsedData.length}...`);
-      await delay(200);
+      await delay(1100);
     }
 
     setStatus(`✅ ${inserted} inserted, ${updated} updated.`);
