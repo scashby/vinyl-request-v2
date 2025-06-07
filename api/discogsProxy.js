@@ -12,7 +12,7 @@ export default async function handler(req, res) {
     return;
   }
 
-  const url = `https://api.discogs.com/masters/${releaseId}?token=${token}`;
+  const url = `https://api.discogs.com/releases/${releaseId}?token=${token}`;
 
   try {
     const apiRes = await fetch(url);
