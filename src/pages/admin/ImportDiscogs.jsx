@@ -64,11 +64,14 @@ export default function ImportDiscogs() {
     for (let i = 0; i < parsedData.length; i++) {
       const row = await enrichWithDiscogs(parsedData[i], existingMap);
 
+      // Generate key using cleaned artist
+      const rowKey = keyFor(row);
+
       // skip if this duplicate already has image_url and tracklists
       if (
-        existingMap.has(keyFor(row)) &&
-        existingMap.get(keyFor(row)).image_url &&
-        existingMap.get(keyFor(row)).tracklists
+        existingMap.has(rowKey) &&
+        existingMap.get(rowKey).image_url &&
+        existingMap.get(rowKey).tracklists
       ) {
         continue;
       }
@@ -93,7 +96,7 @@ export default function ImportDiscogs() {
       };
 
       try {
-        if (existingMap.has(keyFor(row))) {
+        if (existingMap.has(rowKey)) {
           await supabase
             .from('collection')
             .update(record, { returning: 'minimal', count: null })
@@ -102,7 +105,7 @@ export default function ImportDiscogs() {
               discogs_master_id: row.discogs_master_id,
               folder: row.folder,
               media_condition: row.media_condition,
-              artist: row.artist,
+              artist: cleanArtist(row.artist), // << match on cleaned artist!
               title: row.title,
               year: row.year
             });
@@ -112,14 +115,15 @@ export default function ImportDiscogs() {
           inserted++;
         }
       } catch (err) {
-        console.error('Supabase import error:', err, record); // This will show you the BAD record!
+        console.error('Supabase import error:', err, record);
         setStatus(`Error on row ${i + 1}: ${err.message}`);
         continue;
       }
 
       setStatus(`Importing ${i + 1} of ${parsedData.length}...`);
-      await delay(2000); // <-- INCREASE DELAY TO 2000ms (2 seconds)
+      await delay(2000);
     }
+
 
     setStatus(`✅ ${inserted} inserted, ${updated} updated.`);
   };
