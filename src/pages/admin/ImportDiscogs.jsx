@@ -74,7 +74,7 @@ export default function ImportDiscogs() {
       }
 
       const record = {
-        artist: row.artist || null,
+        artist: cleanArtist(row.artist) || null,
         title: row.title || null,
         year: row.year || null,
         folder: row.folder || null,
