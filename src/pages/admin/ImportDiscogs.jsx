@@ -78,7 +78,7 @@ export default function ImportDiscogs() {
         title: row.title || null,
         year: row.year || null,
         folder: row.folder || null,
-        format: row.format     || null,
+        format: row.format || null,
         image_url: row.image_url || null,
         media_condition: row.media_condition || null,
         tracklists: cleanTextOrJSON(row.tracklists),
@@ -112,17 +112,14 @@ export default function ImportDiscogs() {
           inserted++;
         }
       } catch (err) {
-        console.error('Supabase import error:', err, record);
+        console.error('Supabase import error:', err, record); // This will show you the BAD record!
         setStatus(`Error on row ${i + 1}: ${err.message}`);
-        // Optionally: continue to next row on error
         continue;
       }
 
       setStatus(`Importing ${i + 1} of ${parsedData.length}...`);
-      await delay(1100);
-      }
-
-
+      await delay(2000); // <-- INCREASE DELAY TO 2000ms (2 seconds)
+    }
 
     setStatus(`✅ ${inserted} inserted, ${updated} updated.`);
   };
