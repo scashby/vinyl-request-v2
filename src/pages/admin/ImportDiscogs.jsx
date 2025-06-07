@@ -78,7 +78,7 @@ export default function ImportDiscogs() {
         title: row.title || null,
         year: row.year || null,
         folder: row.folder || null,
-        format: row.format || null,
+        format: row.format     || null,
         image_url: row.image_url || null,
         media_condition: row.media_condition || null,
         tracklists: cleanTextOrJSON(row.tracklists),
@@ -92,28 +92,36 @@ export default function ImportDiscogs() {
         child_album_ids: parseIntArray(row.child_album_ids)
       };
 
-      if (existingMap.has(keyFor(row))) {
-        await supabase
-          .from('collection')
-          .update(record, { returning: 'minimal', count: null })
-          .match({ 
-            discogs_release_id: row.discogs_release_id,
-            discogs_master_id: row.discogs_master_id,
-            folder: row.folder,
-            media_condition: row.media_condition,
-            artist: row.artist,
-            title: row.title,
-            year: row.year
-          });
-        updated++;
-      } else {
-        await supabase.from('collection').insert([record], { returning: 'minimal', count: null });
-        inserted++;
+      try {
+        if (existingMap.has(keyFor(row))) {
+          await supabase
+            .from('collection')
+            .update(record, { returning: 'minimal', count: null })
+            .match({ 
+              discogs_release_id: row.discogs_release_id,
+              discogs_master_id: row.discogs_master_id,
+              folder: row.folder,
+              media_condition: row.media_condition,
+              artist: row.artist,
+              title: row.title,
+              year: row.year
+            });
+          updated++;
+        } else {
+          await supabase.from('collection').insert([record], { returning: 'minimal', count: null });
+          inserted++;
+        }
+      } catch (err) {
+        console.error('Supabase import error:', err, record);
+        setStatus(`Error on row ${i + 1}: ${err.message}`);
+        // Optionally: continue to next row on error
+        continue;
       }
 
       setStatus(`Importing ${i + 1} of ${parsedData.length}...`);
       await delay(1100);
-    }
+      }
+
 
 
     setStatus(`✅ ${inserted} inserted, ${updated} updated.`);
