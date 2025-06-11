@@ -6,7 +6,8 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "prebuild": "ls -l src/lib && cat jsconfig.json"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.50.0",
