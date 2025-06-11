@@ -1,4 +1,4 @@
-import Footer from './Footer';
+import Footer from 'Footer';
 import { usePathname } from 'next/navigation';
 
 export default function Layout({ children }: { children: React.ReactNode }) {

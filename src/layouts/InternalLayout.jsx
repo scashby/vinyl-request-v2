@@ -1,6 +1,6 @@
 import React from 'react';
-import '../styles/internal.css';
-import Footer from '../components/Footer'; 
+import 'styles/internal.css';
+import Footer from 'components/Footer'; 
 
 const InternalLayout = ({ title, children }) => {
   return (

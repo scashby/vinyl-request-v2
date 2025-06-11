@@ -1,5 +1,5 @@
 import React from 'react';
-import '../../src/styles/internal.css';
+import 'src/styles/internal.css';
 
 const PageLayout = ({ children }) => (
   <div className="page-container">

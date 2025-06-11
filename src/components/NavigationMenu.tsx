@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
-import '../styles/navigation-menu.css';
+import 'styles/navigation-menu.css';
 
 function NavigationMenu() {
   const [open, setOpen] = useState(false);

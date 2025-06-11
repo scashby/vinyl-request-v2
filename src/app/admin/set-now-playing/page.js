@@ -38,7 +38,7 @@ export default function Page() {
         <div key={req.id} className="bg-gray-800 p-4 rounded mb-2 flex justify-between items-center">
           <div>
             <p className="text-lg">{req.artist} – {req.title} (Side {req.side})</p>
-            <p className="text-sm italic text-zinc-400">Status: {req.status || 'queued'}</p>
+            <p className="text-sm italic text-zinc-400">Status: {req.status || 'queued'p>
           </div>
           <div className="flex gap-2">
             <button
