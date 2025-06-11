@@ -1,7 +1,7 @@
 // Admin Dashboard page ("/admin/admin-dashboard")
 // Main landing page for admin users; links to all admin features.
 
-import '../../styles/internal.css';
+import 'styles/internal.css';
 import Link from 'next/link';
 
 export default function Page() {

@@ -2,8 +2,8 @@
 // Placeholder: Displays the event queue for a given event (demo layout).
 
 import Image from 'next/image';
-import '../../styles/internal.css';
-import '../../styles/browse-queue.css';
+import 'styles/internal.css';
+import 'styles/browse-queue.css';
 
 export default function Page() {
   return (

@@ -1,5 +1,6 @@
 // Admin Add Album page ("/admin/add-album")
 // Allows admin to add a new album manually, including Discogs lookup and Supabase submission.
+"use client";
 
 import { useState } from 'react';
 import { supabase } from 'lib/supabaseClient'
