@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from 'lib/supabaseClient';
+import { supabase } from 'lib/supabaseClient.ts';
 
 export default function Page() {
   const [email, setEmail] = useState('');

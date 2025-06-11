@@ -4,7 +4,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { supabase } from 'lib/supabaseClient';
+import { supabase } from 'lib/supabaseClient.ts';
 
 export default function Page() {
   const [albums, setAlbums] = useState([]);

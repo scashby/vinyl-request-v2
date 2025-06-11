@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { supabase } from 'lib/supabaseClient';
+import { supabase } from 'lib/supabaseClient.ts';
 import Image from 'next/image';
 
 async function fetchDiscogsField(releaseId, field) {
