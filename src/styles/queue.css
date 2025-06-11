@@ -1,0 +1,166 @@
+.queue-wrapper {
+  background: #000;
+  color: #fff;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  margin-top: 2rem;
+  font-family: 'Inter', sans-serif;
+  overflow-x: auto;
+}
+
+.queue-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.queue-table thead th {
+  font-size: 0.75rem;
+  font-weight: bold;
+  color: #888;
+  text-transform: uppercase;
+  padding: 0 0 0.25rem 0;
+  border: none;
+  text-align: left;
+}
+
+.queue-table tbody td {
+  padding: 0.15rem 0;
+  vertical-align: middle;
+}
+
+/* # column */
+.queue-table td.queue-index {
+  width: 1.2rem;
+  text-align: center;
+  color: #888;
+  font-size: 0.875rem;
+}
+
+.queue-table th:nth-child(1),
+.queue-table td:nth-child(1) {
+  width: 5%;
+  text-align: center;
+}
+
+
+/* Cover image */
+.queue-table td.queue-image {
+  width: 3rem;
+  padding-left: 0.15rem;
+  padding-right: 0.15rem;
+}
+
+.queue-table td img.queue-cover {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  display: block;
+}
+
+.queue-table th:nth-child(2),
+.queue-table td:nth-child(2) {
+  width: 3.2rem;
+}
+
+/* Album/Artist */
+.queue-table td.queue-meta {
+  width: auto;
+  padding-left: 0.25rem;
+  padding-right: 0.25rem;
+  min-width: 0;
+  overflow: hidden;
+  vertical-align: top;
+}
+
+.queue-table th:nth-child(3),
+.queue-table td:nth-child(3) {
+  width: auto;
+}
+
+.queue-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.queue-title {
+  font-weight: 600;
+  color: #2563eb;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.queue-artist {
+  font-size: 0.875rem;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Side column */
+.queue-side {
+  font-size: 0.875rem;
+  color: #fff;
+  text-align: center;
+  vertical-align: middle;
+  width: 1.75rem;
+  padding: 0;
+}
+
+.queue-table th:nth-child(4),
+.queue-table td:nth-child(4) {
+  width: 10%;
+  text-align: center;
+}
+
+/* Plus button */
+.queue-plus {
+  font-size: 1.25rem;
+  color: #ccc;
+  text-align: center;
+  vertical-align: middle;
+  padding: 0;
+  white-space: nowrap;
+}
+
+.queue-table th:nth-child(5),
+.queue-table td:nth-child(5) {
+  width: 1.5rem;
+  text-align: center;
+}
+
+/* Heart + count */
+.queue-votes {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 0;
+  text-align: right;
+  height: 48px;
+}
+
+
+.queue-table th:nth-child(6),
+.queue-table td:nth-child(6) {
+  width: 3.5rem;
+  text-align: right;
+}
+
+.queue-heart {
+  font-size: 1.25rem;
+  color: #dc2626;
+  line-height: 1;
+}
+
+.queue-count {
+  font-size: 0.875rem;
+  color: #ccc;
+  line-height: 1;
+}
+
+.queue-table td.queue-votes {
+  vertical-align: middle;
+}

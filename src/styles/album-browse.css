@@ -1,0 +1,77 @@
+.browse-page {
+  padding: 2rem;
+  background-color: #fafafa;
+  color: #222;
+}
+.album-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 1rem;
+}
+.album-card {
+  text-decoration: none;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 5px rgba(0,0,0,0.1);
+  transition: transform 0.2s ease;
+  background: white;
+  position: relative;
+}
+.album-card img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+}
+.info {
+  padding: 0.5rem;
+}
+.album-title {
+  font-weight: bold;
+  color: #2563eb; /* blue-600 for titles */
+}
+.album-artist {
+  color: #222;           /* deep black (not gray) */
+  font-size: 0.75rem;    /* Tailwind's `text-sm`, or 12px */
+  font-weight: 400;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  font-size: 0.65rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: #fff;
+}
+.badge.vinyl {
+  background-color: rgba(147, 51, 234, 0.75); /* purple-600 */
+}
+.badge.cassette {
+  background-color: rgba(22, 163, 74, 0.75);  /* green-600 */
+}
+.badge.cd {
+  background-color: rgba(13, 148, 136, 0.75); /* teal-600 */
+}
+.badge.fortyfive {
+  background-color: rgba(220, 38, 38, 0.75);  /* red-600 */
+}
+.badge.eighttrack {
+  background-color: rgba(234, 88, 12, 0.75);  /* orange-600 */
+}
+
+.search-filter-bar {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.search-filter-bar input,
+.search-filter-bar select {
+  padding: 0.5rem;
+  font-size: 1rem;
+}

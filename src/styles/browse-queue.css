@@ -1,0 +1,53 @@
+
+.browse-queue {
+  display: flex;
+  gap: 2rem;
+  padding: 2rem;
+}
+
+.event-sidebar {
+  flex: 1;
+  max-width: 300px;
+}
+
+.queue-display {
+  flex: 3;
+  background: #000;
+  border-radius: 12px;
+  font-family: 'Inter', sans-serif;
+  color: white;
+  overflow: hidden;
+  padding: 0;
+}
+
+.spotify-header-row {
+  display: grid;
+  grid-template-columns: 2fr 2fr 1fr 1fr 1fr;
+  align-items: center;
+  background: #4b0082;
+  padding: 1rem 1.5rem;
+  color: white;
+  font-weight: 600;
+}
+
+.spotify-row {
+  display: grid;
+  grid-template-columns: 2fr 2fr 1fr 1fr 1fr;
+  align-items: center;
+  padding: 0.5rem 1.5rem;
+  font-size: 0.95rem;
+  border-bottom: 1px solid #333;
+}
+
+.spotify-row .votes {
+  font-family: monospace;
+  color: #ffd700;
+}
+
+.vote-button {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: white;
+}

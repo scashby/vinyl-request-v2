@@ -1,7 +1,7 @@
-// Home page ("/") — Landing for Dead Wax Dialogues (TypeScript version)
+// Home page ("/") — Landing for Dead Wax Dialogues
 
-import Link from "next/link";
-import "./landing.css";
+import '../styles/landing.css';
+import Link from 'next/link';
 
 export default function Page() {
   return (

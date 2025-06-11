@@ -1,0 +1,203 @@
+// Browse Albums page ("/browse/browse-albums")
+// Lists and filters all albums in the collection with search, sort, and filter by media type.
+// Supports event context via query parameters (?eventID=...).
+
+"use client";
+
+import { useEffect, useState, useMemo } from 'react';
+import AlbumCard from '../../components/AlbumCard';
+import '../../styles/album-browse.css';
+import '../../styles/internal.css';
+import { supabase } from '../../lib/supabaseClient';
+import { useSearchParams } from 'next/navigation';
+import Footer from '../../components/Footer';
+
+export default function Page() {
+  const searchParams = useSearchParams();
+  const eventID = searchParams.get('eventID');
+  const allowedFormatsParam = searchParams.get('allowedFormats');
+  const eventTitleParam = searchParams.get('eventTitle');
+
+  const [albums, setAlbums] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [allowedFormats, setAllowedFormats] = useState(null);
+  const [eventTitle, setEventTitle] = useState('');
+  const [mediaFilter, setMediaFilter] = useState('');
+  const [sortField, setSortField] = useState('title');
+  const [sortAsc, setSortAsc] = useState(true);
+
+  // Always fetch event context if eventID param is present
+  useEffect(() => {
+    let isMounted = true;
+    async function fetchEventDataIfNeeded() {
+      if (eventID) {
+        const { data, error } = await supabase
+          .from('events')
+          .select('id, title, allowed_formats')
+          .eq('id', eventID)
+          .single();
+        if (!error && data) {
+          if (isMounted) {
+            setAllowedFormats(data.allowed_formats || []);
+            setEventTitle(data.title || '');
+          }
+        } else {
+          if (isMounted) {
+            setAllowedFormats(null);
+            setEventTitle('');
+          }
+        }
+      } else if (allowedFormatsParam && eventTitleParam) {
+        setAllowedFormats(allowedFormatsParam.split(',').map(f => f.trim()));
+        setEventTitle(eventTitleParam);
+      } else {
+        setAllowedFormats(null);
+        setEventTitle('');
+      }
+    }
+    fetchEventDataIfNeeded();
+    return () => { isMounted = false; };
+  }, [eventID, allowedFormatsParam, eventTitleParam]);
+
+  // Batch fetch all albums (no 1000-row cap)
+  useEffect(() => {
+    async function fetchAllAlbums() {
+      let allRows = [];
+      let from = 0;
+      let batchSize = 1000;
+      let keepGoing = true;
+      while (keepGoing) {
+        let { data: batch, error } = await supabase
+          .from('collection')
+          .select('*')
+          .range(from, from + batchSize - 1);
+        if (error) {
+          console.error('Error fetching albums:', error);
+          break;
+        }
+        if (!batch || batch.length === 0) break;
+        allRows = allRows.concat(batch);
+        keepGoing = batch.length === batchSize;
+        from += batchSize;
+      }
+      const parsed = allRows.map(album => ({
+        id: album.id,
+        title: album.title,
+        artist: album.artist,
+        year: album.year,
+        folder: album.folder,
+        mediaType: album.folder,
+        image:
+          album.image_url && album.image_url.trim().toLowerCase() !== 'no'
+            ? album.image_url.trim()
+            : '/images/coverplaceholder.png'
+      }));
+      setAlbums(parsed);
+    }
+    fetchAllAlbums();
+  }, []);
+
+  // Accept both "CD" and "CDs" for filter/dropdown
+  const formatVariants = (format) => {
+    const f = format.trim().toLowerCase();
+    if (f === "cd" || f === "cds") return ["cd", "cds"];
+    if (f === "cassette" || f === "cassettes") return ["cassette", "cassettes"];
+    if (f === "45" || f === "45s") return ["45", "45s"];
+    if (f === "8-track" || f === "8tracks" || f === "8-track tape" || f === "8 track") return ["8-track", "8tracks", "8-track tape", "8 track"];
+    if (f === "vinyl") return ["vinyl"];
+    return [f];
+  };
+
+  // Memoized normalization for allowed formats (fixes warning)
+  const normalizedFormats = useMemo(() => (
+    allowedFormats ? allowedFormats.flatMap(formatVariants) : []
+  ), [allowedFormats]);
+
+  const normalizedDropdown = allowedFormats?.length > 0
+    ? allowedFormats.map(f => f.trim())
+    : ['Vinyl', 'Cassettes', 'CD', '45s', '8-Track'];
+
+  // Filtering + Sorting
+  const filteredAlbums = useMemo(() => {
+    let fa = albums.filter(album => {
+      const folder = (album.folder || '').trim().toLowerCase();
+      const matchesSearch =
+        (album.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (album.artist || '').toLowerCase().includes(searchTerm.toLowerCase());
+      const isAllowed =
+        !allowedFormats ||
+        normalizedFormats.includes(folder);
+      const matchesFilter =
+        !mediaFilter ||
+        formatVariants(mediaFilter).includes(folder);
+      return matchesSearch && isAllowed && matchesFilter;
+    });
+    fa = [...fa].sort((a, b) => {
+      let va = (a[sortField] || '').toString().toLowerCase();
+      let vb = (b[sortField] || '').toString().toLowerCase();
+      if (va > vb) return sortAsc ? 1 : -1;
+      if (va < vb) return sortAsc ? -1 : 1;
+      return 0;
+    });
+    return fa;
+  }, [albums, searchTerm, mediaFilter, allowedFormats, normalizedFormats, sortField, sortAsc]);
+
+  return (
+    <div className="page-wrapper">
+      <header className="event-hero">
+        <div className="overlay">
+          <h1>
+            Browse the Collection{eventTitle ? ` for ${eventTitle}` : ''}
+          </h1>
+        </div>
+      </header>
+
+      <main className="page-body">
+        <div className="search-filter-bar">
+          <input
+            type="text"
+            placeholder="Search by artist or title"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+          <select
+            value={mediaFilter}
+            onChange={(e) => setMediaFilter(e.target.value)}
+          >
+            <option value="">All Media Types</option>
+            {normalizedDropdown.map((format) => (
+              <option key={format} value={format.trim().toLowerCase()}>
+                {format}
+              </option>
+            ))}
+          </select>
+          <select value={sortField} onChange={e => setSortField(e.target.value)} style={{ marginLeft: 8 }}>
+            <option value="title">Title</option>
+            <option value="artist">Artist</option>
+            <option value="year">Year</option>
+          </select>
+          <button
+            onClick={() => setSortAsc(a => !a)}
+            style={{ marginLeft: 8 }}
+          >
+            Sort: {sortAsc ? 'Ascending' : 'Descending'}
+          </button>
+        </div>
+
+        <section className="album-grid">
+          {filteredAlbums.map((album) => (
+            <AlbumCard
+              key={album.id}
+              album={{
+                ...album,
+                eventId: eventID
+              }}
+            />
+          ))}
+        </section>
+      </main>
+
+      <Footer />
+    </div>
+  );
+}
