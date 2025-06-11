@@ -6,7 +6,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { supabase } from 'lib/supabaseClient.ts';
+import { supabase } from 'lib/supabaseClient'
 
 export default function Page() {
   const [events, setEvents] = useState([]);

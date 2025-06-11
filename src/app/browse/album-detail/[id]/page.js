@@ -5,7 +5,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
-import { supabase } from "../../../../lib/supabaseClient";
+import { supabase } from 'lib/supabaseClient';
 import Image from "next/image";
 import "../../../styles/album-detail.css";
 

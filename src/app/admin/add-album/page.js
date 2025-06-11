@@ -2,7 +2,7 @@
 // Allows admin to add a new album manually, including Discogs lookup and Supabase submission.
 
 import { useState } from 'react';
-import { supabase } from 'lib/supabaseClient.ts';
+import { supabase } from 'lib/supabaseClient'
 
 async function fetchDiscogsRelease(releaseId) {
   const res = await fetch(`/api/discogsProxy?releaseId=${releaseId}`);

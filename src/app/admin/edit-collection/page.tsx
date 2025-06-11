@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from 'lib/supabaseClient.ts';
+import { supabase } from 'lib/supabaseClient'
 
 function parseTracklistShort(tracklists) {
   if (!tracklists) return '';

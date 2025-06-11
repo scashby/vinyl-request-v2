@@ -4,7 +4,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabaseClient';
+import { supabase } from 'lib/supabaseClient';
 import '../../styles/internal.css';
 import Link from 'next/link';
 import Image from 'next/image';
