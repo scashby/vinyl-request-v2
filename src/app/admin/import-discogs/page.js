@@ -5,7 +5,7 @@
 
 import { useState } from 'react';
 import Papa from 'papaparse';
-import { supabase } from '../../lib/supabaseClient.js';
+import { supabase } from '../lib/supabaseClient';
 
 // Artist cleaner: strips trailing (#), trims, preserves case
 const cleanArtist = artist =>
