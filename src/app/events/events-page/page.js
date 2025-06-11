@@ -5,10 +5,10 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from 'lib/supabaseClient';
-import '../../styles/internal.css';
+import 'styles/internal.css';
 import Link from 'next/link';
 import Image from 'next/image';
-import Footer from '../../components/Footer';
+import Footer from 'components/Footer';
 
 export default function Page() {
   const [events, setEvents] = useState([]);

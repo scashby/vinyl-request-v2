@@ -5,12 +5,12 @@
 "use client";
 
 import { useEffect, useState, useMemo } from 'react';
-import AlbumCard from '../../components/AlbumCard';
-import '../../styles/album-browse.css';
-import '../../styles/internal.css';
+import AlbumCard from 'components/AlbumCard';
+import 'styles/album-browse.css';
+import 'styles/internal.css';
 import { supabase } from 'lib/supabaseClient';
 import { useSearchParams } from 'next/navigation';
-import Footer from '../../components/Footer';
+import Footer from 'components/Footer';
 
 export default function Page() {
   const searchParams = useSearchParams();

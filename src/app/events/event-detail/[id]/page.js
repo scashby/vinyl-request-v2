@@ -6,10 +6,10 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from 'lib/supabaseClient';
-import '../../styles/internal.css';
+import 'styles/internal.css';
 import Image from 'next/image';
-import QueueSection from '../../components/QueueSection';
-import Footer from '../../components/Footer';
+import QueueSection from 'components/QueueSection';
+import Footer from 'components/Footer';
 
 export default function Page() {
   const params = useParams();
