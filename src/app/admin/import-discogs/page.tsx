@@ -3,52 +3,52 @@
 
 "use client";
 
-import { useState } from 'react';
-import Papa from 'papaparse';
-import { supabase } from 'lib/supabaseClient'
+import React, { useState, ChangeEvent } from 'react';
+import Papa, { ParseResult } from 'papaparse';
+import { supabase } from 'lib/supabaseClient';
 
 // Artist cleaner: strips trailing (#), trims, preserves case
-const cleanArtist = artist =>
+const cleanArtist = (artist: string): string =>
   (artist || "").replace(/\s*\(\d+\)$/, "").trim();
 
 // Bulletproof dedupe key for ALL sources
-const dedupeKey = row =>
+const dedupeKey = (row: Record<string, unknown>): string =>
   [
     (row.discogs_release_id || '').toString().trim(),
     (row.discogs_master_id || '').toString().trim(),
     (row.folder || '').toString().trim().toLowerCase(),
     (row.media_condition || '').toString().trim().toLowerCase(),
-    cleanArtist(row.artist || '').toLowerCase(),
+    cleanArtist((row.artist as string) || '').toLowerCase(),
     (row.title || '').toString().trim().toLowerCase(),
     (row.year || '').toString().trim().toLowerCase()
   ].join('|--|');
 
-async function fetchDiscogsRelease(releaseId) {
+async function fetchDiscogsRelease(releaseId: string): Promise<Record<string, unknown>> {
   const res = await fetch(`/api/discogsProxy?releaseId=${releaseId}`);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
-async function enrichMediaConditionIfBlank(row) {
-  if (row.media_condition && row.media_condition.trim()) {
-    return row.media_condition; // Already has value
+async function enrichMediaConditionIfBlank(row: Record<string, unknown>): Promise<string> {
+  if (row.media_condition && String(row.media_condition).trim()) {
+    return row.media_condition as string; // Already has value
   }
   if (!row.discogs_release_id) return ""; // Can't enrich
   try {
-    const discogsData = await fetchDiscogsRelease(row.discogs_release_id);
-    return discogsData?.media_condition || "";
+    const discogsData = await fetchDiscogsRelease(row.discogs_release_id as string);
+    return (discogsData?.media_condition as string) || "";
   } catch {
     return "";
   }
 }
 
-async function fetchAllExistingRows() {
-  let allRows = [];
+async function fetchAllExistingRows(): Promise<Record<string, unknown>[]> {
+  let allRows: Record<string, unknown>[] = [];
   let from = 0;
   const batchSize = 1000;
   let keepGoing = true;
 
   while (keepGoing) {
-    let { data: batch, error } = await supabase
+    const { data: batch, error } = await supabase
       .from('collection')
       .select('*')
       .range(from, from + batchSize - 1);
@@ -64,19 +64,20 @@ async function fetchAllExistingRows() {
 }
 
 export default function Page() {
-  const [parsedData, setParsedData] = useState([]);
-  const [duplicates, setDuplicates] = useState([]);
-  const [status, setStatus] = useState('');
-  const [onlyAddNew, setOnlyAddNew] = useState(true); // Default: only add new
+  const [parsedData, setParsedData] = useState<Record<string, unknown>[]>([]);
+  const [duplicates, setDuplicates] = useState<Record<string, unknown>[]>([]);
+  const [status, setStatus] = useState<string>('');
+  const [onlyAddNew, setOnlyAddNew] = useState<boolean>(true); // Default: only add new
 
   // Parse and normalize CSV
-  const handleFile = async (e) => {
-    const file = e.target.files[0];
+  const handleFile = async (e: ChangeEvent<HTMLInputElement>): Promise<void> => {
+    const file = e.target.files?.[0];
+    if (!file) return;
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
-      complete: async function (results) {
-        const csvData = await Promise.all(results.data.map(async row => {
+      complete: async function (results: ParseResult<Record<string, unknown>>) {
+        const csvData = await Promise.all(results.data.map(async (row: Record<string, unknown>) => {
           const norm = normalizeRow(row);
           norm.media_condition = await enrichMediaConditionIfBlank(norm);
           return norm;
@@ -91,8 +92,8 @@ export default function Page() {
     });
   };
 
-  const handleImport = async () => {
-    const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+  const handleImport = async (): Promise<void> => {
+    const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
     if (parsedData.length === 0) return;
     setStatus(`Importing 0 of ${parsedData.length}...`);
 
@@ -113,22 +114,22 @@ export default function Page() {
       const row = await enrichWithDiscogs(csvRow, existingMap);
 
       const record = {
-        artist: cleanArtist(row.artist) || null,
+        artist: cleanArtist((row.artist as string) || '') || null,
         title: row.title || null,
         year: row.year || null,
         folder: row.folder || null,
         format: row.format || null,
         image_url: row.image_url || null,
         media_condition: row.media_condition || null,
-        tracklists: cleanTextOrJSON(row.tracklists),
-        sides: safeParse(row.sides),
+        tracklists: cleanTextOrJSON(row.tracklists as string),
+        sides: safeParse(row.sides as string),
         discogs_master_id: row.discogs_master_id || null,
         discogs_release_id: row.discogs_release_id || null,
         is_box_set: parseBoolean(row.is_box_set),
         parent_id: row.parent_id || null,
         blocked: parseBoolean(row.blocked),
-        blocked_sides: parseArray(row.blocked_sides),
-        child_album_ids: parseIntArray(row.child_album_ids)
+        blocked_sides: parseArray(row.blocked_sides as string),
+        child_album_ids: parseIntArray(row.child_album_ids as string)
       };
 
       try {
@@ -136,17 +137,17 @@ export default function Page() {
           if (!onlyAddNew) {
             await supabase
               .from('collection')
-              .update(record, { returning: 'minimal', count: null })
-              .eq('id', match.id);
+              .update(record, { returning: 'minimal', count: undefined })
+              .eq('id', (match as { id: string }).id);
             updated++;
           }
         } else {
-          await supabase.from('collection').insert([record], { returning: 'minimal', count: null });
+          await supabase.from('collection').insert([record], { returning: 'minimal', count: undefined });
           inserted++;
         }
       } catch (err) {
         console.error('Supabase import error:', err, record);
-        setStatus(`Error on row ${i + 1}: ${err.message}`);
+        setStatus(`Error on row ${i + 1}: ${(err as Error).message}`);
         continue;
       }
 
@@ -157,26 +158,26 @@ export default function Page() {
     setStatus(`✅ ${inserted} inserted${onlyAddNew ? '' : `, ${updated} updated`}.`);
   };
 
-  async function enrichWithDiscogs(row, existingMap) {
+  async function enrichWithDiscogs(row: Record<string, unknown>, existingMap: Map<string, Record<string, unknown>>): Promise<Record<string, unknown>> {
     const existing = existingMap.get(dedupeKey(row)) || {};
-    let image = row.image_url || existing.image_url;
+    let image = row.image_url || (existing as { image_url?: unknown }).image_url;
 
     if (row.discogs_release_id) {
       try {
-        const discogsData = await fetchDiscogsRelease(row.discogs_release_id);
+        const discogsData = await fetchDiscogsRelease(row.discogs_release_id as string);
         if (!discogsData || typeof discogsData !== 'object') {
           console.error('Invalid Discogs response:', discogsData);
           return row;
         }
 
-        if (!image && discogsData.images?.[0]?.uri) {
-          image = discogsData.images[0].uri;
+        if (!image && (discogsData.images as { uri: string }[] | undefined)?.[0]?.uri) {
+          image = (discogsData.images as { uri: string }[])[0].uri;
         }
         if (!row.year && discogsData.year) {
           row.year = discogsData.year.toString();
         }
-        if (!row.format && discogsData.formats?.[0]?.name) {
-          row.format = discogsData.formats[0].name;
+        if (!row.format && (discogsData.formats as { name: string }[] | undefined)?.[0]?.name) {
+          row.format = (discogsData.formats as { name: string }[])[0].name;
         }
         if (!row.tracklists && Array.isArray(discogsData.tracklist)) {
           row.tracklists = JSON.stringify(discogsData.tracklist);
@@ -188,7 +189,7 @@ export default function Page() {
     return { ...row, image_url: image };
   }
 
-  function normalizeRow(row) {
+  function normalizeRow(row: Record<string, unknown>): Record<string, unknown> {
     const releaseId = row['discogs_release_id'] || row['release_id'] || '';
     const masterId = row['discogs_master_id'] || row['discogs_release_id'] || row['release_id'] || '';
     return {
@@ -211,7 +212,7 @@ export default function Page() {
     };
   }
 
-  function safeParse(input) {
+  function safeParse(input: string | null | undefined): unknown {
     try {
       if (!input || input === 'None') return null;
       return typeof input === 'string' ? JSON.parse(input) : input;
@@ -220,7 +221,7 @@ export default function Page() {
     }
   }
 
-  function cleanTextOrJSON(input) {
+  function cleanTextOrJSON(input: string | null | undefined): string | null {
     if (!input || input === 'None') return null;
     try {
       return JSON.stringify(JSON.parse(input));
@@ -229,11 +230,11 @@ export default function Page() {
     }
   }
 
-  function parseBoolean(input) {
+  function parseBoolean(input: unknown): boolean {
     return input === true || input === 'true';
   }
 
-  function parseArray(input) {
+  function parseArray(input: string | null | undefined): string[] | null {
     if (!input || input === 'None') return null;
     try {
       return JSON.parse(input);
@@ -242,7 +243,7 @@ export default function Page() {
     }
   }
 
-  function parseIntArray(input) {
+  function parseIntArray(input: string | null | undefined): number[] | null {
     if (!input || input === 'None' || input === 'null') return null;
     try {
       const parsed = JSON.parse(input);
