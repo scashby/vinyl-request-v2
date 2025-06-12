@@ -4,7 +4,7 @@
 "use client";
 
 import React, { useState, ChangeEvent } from 'react';
-import Papa, { ParseResult } from 'papaparse';
+import Papa from 'papaparse';
 import { supabase } from 'lib/supabaseClient';
 
 // Artist cleaner: strips trailing (#), trims, preserves case
@@ -76,7 +76,7 @@ export default function Page() {
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
-      complete: async function (results: ParseResult<Record<string, unknown>>) {
+      complete: async function (results: { data: Record<string, unknown>[] }) {
         const csvData = await Promise.all(results.data.map(async (row: Record<string, unknown>) => {
           const norm = normalizeRow(row);
           norm.media_condition = await enrichMediaConditionIfBlank(norm);
@@ -137,12 +137,12 @@ export default function Page() {
           if (!onlyAddNew) {
             await supabase
               .from('collection')
-              .update(record, { returning: 'minimal', count: undefined })
+              .update(record, { count: undefined })
               .eq('id', (match as { id: string }).id);
             updated++;
           }
         } else {
-          await supabase.from('collection').insert([record], { returning: 'minimal', count: undefined });
+          await supabase.from('collection').insert([record], { count: undefined });
           inserted++;
         }
       } catch (err) {
