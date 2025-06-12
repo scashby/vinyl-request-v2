@@ -26,7 +26,26 @@ export default function EditEventForm() {
 
   useEffect(() => {
     const fetchEvent = async () => {
-      if (id) {
+      let copiedEvent = null;
+      if (typeof window !== 'undefined') {
+        const stored = sessionStorage.getItem('copiedEvent');
+        if (stored) {
+          copiedEvent = JSON.parse(stored);
+          sessionStorage.removeItem('copiedEvent');
+        }
+      }
+      if (copiedEvent) {
+        setEventData({
+          ...eventData,
+          ...copiedEvent,
+          allowed_formats: Array.isArray(copiedEvent.allowed_formats)
+            ? copiedEvent.allowed_formats
+            : typeof copiedEvent.allowed_formats === 'string'
+              ? copiedEvent.allowed_formats.replace(/[{}]/g, '').split(',').map((f: string) => f.trim()).filter(Boolean)
+              : [],
+          title: copiedEvent.title ? `${copiedEvent.title} (Copy)` : '',
+        });
+      } else if (id) {
         const { data, error } = await supabase
           .from('events')
           .select('*')
