@@ -34,7 +34,7 @@ export default function Page() {
     setStatus('Loading...');
     let allRows = [];
     let from = 0;
-    let batchSize = 1000;
+    const batchSize = 1000;
     let keepGoing = true;
 
     while (keepGoing) {

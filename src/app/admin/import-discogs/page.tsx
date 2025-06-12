@@ -44,7 +44,7 @@ async function enrichMediaConditionIfBlank(row) {
 async function fetchAllExistingRows() {
   let allRows = [];
   let from = 0;
-  let batchSize = 1000;
+  const batchSize = 1000;
   let keepGoing = true;
 
   while (keepGoing) {
