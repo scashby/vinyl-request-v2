@@ -6,8 +6,17 @@
 import { useEffect, useState } from 'react';
 import { supabase } from 'lib/supabaseClient'
 
+type Request = {
+  id: string;
+  artist: string;
+  title: string;
+  side: string;
+  votes: number;
+  [key: string]: unknown;
+};
+
 export default function Page() {
-  const [requests, setRequests] = useState([]);
+  const [requests, setRequests] = useState<Request[]>([]);
 
   useEffect(() => {
     async function fetchRequests() {
@@ -16,12 +25,12 @@ export default function Page() {
         .select('*')
         .order('votes', { ascending: false })
         .order('timestamp', { ascending: true });
-      setRequests(data || []);
+      setRequests((data || []) as Request[]);
     }
     fetchRequests();
   }, []);
 
-  const removeRequest = async (id) => {
+  const removeRequest = async (id: string) => {
     await supabase.from('requests').delete().eq('id', id);
     setRequests(requests.filter(r => r.id !== id));
   };
