@@ -13,11 +13,11 @@ export default function Page() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) router.push('/admin');
+      if (session) router.push('/admin/admin-dashboard');
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session) router.push('/admin');
+      if (session) router.push('/admin/admin-dashboard');
     });
 
     return () => {
