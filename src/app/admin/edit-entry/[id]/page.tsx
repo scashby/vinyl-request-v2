@@ -8,19 +8,47 @@ import { useParams, useRouter } from 'next/navigation';
 import { supabase } from 'lib/supabaseClient'
 import Image from 'next/image';
 
-async function fetchDiscogsField(releaseId, field) {
+type Track = { position: string; title: string; duration: string };
+
+type CollectionEntry = {
+  id: string;
+  artist: string;
+  title: string;
+  year: string;
+  folder: string;
+  format: string;
+  image_url: string;
+  media_condition: string;
+  blocked: boolean;
+  blocked_sides: string[];
+  tracklists: string;
+  discogs_release_id: string;
+  [key: string]: unknown;
+};
+
+type DiscogsData = {
+  year?: string | number;
+  images?: { uri: string }[];
+  tracklist?: { position?: string; title?: string; duration?: string }[];
+  [key: string]: unknown;
+};
+
+async function fetchDiscogsField(
+  releaseId: string,
+  field: string
+) {
   const res = await fetch(`/api/discogsProxy?releaseId=${releaseId}`);
   if (!res.ok) throw new Error('Discogs fetch failed');
-  const data = await res.json();
+  const data: DiscogsData = await res.json();
   switch (field) {
-    case 'year': return data.year ? data.year.toString() : '';
+    case 'year': return data.year ? String(data.year) : '';
     case 'image_url': return data.images?.[0]?.uri || '';
     case 'tracklists': return JSON.stringify(data.tracklist || []);
     default: return '';
   }
 }
 
-function cleanTrack(track) {
+function cleanTrack(track: Partial<Track>): Track {
   return {
     position: track.position || '',
     title: track.title || '',
@@ -30,51 +58,51 @@ function cleanTrack(track) {
 
 export default function Page() {
   const params = useParams();
-  const id = params.id;
+  const id = params.id as string;
   const router = useRouter();
-  const [entry, setEntry] = useState(null);
+  const [entry, setEntry] = useState<CollectionEntry | null>(null);
   const [status, setStatus] = useState('');
-  const [blockedSides, setBlockedSides] = useState([]);
+  const [blockedSides, setBlockedSides] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
-  const [tracks, setTracks] = useState([]);
+  const [tracks, setTracks] = useState<Track[]>([]);
 
   useEffect(() => {
-    fetchEntry(id).then(data => {
+    fetchEntry(id).then((data) => {
       setEntry(data);
       setBlockedSides(Array.isArray(data?.blocked_sides) ? data.blocked_sides : []);
-      let tl = [];
+      let tl: unknown[] = [];
       if (data?.tracklists) {
         try { tl = JSON.parse(data.tracklists); } catch { tl = []; }
       }
-      setTracks(Array.isArray(tl) ? tl.map(cleanTrack) : []);
+      setTracks(Array.isArray(tl) ? (tl as Partial<Track>[]).map(cleanTrack) : []);
     });
   }, [id]);
 
-  async function fetchEntry(rowId) {
+  async function fetchEntry(rowId: string): Promise<CollectionEntry> {
     const { data } = await supabase.from('collection').select('*').eq('id', rowId).single();
-    return data;
+    return data as CollectionEntry;
   }
 
   if (!entry) return <div style={{ color: "#222" }}>Loading...</div>;
 
-  function handleChange(field, value) {
-    setEntry(e => ({ ...e, [field]: value }));
+  function handleChange(field: string, value: unknown) {
+    setEntry((e) => ({ ...(e as CollectionEntry), [field]: value }));
   }
 
-  function handleBlockSide(side) {
-    setBlockedSides(bs =>
-      bs.includes(side) ? bs.filter(s => s !== side) : [...bs, side]
+  function handleBlockSide(side: string) {
+    setBlockedSides((bs) =>
+      bs.includes(side) ? bs.filter((s) => s !== side) : [...bs, side]
     );
   }
 
-  async function fetchDiscogs(field) {
+  async function fetchDiscogs(field: string) {
     setStatus(`Fetching ${field} from Discogs...`);
     try {
-      const val = await fetchDiscogsField(entry.discogs_release_id, field);
+      const val = await fetchDiscogsField(entry!.discogs_release_id, field);
       if (field === "tracklists") {
-        let arr = [];
-        try { arr = JSON.parse(val); } catch { arr = []; }
-        setTracks(Array.isArray(arr) ? arr.map(cleanTrack) : []);
+        let arr: unknown[] = [];
+        try { arr = JSON.parse(val as string); } catch { arr = []; }
+        setTracks(Array.isArray(arr) ? (arr as Partial<Track>[]).map(cleanTrack) : []);
         handleChange('tracklists', val);
       } else {
         handleChange(field, val);
@@ -85,18 +113,19 @@ export default function Page() {
     }
   }
 
-  function handleTrackChange(i, key, value) {
-    setTracks(tks => tks.map((t, j) => j === i ? { ...t, [key]: value } : t));
+  function handleTrackChange(i: number, key: keyof Track, value: string) {
+    setTracks((tks) => tks.map((t, j) => j === i ? { ...t, [key]: value } : t));
   }
 
   function addTrack() {
-    setTracks(tks => [...tks, { position: '', title: '', duration: '' }]);
+    setTracks((tks) => [...tks, { position: '', title: '', duration: '' }]);
   }
-  function removeTrack(i) {
-    setTracks(tks => tks.filter((_, j) => j !== i));
+  function removeTrack(i: number) {
+    setTracks((tks) => tks.filter((_, j) => j !== i));
   }
 
   async function handleSave() {
+    if (!entry) return;
     setSaving(true);
     const update = {
       ...entry,
