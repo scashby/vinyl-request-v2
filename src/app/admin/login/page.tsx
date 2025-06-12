@@ -25,7 +25,7 @@ export default function Page() {
     };
   }, [router]);
 
-  const handleEmailLogin = async (e) => {
+  const handleEmailLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const { error } = await supabase.auth.signInWithOtp({ email });
     if (error) alert('Login error: ' + error.message);
