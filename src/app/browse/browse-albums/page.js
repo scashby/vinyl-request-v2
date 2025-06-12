@@ -4,6 +4,7 @@
 
 "use client";
 
+import { Suspense } from 'react';
 import { useEffect, useState, useMemo } from 'react';
 import AlbumCard from 'components/AlbumCard';
 import 'styles/album-browse.css';
@@ -12,7 +13,7 @@ import { supabase } from 'lib/supabaseClient';
 import { useSearchParams } from 'next/navigation';
 import Footer from 'components/Footer';
 
-export default function Page() {
+function BrowseAlbumsContent() {
   const searchParams = useSearchParams();
   const eventID = searchParams.get('eventID');
   const allowedFormatsParam = searchParams.get('allowedFormats');
@@ -199,5 +200,13 @@ export default function Page() {
 
       <Footer />
     </div>
+  );
+}
+
+export default function Page() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <BrowseAlbumsContent />
+    </Suspense>
   );
 }
