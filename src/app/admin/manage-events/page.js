@@ -48,8 +48,8 @@ export default function Page() {
         marginBottom: '1.5rem'
       }}>Manage Events</h2>
 
-      <Link href="/admin/events/new">
-        <button style={{
+      <Link href="/admin/events/new" passHref>
+        <button type="button" style={{
           backgroundColor: '#2563eb',
           color: '#fff',
           padding: '0.5rem 1rem',
@@ -76,12 +76,15 @@ export default function Page() {
           }}>
             <span>{event.title} – {event.date}</span>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <Link href={`/admin/events/${event.id}`} style={{
-                color: '#2563eb',
-                textDecoration: 'underline',
-                fontWeight: '500'
-              }}>
-                Edit
+              <Link href={`/admin/events/${event.id}`} passHref>
+                <span style={{
+                  color: '#2563eb',
+                  textDecoration: 'underline',
+                  fontWeight: '500',
+                  cursor: 'pointer'
+                }}>
+                  Edit
+                </span>
               </Link>
               <button onClick={() => handleCopy(event)} style={{
                 background: 'none',
