@@ -1,29 +1,30 @@
 // Admin Edit Collection page ("/admin/edit-collection")
-// Allows admins to view/search the entire collection and access edit screens.
+// Allows admin to edit metadata for collection entries.
 
 "use client"; // Required for useState/useEffect
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from 'lib/supabaseClient'
+import { supabase } from 'lib/supabaseClient';
+import Image from 'next/image';
 
-function parseTracklistShort(tracklists) {
-  if (!tracklists) return '';
-  try {
-    const arr = typeof tracklists === 'string' ? JSON.parse(tracklists) : tracklists;
-    if (!Array.isArray(arr) || arr.length === 0) return '';
-    return arr.slice(0, 5).map(t =>
-      [t.position, t.title].filter(Boolean).join(': ')
-    ).join(' | ') + (arr.length > 5 ? ` (+${arr.length - 5} more)` : '');
-  } catch {
-    return 'Invalid';
-  }
+interface CollectionRow {
+  id: number;
+  image_url?: string | null;
+  artist?: string;
+  title?: string;
+  year?: string;
+  folder?: string;
+  format?: string;
+  media_condition?: string;
+  tracklists?: string | object[];
+  blocked?: boolean;
 }
 
 export default function Page() {
-  const [data, setData] = useState([]);
-  const [query, setQuery] = useState('');
-  const [status, setStatus] = useState('');
+  const [data, setData] = useState<CollectionRow[]>([]);
+  const [query, setQuery] = useState<string>('');
+  const [status, setStatus] = useState<string>('');
   const router = useRouter();
 
   useEffect(() => {
@@ -32,14 +33,14 @@ export default function Page() {
 
   async function fetchAllRows() {
     setStatus('Loading...');
-    let allRows = [];
+    let allRows: CollectionRow[] = [];
     let from = 0;
-    const batchSize = 1000;
+    const batchSize: number = 1000;
     let keepGoing = true;
 
     while (keepGoing) {
-      let { data: batch, error } = await supabase
-        .from('collection')
+      const { data: batch, error } = await supabase
+        .from<'collection', CollectionRow>('collection')
         .select('*')
         .range(from, from + batchSize - 1);
       if (error) {
@@ -62,6 +63,19 @@ export default function Page() {
         (row.artist || '').toLowerCase().includes(query.toLowerCase())
       )
     : data;
+
+  function parseTracklistShort(tracklists: string | object[]): string {
+    if (!tracklists) return '';
+    try {
+      const arr = typeof tracklists === 'string' ? JSON.parse(tracklists) : tracklists;
+      if (!Array.isArray(arr) || arr.length === 0) return '';
+      return arr.slice(0, 5).map(t =>
+        [t.position, t.title].filter(Boolean).join(': ')
+      ).join(' | ') + (arr.length > 5 ? ` (+${arr.length - 5} more)` : '');
+    } catch {
+      return 'Invalid';
+    }
+  }
 
   return (
     <div style={{ padding: 24 }}>
@@ -93,7 +107,7 @@ export default function Page() {
             </tr>
           </thead>
           <tbody>
-            {filtered.map(row => (
+            {filtered.map((row: CollectionRow) => (
               <tr key={row.id} style={{
                 background: row.blocked ? '#fee2e2' : '',
                 color: "#fff",
@@ -103,7 +117,7 @@ export default function Page() {
                 <td>{row.id}</td>
                 <td>
                   {row.image_url
-                    ? <img src={row.image_url} alt="cover" style={{ height: 36, maxWidth: 36, objectFit: 'cover', borderRadius: 3 }} />
+                    ? <Image src={row.image_url} alt="cover" width={36} height={36} style={{ objectFit: 'cover', borderRadius: 3 }} />
                     : ''}
                 </td>
                 <td>{row.artist}</td>
@@ -112,7 +126,7 @@ export default function Page() {
                 <td>{row.folder}</td>
                 <td>{row.format}</td>
                 <td>{row.media_condition}</td>
-                <td>{parseTracklistShort(row.tracklists)}</td>
+                <td>{parseTracklistShort(row.tracklists ?? '')}</td>
                 <td>
                   <button
                     onClick={() => router.push(`/admin/edit-entry/${row.id}`)}
