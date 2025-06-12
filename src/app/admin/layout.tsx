@@ -2,7 +2,7 @@
 "use client";
 
 import { ReactNode, useEffect } from "react";
-import { AuthProvider, useSession } from "../../components/AuthProvider";
+import { AuthProvider, useSession } from "components/AuthProvider";
 import { useRouter } from "next/navigation";
 
 function RequireAuth({ children }: { children: ReactNode }) {

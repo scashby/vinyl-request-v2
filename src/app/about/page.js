@@ -9,7 +9,7 @@ import {
   SiSubstack,
 } from "react-icons/si";
 import { FiMail } from "react-icons/fi";
-import Footer from "../../components/Footer";
+import Footer from "components/Footer";
 
 const socials = [
   {

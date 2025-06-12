@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState, FormEvent } from 'react';
 
 interface AddSeriesModalProps {
