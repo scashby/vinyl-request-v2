@@ -1,3 +1,5 @@
+"use client";
+
 import NavigationMenu from './NavigationMenu';
 import Footer from '../components/Footer';
 import { usePathname } from 'next/navigation';
