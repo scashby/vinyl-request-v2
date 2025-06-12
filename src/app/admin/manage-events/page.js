@@ -5,7 +5,6 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { supabase } from 'lib/supabaseClient'
 
 export default function Page() {
@@ -27,7 +26,7 @@ export default function Page() {
     if (typeof window !== 'undefined') {
       sessionStorage.setItem('copiedEvent', JSON.stringify(event));
     }
-    router.push('/admin/events/new');
+    router.push('/admin/manage-events/edit');
   };
 
   return (
@@ -48,8 +47,10 @@ export default function Page() {
         marginBottom: '1.5rem'
       }}>Manage Events</h2>
 
-      <Link href="/admin/events/new" passHref>
-        <button type="button" style={{
+      <button
+        type="button"
+        onClick={() => router.push('/admin/manage-events/edit')}
+        style={{
           backgroundColor: '#2563eb',
           color: '#fff',
           padding: '0.5rem 1rem',
@@ -58,9 +59,8 @@ export default function Page() {
           marginBottom: '1.5rem',
           cursor: 'pointer'
         }}>
-          Add New Event
-        </button>
-      </Link>
+        Add New Event
+      </button>
 
       <ul style={{ listStyle: 'none', padding: 0 }}>
         {events.map(event => (
@@ -76,16 +76,19 @@ export default function Page() {
           }}>
             <span>{event.title} – {event.date}</span>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <Link href={`/admin/events/${event.id}`} passHref>
-                <span style={{
+              <button
+                type="button"
+                onClick={() => router.push(`/admin/manage-events/edit?id=${event.id}`)}
+                style={{
                   color: '#2563eb',
                   textDecoration: 'underline',
                   fontWeight: '500',
+                  background: 'none',
+                  border: 'none',
                   cursor: 'pointer'
                 }}>
-                  Edit
-                </span>
-              </Link>
+                Edit
+              </button>
               <button onClick={() => handleCopy(event)} style={{
                 background: 'none',
                 border: 'none',
