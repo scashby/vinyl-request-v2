@@ -26,12 +26,12 @@ function NavigationMenu() {
               </Link>
             </li>
             <li>
-              <Link href="/events" onClick={() => setOpen(false)}>
+              <Link href="/events/events-page" onClick={() => setOpen(false)}>
                 Events
               </Link>
             </li>
             <li>
-              <Link href="/browse" onClick={() => setOpen(false)}>
+              <Link href="/browse/browse-albums" onClick={() => setOpen(false)}>
                 Browse Albums
               </Link>
             </li>
