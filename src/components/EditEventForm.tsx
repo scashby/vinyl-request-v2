@@ -3,14 +3,14 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { supabase } from 'lib/supabaseClient';
 
 const formatList = ['Vinyl', 'Cassettes', 'CD', '45s', '8-Track'];
 
 export default function EditEventForm() {
-  const params = useParams();
-  const id = params?.id as string | undefined;
+  const searchParams = useSearchParams();
+  const id = searchParams.get('id');
   const router = useRouter();
   const [eventData, setEventData] = useState({
     title: '',
@@ -37,6 +37,7 @@ export default function EditEventForm() {
           console.error('Error fetching event:', error);
         } else if (data) {
           setEventData({
+            ...eventData,
             ...data,
             allowed_formats: Array.isArray(data.allowed_formats)
               ? data.allowed_formats
@@ -48,6 +49,7 @@ export default function EditEventForm() {
       }
     };
     fetchEvent();
+    // eslint-disable-next-line
   }, [id]);
 
   // For all text inputs and textareas (NO CHECKBOXES HERE)
