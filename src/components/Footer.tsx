@@ -79,8 +79,6 @@ export default function Footer() {
             rel="noopener noreferrer"
             aria-label={s.name}
             style={{ opacity: 0.68, transition: "opacity 0.2s" }}
-            onMouseOver={e => (e.currentTarget.style.opacity = "1")}
-            onMouseOut={e => (e.currentTarget.style.opacity = "0.68")}
           >
             {s.icon}
           </a>
