@@ -15,7 +15,7 @@ export default function Page() {
         <h1>Dead Wax Dialogues</h1>
         <p>Drop the needle. Let the side play.</p>
         <nav className="hero-nav">
-          <Link href="/events">Events</Link>
+          <Link href="/events/events-page">Events</Link>
           <Link href="/browse/browse-albums">Browse Collection</Link>
           <Link href="/dialogues">Dialogues</Link>
           <Link href="/about">About</Link>
