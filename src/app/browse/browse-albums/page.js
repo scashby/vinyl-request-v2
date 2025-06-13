@@ -36,7 +36,6 @@ function BrowseAlbumsContent() {
   useEffect(() => {
     let isMounted = true;
     if (eventID) {
-      setLoading(true);
       supabase
         .from('events')
         .select('id, title, allowed_formats')
@@ -51,7 +50,6 @@ function BrowseAlbumsContent() {
               setAllowedFormats(null);
               setEventTitle('');
             }
-            setLoading(false);
           }
         });
     } else if (allowedFormatsParam && eventTitleParam) {
