@@ -65,7 +65,7 @@ export default function Page() {
       eventTitle: event.title,
       trail: JSON.stringify(['events', event.title, 'browse'])
     });
-    router.push(`/browse?${params}`);
+    router.push(`/browse/browse-albums?${params}`);
   };
 
   return (
