@@ -12,7 +12,7 @@ import 'styles/internal.css';
 import { supabase } from 'lib/supabaseClient';
 import { useSearchParams } from 'next/navigation';
 import Footer from 'components/Footer';
-import Link from "next/link"; // Added for error UI
+import Link from "next/link";
 
 function BrowseAlbumsContent() {
   const searchParams = useSearchParams();
@@ -28,43 +28,46 @@ function BrowseAlbumsContent() {
   const [sortField, setSortField] = useState('title');
   const [sortAsc, setSortAsc] = useState(true);
 
-  // New: loading and error state
+  // loading and error state
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState('');
 
-  // Always fetch event context if eventID param is present
+  // Fetch event context only if eventID param is present
   useEffect(() => {
     let isMounted = true;
     setFetchError('');
-    if (!eventID) {
+    if (eventID) {
+      async function fetchEventDataIfNeeded() {
+        setLoading(true);
+        const { data, error } = await supabase
+          .from('events')
+          .select('id, title, allowed_formats')
+          .eq('id', eventID)
+          .single();
+        if (!error && data) {
+          if (isMounted) {
+            setAllowedFormats(data.allowed_formats || []);
+            setEventTitle(data.title || '');
+          }
+        } else {
+          if (isMounted) {
+            setAllowedFormats(null);
+            setEventTitle('');
+            setFetchError('Event not found.');
+          }
+        }
+        setLoading(false);
+      }
+      fetchEventDataIfNeeded();
+    } else if (allowedFormatsParam && eventTitleParam) {
+      setAllowedFormats(allowedFormatsParam.split(',').map(f => f.trim()));
+      setEventTitle(eventTitleParam)
+      setFetchError('');
+    } else {
       setAllowedFormats(null);
       setEventTitle('');
-      setFetchError('No event selected.');
-      setLoading(false);
-      return;
+      setFetchError('');
     }
-    async function fetchEventDataIfNeeded() {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('events')
-        .select('id, title, allowed_formats')
-        .eq('id', eventID)
-        .single();
-      if (!error && data) {
-        if (isMounted) {
-          setAllowedFormats(data.allowed_formats || []);
-          setEventTitle(data.title || '');
-        }
-      } else {
-        if (isMounted) {
-          setAllowedFormats(null);
-          setEventTitle('');
-          setFetchError('Event not found.');
-        }
-      }
-      setLoading(false);
-    }
-    fetchEventDataIfNeeded();
     return () => { isMounted = false; }
   }, [eventID, allowedFormatsParam, eventTitleParam]);
 
@@ -72,13 +75,10 @@ function BrowseAlbumsContent() {
   useEffect(() => {
     let isMounted = true;
     async function fetchAlbums() {
-      if (!eventID) {
-        setAlbums([]);
-        setLoading(false);
-        return;
-      }
       setLoading(true);
+      setFetchError('');
       let query = supabase.from('albums').select('*');
+      // Only filter by event if we have one
       if (eventID) {
         query = query.eq('event_id', eventID);
       }
@@ -113,7 +113,7 @@ function BrowseAlbumsContent() {
         album.folder === mediaFilter ||
         album.format?.toLowerCase().includes(mediaFilter.toLowerCase())
       );
-    } else if (allowedFormats && allowedFormats.length > 0) {
+    } else if (eventID && allowedFormats && allowedFormats.length > 0) {
       filtered = filtered.filter(album =>
         allowedFormats.includes(album.folder)
       );
@@ -130,13 +130,12 @@ function BrowseAlbumsContent() {
     });
 
     return filtered;
-  }, [albums, searchTerm, mediaFilter, allowedFormats, sortField, sortAsc]);
+  }, [albums, searchTerm, mediaFilter, allowedFormats, sortField, sortAsc, eventID]);
 
-  // --- Only added below: robust UI for loading/error/empty ---
+  // Loading and error UI for fetch errors only (not for missing eventID)
   if (loading) return <div>Loading...</div>;
   if (fetchError) return <div>{fetchError}<br /><Link href="/events">Browse events</Link></div>;
-  if (!filteredAlbums.length) return <div>No albums found for this event.</div>;
-  // --- End addition ---
+  if (!filteredAlbums.length) return <div>No albums found{eventTitle ? ` for ${eventTitle}` : ""}.</div>;
 
   return (
     <div className="browse-albums-page">
