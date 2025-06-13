@@ -16,7 +16,7 @@ export default function Page() {
 
   const id = params.id;
   const eventId = searchParams.get("eventId");
-  const fromQueue = searchParams.get("fromQueue") === "true";
+  // const fromQueue = searchParams.get("fromQueue") === "true";
   const allowedFormats = searchParams.get("allowedFormats") || null;
   const eventTitle = searchParams.get("eventTitle") || null;
 
@@ -301,7 +301,7 @@ export default function Page() {
             >
               Browse the Collection
             </button>
-            {fromQueue && eventId && (
+            {eventId && (
               <button
                 onClick={goToEvent}
                 style={{
