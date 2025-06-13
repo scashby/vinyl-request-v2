@@ -17,7 +17,7 @@ interface CollectionRow {
   folder?: string;
   format?: string;
   media_condition?: string;
-  tracklists?: string | object[];
+  tracklists?: string | { position?: string; title?: string }[];
   blocked?: boolean;
 }
 
@@ -35,12 +35,11 @@ export default function Page() {
     setStatus('Loading...');
     let allRows: CollectionRow[] = [];
     let from = 0;
-    const batchSize: number = 1000;
+    const batchSize = 1000;
     let keepGoing = true;
-
     while (keepGoing) {
       const { data: batch, error } = await supabase
-        .from<'collection', CollectionRow>('collection')
+        .from('collection')
         .select('*')
         .range(from, from + batchSize - 1);
       if (error) {
@@ -49,7 +48,7 @@ export default function Page() {
         return;
       }
       if (!batch || batch.length === 0) break;
-      allRows = allRows.concat(batch);
+      allRows = allRows.concat(batch as CollectionRow[]);
       keepGoing = batch.length === batchSize;
       from += batchSize;
     }
@@ -64,14 +63,18 @@ export default function Page() {
       )
     : data;
 
-  function parseTracklistShort(tracklists: string | object[]): string {
+  function parseTracklistShort(tracklists: string | { position?: string; title?: string }[] | undefined): string {
     if (!tracklists) return '';
     try {
-      const arr = typeof tracklists === 'string' ? JSON.parse(tracklists) : tracklists;
+      const arr =
+        typeof tracklists === 'string'
+          ? (JSON.parse(tracklists) as { position?: string; title?: string }[])
+          : tracklists;
       if (!Array.isArray(arr) || arr.length === 0) return '';
-      return arr.slice(0, 5).map(t =>
-        [t.position, t.title].filter(Boolean).join(': ')
-      ).join(' | ') + (arr.length > 5 ? ` (+${arr.length - 5} more)` : '');
+      return arr
+        .slice(0, 5)
+        .map((t) => [t.position, t.title].filter(Boolean).join(': '))
+        .join(' | ') + (arr.length > 5 ? ` (+${arr.length - 5} more)` : '');
     } catch {
       return 'Invalid';
     }
@@ -117,7 +120,7 @@ export default function Page() {
                 <td>{row.id}</td>
                 <td>
                   {row.image_url && row.image_url !== "null" && row.image_url !== ""
-                    ? <Image src={row.image_url} alt="cover" width={36} height={36} style={{ objectFit: 'cover', borderRadius: 3 }} />
+                    ? <Image src={row.image_url} alt="cover" width={36} height={36} style={{ objectFit: 'cover', borderRadius: 3 }} unoptimized />
                     : <div style={{ width: 36, height: 36, background: "#e0e0e0", borderRadius: 3 }} />}
                 </td>
                 <td>{row.artist}</td>
@@ -126,7 +129,7 @@ export default function Page() {
                 <td>{row.folder}</td>
                 <td>{row.format}</td>
                 <td>{row.media_condition}</td>
-                <td>{parseTracklistShort(row.tracklists ?? '')}</td>
+                <td>{parseTracklistShort(row.tracklists)}</td>
                 <td>
                   <button
                     onClick={() => router.push(`/admin/edit-entry/${row.id}`)}
