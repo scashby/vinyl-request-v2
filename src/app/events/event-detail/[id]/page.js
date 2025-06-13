@@ -40,7 +40,7 @@ export default function Page() {
     info,
     info_url,
     allowed_formats,
-    // has_queue // removed: unused
+    has_queue
   } = event;
 
   const formatDate = (dateString) => {
@@ -122,7 +122,7 @@ export default function Page() {
               )}
             </div>
           )}
-          {event.has_queue && (
+          {has_queue && (
             <>
               <QueueSection eventId={event.id} />
               <button
