@@ -1,15 +1,26 @@
-import type { NextConfig } from 'next';
+// next.config.ts
 
-// Use the type from Next.js' own type system for Webpack config
-const nextConfig: NextConfig = {
-  webpack(config) {
-    // TypeScript knows config is type 'import("webpack").Configuration'
-    config.resolve = config.resolve || {};
-    config.resolve.extensions = config.resolve.extensions || [];
-    config.resolve.extensions.push('.ts', '.tsx');
-    return config;
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'img.discogs.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'bntoivaipesuovselglg.supabase.co',
+        pathname: '/storage/v1/object/public/event-images/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'bntoivaipesuovselglg.supabase.co',
+        pathname: '/storage/v1/object/public/album-art/**',
+      },
+    ],
   },
-  // ...other Next.js config here
 };
 
 export default nextConfig;
