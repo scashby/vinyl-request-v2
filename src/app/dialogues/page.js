@@ -59,13 +59,10 @@ export default function Page() {
     fetch("/api/substack")
       .then(res => res.json())
       .then(data => {
-        // Log the entire API response object
         console.log('SUBSTACK FEED FULL DATA:', data);
-
-        // If there's an "items" array, log each item's title and categories/tags
         if (data.items && Array.isArray(data.items)) {
           data.items.forEach(item => {
-            console.log('Item:', item.title, 'Categories:', item.categories);
+            console.log('Item keys:', Object.keys(item), 'Full item:', item);
           });
         } else {
           console.log("No 'items' array in feed. Top-level keys:", Object.keys(data));
