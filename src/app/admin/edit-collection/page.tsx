@@ -78,8 +78,8 @@ export default function Page() {
   }
 
   return (
-    <div style={{ padding: 24 }}>
-      <h2 style={{ color: "#fff" }}>Edit Collection</h2>
+    <div style={{ padding: 24, background: "#fff", color: "#222", minHeight: "100vh" }}>
+      <h2 style={{ color: "#222" }}>Edit Collection</h2>
       <div style={{ marginBottom: 12 }}>
         <input
           placeholder="Search title/artist"
@@ -88,12 +88,12 @@ export default function Page() {
           style={{ marginRight: 8, minWidth: 200 }}
         />
         <button onClick={fetchAllRows} style={{ marginRight: 8 }}>Reload</button>
-        <span style={{ color: "#fff" }}>{status}</span>
+        <span style={{ color: "#222" }}>{status}</span>
       </div>
       <div style={{ overflowX: 'auto', maxHeight: 700 }}>
         <table style={{ borderCollapse: 'collapse', width: '100%' }}>
           <thead>
-            <tr style={{ color: "#fff" }}>
+            <tr style={{ color: "#222" }}>
               <th>ID</th>
               <th>Image</th>
               <th>Artist</th>
@@ -110,15 +110,15 @@ export default function Page() {
             {filtered.map((row: CollectionRow) => (
               <tr key={row.id} style={{
                 background: row.blocked ? '#fee2e2' : '',
-                color: "#fff",
+                color: "#222",
                 fontSize: 13,
                 height: 36
               }}>
                 <td>{row.id}</td>
                 <td>
-                  {row.image_url
+                  {row.image_url && row.image_url !== "null" && row.image_url !== ""
                     ? <Image src={row.image_url} alt="cover" width={36} height={36} style={{ objectFit: 'cover', borderRadius: 3 }} />
-                    : ''}
+                    : <div style={{ width: 36, height: 36, background: "#e0e0e0", borderRadius: 3 }} />}
                 </td>
                 <td>{row.artist}</td>
                 <td>{row.title}</td>
@@ -137,7 +137,7 @@ export default function Page() {
             ))}
           </tbody>
         </table>
-        <div style={{ color: '#fff', marginTop: 16 }}>
+        <div style={{ color: "#222", marginTop: 16 }}>
           Showing {filtered.length} / {data.length} rows.
         </div>
       </div>
