@@ -28,78 +28,65 @@ function BrowseAlbumsContent() {
   const [sortField, setSortField] = useState('title');
   const [sortAsc, setSortAsc] = useState(true);
 
-  // loading and error state
+  // For loading/error UX
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState('');
 
-  // Fetch event context only if eventID param is present
+  // Fetch event context if eventID is present
   useEffect(() => {
     let isMounted = true;
-    setFetchError('');
     if (eventID) {
-      async function fetchEventDataIfNeeded() {
-        setLoading(true);
-        const { data, error } = await supabase
-          .from('events')
-          .select('id, title, allowed_formats')
-          .eq('id', eventID)
-          .single();
-        if (!error && data) {
+      setLoading(true);
+      supabase
+        .from('events')
+        .select('id, title, allowed_formats')
+        .eq('id', eventID)
+        .single()
+        .then(({ data, error }) => {
           if (isMounted) {
-            setAllowedFormats(data.allowed_formats || []);
-            setEventTitle(data.title || '');
+            if (!error && data) {
+              setAllowedFormats(data.allowed_formats || []);
+              setEventTitle(data.title || '');
+            } else {
+              setAllowedFormats(null);
+              setEventTitle('');
+            }
+            setLoading(false);
           }
-        } else {
-          if (isMounted) {
-            setAllowedFormats(null);
-            setEventTitle('');
-            setFetchError('Event not found.');
-          }
-        }
-        setLoading(false);
-      }
-      fetchEventDataIfNeeded();
+        });
     } else if (allowedFormatsParam && eventTitleParam) {
       setAllowedFormats(allowedFormatsParam.split(',').map(f => f.trim()));
-      setEventTitle(eventTitleParam)
-      setFetchError('');
+      setEventTitle(eventTitleParam);
     } else {
       setAllowedFormats(null);
       setEventTitle('');
-      setFetchError('');
     }
     return () => { isMounted = false; }
   }, [eventID, allowedFormatsParam, eventTitleParam]);
 
-  // Fetch all albums on mount or when eventID changes
+  // Fetch all albums or filter by eventID
   useEffect(() => {
     let isMounted = true;
-    async function fetchAlbums() {
-      setLoading(true);
-      setFetchError('');
-      let query = supabase.from('albums').select('*');
-      // Only filter by event if we have one
-      if (eventID) {
-        query = query.eq('event_id', eventID);
-      }
-      const { data, error } = await query;
+    setLoading(true);
+    setFetchError('');
+    let query = supabase.from('albums').select('*');
+    if (eventID) query = query.eq('event_id', eventID);
+    query.then(({ data, error }) => {
       if (isMounted) {
-        if (!error && data) {
-          setAlbums(data);
-        } else {
-          setAlbums([]);
+        if (error) {
           setFetchError('Could not load albums.');
+          setAlbums([]);
+        } else {
+          setAlbums(data || []);
         }
         setLoading(false);
       }
-    }
-    fetchAlbums();
+    });
     return () => { isMounted = false; }
   }, [eventID]);
 
   const filteredAlbums = useMemo(() => {
     let filtered = albums;
-
     if (searchTerm) {
       const search = searchTerm.toLowerCase();
       filtered = filtered.filter(album =>
@@ -107,7 +94,6 @@ function BrowseAlbumsContent() {
         album.title.toLowerCase().includes(search)
       );
     }
-
     if (mediaFilter) {
       filtered = filtered.filter(album =>
         album.folder === mediaFilter ||
@@ -118,7 +104,6 @@ function BrowseAlbumsContent() {
         allowedFormats.includes(album.folder)
       );
     }
-
     filtered = [...filtered].sort((a, b) => {
       let valA = a[sortField];
       let valB = b[sortField];
@@ -128,14 +113,8 @@ function BrowseAlbumsContent() {
       if (valA > valB) return sortAsc ? 1 : -1;
       return 0;
     });
-
     return filtered;
   }, [albums, searchTerm, mediaFilter, allowedFormats, sortField, sortAsc, eventID]);
-
-  // Loading and error UI for fetch errors only (not for missing eventID)
-  if (loading) return <div>Loading...</div>;
-  if (fetchError) return <div>{fetchError}<br /><Link href="/events">Browse events</Link></div>;
-  if (!filteredAlbums.length) return <div>No albums found{eventTitle ? ` for ${eventTitle}` : ""}.</div>;
 
   return (
     <div className="browse-albums-page">
@@ -173,11 +152,19 @@ function BrowseAlbumsContent() {
           <option value="year">Year</option>
         </select>
       </div>
-      <div className="albums-grid">
-        {filteredAlbums.map((album) => (
-          <AlbumCard key={album.id} album={album} />
-        ))}
-      </div>
+      {loading ? (
+        <div>Loading...</div>
+      ) : fetchError ? (
+        <div>{fetchError}<br /><Link href="/events">Browse events</Link></div>
+      ) : filteredAlbums.length === 0 ? (
+        <div>No albums found{eventTitle ? ` for ${eventTitle}` : ""}.</div>
+      ) : (
+        <div className="albums-grid">
+          {filteredAlbums.map((album) => (
+            <AlbumCard key={album.id} album={album} />
+          ))}
+        </div>
+      )}
       <Footer />
     </div>
   );
