@@ -59,14 +59,28 @@ export default function Page() {
     fetch("/api/substack")
       .then(res => res.json())
       .then(data => {
-        console.log('SUBSTACK FEED:', data);
-        if (!data.items || !Array.isArray(data.items)) return;
-        const found = data.items.find(item =>
-          item.categories && item.categories.some(c => c.toLowerCase() === "featured")
-        );
+        // Log the entire API response object
+        console.log('SUBSTACK FEED FULL DATA:', data);
+
+        // If there's an "items" array, log each item's title and categories/tags
+        if (data.items && Array.isArray(data.items)) {
+          data.items.forEach(item => {
+            console.log('Item:', item.title, 'Categories:', item.categories);
+          });
+        } else {
+          console.log("No 'items' array in feed. Top-level keys:", Object.keys(data));
+        }
+
+        // The rest of your logic (keep as is for now)
+        const found = data.items && Array.isArray(data.items) ? data.items.find(item =>
+          item.categories && item.categories.some(
+            c => c && c.trim().toLowerCase() === "featured"
+          )
+        ) : null;
         if (found) setFeatured(found);
       });
   }, []);
+
 
   return (
     <div className="page-wrapper">
