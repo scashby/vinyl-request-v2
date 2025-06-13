@@ -1,6 +1,5 @@
 // Dialogues page ("/dialogues")
-// Lists posts, featured Substack entries, and embedded playlists.
-// All images use Next.js <Image /> for optimization.
+// Lists all Substack entries (since tags/categories are missing), and embedded playlists.
 
 "use client";
 
@@ -53,31 +52,15 @@ function extractFirstImg(html) {
 }
 
 export default function Page() {
-  const [featured, setFeatured] = useState(null);
+  const [articles, setArticles] = useState([]);
 
   useEffect(() => {
     fetch("/api/substack")
       .then(res => res.json())
       .then(data => {
-        console.log('SUBSTACK FEED FULL DATA:', data);
-        if (data.items && Array.isArray(data.items)) {
-          data.items.forEach(item => {
-            console.log('Item keys:', Object.keys(item), 'Full item:', item);
-          });
-        } else {
-          console.log("No 'items' array in feed. Top-level keys:", Object.keys(data));
-        }
-
-        // The rest of your logic (keep as is for now)
-        const found = data.items && Array.isArray(data.items) ? data.items.find(item =>
-          item.categories && item.categories.some(
-            c => c && c.trim().toLowerCase() === "featured"
-          )
-        ) : null;
-        if (found) setFeatured(found);
+        setArticles(data.items || []);
       });
   }, []);
-
 
   return (
     <div className="page-wrapper">
@@ -90,35 +73,40 @@ export default function Page() {
         <div className="dialogues-body-row">
           {/* Main */}
           <div className="dialogues-main-col">
-            {/* Featured from Substack */}
-            {featured && (
-              <div className="dialogues-featured" key={featured.guid}>
-                <Image
-                  className="dialogues-featured-image"
-                  src={extractFirstImg(featured['content:encoded'] || featured.content) || "/images/vinyl-featured.jpg"}
-                  alt={featured.title}
-                  width={700}
-                  height={400}
-                  style={{ objectFit: "cover", borderRadius: 16 }}
-                  unoptimized
-                />
-                <div className="dialogues-featured-content">
-                  <span className="dialogues-featured-meta">FEATURED</span>
-                  <h2 className="dialogues-featured-title">{featured.title}</h2>
-                  <div className="dialogues-featured-date">
-                    {new Date(featured.pubDate).toLocaleDateString(undefined, {
-                      year: "numeric", month: "long", day: "numeric"
-                    })}
-                  </div>
-                  <p className="dialogues-featured-summary">
-                    {featured.contentSnippet || ""}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Original Posts grid (unchanged) */}
+            {/* Substack Articles */}
             <div className="dialogues-posts-grid">
+              {articles.map((item) => (
+                <div className="dialogues-post" key={item.guid || item.link}>
+                  <Image
+                    className="dialogues-post-image"
+                    src={extractFirstImg(item['content:encoded'] || item.content) || "/images/vinyl-featured.jpg"}
+                    alt={item.title}
+                    width={350}
+                    height={200}
+                    style={{ objectFit: "cover", borderRadius: 10 }}
+                    unoptimized
+                  />
+                  <div className="dialogues-post-content">
+                    <span className="dialogues-post-meta dialogues-post-meta--substack">
+                      SUBSTACK
+                    </span>
+                    <div className="dialogues-post-title">{item.title}</div>
+                    <div className="dialogues-post-date">
+                      {item.pubDate
+                        ? new Date(item.pubDate).toLocaleDateString(undefined, {
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                          })
+                        : ""}
+                    </div>
+                    <div className="dialogues-post-summary">
+                      {item.contentSnippet || ""}
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {/* Original Posts grid (unchanged) */}
               {posts.map((post) => (
                 <div className="dialogues-post" key={post.title}>
                   <Image
