@@ -59,6 +59,7 @@ export default function Page() {
     fetch("/api/substack")
       .then(res => res.json())
       .then(data => {
+        console.log('SUBSTACK FEED:', data);
         if (!data.items || !Array.isArray(data.items)) return;
         const found = data.items.find(item =>
           item.categories && item.categories.some(c => c.toLowerCase() === "featured")
