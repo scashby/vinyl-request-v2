@@ -12,7 +12,6 @@ import 'styles/internal.css';
 import { supabase } from 'lib/supabaseClient';
 import { useSearchParams } from 'next/navigation';
 import Footer from 'components/Footer';
-import Link from "next/link";
 
 function BrowseAlbumsContent() {
   const searchParams = useSearchParams();
@@ -28,63 +27,63 @@ function BrowseAlbumsContent() {
   const [sortField, setSortField] = useState('title');
   const [sortAsc, setSortAsc] = useState(true);
 
-  // For loading/error UX
-  const [loading, setLoading] = useState(true);
-  const [fetchError, setFetchError] = useState('');
-
-  // Fetch event context if eventID is present
+  // Always fetch event context if eventID param is present
   useEffect(() => {
     let isMounted = true;
-    if (eventID) {
-      supabase
-        .from('events')
-        .select('id, title, allowed_formats')
-        .eq('id', eventID)
-        .single()
-        .then(({ data, error }) => {
+    async function fetchEventDataIfNeeded() {
+      if (eventID) {
+        const { data, error } = await supabase
+          .from('events')
+          .select('id, title, allowed_formats')
+          .eq('id', eventID)
+          .single();
+        if (!error && data) {
           if (isMounted) {
-            if (!error && data) {
-              setAllowedFormats(data.allowed_formats || []);
-              setEventTitle(data.title || '');
-            } else {
-              setAllowedFormats(null);
-              setEventTitle('');
-            }
+            setAllowedFormats(data.allowed_formats || []);
+            setEventTitle(data.title || '');
           }
-        });
-    } else if (allowedFormatsParam && eventTitleParam) {
-      setAllowedFormats(allowedFormatsParam.split(',').map(f => f.trim()));
-      setEventTitle(eventTitleParam);
-    } else {
-      setAllowedFormats(null);
-      setEventTitle('');
+        } else {
+          if (isMounted) {
+            setAllowedFormats(null);
+            setEventTitle('');
+          }
+        }
+      } else if (allowedFormatsParam && eventTitleParam) {
+        setAllowedFormats(allowedFormatsParam.split(',').map(f => f.trim()));
+        setEventTitle(eventTitleParam)
+      } else {
+        setAllowedFormats(null);
+        setEventTitle('');
+      }
     }
+    fetchEventDataIfNeeded();
     return () => { isMounted = false; }
   }, [eventID, allowedFormatsParam, eventTitleParam]);
 
-  // Fetch all albums or filter by eventID
+  // Fetch all albums on mount or when eventID changes
   useEffect(() => {
     let isMounted = true;
-    setLoading(true);
-    setFetchError('');
-    let query = supabase.from('albums').select('*');
-    if (eventID) query = query.eq('event_id', eventID);
-    query.then(({ data, error }) => {
-      if (isMounted) {
-        if (error) {
-          setFetchError('Could not load albums.');
-          setAlbums([]);
-        } else {
-          setAlbums(data || []);
-        }
-        setLoading(false);
+    async function fetchAlbums() {
+      let query = supabase.from('albums').select('*');
+      if (eventID) {
+        query = query.eq('event_id', eventID);
       }
-    });
+      const { data, error } = await query;
+      if (isMounted) {
+        if (!error && data) {
+          setAlbums(data);
+        } else {
+          setAlbums([]);
+        }
+      }
+    }
+    fetchAlbums();
     return () => { isMounted = false; }
   }, [eventID]);
 
   const filteredAlbums = useMemo(() => {
     let filtered = albums;
+
     if (searchTerm) {
       const search = searchTerm.toLowerCase();
       filtered = filtered.filter(album =>
@@ -92,16 +91,18 @@ function BrowseAlbumsContent() {
         album.title.toLowerCase().includes(search)
       );
     }
+
     if (mediaFilter) {
       filtered = filtered.filter(album =>
         album.folder === mediaFilter ||
         album.format?.toLowerCase().includes(mediaFilter.toLowerCase())
       );
-    } else if (eventID && allowedFormats && allowedFormats.length > 0) {
+    } else if (allowedFormats && allowedFormats.length > 0) {
       filtered = filtered.filter(album =>
         allowedFormats.includes(album.folder)
       );
     }
+
     filtered = [...filtered].sort((a, b) => {
       let valA = a[sortField];
       let valB = b[sortField];
@@ -111,8 +112,9 @@ function BrowseAlbumsContent() {
       if (valA > valB) return sortAsc ? 1 : -1;
       return 0;
     });
+
     return filtered;
-  }, [albums, searchTerm, mediaFilter, allowedFormats, sortField, sortAsc, eventID]);
+  }, [albums, searchTerm, mediaFilter, allowedFormats, sortField, sortAsc]);
 
   return (
     <div className="browse-albums-page">
@@ -150,19 +152,11 @@ function BrowseAlbumsContent() {
           <option value="year">Year</option>
         </select>
       </div>
-      {loading ? (
-        <div>Loading...</div>
-      ) : fetchError ? (
-        <div>{fetchError}<br /><Link href="/events">Browse events</Link></div>
-      ) : filteredAlbums.length === 0 ? (
-        <div>No albums found{eventTitle ? ` for ${eventTitle}` : ""}.</div>
-      ) : (
-        <div className="albums-grid">
-          {filteredAlbums.map((album) => (
-            <AlbumCard key={album.id} album={album} />
-          ))}
-        </div>
-      )}
+      <div className="albums-grid">
+        {filteredAlbums.map((album) => (
+          <AlbumCard key={album.id} album={album} />
+        ))}
+      </div>
       <Footer />
     </div>
   );
