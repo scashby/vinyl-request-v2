@@ -59,6 +59,9 @@ export default function Page() {
       .then(res => res.json())
       .then(data => {
         setArticles(data.items || []);
+        (data.items || []).forEach(item => {
+          console.log("ARTICLE:", item.title, "| categories:", item.categories);
+        });
       });
   }, []);
 
