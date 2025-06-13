@@ -39,7 +39,7 @@ export default function Page() {
     image_url,
     info,
     info_url,
-    allowed_formats,
+    // allowed_formats,
     has_queue
   } = event;
 
@@ -59,14 +59,9 @@ export default function Page() {
 
   // Go to browse page (Next.js style)
   const goToBrowse = () => {
-    const params = new URLSearchParams({
-      allowedFormats: allowed_formats ? allowed_formats.join(',') : '',
-      eventId: event.id,
-      eventTitle: event.title,
-      trail: JSON.stringify(['events', event.title, 'browse'])
-    });
-    router.push(`/browse/browse-albums?${params}`);
+    router.push(`/browse/browse-albums?eventId=${event.id}`);
   };
+
 
   return (
     <div className="page-wrapper">
