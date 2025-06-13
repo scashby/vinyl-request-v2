@@ -1,6 +1,6 @@
 // Browse Albums page ("/browse/browse-albums")
 // Lists and filters all albums in the collection with search, sort, and filter by media type.
-// Supports event context via query parameters (?eventID=...).
+// Supports event context via query parameters (?eventId=...).
 
 "use client";
 
@@ -15,7 +15,7 @@ import Footer from 'components/Footer';
 
 function BrowseAlbumsContent() {
   const searchParams = useSearchParams();
-  const eventID = searchParams.get('eventID');
+  const eventId = searchParams.get('eventId');
   const allowedFormatsParam = searchParams.get('allowedFormats');
   const eventTitleParam = searchParams.get('eventTitle');
 
@@ -27,15 +27,15 @@ function BrowseAlbumsContent() {
   const [sortField, setSortField] = useState('title');
   const [sortAsc, setSortAsc] = useState(true);
 
-  // Always fetch event context if eventID param is present
+  // Always fetch event context if eventId param is present
   useEffect(() => {
     let isMounted = true;
     async function fetchEventDataIfNeeded() {
-      if (eventID) {
+      if (eventId) {
         const { data, error } = await supabase
           .from('events')
           .select('id, title, allowed_formats')
-          .eq('id', eventID)
+          .eq('id', eventId)
           .single();
         if (!error && data) {
           if (isMounted) {
@@ -58,7 +58,7 @@ function BrowseAlbumsContent() {
     }
     fetchEventDataIfNeeded();
     return () => { isMounted = false; };
-  }, [eventID, allowedFormatsParam, eventTitleParam]);
+  }, [eventId, allowedFormatsParam, eventTitleParam]);
 
   // Batch fetch all albums (no 1000-row cap)
   useEffect(() => {
@@ -191,7 +191,7 @@ function BrowseAlbumsContent() {
               key={album.id}
               album={{
                 ...album,
-                eventId: eventID
+                eventId: eventId
               }}
             />
           ))}
