@@ -4,7 +4,7 @@
 "use client"; // Required for useState/useEffect
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { supabase } from 'lib/supabaseClient';
 import Image from 'next/image';
 
@@ -25,7 +25,6 @@ export default function Page() {
   const [data, setData] = useState<CollectionRow[]>([]);
   const [query, setQuery] = useState<string>('');
   const [status, setStatus] = useState<string>('');
-  const router = useRouter();
 
   useEffect(() => {
     fetchAllRows();
@@ -131,10 +130,10 @@ export default function Page() {
                 <td>{row.media_condition}</td>
                 <td>{parseTracklistShort(row.tracklists)}</td>
                 <td>
-                  <button
-                    onClick={() => router.push(`/admin/edit-entry/${row.id}`)}
+                  <Link
+                    href={`/admin/edit-entry/${row.id}`}
                     style={{ color: '#2563eb', fontWeight: 500, cursor: 'pointer', border: 0, background: 'none' }}
-                  >Edit</button>
+                  >Edit</Link>
                 </td>
               </tr>
             ))}
