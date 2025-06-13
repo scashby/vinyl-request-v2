@@ -131,7 +131,7 @@ export default function Page() {
 
   const goToEvent = () => {
     if (eventId) {
-      router.push(`/events/${eventId}`);
+      router.push(`/events/event-detail/${eventId}`);
     }
   };
 
