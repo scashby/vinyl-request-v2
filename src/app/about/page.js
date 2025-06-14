@@ -1,65 +1,175 @@
-// About page ("/about") — Info and wishlist for Dead Wax Dialogues
+// Dialogues page ("/dialogues")
+// Lists all WordPress articles (with tag/category badges), and embedded playlists.
 
-'use client'
+"use client";
 
-import React from "react"
-import 'styles/about.css'
+import React, { useEffect, useState } from "react";
+import Image from "next/image";
+import Footer from "components/Footer";
+import 'styles/dialogues.css';
+import 'styles/internal.css';
 
-export default function AboutPage() {
+const posts = [
+  {
+    title: "DJ Setlist: Summer Nights Playlist",
+    image: "/images/setlist.jpg",
+    date: "June 8, 2025",
+    type: "PLAYLIST",
+    summary: "Perfect side A’s for patio listening, plus Apple/Spotify embeds.",
+    categories: ["playlist"],
+  },
+  {
+    title: "Notes from the Booth",
+    image: "/images/booth.jpg",
+    date: "June 3, 2025",
+    type: "BLOG",
+    summary: "Stories, crowd picks, and last week’s most requested LP.",
+    categories: ["blog"],
+  },
+  {
+    title: "5 New Finds at the Shop",
+    image: "/images/records.jpg",
+    date: "May 29, 2025",
+    type: "NEWS",
+    summary: "Quick reviews of the freshest wax in the collection.",
+    categories: ["news"],
+  },
+];
+
+const playlists = [
+  {
+    platform: "Spotify",
+    embed: "https://open.spotify.com/embed/playlist/37i9dQZF1DX2sUQwD7tbmL?utm_source=generator",
+  },
+  {
+    platform: "Apple Music",
+    embed: "https://embed.music.apple.com/us/playlist/indie-plaza/pl.1234567890abcdef",
+  },
+  {
+    platform: "Tidal",
+    embed: "https://embed.tidal.com/albums/192548722?layout=gridify",
+  },
+];
+
+// Extract the first image from content HTML
+function extractFirstImg(html) {
+  if (!html) return null;
+  const match = html.match(/<img[^>]+src=["']([^"'>]+)["']/i);
+  return match ? match[1] : null;
+}
+
+function Tags({ categories }) {
+  if (!categories || !categories.length) return null;
+  return (
+    <div className="post-tags">
+      {categories.map((cat, i) => (
+        <span key={i} className={`tag tag-${cat.toLowerCase()}`}>
+          {cat.toUpperCase()}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+export default function DialoguesPage() {
+  const [featured, setFeatured] = useState(null);
+
+  useEffect(() => {
+    fetch("/api/wordpress")
+      .then(res => res.json())
+      .then(data => {
+        if (!data.items || !Array.isArray(data.items)) return;
+        const found = data.items.find(item =>
+          item.categories && item.categories.map(c => c.toLowerCase()).includes("featured")
+        );
+        if (found) setFeatured(found);
+      });
+  }, []);
+
   return (
     <div className="page-wrapper">
       <header className="event-hero">
         <div className="overlay">
-          <h1>About</h1>
+          <h1>Dialogues</h1>
         </div>
       </header>
       <main className="event-body">
-        <div className="about-body-row">
-          <div className="about-main-col">
-            <div className="about-body-container">
-              <h2 className="about-title">About Dead Wax Dialogues</h2>
-              <p className="about-intro">
-                Hi, I&apos;m Stephen. If you ever wanted to know why anyone still loves vinyl, cassettes, or tangling with Discogs, you’re in the right place.
-              </p>
-              <div className="about-qa">
-                <div className="about-qa__q"><strong>Q:</strong> Why vinyl?</div>
-                <div className="about-qa__a"><strong>A:</strong> Because you can hold it, hear it, and see the music. It’s not just sound, it’s an experience.</div>
-                <div className="about-qa__q"><strong>Q:</strong> What’s your favorite side to drop?</div>
-                <div className="about-qa__a"><strong>A:</strong> Side A, always. But Side B after midnight.</div>
-                <div className="about-qa__q"><strong>Q:</strong> Most wanted record right now?</div>
-                <div className="about-qa__a"><strong>A:</strong> See the wish list below. (Feel free to send one my way.)</div>
-                <div className="about-qa__q"><strong>Q:</strong> Where can I find you online?</div>
-                <div className="about-qa__a"><strong>A:</strong> Try the linktree below—or at the next vinyl night.</div>
+        <div className="dialogues-body-row">
+          <div className="dialogues-main-col">
+            {/* Featured from WordPress */}
+            {featured && (
+              <div className="dialogues-featured" key={featured.guid || featured.link}>
+                <Image
+                  className="dialogues-featured-image"
+                  src={extractFirstImg(featured['content:encoded'] || featured.content) || "/images/vinyl-featured.jpg"}
+                  alt={featured.title}
+                  width={350}
+                  height={260}
+                  style={{ objectFit: "cover", borderRadius: 10 }}
+                  unoptimized
+                  priority
+                />
+                <div className="dialogues-featured-content">
+                  <h2 className="dialogues-featured-title">{featured.title}</h2>
+                  <div className="dialogues-featured-date">
+                    {featured.pubDate
+                      ? new Date(featured.pubDate).toLocaleDateString(undefined, {
+                          year: "numeric", month: "long", day: "numeric"
+                        })
+                      : ""}
+                  </div>
+                  <p className="dialogues-featured-summary">
+                    {featured.contentSnippet || ""}
+                  </p>
+                  <Tags categories={featured.categories} />
+                </div>
               </div>
-              <h3>Top 10 Most Wanted</h3>
-              <ol>
-                <li><a href="#">The National – Sad Songs for Dirty Lovers (LP)</a></li>
-                <li><a href="#">Radiohead – Kid A (First UK Pressing)</a></li>
-                <li><a href="#">Fleet Foxes – Helplessness Blues (LP)</a></li>
-                <li><a href="#">Beastie Boys – Paul&apos;s Boutique (180g)</a></li>
-                <li><a href="#">PJ Harvey – Let England Shake (LP)</a></li>
-                <li><a href="#">Talk Talk – Spirit of Eden (LP)</a></li>
-                <li><a href="#">Beck – Sea Change (MoFi)</a></li>
-                <li><a href="#">Sufjan Stevens – Illinois (LP)</a></li>
-                <li><a href="#">Wilco – Yankee Hotel Foxtrot (Deluxe)</a></li>
-                <li><a href="#">Fiona Apple – Extraordinary Machine (LP)</a></li>
-              </ol>
+            )}
+
+            <div className="dialogues-posts-grid">
+              {posts.map((post) => (
+                <div className="dialogues-post" key={post.title}>
+                  <Image
+                    className="dialogues-post-image"
+                    src={post.image}
+                    alt={post.title}
+                    width={350}
+                    height={200}
+                    style={{ objectFit: "cover", borderRadius: 10 }}
+                    unoptimized
+                  />
+                  <div className="dialogues-post-content">
+                    <Tags categories={post.categories} />
+                    <div className="dialogues-post-title">{post.title}</div>
+                    <div className="dialogues-post-date">{post.date}</div>
+                    <div className="dialogues-post-summary">{post.summary}</div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
-          <aside className="about-sidebar">
-            <div className="about-sidebar-title">Wish List</div>
-            <div className="about-sidebar-list">
-              <a href="https://www.amazon.com/hz/wishlist/ls/" target="_blank" rel="noopener noreferrer">
-                Full Amazon Wish List
-              </a>
-              <a href="https://www.discogs.com/user/socialblunders/wants" target="_blank" rel="noopener noreferrer">
-                Full Discogs Wantlist
-              </a>
+          <aside className="dialogues-sidebar">
+            <div className="dialogues-sidebar-title">Playlists</div>
+            <div className="dialogues-sidebar-list">
+              {playlists.map((p) => (
+                <div className="dialogues-playlist" key={p.platform}>
+                  <div className="dialogues-playlist-label">{p.platform}</div>
+                  <iframe
+                    title={p.platform}
+                    src={p.embed}
+                    width="100%"
+                    height="80"
+                    className="dialogues-playlist-iframe"
+                    allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                    loading="lazy"
+                  ></iframe>
+                </div>
+              ))}
             </div>
-            <div className="about-social-feed">[Social Feed Placeholder]</div>
           </aside>
         </div>
       </main>
+      <Footer />
     </div>
-  )
+  );
 }
