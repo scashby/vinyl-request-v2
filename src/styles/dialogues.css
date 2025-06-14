@@ -14,10 +14,8 @@
   gap: 2.5rem;
 }
 
-/* FEATURED block styles */
 .dialogues-featured {
   display: flex;
-  /* old: flex-direction: row; */
   flex-direction: column;
   align-items: stretch;
   border-radius: 16px;
@@ -48,16 +46,14 @@
 
 .dialogues-featured-meta {
   display: inline-block;
-  background: #9333ea;
-  color: #fff;
-  font-size: 0.8rem;
-  font-weight: bold;
-  border-radius: 8px;
-  padding: 3px 10px;
-  letter-spacing: 0.06em;
+  /* No background or border */
+  font-size: 0.87rem;
+  font-weight: 700;
+  color: #9333ea;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
   margin-bottom: 0.7rem;
   margin-right: 0;
-  text-transform: uppercase;
 }
 
 .dialogues-featured-title {
@@ -82,6 +78,25 @@
 
 .dialogues-featured-badges {
   margin-top: 0.5rem;
+}
+
+/* Remove all badge backgrounds and borders, use text color only */
+.dialogues-post-meta-tag,
+.dialogues-post-meta,
+.dialogues-post-meta--blog,
+.dialogues-post-meta--news,
+.dialogues-post-meta--playlist,
+.dialogues-post-meta-featured {
+  background: none !important;
+  border: none !important;
+  color: inherit;
+  font-size: 0.87rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.4rem;
+  padding: 0;
+  box-shadow: none;
 }
 
 /* Post grid and cards */
@@ -130,27 +145,6 @@
   font-size: 0.97rem;
   color: #333;
   line-height: 1.6;
-}
-
-/* Meta/tag styles */
-.dialogues-post-meta {
-  font-size: 0.75rem;
-  font-weight: 500;
-  letter-spacing: 0.03em;
-  border-radius: 8px;
-  padding: 2px 8px;
-  display: inline-block;
-  background: #e5e7eb;
-  color: #222;
-  margin-bottom: 0.4rem;
-  text-transform: uppercase;
-}
-.dialogues-post-meta--blog { background: #fde68a; }
-.dialogues-post-meta--news { background: #bae6fd; }
-.dialogues-post-meta--playlist { background: #c7d2fe; }
-.dialogues-post-meta-featured {
-  background: #9333ea !important;
-  color: #fff !important;
 }
 
 /* Sidebar styles */
