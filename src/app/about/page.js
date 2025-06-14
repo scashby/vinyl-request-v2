@@ -40,19 +40,6 @@ export default function Page() {
             <div className="about-qa__a"><strong>A:</strong> Try the linktree below—or at the next vinyl night.</div>
         </div>
           </div>
-          <div className="about-socials">
-            {socials.map((s) => (
-              <a
-                key={s.name}
-                href={s.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="about-socials__link"
-              >
-                {s.icon}
-              </a>
-            ))}
-          </div>
           <div className="about-wishlist">
             <h3>Top 10 Most Wanted</h3>
             <ol>
