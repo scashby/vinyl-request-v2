@@ -62,17 +62,6 @@
   margin-bottom: 1.25rem;
 }
 
-.about-wishlist {
-  margin-top: 2rem;
-}
-
-.about-wishlist a {
-  display: block;
-  margin-bottom: 0.5rem;
-  color: #2563eb;
-  text-decoration: underline;
-}
-
 .about-sidebar {
   flex: 1;
   min-width: 260px;
@@ -100,18 +89,24 @@
   text-decoration: underline;
 }
 
-.about-social-feed {
+.about-wishlist {
   margin-top: 2rem;
-  font-style: italic;
-  color: #666;
 }
 
+.about-wishlist a {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: #2563eb;
+  text-decoration: underline;
+}
 
 .about-social-feed {
   margin-top: 2rem;
-  font-weight: 600;
-  font-size: 1rem;
-  color: #111;
+}
+
+.about-social-feed h3 {
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
 }
 
 .social-scroll-strip {
