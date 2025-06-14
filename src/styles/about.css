@@ -156,3 +156,8 @@
   min-width: 260px;
   padding-top: 0.25rem;
 }
+
+.about-body-container {
+  padding-top: 0 !important;
+  margin-top: 0 !important;
+}
