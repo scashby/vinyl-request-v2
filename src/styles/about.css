@@ -1,0 +1,31 @@
+
+.about-body-row {
+  max-width: 1140px;
+  margin: 0 auto;
+  padding: 32px 16px;
+  display: flex;
+  gap: 36px;
+  background: #fff;
+}
+
+.about-main-col {
+  flex: 2;
+  min-width: 0;
+}
+
+.about-sidebar {
+  flex: 1;
+  min-width: 260px;
+}
+
+.about-sidebar-title {
+  font-weight: 700;
+  font-size: 17px;
+  margin-bottom: 12px;
+}
+
+.about-sidebar-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
