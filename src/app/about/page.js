@@ -1,54 +1,5 @@
 // About page ("/about") — Info, social links, and wish list for Dead Wax Dialogues
 
-import {
-  SiDiscogs,
-  SiFacebook,
-  SiInstagram,
-  SiThreads,
-  SiBluesky,
-  SiSubstack,
-} from "react-icons/si";
-import { FiMail } from "react-icons/fi";
-import Footer from "components/Footer";
-
-const socials = [
-  {
-    name: "Discogs",
-    url: "https://www.discogs.com/user/socialblunders/collection",
-    icon: <SiDiscogs size={22} color="#444" />,
-  },
-  {
-    name: "Email",
-    url: "mailto:steve@deadwaxdialogues.com",
-    icon: <FiMail size={22} color="#444" />,
-  },
-  {
-    name: "Facebook",
-    url: "https://www.facebook.com/profile.php?id=61576451743378",
-    icon: <SiFacebook size={22} color="#444" />,
-  },
-  {
-    name: "Instagram",
-    url: "https://www.instagram.com/deadwaxdialogues/",
-    icon: <SiInstagram size={22} color="#444" />,
-  },
-  {
-    name: "Threads",
-    url: "https://www.threads.net/@deadwaxdialogues",
-    icon: <SiThreads size={22} color="#444" />,
-  },
-  {
-    name: "Bluesky",
-    url: "https://bsky.app/profile/deadwaxdialogues.bsky.social",
-    icon: <SiBluesky size={22} color="#444" />,
-  },
-  {
-    name: "Substack",
-    url: "https://deadwaxdialogues.substack.com",
-    icon: <SiSubstack size={22} color="#444" />,
-  },
-];
-
 const wishlist = [
   { name: "The National – Sad Songs for Dirty Lovers (LP)", url: "https://www.discogs.com/sell/release/1573764?ev=rb" },
   { name: "Radiohead – Kid A (First UK Pressing)", url: "https://www.discogs.com/sell/release/40846?ev=rb" },
@@ -71,6 +22,8 @@ export default function Page() {
         </div>
       </header>
       <main className="event-body">
+        <div className="dialogues-body-row">
+          <div className="dialogues-main-col">
         <div className="about-body-container">
           <h2 className="about-title">About Dead Wax Dialogues</h2>
           <p className="about-intro">
@@ -85,6 +38,7 @@ export default function Page() {
             <div className="about-qa__a"><strong>A:</strong> See the wish list below. (Feel free to send one my way.)</div>
             <div className="about-qa__q"><strong>Q:</strong> Where can I find you online?</div>
             <div className="about-qa__a"><strong>A:</strong> Try the linktree below—or at the next vinyl night.</div>
+        </div>
           </div>
           <div className="about-socials">
             {socials.map((s) => (
@@ -120,8 +74,15 @@ export default function Page() {
             </div>
           </div>
         </div>
+          <aside className="dialogues-sidebar">
+            <div className="dialogues-sidebar-title">Wish List</div>
+            <div className="dialogues-sidebar-list">
+              {/* Amazon + Discogs links already present */}
+            </div>
+            <div className="about-social-feed">[Social Feed Placeholder]</div>
+          </aside>
+          </div>
       </main>
-      <Footer />
     </div>
   );
 }
