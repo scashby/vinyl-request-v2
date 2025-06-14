@@ -9,7 +9,6 @@ html, body {
   color: #111;
   min-height: 100vh;
 }
-
 .page-wrapper {
   display: flex;
   flex-direction: column;
@@ -17,7 +16,6 @@ html, body {
   background: white;
   width: 100%;
 }
-
 .event-hero {
   position: relative;
   width: 100%;
@@ -27,7 +25,6 @@ html, body {
   align-items: center;
   justify-content: center;
 }
-
 .overlay {
   position: absolute;
   top: 0;
@@ -40,7 +37,6 @@ html, body {
   justify-content: center;
   padding: 0 2rem;
 }
-
 .event-hero h1 {
   font-family: 'Playfair Display', serif;
   font-size: 2.75rem;
@@ -49,7 +45,6 @@ html, body {
   margin: 0;
   text-align: center;
 }
-
 .event-body {
   flex-grow: 1;
   padding: 4rem 2rem;
@@ -57,7 +52,6 @@ html, body {
   display: flex;
   justify-content: center;
 }
-
 .event-grid {
   display: flex;
   flex-wrap: wrap;
@@ -65,7 +59,6 @@ html, body {
   justify-content: center;
   max-width: 1200px;
 }
-
 .event-card {
   background: white;
   border-radius: 8px;
@@ -75,17 +68,14 @@ html, body {
   overflow: hidden;
   transition: transform 0.2s ease;
 }
-
 .event-card:hover {
   transform: scale(1.02);
 }
-
 .event-card img {
   width: 100%;
   height: auto;
   display: block;
 }
-
 .event-card h2 {
   font-weight: bold;
   color: #6a0dad;
@@ -93,13 +83,11 @@ html, body {
   margin: 1rem 0 0.5rem;
   display: block;
 }
-
 .event-card p {
   font-size: 0.9rem;
   color: #1a73e8;
   margin-bottom: 1.5rem;
 }
-
 .footer {
   background: #f2f2f2;
   color: #333;
@@ -107,24 +95,20 @@ html, body {
   padding: 1.5rem;
   font-size: 0.85rem;
 }
-
 .card-square {
   aspect-ratio: 1 / 1;
   object-fit: cover;
 }
-
 .event-date {
   margin-top: 0.25rem;
   font-size: 0.9rem;
   color: #444;
 }
-
 .event-time {
   font-size: 0.9rem;
   color: #444;
   margin-top: 0;
 }
-
 /* === Re-added About the Event section === */
 .event-info-card {
   background-color: white;
@@ -134,25 +118,21 @@ html, body {
   border-radius: 0.5rem;
   box-shadow: 0 0 6px rgba(0, 0, 0, 0.1);
 }
-
 .event-info-card h3 {
   font-size: 1.125rem;
   font-weight: 600;
   margin-bottom: 0.5rem;
 }
-
 .event-info-card p {
   font-size: 0.875rem;
   line-height: 1.5;
   margin-bottom: 0.5rem;
 }
-
 .event-info-card a {
   color: #2563eb;
   font-size: 0.875rem;
   text-decoration: underline;
 }
-
 /* === Queue Section === */
 .queue-section {
   margin-top: 1.5rem;
@@ -161,7 +141,6 @@ html, body {
   padding: 1rem;
   border-radius: 0.5rem;
 }
-
 .queue-header-row {
   display: grid;
   grid-template-columns: auto 1fr auto auto;
@@ -175,230 +154,60 @@ html, body {
   padding-bottom: 0.5rem;
   margin-bottom: 0.5rem;
 }
-
 .queue-grid {
   display: grid;
   grid-template-columns: auto 1fr auto auto;
   gap: 1rem;
   align-items: center;
 }
-
 .queue-row {
   display: contents;
   border-top: 1px solid #333;
   padding: 0.75rem 0;
 }
-
 .queue-cover {
   width: 48px;
   height: 48px;
   object-fit: cover;
 }
-
 .queue-info {
   display: flex;
   flex-direction: column;
 }
-
 .queue-title {
   font-weight: 600;
   color: #2563eb;
 }
-
 .queue-artist {
   font-size: 0.875rem;
   color: #aaa;
 }
-
 .queue-side {
   font-size: 0.875rem;
   color: #ccc;
   text-align: center;
 }
-
 .queue-votes {
   display: flex;
   align-items: center;
   gap: 0.25rem;
   justify-content: flex-end;
 }
-
 .queue-heart {
   color: #dc2626;
   font-size: 1.25rem;
 }
-
 .queue-plus {
   color: #ccc;
   font-size: 1.25rem;
   cursor: pointer;
 }
-
 .queue-count {
   font-size: 0.875rem;
   color: #ccc;
 }
-
 .queue-index {
   color: #888;
   font-size: 0.875rem;
   text-align: center;
 }
-
-.dialogues-body-row {
-  max-width: 1140px;
-  margin: 0 auto;
-  padding: 32px 16px 32px 16px;
-  display: flex;
-  gap: 36px;
-  background: #fff;
-}
-.dialogues-main-col {
-  flex: 2;
-  min-width: 0;
-}
-.dialogues-featured {
-  border-radius: 10px;
-  overflow: hidden;
-  margin-bottom: 36px;
-  box-shadow: 0 1px 12px rgba(0,0,0,0.10);
-  border: 1px solid #f1f1f1;
-}
-.dialogues-featured-image {
-  width: 100%;
-  height: 220px;
-  object-fit: cover;
-}
-.dialogues-featured-content {
-  padding: 20px;
-}
-.dialogues-featured-meta {
-  text-transform: uppercase;
-  color: #888;
-  font-size: 12px;
-  font-weight: 600;
-}
-.dialogues-featured-title {
-  margin: 12px 0 8px;
-  font-weight: 700;
-  font-size: 28px;
-}
-.dialogues-featured-date {
-  color: #888;
-  font-size: 13px;
-}
-.dialogues-featured-summary {
-  margin: 10px 0 0;
-}
-.dialogues-posts-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
-}
-.dialogues-post {
-  background: #fafbfc;
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 1px 8px rgba(0,0,0,0.07);
-  border: 1px solid #eee;
-  min-height: 180px;
-  display: flex;
-  flex-direction: column;
-}
-.dialogues-post-image {
-  width: 100%;
-  height: 90px;
-  object-fit: cover;
-  background: #eee;
-}
-.dialogues-post-content {
-  padding: 16px;
-  flex-grow: 1;
-}
-.dialogues-post-meta {
-  font-size: 11px;
-  font-weight: 600;
-  color: #3f4fff;
-  text-transform: uppercase;
-  margin-right: 8px;
-  letter-spacing: 0.05em;
-}
-.dialogues-post-title {
-  font-size: 15px;
-  font-weight: 600;
-  margin: 6px 0;
-}
-.dialogues-post-date {
-  color: #888;
-  font-size: 12px;
-  margin-bottom: 6px;
-}
-.dialogues-post-summary {
-  font-size: 13px;
-}
-.dialogues-sidebar {
-  flex: 1;
-  min-width: 260px;
-}
-.dialogues-sidebar-title {
-  font-weight: 700;
-  font-size: 17px;
-  margin-bottom: 12px;
-}
-.dialogues-sidebar-list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-.dialogues-playlist {
-  background: #f6f6f7;
-  border-radius: 6px;
-  border: 1px solid #eee;
-  padding: 6px;
-  margin-bottom: 0;
-}
-.dialogues-playlist-label {
-  font-weight: 500;
-  color: #333;
-  margin-bottom: 4px;
-  font-size: 13px;
-}
-.dialogues-playlist-iframe {
-  border: none;
-  border-radius: 4px;
-}
-.about-body-container {
-  max-width: 700px;
-  margin: 0 auto;
-  padding: 36px 16px;
-  background: #fff;
-}
-
-/* Force main readable color */
-.dialogues-body-row,
-.dialogues-body-row * {
-  color: #222 !important;
-}
-
-/* Text color exceptions for labels */
-.dialogues-featured-meta { color: #9333ea !important; }   /* blue for FEATURED */
-.dialogues-post-meta--playlist { color: #dc2626 !important; }  /* red for PLAYLIST */
-.dialogues-post-meta--blog { color: #16a34a !important; }      /* green for BLOG */
-.dialogues-post-meta--news { color: #ea580c !important; }      /* orange for NEWS */
-
-/* Titles */
-.dialogues-featured-title { color: #2562eb !important; }   /* purple for featured title */
-.dialogues-post-title { color: #2563eb !important; }       /* blue for all post titles */
-
-/* === Badge color override fix === */
-.badge-featured,
-.badge-blog,
-.badge-news,
-.badge-playlist {
-  color: inherit !important;
-}
-
-.tag-featured { color: #9333ea !important; }
-.tag-blog    { color: #16a34a !important; }
-.tag-news    { color: #ea580c !important; }
-.tag-playlist{ color: #dc2626 !important; }
