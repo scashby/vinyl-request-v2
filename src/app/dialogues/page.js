@@ -110,6 +110,7 @@ export default function DialoguesPage() {
                   priority
                 />
                 <div className="dialogues-featured-content">
+                  <span className="badge badge-featured">FEATURED</span>
                   <h2 className="dialogues-featured-title">{featured.title}</h2>
                   <div className="dialogues-featured-date">
                     {featured.pubDate
@@ -121,7 +122,6 @@ export default function DialoguesPage() {
                   <p className="dialogues-featured-summary">
                     {featured.contentSnippet || ""}
                   </p>
-                  <Tags categories={featured.categories} />
                 </div>
               </div>
             )}
