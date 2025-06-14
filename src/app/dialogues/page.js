@@ -9,24 +9,6 @@ import Footer from "components/Footer";
 import 'styles/dialogues.css';
 import 'styles/internal.css';
 
-// BADGE CLASS MAP
-const badgeClass = {
-  featured: "badge-featured",
-  playlist: "badge-playlist",
-  blog: "badge-blog",
-  news: "badge-news"
-};
-
-function Badge({ label }) {
-  const cls = badgeClass[label.toLowerCase()] || "";
-  return (
-    <span className={`badge ${cls}`}>
-      {label}
-    </span>
-  );
-}
-
-// Example static posts (you can keep or remove)
 const posts = [
   {
     title: "DJ Setlist: Summer Nights Playlist",
@@ -34,6 +16,7 @@ const posts = [
     date: "June 8, 2025",
     type: "PLAYLIST",
     summary: "Perfect side A’s for patio listening, plus Apple/Spotify embeds.",
+    categories: ["playlist"],
   },
   {
     title: "Notes from the Booth",
@@ -41,6 +24,7 @@ const posts = [
     date: "June 3, 2025",
     type: "BLOG",
     summary: "Stories, crowd picks, and last week’s most requested LP.",
+    categories: ["blog"],
   },
   {
     title: "5 New Finds at the Shop",
@@ -48,6 +32,7 @@ const posts = [
     date: "May 29, 2025",
     type: "NEWS",
     summary: "Quick reviews of the freshest wax in the collection.",
+    categories: ["news"],
   },
 ];
 
@@ -73,6 +58,19 @@ function extractFirstImg(html) {
   return match ? match[1] : null;
 }
 
+function Tags({ categories }) {
+  if (!categories || !categories.length) return null;
+  return (
+    <div className="post-tags">
+      {categories.map((cat, i) => (
+        <span key={i} className={`tag tag-${cat.toLowerCase()}`}>
+          {cat.toUpperCase()}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 export default function DialoguesPage() {
   const [featured, setFeatured] = useState(null);
 
@@ -82,7 +80,7 @@ export default function DialoguesPage() {
       .then(data => {
         if (!data.items || !Array.isArray(data.items)) return;
         const found = data.items.find(item =>
-          item.categories && item.categories.some(c => c.toLowerCase() === "featured")
+          item.categories && item.categories.map(c => c.toLowerCase()).includes("featured")
         );
         if (found) setFeatured(found);
       });
@@ -112,7 +110,6 @@ export default function DialoguesPage() {
                   priority
                 />
                 <div className="dialogues-featured-content">
-                  <Badge label="FEATURED" />
                   <h2 className="dialogues-featured-title">{featured.title}</h2>
                   <div className="dialogues-featured-date">
                     {featured.pubDate
@@ -124,16 +121,7 @@ export default function DialoguesPage() {
                   <p className="dialogues-featured-summary">
                     {featured.contentSnippet || ""}
                   </p>
-                  {/* All other badges except "featured" */}
-                  {featured.categories && (
-                    <div className="dialogues-featured-badges">
-                      {featured.categories
-                        .filter(cat => cat.toLowerCase() !== "featured")
-                        .map((cat, i) => (
-                          <Badge key={i} label={cat} />
-                        ))}
-                    </div>
-                  )}
+                  <Tags categories={featured.categories} />
                 </div>
               </div>
             )}
@@ -151,7 +139,7 @@ export default function DialoguesPage() {
                     unoptimized
                   />
                   <div className="dialogues-post-content">
-                    <Badge label={post.type} />
+                    <Tags categories={post.categories} />
                     <div className="dialogues-post-title">{post.title}</div>
                     <div className="dialogues-post-date">{post.date}</div>
                     <div className="dialogues-post-summary">{post.summary}</div>

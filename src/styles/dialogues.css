@@ -228,3 +228,22 @@
 .badge-playlist { color: #dc2626; }
 .badge-blog { color: #16a34a; }
 .badge-news { color: #ea580c; }
+
+
+/* Tag colors - no background, no border, no pills, all caps, spaced */
+.tag {
+  font-weight: bold;
+  text-transform: uppercase;
+  font-size: 1em;
+  margin-right: 16px;
+  letter-spacing: 0.04em;
+  background: none;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  display: inline-block;
+}
+.tag-blog { color: #16a34a; }
+.tag-featured { color: #9333ea; }
+.tag-news { color: #ea580c; }
+.tag-playlist { color: #dc2626; }
