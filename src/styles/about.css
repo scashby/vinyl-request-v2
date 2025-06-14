@@ -1,15 +1,15 @@
 
 .about-body-row {
+  display: flex;
+  flex-direction: row;
   max-width: 1140px;
   margin: 0 auto;
   padding: 2rem 1rem;
-  display: flex;
   gap: 2rem;
 }
 
 .about-main-col {
   flex: 2;
-  min-width: 0;
 }
 
 .about-sidebar {
@@ -18,34 +18,35 @@
 }
 
 .about-title {
-  font-size: 1.75rem;
-  font-weight: 700;
+  font-size: 2rem;
+  font-weight: bold;
   margin-bottom: 1rem;
 }
 
-.about-body-container p {
-  font-size: 1rem;
-  line-height: 1.6;
-  margin-bottom: 1rem;
+.about-wishlist {
+  margin-top: 1rem;
+  list-style: disc;
+  padding-left: 1.25rem;
 }
 
-.about-body-container a {
+.about-wishlist a {
   color: #2563eb;
   text-decoration: underline;
 }
 
-.about-sidebar-title {
-  font-size: 1rem;
-  font-weight: 600;
-  margin-bottom: 0.75rem;
+.about-mostwanted {
+  list-style: decimal;
+  margin-left: 1.25rem;
+  margin-top: 0.5rem;
+  padding-left: 1rem;
 }
 
-.about-sidebar-list {
-  list-style-type: disc;
-  padding-left: 1.25rem;
-  font-size: 0.95rem;
-}
-
-.about-sidebar-list li {
+.about-mostwanted li {
   margin-bottom: 0.5rem;
+}
+
+.about-social-feed {
+  margin-top: 2rem;
+  font-style: italic;
+  color: #666;
 }
