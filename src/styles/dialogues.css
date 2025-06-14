@@ -1,154 +1,220 @@
-/* src/styles/dialogues.css */
+/* Dialogues Page Styles */
 
 .dialogues-body-row {
   display: flex;
-  gap: 2rem;
-  margin-top: 2rem;
+  gap: 2.5rem;
+  margin: 2.5rem 0 0 0;
+  align-items: flex-start;
 }
 
 .dialogues-main-col {
-  flex: 3;
-}
-
-.dialogues-sidebar {
-  flex: 1;
-  min-width: 250px;
-  background: #fafafa;
-  border-radius: 16px;
-  padding: 1.5rem 1rem;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-}
-
-.dialogues-sidebar-title {
-  font-size: 1.2rem;
-  font-weight: 700;
-  margin-bottom: 1rem;
-  color: #222;
-}
-
-.dialogues-posts-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
-  gap: 2rem;
-}
-
-.dialogues-post {
-  background: #fff;
-  border-radius: 16px;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
-  overflow: hidden;
+  flex: 2 1 0%;
   display: flex;
   flex-direction: column;
-  min-height: 340px;
+  gap: 2.5rem;
 }
 
-.dialogues-post-image {
-  width: 100%;
-  height: 200px;
-  object-fit: cover;
-  border-bottom: 1px solid #eee;
-}
-
-.dialogues-post-content {
-  padding: 1rem;
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-}
-
-.dialogues-post-meta-tag {
-  background: #eee;
-  color: #333;
-  border-radius: 8px;
-  padding: 2px 8px;
-  font-size: 0.8rem;
-  margin-right: 6px;
-  font-weight: 600;
-  text-transform: uppercase;
-}
-
-.dialogues-post-meta-featured {
-  background: #9333ea;
-  color: #fff;
-}
-
-.dialogues-post-title {
-  font-size: 1.05rem;
-  font-weight: 700;
-  margin: 0.6em 0 0.2em 0;
-}
-
-.dialogues-post-date {
-  font-size: 0.93rem;
-  color: #666;
-  margin-bottom: 0.3em;
-}
-
-.dialogues-post-summary {
-  font-size: 0.99rem;
-  color: #222;
-  flex: 1;
-}
-
+/* FEATURED block styles */
 .dialogues-featured {
   display: flex;
-  background: #f4ebff;
+  /* old: flex-direction: row; */
+  flex-direction: column;
+  align-items: stretch;
   border-radius: 16px;
+  box-shadow: 0 4px 32px #0001;
+  background: #fff;
   overflow: hidden;
-  margin-bottom: 2.5rem;
-  box-shadow: 0 2px 12px rgba(147, 51, 234, 0.06);
-  gap: 0;
+  margin-bottom: 2rem;
 }
+
 .dialogues-featured-image {
-  width: 350px;
-  height: 260px;
-  object-fit: cover;
   border-radius: 0;
   border-top-left-radius: 16px;
-  border-bottom-left-radius: 16px;
+  border-top-right-radius: 16px;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  min-width: unset;
+  width: 100%;
+  height: 260px;
+  object-fit: cover;
 }
+
 .dialogues-featured-content {
   padding: 2rem 1.5rem;
-  flex: 1;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  gap: 0.5rem;
 }
+
 .dialogues-featured-meta {
   display: inline-block;
   background: #9333ea;
   color: #fff;
-  font-size: 0.85rem;
-  font-weight: 700;
-  padding: 2px 10px;
+  font-size: 0.8rem;
+  font-weight: bold;
   border-radius: 8px;
-  letter-spacing: 0.07em;
-  margin-bottom: 0.6em;
-}
-.dialogues-featured-title {
-  font-size: 1.6rem;
-  font-weight: 700;
-  margin-bottom: 0.5em;
-}
-.dialogues-featured-date {
-  font-size: 1.1rem;
-  color: #6c48a1;
-  margin-bottom: 0.6em;
-}
-.dialogues-featured-summary {
-  font-size: 1.05rem;
-  color: #222;
-}
-.dialogues-playlist {
-  margin-bottom: 1.5rem;
-}
-.dialogues-playlist-label {
-  font-weight: 700;
-  color: #2563eb;
-  margin-bottom: 0.3em;
-}
-.dialogues-playlist-iframe {
-  border-radius: 8px;
-  border: 1px solid #ddd;
+  padding: 3px 10px;
+  letter-spacing: 0.06em;
+  margin-bottom: 0.7rem;
+  margin-right: 0;
+  text-transform: uppercase;
 }
 
+.dialogues-featured-title {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 0.4rem;
+  color: #18181b;
+  letter-spacing: -0.01em;
+}
+
+.dialogues-featured-date {
+  font-size: 0.9rem;
+  color: #555;
+  margin-bottom: 0.6rem;
+}
+
+.dialogues-featured-summary {
+  font-size: 1.07rem;
+  line-height: 1.7;
+  color: #444;
+}
+
+.dialogues-featured-badges {
+  margin-top: 0.5rem;
+}
+
+/* Post grid and cards */
+.dialogues-posts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 2.2rem 1.4rem;
+}
+
+.dialogues-post {
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 2px 14px #0001;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: box-shadow 0.13s;
+}
+
+.dialogues-post-image {
+  width: 100%;
+  height: 130px;
+  object-fit: cover;
+}
+
+.dialogues-post-content {
+  padding: 1.1rem 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.dialogues-post-title {
+  font-size: 1.13rem;
+  font-weight: 600;
+  margin-bottom: 0.2rem;
+  color: #1e293b;
+}
+
+.dialogues-post-date {
+  font-size: 0.9rem;
+  color: #71717a;
+}
+
+.dialogues-post-summary {
+  font-size: 0.97rem;
+  color: #333;
+  line-height: 1.6;
+}
+
+/* Meta/tag styles */
+.dialogues-post-meta {
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  border-radius: 8px;
+  padding: 2px 8px;
+  display: inline-block;
+  background: #e5e7eb;
+  color: #222;
+  margin-bottom: 0.4rem;
+  text-transform: uppercase;
+}
+.dialogues-post-meta--blog { background: #fde68a; }
+.dialogues-post-meta--news { background: #bae6fd; }
+.dialogues-post-meta--playlist { background: #c7d2fe; }
+.dialogues-post-meta-featured {
+  background: #9333ea !important;
+  color: #fff !important;
+}
+
+/* Sidebar styles */
+.dialogues-sidebar {
+  flex: 1 1 0%;
+  background: #f5f3ff;
+  border-radius: 18px;
+  padding: 2.2rem 1.2rem 1.6rem 1.2rem;
+  box-shadow: 0 2px 14px #0001;
+  min-width: 260px;
+}
+
+.dialogues-sidebar-title {
+  font-size: 1.07rem;
+  font-weight: 700;
+  color: #a21caf;
+  margin-bottom: 1.2rem;
+}
+
+.dialogues-sidebar-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.7rem;
+}
+
+.dialogues-playlist-label {
+  font-size: 0.88rem;
+  font-weight: 600;
+  margin-bottom: 0.6rem;
+  color: #3b0764;
+}
+
+/* Playlist iframe */
+.dialogues-playlist-iframe {
+  border: none;
+  border-radius: 9px;
+  min-height: 70px;
+  background: #fff;
+}
+
+/* Responsive tweaks */
+@media (max-width: 1000px) {
+  .dialogues-posts-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .dialogues-body-row {
+    flex-direction: column;
+    gap: 2.3rem;
+  }
+  .dialogues-sidebar {
+    min-width: unset;
+    margin-top: 2.5rem;
+    width: 100%;
+  }
+}
+@media (max-width: 700px) {
+  .dialogues-posts-grid {
+    grid-template-columns: 1fr;
+    gap: 1.2rem;
+  }
+  .dialogues-main-col {
+    gap: 1.6rem;
+  }
+  .dialogues-featured-content {
+    padding: 1.1rem 0.7rem;
+  }
+}

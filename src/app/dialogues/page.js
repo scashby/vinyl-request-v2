@@ -111,29 +111,30 @@ export default function DialoguesPage() {
                   <p className="dialogues-featured-summary">
                     {featured.contentSnippet || ""}
                   </p>
-                  {/* Category badges */}
                   {featured.categories && featured.categories.length > 0 && (
-                    <div style={{ marginTop: 8 }}>
-                      {featured.categories.map((cat, i) => (
-                        <span
-                          key={i}
-                          className={`dialogues-post-meta-tag${cat.toLowerCase() === "featured" ? " dialogues-post-meta-featured" : ""}`}
-                          style={{
-                            display: "inline-block",
-                            marginRight: 6,
-                            padding: "2px 8px",
-                            background: cat.toLowerCase() === "featured" ? "#9333ea" : "#f1f1f1",
-                            color: cat.toLowerCase() === "featured" ? "#fff" : "#222",
-                            borderRadius: 8,
-                            fontSize: "0.75rem",
-                            fontWeight: 500,
-                            textTransform: "uppercase",
-                            letterSpacing: "0.03em",
-                          }}
-                        >
-                          {cat}
-                        </span>
-                      ))}
+                    <div className="dialogues-featured-badges">
+                      {featured.categories
+                        .filter(cat => cat.toLowerCase() !== "featured")
+                        .map((cat, i) => (
+                          <span
+                            key={i}
+                            className="dialogues-post-meta-tag"
+                            style={{
+                              display: "inline-block",
+                              marginRight: 6,
+                              padding: "2px 8px",
+                              background: "#f1f1f1",
+                              color: "#222",
+                              borderRadius: 8,
+                              fontSize: "0.75rem",
+                              fontWeight: 500,
+                              textTransform: "uppercase",
+                              letterSpacing: "0.03em",
+                            }}
+                          >
+                            {cat}
+                          </span>
+                        ))}
                     </div>
                   )}
                 </div>
