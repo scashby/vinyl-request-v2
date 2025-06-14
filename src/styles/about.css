@@ -146,6 +146,13 @@
   color: #888;
 }
 
+
 .about-body-row {
   align-items: flex-start;
+}
+
+.about-sidebar {
+  flex: 1;
+  min-width: 260px;
+  padding-top: 0.25rem;
 }
