@@ -389,3 +389,16 @@ html, body {
 /* Titles */
 .dialogues-featured-title { color: #2562eb !important; }   /* purple for featured title */
 .dialogues-post-title { color: #2563eb !important; }       /* blue for all post titles */
+
+/* === Badge color override fix === */
+.badge-featured,
+.badge-blog,
+.badge-news,
+.badge-playlist {
+  color: inherit !important;
+}
+
+.tag-featured { color: #9333ea !important; }
+.tag-blog    { color: #16a34a !important; }
+.tag-news    { color: #ea580c !important; }
+.tag-playlist{ color: #dc2626 !important; }
