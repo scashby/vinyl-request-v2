@@ -9,27 +9,18 @@ import Footer from "components/Footer";
 import 'styles/dialogues.css';
 import 'styles/internal.css';
 
-// BADGE COLOR MAP
-const badgeColor = {
-  featured: "#9333ea",
-  playlist: "#dc2626",
-  blog: "#16a34a",
-  news: "#ea580c",
+// BADGE CLASS MAP
+const badgeClass = {
+  featured: "badge-featured",
+  playlist: "badge-playlist",
+  blog: "badge-blog",
+  news: "badge-news"
 };
 
 function Badge({ label }) {
-  const color = badgeColor[label.toLowerCase()] || "#333";
+  const cls = badgeClass[label.toLowerCase()] || "";
   return (
-    <span
-      style={{
-        color,
-        fontWeight: 700,
-        textTransform: "uppercase",
-        fontSize: "0.87rem",
-        letterSpacing: "0.08em",
-        marginRight: 9,
-      }}
-    >
+    <span className={`badge ${cls}`}>
       {label}
     </span>
   );
@@ -106,7 +97,6 @@ export default function DialoguesPage() {
       </header>
       <main className="event-body">
         <div className="dialogues-body-row">
-          {/* Main */}
           <div className="dialogues-main-col">
             {/* Featured from WordPress */}
             {featured && (
@@ -134,7 +124,8 @@ export default function DialoguesPage() {
                   <p className="dialogues-featured-summary">
                     {featured.contentSnippet || ""}
                   </p>
-                  {featured.categories && featured.categories.length > 0 && (
+                  {/* All other badges except "featured" */}
+                  {featured.categories && (
                     <div className="dialogues-featured-badges">
                       {featured.categories
                         .filter(cat => cat.toLowerCase() !== "featured")
@@ -147,7 +138,6 @@ export default function DialoguesPage() {
               </div>
             )}
 
-            {/* Example static posts grid (replace with your WP feed if desired) */}
             <div className="dialogues-posts-grid">
               {posts.map((post) => (
                 <div className="dialogues-post" key={post.title}>
@@ -170,7 +160,6 @@ export default function DialoguesPage() {
               ))}
             </div>
           </div>
-          {/* Sidebar */}
           <aside className="dialogues-sidebar">
             <div className="dialogues-sidebar-title">Playlists</div>
             <div className="dialogues-sidebar-list">
