@@ -157,7 +157,14 @@
   padding-top: 0.25rem;
 }
 
-.about-body-container {
-  padding-top: 0 !important;
+
+.about-main-col,
+.about-sidebar {
   margin-top: 0 !important;
+  padding-top: 0 !important;
+}
+
+.about-body-container {
+  margin-top: 0 !important;
+  padding-top: 0 !important;
 }
