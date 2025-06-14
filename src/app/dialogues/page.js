@@ -169,7 +169,6 @@ export default function DialoguesPage() {
           </aside>
         </div>
       </main>
-      <Footer />
     </div>
   );
 }
