@@ -1,5 +1,5 @@
 // Dialogues page ("/dialogues")
-// Lists all Substack entries (since tags/categories are missing), and embedded playlists.
+// Lists all WordPress articles (with tag/category badges), and embedded playlists.
 
 "use client";
 
@@ -59,7 +59,7 @@ export default function Page() {
       .then(res => res.json())
       .then(data => {
         setArticles(data.items || []);
-        });
+      });
   }, []);
 
   return (
@@ -73,7 +73,7 @@ export default function Page() {
         <div className="dialogues-body-row">
           {/* Main */}
           <div className="dialogues-main-col">
-            {/* Substack Articles */}
+            {/* WordPress Articles */}
             <div className="dialogues-posts-grid">
               {articles.map((item) => (
                 <div className="dialogues-post" key={item.guid || item.link}>
@@ -87,9 +87,30 @@ export default function Page() {
                     unoptimized
                   />
                   <div className="dialogues-post-content">
-                    <span className="dialogues-post-meta dialogues-post-meta--substack">
-                      SUBSTACK
-                    </span>
+                    {/* Category/tag badges */}
+                    <div style={{ marginBottom: 8 }}>
+                      {item.categories &&
+                        item.categories.map((cat, i) => (
+                          <span
+                            key={i}
+                            className={`dialogues-post-meta-tag${cat.toLowerCase() === "featured" ? " dialogues-post-meta-featured" : ""}`}
+                            style={{
+                              display: "inline-block",
+                              marginRight: 6,
+                              padding: "2px 8px",
+                              background: cat.toLowerCase() === "featured" ? "#9333ea" : "#f1f1f1",
+                              color: cat.toLowerCase() === "featured" ? "#fff" : "#222",
+                              borderRadius: 8,
+                              fontSize: "0.75rem",
+                              fontWeight: 500,
+                              textTransform: "uppercase",
+                              letterSpacing: "0.03em",
+                            }}
+                          >
+                            {cat}
+                          </span>
+                        ))}
+                    </div>
                     <div className="dialogues-post-title">{item.title}</div>
                     <div className="dialogues-post-date">
                       {item.pubDate
