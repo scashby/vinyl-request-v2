@@ -9,7 +9,31 @@ import Footer from "components/Footer";
 import 'styles/dialogues.css';
 import 'styles/internal.css';
 
-// Playlists (unchanged)
+// Example static posts (you can keep or remove)
+const posts = [
+  {
+    title: "DJ Setlist: Summer Nights Playlist",
+    image: "/images/setlist.jpg",
+    date: "June 8, 2025",
+    type: "PLAYLIST",
+    summary: "Perfect side A’s for patio listening, plus Apple/Spotify embeds.",
+  },
+  {
+    title: "Notes from the Booth",
+    image: "/images/booth.jpg",
+    date: "June 3, 2025",
+    type: "BLOG",
+    summary: "Stories, crowd picks, and last week’s most requested LP.",
+  },
+  {
+    title: "5 New Finds at the Shop",
+    image: "/images/records.jpg",
+    date: "May 29, 2025",
+    type: "NEWS",
+    summary: "Quick reviews of the freshest wax in the collection.",
+  },
+];
+
 const playlists = [
   {
     platform: "Spotify",
@@ -25,26 +49,28 @@ const playlists = [
   },
 ];
 
-// Utility to extract first image from HTML
+// Extract the first image from content HTML
 function extractFirstImg(html) {
-  const match = html && html.match(/<img[^>]+src="([^">]+)"/i);
+  if (!html) return null;
+  const match = html.match(/<img[^>]+src=["']([^"'>]+)["']/i);
   return match ? match[1] : null;
 }
 
 export default function DialoguesPage() {
-  const [articles, setArticles] = useState([]);
   const [featured, setFeatured] = useState(null);
 
   useEffect(() => {
     fetch("/api/wordpress")
       .then(res => res.json())
       .then(data => {
-        setArticles(data.items || []);
-        // Find a post tagged 'featured' (case-insensitive)
-        const found = data.items?.find(item =>
+        // Debug: log feed items
+        console.log('WordPress items:', data.items);
+        if (!data.items || !Array.isArray(data.items)) return;
+        // Find first "featured" post
+        const found = data.items.find(item =>
           item.categories && item.categories.some(c => c.toLowerCase() === "featured")
         );
-        setFeatured(found || null);
+        if (found) setFeatured(found);
       });
   }, []);
 
@@ -57,19 +83,20 @@ export default function DialoguesPage() {
       </header>
       <main className="event-body">
         <div className="dialogues-body-row">
-          {/* Main column */}
+          {/* Main */}
           <div className="dialogues-main-col">
-            {/* Featured Article */}
+            {/* Featured from WordPress */}
             {featured && (
               <div className="dialogues-featured" key={featured.guid || featured.link}>
                 <Image
                   className="dialogues-featured-image"
                   src={extractFirstImg(featured['content:encoded'] || featured.content) || "/images/vinyl-featured.jpg"}
                   alt={featured.title}
-                  width={700}
+                  width={350}
                   height={260}
-                  style={{ objectFit: "cover", borderRadius: 14 }}
+                  style={{ objectFit: "cover", borderRadius: 10 }}
                   unoptimized
+                  priority
                 />
                 <div className="dialogues-featured-content">
                   <span className="dialogues-featured-meta">FEATURED</span>
@@ -84,7 +111,7 @@ export default function DialoguesPage() {
                   <p className="dialogues-featured-summary">
                     {featured.contentSnippet || ""}
                   </p>
-                  {/* Tag badges */}
+                  {/* Category badges */}
                   {featured.categories && featured.categories.length > 0 && (
                     <div style={{ marginTop: 8 }}>
                       {featured.categories.map((cat, i) => (
@@ -113,58 +140,26 @@ export default function DialoguesPage() {
               </div>
             )}
 
-            {/* All Articles Grid */}
+            {/* Example static posts grid (replace with your WP feed if desired) */}
             <div className="dialogues-posts-grid">
-              {articles.filter(item => !(
-                item.categories && item.categories.some(c => c.toLowerCase() === "featured")
-              )).map((item) => (
-                <div className="dialogues-post" key={item.guid || item.link}>
+              {posts.map((post) => (
+                <div className="dialogues-post" key={post.title}>
                   <Image
                     className="dialogues-post-image"
-                    src={extractFirstImg(item['content:encoded'] || item.content) || "/images/vinyl-featured.jpg"}
-                    alt={item.title}
+                    src={post.image}
+                    alt={post.title}
                     width={350}
                     height={200}
                     style={{ objectFit: "cover", borderRadius: 10 }}
                     unoptimized
                   />
                   <div className="dialogues-post-content">
-                    {/* Tag/category badges */}
-                    <div style={{ marginBottom: 8 }}>
-                      {item.categories && item.categories.map((cat, i) => (
-                        <span
-                          key={i}
-                          className={`dialogues-post-meta-tag${cat.toLowerCase() === "featured" ? " dialogues-post-meta-featured" : ""}`}
-                          style={{
-                            display: "inline-block",
-                            marginRight: 6,
-                            padding: "2px 8px",
-                            background: cat.toLowerCase() === "featured" ? "#9333ea" : "#f1f1f1",
-                            color: cat.toLowerCase() === "featured" ? "#fff" : "#222",
-                            borderRadius: 8,
-                            fontSize: "0.75rem",
-                            fontWeight: 500,
-                            textTransform: "uppercase",
-                            letterSpacing: "0.03em",
-                          }}
-                        >
-                          {cat}
-                        </span>
-                      ))}
-                    </div>
-                    <div className="dialogues-post-title">{item.title}</div>
-                    <div className="dialogues-post-date">
-                      {item.pubDate
-                        ? new Date(item.pubDate).toLocaleDateString(undefined, {
-                            year: "numeric",
-                            month: "long",
-                            day: "numeric",
-                          })
-                        : ""}
-                    </div>
-                    <div className="dialogues-post-summary">
-                      {item.contentSnippet || ""}
-                    </div>
+                    <span className={`dialogues-post-meta dialogues-post-meta--${post.type.toLowerCase()}`}>
+                      {post.type}
+                    </span>
+                    <div className="dialogues-post-title">{post.title}</div>
+                    <div className="dialogues-post-date">{post.date}</div>
+                    <div className="dialogues-post-summary">{post.summary}</div>
                   </div>
                 </div>
               ))}
