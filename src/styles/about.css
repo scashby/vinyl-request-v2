@@ -1,15 +1,76 @@
 
-.about-body-row {
+.about-hero {
+  position: relative;
+  width: 100%;
+  height: 300px;
+  background: url('/images/event-header-still.jpg') center/cover no-repeat;
   display: flex;
-  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+}
+
+.about-hero .overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 100%;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 2rem;
+}
+
+.about-hero h1 {
+  font-family: 'Playfair Display', serif;
+  font-size: 2.75rem;
+  font-weight: bold;
+  color: white;
+  margin: 0;
+  text-align: center;
+}
+
+.about-body-row {
   max-width: 1140px;
   margin: 0 auto;
-  padding: 2rem 1rem;
-  gap: 2rem;
+  padding: 32px 16px;
+  display: flex;
+  gap: 36px;
+  background: #fff;
 }
 
 .about-main-col {
   flex: 2;
+  min-width: 0;
+}
+
+.about-body-container {
+  padding-right: 1rem;
+}
+
+.about-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+}
+
+.about-body-container p {
+  font-size: 1rem;
+  color: #333;
+  line-height: 1.6;
+  margin-bottom: 1.25rem;
+}
+
+.about-wishlist {
+  margin-top: 2rem;
+}
+
+.about-wishlist a {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: #2563eb;
+  text-decoration: underline;
 }
 
 .about-sidebar {
@@ -17,36 +78,75 @@
   min-width: 260px;
 }
 
-.about-title {
-  font-size: 2rem;
-  font-weight: bold;
-  margin-bottom: 1rem;
-}
-
-.about-wishlist {
-  margin-top: 1rem;
-  list-style: disc;
-  padding-left: 1.25rem;
-}
-
-.about-wishlist a {
-  color: #2563eb;
-  text-decoration: underline;
+.about-sidebar-title {
+  font-weight: 700;
+  font-size: 17px;
+  margin-bottom: 12px;
 }
 
 .about-mostwanted {
   list-style: decimal;
-  margin-left: 1.25rem;
-  margin-top: 0.5rem;
-  padding-left: 1rem;
+  padding-left: 1.25rem;
+  font-size: 0.95rem;
+  color: #111;
 }
 
 .about-mostwanted li {
   margin-bottom: 0.5rem;
 }
 
+.about-mostwanted a {
+  color: #1e40af;
+  text-decoration: underline;
+}
+
 .about-social-feed {
   margin-top: 2rem;
   font-style: italic;
   color: #666;
+}
+
+
+.about-social-feed {
+  margin-top: 2rem;
+  font-weight: 600;
+  font-size: 1rem;
+  color: #111;
+}
+
+.social-scroll-strip {
+  display: flex;
+  gap: 1rem;
+  overflow-x: auto;
+  padding: 0.5rem 0;
+  margin-top: 1rem;
+  scroll-snap-type: x mandatory;
+}
+
+.social-card {
+  min-width: 220px;
+  max-width: 220px;
+  background: #f8f8f8;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 0.75rem;
+  flex-shrink: 0;
+  scroll-snap-align: start;
+}
+
+.social-card h4 {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+  color: #2563eb;
+}
+
+.social-card p {
+  font-size: 0.875rem;
+  color: #333;
+  margin: 0 0 0.5rem;
+}
+
+.social-card time {
+  font-size: 0.75rem;
+  color: #888;
 }
