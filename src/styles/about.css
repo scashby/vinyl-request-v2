@@ -145,3 +145,7 @@
   font-size: 0.75rem;
   color: #888;
 }
+
+.about-body-row {
+  align-items: flex-start;
+}
