@@ -1,6 +1,3 @@
-// Dialogues page ("/dialogues")
-// Lists all WordPress articles (with tag/category badges), and embedded playlists.
-
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -9,30 +6,28 @@ import Footer from "components/Footer";
 import 'styles/dialogues.css';
 import 'styles/internal.css';
 
+// Posts example (edit categories as you wish)
 const posts = [
   {
     title: "DJ Setlist: Summer Nights Playlist",
     image: "/images/setlist.jpg",
     date: "June 8, 2025",
-    type: "PLAYLIST",
-    summary: "Perfect side A’s for patio listening, plus Apple/Spotify embeds.",
     categories: ["playlist"],
+    summary: "Perfect side A’s for patio listening, plus Apple/Spotify embeds.",
   },
   {
     title: "Notes from the Booth",
     image: "/images/booth.jpg",
     date: "June 3, 2025",
-    type: "BLOG",
-    summary: "Stories, crowd picks, and last week’s most requested LP.",
     categories: ["blog"],
+    summary: "Stories, crowd picks, and last week’s most requested LP.",
   },
   {
     title: "5 New Finds at the Shop",
     image: "/images/records.jpg",
     date: "May 29, 2025",
-    type: "NEWS",
-    summary: "Quick reviews of the freshest wax in the collection.",
     categories: ["news"],
+    summary: "Quick reviews of the freshest wax in the collection.",
   },
 ];
 
@@ -51,23 +46,33 @@ const playlists = [
   },
 ];
 
-// Extract the first image from content HTML
 function extractFirstImg(html) {
   if (!html) return null;
   const match = html.match(/<img[^>]+src=["']([^"'>]+)["']/i);
   return match ? match[1] : null;
 }
 
-function Tags({ categories }) {
-  if (!categories || !categories.length) return null;
+// Renders a single colored tag (all-caps, no pill)
+function Tag({ tag }) {
+  const t = tag.toLowerCase();
+  let color = "#444";
+  if (t === "blog") color = "#16a34a";
+  if (t === "news") color = "#ea580c";
+  if (t === "playlist") color = "#dc2626";
+  if (t === "featured") color = "#9333ea";
   return (
-    <div className="post-tags">
-      {categories.map((cat, i) => (
-        <span key={i} className={`tag tag-${cat.toLowerCase()}`}>
-          {cat.toUpperCase()}
-        </span>
-      ))}
-    </div>
+    <span style={{
+      color,
+      fontWeight: 700,
+      textTransform: "uppercase",
+      fontSize: "1.05em",
+      letterSpacing: "0.05em",
+      marginRight: 14,
+      background: "none",
+      border: "none"
+    }}>
+      {tag}
+    </span>
   );
 }
 
@@ -80,7 +85,7 @@ export default function DialoguesPage() {
       .then(data => {
         if (!data.items || !Array.isArray(data.items)) return;
         const found = data.items.find(item =>
-          item.categories && item.categories.map(c => c.toLowerCase()).includes("featured")
+          item.categories && item.categories.some(c => c.toLowerCase() === "featured")
         );
         if (found) setFeatured(found);
       });
@@ -96,7 +101,7 @@ export default function DialoguesPage() {
       <main className="event-body">
         <div className="dialogues-body-row">
           <div className="dialogues-main-col">
-            {/* Featured from WordPress */}
+            {/* FEATURED ARTICLE: only show FEATURED tag above title, no others */}
             {featured && (
               <div className="dialogues-featured" key={featured.guid || featured.link}>
                 <Image
@@ -110,6 +115,7 @@ export default function DialoguesPage() {
                   priority
                 />
                 <div className="dialogues-featured-content">
+                  <Tag tag="FEATURED" />
                   <h2 className="dialogues-featured-title">{featured.title}</h2>
                   <div className="dialogues-featured-date">
                     {featured.pubDate
@@ -121,11 +127,11 @@ export default function DialoguesPage() {
                   <p className="dialogues-featured-summary">
                     {featured.contentSnippet || ""}
                   </p>
-                  <Tags categories={featured.categories} />
                 </div>
               </div>
             )}
 
+            {/* NON-FEATURED POSTS: show tags in color */}
             <div className="dialogues-posts-grid">
               {posts.map((post) => (
                 <div className="dialogues-post" key={post.title}>
@@ -139,7 +145,11 @@ export default function DialoguesPage() {
                     unoptimized
                   />
                   <div className="dialogues-post-content">
-                    <Tags categories={post.categories} />
+                    <div className="post-tags">
+                      {post.categories && post.categories.map((cat, i) => (
+                        <Tag tag={cat} key={i} />
+                      ))}
+                    </div>
                     <div className="dialogues-post-title">{post.title}</div>
                     <div className="dialogues-post-date">{post.date}</div>
                     <div className="dialogues-post-summary">{post.summary}</div>
