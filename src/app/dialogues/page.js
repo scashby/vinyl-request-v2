@@ -9,6 +9,32 @@ import Footer from "components/Footer";
 import 'styles/dialogues.css';
 import 'styles/internal.css';
 
+// BADGE COLOR MAP
+const badgeColor = {
+  featured: "#9333ea",
+  playlist: "#dc2626",
+  blog: "#16a34a",
+  news: "#ea580c",
+};
+
+function Badge({ label }) {
+  const color = badgeColor[label.toLowerCase()] || "#333";
+  return (
+    <span
+      style={{
+        color,
+        fontWeight: 700,
+        textTransform: "uppercase",
+        fontSize: "0.87rem",
+        letterSpacing: "0.08em",
+        marginRight: 9,
+      }}
+    >
+      {label}
+    </span>
+  );
+}
+
 // Example static posts (you can keep or remove)
 const posts = [
   {
@@ -63,10 +89,7 @@ export default function DialoguesPage() {
     fetch("/api/wordpress")
       .then(res => res.json())
       .then(data => {
-        // Debug: log feed items
-        console.log('WordPress items:', data.items);
         if (!data.items || !Array.isArray(data.items)) return;
-        // Find first "featured" post
         const found = data.items.find(item =>
           item.categories && item.categories.some(c => c.toLowerCase() === "featured")
         );
@@ -99,7 +122,7 @@ export default function DialoguesPage() {
                   priority
                 />
                 <div className="dialogues-featured-content">
-                  <span className="dialogues-featured-meta">FEATURED</span>
+                  <Badge label="FEATURED" />
                   <h2 className="dialogues-featured-title">{featured.title}</h2>
                   <div className="dialogues-featured-date">
                     {featured.pubDate
@@ -116,24 +139,7 @@ export default function DialoguesPage() {
                       {featured.categories
                         .filter(cat => cat.toLowerCase() !== "featured")
                         .map((cat, i) => (
-                          <span
-                            key={i}
-                            className="dialogues-post-meta-tag"
-                            style={{
-                              display: "inline-block",
-                              marginRight: 6,
-                              padding: "2px 8px",
-                              background: "#f1f1f1",
-                              color: "#222",
-                              borderRadius: 8,
-                              fontSize: "0.75rem",
-                              fontWeight: 500,
-                              textTransform: "uppercase",
-                              letterSpacing: "0.03em",
-                            }}
-                          >
-                            {cat}
-                          </span>
+                          <Badge key={i} label={cat} />
                         ))}
                     </div>
                   )}
@@ -155,9 +161,7 @@ export default function DialoguesPage() {
                     unoptimized
                   />
                   <div className="dialogues-post-content">
-                    <span className={`dialogues-post-meta dialogues-post-meta--${post.type.toLowerCase()}`}>
-                      {post.type}
-                    </span>
+                    <Badge label={post.type} />
                     <div className="dialogues-post-title">{post.title}</div>
                     <div className="dialogues-post-date">{post.date}</div>
                     <div className="dialogues-post-summary">{post.summary}</div>
