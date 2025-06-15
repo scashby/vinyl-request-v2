@@ -9,6 +9,7 @@ html, body {
   color: #111;
   min-height: 100vh;
 }
+
 .page-wrapper {
   display: flex;
   flex-direction: column;
@@ -16,6 +17,7 @@ html, body {
   background: white;
   width: 100%;
 }
+
 .event-hero {
   position: relative;
   width: 100%;
@@ -25,6 +27,7 @@ html, body {
   align-items: center;
   justify-content: center;
 }
+
 .overlay {
   position: absolute;
   top: 0;
@@ -37,6 +40,7 @@ html, body {
   justify-content: center;
   padding: 0 2rem;
 }
+
 .event-hero h1 {
   font-family: 'Playfair Display', serif;
   font-size: 2.75rem;
@@ -45,6 +49,7 @@ html, body {
   margin: 0;
   text-align: center;
 }
+
 .event-body {
   flex-grow: 1;
   padding: 2rem 2rem 4rem;
@@ -53,78 +58,13 @@ html, body {
   justify-content: center;
 }
 
-.event-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2rem;
-  justify-content: center;
-  max-width: 1200px;
-}
-.event-card {
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  width: 260px;
-  text-align: center;
-  overflow: hidden;
-  transition: transform 0.2s ease;
-}
-.event-card:hover {
-  transform: scale(1.02);
-}
-.event-card img {
-  width: 100%;
-  height: auto;
-  display: block;
-}
-.event-card h2 {
-  font-weight: bold;
-  color: #6a0dad;
-  font-size: 1.25rem;
-  margin: 1rem 0 0.5rem;
-  display: block;
-}
-.event-card p {
-  font-size: 0.9rem;
-  color: #1a73e8;
-  margin-bottom: 1.5rem;
-}
-.footer {
-  background: #f2f2f2;
-  color: #333;
-  text-align: center;
-  padding: 1.5rem;
-  font-size: 0.85rem;
-}
-.card-square {
-  aspect-ratio: 1 / 1;
-  object-fit: cover;
-}
-.event-date {
-  margin-top: 0.25rem;
-  font-size: 0.9rem;
-  color: #444;
-}
-.event-time {
-  font-size: 0.9rem;
-  color: #444;
-  margin-top: 0;
-}
-/* === Re-added About the Event section === */
+/* Event Detail Layout */
 .event-detail-body {
   display: flex;
   flex-wrap: wrap;
   gap: 2rem;
-  padding: 3rem 2rem;
   justify-content: center;
   align-items: flex-start;
-}
-.event-sidebar {
-  flex: 0 0 auto;
-}
-.event-detail-body section {
-  flex: 1 1 500px;
-  max-width: 700px;
 }
 
 .event-content-grid {
@@ -150,32 +90,89 @@ html, body {
   margin-top: 0;
 }
 
+/* Event Card */
+.event-card {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  width: 260px;
+  text-align: center;
+  overflow: hidden;
+  transition: transform 0.2s ease;
+}
+
+.event-card:hover {
+  transform: scale(1.02);
+}
+
+.event-card img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.event-card h2 {
+  font-weight: bold;
+  color: #6a0dad;
+  font-size: 1.25rem;
+  margin: 1rem 0 0.5rem;
+  display: block;
+}
+
+.event-card p {
+  font-size: 0.9rem;
+  color: #1a73e8;
+  margin-bottom: 1.5rem;
+}
+
+.event-date {
+  margin-top: 0.25rem;
+  font-size: 0.9rem;
+  color: #444;
+}
+
+.event-time {
+  font-size: 0.9rem;
+  color: #444;
+  margin-top: 0;
+}
+
+.card-square {
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+}
+
+/* About Section */
 .event-info-card {
   background-color: white;
   color: black;
   padding: 1rem;
-  margin-top: 0 !important;
+  margin-top: 0;
   margin-bottom: 1.5rem;
   border-radius: 0.5rem;
   box-shadow: 0 0 6px rgba(0, 0, 0, 0.1);
 }
+
 .event-info-card h3 {
   font-size: 1.125rem;
   font-weight: 600;
   margin-top: 0;
   margin-bottom: 0.5rem;
 }
+
 .event-info-card p {
   font-size: 0.875rem;
   line-height: 1.5;
   margin-bottom: 0.5rem;
 }
+
 .event-info-card a {
   color: #2563eb;
   font-size: 0.875rem;
   text-decoration: underline;
 }
-/* === Queue Section === */
+
+/* Queue Section */
 .queue-section {
   margin-top: 1rem;
   background-color: #000;
@@ -183,9 +180,11 @@ html, body {
   padding: 1rem;
   border-radius: 0.5rem;
 }
+
 .queue-section h3 {
   margin-top: 0;
 }
+
 .queue-header-row {
   display: grid;
   grid-template-columns: auto 1fr auto auto;
@@ -199,60 +198,81 @@ html, body {
   padding-bottom: 0.5rem;
   margin-bottom: 0.5rem;
 }
+
 .queue-grid {
   display: grid;
   grid-template-columns: auto 1fr auto auto;
   gap: 1rem;
   align-items: center;
 }
+
 .queue-row {
   display: contents;
   border-top: 1px solid #333;
   padding: 0.75rem 0;
 }
+
 .queue-cover {
   width: 48px;
   height: 48px;
   object-fit: cover;
 }
+
 .queue-info {
   display: flex;
   flex-direction: column;
 }
+
 .queue-title {
   font-weight: 600;
   color: #2563eb;
 }
+
 .queue-artist {
   font-size: 0.875rem;
   color: #aaa;
 }
+
 .queue-side {
   font-size: 0.875rem;
   color: #ccc;
   text-align: center;
 }
+
 .queue-votes {
   display: flex;
   align-items: center;
   gap: 0.25rem;
   justify-content: flex-end;
 }
+
 .queue-heart {
   color: #dc2626;
   font-size: 1.25rem;
 }
+
 .queue-plus {
   color: #ccc;
   font-size: 1.25rem;
   cursor: pointer;
 }
+
 .queue-count {
   font-size: 0.875rem;
   color: #ccc;
 }
+
 .queue-index {
   color: #888;
   font-size: 0.875rem;
   text-align: center;
+}
+
+/* Footer */
+.footer {
+  background: #f2f2f2;
+  color: #333;
+  text-align: center;
+  padding: 1.5rem;
+  font-size: 0.85rem;
 }
