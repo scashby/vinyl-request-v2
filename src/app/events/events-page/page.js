@@ -48,7 +48,7 @@ export default function Page() {
           <h1>Upcoming Vinyl Nights</h1>
         </div>
       </header>
-      <main className="event-body">
+      <main className="events-page-body">
         <section className="event-grid">
           {events.map((event) => {
             const imageSrc = event.image_url || "/images/placeholder.png";

@@ -29,6 +29,10 @@ body {
 .event-body {
   padding: 3rem 2rem;
 }
+.events-page-body {
+  padding: 3rem 2rem;
+  background: white;
+}
 
 .event-grid {
   display: flex;
