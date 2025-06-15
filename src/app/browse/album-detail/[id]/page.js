@@ -8,6 +8,8 @@ import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { supabase } from 'lib/supabaseClient';
 import Image from "next/image";
 import 'styles/album-detail.css';
+import 'styles/internal.css';
+
 
 export default function Page() {
   const params = useParams();
