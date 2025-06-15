@@ -9,7 +9,7 @@ import { supabase } from 'lib/supabaseClient';
 import 'styles/internal.css';
 import Image from 'next/image';
 import QueueSection from 'components/QueueSection';
-import Footer from 'components/Footer';
+// import Footer from 'components/Footer';
 
 export default function Page() {
   const params = useParams();
