@@ -70,7 +70,7 @@ export default function Page() {
           <h1>{title}</h1>
         </div>
       </header>
-      <main className="page-body browse-queue" style={{ display: 'flex', gap: '2rem' }}>
+      <main className="event-body">
         <aside className="event-sidebar">
           <article className="event-card">
             <Image
@@ -138,7 +138,6 @@ export default function Page() {
           )}
         </section>
       </main>
-      <Footer />
     </div>
   );
 }
