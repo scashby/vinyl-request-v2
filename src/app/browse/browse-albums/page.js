@@ -153,7 +153,7 @@ function BrowseAlbumsContent() {
         </div>
       </header>
 
-      <main className="page-body">
+      <main className="page-body browse-collection-body">
         <div className="search-filter-bar">
           <input
             type="text"
