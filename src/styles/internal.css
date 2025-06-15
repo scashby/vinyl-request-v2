@@ -14,9 +14,12 @@ html, body {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background: white;
+  background: white;          /* <- this removes the gray */
   width: 100%;
+  position: relative;         /* <- ensures .overlay layering is respected */
+  z-index: 0;                 /* <- keeps it behind .overlay */
 }
+
 
 .overlay {
   position: absolute;
