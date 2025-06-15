@@ -110,6 +110,42 @@ html, body {
   margin-top: 0;
 }
 /* === Re-added About the Event section === */
+.event-detail-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2rem;
+  padding: 3rem 2rem;
+  justify-content: center;
+  align-items: flex-start;
+}
+.event-sidebar {
+  flex: 0 0 auto;
+}
+.event-detail-body section {
+  flex: 1 1 500px;
+  max-width: 700px;
+}
+
+.event-content-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2rem;
+  justify-content: center;
+  align-items: flex-start;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.event-sidebar {
+  flex: 0 0 260px;
+}
+
+.event-content-grid section {
+  flex: 1 1 500px;
+  max-width: 700px;
+}
+
+
 .event-info-card {
   background-color: white;
   color: black;
