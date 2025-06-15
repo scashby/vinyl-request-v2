@@ -32,13 +32,16 @@ body {
 .events-page-body {
   padding: 3rem 2rem;
   background: white;
+  display: block;
 }
 
 .event-grid {
   display: flex;
-  gap: 2rem;
   flex-wrap: wrap;
+  gap: 2rem;
   justify-content: center;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
 .event-card {
