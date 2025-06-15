@@ -26,6 +26,8 @@
 .event-body {
   padding: 3rem 2rem;
   background: white;
+  display: flex;
+  justify-content: center;
 }
 
 .event-grid {
