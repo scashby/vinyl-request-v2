@@ -47,11 +47,12 @@ html, body {
 }
 .event-body {
   flex-grow: 1;
-  padding: 4rem 2rem;
+  padding: 2rem 2rem 4rem;
   background: white;
   display: flex;
   justify-content: center;
 }
+
 .event-grid {
   display: flex;
   flex-wrap: wrap;
