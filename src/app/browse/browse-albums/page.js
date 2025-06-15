@@ -11,7 +11,7 @@ import 'styles/album-browse.css';
 import 'styles/internal.css';
 import { supabase } from 'lib/supabaseClient';
 import { useSearchParams } from 'next/navigation';
-import Footer from 'components/Footer';
+//import Footer from 'components/Footer';
 
 function BrowseAlbumsContent() {
   const searchParams = useSearchParams();
@@ -153,7 +153,7 @@ function BrowseAlbumsContent() {
         </div>
       </header>
 
-      <main className="page-body browse-collection-body">
+      <main className="browse-collection-body">
         <div className="search-filter-bar">
           <input
             type="text"
@@ -198,7 +198,7 @@ function BrowseAlbumsContent() {
         </section>
       </main>
 
-      <Footer />
+     
     </div>
   );
 }
