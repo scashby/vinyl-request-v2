@@ -30,10 +30,10 @@ body {
   padding: 3rem 2rem;
 }
 .events-page-body {
+  display: block !important;
   padding: 3rem 2rem;
-  background: white;
-  display: block;
 }
+
 
 .event-grid {
   display: flex;

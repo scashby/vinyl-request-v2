@@ -8,7 +8,7 @@ import { supabase } from 'lib/supabaseClient';
 import 'styles/internal.css';
 import Link from 'next/link';
 import Image from 'next/image';
-import Footer from 'components/Footer';
+// import Footer from 'components/Footer';
 
 export default function Page() {
   const [events, setEvents] = useState([]);
@@ -48,7 +48,7 @@ export default function Page() {
           <h1>Upcoming Vinyl Nights</h1>
         </div>
       </header>
-      <main className="events-page-body">
+      <main className="event-body events-page-body">
         <section className="event-grid">
           {events.map((event) => {
             const imageSrc = event.image_url || "/images/placeholder.png";
@@ -87,7 +87,6 @@ export default function Page() {
           })}
         </section>
       </main>
-      <Footer />
     </div>
   );
 }
