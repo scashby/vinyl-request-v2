@@ -29,20 +29,7 @@ body {
 .event-body {
   padding: 3rem 2rem;
 }
-.events-page-body {
-  display: block !important;
-  padding: 3rem 2rem;
-}
 
-
-.event-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2rem;
-  justify-content: center;
-  max-width: 1200px;
-  margin: 0 auto;
-}
 
 .event-card {
   width: 240px;
