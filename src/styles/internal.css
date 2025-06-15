@@ -162,6 +162,7 @@ html, body {
 .event-info-card h3 {
   font-size: 1.125rem;
   font-weight: 600;
+  margin-top: 0;
   margin-bottom: 0.5rem;
 }
 .event-info-card p {
@@ -181,6 +182,9 @@ html, body {
   color: #fff;
   padding: 1rem;
   border-radius: 0.5rem;
+}
+.queue-section h3 {
+  margin-top: 0;
 }
 .queue-header-row {
   display: grid;
