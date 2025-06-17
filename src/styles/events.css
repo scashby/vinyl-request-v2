@@ -30,11 +30,15 @@
   justify-content: center;
 }
 
-.event-body > section,
-.event-body > div {
+.events-page-body > section {
   max-width: 960px;
-  width: 100%;
   margin: 0 auto;
+}
+
+.event-info-card,
+.queue-section {
+  max-width: 960px;
+  margin: 2rem auto;
 }
 .event-hero + .event-body {
   background: white;
