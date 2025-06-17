@@ -19,7 +19,7 @@ body, html {
   left: 0;
   height: 100%;
   width: 100%;
-  background-image: url('/images/judas-priest-british-steel.jpg');
+  
   background-size: cover;
   background-position: center;
   filter: blur(20px) brightness(0.4);

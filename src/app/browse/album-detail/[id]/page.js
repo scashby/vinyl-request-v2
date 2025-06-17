@@ -152,7 +152,7 @@ export default function Page() {
 
   return (
     <div className="album-detail">
-      <div className="background-blur"></div>
+      {album?.image_url && (<div className="background-blur" style={{ backgroundImage: `url(${album.image_url})` }}></div>)}
       <div
         className="album-header"
         style={{
