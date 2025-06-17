@@ -119,15 +119,13 @@
   display: flex;
   flex-wrap: wrap;
   gap: 2rem;
-  margin-top: 2rem;
   align-items: flex-start;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding-top: 2rem;
 }
 
-.event-sidebar {
-  flex: 0 0 350px;
-}
-
-.event-content-grid section {
-  flex: 1;
-  min-width: 300px;
+.event-info-card h3,
+.queue-section h3 {
+  margin-top: 0;
 }
