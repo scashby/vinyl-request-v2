@@ -36,6 +36,11 @@
   width: 100%;
   margin: 0 auto;
 }
+.event-hero + .event-body {
+  background: white;
+  z-index: 0;
+  position: relative;
+}
 
 .event-info-card,
 .queue-section {
