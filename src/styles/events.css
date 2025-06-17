@@ -30,6 +30,20 @@
   justify-content: center;
 }
 
+.event-body > section,
+.event-body > div {
+  max-width: 960px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.event-info-card,
+.queue-section {
+  max-width: 960px;
+  width: 100%;
+  margin: 0 auto;
+}
+
 .event-grid {
   display: flex;
   flex-wrap: wrap;
