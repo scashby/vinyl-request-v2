@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from 'lib/supabaseClient';
 import 'styles/internal.css';
+import 'styles/events.css';
 import Image from 'next/image';
 import QueueSection from 'components/QueueSection';
 // import Footer from 'components/Footer';

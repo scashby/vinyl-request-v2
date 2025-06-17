@@ -6,6 +6,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from 'lib/supabaseClient';
 import 'styles/internal.css';
+import 'styles/events.css';
 import Link from 'next/link';
 import Image from 'next/image';
 // import Footer from 'components/Footer';
