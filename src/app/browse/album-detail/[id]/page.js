@@ -144,9 +144,9 @@ export default function Page() {
       if (eventTitle) params.set("eventTitle", eventTitle);
       params.set("eventId", eventId);
       params.set("fromQueue", "true");
-      router.push(`/browse?${params.toString()}`);
+      router.push(`/browse/browse-albums?${params.toString()}`);
     } else {
-      router.push("/browse");
+      router.push("/browse/browse-albums");
     }
   };
 
