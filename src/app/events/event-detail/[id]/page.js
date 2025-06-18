@@ -64,13 +64,13 @@ export default function Page() {
   };
 
   return (
-    <div className="page-wrapper">
+   <div className="page-wrapper event-body event-detail-body">
       <header className="event-hero">
         <div className="overlay">
           <h1>{title}</h1>
         </div>
       </header>
-      <main className="event-body event-detail-body">
+      <main>
         <div className="event-content-grid">
           <aside className="event-sidebar">
             <article className="event-card">
