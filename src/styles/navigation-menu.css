@@ -8,6 +8,12 @@
   line-height: 1;
   border-radius: 4px;
 }
+.menu-toggle.light {
+  color: white;
+}
+.menu-toggle.dark {
+  color: black;
+}
 
 
 /* Precise alignment to right of icon, no white gap */

@@ -1,11 +1,26 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import 'styles/navigation-menu.css';
 
 function NavigationMenu() {
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const button = document.querySelector('.menu-toggle');
+      if (window.scrollY > 100) {
+        button?.classList.remove('light');
+        button?.classList.add('dark');
+      } else {
+        button?.classList.remove('dark');
+        button?.classList.add('light');
+      }
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   return (
     <div style={{ position: 'fixed', top: '0.5rem', left: '0.5rem', zIndex: 1000 }}>
