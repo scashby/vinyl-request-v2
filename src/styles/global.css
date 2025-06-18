@@ -8,15 +8,13 @@
 .text-2xl .bg-white .text-black .p-4 .rounded .shadow .flex .justify-between .items-center {}
 
 /* Contents from style.css */
-body {
+body, html {
   margin: 0;
-  background-color: #101014;
-  color: #eaeaea;
+  background-color: white;
+  color: #111;
   font-family: 'Inter', 'Segoe UI', sans-serif;
 }
-html, body {
-  background-color: white !important;
-}
+
 
 .header-bar {
   background-color: #16161c;
