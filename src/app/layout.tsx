@@ -1,6 +1,6 @@
 // Root layout for all pages (sets up global styles, font, and metadata)
 
-import "styles/globals.css";
+import "styles/global.css";
 import { Inter } from "next/font/google";
 import Layout from "components/Layout";
 import "styles/internal.css";
