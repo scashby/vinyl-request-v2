@@ -9,7 +9,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const showLayout = pathname !== '/login';
 
   return (
-    <div className="bg-zinc-950 text-zinc-100 min-h-screen flex flex-col">
+    <div className="bg-white text-zinc-900 min-h-screen flex flex-col">
       {showLayout && <NavigationMenu />}
       <main className="flex-grow">{children}</main>
       {showLayout && <Footer />}
