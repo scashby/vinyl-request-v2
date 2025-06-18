@@ -1,18 +1,12 @@
 .menu-toggle {
   background: none;
   border: 1px solid #888;    /* subtle outline */
-  color: #666;               /* medium grey for visibility   */
+  color: #fff;               /* white for visibility   */
   font-size: 2rem;
   cursor: pointer;
   padding: 0.25rem;
   line-height: 1;
   border-radius: 4px;
-}
-.menu-toggle.light {
-  color: white;
-}
-.menu-toggle.dark {
-  color: black;
 }
 
 
