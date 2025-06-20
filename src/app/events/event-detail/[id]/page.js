@@ -70,76 +70,75 @@ export default function Page() {
           <h1>{title}</h1>
         </div>
       </header>
-      <div className="event-content-grid">
-        <div className="event-content-grid">
-          <aside className="event-sidebar">
-            <article className="event-card">
-              <Image
-                src={imageSrc}
-                alt={title}
-                className="card-square"
-                width={350}
-                height={350}
-                style={{ objectFit: "cover", borderRadius: 16 }}
-                unoptimized
-              />
-              <h2>{title}</h2>
-              {location && (
-                <p>
-                  <a
-                    href={`https://www.google.com/maps/search/${encodeURIComponent(location)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {location}
-                  </a>
-                </p>
-              )}
-              <p className="event-date">
-                {formatDate(date)}
-                <br />
-                {time && <span className="event-time">{time}</span>}
-              </p>
-            </article>
-          </aside>
-          <section>
-            {(info || info_url) && (
-              <div className="event-info-card">
-                <h3>About This Event</h3>
-                {info && <p>{info}</p>}
-                {info_url && (
-                  <a
-                    href={info_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    View the event page
-                  </a>
+            <div className="event-content-grid">
+              <aside className="event-sidebar">
+                <article className="event-card">
+                  <Image
+                    src={imageSrc}
+                    alt={title}
+                    className="card-square"
+                    width={350}
+                    height={350}
+                    style={{ objectFit: "cover", borderRadius: 16 }}
+                    unoptimized
+                  />
+                  <h2>{title}</h2>
+                  {location && (
+                    <p>
+                      <a
+                        href={`https://www.google.com/maps/search/${encodeURIComponent(location)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {location}
+                      </a>
+                    </p>
+                  )}
+                  <p className="event-date">
+                    {formatDate(date)}
+                    <br />
+                    {time && <span className="event-time">{time}</span>}
+                  </p>
+                </article>
+              </aside>
+              <section>
+                {(info || info_url) && (
+                  <div className="event-info-card">
+                    <h3>About This Event</h3>
+                    {info && <p>{info}</p>}
+                    {info_url && (
+                      <a
+                        href={info_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        View the event page
+                      </a>
+                    )}
+                  </div>
                 )}
-              </div>
-            )}
-            {has_queue && (
-              <>
-                <QueueSection eventId={event.id} />
-                <button
-                  className="text-blue-600 underline mt-4 inline-block"
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "#2563eb",
-                    cursor: "pointer",
-                    fontWeight: 500,
-                    fontSize: "1rem"
-                  }}
-                  onClick={goToBrowse}
-                >
-                  Browse the Collection
-                </button>
-              </>
-            )}
-          </section>
-        </div>
-      </div>
+                {has_queue && (
+                  <>
+                    <QueueSection eventId={event.id} />
+                    <button
+                      className="text-blue-600 underline mt-4 inline-block"
+                      style={{
+                        background: "none",
+                        border: "none",
+                        color: "#2563eb",
+                        cursor: "pointer",
+                        fontWeight: 500,
+                        fontSize: "1rem"
+                      }}
+                      onClick={goToBrowse}
+                    >
+                      Browse the Collection
+                    </button>
+                  </>
+                )}
+              </section>
+            </div>
+
     </div>
   );
 }
