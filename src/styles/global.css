@@ -5,7 +5,8 @@
 @tailwind utilities;
 
 /* FORCE USAGE BLOCK (do not remove) */
-.text-2xl .bg-white .text-black .p-4 .rounded .shadow .flex .justify-between .items-center {}
+.text-2xl .bg-white .text-black .p-4 .rounded .shadow .flex .justify-between .items-center
+.event-content-grid .event-sidebar .event-card .event-info-card .queue-section {}
 
 /* Contents from style.css */
 body, html {
