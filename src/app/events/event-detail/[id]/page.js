@@ -70,7 +70,7 @@ export default function Page() {
           <h1>{title}</h1>
         </div>
       </header>
-      <main>
+      <div className="event-content-grid">
         <div className="event-content-grid">
           <aside className="event-sidebar">
             <article className="event-card">
@@ -139,7 +139,7 @@ export default function Page() {
             )}
           </section>
         </div>
-      </main>
+      </div>
     </div>
   );
 }
