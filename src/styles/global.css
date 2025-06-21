@@ -175,3 +175,9 @@ main {
 .queue-wrapper h3 {
   color: white !important;
 }
+.event-sidebar .card-square {
+  border: none;
+  box-shadow: none;
+  background: none;
+  display: block;
+}
