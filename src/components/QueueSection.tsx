@@ -98,28 +98,27 @@ export default function QueueSection({ eventId }: QueueSectionProps) {
     fetchQueue();
   }, [eventId]);
 
-  // Upvote handler with spam prevention
   const handleUpvote = async (reqId: string | number) => {
     const key = getVoteKey(eventId, reqId);
     if (typeof window !== "undefined" && localStorage.getItem(key)) {
       alert("You have already voted for this entry.");
       return;
     }
-    setVoting((v) => ({ ...v, [reqId]: true }));
-    const item = queue.find((q) => q.id === reqId);
+    setVoting((v: { [key: string]: boolean }) => ({ ...v, [reqId]: true }));
+    const item = queue.find((q: QueueItem) => q.id === reqId);
     const newVotes = (item?.votes || 1) + 1;
     const { error } = await supabase
       .from("requests")
       .update({ votes: newVotes })
       .eq("id", reqId);
-    setVoting((v) => ({ ...v, [reqId]: false }));
+    setVoting((v: { [key: string]: boolean }) => ({ ...v, [reqId]: false }));
 
     if (!error) {
       if (typeof window !== "undefined") {
         localStorage.setItem(key, "voted");
       }
-      setQueue((q) =>
-        q.map((entry) =>
+      setQueue((q: QueueItem[]) =>
+        q.map((entry: QueueItem) =>
           entry.id === reqId ? { ...entry, votes: newVotes } : entry
         )
       );
@@ -128,7 +127,6 @@ export default function QueueSection({ eventId }: QueueSectionProps) {
     }
   };
 
-  // Navigation for album detail (Next.js style)
   const goToAlbum = (albumId: string | number) => {
     router.push(`/browse/album-detail/${albumId}${eventId ? `?eventId=${eventId}` : ""}`);
   };
@@ -163,7 +161,7 @@ export default function QueueSection({ eventId }: QueueSectionProps) {
             </tr>
           </thead>
           <tbody>
-            {queue.map((item) => {
+            {queue.map((item: QueueItem) => {
               const disabled =
                 voting[item.id] ||
                 (typeof window !== "undefined" &&

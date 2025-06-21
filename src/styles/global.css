@@ -148,3 +148,10 @@ main {
   flex: 1;
   min-width: 0;
 }
+
+.queue-section h3 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #111;
+  margin-bottom: 1rem;
+}
