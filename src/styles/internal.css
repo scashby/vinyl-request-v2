@@ -42,6 +42,8 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
+  margin-bottom: -4px; /* trims the visible seam */
+  border-bottom: none;
 }
 
 .event-hero h1 {
