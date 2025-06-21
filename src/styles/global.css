@@ -162,3 +162,13 @@ main {
   color: #111;
   margin-bottom: 1rem;
 }
+.event-info-card a {
+  color: #2563eb;
+  text-decoration: underline;
+  font-weight: 500;
+}
+.event-card img,
+.card-square {
+  border: none;
+  outline: none;
+}
