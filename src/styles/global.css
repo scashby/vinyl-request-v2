@@ -134,6 +134,10 @@ main {
 .event-info-card h3,
 .queue-section h3 {
   margin-top: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #111;
+  margin-bottom: 1rem;
 }
 
 .event-sidebar {
