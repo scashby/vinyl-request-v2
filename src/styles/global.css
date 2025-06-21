@@ -155,3 +155,10 @@ main {
   color: #111;
   margin-bottom: 1rem;
 }
+.queue-wrapper h3,
+.queue-section h3 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #111;
+  margin-bottom: 1rem;
+}
