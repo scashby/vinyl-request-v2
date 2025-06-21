@@ -135,3 +135,12 @@ main {
 .queue-section h3 {
   margin-top: 0;
 }
+
+.event-sidebar {
+  flex: 0 0 350px;
+}
+
+.event-content-grid > section {
+  flex: 1;
+  min-width: 0;
+}
