@@ -35,19 +35,6 @@
   margin: 0 auto;
 }
 
-.event-info-card,
-.queue-section {
-  max-width: 960px;
-  margin: 2rem auto;
-}
-
-.event-info-card,
-.queue-section {
-  max-width: 960px;
-  width: 100%;
-  margin: 0 auto;
-}
-
 .event-grid {
   display: flex;
   flex-wrap: wrap;
@@ -108,19 +95,4 @@
 .card-square {
   aspect-ratio: 1 / 1;
   object-fit: cover;
-}
-
-.event-content-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2rem;
-  align-items: flex-start;
-  max-width: 1100px;
-  margin: 0 auto;
-  padding-top: 2rem;
-}
-
-.event-info-card h3,
-.queue-section h3 {
-  margin-top: 0;
 }
