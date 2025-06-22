@@ -5,17 +5,17 @@ import "../styles/base.css";
 
 const InternalLayout = ({ title, children }) => {
   return (
-    <div className="w-full m-0 p-0">
-      <header className="event-hero">
+    <>
+      <header className="event-hero no-spacing">
         <div className="overlay">
           <h1>{title}</h1>
         </div>
       </header>
-      <main className="event-body">
+      <main className="event-body no-spacing">
         {children}
       </main>
       <Footer />
-    </div>
+    </>
   );
 };
 

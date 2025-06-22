@@ -4,9 +4,9 @@
 html, body {
   margin: 0;
   padding: 0;
-  background: #000000;
   font-family: 'Inter', sans-serif;
-  color: #ffffff;
+  color: #111;
+  background: white;
   min-height: 100vh;
 }
 
@@ -14,7 +14,7 @@ html, body {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background: transparent;
+  background: white;
   width: 100%;
   position: relative;
   z-index: 0;
@@ -41,8 +41,9 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: -4px;
-  border-bottom: none;
+  margin: 0;
+  padding: 0;
+  border: none;
 }
 
 .event-hero h1 {
@@ -65,4 +66,10 @@ html, body {
   text-align: center;
   padding: 1.5rem;
   font-size: 0.85rem;
+}
+
+.no-spacing {
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100% !important;
 }
