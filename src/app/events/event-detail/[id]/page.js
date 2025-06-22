@@ -40,7 +40,6 @@ export default function Page() {
     image_url,
     info,
     info_url,
-    // allowed_formats,
     has_queue
   } = event;
 
@@ -58,7 +57,6 @@ export default function Page() {
     ? image_url.replace('www.dropbox.com', 'dl.dropboxusercontent.com').replace(/\?.*$/, '')
     : image_url || '/images/event-header-still.jpg';
 
-  // Go to browse page (Next.js style)
   const goToBrowse = () => {
     router.push(`/browse/browse-albums?eventId=${event.id}`);
   };
@@ -106,7 +104,7 @@ export default function Page() {
 
           <section>
             {(info || info_url) && (
-              <div className="event-info-card">
+              <div className="event-info-card event-section">
                 <h3>About This Event</h3>
                 {info && <p>{info}</p>}
                 {info_url && (
@@ -144,5 +142,4 @@ export default function Page() {
       </main>
     </div>
   );
-
 }
