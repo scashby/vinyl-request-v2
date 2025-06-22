@@ -1,11 +1,11 @@
 import React from 'react';
 import 'styles/internal.css';
-import Footer from 'components/Footer'; 
+import Footer from 'components/Footer';
 import "../styles/base.css";
 
 const InternalLayout = ({ title, children }) => {
   return (
-    <>
+    <div className="w-full m-0 p-0">
       <header className="event-hero">
         <div className="overlay">
           <h1>{title}</h1>
@@ -15,7 +15,7 @@ const InternalLayout = ({ title, children }) => {
         {children}
       </main>
       <Footer />
-    </>
+    </div>
   );
 };
 
