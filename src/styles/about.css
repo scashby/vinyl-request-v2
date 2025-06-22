@@ -174,3 +174,16 @@
 .about-title {
   margin-top: 0 !important;
 }
+
+.about-body-row h1,
+.about-body-row h2,
+.about-body-row h3,
+.about-body-row h4 {
+  color: #111;
+}
+
+.about-sidebar h2,
+.about-sidebar h3,
+.about-sidebar h4 {
+  color: #111;
+}
