@@ -23,7 +23,9 @@ function RequireAuth({ children }: { children: ReactNode }) {
 export default function AdminLayout({ children }: { children: ReactNode }) {
   return (
     <AuthProvider>
-      <RequireAuth>{children}</RequireAuth>
+      <RequireAuth>
+        <div className="admin-wrapper">{children}</div>
+      </RequireAuth>
     </AuthProvider>
   );
 }

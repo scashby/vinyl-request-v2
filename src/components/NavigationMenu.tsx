@@ -8,8 +8,12 @@ function NavigationMenu() {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
+    const button = document.querySelector('.menu-toggle');
+    if (button) {
+      button.classList.add('light'); // force default to white
+    }
+
     const handleScroll = () => {
-      const button = document.querySelector('.menu-toggle');
       if (window.scrollY > 100) {
         button?.classList.remove('light');
         button?.classList.add('dark');
@@ -18,6 +22,7 @@ function NavigationMenu() {
         button?.classList.add('light');
       }
     };
+
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
@@ -36,29 +41,19 @@ function NavigationMenu() {
         <div className="menu-panel">
           <ul>
             <li>
-              <Link href="/" onClick={() => setOpen(false)}>
-                Home
-              </Link>
+              <Link href="/" onClick={() => setOpen(false)}>Home</Link>
             </li>
             <li>
-              <Link href="/events/events-page" onClick={() => setOpen(false)}>
-                Events
-              </Link>
+              <Link href="/events/events-page" onClick={() => setOpen(false)}>Events</Link>
             </li>
             <li>
-              <Link href="/browse/browse-albums" onClick={() => setOpen(false)}>
-                Browse Albums
-              </Link>
+              <Link href="/browse/browse-albums" onClick={() => setOpen(false)}>Browse Albums</Link>
             </li>
             <li>
-              <Link href="/dialogues" onClick={() => setOpen(false)}>
-                Dialogues
-              </Link>
+              <Link href="/dialogues" onClick={() => setOpen(false)}>Dialogues</Link>
             </li>
             <li>
-              <Link href="/about" onClick={() => setOpen(false)}>
-                About
-              </Link>
+              <Link href="/about" onClick={() => setOpen(false)}>About</Link>
             </li>
           </ul>
         </div>

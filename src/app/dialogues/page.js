@@ -5,7 +5,6 @@
 
 import React, { useEffect, useState } from "react";
 import Image from "next/image";
-// import Footer from "components/Footer";
 import 'styles/dialogues.css';
 import 'styles/internal.css';
 
@@ -51,7 +50,6 @@ const playlists = [
   },
 ];
 
-// Extract the first image from content HTML
 function extractFirstImg(html) {
   if (!html) return null;
   const match = html.match(/<img[^>]+src=["']([^"'>]+)["']/i);
@@ -61,7 +59,7 @@ function extractFirstImg(html) {
 function Tags({ categories }) {
   if (!categories || !categories.length) return null;
   return (
-    <div className="post-tags">
+    <div className="post-tags relative">
       {categories.map((cat, i) => (
         <span key={i} className={`tag tag-${cat.toLowerCase()} badge badge-${cat.toLowerCase()}`}>
           {cat.toUpperCase()}
@@ -87,18 +85,17 @@ export default function DialoguesPage() {
   }, []);
 
   return (
-    <div className="page-wrapper">
+    <div className="relative page-wrapper">
       <header className="event-hero">
-        <div className="overlay">
+        <div className="relative overlay">
           <h1>Dialogues</h1>
         </div>
       </header>
       <main className="event-body">
-        <div className="dialogues-body-row">
-          <div className="dialogues-main-col">
-            {/* Featured from WordPress */}
+        <div className="relative dialogues-body-row">
+          <div className="relative dialogues-main-col">
             {featured && (
-              <div className="dialogues-featured" key={featured.guid || featured.link}>
+              <div className="relative dialogues-featured" key={featured.guid || featured.link}>
                 <Image
                   className="dialogues-featured-image"
                   src={extractFirstImg(featured['content:encoded'] || featured.content) || "/images/vinyl-featured.jpg"}
@@ -109,10 +106,10 @@ export default function DialoguesPage() {
                   unoptimized
                   priority
                 />
-                <div className="dialogues-featured-content">
+                <div className="relative dialogues-featured-content">
                   <span className="badge badge-featured">FEATURED</span>
                   <h2 className="dialogues-featured-title">{featured.title}</h2>
-                  <div className="dialogues-featured-date">
+                  <div className="relative dialogues-featured-date">
                     {featured.pubDate
                       ? new Date(featured.pubDate).toLocaleDateString(undefined, {
                           year: "numeric", month: "long", day: "numeric"
@@ -126,9 +123,9 @@ export default function DialoguesPage() {
               </div>
             )}
 
-            <div className="dialogues-posts-grid">
+            <div className="relative dialogues-posts-grid">
               {posts.map((post) => (
-                <div className="dialogues-post" key={post.title}>
+                <div className="relative dialogues-post" key={post.title}>
                   <Image
                     className="dialogues-post-image"
                     src={post.image}
@@ -138,22 +135,22 @@ export default function DialoguesPage() {
                     style={{ objectFit: "cover", borderRadius: 10 }}
                     unoptimized
                   />
-                  <div className="dialogues-post-content">
+                  <div className="relative dialogues-post-content">
                     <Tags categories={post.categories} />
-                    <div className="dialogues-post-title">{post.title}</div>
-                    <div className="dialogues-post-date">{post.date}</div>
-                    <div className="dialogues-post-summary">{post.summary}</div>
+                    <div className="relative dialogues-post-title">{post.title}</div>
+                    <div className="relative dialogues-post-date">{post.date}</div>
+                    <div className="relative dialogues-post-summary">{post.summary}</div>
                   </div>
                 </div>
               ))}
             </div>
           </div>
           <aside className="dialogues-sidebar">
-            <div className="dialogues-sidebar-title">Playlists</div>
-            <div className="dialogues-sidebar-list">
+            <div className="relative dialogues-sidebar-title">Playlists</div>
+            <div className="relative dialogues-sidebar-list">
               {playlists.map((p) => (
-                <div className="dialogues-playlist" key={p.platform}>
-                  <div className="dialogues-playlist-label">{p.platform}</div>
+                <div className="relative dialogues-playlist" key={p.platform}>
+                  <div className="relative dialogues-playlist-label">{p.platform}</div>
                   <iframe
                     title={p.platform}
                     src={p.embed}

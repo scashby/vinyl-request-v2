@@ -4,9 +4,9 @@
 html, body {
   margin: 0;
   padding: 0;
-  background: #ffffff;
+  background: #000000;
   font-family: 'Inter', sans-serif;
-  color: #111;
+  color: #ffffff;
   min-height: 100vh;
 }
 
@@ -14,12 +14,11 @@ html, body {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background: white;          /* <- this removes the gray */
+  background: transparent;
   width: 100%;
-  position: relative;         /* <- ensures .overlay layering is respected */
-  z-index: 0;                 /* <- keeps it behind .overlay */
+  position: relative;
+  z-index: 0;
 }
-
 
 .overlay {
   position: absolute;
@@ -42,7 +41,7 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: -4px; /* trims the visible seam */
+  margin-bottom: -4px;
   border-bottom: none;
 }
 
@@ -53,6 +52,11 @@ html, body {
   color: white;
   margin: 0;
   text-align: center;
+}
+
+.event-body {
+  padding-top: 0;
+  padding: 2rem 2rem 3rem 2rem;
 }
 
 .footer {

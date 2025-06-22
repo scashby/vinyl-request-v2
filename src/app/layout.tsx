@@ -1,11 +1,9 @@
-// Root layout for all pages (sets up global styles, font, and metadata)
-
 import "styles/global.css";
+import "styles/internal.css";
+import "styles/base.css";
+
 import { Inter } from "next/font/google";
 import Layout from "components/Layout";
-import "styles/internal.css";
-import "../styles/base.css";
-
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -21,7 +19,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={inter.className + " antialiased"}>
+      <body className={`${inter.className} antialiased bg-black text-white`}>
         <Layout>{children}</Layout>
       </body>
     </html>
