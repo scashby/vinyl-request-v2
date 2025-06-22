@@ -27,7 +27,6 @@ function BrowseAlbumsContent() {
   const [sortField, setSortField] = useState('title');
   const [sortAsc, setSortAsc] = useState(true);
 
-  // Always fetch event context if eventId param is present
   useEffect(() => {
     let isMounted = true;
     async function fetchEventDataIfNeeded() {
@@ -60,7 +59,6 @@ function BrowseAlbumsContent() {
     return () => { isMounted = false; };
   }, [eventId, allowedFormatsParam, eventTitleParam]);
 
-  // Batch fetch all albums (no 1000-row cap)
   useEffect(() => {
     async function fetchAllAlbums() {
       let allRows = [];
@@ -98,7 +96,6 @@ function BrowseAlbumsContent() {
     fetchAllAlbums();
   }, []);
 
-  // Accept both "CD" and "CDs" for filter/dropdown
   const formatVariants = (format) => {
     const f = format.trim().toLowerCase();
     if (f === "cd" || f === "cds") return ["cd", "cds"];
@@ -109,7 +106,6 @@ function BrowseAlbumsContent() {
     return [f];
   };
 
-  // Memoized normalization for allowed formats (fixes warning)
   const normalizedFormats = useMemo(() => (
     allowedFormats ? allowedFormats.flatMap(formatVariants) : []
   ), [allowedFormats]);
@@ -118,7 +114,6 @@ function BrowseAlbumsContent() {
     ? allowedFormats.map(f => f.trim())
     : ['Vinyl', 'Cassettes', 'CD', '45s', '8-Track'];
 
-  // Filtering + Sorting
   const filteredAlbums = useMemo(() => {
     let fa = albums.filter(album => {
       const folder = (album.folder || '').trim().toLowerCase();
@@ -172,14 +167,14 @@ function BrowseAlbumsContent() {
               </option>
             ))}
           </select>
-          <select value={sortField} onChange={e => setSortField(e.target.value)} style={{ marginLeft: 8 }}>
+          <select value={sortField} onChange={e => setSortField(e.target.value)}>
             <option value="title">Title</option>
             <option value="artist">Artist</option>
             <option value="year">Year</option>
           </select>
           <button
+            className="button-secondary"
             onClick={() => setSortAsc(a => !a)}
-            style={{ marginLeft: 8 }}
           >
             Sort: {sortAsc ? 'Ascending' : 'Descending'}
           </button>
@@ -197,8 +192,6 @@ function BrowseAlbumsContent() {
           ))}
         </section>
       </main>
-
-     
     </div>
   );
 }
