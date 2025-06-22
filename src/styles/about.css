@@ -177,13 +177,12 @@
 
 .about-body-row h1,
 .about-body-row h2,
-.about-body-row h3,
-.about-body-row h4 {
+.about-body-row h3 {
   color: #240042;
 }
 
+.about-sidebar h1,
 .about-sidebar h2,
-.about-sidebar h3,
-.about-sidebar h4 {
+.about-sidebar h3 {
   color: #111;
 }
