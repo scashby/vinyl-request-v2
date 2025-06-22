@@ -99,3 +99,10 @@ html, body {
   width: 250px;
   border-radius: 0.5rem;
 }
+
+.page-wrapper {
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
