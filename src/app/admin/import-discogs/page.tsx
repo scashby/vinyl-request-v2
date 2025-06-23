@@ -250,11 +250,11 @@ export default function Page() {
     <div>
       <h2>Import Discogs Collection</h2>
       <input type="file" accept=".csv" onChange={handleFile} />
-      <label style={{ marginLeft: 8 }}>
+      <p><label style={{ marginLeft: 8 }}>
         <input type="checkbox" checked={onlyAddNew} onChange={e => setOnlyAddNew(e.target.checked)} />
         {' '}Only add new items (skip updating existing)
-      </label>
-      <button onClick={handleImport}>Import</button>
+      </label></p>
+      <p><button onClick={handleImport}>Import</button></p>
       <p>{status}</p>
       <p>Duplicates Detected: {duplicates.length}</p>
     </div>
