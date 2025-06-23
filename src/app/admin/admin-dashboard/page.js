@@ -16,12 +16,12 @@ export default function Page() {
           <Link href="/admin/edit-queue" style={{ color: '#2563eb', textDecoration: 'none' }}>Manage Queues</Link>
         </li>
         <li style={{ marginBottom: '1rem' }}>
-          <Link href="/admin/import-discogs" style={{ color: '#2563eb', textDecoration: 'none' }}>Manage Collection</Link>
+          <Link href="/admin/import-discogs" style={{ color: '#2563eb', textDecoration: 'none' }}>Import from Discogs</Link>
         </li>
-        <li>
+        <li style={{ marginBottom: '1rem' }}>
           <Link href="/admin/edit-collection" style={{ color: '#2563eb', textDecoration: 'none' }}>Edit Collection</Link>
         </li>
-        <li>
+        <li style={{ marginBottom: '1rem' }}>
           <Link href="/admin/add-album" style={{ color: '#2563eb', textDecoration: 'none' }}>Add Album Manually</Link>
         </li>
       </ul>
