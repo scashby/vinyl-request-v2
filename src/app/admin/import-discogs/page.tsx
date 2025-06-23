@@ -13,15 +13,7 @@ const cleanArtist = (artist: string): string =>
 
 // Bulletproof dedupe key for ALL sources
 const dedupeKey = (row: Record<string, unknown>): string =>
-  [
-    (row.discogs_release_id || '').toString().trim(),
-    (row.discogs_master_id || '').toString().trim(),
-    (row.folder || '').toString().trim().toLowerCase(),
-    (row.media_condition || '').toString().trim().toLowerCase(),
-    cleanArtist((row.artist as string) || '').toLowerCase(),
-    (row.title || '').toString().trim().toLowerCase(),
-    (row.year || '').toString().trim().toLowerCase()
-  ].join('|--|');
+  (row.discogs_release_id || row.release_id || '').toString().trim();
 
 async function fetchDiscogsRelease(releaseId: string): Promise<Record<string, unknown>> {
   const res = await fetch(`/api/discogsProxy?releaseId=${releaseId}`);
