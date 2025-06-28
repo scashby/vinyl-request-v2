@@ -8,164 +8,157 @@ import Image from "next/image";
 import 'styles/dialogues.css';
 import 'styles/internal.css';
 
-const posts = [
-  {
-    title: "DJ Setlist: Summer Nights Playlist",
-    image: "/images/setlist.jpg",
-    date: "June 8, 2025",
-    type: "PLAYLIST",
-    summary: "Perfect side A’s for patio listening, plus Apple/Spotify embeds.",
-    categories: ["playlist"],
-  },
-  {
-    title: "Notes from the Booth",
-    image: "/images/booth.jpg",
-    date: "June 3, 2025",
-    type: "BLOG",
-    summary: "Stories, crowd picks, and last week’s most requested LP.",
-    categories: ["blog"],
-  },
-  {
-    title: "5 New Finds at the Shop",
-    image: "/images/records.jpg",
-    date: "May 29, 2025",
-    type: "NEWS",
-    summary: "Quick reviews of the freshest wax in the collection.",
-    categories: ["news"],
-  },
-];
-
-const playlists = [
-  {
-    platform: "Spotify",
-    embed: "https://open.spotify.com/embed/playlist/37i9dQZF1DX2sUQwD7tbmL?utm_source=generator",
-  },
-  {
-    platform: "Apple Music",
-    embed: "https://embed.music.apple.com/us/playlist/indie-plaza/pl.1234567890abcdef",
-  },
-  {
-    platform: "Tidal",
-    embed: "https://embed.tidal.com/albums/192548722?layout=gridify",
-  },
-];
-
-function extractFirstImg(html) {
-  if (!html) return null;
-  const match = html.match(/<img[^>]+src=["']([^"'>]+)["']/i);
-  return match ? match[1] : null;
-}
-
-function Tags({ categories }) {
-  if (!categories || !categories.length) return null;
-  return (
-    <div className="post-tags relative">
-      {categories.map((cat, i) => (
-        <span key={i} className={`tag tag-${cat.toLowerCase()} badge badge-${cat.toLowerCase()}`}>
-          {cat.toUpperCase()}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-export default function DialoguesPage() {
-  const [featured, setFeatured] = useState(null);
+export default function Page() {
+  const [posts, setPosts] = useState([]);
 
   useEffect(() => {
-    fetch("/api/wordpress")
+    fetch('https://blog.deadwaxdialogues.com/wp-json/wp/v2/posts?_embed&per_page=5')
       .then(res => res.json())
-      .then(data => {
-        if (!data.items || !Array.isArray(data.items)) return;
-        const found = data.items.find(item =>
-          item.categories && item.categories.map(c => c.toLowerCase()).includes("featured")
-        );
-        if (found) setFeatured(found);
-      });
+      .then(setPosts)
+      .catch(console.error);
   }, []);
 
   return (
-    <div className="relative page-wrapper">
-      <header className="event-hero">
-        <div className="relative overlay">
-          <h1>Dialogues</h1>
-        </div>
-      </header>
-      <main className="event-body">
-        <div className="relative dialogues-body-row">
-          <div className="relative dialogues-main-col">
-            {featured && (
-              <div className="relative dialogues-featured" key={featured.guid || featured.link}>
-                <Image
-                  className="dialogues-featured-image"
-                  src={extractFirstImg(featured['content:encoded'] || featured.content) || "/images/vinyl-featured.jpg"}
-                  alt={featured.title}
-                  width={350}
-                  height={260}
-                  style={{ objectFit: "cover", borderRadius: 10 }}
-                  unoptimized
-                  priority
-                />
-                <div className="relative dialogues-featured-content">
-                  <span className="badge badge-featured">FEATURED</span>
-                  <h2 className="dialogues-featured-title">{featured.title}</h2>
-                  <div className="relative dialogues-featured-date">
-                    {featured.pubDate
-                      ? new Date(featured.pubDate).toLocaleDateString(undefined, {
-                          year: "numeric", month: "long", day: "numeric"
-                        })
-                      : ""}
-                  </div>
-                  <p className="dialogues-featured-summary">
-                    {featured.contentSnippet || ""}
-                  </p>
-                </div>
-              </div>
-            )}
+    <div className="site-wrapper">
+      <div className="dialogues-body-row">
+        <main className="dialogues-main-col">
 
-            <div className="relative dialogues-posts-grid">
-              {posts.map((post) => (
-                <div className="relative dialogues-post" key={post.title}>
-                  <Image
-                    className="dialogues-post-image"
-                    src={post.image}
-                    alt={post.title}
-                    width={350}
-                    height={200}
-                    style={{ objectFit: "cover", borderRadius: 10 }}
-                    unoptimized
-                  />
-                  <div className="relative dialogues-post-content">
-                    <Tags categories={post.categories} />
-                    <div className="relative dialogues-post-title">{post.title}</div>
-                    <div className="relative dialogues-post-date">{post.date}</div>
-                    <div className="relative dialogues-post-summary">{post.summary}</div>
-                  </div>
-                </div>
-              ))}
+          <section className="dialogues-featured">
+            <Image
+              className="dialogues-featured-image"
+              src="/images/dialogues-placeholder.jpg"
+              alt=""
+              width={800}
+              height={450}
+              unoptimized
+            />
+            <div className="dialogues-featured-content">
+              <span className="dialogues-featured-meta">FEATURED</span>
+              <h2 className="dialogues-featured-title">
+                {posts[0] ? posts[0].title.rendered : "Title of the featured interview goes here"}
+              </h2>
+              <div className="dialogues-featured-date">
+                {posts[0]
+                  ? new Date(posts[0].date).toLocaleDateString(undefined, {
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
+                    })
+                  : "May 24, 2024"}
+              </div>
+              <p className="dialogues-featured-summary">
+                {posts[0]
+                  ? posts[0].excerpt.rendered
+                  : "A short excerpt of the featured interview or article will appear here to draw users in..."}
+              </p>
             </div>
-          </div>
-          <aside className="dialogues-sidebar">
-            <div className="relative dialogues-sidebar-title">Playlists</div>
-            <div className="relative dialogues-sidebar-list">
-              {playlists.map((p) => (
-                <div className="relative dialogues-playlist" key={p.platform}>
-                  <div className="relative dialogues-playlist-label">{p.platform}</div>
-                  <iframe
-                    title={p.platform}
-                    src={p.embed}
-                    width="100%"
-                    height="80"
-                    className="dialogues-playlist-iframe"
-                    allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                    loading="lazy"
-                  ></iframe>
+          </section>
+
+          <section className="dialogues-posts-grid">
+            <article className="dialogues-post">
+              <Image
+                className="dialogues-post-image"
+                src="/images/dialogues-placeholder.jpg"
+                alt=""
+                width={600}
+                height={400}
+                unoptimized
+              />
+              <div className="dialogues-post-content">
+                <h3 className="dialogues-post-title">
+                  {posts[1] ? posts[1].title.rendered : "Post title"}
+                </h3>
+                <div className="dialogues-post-date">
+                  {posts[1]
+                    ? new Date(posts[1].date).toLocaleDateString(undefined, {
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                      })
+                    : "May 21, 2024"}
                 </div>
-              ))}
-            </div>
-          </aside>
-        </div>
-      </main>
+                <p className="dialogues-post-summary">
+                  {posts[1]
+                    ? posts[1].excerpt.rendered
+                    : "Short summary of the article or post goes here..."}
+                </p>
+              </div>
+            </article>
+
+            <article className="dialogues-post">
+              <Image
+                className="dialogues-post-image"
+                src="/images/dialogues-placeholder.jpg"
+                alt=""
+                width={600}
+                height={400}
+                unoptimized
+              />
+              <div className="dialogues-post-content">
+                <h3 className="dialogues-post-title">
+                  {posts[2] ? posts[2].title.rendered : "Another post title"}
+                </h3>
+                <div className="dialogues-post-date">
+                  {posts[2]
+                    ? new Date(posts[2].date).toLocaleDateString(undefined, {
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                      })
+                    : "May 17, 2024"}
+                </div>
+                <p className="dialogues-post-summary">
+                  {posts[2]
+                    ? posts[2].excerpt.rendered
+                    : "Another brief summary appears here with a link..."}
+                </p>
+              </div>
+            </article>
+
+            <article className="dialogues-post">
+              <Image
+                className="dialogues-post-image"
+                src="/images/dialogues-placeholder.jpg"
+                alt=""
+                width={600}
+                height={400}
+                unoptimized
+              />
+              <div className="dialogues-post-content">
+                <h3 className="dialogues-post-title">
+                  {posts[3] ? posts[3].title.rendered : "Third post title"}
+                </h3>
+                <div className="dialogues-post-date">
+                  {posts[3]
+                    ? new Date(posts[3].date).toLocaleDateString(undefined, {
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                      })
+                    : "May 12, 2024"}
+                </div>
+                <p className="dialogues-post-summary">
+                  {posts[3]
+                    ? posts[3].excerpt.rendered
+                    : "And a third post has a quick excerpt right here..."}
+                </p>
+              </div>
+            </article>
+          </section>
+
+        </main>
+
+        <aside className="dialogues-sidebar">
+          <div className="dialogues-sidebar-title">Featured Playlist</div>
+          <iframe
+            className="dialogues-playlist-iframe"
+            src="https://open.spotify.com/embed/playlist/37i9dQZF1DXcBWIGoYBM5M"
+            width="100%"
+            height="80"
+            allow="encrypted-media"
+          />
+        </aside>
+      </div>
     </div>
   );
 }
