@@ -28,8 +28,12 @@ function extractFirstImg(post) {
   const match = html.match(/<img[^>]+src=["']([^"'>]+)["']/i);
   if (match) return match[1];
 
-  const media = post["media:thumbnail"]?.url || post["media:content"]?.url;
-  return media || null;
+  const mediaThumb = post["media:thumbnail"];
+  const mediaContent = post["media:content"];
+  if (mediaThumb && typeof mediaThumb === "object" && mediaThumb.url) return mediaThumb.url;
+  if (mediaContent && typeof mediaContent === "object" && mediaContent.url) return mediaContent.url;
+
+  return null;
 }
 
 function Tags({ categories }) {
@@ -63,7 +67,9 @@ export default function DialoguesPage() {
 
         const cleaned = rest.map(p => ({
           ...p,
-          categories: (p.categories || []).filter(c => c.toLowerCase() !== "featured")
+          categories: Array.isArray(p.categories)
+            ? p.categories.filter(c => typeof c === "string")
+            : []
         }));
 
         setFeatured(featuredItem);
@@ -116,41 +122,41 @@ export default function DialoguesPage() {
 
             <div className="relative dialogues-posts-grid">
               {articles.map((post) => (
-                <a
-                  href={post.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="relative dialogues-post"
-                  key={post.guid || post.link}
-                >
-                  <Image
-                    className="dialogues-post-image"
-                    src={extractFirstImg(post) || "/images/vinyl-featured.jpg"}
-                    alt={post.title}
-                    width={350}
-                    height={200}
-                    style={{ objectFit: "cover", borderRadius: 10 }}
-                    unoptimized
-                  />
-                  <div className="relative dialogues-post-content">
-                    <Tags categories={post.categories} />
-                    <div className="relative dialogues-post-title">{post.title}</div>
-                    <div className="relative dialogues-post-date">
-                      {post.pubDate ? new Date(post.pubDate).toLocaleDateString(undefined, {
-                        year: "numeric", month: "long", day: "numeric"
-                      }) : ""}
+                <div className="relative dialogues-post" key={post.guid || post.link}>
+                  <a
+                    href={post.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Image
+                      className="dialogues-post-image"
+                      src={extractFirstImg(post) || "/images/vinyl-featured.jpg"}
+                      alt={post.title}
+                      width={350}
+                      height={200}
+                      style={{ objectFit: "cover", borderRadius: 10 }}
+                      unoptimized
+                    />
+                    <div className="relative dialogues-post-content">
+                      <Tags categories={post.categories} />
+                      <div className="relative dialogues-post-title">{post.title}</div>
+                      <div className="relative dialogues-post-date">
+                        {post.pubDate ? new Date(post.pubDate).toLocaleDateString(undefined, {
+                          year: "numeric", month: "long", day: "numeric"
+                        }) : ""}
+                      </div>
+                      <div className="relative dialogues-post-summary">{post.contentSnippet || ""}</div>
                     </div>
-                    <div className="relative dialogues-post-summary">{post.contentSnippet || ""}</div>
-                    <a
-                      href={post.link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="dialogues-read-more"
-                    >
-                      Read more →
-                    </a>
-                  </div>
-                </a>
+                  </a>
+                  <a
+                    href={post.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="dialogues-read-more"
+                  >
+                    Read more →
+                  </a>
+                </div>
               ))}
             </div>
           </div>

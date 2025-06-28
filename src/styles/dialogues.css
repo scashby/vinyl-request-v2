@@ -146,6 +146,12 @@
   color: #333;
   line-height: 1.6;
 }
+.dialogues-read-more {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+  color: #2563eb;
+}
 
 /* Sidebar styles */
 .dialogues-sidebar {
