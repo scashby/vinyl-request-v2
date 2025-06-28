@@ -7,6 +7,7 @@ export async function GET() {
     customFields: {
       item: [
         ['category', 'categories', { keepArray: true }],
+        ['guid', 'guid'],
       ],
     },
   });
