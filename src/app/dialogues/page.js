@@ -23,10 +23,13 @@ const playlists = [
   },
 ];
 
-function extractFirstImg(html) {
-  if (!html) return null;
+function extractFirstImg(post) {
+  const html = post["content:encoded"] || post.content || "";
   const match = html.match(/<img[^>]+src=["']([^"'>]+)["']/i);
-  return match ? match[1] : null;
+  if (match) return match[1];
+
+  const media = post["media:thumbnail"]?.url || post["media:content"]?.url;
+  return media || null;
 }
 
 function Tags({ categories }) {
@@ -58,8 +61,13 @@ export default function DialoguesPage() {
         );
         const rest = all.filter(item => item !== featuredItem);
 
+        const cleaned = rest.map(p => ({
+          ...p,
+          categories: (p.categories || []).filter(c => c.toLowerCase() !== "featured")
+        }));
+
         setFeatured(featuredItem);
-        setArticles(rest);
+        setArticles(cleaned);
       });
   }, []);
 
@@ -77,7 +85,7 @@ export default function DialoguesPage() {
               <div className="relative dialogues-featured" key={featured.guid || featured.link}>
                 <Image
                   className="dialogues-featured-image"
-                  src={extractFirstImg(featured['content:encoded'] || featured.content) || "/images/vinyl-featured.jpg"}
+                  src={extractFirstImg(featured) || "/images/vinyl-featured.jpg"}
                   alt={featured.title}
                   width={350}
                   height={260}
@@ -117,7 +125,7 @@ export default function DialoguesPage() {
                 >
                   <Image
                     className="dialogues-post-image"
-                    src={extractFirstImg(post["content:encoded"] || post.content) || "/images/vinyl-featured.jpg"}
+                    src={extractFirstImg(post) || "/images/vinyl-featured.jpg"}
                     alt={post.title}
                     width={350}
                     height={200}
@@ -133,6 +141,14 @@ export default function DialoguesPage() {
                       }) : ""}
                     </div>
                     <div className="relative dialogues-post-summary">{post.contentSnippet || ""}</div>
+                    <a
+                      href={post.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="dialogues-read-more"
+                    >
+                      Read more →
+                    </a>
                   </div>
                 </a>
               ))}
