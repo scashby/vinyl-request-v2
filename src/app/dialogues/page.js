@@ -18,6 +18,9 @@ export default function Page() {
       .catch(console.error);
   }, []);
 
+  const getImage = (post) =>
+    post?._embedded?.['wp:featuredmedia']?.[0]?.source_url || "/images/dialogues-placeholder.jpg";
+
   return (
     <div className="site-wrapper">
       <div className="dialogues-body-row">
@@ -26,7 +29,7 @@ export default function Page() {
           <section className="dialogues-featured">
             <Image
               className="dialogues-featured-image"
-              src="/images/dialogues-placeholder.jpg"
+              src={getImage(posts[0])}
               alt=""
               width={800}
               height={450}
@@ -35,7 +38,13 @@ export default function Page() {
             <div className="dialogues-featured-content">
               <span className="dialogues-featured-meta">FEATURED</span>
               <h2 className="dialogues-featured-title">
-                {posts[0] ? posts[0].title.rendered : "Title of the featured interview goes here"}
+                {posts[0] ? (
+                  <a href={posts[0].link} target="_blank" rel="noopener noreferrer">
+                    {posts[0].title.rendered}
+                  </a>
+                ) : (
+                  "Title of the featured interview goes here"
+                )}
               </h2>
               <div className="dialogues-featured-date">
                 {posts[0]
@@ -55,95 +64,55 @@ export default function Page() {
           </section>
 
           <section className="dialogues-posts-grid">
-            <article className="dialogues-post">
-              <Image
-                className="dialogues-post-image"
-                src="/images/dialogues-placeholder.jpg"
-                alt=""
-                width={600}
-                height={400}
-                unoptimized
-              />
-              <div className="dialogues-post-content">
-                <h3 className="dialogues-post-title">
-                  {posts[1] ? posts[1].title.rendered : "Post title"}
-                </h3>
-                <div className="dialogues-post-date">
-                  {posts[1]
-                    ? new Date(posts[1].date).toLocaleDateString(undefined, {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                      })
-                    : "May 21, 2024"}
+            {[1, 2, 3].map((i) => (
+              <article key={posts[i]?.id || i} className="dialogues-post">
+                <Image
+                  className="dialogues-post-image"
+                  src={getImage(posts[i])}
+                  alt=""
+                  width={600}
+                  height={400}
+                  unoptimized
+                />
+                <div className="dialogues-post-content">
+                  <h3 className="dialogues-post-title">
+                    {posts[i] ? (
+                      <a href={posts[i].link} target="_blank" rel="noopener noreferrer">
+                        {posts[i].title.rendered}
+                      </a>
+                    ) : (
+                      i === 1
+                        ? "Post title"
+                        : i === 2
+                        ? "Another post title"
+                        : "Third post title"
+                    )}
+                  </h3>
+                  <div className="dialogues-post-date">
+                    {posts[i]
+                      ? new Date(posts[i].date).toLocaleDateString(undefined, {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                        })
+                      : i === 1
+                      ? "May 21, 2024"
+                      : i === 2
+                      ? "May 17, 2024"
+                      : "May 12, 2024"}
+                  </div>
+                  <p className="dialogues-post-summary">
+                    {posts[i]
+                      ? posts[i].excerpt.rendered
+                      : i === 1
+                      ? "Short summary of the article or post goes here..."
+                      : i === 2
+                      ? "Another brief summary appears here with a link..."
+                      : "And a third post has a quick excerpt right here..."}
+                  </p>
                 </div>
-                <p className="dialogues-post-summary">
-                  {posts[1]
-                    ? posts[1].excerpt.rendered
-                    : "Short summary of the article or post goes here..."}
-                </p>
-              </div>
-            </article>
-
-            <article className="dialogues-post">
-              <Image
-                className="dialogues-post-image"
-                src="/images/dialogues-placeholder.jpg"
-                alt=""
-                width={600}
-                height={400}
-                unoptimized
-              />
-              <div className="dialogues-post-content">
-                <h3 className="dialogues-post-title">
-                  {posts[2] ? posts[2].title.rendered : "Another post title"}
-                </h3>
-                <div className="dialogues-post-date">
-                  {posts[2]
-                    ? new Date(posts[2].date).toLocaleDateString(undefined, {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                      })
-                    : "May 17, 2024"}
-                </div>
-                <p className="dialogues-post-summary">
-                  {posts[2]
-                    ? posts[2].excerpt.rendered
-                    : "Another brief summary appears here with a link..."}
-                </p>
-              </div>
-            </article>
-
-            <article className="dialogues-post">
-              <Image
-                className="dialogues-post-image"
-                src="/images/dialogues-placeholder.jpg"
-                alt=""
-                width={600}
-                height={400}
-                unoptimized
-              />
-              <div className="dialogues-post-content">
-                <h3 className="dialogues-post-title">
-                  {posts[3] ? posts[3].title.rendered : "Third post title"}
-                </h3>
-                <div className="dialogues-post-date">
-                  {posts[3]
-                    ? new Date(posts[3].date).toLocaleDateString(undefined, {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                      })
-                    : "May 12, 2024"}
-                </div>
-                <p className="dialogues-post-summary">
-                  {posts[3]
-                    ? posts[3].excerpt.rendered
-                    : "And a third post has a quick excerpt right here..."}
-                </p>
-              </div>
-            </article>
+              </article>
+            ))}
           </section>
 
         </main>
