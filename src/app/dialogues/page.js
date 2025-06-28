@@ -8,33 +8,6 @@ import Image from "next/image";
 import 'styles/dialogues.css';
 import 'styles/internal.css';
 
-const posts = [
-  {
-    title: "DJ Setlist: Summer Nights Playlist",
-    image: "/images/setlist.jpg",
-    date: "June 8, 2025",
-    type: "PLAYLIST",
-    summary: "Perfect side A’s for patio listening, plus Apple/Spotify embeds.",
-    categories: ["playlist"],
-  },
-  {
-    title: "Notes from the Booth",
-    image: "/images/booth.jpg",
-    date: "June 3, 2025",
-    type: "BLOG",
-    summary: "Stories, crowd picks, and last week’s most requested LP.",
-    categories: ["blog"],
-  },
-  {
-    title: "5 New Finds at the Shop",
-    image: "/images/records.jpg",
-    date: "May 29, 2025",
-    type: "NEWS",
-    summary: "Quick reviews of the freshest wax in the collection.",
-    categories: ["news"],
-  },
-];
-
 const playlists = [
   {
     platform: "Spotify",
@@ -71,16 +44,22 @@ function Tags({ categories }) {
 
 export default function DialoguesPage() {
   const [featured, setFeatured] = useState(null);
+  const [articles, setArticles] = useState([]);
 
   useEffect(() => {
     fetch("/api/wordpress")
       .then(res => res.json())
       .then(data => {
         if (!data.items || !Array.isArray(data.items)) return;
-        const found = data.items.find(item =>
-          item.categories && item.categories.map(c => c.toLowerCase()).includes("featured")
+
+        const all = data.items;
+        const featuredItem = all.find(item =>
+          item.categories?.map(c => c.toLowerCase()).includes("featured")
         );
-        if (found) setFeatured(found);
+        const rest = all.filter(item => item !== featuredItem);
+
+        setFeatured(featuredItem);
+        setArticles(rest);
       });
   }, []);
 
@@ -108,7 +87,11 @@ export default function DialoguesPage() {
                 />
                 <div className="relative dialogues-featured-content">
                   <span className="badge badge-featured">FEATURED</span>
-                  <h2 className="dialogues-featured-title">{featured.title}</h2>
+                  <h2 className="dialogues-featured-title">
+                    <a href={featured.link} target="_blank" rel="noopener noreferrer">
+                      {featured.title}
+                    </a>
+                  </h2>
                   <div className="relative dialogues-featured-date">
                     {featured.pubDate
                       ? new Date(featured.pubDate).toLocaleDateString(undefined, {
@@ -124,11 +107,17 @@ export default function DialoguesPage() {
             )}
 
             <div className="relative dialogues-posts-grid">
-              {posts.map((post) => (
-                <div className="relative dialogues-post" key={post.title}>
+              {articles.map((post) => (
+                <a
+                  href={post.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="relative dialogues-post"
+                  key={post.guid || post.link}
+                >
                   <Image
                     className="dialogues-post-image"
-                    src={post.image}
+                    src={extractFirstImg(post["content:encoded"] || post.content) || "/images/vinyl-featured.jpg"}
                     alt={post.title}
                     width={350}
                     height={200}
@@ -138,13 +127,18 @@ export default function DialoguesPage() {
                   <div className="relative dialogues-post-content">
                     <Tags categories={post.categories} />
                     <div className="relative dialogues-post-title">{post.title}</div>
-                    <div className="relative dialogues-post-date">{post.date}</div>
-                    <div className="relative dialogues-post-summary">{post.summary}</div>
+                    <div className="relative dialogues-post-date">
+                      {post.pubDate ? new Date(post.pubDate).toLocaleDateString(undefined, {
+                        year: "numeric", month: "long", day: "numeric"
+                      }) : ""}
+                    </div>
+                    <div className="relative dialogues-post-summary">{post.contentSnippet || ""}</div>
                   </div>
-                </div>
+                </a>
               ))}
             </div>
           </div>
+
           <aside className="dialogues-sidebar">
             <div className="relative dialogues-sidebar-title">Playlists</div>
             <div className="relative dialogues-sidebar-list">
