@@ -1,7 +1,7 @@
 // Admin Login page ("/admin/login")
 // Authenticates admins with magic link or Google, using Supabase
 
-"use client";
+'use client';
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -9,18 +9,25 @@ import { supabase } from 'lib/supabaseClient'
 
 export default function Page() {
   const [email, setEmail] = useState('');
+  const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
+    let mounted = true;
+
+    // Redirect to dashboard if already logged in
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) router.push('/admin/admin-dashboard');
+      if (mounted && session) router.push('/admin/admin-dashboard');
+      else setLoading(false);
     });
 
+    // Watch for login via magic link or OAuth
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
       if (session) router.push('/admin/admin-dashboard');
     });
 
     return () => {
+      mounted = false;
       listener.subscription.unsubscribe();
     };
   }, [router]);
@@ -41,6 +48,8 @@ export default function Page() {
     });
     if (error) alert('Google login error: ' + error.message);
   };
+
+  if (loading) return null;
 
   return (
     <div style={{
