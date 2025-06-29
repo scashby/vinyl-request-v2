@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 
 export default function SocialEmbeds() {
   const [embeds, setEmbeds] = useState([]);
+  const containerRef = useRef(null);
 
   useEffect(() => {
     fetch("/api/social-embeds")
@@ -12,39 +13,29 @@ export default function SocialEmbeds() {
   }, []);
 
   useEffect(() => {
-    if (embeds.length === 0) return;
+    if (!containerRef.current) return;
 
-    const ensureScript = (id, src, callback) => {
-      if (!document.getElementById(id)) {
-        const script = document.createElement("script");
-        script.id = id;
-        script.src = src;
-        script.async = true;
-        script.onload = callback;
-        document.body.appendChild(script);
-      } else {
-        callback();
-      }
-    };
+    // Replace innerHTML and re-run all <script> tags
+    containerRef.current.innerHTML = "";
+    embeds.forEach((e) => {
+      const wrapper = document.createElement("div");
+      wrapper.className = "social-embed";
+      wrapper.innerHTML = e.embed_html;
 
-    ensureScript("instagram-embed", "https://www.instagram.com/embed.js", () => {
-      if (window.instgrm?.Embeds?.process) window.instgrm.Embeds.process();
-    });
+      // Re-run <script> tags
+      const scripts = wrapper.querySelectorAll("script");
+      scripts.forEach(oldScript => {
+        const newScript = document.createElement("script");
+        Array.from(oldScript.attributes).forEach(attr =>
+          newScript.setAttribute(attr.name, attr.value)
+        );
+        newScript.textContent = oldScript.textContent;
+        oldScript.replaceWith(newScript);
+      });
 
-    ensureScript("bluesky-embed", "https://embed.bsky.app/static/embed.js", () => {
-      if (window.blueskyEmbed?.load) window.blueskyEmbed.load();
+      containerRef.current.appendChild(wrapper);
     });
   }, [embeds]);
 
-  return (
-    <div className="social-embeds">
-      {embeds.map((e) => (
-        <div
-          key={e.id}
-          className="social-embed"
-          dangerouslySetInnerHTML={{ __html: e.embed_html }}
-        />
-      ))}
-    </div>
-  );
+  return <div ref={containerRef} className="social-embeds" />;
 }
