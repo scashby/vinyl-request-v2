@@ -20,3 +20,19 @@ export async function GET() {
     headers: { 'Cache-Control': 's-maxage=60' }
   });
 }
+
+export async function PUT(request) {
+  const body = await request.json();
+  const { platform, embed_url } = body;
+
+  const { error } = await supabase
+    .from("playlists")
+    .update({ platform, embed_url })
+    .eq("platform", platform);
+
+  if (error) {
+    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+  }
+
+  return new Response(JSON.stringify({ success: true }), { status: 200 });
+}

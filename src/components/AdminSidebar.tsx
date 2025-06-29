@@ -14,6 +14,7 @@ export default function AdminSidebar() {
     { label: "Add Vinyl", path: "/admin/add-customer-vinyl" },
     { label: "Import Collection", path: "/admin/import-discogs" },
     { label: "Now Playing", path: "/admin/now-playing-admin" },
+    { label: "Edit Playlists", path: "/admin/playlists" },
     { label: "Logout", path: "/" },
   ];
 
