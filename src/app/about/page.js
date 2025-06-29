@@ -68,10 +68,10 @@ export default function AboutPage() {
             </ol>
             <div className="about-wishlist">
               <h3>Wish List</h3>
-              <a href="https://www.amazon.com/hz/wishlist/ls/" target="_blank" rel="noopener noreferrer">
+              <a href="https://www.amazon.com/hz/wishlist/ls/D5MXYF471325?ref_=wl_share" target="_blank" rel="noopener noreferrer">
                 Full Amazon Wish List
               </a>
-              <a href="https://www.discogs.com/user/socialblunders/wants" target="_blank" rel="noopener noreferrer">
+              <a href="https://www.discogs.com/wantlist?user=socialblunders" target="_blank" rel="noopener noreferrer">
                 Full Discogs Wantlist
               </a>
             </div>
