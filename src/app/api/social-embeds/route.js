@@ -1,38 +1,35 @@
-import { createClient } from '@supabase/supabase-js';
+'use client';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
+import { useEffect, useState } from "react";
 
-export async function GET() {
-  const { data, error } = await supabase
-    .from('social_embeds')
-    .select('id, platform, embed_html, visible')
-    .order('created_at', { ascending: false });
+export default function SocialEmbeds() {
+  const [embeds, setEmbeds] = useState([]);
 
-  if (error) {
-    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
-  }
+  useEffect(() => {
+    fetch("/api/social-embeds")
+      .then(res => res.json())
+      .then(data => setEmbeds(data.filter(e => e.visible)));
+  }, []);
 
-  return new Response(JSON.stringify(data), {
-    status: 200,
-    headers: { 'Cache-Control': 's-maxage=60' }
-  });
-}
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.instgrm) {
+      try {
+        window.instgrm.Embeds.process();
+      } catch (err) {
+        console.error("Instagram embed process failed", err);
+      }
+    }
+  }, [embeds]);
 
-export async function PUT(request) {
-  const body = await request.json();
-  const { id, platform, embed_html, visible } = body;
-
-  const { error } = await supabase
-    .from("social_embeds")
-    .update({ platform, embed_html, visible })
-    .eq("id", id);
-
-  if (error) {
-    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
-  }
-
-  return new Response(JSON.stringify({ success: true }), { status: 200 });
+  return (
+    <div className="social-embeds">
+      {embeds.map((e) => (
+        <div
+          key={e.id}
+          className="social-embed"
+          dangerouslySetInnerHTML={{ __html: e.embed_html }}
+        />
+      ))}
+    </div>
+  );
 }
