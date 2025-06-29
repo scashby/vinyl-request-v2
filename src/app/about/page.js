@@ -30,24 +30,34 @@ export default function AboutPage() {
 
               <div className="about-social-feed">
                 <h3>Recent Social Posts</h3>
-                <div className="social-scroll-strip">
-                  <div className="social-card">
-                    <h4>@instagram</h4>
-                    <p>Spinning Blue Note reissues tonight at Devil’s Purse 🍻</p>
-                    <time>2h ago</time>
+                <div className="social-widgets">
+
+                  {/* Instagram Embed */}
+                  <div
+                    className="social-embed"
+                    dangerouslySetInnerHTML={{ __html: `
+                      <blockquote class="instagram-media" data-instgrm-permalink="https://www.instagram.com/deadwaxdialogues" data-instgrm-version="12" style="max-width:540px;width:100%"></blockquote>
+                      <script async src="https://www.instagram.com/embed.js"></script>
+                    ` }}
+                  />
+
+                  {/* Facebook Embed */}
+                  <div
+                    className="social-embed"
+                    dangerouslySetInnerHTML={{ __html: `
+                      <iframe frameborder="0" width="340" height="130" src="https://www.facebook.com/v9.0/plugins/page.php?adapt_container_width=true&app_id=113869198637480&href=https://www.facebook.com/profile.php?id=61576451743378&tabs=timeline&width=500&height=130&hide_cover=false&show_facepile=true&small_header=true"></iframe>
+                    ` }}
+                  />
+
+                  {/* BlueSky Embed */}
+                  <div className="social-embed">
+                    <script async src="https://cdn.jsdelivr.net/npm/bsky-embed@0.0.5/dist/bsky-embed.es.js"></script>
+                    <bsky-embed username="deadwaxdialogues" limit="5"></bsky-embed>
                   </div>
-                  <div className="social-card">
-                    <h4>@threads</h4>
-                    <p>Nothing beats a good Side B after midnight.</p>
-                    <time>4h ago</time>
-                  </div>
-                  <div className="social-card">
-                    <h4>@bluesky</h4>
-                    <p>New Discogs arrivals in the crate 📦</p>
-                    <time>6h ago</time>
-                  </div>
+
                 </div>
               </div>
+
             </div>
           </div>
           <aside className="about-sidebar">

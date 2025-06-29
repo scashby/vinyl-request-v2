@@ -187,3 +187,8 @@
 .about-sidebar h3 {
   color: #111;
 }
+
+.social-embed {
+  margin-bottom: 2rem;
+  max-width: 540px;
+}
