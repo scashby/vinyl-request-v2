@@ -12,11 +12,12 @@ export default function SocialEmbeds() {
   }, []);
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.instgrm) {
+    // This forces Instagram/Threads embeds to render
+    if (typeof window !== 'undefined' && window.instgrm?.Embeds?.process) {
       try {
         window.instgrm.Embeds.process();
       } catch (err) {
-        console.error("Instagram embed process failed", err);
+        console.error("Instagram embed failed:", err);
       }
     }
   }, [embeds]);
