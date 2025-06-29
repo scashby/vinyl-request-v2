@@ -2,10 +2,18 @@
 
 'use client'
 
-import React from "react"
+import React, { useEffect, useState } from "react"
 import 'styles/about.css'
 
 export default function AboutPage() {
+  const [mostWanted, setMostWanted] = useState([]);
+
+  useEffect(() => {
+    fetch("/api/most-wanted")
+      .then(res => res.json())
+      .then(data => setMostWanted(data));
+  }, []);
+
   return (
     <div className="page-wrapper">
       <header className="about-hero">
@@ -57,22 +65,17 @@ export default function AboutPage() {
 
                 </div>
               </div>
-
             </div>
           </div>
+
           <aside className="about-sidebar">
             <div className="about-sidebar-title">Top 10 Most Wanted</div>
             <ol className="about-mostwanted">
-              <li><a href="#">The National – Sad Songs for Dirty Lovers (LP)</a></li>
-              <li><a href="#">Radiohead – Kid A (First UK Pressing)</a></li>
-              <li><a href="#">Fleet Foxes – Helplessness Blues (LP)</a></li>
-              <li><a href="#">Beastie Boys – Paul&apos;s Boutique (180g)</a></li>
-              <li><a href="#">PJ Harvey – Let England Shake (LP)</a></li>
-              <li><a href="#">Talk Talk – Spirit of Eden (LP)</a></li>
-              <li><a href="#">Beck – Sea Change (MoFi)</a></li>
-              <li><a href="#">Sufjan Stevens – Illinois (LP)</a></li>
-              <li><a href="#">Wilco – Yankee Hotel Foxtrot (Deluxe)</a></li>
-              <li><a href="#">Fiona Apple – Extraordinary Machine (LP)</a></li>
+              {mostWanted.map((item) => (
+                <li key={item.id}>
+                  <a href={item.url} target="_blank" rel="noopener noreferrer">{item.title}</a>
+                </li>
+              ))}
             </ol>
             <div className="about-wishlist">
               <h3>Wish List</h3>

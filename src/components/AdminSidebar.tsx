@@ -15,9 +15,9 @@ export default function AdminSidebar() {
     { label: "Import Collection from Discogs", path: "/admin/import-discogs" },
     { label: "Edit Collection", path: "/admin/edit-collection" },
     { label: "Add Album", path: "/admin/add-album" },
-    
     { label: "Now Playing", path: "/admin/now-playing-admin" },
     { label: "Edit Playlists", path: "/admin/playlists" },
+    { label: "Most Wanted", path: "/admin/most-wanted" },
     { label: "Logout", path: "/" },
   ];
 
