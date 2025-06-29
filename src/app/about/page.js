@@ -40,6 +40,16 @@ export default function AboutPage() {
                 <h3>Recent Social Posts</h3>
                 <div className="social-widgets">
 
+                  {/* LinkTree Embed */}
+                  <div className="social-embed">
+                    <iframe
+                      src="https://linktr.ee/deadwaxdialogues"
+                      width="100%"
+                      height="500"
+                      allowTransparency="true"
+                      ></iframe>
+                  </div>
+
                   {/* Instagram Embed */}
                   <div
                     className="social-embed"
