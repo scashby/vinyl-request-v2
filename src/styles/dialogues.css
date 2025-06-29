@@ -263,3 +263,14 @@
   gap: 36px;
   background: #fff;
 }
+
+.dialogues-more-link {
+  margin-top: 2rem;
+  text-align: center;
+  font-weight: 500;
+}
+
+.dialogues-more-link a {
+  color: #2563eb;
+  font-size: 1rem;
+}

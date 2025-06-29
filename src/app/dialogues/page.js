@@ -53,7 +53,6 @@ export default function DialoguesPage() {
       .then(data => {
         if (!data.items || !Array.isArray(data.items)) return;
 
-        // Use full GUID as canonical post link
         const items = data.items.map(p => ({
           ...p,
           link: p.guid || p.link
@@ -159,6 +158,18 @@ export default function DialoguesPage() {
                 </div>
               ))}
             </div>
+
+            {articles.length > 9 && (
+              <div className="dialogues-more-link">
+                <a
+                  href="https://blog.deadwaxdialogues.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  View more on Substack →
+                </a>
+              </div>
+            )}
           </div>
 
           <aside className="dialogues-sidebar">
