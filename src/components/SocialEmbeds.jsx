@@ -12,14 +12,28 @@ export default function SocialEmbeds() {
   }, []);
 
   useEffect(() => {
-    // This forces Instagram/Threads embeds to render
-    if (typeof window !== 'undefined' && window.instgrm?.Embeds?.process) {
-      try {
-        window.instgrm.Embeds.process();
-      } catch (err) {
-        console.error("Instagram embed failed:", err);
+    if (embeds.length === 0) return;
+
+    const ensureScript = (id, src, callback) => {
+      if (!document.getElementById(id)) {
+        const script = document.createElement("script");
+        script.id = id;
+        script.src = src;
+        script.async = true;
+        script.onload = callback;
+        document.body.appendChild(script);
+      } else {
+        callback();
       }
-    }
+    };
+
+    ensureScript("instagram-embed", "https://www.instagram.com/embed.js", () => {
+      if (window.instgrm?.Embeds?.process) window.instgrm.Embeds.process();
+    });
+
+    ensureScript("bluesky-embed", "https://embed.bsky.app/static/embed.js", () => {
+      if (window.blueskyEmbed?.load) window.blueskyEmbed.load();
+    });
   }, [embeds]);
 
   return (
