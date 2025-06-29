@@ -9,10 +9,13 @@ export default function AdminSidebar() {
   const pathname = usePathname();
 
   const navItems = [
-    { label: "Events", path: "/admin/manage-events" },
-    { label: "Queue", path: "/admin/edit-queue" },
-    { label: "Add Vinyl", path: "/admin/add-customer-vinyl" },
-    { label: "Import Collection", path: "/admin/import-discogs" },
+    { label: "Manage Events", path: "/admin/manage-events" },
+    { label: "Manage Queues", path: "/admin/edit-queue" },
+    { label: "Add Customer Vinyl", path: "/admin/add-customer-vinyl" },
+    { label: "Import Collection from Discogs", path: "/admin/import-discogs" },
+    { label: "Edit Collection", path: "/admin/edit-collection" },
+    { label: "Add Album", path: "/admin/add-album" },
+    
     { label: "Now Playing", path: "/admin/now-playing-admin" },
     { label: "Edit Playlists", path: "/admin/playlists" },
     { label: "Logout", path: "/" },
