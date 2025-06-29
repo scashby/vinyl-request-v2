@@ -15,14 +15,12 @@ export default function SocialEmbeds() {
   useEffect(() => {
     if (!containerRef.current) return;
 
-    // Replace innerHTML and re-run all <script> tags
     containerRef.current.innerHTML = "";
     embeds.forEach((e) => {
       const wrapper = document.createElement("div");
       wrapper.className = "social-embed";
       wrapper.innerHTML = e.embed_html;
 
-      // Re-run <script> tags
       const scripts = wrapper.querySelectorAll("script");
       scripts.forEach(oldScript => {
         const newScript = document.createElement("script");
@@ -35,6 +33,13 @@ export default function SocialEmbeds() {
 
       containerRef.current.appendChild(wrapper);
     });
+
+    // Delay to allow embed scripts to initialize
+    setTimeout(() => {
+      if (window.instgrm?.Embeds?.process) window.instgrm.Embeds.process();
+      if (window.blueskyEmbed?.load) window.blueskyEmbed.load();
+      if (window.ThreadsEmbed?.load) window.ThreadsEmbed.load();
+    }, 100);
   }, [embeds]);
 
   return <div ref={containerRef} className="social-embeds" />;
