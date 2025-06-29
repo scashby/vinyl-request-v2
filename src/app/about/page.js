@@ -42,35 +42,14 @@ export default function AboutPage() {
 
                   {/* LinkTree Embed */}
                   <div className="social-embed">
-                    <iframe
-                      src="https://linktr.ee/deadwaxdialogues"
-                      width="100%"
-                      height="500"
-                      allowTransparency="true"
-                      ></iframe>
-                  </div>
-
-                  {/* Instagram Embed */}
-                  <div
-                    className="social-embed"
-                    dangerouslySetInnerHTML={{ __html: `
-                      <blockquote class="instagram-media" data-instgrm-permalink="https://www.instagram.com/deadwaxdialogues" data-instgrm-version="12" style="max-width:540px;width:100%"></blockquote>
-                      <script async src="https://www.instagram.com/embed.js"></script>
-                    ` }}
-                  />
-
-                  {/* Facebook Embed */}
-                  <div
-                    className="social-embed"
-                    dangerouslySetInnerHTML={{ __html: `
-                      <iframe frameborder="0" width="340" height="130" src="https://www.facebook.com/v9.0/plugins/page.php?adapt_container_width=true&app_id=113869198637480&href=https://www.facebook.com/profile.php?id=61576451743378&tabs=timeline&width=500&height=130&hide_cover=false&show_facepile=true&small_header=true"></iframe>
-                    ` }}
-                  />
-
-                  {/* BlueSky Embed */}
-                  <div className="social-embed">
-                    <script async src="https://cdn.jsdelivr.net/npm/bsky-embed@0.0.5/dist/bsky-embed.es.js"></script>
-                    <bsky-embed username="deadwaxdialogues" limit="5"></bsky-embed>
+                    <a
+                      href="https://linktr.ee/deadwaxdialogues"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="linktree-button"
+                    >
+                      Visit Our Linktree
+                    </a>
                   </div>
 
                 </div>
