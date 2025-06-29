@@ -8,7 +8,7 @@ const supabase = createClient(
 export async function GET() {
   const { data, error } = await supabase
     .from('playlists')
-    .select('platform, embed_url')
+    .select('id, platform, embed_url')
     .order('sort_order', { ascending: true });
 
   if (error) {
@@ -23,12 +23,12 @@ export async function GET() {
 
 export async function PUT(request) {
   const body = await request.json();
-  const { platform, embed_url } = body;
+  const { id, platform, embed_url } = body;
 
   const { error } = await supabase
     .from("playlists")
     .update({ platform, embed_url })
-    .eq("platform", platform);
+    .eq("id", id);
 
   if (error) {
     return new Response(JSON.stringify({ error: error.message }), { status: 500 });

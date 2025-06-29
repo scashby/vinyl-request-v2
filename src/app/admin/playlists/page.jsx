@@ -40,12 +40,13 @@ export default function AdminPlaylistsPage() {
         </thead>
         <tbody>
           {playlists.map((p, i) => (
-            <tr key={p.platform}>
+            <tr key={p.id}>
               <td>
                 <input
                   type="text"
                   value={p.platform}
-                  onChange={(e) => handleChange(i, "platform", e.target.value)}
+                  readOnly
+                  className="bg-gray-100 text-gray-600 cursor-not-allowed"
                 />
               </td>
               <td>
