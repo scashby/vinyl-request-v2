@@ -67,7 +67,7 @@ export default function AboutPage() {
               ))}
             </ol>
             <div className="about-wishlist">
-              <h3>Wish List</h3>
+              <div className="about-sidebar-title">Wish List</div>
               <a href="https://www.amazon.com/hz/wishlist/ls/D5MXYF471325?ref_=wl_share" target="_blank" rel="noopener noreferrer">
                 Full Amazon Wish List
               </a>
