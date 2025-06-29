@@ -8,21 +8,6 @@ import Image from "next/image";
 import 'styles/dialogues.css';
 import 'styles/internal.css';
 
-const playlists = [
-  {
-    platform: "Spotify",
-    embed: "https://open.spotify.com/embed/playlist/37i9dQZF1DX2sUQwD7tbmL?utm_source=generator",
-  },
-  {
-    platform: "Apple Music",
-    embed: "https://embed.music.apple.com/us/playlist/indie-plaza/pl.1234567890abcdef",
-  },
-  {
-    platform: "Tidal",
-    embed: "https://embed.tidal.com/albums/192548722?layout=gridify",
-  },
-];
-
 function extractFirstImg(post) {
   const html = post["content:encoded"] || post.content || "";
   const match = html.match(/<img[^>]+src=["']([^"'>]+)["']/i);
@@ -46,7 +31,14 @@ function Tags({ categories }) {
 export default function DialoguesPage() {
   const [featured, setFeatured] = useState(null);
   const [articles, setArticles] = useState([]);
+  const [playlists, setPlaylists] = useState([]);
 
+  useEffect(() => {
+    fetch("/api/playlists")
+      .then(res => res.json())
+      .then(data => setPlaylists(data));
+  }, []);
+  
   useEffect(() => {
     fetch("/api/wordpress")
       .then(res => res.json())
@@ -180,7 +172,7 @@ export default function DialoguesPage() {
                   <div className="relative dialogues-playlist-label">{p.platform}</div>
                   <iframe
                     title={p.platform}
-                    src={p.embed}
+                    src={p.embed_url}
                     width="100%"
                     height="80"
                     className="dialogues-playlist-iframe"
