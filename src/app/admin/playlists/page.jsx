@@ -27,10 +27,6 @@ export default function AdminPlaylistsPage() {
 
   const handleChange = (index, key, value) => {
     const updated = [...playlists];
-    if (key === "embed_url" && value.includes("<iframe")) {
-      const match = value.match(/src=["']([^"']+)["']/);
-      if (match) value = match[1];
-    }
     updated[index][key] = value;
     setPlaylists(updated);
   };
@@ -40,7 +36,7 @@ export default function AdminPlaylistsPage() {
       <h1>Edit Embedded Playlists</h1>
       <table className="w-full text-left border-separate border-spacing-y-2">
         <thead>
-          <tr><th>Platform</th><th>Embed URL</th><th>Actions</th></tr>
+          <tr><th>Platform</th><th>Embed Code</th><th>Actions</th></tr>
         </thead>
         <tbody>
           {playlists.map((p, i) => (
@@ -54,11 +50,11 @@ export default function AdminPlaylistsPage() {
                 />
               </td>
               <td>
-                <input
-                  type="text"
+                <textarea
                   value={p.embed_url}
                   onChange={(e) => handleChange(i, "embed_url", e.target.value)}
                   className="bg-white text-black border border-gray-300 px-2 py-1 w-full"
+                  rows={4}
                 />
               </td>
               <td>

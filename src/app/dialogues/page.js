@@ -168,18 +168,11 @@ export default function DialoguesPage() {
             <div className="relative dialogues-sidebar-title">Playlists</div>
             <div className="relative dialogues-sidebar-list">
               {playlists.map((p) => (
-                <div className="relative dialogues-playlist" key={p.platform}>
-                  <div className="relative dialogues-playlist-label">{p.platform}</div>
-                  <iframe
-                    title={p.platform}
-                    src={p.embed_url}
-                    width="100%"
-                    height="80"
-                    className="dialogues-playlist-iframe"
-                    allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                    loading="lazy"
-                  ></iframe>
-                </div>
+                <div
+                  className="relative dialogues-playlist"
+                  key={p.platform}
+                  dangerouslySetInnerHTML={{ __html: p.embed_url }}
+                />
               ))}
             </div>
           </aside>
