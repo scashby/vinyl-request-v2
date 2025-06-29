@@ -3,6 +3,7 @@
 'use client'
 
 import React, { useEffect, useState } from "react"
+import SocialEmbeds from "@/components/SocialEmbeds"
 import 'styles/about.css'
 
 export default function AboutPage() {
@@ -39,8 +40,8 @@ export default function AboutPage() {
               <div className="about-social-feed">
                 <h3>Recent Social Posts</h3>
                 <div className="social-widgets">
+                  <SocialEmbeds />
 
-                  {/* LinkTree Embed */}
                   <div className="social-embed">
                     <a
                       href="https://linktr.ee/deadwaxdialogues"
@@ -51,7 +52,6 @@ export default function AboutPage() {
                       Visit Our Linktree
                     </a>
                   </div>
-
                 </div>
               </div>
             </div>
