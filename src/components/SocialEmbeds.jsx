@@ -11,6 +11,16 @@ export default function SocialEmbeds() {
       .then(data => setEmbeds(data.filter(e => e.visible)));
   }, []);
 
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.instgrm) {
+      try {
+        window.instgrm.Embeds.process();
+      } catch (err) {
+        console.error("Instagram embed process failed", err);
+      }
+    }
+  }, [embeds]);
+
   return (
     <div className="social-embeds">
       {embeds.map((e) => (
