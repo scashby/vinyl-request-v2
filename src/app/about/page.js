@@ -38,7 +38,7 @@ export default function AboutPage() {
               </p>
 
               <div className="about-social-feed">
-                <h3>Recent Social Posts</h3>
+                <div className="about-sidebar-title">Recent Social Posts</div>
                 <div className="social-widgets">
                   <SocialEmbeds />
 
