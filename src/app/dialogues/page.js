@@ -168,11 +168,10 @@ export default function DialoguesPage() {
             <div className="relative dialogues-sidebar-title">Playlists</div>
             <div className="relative dialogues-sidebar-list">
               {playlists.map((p) => (
-                <div
-                  className="relative dialogues-playlist"
-                  key={p.platform}
-                  dangerouslySetInnerHTML={{ __html: p.embed_url }}
-                />
+                <div className="relative dialogues-playlist" key={p.platform}>
+                  <div className="relative dialogues-playlist-label">{p.platform}</div>
+                  <div dangerouslySetInnerHTML={{ __html: p.embed_url }} />
+                </div>
               ))}
             </div>
           </aside>
