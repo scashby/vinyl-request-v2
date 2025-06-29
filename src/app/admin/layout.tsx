@@ -11,15 +11,18 @@ function RequireAuth({ children }: { children: ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
-    if (session === null) {
+    const isLoginPage = window.location.pathname === "/admin/login";
+    if (!isLoginPage && session === null) {
       router.push("/admin/login");
     }
   }, [session, router]);
 
-  if (session === null) return null; // Or a loading spinner
+  const isLoginPage = typeof window !== "undefined" && window.location.pathname === "/admin/login";
+  if (!isLoginPage && session === null) return null;
 
   return <>{children}</>;
 }
+
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   return (
