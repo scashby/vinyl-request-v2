@@ -61,7 +61,6 @@ export default function Page() {
   const [status, setStatus] = useState<string>('');
   const [onlyAddNew, setOnlyAddNew] = useState<boolean>(true); // Default: only add new
 
-  // Parse and normalize CSV
   const handleFile = async (e: ChangeEvent<HTMLInputElement>): Promise<void> => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -69,14 +68,20 @@ export default function Page() {
       header: true,
       skipEmptyLines: true,
       complete: async function (results: { data: Record<string, unknown>[] }) {
+        const existing = await fetchAllExistingRows();
+        const existingMap = new Map(existing.map(e => [dedupeKey(e), e]));
+
         const csvData = await Promise.all(results.data.map(async (row: Record<string, unknown>) => {
           const norm = normalizeRow(row);
           norm.media_condition = await enrichMediaConditionIfBlank(norm);
-          return norm;
+
+          // Enrich image and tracklist here
+          const enriched = await enrichWithDiscogs(norm, existingMap);
+          return enriched;
         }));
+
         setParsedData(csvData);
 
-        const existing = await fetchAllExistingRows();
         const existingKeys = new Set(existing.map(e => dedupeKey(e)));
         const dupeRows = csvData.filter(row => existingKeys.has(dedupeKey(row)));
         setDuplicates(dupeRows);
@@ -96,14 +101,11 @@ export default function Page() {
     let updated = 0;
 
     for (let i = 0; i < parsedData.length; i++) {
-      const csvRow = parsedData[i];
-      const rowKey = dedupeKey(csvRow);
-      const match = existingMap.get(rowKey);
+      const row = parsedData[i];
+      const key = dedupeKey(row);
+      const match = existingMap.get(key);
 
-      // Only add new: skip if already exists
       if (onlyAddNew && match) continue;
-
-      const row = await enrichWithDiscogs(csvRow, existingMap);
 
       const record = {
         artist: cleanArtist((row.artist as string) || '') || null,
@@ -165,19 +167,20 @@ export default function Page() {
         if (!image && (discogsData.images as { uri: string }[] | undefined)?.[0]?.uri) {
           image = (discogsData.images as { uri: string }[])[0].uri;
         }
+        if (!row.tracklists && Array.isArray(discogsData.tracklist)) {
+          row.tracklists = JSON.stringify(discogsData.tracklist);
+        }
         if (!row.year && discogsData.year) {
           row.year = discogsData.year.toString();
         }
         if (!row.format && (discogsData.formats as { name: string }[] | undefined)?.[0]?.name) {
           row.format = (discogsData.formats as { name: string }[])[0].name;
         }
-        if (!row.tracklists && Array.isArray(discogsData.tracklist)) {
-          row.tracklists = JSON.stringify(discogsData.tracklist);
-        }
       } catch (err) {
         console.error('Discogs enrichment failed:', err);
       }
     }
+
     return { ...row, image_url: image };
   }
 
