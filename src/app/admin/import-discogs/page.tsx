@@ -69,14 +69,18 @@ export default function Page() {
       header: true,
       skipEmptyLines: true,
       complete: async function (results: { data: Record<string, unknown>[] }) {
+        const existing = await fetchAllExistingRows();
+        const existingMap = new Map(existing.map(e => [dedupeKey(e), e]));
+
         const csvData = await Promise.all(results.data.map(async (row: Record<string, unknown>) => {
           const norm = normalizeRow(row);
           norm.media_condition = await enrichMediaConditionIfBlank(norm);
-          return norm;
+          const enriched = await enrichWithDiscogs(norm, existingMap);
+          return enriched;
         }));
+
         setParsedData(csvData);
 
-        const existing = await fetchAllExistingRows();
         const existingKeys = new Set(existing.map(e => dedupeKey(e)));
         const dupeRows = csvData.filter(row => existingKeys.has(dedupeKey(row)));
         setDuplicates(dupeRows);
