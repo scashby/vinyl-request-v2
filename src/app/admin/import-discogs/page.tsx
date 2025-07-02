@@ -59,7 +59,7 @@ export default function ImportDiscogs(): React.ReactElement {
       complete: async (results: { data: CsvRow[] }): Promise<void> => {
         const rows = results.data;
         const discogsIds = rows
-          .map((r: CsvRow) => r["Discogs Release ID"])
+          .map((r: CsvRow) => r["release_id"])
           .filter(Boolean);
 
         if (discogsIds.length === 0) {
