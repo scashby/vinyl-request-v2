@@ -23,19 +23,6 @@ async function fetchDiscogsRelease(releaseId: string): Promise<Record<string, un
   return await res.json();
 }
 
-async function enrichMediaConditionIfBlank(row: Record<string, unknown>): Promise<string> {
-  if (row.media_condition && String(row.media_condition).trim()) {
-    return row.media_condition as string;
-  }
-  if (!row.discogs_release_id) return "";
-  try {
-    const discogsData = await fetchDiscogsRelease(row.discogs_release_id as string);
-    return (discogsData?.media_condition as string) || "";
-  } catch {
-    return "";
-  }
-}
-
 async function fetchAllExistingRows(): Promise<Record<string, unknown>[]> {
   let allRows: Record<string, unknown>[] = [];
   let from = 0;
@@ -70,6 +57,7 @@ export default function Page() {
       header: true,
       skipEmptyLines: true,
       complete: async function (results: { data: Record<string, unknown>[] }) {
+        const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
         const existing = await fetchAllExistingRows();
         const existingKeys = new Set(existing.map(e => dedupeKey(e)));
 
@@ -78,20 +66,24 @@ export default function Page() {
 
         for (const rawRow of results.data) {
           const norm = normalizeRow(rawRow);
-          norm.media_condition = await enrichMediaConditionIfBlank(norm);
           const key = dedupeKey(norm);
 
           if (existingKeys.has(key)) {
             dupeRows.push(norm);
             csvData.push(norm);
-          } else {
-            try {
-              const enriched = await enrichWithDiscogs(norm, new Map());
-              csvData.push(enriched);
-            } catch (err) {
-              console.error(`❌ Skipped during initial enrichment: ${dedupeKey(norm)}`, err);
-            }
+            continue;
           }
+
+          try {
+            norm.media_condition = await enrichMediaConditionIfBlank(norm);
+            const enriched = await enrichWithDiscogs(norm, new Map());
+            csvData.push(enriched);
+          } catch (err) {
+            console.error(`❌ Skipped during initial enrichment: ${key}`, err);
+            continue;
+          }
+
+          await delay(5000); // throttle new-only rows
         }
 
         setParsedData(csvData);
@@ -202,6 +194,19 @@ export default function Page() {
     }
 
     return { ...row, image_url: image };
+  }
+
+  async function enrichMediaConditionIfBlank(row: Record<string, unknown>): Promise<string> {
+    if (row.media_condition && String(row.media_condition).trim()) {
+      return row.media_condition as string;
+    }
+    if (!row.discogs_release_id) return "";
+    try {
+      const discogsData = await fetchDiscogsRelease(row.discogs_release_id as string);
+      return (discogsData?.media_condition as string) || "";
+    } catch {
+      return "";
+    }
   }
 
   function normalizeRow(row: Record<string, unknown>): Record<string, unknown> {
