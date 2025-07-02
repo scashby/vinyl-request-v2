@@ -93,7 +93,7 @@ export default function Page() {
               const enriched = await enrichWithDiscogs(norm, new Map());
               csvData.push(enriched);
             } catch (err) {
-              console.error('Initial enrichment failed, skipping row:', err);
+              console.error(`❌ Skipped during initial enrichment: ${dedupeKey(norm)}`, err);
             }
           }
         }
@@ -126,7 +126,7 @@ export default function Page() {
       try {
         row = await enrichWithDiscogs(csvRow, existingMap);
       } catch (err) {
-        console.error('Enrichment skipped for row due to fetch failure:', err);
+        console.error(`❌ Skipped during import enrichment: ${rowKey}`, err);
         continue;
       }
 
@@ -184,7 +184,7 @@ export default function Page() {
         const discogsData = await fetchDiscogsRelease(row.discogs_release_id as string);
         if (!discogsData || typeof discogsData !== 'object') {
           console.error('Invalid Discogs response:', discogsData);
-          return row;
+          throw new Error('Invalid Discogs response');
         }
 
         if (!image && (discogsData.images as { uri: string }[] | undefined)?.[0]?.uri) {
@@ -204,6 +204,7 @@ export default function Page() {
         throw err;
       }
     }
+
     return { ...row, image_url: image };
   }
 
