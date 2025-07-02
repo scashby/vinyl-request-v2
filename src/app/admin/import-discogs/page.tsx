@@ -17,7 +17,11 @@ const dedupeKey = (row: Record<string, unknown>): string =>
 
 async function fetchDiscogsRelease(releaseId: string): Promise<Record<string, unknown>> {
   const res = await fetch(`/api/discogsProxy?releaseId=${releaseId}`);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  if (!res.ok) {
+    const text = await res.text();
+    console.error(`DiscogsProxy failed (${res.status}):`, text);
+    throw new Error(`HTTP ${res.status}`);
+  }
   return res.json();
 }
 
@@ -85,8 +89,12 @@ export default function Page() {
             dupeRows.push(norm);
             csvData.push(norm);
           } else {
-            const enriched = await enrichWithDiscogs(norm, new Map());
-            csvData.push(enriched);
+            try {
+              const enriched = await enrichWithDiscogs(norm, new Map());
+              csvData.push(enriched);
+            } catch (err) {
+              console.error('Initial enrichment failed, skipping row:', err);
+            }
           }
         }
 
@@ -114,7 +122,13 @@ export default function Page() {
 
       if (onlyAddNew && match) continue;
 
-      const row = csvRow;
+      let row: Record<string, unknown>;
+      try {
+        row = await enrichWithDiscogs(csvRow, existingMap);
+      } catch (err) {
+        console.error('Enrichment skipped for row due to fetch failure:', err);
+        continue;
+      }
 
       const record = {
         artist: cleanArtist((row.artist as string) || '') || null,
@@ -187,6 +201,7 @@ export default function Page() {
         }
       } catch (err) {
         console.error('Discogs enrichment failed:', err);
+        throw err;
       }
     }
     return { ...row, image_url: image };

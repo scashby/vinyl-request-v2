@@ -26,7 +26,13 @@ export async function GET(request) {
 
     if (!apiRes.ok) {
       const errorText = await apiRes.text();
-      console.error('Discogs API error:', errorText);
+      console.error('Discogs API 403 Error:', {
+        url,
+        releaseId,
+        status: apiRes.status,
+        tokenIncluded: Boolean(token),
+        response: errorText
+      });
       return Response.json({ error: errorText }, { status: apiRes.status });
     }
 
