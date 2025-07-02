@@ -3,7 +3,7 @@
 import React from "react";
 import { useState } from "react";
 import Papa from "papaparse";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "lib/supabaseClient";
 
 type CollectionRow = {
   catalog_number: string;
@@ -39,11 +39,6 @@ type DiscogsResponse = {
   tracklist?: DiscogsTrack[];
 };
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
-
 export default function ImportDiscogs(): React.ReactElement {
   const [uniqueRows, setUniqueRows] = useState<CsvRow[]>([]);
   const [importing, setImporting] = useState(false);
@@ -67,14 +62,21 @@ export default function ImportDiscogs(): React.ReactElement {
           .map((r: CsvRow) => r["Discogs Release ID"])
           .filter(Boolean);
 
+        if (discogsIds.length === 0) {
+          setUniqueRows([]);
+          log("No Discogs IDs found in uploaded CSV.");
+          return;
+        }
+
         const { data: existing } = await supabase
           .from("Collections")
           .select("discogs_id")
           .in("discogs_id", discogsIds);
 
         const existingIds = new Set(
-          (existing || []).map((r) => r.discogs_id)
+          (existing || []).map((r: { discogs_id: string }) => r.discogs_id)
         );
+
         const newRows = rows.filter(
           (r: CsvRow) => !existingIds.has(r["Discogs Release ID"])
         );
