@@ -80,8 +80,8 @@ export default function Page() {
         format: row.format || null,
         image_url: row.image_url || null,
         media_condition: row.media_condition || null,
-        tracklists: Array.isArray(row.tracklists) ? row.tracklists : cleanTextOrJSON(row.tracklists as string),
-        sides: safeParse(row.sides as string),
+        tracklists: cleanTextOrJSON(row.tracklists),
+        sides: safeParse(row.sides),
         discogs_master_id: row.discogs_master_id || null,
         discogs_release_id: row.discogs_release_id || null,
         is_box_set: false,
@@ -187,17 +187,21 @@ export default function Page() {
     return row;
   }
 
-  function cleanTextOrJSON(input: string | null | undefined): unknown[] | null {
+  function cleanTextOrJSON(input: unknown): unknown[] | null {
     if (!input || input === 'None') return null;
-    try {
-      const parsed = JSON.parse(input);
-      return Array.isArray(parsed) ? parsed : null;
-    } catch {
-      return null;
+    if (Array.isArray(input)) return input;
+    if (typeof input === 'string') {
+      try {
+        const parsed = JSON.parse(input);
+        return Array.isArray(parsed) ? parsed : null;
+      } catch {
+        return null;
+      }
     }
+    return null;
   }
 
-  function safeParse(input: string | null | undefined): unknown {
+  function safeParse(input: unknown): unknown {
     try {
       if (!input || input === 'None') return null;
       return typeof input === 'string' ? JSON.parse(input) : input;
