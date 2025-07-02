@@ -15,10 +15,10 @@ export async function GET(request) {
     return Response.json({ error: 'Discogs token missing from environment' }, { status: 500 });
   }
 
-  const url = `https://api.discogs.com/releases/${releaseId}`;
+  // ✅ Move token to querystring (header version is blocked)
+  const url = `https://api.discogs.com/releases/${releaseId}?token=${token}`;
   const headers = {
-    'User-Agent': 'DeadWaxDialogues/1.0 +https://deadwaxdialogues.com',
-    'Authorization': `Discogs token=${token}`
+    'User-Agent': 'DeadWaxDialogues/1.0 +https://deadwaxdialogues.com'
   };
 
   try {
