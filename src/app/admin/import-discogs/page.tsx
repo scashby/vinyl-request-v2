@@ -127,7 +127,7 @@ export default function Page() {
       folder: row['Collection Folder'] || '',
       format: row['Format'] || '',
       media_condition: row['Media Condition'] || '',
-      discogs_release_id: row['discogs_release_id'] || row['Release ID'],
+      discogs_release_id: row['discogs_release_id'] || '',
       image_url: row['image_url'] || '',
       tracklists: row['tracklists'] || '',
     };
