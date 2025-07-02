@@ -7,11 +7,9 @@ import React, { useState, ChangeEvent } from 'react';
 import Papa from 'papaparse';
 import { supabase } from 'lib/supabaseClient';
 
-// Artist cleaner: strips trailing (#), trims, preserves case
 const cleanArtist = (artist: string): string =>
   (artist || "").replace(/\s*\(\d+\)$/, "").trim();
 
-// Bulletproof dedupe key for ALL sources
 const dedupeKey = (row: Record<string, unknown>): string =>
   (row.discogs_release_id || row.release_id || '').toString().trim();
 
@@ -49,9 +47,7 @@ async function fetchAllExistingRows(): Promise<Record<string, unknown>[]> {
       .from('collection')
       .select('*')
       .range(from, from + batchSize - 1);
-    if (error) {
-      break;
-    }
+    if (error) break;
     if (!batch || batch.length === 0) break;
     allRows = allRows.concat(batch);
     keepGoing = batch.length === batchSize;
@@ -138,7 +134,7 @@ export default function Page() {
         format: row.format || null,
         image_url: row.image_url || null,
         media_condition: row.media_condition || null,
-        tracklists: cleanTextOrJSON(row.tracklists as string),
+        tracklists: Array.isArray(row.tracklists) ? row.tracklists : cleanTextOrJSON(row.tracklists as string),
         sides: safeParse(row.sides as string),
         discogs_master_id: row.discogs_master_id || null,
         discogs_release_id: row.discogs_release_id || null,
