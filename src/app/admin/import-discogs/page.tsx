@@ -22,7 +22,7 @@ async function fetchDiscogsRelease(releaseId: string): Promise<Record<string, un
     console.error(`DiscogsProxy failed (${res.status}):`, text);
     throw new Error(`HTTP ${res.status}`);
   }
-  return await res.json(); // ✅ Fixed: return parsed JSON
+  return await res.json();
 }
 
 async function enrichMediaConditionIfBlank(row: Record<string, unknown>): Promise<string> {
@@ -181,7 +181,7 @@ export default function Page() {
 
     if (row.discogs_release_id) {
       try {
-        const discogsData = await fetchDiscogsRelease(row.discogs_release_id as string); // ✅ discogsData now properly resolved
+        const discogsData = await fetchDiscogsRelease(row.discogs_release_id as string);
         if (!discogsData || typeof discogsData !== 'object') {
           console.error('Invalid Discogs response:', discogsData);
           throw new Error('Invalid Discogs response');
@@ -197,7 +197,7 @@ export default function Page() {
           row.format = (discogsData.formats as { name: string }[])[0].name;
         }
         if (!row.tracklists && Array.isArray(discogsData.tracklist)) {
-          row.tracklists = JSON.stringify(discogsData.tracklist);
+          row.tracklists = discogsData.tracklist;
         }
       } catch (err) {
         console.error('Discogs enrichment failed:', err);
@@ -240,12 +240,13 @@ export default function Page() {
     }
   }
 
-  function cleanTextOrJSON(input: string | null | undefined): string | null {
+  function cleanTextOrJSON(input: string | null | undefined): unknown[] | null {
     if (!input || input === 'None') return null;
     try {
-      return JSON.stringify(JSON.parse(input));
+      const parsed = JSON.parse(input);
+      return Array.isArray(parsed) ? parsed : null;
     } catch {
-      return input;
+      return null;
     }
   }
 
