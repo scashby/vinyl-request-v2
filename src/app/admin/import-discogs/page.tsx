@@ -1,18 +1,17 @@
 "use client";
 
-import React from "react";
-import { useState } from "react";
+import React, { useState } from "react";
 import Papa from "papaparse";
 import { supabase } from "lib/supabaseClient";
 
 type CollectionRow = {
-  catalog_number: string;
   artist: string;
   title: string;
   label: string;
+  catalog_number: string;
   format: string;
   release_year: string | null;
-  discogs_id: string;
+  discogs_release_id: string;
   media_condition: string;
   sleeve_condition: string;
   notes: string;
@@ -58,33 +57,30 @@ export default function ImportDiscogs(): React.ReactElement {
       skipEmptyLines: true,
       complete: async (results: { data: CsvRow[] }): Promise<void> => {
         const rows = results.data;
+        const releaseIds = rows.map((r) => r["release_id"]).filter(Boolean);
 
-        const discogsIds = rows
-          .map((r: CsvRow) => r["release_id"])
-          .filter((id): id is string => typeof id === "string" && /^\d+$/.test(id))
-          .map((id) => Number(id));
-
-        if (discogsIds.length === 0) {
-          setUniqueRows([]);
-          log("No valid Discogs IDs found in uploaded CSV.");
+        if (releaseIds.length === 0) {
+          log("No Discogs release_ids found in uploaded CSV.");
           return;
         }
 
         const { data: existing } = await supabase
-          .from("Collections")
+          .from("collection")
           .select("discogs_release_id")
-          .in("discogs_release_id", discogsIds);
+          .in("discogs_release_id", releaseIds);
 
         const existingIds = new Set(
-          (existing || []).map((r: { discogs_release_id: number }) => r.discogs_release_id)
+          (existing || []).map((r) => r.discogs_release_id)
         );
 
         const newRows = rows.filter(
-          (r: CsvRow) => !existingIds.has(Number(r["release_id"]))
+          (r) => r["release_id"] && !existingIds.has(r["release_id"])
         );
 
         setUniqueRows(newRows);
-        log(`Found ${newRows.length} new unique entries out of ${rows.length} total.`);
+        log(
+          `Found ${newRows.length} new unique entries out of ${rows.length} total.`
+        );
       },
     });
   };
@@ -113,32 +109,32 @@ export default function ImportDiscogs(): React.ReactElement {
   const handleImport = async (): Promise<void> => {
     setImporting(true);
     for (const row of uniqueRows) {
-      const discogs_id = row["release_id"];
+      const release_id = row["release_id"];
       const collectionRow: Omit<CollectionRow, "image_url" | "tracklists"> = {
-        catalog_number: row["Catalog Number"],
-        artist: row["Artist"],
-        title: row["Title"],
-        label: row["Label"],
-        format: row["Format"],
-        release_year: row["Release Year"] || null,
-        discogs_id,
-        media_condition: row["Media Condition"],
-        sleeve_condition: row["Sleeve Condition"],
-        notes: row["Notes"],
-        added_date: row["Date Added"] ? new Date(row["Date Added"]) : null,
-        media_type: row["Collection Media Type"],
+        catalog_number: row["catalog_number"],
+        artist: row["artist"],
+        title: row["title"],
+        label: row["label"],
+        format: row["format"],
+        release_year: row["release_year"] || null,
+        discogs_release_id: release_id,
+        media_condition: row["media_condition"],
+        sleeve_condition: row["sleeve_condition"],
+        notes: row["notes"],
+        added_date: row["added_date"] ? new Date(row["added_date"]) : null,
+        media_type: row["media_type"],
       };
 
-      const enriched = await enrichWithDiscogs(discogs_id);
+      const enriched = await enrichWithDiscogs(release_id);
       const fullRow: CollectionRow = {
         ...collectionRow,
         image_url: enriched.image_url,
         tracklists: enriched.tracklists,
       };
 
-      const { error } = await supabase.from("Collections").insert(fullRow);
+      const { error } = await supabase.from("collection").insert(fullRow);
       if (error) {
-        log(`Insert failed for ${discogs_id}: ${error.message}`);
+        log(`Insert failed for ${release_id}: ${error.message}`);
       } else {
         log(`Imported ${collectionRow.artist} – ${collectionRow.title}`);
       }
@@ -152,17 +148,20 @@ export default function ImportDiscogs(): React.ReactElement {
     <div style={{ padding: "2rem" }}>
       <h2>Import Discogs CSV</h2>
       <input type="file" accept=".csv" onChange={handleCSVUpload} />
-      <br /><br />
+      <br />
+      <br />
       {uniqueRows.length > 0 && (
         <>
           <button onClick={handleImport} disabled={importing}>
-            {importing ? "Importing..." : `Import ${uniqueRows.length} New Rows`}
+            {importing
+              ? "Importing..."
+              : `Import ${uniqueRows.length} New Rows`}
           </button>
           <h4>Preview of entries to be imported:</h4>
           <ul>
             {uniqueRows.map((r: CsvRow, i: number) => (
               <li key={i}>
-                {r["Artist"]} – {r["Title"]}
+                {r["artist"]} – {r["title"]}
               </li>
             ))}
           </ul>
