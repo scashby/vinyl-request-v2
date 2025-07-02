@@ -1,5 +1,5 @@
 // Admin Import Discogs page ("/admin/import-discogs")
-// Upload and import Discogs CSV exports to Supabase, including deduplication and enrichment.
+// Upload and import Discogs CSV exports to Supabase, excluding duplicates and enriching new records with image_url and tracklists.
 
 "use client";
 
@@ -7,41 +7,10 @@ import React, { useState, ChangeEvent } from 'react';
 import Papa from 'papaparse';
 import { supabase } from 'lib/supabaseClient';
 
-const cleanArtist = (artist: string): string =>
-  (artist || "").replace(/\s*\(\d+\)$/, "").trim();
-
-const dedupeKey = (row: Record<string, unknown>): string =>
-  (row.discogs_release_id || row.release_id || '').toString().trim();
-
-async function fetchDiscogsRelease(releaseId: string): Promise<Record<string, unknown>> {
-  const res = await fetch(`/api/discogsProxy?releaseId=${releaseId}`);
-  if (!res.ok) {
-    const text = await res.text();
-    console.error(`DiscogsProxy failed (${res.status}):`, text);
-    throw new Error(`HTTP ${res.status}`);
-  }
-  return await res.json();
-}
-
-async function fetchAllExistingRows(): Promise<Record<string, unknown>[]> {
-  let allRows: Record<string, unknown>[] = [];
-  let from = 0;
-  const batchSize = 1000;
-  let keepGoing = true;
-
-  while (keepGoing) {
-    const { data: batch, error } = await supabase
-      .from('collection')
-      .select('*')
-      .range(from, from + batchSize - 1);
-    if (error) break;
-    if (!batch || batch.length === 0) break;
-    allRows = allRows.concat(batch);
-    keepGoing = batch.length === batchSize;
-    from += batchSize;
-  }
-  return allRows;
-}
+type DiscogsRelease = {
+  images?: { uri?: string }[];
+  tracklist?: unknown[];
+};
 
 export default function Page() {
   const [parsedData, setParsedData] = useState<Record<string, unknown>[]>([]);
@@ -70,20 +39,16 @@ export default function Page() {
 
           if (existingKeys.has(key)) {
             dupeRows.push(norm);
-            csvData.push(norm);
             continue;
           }
 
           try {
-            norm.media_condition = await enrichMediaConditionIfBlank(norm);
-            const enriched = await enrichWithDiscogs(norm, new Map());
+            const enriched = await enrichWithDiscogs(norm);
             csvData.push(enriched);
+            await delay(2000); // throttle to avoid Cloudflare block
           } catch (err) {
-            console.error(`❌ Skipped during initial enrichment: ${key}`, err);
-            continue;
+            console.error(`❌ Skipped during enrichment: ${key}`, err);
           }
-
-          await delay(5000); // throttle new-only rows
         }
 
         setParsedData(csvData);
@@ -101,25 +66,14 @@ export default function Page() {
     const existingMap = new Map(existing.map(e => [dedupeKey(e), e]));
 
     let inserted = 0;
-    let updated = 0;
 
     for (let i = 0; i < parsedData.length; i++) {
-      const csvRow = parsedData[i];
-      const rowKey = dedupeKey(csvRow);
-      const match = existingMap.get(rowKey);
-
-      if (onlyAddNew && match) continue;
-
-      let row: Record<string, unknown>;
-      try {
-        row = await enrichWithDiscogs(csvRow, existingMap);
-      } catch (err) {
-        console.error(`❌ Skipped during import enrichment: ${rowKey}`, err);
-        continue;
-      }
+      const row = parsedData[i];
+      const key = dedupeKey(row);
+      if (onlyAddNew && existingMap.has(key)) continue;
 
       const record = {
-        artist: cleanArtist((row.artist as string) || '') || null,
+        artist: cleanArtist(row.artist as string),
         title: row.title || null,
         year: row.year || null,
         folder: row.folder || null,
@@ -130,115 +84,107 @@ export default function Page() {
         sides: safeParse(row.sides as string),
         discogs_master_id: row.discogs_master_id || null,
         discogs_release_id: row.discogs_release_id || null,
-        is_box_set: parseBoolean(row.is_box_set),
-        parent_id: row.parent_id || null,
-        blocked: parseBoolean(row.blocked),
-        blocked_sides: parseArray(row.blocked_sides as string),
-        child_album_ids: parseIntArray(row.child_album_ids as string)
+        is_box_set: false,
+        parent_id: null,
+        blocked: false,
+        blocked_sides: null,
+        child_album_ids: null
       };
 
       try {
-        if (match) {
-          if (!onlyAddNew) {
-            await supabase
-              .from('collection')
-              .update(record, { count: undefined })
-              .eq('id', (match as { id: string }).id);
-            updated++;
-          }
-        } else {
-          await supabase.from('collection').insert([record], { count: undefined });
-          inserted++;
-        }
+        await supabase.from('collection').insert([record], { count: undefined });
+        inserted++;
       } catch (err) {
-        console.error('Supabase import error:', err, record);
+        console.error('Supabase insert error:', err, record);
         setStatus(`Error on row ${i + 1}: ${(err as Error).message}`);
         continue;
       }
 
       setStatus(`Importing ${i + 1} of ${parsedData.length}...`);
-      await delay(5000);
+      await delay(2000);
     }
 
-    setStatus(`✅ ${inserted} inserted${onlyAddNew ? '' : `, ${updated} updated`}.`);
+    setStatus(`✅ ${inserted} inserted.`);
   };
 
-  async function enrichWithDiscogs(row: Record<string, unknown>, existingMap: Map<string, Record<string, unknown>>): Promise<Record<string, unknown>> {
-    const existing = existingMap.get(dedupeKey(row)) || {};
-    let image = row.image_url || (existing as { image_url?: unknown }).image_url;
-
-    if (row.discogs_release_id) {
-      try {
-        const discogsData = await fetchDiscogsRelease(row.discogs_release_id as string);
-        if (!discogsData || typeof discogsData !== 'object') {
-          console.error('Invalid Discogs response:', discogsData);
-          throw new Error('Invalid Discogs response');
-        }
-
-        if (!image && (discogsData.images as { uri: string }[] | undefined)?.[0]?.uri) {
-          image = (discogsData.images as { uri: string }[])[0].uri;
-        }
-        if (!row.year && discogsData.year) {
-          row.year = discogsData.year.toString();
-        }
-        if (!row.format && (discogsData.formats as { name: string }[] | undefined)?.[0]?.name) {
-          row.format = (discogsData.formats as { name: string }[])[0].name;
-        }
-        if (!row.tracklists && Array.isArray(discogsData.tracklist)) {
-          row.tracklists = discogsData.tracklist;
-        }
-      } catch (err) {
-        console.error('Discogs enrichment failed:', err);
-        throw err;
-      }
-    }
-
-    return { ...row, image_url: image };
+  function dedupeKey(row: Record<string, unknown>): string {
+    return (row.discogs_release_id || row.release_id || '').toString().trim();
   }
 
-  async function enrichMediaConditionIfBlank(row: Record<string, unknown>): Promise<string> {
-    if (row.media_condition && String(row.media_condition).trim()) {
-      return row.media_condition as string;
-    }
-    if (!row.discogs_release_id) return "";
-    try {
-      const discogsData = await fetchDiscogsRelease(row.discogs_release_id as string);
-      return (discogsData?.media_condition as string) || "";
-    } catch {
-      return "";
-    }
+  function cleanArtist(input: string): string {
+    return input.replace(/\s*\(\d+\)$/, '').trim();
   }
 
   function normalizeRow(row: Record<string, unknown>): Record<string, unknown> {
     const releaseId = row['discogs_release_id'] || row['release_id'] || '';
-    const masterId = row['discogs_master_id'] || row['discogs_release_id'] || row['release_id'] || '';
     return {
-      artist: row['Artist'] || row['artist'] || null,
-      title: row['Title'] || row['title'] || null,
-      year: row['Released'] || row['year'] || null,
-      folder: row['CollectionFolder'] || row['folder'] || null,
-      format: row['Format'] || row['format'] || null,
-      image_url: row['image_url'] || null,
-      media_condition: row['Collection Media Condition'] || row['media_condition'] || null,
-      tracklists: row['tracklists'] || null,
-      sides: row['sides'] || null,
-      discogs_master_id: masterId,
+      artist: row['Artist'] || '',
+      title: row['Title'] || '',
+      folder: row['CollectionFolder'] || '',
+      format: row['Format'] || '',
+      year: row['Released'] || '',
+      media_condition: row['Collection Media Condition'] || '',
       discogs_release_id: releaseId,
-      is_box_set: row['is_box_set'] || false,
-      parent_id: row['parent_id'] || null,
-      blocked: row['blocked'] || false,
-      blocked_sides: row['blocked_sides'] || null,
-      child_album_ids: row['child_album_ids'] || null
+      discogs_master_id: releaseId,
+      image_url: null,
+      tracklists: null,
+      sides: null,
+      is_box_set: false,
+      parent_id: null,
+      blocked: false,
+      blocked_sides: null,
+      child_album_ids: null
     };
   }
 
-  function safeParse(input: string | null | undefined): unknown {
-    try {
-      if (!input || input === 'None') return null;
-      return typeof input === 'string' ? JSON.parse(input) : input;
-    } catch {
-      return null;
+  async function fetchAllExistingRows(): Promise<Record<string, unknown>[]> {
+    let allRows: Record<string, unknown>[] = [];
+    let from = 0;
+    const batchSize = 1000;
+    let keepGoing = true;
+
+    while (keepGoing) {
+      const { data: batch, error } = await supabase
+        .from('collection')
+        .select('*')
+        .range(from, from + batchSize - 1);
+      if (error) break;
+      if (!batch || batch.length === 0) break;
+      allRows = allRows.concat(batch);
+      keepGoing = batch.length === batchSize;
+      from += batchSize;
     }
+
+    return allRows;
+  }
+
+  async function fetchDiscogsRelease(releaseId: string): Promise<DiscogsRelease> {
+    const res = await fetch(`/api/discogsProxy?releaseId=${releaseId}`);
+    if (!res.ok) {
+      const text = await res.text();
+      console.error(`DiscogsProxy failed (${res.status}):`, text);
+      throw new Error(`HTTP ${res.status}`);
+    }
+    return await res.json();
+  }
+
+  async function enrichWithDiscogs(row: Record<string, unknown>): Promise<Record<string, unknown>> {
+    if (!row.discogs_release_id) return row;
+
+    try {
+      const data = await fetchDiscogsRelease(row.discogs_release_id as string);
+      if (!row.image_url && Array.isArray(data.images) && data.images[0]?.uri) {
+        row.image_url = data.images[0].uri;
+      }
+      if (!row.tracklists && Array.isArray(data.tracklist)) {
+        row.tracklists = data.tracklist;
+      }
+    } catch (err) {
+      console.error('Discogs enrichment failed:', err);
+      throw err;
+    }
+
+    return row;
   }
 
   function cleanTextOrJSON(input: string | null | undefined): unknown[] | null {
@@ -251,27 +197,12 @@ export default function Page() {
     }
   }
 
-  function parseBoolean(input: unknown): boolean {
-    return input === true || input === 'true';
-  }
-
-  function parseArray(input: string | null | undefined): string[] | null {
-    if (!input || input === 'None') return null;
+  function safeParse(input: string | null | undefined): unknown {
     try {
-      return JSON.parse(input);
+      if (!input || input === 'None') return null;
+      return typeof input === 'string' ? JSON.parse(input) : input;
     } catch {
-      return input.split(',').map(s => s.trim());
-    }
-  }
-
-  function parseIntArray(input: string | null | undefined): number[] | null {
-    if (!input || input === 'None' || input === 'null') return null;
-    try {
-      const parsed = JSON.parse(input);
-      if (!Array.isArray(parsed)) return null;
-      return parsed.map(n => parseInt(n, 10)).filter(n => !isNaN(n));
-    } catch {
-      return input.split(',').map(n => parseInt(n.trim(), 10)).filter(n => !isNaN(n));
+      return null;
     }
   }
 
