@@ -58,13 +58,15 @@ export default function ImportDiscogs(): React.ReactElement {
       skipEmptyLines: true,
       complete: async (results: { data: CsvRow[] }): Promise<void> => {
         const rows = results.data;
+
+        // ✅ Convert release_id to numbers for correct Supabase match
         const discogsIds = rows
-          .map((r: CsvRow) => String(r["release_id"]).trim())
-          .filter(Boolean);
+          .map((r: CsvRow) => Number(r["release_id"]))
+          .filter((id) => !isNaN(id));
 
         if (discogsIds.length === 0) {
           setUniqueRows([]);
-          log("No Discogs IDs found in uploaded CSV.");
+          log("No valid Discogs IDs found in uploaded CSV.");
           return;
         }
 
@@ -74,11 +76,11 @@ export default function ImportDiscogs(): React.ReactElement {
           .in("discogs_release_id", discogsIds);
 
         const existingIds = new Set(
-          (existing || []).map((r: { discogs_release_id: string }) => r.discogs_release_id)
+          (existing || []).map((r: { discogs_release_id: number }) => r.discogs_release_id)
         );
 
         const newRows = rows.filter(
-          (r: CsvRow) => !existingIds.has(String(r["release_id"]).trim())
+          (r: CsvRow) => !existingIds.has(Number(r["release_id"]))
         );
 
         setUniqueRows(newRows);
