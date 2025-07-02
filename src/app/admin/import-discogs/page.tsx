@@ -22,9 +22,9 @@ async function fetchDiscogsRelease(releaseId: string): Promise<Record<string, un
 }
 async function enrichMediaConditionIfBlank(row: Record<string, unknown>): Promise<string> {
   if (row.media_condition && String(row.media_condition).trim()) {
-    return row.media_condition as string; // Can't enrich
+    return row.media_condition as string; // Already has value
   }
-  if (!row.discogs_release_id) return "";
+  if (!row.discogs_release_id) return ""; // Can't enrich
   try {
     const discogsData = await fetchDiscogsRelease(row.discogs_release_id as string);
     return (discogsData?.media_condition as string) || "";
@@ -162,19 +162,17 @@ export default function Page() {
           return row;
         }
 
-        // ADD ONLY THIS BLOCK:
         if (!image && (discogsData.images as { uri: string }[] | undefined)?.[0]?.uri) {
           image = (discogsData.images as { uri: string }[])[0].uri;
         }
-        if (!row.tracklists && Array.isArray(discogsData.tracklist)) {
-          row.tracklists = JSON.stringify(discogsData.tracklist);
-        }
-
         if (!row.year && discogsData.year) {
           row.year = discogsData.year.toString();
         }
         if (!row.format && (discogsData.formats as { name: string }[] | undefined)?.[0]?.name) {
           row.format = (discogsData.formats as { name: string }[])[0].name;
+        }
+        if (!row.tracklists && Array.isArray(discogsData.tracklist)) {
+          row.tracklists = JSON.stringify(discogsData.tracklist);
         }
       } catch (err) {
         console.error('Discogs enrichment failed:', err);
