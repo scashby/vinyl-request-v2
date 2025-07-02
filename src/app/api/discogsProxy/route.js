@@ -1,45 +1,41 @@
 // API route: /api/discogsProxy?releaseId=xxxx
 // Proxies requests to Discogs API using server-side token.
+// Ensures valid headers and avoids frontend rate limiting.
 
-export async function GET(request) {
-  const { searchParams } = new URL(request.url);
-  const releaseId = searchParams.get('releaseId');
-
+export async function GET(req) {
+  const { searchParams } = new URL(req.url);
+  const releaseId = searchParams.get("releaseId");
   if (!releaseId) {
-    return Response.json({ error: 'Missing releaseId' }, { status: 400 });
+    return new Response("Missing releaseId parameter", { status: 400 });
   }
 
-  const token = process.env.VITE_DISCOGS_TOKEN;
-
+  const token = process.env.DISCOGS_TOKEN;
   if (!token) {
-    return Response.json({ error: 'Discogs token missing from environment' }, { status: 500 });
+    return new Response("Missing Discogs token", { status: 500 });
   }
 
-  // ✅ Move token to querystring (header version is blocked)
-  const url = `https://api.discogs.com/releases/${releaseId}?token=${token}`;
-  const headers = {
-    'User-Agent': 'DeadWaxDialogues/1.0 +https://deadwaxdialogues.com'
-  };
+  const url = `https://api.discogs.com/releases/${releaseId}`;
 
   try {
-    const apiRes = await fetch(url, { headers });
+    const res = await fetch(url, {
+      headers: {
+        "Authorization": `Discogs token=${token}`,
+        "User-Agent": "DeadWaxDialogues/1.0 +https://deadwaxdialogues.com",
+      },
+    });
 
-    if (!apiRes.ok) {
-      const errorText = await apiRes.text();
-      console.error('Discogs API 403 Error:', {
-        url,
-        releaseId,
-        status: apiRes.status,
-        tokenIncluded: Boolean(token),
-        response: errorText
-      });
-      return Response.json({ error: errorText }, { status: apiRes.status });
+    if (!res.ok) {
+      const errorText = await res.text();
+      return new Response(errorText, { status: res.status });
     }
 
-    const data = await apiRes.json();
-    return Response.json(data);
+    const data = await res.json();
+    return new Response(JSON.stringify(data), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
   } catch (err) {
-    console.error('Discogs proxy failed:', err);
-    return Response.json({ error: err.message || 'Unknown error' }, { status: 500 });
+    console.error("Proxy error:", err);
+    return new Response("Server error", { status: 500 });
   }
 }
