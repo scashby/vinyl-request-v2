@@ -59,10 +59,10 @@ export default function ImportDiscogs(): React.ReactElement {
       complete: async (results: { data: CsvRow[] }): Promise<void> => {
         const rows = results.data;
 
-        // ✅ Convert release_id to numbers for correct Supabase match
         const discogsIds = rows
-          .map((r: CsvRow) => Number(r["release_id"]))
-          .filter((id) => !isNaN(id));
+          .map((r: CsvRow) => r["release_id"])
+          .filter((id): id is string => typeof id === "string" && /^\d+$/.test(id))
+          .map((id) => Number(id));
 
         if (discogsIds.length === 0) {
           setUniqueRows([]);
