@@ -22,7 +22,7 @@ async function fetchDiscogsRelease(releaseId: string): Promise<Record<string, un
     console.error(`DiscogsProxy failed (${res.status}):`, text);
     throw new Error(`HTTP ${res.status}`);
   }
-  return res.json();
+  return await res.json(); // ✅ Fixed: return parsed JSON
 }
 
 async function enrichMediaConditionIfBlank(row: Record<string, unknown>): Promise<string> {
@@ -181,7 +181,7 @@ export default function Page() {
 
     if (row.discogs_release_id) {
       try {
-        const discogsData = await fetchDiscogsRelease(row.discogs_release_id as string);
+        const discogsData = await fetchDiscogsRelease(row.discogs_release_id as string); // ✅ discogsData now properly resolved
         if (!discogsData || typeof discogsData !== 'object') {
           console.error('Invalid Discogs response:', discogsData);
           throw new Error('Invalid Discogs response');
