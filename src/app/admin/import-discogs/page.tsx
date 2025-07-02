@@ -59,7 +59,7 @@ export default function ImportDiscogs(): React.ReactElement {
       complete: async (results: { data: CsvRow[] }): Promise<void> => {
         const rows = results.data;
         const discogsIds = rows
-          .map((r: CsvRow) => r["release_id"])
+          .map((r: CsvRow) => String(r["release_id"]).trim())
           .filter(Boolean);
 
         if (discogsIds.length === 0) {
@@ -70,15 +70,15 @@ export default function ImportDiscogs(): React.ReactElement {
 
         const { data: existing } = await supabase
           .from("Collections")
-          .select("discogs_id")
-          .in("discogs_id", discogsIds);
+          .select("discogs_release_id")
+          .in("discogs_release_id", discogsIds);
 
         const existingIds = new Set(
-          (existing || []).map((r: { discogs_id: string }) => r.discogs_id)
+          (existing || []).map((r: { discogs_release_id: string }) => r.discogs_release_id)
         );
 
         const newRows = rows.filter(
-          (r: CsvRow) => !existingIds.has(r["Discogs Release ID"])
+          (r: CsvRow) => !existingIds.has(String(r["release_id"]).trim())
         );
 
         setUniqueRows(newRows);
@@ -111,7 +111,7 @@ export default function ImportDiscogs(): React.ReactElement {
   const handleImport = async (): Promise<void> => {
     setImporting(true);
     for (const row of uniqueRows) {
-      const discogs_id = row["Discogs Release ID"];
+      const discogs_id = row["release_id"];
       const collectionRow: Omit<CollectionRow, "image_url" | "tracklists"> = {
         catalog_number: row["Catalog Number"],
         artist: row["Artist"],
