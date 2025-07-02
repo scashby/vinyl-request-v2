@@ -20,11 +20,12 @@ async function fetchDiscogsRelease(releaseId: string): Promise<Record<string, un
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
+
 async function enrichMediaConditionIfBlank(row: Record<string, unknown>): Promise<string> {
   if (row.media_condition && String(row.media_condition).trim()) {
-    return row.media_condition as string; // Already has value
+    return row.media_condition as string;
   }
-  if (!row.discogs_release_id) return ""; // Can't enrich
+  if (!row.discogs_release_id) return "";
   try {
     const discogsData = await fetchDiscogsRelease(row.discogs_release_id as string);
     return (discogsData?.media_condition as string) || "";
@@ -59,26 +60,37 @@ export default function Page() {
   const [parsedData, setParsedData] = useState<Record<string, unknown>[]>([]);
   const [duplicates, setDuplicates] = useState<Record<string, unknown>[]>([]);
   const [status, setStatus] = useState<string>('');
-  const [onlyAddNew, setOnlyAddNew] = useState<boolean>(true); // Default: only add new
+  const [onlyAddNew, setOnlyAddNew] = useState<boolean>(true);
 
-  // Parse and normalize CSV
   const handleFile = async (e: ChangeEvent<HTMLInputElement>): Promise<void> => {
     const file = e.target.files?.[0];
     if (!file) return;
+
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
       complete: async function (results: { data: Record<string, unknown>[] }) {
-        const csvData = await Promise.all(results.data.map(async (row: Record<string, unknown>) => {
-          const norm = normalizeRow(row);
-          norm.media_condition = await enrichMediaConditionIfBlank(norm);
-          return norm;
-        }));
-        setParsedData(csvData);
-
         const existing = await fetchAllExistingRows();
         const existingKeys = new Set(existing.map(e => dedupeKey(e)));
-        const dupeRows = csvData.filter(row => existingKeys.has(dedupeKey(row)));
+
+        const csvData: Record<string, unknown>[] = [];
+        const dupeRows: Record<string, unknown>[] = [];
+
+        for (const rawRow of results.data) {
+          const norm = normalizeRow(rawRow);
+          norm.media_condition = await enrichMediaConditionIfBlank(norm);
+          const key = dedupeKey(norm);
+
+          if (existingKeys.has(key)) {
+            dupeRows.push(norm);
+            csvData.push(norm);
+          } else {
+            const enriched = await enrichWithDiscogs(norm, new Map());
+            csvData.push(enriched);
+          }
+        }
+
+        setParsedData(csvData);
         setDuplicates(dupeRows);
       }
     });
@@ -100,10 +112,9 @@ export default function Page() {
       const rowKey = dedupeKey(csvRow);
       const match = existingMap.get(rowKey);
 
-      // Only add new: skip if already exists
       if (onlyAddNew && match) continue;
 
-      const row = await enrichWithDiscogs(csvRow, existingMap);
+      const row = csvRow;
 
       const record = {
         artist: cleanArtist((row.artist as string) || '') || null,
