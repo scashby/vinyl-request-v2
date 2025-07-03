@@ -30,7 +30,7 @@ type ProcessedRow = {
   format: string;
   folder: string;
   media_condition: string;
-  discogs_release_id: number; // Supabase expects this field name
+  discogs_release_id: string; // String to match database schema
   image_url: string | null;
   tracklists: string | null;
 };
@@ -50,7 +50,7 @@ export default function ImportDiscogsPage() {
   const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
   const fetchDiscogsData = async (
-    releaseId: number,
+    releaseId: string,
     retries = 3
   ): Promise<{ image_url: string | null; tracklists: string | null }> => {
     const url = `https://api.discogs.com/releases/${releaseId}`;
@@ -149,7 +149,7 @@ export default function ImportDiscogsPage() {
               }
               return false;
             }
-            // Also filter out non-numeric strings
+            // Also filter out non-numeric strings (we'll convert valid numbers to strings later)
             const numericValue = Number(releaseId);
             if (isNaN(numericValue) || numericValue <= 0) {
               if (index < 10) {
@@ -177,14 +177,14 @@ export default function ImportDiscogsPage() {
             format: row.Format,
             folder: row.CollectionFolder,
             media_condition: row['Collection Media Condition'],
-            discogs_release_id: Number(row.release_id), // Convert to number
+            discogs_release_id: String(row.release_id), // Convert to string to match database
             image_url: null,
             tracklists: null
           }));
 
           const releaseIds = processedRows.map(r => r.discogs_release_id);
           
-          console.log('Release IDs to check:', releaseIds.slice(0, 5)); // Log first 5 for debugging
+          console.log('Release IDs to check (converted to strings):', releaseIds.slice(0, 5)); // Log first 5 for debugging
           
           setStatus(`Checking Supabase for existing entries among ${releaseIds.length} items...`);
           
@@ -202,7 +202,7 @@ export default function ImportDiscogsPage() {
           console.log('Sample existing IDs:', existing?.slice(0, 5).map(r => r.discogs_release_id));
 
           const existingIds = new Set(
-            (existing || []).map((r: { discogs_release_id: number }) => r.discogs_release_id)
+            (existing || []).map((r: { discogs_release_id: string }) => r.discogs_release_id)
           );
           
           const newRows = processedRows.filter(
@@ -210,7 +210,7 @@ export default function ImportDiscogsPage() {
           );
           
           setStatus(`Found ${newRows.length} new items out of ${releaseIds.length} total. ${existingIds.size} already exist.`);
-          setDebugInfo(prev => prev + `\nTotal CSV rows: ${results.data.length}, Valid rows with release_id: ${validRows.length}, New items: ${newRows.length}, Existing: ${existingIds.size}`);
+          setDebugInfo(prev => prev + `\nTotal CSV rows: ${results.data.length}, Valid rows with release_id: ${validRows.length}, New items: ${newRows.length}, Existing: ${existingIds.size}\nNote: Converting release IDs to strings to match database schema`);
           
           if (validRows.length === 0) {
             setDebugInfo(prev => prev + `\nPROBLEM: No rows have valid release_id values! This suggests the Discogs export may be missing release IDs.`);
