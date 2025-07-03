@@ -346,7 +346,7 @@ export default function ImportDiscogsPage() {
               </tr>
             </thead>
             <tbody>
-              {csvPreview.slice(0, 50).map((row, i) => (
+              {csvPreview.map((row, i) => (
                 <tr key={i}>
                   <td>{row.artist}</td>
                   <td>{row.title}</td>
@@ -377,13 +377,6 @@ export default function ImportDiscogsPage() {
                   </td>
                 </tr>
               ))}
-              {csvPreview.length > 50 && (
-                <tr>
-                  <td colSpan={9} style={{ textAlign: 'center', fontStyle: 'italic' }}>
-                    ... and {csvPreview.length - 50} more items
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table>
         </div>
