@@ -188,29 +188,37 @@ export default function ImportDiscogsPage() {
           
           setStatus(`Checking Supabase for existing entries among ${releaseIds.length} items...`);
           
-          // Check for existing entries
-          const { data: existing, error: queryError } = await supabase
+          // First, get ALL existing release IDs from the database
+          const { data: allExisting, error: queryError } = await supabase
             .from('collection')
             .select('discogs_release_id')
-            .in('discogs_release_id', releaseIds);
+            .not('discogs_release_id', 'is', null); // Only get rows where discogs_release_id is not null
 
           if (queryError) {
             throw new Error(`Database query failed: ${queryError.message}`);
           }
 
-          console.log('Existing entries:', existing?.length);
-          console.log('Sample existing IDs:', existing?.slice(0, 5).map(r => r.discogs_release_id));
+          console.log('Total existing entries in database:', allExisting?.length || 0);
+          
+          // Create a Set of all existing release IDs for fast lookup
+          const allExistingIds = new Set(
+            (allExisting || [])
+              .map((r: { discogs_release_id: string }) => r.discogs_release_id)
+              .filter(id => id) // Remove any null/undefined values
+          );
 
-          const existingIds = new Set(
-            (existing || []).map((r: { discogs_release_id: string }) => r.discogs_release_id)
-          );
+          console.log('All existing release IDs count:', allExistingIds.size);
           
-          const newRows = processedRows.filter(
-            (r: ProcessedRow) => !existingIds.has(r.discogs_release_id)
-          );
+          // Now filter our CSV data to find only the ones that don't exist
+          const existingInCsv = releaseIds.filter(id => allExistingIds.has(id));
+          const newRows = processedRows.filter(row => !allExistingIds.has(row.discogs_release_id));
+
+          console.log(`CSV analysis: ${existingInCsv.length} already exist, ${newRows.length} are new`);
+          console.log('Sample existing in CSV:', existingInCsv.slice(0, 5));
+          console.log('Sample new release IDs:', newRows.slice(0, 5).map(r => r.discogs_release_id));
           
-          setStatus(`Found ${newRows.length} new items out of ${releaseIds.length} total. ${existingIds.size} already exist.`);
-          setDebugInfo(prev => prev + `\nTotal CSV rows: ${results.data.length}, Valid rows with release_id: ${validRows.length}, New items: ${newRows.length}, Existing: ${existingIds.size}\nNote: Converting release IDs to strings to match database schema`);
+          setStatus(`Found ${newRows.length} new items out of ${releaseIds.length} total. ${existingInCsv.length} already exist in database.`);
+          setDebugInfo(prev => prev + `\nTotal CSV rows: ${results.data.length}, Valid rows with release_id: ${validRows.length}, New items: ${newRows.length}, Existing in DB: ${existingInCsv.length}\nTotal existing items in database: ${allExistingIds.size}\nNote: Converting release IDs to strings to match database schema`);
           
           if (validRows.length === 0) {
             setDebugInfo(prev => prev + `\nPROBLEM: No rows have valid release_id values! This suggests the Discogs export may be missing release IDs.`);
@@ -338,7 +346,7 @@ export default function ImportDiscogsPage() {
               </tr>
             </thead>
             <tbody>
-              {csvPreview.slice(0, 10).map((row, i) => (
+              {csvPreview.slice(0, 50).map((row, i) => (
                 <tr key={i}>
                   <td>{row.artist}</td>
                   <td>{row.title}</td>
@@ -369,10 +377,10 @@ export default function ImportDiscogsPage() {
                   </td>
                 </tr>
               ))}
-              {csvPreview.length > 10 && (
+              {csvPreview.length > 50 && (
                 <tr>
                   <td colSpan={9} style={{ textAlign: 'center', fontStyle: 'italic' }}>
-                    ... and {csvPreview.length - 10} more items
+                    ... and {csvPreview.length - 50} more items
                   </td>
                 </tr>
               )}
