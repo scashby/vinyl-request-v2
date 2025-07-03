@@ -1,192 +1,140 @@
-"use client";
+'use client';
 
-import React, { useState } from "react";
-import Papa from "papaparse";
-import { supabase } from "lib/supabaseClient";
+import { useState } from 'react';
+import Papa from 'papaparse';
+import { supabase } from 'lib/supabaseClient';
+import Image from 'next/image';
 
-// Type for each row in the uploaded CSV
-type CsvRow = Record<string, string>;
-
-// Type for each track from Discogs
-type DiscogsTrack = {
-  position: string;
-  title: string;
-  duration: string;
-};
-
-// Expected Discogs API response structure
-type DiscogsResponse = {
-  images?: { uri: string }[];
-  tracklist?: DiscogsTrack[];
-};
-
-// Final row to insert into Supabase collection table
-type CollectionRow = {
+type CsvRow = {
   artist: string;
   title: string;
   year: string;
   format: string;
   folder: string;
   media_condition: string;
-  image_url: string | null;
-  tracklists: DiscogsTrack[] | null;
-  discogs_master_id: string | null;
   discogs_release_id: string;
 };
 
-export default function ImportDiscogs(): React.ReactElement {
-  // State: unique rows from CSV that aren't already in Supabase
-  const [uniqueRows, setUniqueRows] = useState<CsvRow[]>([]);
+type EnrichedRow = CsvRow & {
+  image_url: string | null;
+  tracklists: string[] | null;
+};
 
-  // State: whether import is actively running
-  const [importing, setImporting] = useState(false);
+export default function ImportDiscogsPage() {
+  const [csvPreview, setCsvPreview] = useState<EnrichedRow[]>([]);
+  const [status, setStatus] = useState<string>('');
 
-  // State: status log for user feedback
-  const [statusLog, setStatusLog] = useState<string[]>([]);
+  const fetchDiscogsData = async (
+    releaseId: string
+  ): Promise<{ image_url: string | null; tracklists: string[] | null }> => {
+    const url = `https://api.discogs.com/releases/${releaseId}`;
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      return {
+        image_url: data.images?.[0]?.uri || null,
+        tracklists: Array.isArray(data.tracklist)
+          ? data.tracklist.map((t: { title: string }) => t.title)
+          : null,
+      };
+    } catch {
+      return { image_url: null, tracklists: null };
+    }
+  };
 
-  // Append a message to the log area
-  const log = (msg: string): void =>
-    setStatusLog((prev) => [...prev, msg]);
-
-  // CSV file upload handler
-  const handleCSVUpload = async (
-    e: React.ChangeEvent<HTMLInputElement>
-  ): Promise<void> => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Parse CSV using PapaParse
+    setStatus('Parsing CSV...');
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
       complete: async (results: { data: CsvRow[] }) => {
         const rows = results.data;
+        const ids = rows.map((r: CsvRow) => r.discogs_release_id).filter(Boolean);
 
-        // Extract Release IDs from CSV
-        const releaseIds = rows
-          .map((r) => r["Release ID"])
-          .filter((id): id is string => Boolean(id));
+        setStatus('Checking Supabase for existing entries...');
+        const { data: existing } = await supabase
+          .from('collection')
+          .select('discogs_release_id')
+          .in('discogs_release_id', ids);
 
-        // Query Supabase to find which IDs already exist
-        const { data: existing, error } = await supabase
-          .from("collection")
-          .select("discogs_release_id")
-          .in("discogs_release_id", releaseIds);
-
-        if (error) {
-          log(`Supabase query failed: ${error.message}`);
-          return;
-        }
-
-        // Filter out already imported rows
         const existingIds = new Set(
-          (existing || []).map((r) => r.discogs_release_id)
+          (existing || []).map((r: { discogs_release_id: string }) => r.discogs_release_id)
         );
-        const newRows = rows.filter(
-          (r) => !existingIds.has(r["Release ID"])
+        const newRows: CsvRow[] = rows.filter(
+          (r: CsvRow) => !existingIds.has(r.discogs_release_id)
         );
 
-        // Store the filtered new rows
-        setUniqueRows(newRows);
-        log(`Found ${newRows.length} new entries out of ${rows.length} total.`);
+        setStatus(`Found ${newRows.length} new items. Enriching...`);
+
+        const enriched: EnrichedRow[] = await Promise.all(
+          newRows.map(async (row: CsvRow) => {
+            const { image_url, tracklists } = await fetchDiscogsData(row.discogs_release_id);
+            return { ...row, image_url, tracklists };
+          })
+        );
+
+        setCsvPreview(enriched);
+        setStatus('Inserting into Supabase...');
+        await supabase.from('collection').insert(enriched);
+        setStatus('Upload complete.');
       },
     });
   };
 
-  // Fetch image URL and tracklist from Discogs
-  const enrichWithDiscogs = async (
-    releaseId: string
-  ): Promise<{ image_url: string | null; tracklists: DiscogsTrack[] | null }> => {
-    try {
-      const res = await fetch(`/api/discogsProxy?releaseId=${releaseId}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json: DiscogsResponse = await res.json();
-
-      // Extract first image URL and map tracklist
-      const image_url = json.images?.[0]?.uri || null;
-      const tracklists = json.tracklist?.map((t) => ({
-        position: t.position,
-        title: t.title,
-        duration: t.duration,
-      })) || null;
-
-      return { image_url, tracklists };
-    } catch (err) {
-      log(`Discogs fetch failed for ${releaseId}: ${String(err)}`);
-      return { image_url: null, tracklists: null };
-    }
-  };
-
-  // Import button handler
-  const handleImport = async (): Promise<void> => {
-    setImporting(true);
-
-    // Iterate through each new CSV row
-    for (const row of uniqueRows) {
-      const releaseId = row["Release ID"];
-      const masterId = row["Master ID"] || null;
-
-      // Enrich with image and tracklist data from Discogs
-      const enriched = await enrichWithDiscogs(releaseId);
-
-      // Build row object to insert into Supabase
-      const fullRow: CollectionRow = {
-        artist: row["Artist"],
-        title: row["Title"],
-        year: row["Released"],
-        format: row["Format"],
-        folder: row["Collection Folder"],
-        media_condition: row["Media Condition"],
-        discogs_release_id: releaseId,
-        discogs_master_id: masterId,
-        image_url: enriched.image_url,
-        tracklists: enriched.tracklists,
-      };
-
-      // Insert into Supabase
-      const { error } = await supabase.from("collection").insert(fullRow);
-
-      if (error) {
-        log(`Insert failed for ${releaseId}: ${error.message}`);
-      } else {
-        log(`Imported: ${fullRow.artist} – ${fullRow.title}`);
-      }
-
-      // Rate-limit requests
-      await new Promise((res) => setTimeout(res, 1000));
-    }
-
-    setImporting(false);
-  };
-
-  // Render the upload form and preview
   return (
-    <div style={{ padding: "2rem" }}>
-      <h2>Import Discogs CSV</h2>
-      <input type="file" accept=".csv" onChange={handleCSVUpload} />
-      <br /><br />
+    <div style={{ padding: '1rem' }}>
+      <h1>Import Discogs CSV</h1>
+      <input type="file" accept=".csv" onChange={handleFileUpload} />
+      <p>{status}</p>
 
-      {uniqueRows.length > 0 && (
-        <>
-          <button onClick={handleImport} disabled={importing}>
-            {importing ? "Importing..." : `Import ${uniqueRows.length} New Rows`}
-          </button>
-          <h4>Preview of entries to be imported:</h4>
-          <ul>
-            {uniqueRows.map((r, i) => (
-              <li key={i}>
-                {r["Artist"]} – {r["Title"]}
-              </li>
+      {csvPreview.length > 0 && (
+        <table border={1} cellPadding={4}>
+          <thead>
+            <tr>
+              <th>Artist</th>
+              <th>Title</th>
+              <th>Year</th>
+              <th>Format</th>
+              <th>Folder</th>
+              <th>Media</th>
+              <th>Release ID</th>
+              <th>Image</th>
+              <th>Tracklist</th>
+            </tr>
+          </thead>
+          <tbody>
+            {csvPreview.map((row, i) => (
+              <tr key={i}>
+                <td>{row.artist}</td>
+                <td>{row.title}</td>
+                <td>{row.year}</td>
+                <td>{row.format}</td>
+                <td>{row.folder}</td>
+                <td>{row.media_condition}</td>
+                <td>{row.discogs_release_id}</td>
+                <td>
+                  {row.image_url ? (
+                    <Image
+                      src={row.image_url}
+                      alt=""
+                      width={50}
+                      height={50}
+                      style={{ objectFit: 'cover' }}
+                    />
+                  ) : (
+                    '—'
+                  )}
+                </td>
+                <td>{row.tracklists?.join(', ') ?? '—'}</td>
+              </tr>
             ))}
-          </ul>
-        </>
+          </tbody>
+        </table>
       )}
-
-      <div style={{ marginTop: "2rem", whiteSpace: "pre-wrap" }}>
-        {statusLog.map((line, i) => (
-          <div key={i}>{line}</div>
-        ))}
-      </div>
     </div>
   );
 }
