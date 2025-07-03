@@ -44,71 +44,11 @@ export default function ImportDiscogsPage() {
   const [csvPreview, setCsvPreview] = useState<EnrichedRow[]>([]);
   const [status, setStatus] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<string[]>([]);
 
-  // Add rate limiting for Discogs API
-  const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-  const fetchDiscogsData = async (
-    releaseId: number,
-    retries = 3
-  ): Promise<{ image_url: string | null; tracklists: string | null }> => {
-    const url = `https://api.discogs.com/releases/${releaseId}`;
-    
-    for (let attempt = 0; attempt < retries; attempt++) {
-      try {
-        // Add delay to respect rate limits (1 request per second for free accounts)
-        if (attempt > 0) await delay(1000);
-        
-        const res = await fetch(url, {
-          headers: {
-            'User-Agent': 'DeadwaxDialogues/1.0 +https://yourwebsite.com', // Replace with your actual website
-            'Authorization': `Discogs token=${process.env.NEXT_PUBLIC_DISCOGS_TOKEN}`
-          }
-        });
-        
-        if (res.status === 429) {
-          // Rate limited, wait longer
-          await delay(2000);
-          continue;
-        }
-        
-        if (!res.ok) {
-          console.warn(`Failed to fetch release ${releaseId}, status: ${res.status}`);
-          return { image_url: null, tracklists: null };
-        }
-        
-        const data = await res.json();
-        
-        // Process tracklist - store as JSON string for Supabase
-        let tracklistsStr = null;
-        if (Array.isArray(data.tracklist) && data.tracklist.length > 0) {
-          tracklistsStr = JSON.stringify(data.tracklist.map((track: {
-            position?: string;
-            type_?: string;
-            title?: string;
-            duration?: string;
-          }) => ({
-            position: track.position || '',
-            type_: track.type_ || 'track',
-            title: track.title || '',
-            duration: track.duration || ''
-          })));
-        }
-        
-        return {
-          image_url: data.images?.[0]?.uri || null,
-          tracklists: tracklistsStr
-        };
-      } catch (error) {
-        console.warn(`Attempt ${attempt + 1} failed for release ${releaseId}:`, error);
-        if (attempt === retries - 1) {
-          return { image_url: null, tracklists: null };
-        }
-        await delay(1000);
-      }
-    }
-    
-    return { image_url: null, tracklists: null };
+  const addDebug = (message: string) => {
+    console.log(message);
+    setDebugInfo(prev => [...prev, `${new Date().toLocaleTimeString()}: ${message}`]);
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -117,6 +57,8 @@ export default function ImportDiscogsPage() {
 
     setIsProcessing(true);
     setStatus('Parsing CSV...');
+    setDebugInfo([]);
+    setCsvPreview([]);
     
     try {
       Papa.parse(file, {
@@ -124,93 +66,179 @@ export default function ImportDiscogsPage() {
         skipEmptyLines: true,
         dynamicTyping: true, // This will convert numbers properly
         complete: async (results: { data: DiscogsCSVRow[] }) => {
-          const rows = results.data.filter(row => row.release_id); // Filter out rows without release_id
-          
-          // Convert to the format expected by Supabase
-          const processedRows: ProcessedRow[] = rows.map(row => ({
-            artist: row.Artist,
-            title: row.Title,
-            year: row.Released,
-            format: row.Format,
-            folder: row.CollectionFolder,
-            media_condition: row['Collection Media Condition'],
-            discogs_release_id: row.release_id, // Map release_id to discogs_release_id
-            image_url: null,
-            tracklists: null
-          }));
-
-          const releaseIds = processedRows.map(r => r.discogs_release_id);
-          
-          setStatus(`Checking Supabase for existing entries among ${releaseIds.length} items...`);
-          
-          // Check for existing entries
-          const { data: existing, error: queryError } = await supabase
-            .from('collection')
-            .select('discogs_release_id')
-            .in('discogs_release_id', releaseIds);
-
-          if (queryError) {
-            throw new Error(`Database query failed: ${queryError.message}`);
-          }
-
-          const existingIds = new Set(
-            (existing || []).map((r: { discogs_release_id: number }) => r.discogs_release_id)
-          );
-          
-          const newRows = processedRows.filter(
-            (r: ProcessedRow) => !existingIds.has(r.discogs_release_id)
-          );
-
-          setStatus(`Found ${newRows.length} new items out of ${releaseIds.length} total. ${existingIds.size} already exist.`);
-          
-          if (newRows.length === 0) {
-            setStatus('No new items to import.');
-            setCsvPreview([]);
-            setIsProcessing(false);
-            return;
-          }
-
-          // Show preview before enriching
-          setCsvPreview(newRows);
-          setStatus(`Enriching ${newRows.length} new items with Discogs data...`);
-
-          // Enrich with Discogs data (with rate limiting)
-          const enriched: EnrichedRow[] = [];
-          for (let i = 0; i < newRows.length; i++) {
-            const row = newRows[i];
-            setStatus(`Enriching ${i + 1}/${newRows.length}: ${row.artist} - ${row.title}`);
+          try {
+            addDebug(`Parsed ${results.data.length} rows from CSV`);
             
-            const { image_url, tracklists } = await fetchDiscogsData(row.discogs_release_id);
-            enriched.push({ ...row, image_url, tracklists });
+            const rows = results.data.filter(row => row.release_id);
+            addDebug(`Filtered to ${rows.length} rows with release_id`);
             
-            // Rate limiting: wait 1 second between requests
-            if (i < newRows.length - 1) {
-              await delay(1000);
+            if (rows.length === 0) {
+              setStatus('No valid rows found in CSV');
+              setIsProcessing(false);
+              return;
             }
+
+            // Log sample data for debugging
+            addDebug(`Sample row: ${JSON.stringify(rows[0])}`);
+            addDebug(`First 5 release_ids: ${rows.slice(0, 5).map(r => r.release_id).join(', ')}`);
+            
+            // Convert to the format expected by Supabase
+            const processedRows: ProcessedRow[] = rows.map(row => ({
+              artist: row.Artist,
+              title: row.Title,
+              year: row.Released,
+              format: row.Format,
+              folder: row.CollectionFolder,
+              media_condition: row['Collection Media Condition'],
+              discogs_release_id: row.release_id, // Map release_id to discogs_release_id
+              image_url: null,
+              tracklists: null
+            }));
+
+            addDebug(`Processed ${processedRows.length} rows`);
+            addDebug(`Sample processed row: ${JSON.stringify(processedRows[0])}`);
+
+            const releaseIds = processedRows.map(r => r.discogs_release_id);
+            addDebug(`Release IDs to check: ${releaseIds.slice(0, 5).join(', ')}...`);
+            
+            setStatus(`Checking Supabase for existing entries among ${releaseIds.length} items...`);
+            
+            // Check for existing entries
+            const { data: existing, error: queryError } = await supabase
+              .from('collection')
+              .select('discogs_release_id')
+              .in('discogs_release_id', releaseIds);
+
+            if (queryError) {
+              addDebug(`Database query error: ${queryError.message}`);
+              throw new Error(`Database query failed: ${queryError.message}`);
+            }
+
+            addDebug(`Found ${existing?.length || 0} existing entries in database`);
+            if (existing && existing.length > 0) {
+              addDebug(`Sample existing IDs: ${existing.slice(0, 5).map(r => r.discogs_release_id).join(', ')}`);
+            }
+
+            const existingIds = new Set(
+              (existing || []).map((r: { discogs_release_id: number }) => r.discogs_release_id)
+            );
+            
+            const newRows = processedRows.filter(
+              (r: ProcessedRow) => !existingIds.has(r.discogs_release_id)
+            );
+
+            addDebug(`Found ${newRows.length} new items (${existingIds.size} duplicates filtered out)`);
+            setStatus(`Found ${newRows.length} new items out of ${releaseIds.length} total. ${existingIds.size} already exist.`);
+            
+            if (newRows.length === 0) {
+              setStatus('No new items to import.');
+              setCsvPreview([]);
+              setIsProcessing(false);
+              return;
+            }
+
+            // Show preview before enriching
+            setCsvPreview(newRows);
+            setStatus(`Enriching ${newRows.length} new items with Discogs data...`);
+            addDebug(`Starting enrichment for ${newRows.length} items`);
+
+            // Enrich with Discogs data via existing proxy route
+            const enriched: EnrichedRow[] = [];
+            
+            for (let i = 0; i < newRows.length; i++) {
+              const row = newRows[i];
+              setStatus(`Enriching ${i + 1}/${newRows.length}: ${row.artist} - ${row.title}`);
+              addDebug(`Enriching release ID: ${row.discogs_release_id}`);
+              
+              try {
+                const response = await fetch(`/api/discogsProxy?releaseId=${row.discogs_release_id}`);
+                
+                if (!response.ok) {
+                  addDebug(`Failed to fetch release ${row.discogs_release_id}, status: ${response.status}`);
+                  enriched.push({
+                    ...row,
+                    image_url: null,
+                    tracklists: null
+                  });
+                  continue;
+                }
+                
+                const data = await response.json();
+                
+                // Process tracklist - store as JSON string for Supabase
+                let tracklistsStr = null;
+                if (Array.isArray(data.tracklist) && data.tracklist.length > 0) {
+                  tracklistsStr = JSON.stringify(data.tracklist.map((track: {
+                    position?: string;
+                    type_?: string;
+                    title?: string;
+                    duration?: string;
+                  }) => ({
+                    position: track.position || '',
+                    type_: track.type_ || 'track',
+                    title: track.title || '',
+                    duration: track.duration || ''
+                  })));
+                }
+                
+                enriched.push({
+                  ...row,
+                  image_url: data.images?.[0]?.uri || null,
+                  tracklists: tracklistsStr
+                });
+                
+                addDebug(`Successfully enriched ${row.artist} - ${row.title}`);
+                
+                // Rate limiting: wait 1 second between requests
+                if (i < newRows.length - 1) {
+                  await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+                
+              } catch (error) {
+                addDebug(`Error enriching release ${row.discogs_release_id}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                enriched.push({
+                  ...row,
+                  image_url: null,
+                  tracklists: null
+                });
+              }
+            }
+
+            setCsvPreview(enriched);
+            setStatus('Inserting into Supabase...');
+            addDebug(`Inserting ${enriched.length} enriched items into database`);
+            
+            // Insert into database
+            const { error: insertError } = await supabase
+              .from('collection')
+              .insert(enriched);
+
+            if (insertError) {
+              addDebug(`Database insert error: ${insertError.message}`);
+              throw new Error(`Database insert failed: ${insertError.message}`);
+            }
+
+            addDebug(`Successfully inserted ${enriched.length} items`);
+            setStatus(`Successfully imported ${enriched.length} new items!`);
+
+          } catch (error) {
+            console.error('Processing error:', error);
+            addDebug(`Processing error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            setStatus(`Processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          } finally {
+            setIsProcessing(false);
           }
-
-          setCsvPreview(enriched);
-          setStatus('Inserting into Supabase...');
-          
-          // Insert into database
-          const { error: insertError } = await supabase
-            .from('collection')
-            .insert(enriched);
-
-          if (insertError) {
-            throw new Error(`Database insert failed: ${insertError.message}`);
-          }
-
-          setStatus(`Successfully imported ${enriched.length} new items!`);
         },
         error: (error: Error) => {
+          addDebug(`CSV parsing error: ${error.message}`);
           setStatus(`CSV parsing error: ${error.message}`);
           setIsProcessing(false);
         }
       });
     } catch (error) {
-      console.error('Import error:', error);
-      setStatus(`Import failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('File processing error:', error);
+      addDebug(`File processing error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setStatus(`File processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setIsProcessing(false);
     }
   };
@@ -231,6 +259,24 @@ export default function ImportDiscogsPage() {
         {status}
       </p>
 
+      {debugInfo.length > 0 && (
+        <div style={{ marginTop: '1rem' }}>
+          <h3>Debug Information:</h3>
+          <div style={{ 
+            maxHeight: '200px', 
+            overflowY: 'auto', 
+            backgroundColor: '#f5f5f5', 
+            padding: '10px', 
+            fontSize: '12px',
+            fontFamily: 'monospace'
+          }}>
+            {debugInfo.map((info, i) => (
+              <div key={i}>{info}</div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {csvPreview.length > 0 && (
         <div>
           <h2>Preview ({csvPreview.length} items)</h2>
@@ -249,7 +295,7 @@ export default function ImportDiscogsPage() {
               </tr>
             </thead>
             <tbody>
-              {csvPreview.map((row, i) => (
+              {csvPreview.slice(0, 10).map((row, i) => (
                 <tr key={i}>
                   <td>{row.artist}</td>
                   <td>{row.title}</td>
@@ -280,6 +326,13 @@ export default function ImportDiscogsPage() {
                   </td>
                 </tr>
               ))}
+              {csvPreview.length > 10 && (
+                <tr>
+                  <td colSpan={9} style={{ textAlign: 'center', fontStyle: 'italic' }}>
+                    ... and {csvPreview.length - 10} more items
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
