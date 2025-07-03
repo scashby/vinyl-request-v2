@@ -200,19 +200,35 @@ export default function ImportDiscogsPage() {
             console.log('Total records with discogs_release_id in database:', totalCount);
           }
           
-          // Now get ALL existing release IDs from the database with a high limit
-          const { data: allExisting, error: queryError } = await supabase
-            .from('collection')
-            .select('discogs_release_id')
-            .not('discogs_release_id', 'is', null)
-            .limit(10000); // Set a high limit to get all existing records
+          // Use pagination to get ALL existing release IDs
+          let allExisting: { discogs_release_id: string }[] = [];
+          let start = 0;
+          const pageSize = 1000;
+          let hasMore = true;
 
-          if (queryError) {
-            throw new Error(`Database query failed: ${queryError.message}`);
+          while (hasMore) {
+            const { data: pageData, error: queryError } = await supabase
+              .from('collection')
+              .select('discogs_release_id')
+              .not('discogs_release_id', 'is', null)
+              .range(start, start + pageSize - 1);
+
+            if (queryError) {
+              throw new Error(`Database query failed: ${queryError.message}`);
+            }
+
+            if (pageData && pageData.length > 0) {
+              allExisting = allExisting.concat(pageData);
+              start += pageSize;
+              hasMore = pageData.length === pageSize; // Continue if we got a full page
+              console.log(`Fetched page: ${pageData.length} records, total so far: ${allExisting.length}`);
+            } else {
+              hasMore = false;
+            }
           }
 
-          console.log('Total existing entries fetched from database:', allExisting?.length || 0);
-          console.log('Expected around 1178, fetched:', allExisting?.length, 'Count query returned:', totalCount);
+          console.log('Total existing entries fetched from database via pagination:', allExisting.length);
+          console.log('Expected around 1178, fetched:', allExisting.length, 'Count query returned:', totalCount);
           
           // Create a Set of all existing release IDs for fast lookup
           const allExistingIds = new Set(
