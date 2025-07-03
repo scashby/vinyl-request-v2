@@ -14,7 +14,7 @@ type DiscogsCSVRow = {
   Format: string;
   Rating: string | null;
   Released: number;
-  'Release ID': number; // THIS IS THE CORRECT FIELD NAME - note the space!
+  release_id: number | string | null; // Can be number, string, or null from CSV parsing
   CollectionFolder: string;
   'Date Added': string;
   'Collection Media Condition': string;
@@ -128,14 +128,40 @@ export default function ImportDiscogsPage() {
         complete: async (results: { data: DiscogsCSVRow[], meta: { fields?: string[] } }) => {
           console.log('CSV Headers:', results.meta.fields);
           console.log('Sample row:', results.data[0]);
+          console.log('Sample release_id value:', results.data[0]?.release_id);
+          console.log('Sample release_id type:', typeof results.data[0]?.release_id);
           
           setDebugInfo(`CSV Headers: ${results.meta.fields?.join(', ')}`);
           
           // Filter out rows without Release ID and log issues
-          const validRows = results.data.filter(row => {
-            const releaseId = row['Release ID'];
-            if (!releaseId) {
-              console.log('Row missing Release ID:', row);
+          const validRows = results.data.filter((row, index) => {
+            const releaseId = row.release_id;
+            // Check for missing, null, undefined, empty string, or zero values
+            if (!releaseId || releaseId === 0 || releaseId === '' || releaseId === null || releaseId === undefined) {
+              if (index < 10) { // Only log first 10 for brevity
+                console.log(`Row ${index} missing/invalid release_id:`, { 
+                  catalog: row['Catalog#'], 
+                  artist: row.Artist, 
+                  title: row.Title,
+                  release_id: releaseId,
+                  release_id_type: typeof releaseId 
+                });
+              }
+              return false;
+            }
+            // Also filter out non-numeric strings
+            const numericValue = Number(releaseId);
+            if (isNaN(numericValue) || numericValue <= 0) {
+              if (index < 10) {
+                console.log(`Row ${index} invalid release_id (not a positive number):`, { 
+                  catalog: row['Catalog#'], 
+                  artist: row.Artist, 
+                  title: row.Title,
+                  release_id: releaseId,
+                  release_id_type: typeof releaseId,
+                  numeric_value: numericValue
+                });
+              }
               return false;
             }
             return true;
@@ -151,7 +177,7 @@ export default function ImportDiscogsPage() {
             format: row.Format,
             folder: row.CollectionFolder,
             media_condition: row['Collection Media Condition'],
-            discogs_release_id: Number(row['Release ID']), // Ensure it's a number
+            discogs_release_id: Number(row.release_id), // Convert to number
             image_url: null,
             tracklists: null
           }));
@@ -182,15 +208,13 @@ export default function ImportDiscogsPage() {
           const newRows = processedRows.filter(
             (r: ProcessedRow) => !existingIds.has(r.discogs_release_id)
           );
-
-          console.log(`Found ${newRows.length} new items out of ${releaseIds.length} total. ${existingIds.size} already exist.`);
           
           setStatus(`Found ${newRows.length} new items out of ${releaseIds.length} total. ${existingIds.size} already exist.`);
-          setDebugInfo(prev => prev + `\nTotal CSV rows: ${results.data.length}, Valid rows: ${validRows.length}, New items: ${newRows.length}, Existing: ${existingIds.size}`);
+          setDebugInfo(prev => prev + `\nTotal CSV rows: ${results.data.length}, Valid rows with release_id: ${validRows.length}, New items: ${newRows.length}, Existing: ${existingIds.size}`);
           
-          if (newRows.length === 0) {
-            setStatus('No new items to import.');
-            setCsvPreview([]);
+          if (validRows.length === 0) {
+            setDebugInfo(prev => prev + `\nPROBLEM: No rows have valid release_id values! This suggests the Discogs export may be missing release IDs.`);
+            setStatus('No rows with valid Release IDs found. Please check your Discogs CSV export includes Release IDs.');
             setIsProcessing(false);
             return;
           }
