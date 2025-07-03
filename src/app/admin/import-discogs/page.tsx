@@ -188,17 +188,31 @@ export default function ImportDiscogsPage() {
           
           setStatus(`Checking Supabase for existing entries among ${releaseIds.length} items...`);
           
-          // First, get ALL existing release IDs from the database
+          // First, get a count of all records with discogs_release_id
+          const { count: totalCount, error: countError } = await supabase
+            .from('collection')
+            .select('*', { count: 'exact', head: true })
+            .not('discogs_release_id', 'is', null);
+
+          if (countError) {
+            console.warn('Count query failed:', countError);
+          } else {
+            console.log('Total records with discogs_release_id in database:', totalCount);
+          }
+          
+          // Now get ALL existing release IDs from the database with a high limit
           const { data: allExisting, error: queryError } = await supabase
             .from('collection')
             .select('discogs_release_id')
-            .not('discogs_release_id', 'is', null); // Only get rows where discogs_release_id is not null
+            .not('discogs_release_id', 'is', null)
+            .limit(10000); // Set a high limit to get all existing records
 
           if (queryError) {
             throw new Error(`Database query failed: ${queryError.message}`);
           }
 
-          console.log('Total existing entries in database:', allExisting?.length || 0);
+          console.log('Total existing entries fetched from database:', allExisting?.length || 0);
+          console.log('Expected around 1178, fetched:', allExisting?.length, 'Count query returned:', totalCount);
           
           // Create a Set of all existing release IDs for fast lookup
           const allExistingIds = new Set(
@@ -208,6 +222,14 @@ export default function ImportDiscogsPage() {
           );
 
           console.log('All existing release IDs count:', allExistingIds.size);
+          
+          // Debug: Check specific IDs that should be duplicates
+          const testIds = ['24532220', '21975574', '2775546', '8315395', '1841179'];
+          testIds.forEach(id => {
+            const inDatabase = allExistingIds.has(id);
+            const inCsv = releaseIds.includes(id);
+            console.log(`Test ID ${id}: In database: ${inDatabase}, In CSV: ${inCsv}`);
+          });
           
           // Now filter our CSV data to find only the ones that don't exist
           const existingInCsv = releaseIds.filter(id => allExistingIds.has(id));
