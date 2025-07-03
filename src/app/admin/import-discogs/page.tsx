@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import Papa from 'papaparse';
 import { supabase } from 'lib/supabaseClient';
-import Image from 'next/image';
 
 // Updated type to match actual Discogs CSV export structure
 type DiscogsCSVRow = {
@@ -286,7 +285,7 @@ export default function ImportDiscogsPage() {
     if (csvPreview.length === 0) return;
     
     setIsProcessing(true);
-    setStatus(`Enriching ${csvPreview.length} items with Discogs data...`);
+    setStatus(`Starting enrichment process for ${csvPreview.length} items...`);
 
     try {
       // Enrich with Discogs data (with rate limiting)
@@ -295,8 +294,14 @@ export default function ImportDiscogsPage() {
         const row = csvPreview[i];
         setStatus(`Enriching ${i + 1}/${csvPreview.length}: ${row.artist} - ${row.title}`);
         
-        const { image_url, tracklists } = await fetchDiscogsData(row.discogs_release_id);
-        enriched.push({ ...row, image_url, tracklists });
+        try {
+          const { image_url, tracklists } = await fetchDiscogsData(row.discogs_release_id);
+          enriched.push({ ...row, image_url, tracklists });
+        } catch (error) {
+          console.warn(`Failed to enrich ${row.discogs_release_id}:`, error);
+          // Add the row without enrichment if Discogs API fails
+          enriched.push({ ...row, image_url: null, tracklists: null });
+        }
         
         // Rate limiting: wait 1 second between requests
         if (i < csvPreview.length - 1) {
@@ -305,7 +310,7 @@ export default function ImportDiscogsPage() {
       }
 
       setCsvPreview(enriched);
-      setStatus('Inserting into Supabase...');
+      setStatus('Inserting enriched data into Supabase...');
       
       // Insert into database
       const { error: insertError } = await supabase
@@ -316,10 +321,10 @@ export default function ImportDiscogsPage() {
         throw new Error(`Database insert failed: ${insertError.message}`);
       }
 
-      setStatus(`Successfully imported ${enriched.length} new items!`);
+      setStatus(`✅ Successfully imported ${enriched.length} new items with Discogs enrichment!`);
     } catch (error) {
       console.error('Enrichment error:', error);
-      setStatus(`Enrichment failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setStatus(`❌ Enrichment failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsProcessing(false);
     }
@@ -335,20 +340,22 @@ export default function ImportDiscogsPage() {
         disabled={isProcessing}
       />
       
-      {csvPreview.length > 0 && !isProcessing && (
+      {csvPreview.length > 0 && (
         <button 
           onClick={enrichAndImport}
+          disabled={isProcessing}
           style={{ 
             marginLeft: '1rem', 
             padding: '0.5rem 1rem',
-            backgroundColor: '#007bff',
+            backgroundColor: isProcessing ? '#6c757d' : '#007bff',
             color: 'white',
             border: 'none',
             borderRadius: '4px',
-            cursor: 'pointer'
+            cursor: isProcessing ? 'not-allowed' : 'pointer',
+            opacity: isProcessing ? 0.6 : 1
           }}
         >
-          Enrich with Discogs Data & Import
+          {isProcessing ? 'Processing...' : 'Enrich with Discogs Data & Import'}
         </button>
       )}
       
@@ -395,12 +402,17 @@ export default function ImportDiscogsPage() {
                   <td>{row.discogs_release_id}</td>
                   <td>
                     {row.image_url ? (
-                      <Image
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
                         src={row.image_url}
-                        alt=""
+                        alt={`${row.artist} - ${row.title}`}
                         width={50}
                         height={50}
                         style={{ objectFit: 'cover' }}
+                        onError={(e) => {
+                          // Hide broken images
+                          e.currentTarget.style.display = 'none';
+                        }}
                       />
                     ) : (
                       '—'
