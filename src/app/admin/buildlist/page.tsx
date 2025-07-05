@@ -5,21 +5,22 @@ import { supabase } from 'lib/supabaseClient';
 import 'styles/build-list.css';
 
 type Album = {
-  id: string;
+  id: string | number;
   artist: string;
   title: string;
   genre: string;
   year: number;
+  format: string;
 };
 
 export default function BuildListPage() {
   const [albums, setAlbums] = useState<Album[]>([]);
   const [filtered, setFiltered] = useState<Album[]>([]);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [genres, setGenres] = useState<string[]>([]);
   const [decades, setDecades] = useState<string[]>([]);
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   const [selectedDecades, setSelectedDecades] = useState<string[]>([]);
-  const [limit, setLimit] = useState<number>(10);
 
   useEffect(() => {
     fetchAlbums();
@@ -27,47 +28,98 @@ export default function BuildListPage() {
 
   const fetchAlbums = async () => {
     const { data, error } = await supabase.from('collection').select('*');
-
     if (error || !data) {
       console.error('Fetch error:', error);
       return;
     }
 
-    const valid = (data as Album[]).filter(
-      (a: Album) => !!a.genre && !!a.year
-    );
-
+    const valid = (data as Album[]).filter((a) => a.genre && a.year);
     setAlbums(valid);
 
-    const genreSet = Array.from(new Set(valid.map((a: Album) => a.genre)));
+    const genreSet = Array.from(new Set(valid.map((a) => a.genre))).sort();
     const decadeSet = Array.from(
-      new Set(valid.map((a: Album) => `${Math.floor(a.year / 10) * 10}s`))
-    );
+      new Set(valid.map((a) => `${Math.floor(a.year / 10) * 10}s`))
+    ).sort();
 
-    setGenres(genreSet.sort());
-    setDecades(decadeSet.sort());
+    setGenres(genreSet);
+    setDecades(decadeSet);
   };
 
-  const handleFilter = () => {
+  const applyFilters = () => {
     let pool = [...albums];
 
-    if (selectedGenres.length) {
-      pool = pool.filter((a: Album) => selectedGenres.includes(a.genre));
+    if (selectedGenres.length > 0) {
+      pool = pool.filter((a) => selectedGenres.includes(a.genre));
     }
 
-    if (selectedDecades.length) {
-      pool = pool.filter((a: Album) =>
+    if (selectedDecades.length > 0) {
+      pool = pool.filter((a) =>
         selectedDecades.includes(`${Math.floor(a.year / 10) * 10}s`)
       );
     }
 
-    const shuffled = pool.sort(() => 0.5 - Math.random());
-    setFiltered(shuffled.slice(0, limit));
+    setFiltered(pool);
+
+    // ✅ THIS is the fix — guaranteed call, not dangling
+    setSelected(new Set());
   };
+
+  const toggleSelection = (id: string | number) => {
+    const key = String(id);
+    const next = new Set(selected);
+    if (next.has(key)) {
+      next.delete(key);
+    } else {
+      next.add(key);
+    }
+    setSelected(next);
+  };
+
+  const getStats = () => {
+    const selectedAlbums = filtered.filter((a) => selected.has(String(a.id)));
+    return {
+      genres: countBy(selectedAlbums, 'genre'),
+      decades: countBy(selectedAlbums, (a) => `${Math.floor(a.year / 10) * 10}s`),
+      formats: countBy(selectedAlbums, 'format'),
+    };
+  };
+
+  const countBy = (
+    items: Album[],
+    key: keyof Album | ((a: Album) => string)
+  ): [string, number][] => {
+    const map = new Map<string, number>();
+    for (const item of items) {
+      const k = typeof key === 'function' ? key(item) : item[key];
+      map.set(String(k), (map.get(String(k)) || 0) + 1);
+    }
+    return Array.from(map.entries()).sort();
+  };
+
+  const exportCSV = () => {
+    const rows = filtered
+      .filter((a) => selected.has(String(a.id)))
+      .map((a) => `${a.artist},"${a.title}",${a.genre},${a.format},${a.year}`);
+    const header = 'Artist,Title,Genre,Format,Year\n';
+    const blob = new Blob([header + rows.join('\n')], { type: 'text/csv' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'byov-list.csv';
+    link.click();
+  };
+
+  const copyToClipboard = () => {
+    const lines = filtered
+      .filter((a) => selected.has(String(a.id)))
+      .map((a) => `${a.artist} – ${a.title} (${a.year})`);
+    navigator.clipboard.writeText(lines.join('\n'));
+  };
+
+  const stats = getStats();
 
   return (
     <div className="build-list">
-      <h2>Build Album List</h2>
+      <h2>Build BYOV Crate</h2>
 
       <div className="filters">
         <label>Genres:</label>
@@ -102,28 +154,49 @@ export default function BuildListPage() {
           ))}
         </select>
 
-        <label># of Albums:</label>
-        <input
-          type="number"
-          value={limit}
-          onChange={(e) => setLimit(Number(e.target.value))}
-          min={1}
-          max={100}
-        />
+        <button onClick={applyFilters}>Filter Albums</button>
+      </div>
 
-        <button onClick={handleFilter}>Generate List</button>
+      <div className="summary">
+        <h4>Selection Summary:</h4>
+        <p>
+          <strong>Genres:</strong>{' '}
+          {stats.genres.map(([g, n]) => `${g} (${n})`).join(', ') || 'None'}
+        </p>
+        <p>
+          <strong>Decades:</strong>{' '}
+          {stats.decades.map(([d, n]) => `${d} (${n})`).join(', ') || 'None'}
+        </p>
+        <p>
+          <strong>Formats:</strong>{' '}
+          {stats.formats.map(([f, n]) => `${f} (${n})`).join(', ') || 'None'}
+        </p>
       </div>
 
       <div className="results">
         {filtered.map((a) => (
-          <div key={a.id} className="album-card">
-            <strong>{a.artist}</strong> – <em>{a.title}</em> ({a.year})<br />
-            <small>
-              {a.genre} | {Math.floor(a.year / 10) * 10}s
-            </small>
-          </div>
+          <label key={a.id} className="album-row">
+            <input
+              type="checkbox"
+              checked={selected.has(String(a.id))}
+              onChange={() => toggleSelection(a.id)}
+            />
+            <span>
+              <strong>{a.artist}</strong> – <em>{a.title}</em> ({a.year})<br />
+              <small>
+                {a.genre} | {a.format} | {Math.floor(a.year / 10) * 10}s
+              </small>
+            </span>
+          </label>
         ))}
       </div>
+
+      {selected.size > 0 && (
+        <div className="actions">
+          <button onClick={copyToClipboard}>Copy to Clipboard</button>
+          <button onClick={exportCSV}>Download CSV</button>
+        </div>
+      )}
     </div>
   );
 }
