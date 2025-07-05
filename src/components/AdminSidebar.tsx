@@ -19,7 +19,6 @@ export default function AdminSidebar() {
     { label: "Edit Playlists", path: "/admin/playlists" },
     { label: "Most Wanted", path: "/admin/most-wanted" },
     { label: "Socials", path: "/admin/socials" },
-    { label: "Build Album List", path: "/admin/buildlist" },
     { label: "Logout", path: "/" },
   ];
 
