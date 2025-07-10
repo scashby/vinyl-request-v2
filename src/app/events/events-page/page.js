@@ -24,8 +24,14 @@ export default function Page() {
       if (error) {
         console.error('Error fetching events:', error);
       } else {
+        // Get today's date string in YYYY-MM-DD format
         const today = new Date();
-        const filtered = data.filter(event => new Date(event.date) >= today);
+        const todayString = today.getFullYear() + '-' + 
+          String(today.getMonth() + 1).padStart(2, '0') + '-' + 
+          String(today.getDate()).padStart(2, '0');
+        
+        // Filter events to only include today and future dates
+        const filtered = data.filter(event => event.date >= todayString);
         setEvents(filtered);
       }
     };
