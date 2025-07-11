@@ -12,6 +12,25 @@ interface RecognitionResult {
   service?: string;
 }
 
+interface ApiResponse {
+  success: boolean;
+  track?: RecognitionResult;
+  error?: string;
+}
+
+interface CollectionItem {
+  id: string;
+  artist: string;
+  title: string;
+  [key: string]: unknown;
+}
+
+interface SupabaseError {
+  message: string;
+  details?: string;
+  hint?: string;
+}
+
 type RecognitionService = 'shazam' | 'audd' | 'gracenote' | 'spotify';
 
 export default function AudioRecognitionPage() {
@@ -73,9 +92,10 @@ export default function AudioRecognitionPage() {
         }
       }, 10000);
 
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error accessing microphone:', error);
-      setStatus('Error: Could not access microphone');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      setStatus(`Error: Could not access microphone - ${errorMessage}`);
     }
   };
 
@@ -101,7 +121,11 @@ export default function AudioRecognitionPage() {
         body: formData
       });
 
-      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result: ApiResponse = await response.json();
       
       if (result.success && result.track) {
         setLastRecognition(result.track);
@@ -110,29 +134,36 @@ export default function AudioRecognitionPage() {
         // Update now playing in database
         await updateNowPlaying(result.track);
       } else {
-        setStatus('No match found');
+        setStatus(result.error || 'No match found');
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Recognition error:', error);
-      setStatus('Error during recognition');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      setStatus(`Error during recognition: ${errorMessage}`);
     }
   };
 
   const updateNowPlaying = async (track: RecognitionResult): Promise<void> => {
     try {
       // Find matching album in collection
-      const { data: albums } = await supabase
+      const { data: albums, error: queryError } = await supabase
         .from('collection')
         .select('*')
         .ilike('artist', `%${track.artist}%`)
         .ilike('title', `%${track.title}%`)
         .limit(1);
 
+      if (queryError) {
+        console.error('Query error:', queryError);
+        setStatus('Error querying collection');
+        return;
+      }
+
       if (albums && albums.length > 0) {
-        const album = albums[0];
+        const album = albums[0] as CollectionItem;
         
         // Update or create now playing entry
-        const { error } = await supabase
+        const { error: upsertError } = await supabase
           .from('now_playing')
           .upsert({
             id: 1, // Single row for current track
@@ -145,12 +176,20 @@ export default function AudioRecognitionPage() {
             updated_at: new Date().toISOString()
           });
 
-        if (!error) {
+        if (upsertError) {
+          console.error('Upsert error:', upsertError);
+          const error = upsertError as SupabaseError;
+          setStatus(`Database error: ${error.message}`);
+        } else {
           setStatus('✅ Updated now playing in database');
         }
+      } else {
+        setStatus('No matching album found in collection');
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Database update error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown database error';
+      setStatus(`Database update failed: ${errorMessage}`);
     }
   };
 
