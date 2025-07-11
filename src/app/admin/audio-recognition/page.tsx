@@ -55,6 +55,8 @@ export default function AudioRecognitionPage() {
   const streamRef = useRef<MediaStream | null>(null);
   const continuousTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const recordingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isListeningRef = useRef<boolean>(false);
+  const isContinuousRef = useRef<boolean>(false);
 
   useEffect(() => {
     // Check service configuration
@@ -110,20 +112,24 @@ export default function AudioRecognitionPage() {
       });
       
       streamRef.current = stream;
+      setIsListening(true);
+      isListeningRef.current = true;
+      isContinuousRef.current = isContinuous;
       
       if (isContinuous) {
+        setStatus('Starting continuous recognition...');
         startContinuousRecognition();
       } else {
+        setStatus(`Recording ${sampleDuration} seconds of audio...`);
         startSingleRecognition();
       }
-      
-      setIsListening(true);
-      setStatus(isContinuous ? 'Starting continuous recognition...' : `Recording ${sampleDuration} seconds of audio...`);
 
     } catch (error: unknown) {
       console.error('Error accessing microphone:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       setStatus(`Error: Could not access microphone - ${errorMessage}`);
+      setIsListening(false);
+      isListeningRef.current = false;
     }
   };
 
@@ -167,9 +173,11 @@ export default function AudioRecognitionPage() {
 
   const startContinuousRecognition = (): void => {
     const recordSample = () => {
-      // Check if we should still be running
-      if (!streamRef.current || !isListening) {
+      // Check if we should still be running using refs
+      if (!streamRef.current || !isListeningRef.current) {
         console.log('Stopping continuous recognition - no stream or not listening');
+        setIsListening(false);
+        isListeningRef.current = false;
         return;
       }
 
@@ -191,16 +199,25 @@ export default function AudioRecognitionPage() {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         await recognizeAudio(audioBlob);
         
-        // Schedule next sample if still in continuous mode
-        if (isListening && isContinuous && streamRef.current) {
+        // Schedule next sample if still in continuous mode using refs
+        if (streamRef.current && isListeningRef.current && isContinuousRef.current) {
           console.log(`Scheduling next sample in ${continuousInterval} seconds`);
-          setStatus(`Next sample in ${continuousInterval} seconds...`);
+          setStatus(`Next sample in ${continuousInterval} seconds... (continuous active)`);
           continuousTimeoutRef.current = setTimeout(() => {
             console.log('Starting next sample...');
-            recordSample();
+            // Check state again before proceeding using refs
+            if (streamRef.current && isListeningRef.current && isContinuousRef.current) {
+              recordSample();
+            } else {
+              console.log('Continuous mode ended during timeout');
+              setIsListening(false);
+              isListeningRef.current = false;
+            }
           }, continuousInterval * 1000);
         } else {
           console.log('Not scheduling next sample - continuous mode ended');
+          setIsListening(false);
+          isListeningRef.current = false;
         }
       };
 
@@ -224,6 +241,8 @@ export default function AudioRecognitionPage() {
 
   const stopListening = (): void => {
     setIsListening(false);
+    isListeningRef.current = false;
+    isContinuousRef.current = false;
     
     // Clear timeouts
     if (continuousTimeoutRef.current) {
@@ -294,27 +313,65 @@ export default function AudioRecognitionPage() {
     try {
       console.log('Updating now playing with:', track);
       
-      // Find matching album in collection
-      const { data: albums, error: queryError } = await supabase
+      // Try multiple search strategies to find matching album
+      let albums = null;
+      
+      // Strategy 1: Exact artist and title match
+      const { data: exactMatch, error: exactError } = await supabase
         .from('collection')
         .select('*')
-        .ilike('artist', `%${track.artist}%`)
-        .ilike('title', `%${track.title}%`)
+        .ilike('artist', track.artist)
+        .ilike('title', track.title)
         .limit(1);
 
-      if (queryError) {
-        console.error('Query error:', queryError);
-        setStatus('Error querying collection');
-        return;
+      if (!exactError && exactMatch && exactMatch.length > 0) {
+        albums = exactMatch;
+        console.log('Found exact match in collection');
+      } else {
+        // Strategy 2: Fuzzy match on artist
+        const { data: artistMatch, error: artistError } = await supabase
+          .from('collection')
+          .select('*')
+          .ilike('artist', `%${track.artist}%`)
+          .limit(5);
+
+        if (!artistError && artistMatch && artistMatch.length > 0) {
+          // Look for title matches within artist matches
+          const titleMatch = artistMatch.find(album => 
+            album.title?.toLowerCase().includes(track.title.toLowerCase()) ||
+            track.title.toLowerCase().includes(album.title?.toLowerCase())
+          );
+          
+          if (titleMatch) {
+            albums = [titleMatch];
+            console.log('Found fuzzy match in collection:', titleMatch.artist, '-', titleMatch.title);
+          } else {
+            // Just use the first artist match
+            albums = [artistMatch[0]];
+            console.log('Found artist match in collection:', artistMatch[0].artist);
+          }
+        } else {
+          // Strategy 3: Search for the album title in your collection
+          const { data: titleSearch, error: titleError } = await supabase
+            .from('collection')
+            .select('*')
+            .ilike('title', `%${track.title}%`)
+            .limit(3);
+
+          if (!titleError && titleSearch && titleSearch.length > 0) {
+            albums = titleSearch;
+            console.log('Found title match in collection');
+          } else {
+            console.log('No matching album found in collection, creating entry without album link');
+          }
+        }
       }
 
       let albumId = null;
       if (albums && albums.length > 0) {
         const album = albums[0] as CollectionItem;
         albumId = album.id;
-        console.log('Found matching album in collection:', album.artist, '-', album.title);
-      } else {
-        console.log('No matching album found in collection, updating anyway');
+        console.log('Using album from collection:', album.artist, '-', album.title, 'ID:', album.id);
       }
       
       // Update or create now playing entry
@@ -341,12 +398,23 @@ export default function AudioRecognitionPage() {
         setStatus(`Database error: ${error.message}`);
       } else {
         console.log('✅ Successfully updated now playing in database');
-        setStatus(`✅ Updated: ${track.artist} - ${track.title} (DB updated)`);
+        setStatus(`✅ Updated: ${track.artist} - ${track.title} ${albumId ? '(album found)' : '(no album)'}`);
         
         // Verify the update worked
         const { data: verification, error: verifyError } = await supabase
           .from('now_playing')
-          .select('*')
+          .select(`
+            *,
+            collection (
+              id,
+              artist,
+              title,
+              year,
+              image_url,
+              folder,
+              format
+            )
+          `)
           .eq('id', 1)
           .single();
           
@@ -354,6 +422,11 @@ export default function AudioRecognitionPage() {
           console.error('Verification failed:', verifyError);
         } else {
           console.log('Database verification successful:', verification);
+          if (verification.collection) {
+            console.log('Album data will be available on TV display:', verification.collection);
+          } else {
+            console.log('No album data linked - TV display will show placeholder');
+          }
         }
       }
     } catch (error: unknown) {
@@ -507,7 +580,10 @@ export default function AudioRecognitionPage() {
               type="checkbox"
               id="continuous"
               checked={isContinuous}
-              onChange={(e) => setIsContinuous(e.target.checked)}
+              onChange={(e) => {
+                setIsContinuous(e.target.checked);
+                isContinuousRef.current = e.target.checked;
+              }}
             />
             <label htmlFor="continuous" style={{ fontWeight: 600 }}>
               Continuous Recognition
