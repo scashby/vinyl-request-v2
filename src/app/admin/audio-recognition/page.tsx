@@ -255,12 +255,20 @@ export default function SmartAudioRecognitionPage() {
           confidence_score: result.track.confidence || 0.8
         };
 
-        // Auto-select best match or prompt for selection
-        if (matches.length === 1 || matches[0].match_score > 0.9) {
-          await selectMatch(candidate, matches[0]);
+        // Always update TV display immediately with best available data
+        if (matches.length > 0) {
+          // Use best collection match
+          await selectMatch(candidate, matches[0], false); // false = don't clear pending selection
+          
+          // Still show selection UI for correction if multiple matches
+          if (matches.length > 1 && matches[0].match_score < 0.95) {
+            setPendingSelection(candidate);
+            setStatus(`🎵 Playing: ${matches[0].artist} - ${matches[0].title} (${matches.length - 1} other matches available)`);
+          }
         } else {
-          setPendingSelection(candidate);
-          setStatus(`🎵 Found ${matches.length} possible matches - please select`);
+          // No collection match - use recognition data directly
+          await updateNowPlayingDirect(result.track);
+          setStatus(`🎵 Playing: ${result.track.artist} - ${result.track.title} (not in collection)`);
         }
       } else {
         setStatus(result.error || 'No match found');
@@ -404,7 +412,7 @@ export default function SmartAudioRecognitionPage() {
     return matrix[str2.length][str1.length];
   };
 
-  const selectMatch = async (candidate: RecognitionCandidate, selectedMatch: CollectionMatch): Promise<void> => {
+  const selectMatch = async (candidate: RecognitionCandidate, selectedMatch: CollectionMatch, clearPending: boolean = true): Promise<void> => {
     console.log('Selected match:', selectedMatch);
     
     // Update album context
@@ -428,8 +436,43 @@ export default function SmartAudioRecognitionPage() {
     await updateNowPlaying(candidate.recognition, selectedMatch);
     
     setLastRecognition(candidate.recognition);
-    setPendingSelection(null);
-    setStatus(`✅ Playing: ${selectedMatch.artist} - ${selectedMatch.title}`);
+    
+    if (clearPending) {
+      setPendingSelection(null);
+      setStatus(`✅ Playing: ${selectedMatch.artist} - ${selectedMatch.title}`);
+    }
+  };
+
+  const updateNowPlayingDirect = async (track: RecognitionResult): Promise<void> => {
+    try {
+      // Update now playing without collection link
+      const nowPlayingData = {
+        id: 1,
+        artist: track.artist,
+        title: track.title,
+        album_id: null, // No collection match
+        started_at: new Date().toISOString(),
+        recognition_confidence: track.confidence || 0.8,
+        service_used: track.service || 'ACRCloud',
+        updated_at: new Date().toISOString()
+      };
+
+      const { error } = await supabase
+        .from('now_playing')
+        .upsert(nowPlayingData);
+
+      if (error) {
+        console.error('Database update error:', error);
+      } else {
+        console.log('✅ Now playing updated (no collection match)');
+        setLastRecognition(track);
+        
+        // Clear album context since this isn't from collection
+        setAlbumContext(null);
+      }
+    } catch (error) {
+      console.error('Failed to update now playing:', error);
+    }
   };
 
   const updateNowPlaying = async (track: RecognitionResult, match: CollectionMatch): Promise<void> => {
@@ -632,7 +675,7 @@ export default function SmartAudioRecognitionPage() {
         )}
       </div>
 
-      {/* Match Selection */}
+      {/* Match Selection/Correction */}
       {pendingSelection && (
         <div style={{ 
           background: "#fffbeb", 
@@ -642,8 +685,11 @@ export default function SmartAudioRecognitionPage() {
           border: "1px solid #f59e0b"
         }}>
           <h3 style={{ marginTop: 0, color: "#92400e" }}>
-            Select Best Match for: &ldquo;{pendingSelection.recognition.artist} - {pendingSelection.recognition.title}&rdquo;
+            Improve Match for: &ldquo;{pendingSelection.recognition.artist} - {pendingSelection.recognition.title}&rdquo;
           </h3>
+          <p style={{ fontSize: 14, color: "#92400e", marginBottom: 16 }}>
+            Currently playing the first option below. Click a different match to correct it:
+          </p>
           
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
             {pendingSelection.collection_matches.map((match) => (
@@ -689,6 +735,42 @@ export default function SmartAudioRecognitionPage() {
                 </div>
               </div>
             ))}
+          </div>
+          
+          <div style={{ marginTop: 16, textAlign: "center" }}>
+            <button 
+              onClick={() => {
+                updateNowPlayingDirect(pendingSelection.recognition);
+                setPendingSelection(null);
+                setStatus(`✅ Playing: ${pendingSelection.recognition.artist} - ${pendingSelection.recognition.title} (not in collection)`);
+              }}
+              style={{
+                background: "#059669",
+                color: "white",
+                border: "none",
+                padding: "8px 16px",
+                borderRadius: 4,
+                fontSize: 14,
+                cursor: "pointer",
+                marginRight: 12
+              }}
+            >
+              None of These - Use Recognition Data
+            </button>
+            <button 
+              onClick={() => setPendingSelection(null)}
+              style={{
+                background: "#6b7280",
+                color: "white",
+                border: "none",
+                padding: "8px 16px",
+                borderRadius: 4,
+                fontSize: 14,
+                cursor: "pointer"
+              }}
+            >
+              Keep Current Selection
+            </button>
           </div>
         </div>
       )}

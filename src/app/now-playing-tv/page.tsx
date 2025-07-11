@@ -179,6 +179,7 @@ export default function CleanNowPlayingTVPage() {
   const displayYear = currentTrack.collection?.year;
   const displayImage = currentTrack.collection?.image_url;
   const displayFormat = currentTrack.collection?.folder;
+  const isFromCollection = !!currentTrack.collection;
 
   return (
     <div 
@@ -242,8 +243,8 @@ export default function CleanNowPlayingTVPage() {
               priority
             />
             
-            {/* Format badge - only if we have format info */}
-            {displayFormat && (
+            {/* Format badge - only if we have format info, or show "Guest" if not from collection */}
+            {displayFormat ? (
               <div style={{
                 position: 'absolute',
                 top: '-15px',
@@ -260,7 +261,24 @@ export default function CleanNowPlayingTVPage() {
               }}>
                 {displayFormat}
               </div>
-            )}
+            ) : !isFromCollection ? (
+              <div style={{
+                position: 'absolute',
+                top: '-15px',
+                right: '-15px',
+                background: '#f59e0b',
+                color: 'white',
+                padding: '12px 20px',
+                borderRadius: '25px',
+                fontSize: '1.1rem',
+                fontWeight: 'bold',
+                boxShadow: '0 6px 20px rgba(0,0,0,0.4)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px'
+              }}>
+                GUEST
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -292,17 +310,15 @@ export default function CleanNowPlayingTVPage() {
             {displayArtist}
           </p>
           
-          {/* Year - only if we have it */}
-          {displayYear && (
-            <p style={{ 
-              fontSize: '1.8rem', 
-              margin: '0 0 3rem 0',
-              opacity: 0.7,
-              fontWeight: 400
-            }}>
-              {displayYear}
-            </p>
-          )}
+          {/* Year or source indicator */}
+          <p style={{ 
+            fontSize: '1.8rem', 
+            margin: '0 0 3rem 0',
+            opacity: 0.7,
+            fontWeight: 400
+          }}>
+            {displayYear || (isFromCollection ? 'Unknown Year' : 'Guest Vinyl')}
+          </p>
 
           {/* Playing indicator */}
           <div style={{
@@ -372,9 +388,9 @@ export default function CleanNowPlayingTVPage() {
           minWidth: 250
         }}>
           <div><strong>Connection:</strong> {isConnected ? '🟢' : '🔴'}</div>
+          <div><strong>Source:</strong> {isFromCollection ? 'Collection' : 'Guest Vinyl'}</div>
           <div><strong>Album ID:</strong> {currentTrack.album_id || 'None'}</div>
-          <div><strong>Has Collection:</strong> {currentTrack.collection ? 'Yes' : 'No'}</div>
-          <div><strong>Image Source:</strong> {displayImage ? 'Collection' : 'Placeholder'}</div>
+          <div><strong>Image:</strong> {displayImage ? 'Yes' : 'Placeholder'}</div>
           <div><strong>Started:</strong> {currentTrack.started_at ? new Date(currentTrack.started_at).toLocaleTimeString() : 'Unknown'}</div>
         </div>
       )}
