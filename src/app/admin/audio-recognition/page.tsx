@@ -3,8 +3,18 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from 'lib/supabaseClient';
+import Image from 'next/image';
 
 interface RecognitionResult {
+  artist: string;
+  title: string;
+  album?: string;
+  image_url?: string;
+  confidence?: number;
+  service?: string;
+}
+
+interface RecognitionCandidate {
   artist: string;
   title: string;
   album?: string;
@@ -26,6 +36,11 @@ export default function CleanRecognitionSystem() {
   const [isListening, setIsListening] = useState<boolean>(false);
   const [recognitionMode, setRecognitionMode] = useState<'manual' | 'smart_continuous' | 'album_follow'>('smart_continuous');
   const [lastRecognition, setLastRecognition] = useState<RecognitionResult | null>(null);
+  const [recognitionCandidates, setRecognitionCandidates] = useState<RecognitionCandidate[]>([]);
+  const [showCandidates, setShowCandidates] = useState<boolean>(false);
+  const [manualArtist, setManualArtist] = useState<string>('');
+  const [manualAlbum, setManualAlbum] = useState<string>('');
+  const [isManualSearching, setIsManualSearching] = useState<boolean>(false);
   const [collectionMetadata, setCollectionMetadata] = useState<CollectionMetadata | null>(null);
   const [status, setStatus] = useState<string>('');
   const [sampleDuration, setSampleDuration] = useState<number>(15);
@@ -250,6 +265,14 @@ export default function CleanRecognitionSystem() {
       if (result.success && result.track) {
         console.log('Recognition result:', result.track);
         
+        // Store all candidates if available
+        if (result.candidates && Array.isArray(result.candidates)) {
+          setRecognitionCandidates(result.candidates);
+          console.log(`Found ${result.candidates.length} recognition candidates`);
+        } else {
+          setRecognitionCandidates([]);
+        }
+        
         await updateNowPlaying(result.track);
         setLastRecognition(result.track);
         
@@ -358,6 +381,66 @@ export default function CleanRecognitionSystem() {
     } catch (error) {
       console.error('Failed to update now playing:', error);
     }
+  };
+
+  const performManualSearch = async (): Promise<void> => {
+    if (!manualArtist.trim()) {
+      setStatus('Please enter an artist name for manual search');
+      return;
+    }
+
+    setIsManualSearching(true);
+    setStatus('Performing manual search...');
+    
+    try {
+      const response = await fetch('/api/manual-recognition', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          artist: manualArtist.trim(),
+          album: manualAlbum.trim() || undefined
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('Manual search result:', result);
+      
+      if (result.success && result.track) {
+        await updateNowPlaying(result.track);
+        setLastRecognition(result.track);
+        
+        await checkForCollectionMetadata(result.track);
+        
+        setStatus(`Manual Override: ${result.track.artist} - ${result.track.title}`);
+        
+        setManualArtist('');
+        setManualAlbum('');
+      } else {
+        setStatus(result.error || 'Manual search failed');
+      }
+    } catch (error: unknown) {
+      console.error('Manual search error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      setStatus(`Manual search error: ${errorMessage}`);
+    } finally {
+      setIsManualSearching(false);
+    }
+  };
+
+  const selectRecognitionCandidate = async (candidate: RecognitionCandidate): Promise<void> => {
+    await updateNowPlaying(candidate);
+    setLastRecognition(candidate);
+    
+    await checkForCollectionMetadata(candidate);
+    
+    setShowCandidates(false);
+    setStatus(`Selected: ${candidate.artist} - ${candidate.title}`);
   };
 
   const extractTrackInfo = (trackTitle: string): { number: string | null, side: string | null } => {
@@ -481,6 +564,160 @@ export default function CleanRecognitionSystem() {
         </div>
       </div>
 
+      {/* Recognition Correction Options */}
+      {(recognitionCandidates.length > 0 || lastRecognition) && (
+        <div style={{ 
+          background: "#fffbeb", 
+          padding: 24, 
+          borderRadius: 8, 
+          marginBottom: 24,
+          border: "1px solid #f59e0b"
+        }}>
+          <h3 style={{ margin: 0, marginBottom: 16, color: "#92400e" }}>Recognition Correction</h3>
+          
+          {/* Recognition Candidates */}
+          {recognitionCandidates.length > 0 && (
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                <h4 style={{ margin: 0, color: "#92400e" }}>
+                  Other Recognition Candidates ({recognitionCandidates.length})
+                </h4>
+                <button 
+                  onClick={() => setShowCandidates(!showCandidates)}
+                  style={{
+                    background: showCandidates ? "#6b7280" : "#f59e0b",
+                    color: "white",
+                    border: "none",
+                    padding: "8px 16px",
+                    borderRadius: 4,
+                    fontSize: 14,
+                    cursor: "pointer"
+                  }}
+                >
+                  {showCandidates ? "Hide Candidates" : "Show Candidates"}
+                </button>
+              </div>
+              
+              {showCandidates && (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+                  {recognitionCandidates.map((candidate, index) => (
+                    <div 
+                      key={index}
+                      onClick={() => selectRecognitionCandidate(candidate)}
+                      style={{
+                        background: "#fff",
+                        border: "2px solid #e5e7eb",
+                        borderRadius: 8,
+                        padding: 16,
+                        cursor: "pointer",
+                        transition: "all 0.2s",
+                        display: "flex",
+                        gap: 12,
+                        alignItems: "center"
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = "#f59e0b";
+                        e.currentTarget.style.background = "#fffbeb";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = "#e5e7eb";
+                        e.currentTarget.style.background = "#fff";
+                      }}
+                    >
+                      {candidate.image_url && (
+                        <Image 
+                          src={candidate.image_url}
+                          alt={candidate.album || candidate.title}
+                          width={60}
+                          height={60}
+                          style={{ objectFit: "cover", borderRadius: 6 }}
+                          unoptimized
+                        />
+                      )}
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 600, marginBottom: 4 }}>{candidate.title}</div>
+                        <div style={{ fontSize: 14, color: "#666", marginBottom: 4 }}>
+                          {candidate.artist} {candidate.album && `• ${candidate.album}`}
+                        </div>
+                        <div style={{ fontSize: 12, color: "#888" }}>
+                          {Math.round((candidate.confidence || 0.8) * 100)}% confidence
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          
+          {/* Manual Override */}
+          <div>
+            <h4 style={{ margin: 0, marginBottom: 12, color: "#92400e" }}>Manual Override</h4>
+            <p style={{ fontSize: 14, color: "#92400e", marginBottom: 16 }}>
+              Enter the correct artist and album to fetch fresh recognition data:
+            </p>
+            
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 12, alignItems: "end" }}>
+              <div>
+                <label style={{ display: "block", marginBottom: 4, fontSize: 14, fontWeight: 600 }}>
+                  Artist (required)
+                </label>
+                <input
+                  type="text"
+                  value={manualArtist}
+                  onChange={(e) => setManualArtist(e.target.value)}
+                  placeholder="e.g. Pink Floyd"
+                  style={{
+                    width: "100%",
+                    padding: "8px 12px",
+                    border: "1px solid #d1d5db",
+                    borderRadius: 4,
+                    fontSize: 14
+                  }}
+                />
+              </div>
+              
+              <div>
+                <label style={{ display: "block", marginBottom: 4, fontSize: 14, fontWeight: 600 }}>
+                  Album (optional)
+                </label>
+                <input
+                  type="text"
+                  value={manualAlbum}
+                  onChange={(e) => setManualAlbum(e.target.value)}
+                  placeholder="e.g. The Wall"
+                  style={{
+                    width: "100%",
+                    padding: "8px 12px",
+                    border: "1px solid #d1d5db",
+                    borderRadius: 4,
+                    fontSize: 14
+                  }}
+                />
+              </div>
+              
+              <button
+                onClick={performManualSearch}
+                disabled={!manualArtist.trim() || isManualSearching}
+                style={{
+                  background: manualArtist.trim() && !isManualSearching ? "#f59e0b" : "#9ca3af",
+                  color: "white",
+                  border: "none",
+                  padding: "10px 20px",
+                  borderRadius: 4,
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: manualArtist.trim() && !isManualSearching ? "pointer" : "not-allowed",
+                  whiteSpace: "nowrap"
+                }}
+              >
+                {isManualSearching ? "Searching..." : "Search & Override"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {collectionMetadata && (
         <div style={{ 
           background: "#f0fdf4", 
@@ -601,6 +838,12 @@ export default function CleanRecognitionSystem() {
             {!collectionMetadata && (
               <span> Perfect for guest vinyls!</span>
             )}
+            <br/><br/>
+            <strong>API Requirements:</strong>
+            <ul style={{ margin: "8px 0", paddingLeft: "20px", fontSize: "12px" }}>
+              <li>Update <code>/api/audio-recognition</code> to return <code>candidates</code> array for alternate choices</li>
+              <li>Add <code>/api/manual-recognition</code> endpoint that accepts artist/album and returns recognition data</li>
+            </ul>
           </div>
         </div>
       )}

@@ -1,16 +1,20 @@
-// src/app/api/audio-recognition/route.ts
+// src/app/api/audio-recognition/route.ts - Enhanced with candidates
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 
+interface RecognitionTrack {
+  artist: string;
+  title: string;
+  album?: string;
+  image_url?: string;
+  confidence?: number;
+  service?: string;
+}
+
 interface RecognitionResult {
   success: boolean;
-  track?: {
-    artist: string;
-    title: string;
-    album?: string;
-    confidence?: number;
-    service?: string;
-  };
+  track?: RecognitionTrack;
+  candidates?: RecognitionTrack[]; // Additional matches for correction
   error?: string;
 }
 
@@ -18,6 +22,42 @@ interface ServiceConfig {
   name: string;
   apiKey: string | undefined;
   enabled: boolean;
+}
+
+// ACRCloud API response types
+interface ACRCloudTrack {
+  title?: string;
+  artists?: Array<{ name?: string }>;
+  album?: { name?: string };
+  external_metadata?: {
+    spotify?: {
+      album?: {
+        images?: Array<{ url?: string }>;
+      };
+    };
+    apple_music?: {
+      album?: {
+        artwork?: { url?: string };
+      };
+    };
+    deezer?: {
+      album?: { cover_big?: string };
+    };
+    youtube?: {
+      thumbnail?: string;
+    };
+  };
+}
+
+interface ACRCloudResponse {
+  status?: {
+    code?: number;
+    msg?: string;
+    score?: number;
+  };
+  metadata?: {
+    music?: ACRCloudTrack[];
+  };
 }
 
 // ACRCloud signature generation
@@ -66,35 +106,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const enabledServices = services.filter(service => service.enabled);
     
     if (enabledServices.length === 0) {
-      // Check for manual configuration
-      const manualService = formData.get('service') as string;
-      const manualApiKey = formData.get('apiKey') as string;
-      
-      if (manualService && manualApiKey) {
-        console.log(`Using manual configuration: ${manualService}`);
-        
-        let result: RecognitionResult;
-        
-        switch (manualService) {
-          case 'shazam':
-            result = await recognizeWithACRCloudManual(audioFile, manualApiKey);
-            break;
-          case 'audd':
-            result = await recognizeWithAudD(audioFile, manualApiKey);
-            break;
-          default:
-            return NextResponse.json({
-              success: false,
-              error: 'Invalid manual service specified'
-            }, { status: 400 });
-        }
-        
-        return NextResponse.json(result);
-      }
-      
       return NextResponse.json({
         success: false,
-        error: 'No audio recognition services configured. Please add environment variables or provide manual configuration.'
+        error: 'No audio recognition services configured. Please add environment variables.'
       }, { status: 500 });
     }
 
@@ -120,6 +134,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
         if (result.success && result.track) {
           console.log(`✅ Success with ${service.name}:`, result.track);
+          console.log(`Found ${result.candidates?.length || 0} additional candidates`);
           return NextResponse.json(result);
         } else {
           console.log(`❌ No match with ${service.name}: ${result.error}`);
@@ -145,7 +160,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 }
 
-// ACRCloud with full environment configuration
+// Enhanced ACRCloud with candidates and image extraction
 async function recognizeWithACRCloud(audioFile: File): Promise<RecognitionResult> {
   try {
     const accessKey = process.env.ACRCLOUD_ACCESS_KEY!;
@@ -196,24 +211,64 @@ async function recognizeWithACRCloud(audioFile: File): Promise<RecognitionResult
       throw new Error(`ACRCloud API error: ${response.status} ${response.statusText}`);
     }
 
-    const data = await response.json();
+    const data: ACRCloudResponse = await response.json();
     console.log('ACRCloud response:', JSON.stringify(data, null, 2));
     
-    if (data.status?.code === 0 && data.metadata?.music?.length > 0) {
-      const track = data.metadata.music[0];
-      const confidence = (data.status.score || 80) / 100;
+    if (data.status?.code === 0 && data.metadata?.music && data.metadata.music.length > 0) {
+      const tracks = data.metadata.music;
       
-      console.log('ACRCloud found track:', track.title, 'by', track.artists?.[0]?.name);
+      // Extract artwork URL from various sources
+      const extractImageUrl = (track: ACRCloudTrack): string | undefined => {
+        // Try Spotify first (usually highest quality)
+        if (track.external_metadata?.spotify?.album?.images && 
+            track.external_metadata.spotify.album.images.length > 0) {
+          return track.external_metadata.spotify.album.images[0]?.url;
+        }
+        
+        // Try Apple Music
+        if (track.external_metadata?.apple_music?.album?.artwork?.url) {
+          return track.external_metadata.apple_music.album.artwork.url;
+        }
+        
+        // Try Deezer
+        if (track.external_metadata?.deezer?.album?.cover_big) {
+          return track.external_metadata.deezer.album.cover_big;
+        }
+        
+        // Try YouTube Music
+        if (track.external_metadata?.youtube?.thumbnail) {
+          return track.external_metadata.youtube.thumbnail;
+        }
+        
+        return undefined;
+      };
       
-      return {
-        success: true,
-        track: {
+      // Convert all tracks to our format
+      const convertTrack = (track: ACRCloudTrack, index: number): RecognitionTrack => {
+        const confidence = tracks.length > 1 ? 
+          Math.max(0.5, (data.status?.score || 80) / 100 - (index * 0.1)) : 
+          (data.status?.score || 80) / 100;
+          
+        return {
           artist: track.artists?.[0]?.name || 'Unknown Artist',
           title: track.title || 'Unknown Title',
           album: track.album?.name,
+          image_url: extractImageUrl(track),
           confidence: confidence,
           service: 'ACRCloud'
-        }
+        };
+      };
+      
+      const primaryTrack = convertTrack(tracks[0], 0);
+      const candidates = tracks.slice(1, 6).map((track: ACRCloudTrack, index: number) => convertTrack(track, index + 1));
+      
+      console.log(`ACRCloud found primary track: ${primaryTrack.title} by ${primaryTrack.artist}`);
+      console.log(`ACRCloud found ${candidates.length} additional candidates`);
+      
+      return {
+        success: true,
+        track: primaryTrack,
+        candidates: candidates
       };
     }
     
@@ -229,63 +284,7 @@ async function recognizeWithACRCloud(audioFile: File): Promise<RecognitionResult
   }
 }
 
-// ACRCloud with manual API key (simplified for manual config)
-async function recognizeWithACRCloudManual(audioFile: File, apiKey: string): Promise<RecognitionResult> {
-  try {
-    console.log('ACRCloud Manual: Converting audio file...');
-    
-    // Convert audio file to buffer
-    const arrayBuffer = await audioFile.arrayBuffer();
-    const audioBuffer = Buffer.from(arrayBuffer);
-    
-    // Create simple form data (without signature for basic tier)
-    const formData = new FormData();
-    formData.append('sample', new Blob([audioBuffer], { type: 'audio/wav' }));
-    formData.append('sample_bytes', audioBuffer.length.toString());
-    formData.append('access_key', apiKey);
-    
-    console.log('ACRCloud Manual: Sending request...');
-    
-    const response = await fetch('https://identify-us-west-2.acrcloud.com/v1/identify', {
-      method: 'POST',
-      body: formData,
-      headers: {
-        'User-Agent': 'DeadWaxDialogues/1.0'
-      }
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('ACRCloud Manual API error:', response.status, errorText);
-      throw new Error(`ACRCloud API error: ${response.status} ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    console.log('ACRCloud Manual response status:', data.status);
-    
-    if (data.status?.code === 0 && data.metadata?.music?.length > 0) {
-      const track = data.metadata.music[0];
-      return {
-        success: true,
-        track: {
-          artist: track.artists?.[0]?.name || 'Unknown Artist',
-          title: track.title || 'Unknown Title',
-          album: track.album?.name,
-          confidence: (data.status.score || 80) / 100,
-          service: 'ACRCloud'
-        }
-      };
-    }
-    
-    return { success: false, error: `ACRCloud: ${data.status?.msg || 'No match found'}` };
-  } catch (error: unknown) {
-    console.error('ACRCloud Manual error:', error);
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    return { success: false, error: `ACRCloud failed: ${message}` };
-  }
-}
-
-// AudD.io service (unchanged but with better error handling)
+// Enhanced AudD.io service 
 async function recognizeWithAudD(audioFile: File, apiKey: string): Promise<RecognitionResult> {
   try {
     console.log('AudD: Preparing request...');
@@ -293,7 +292,7 @@ async function recognizeWithAudD(audioFile: File, apiKey: string): Promise<Recog
     const formData = new FormData();
     formData.append('api_token', apiKey);
     formData.append('audio', audioFile);
-    formData.append('return', 'apple_music,spotify');
+    formData.append('return', 'apple_music,spotify,deezer');
 
     console.log('AudD: Sending request...');
 
@@ -315,15 +314,28 @@ async function recognizeWithAudD(audioFile: File, apiKey: string): Promise<Recog
     console.log('AudD response:', data.status);
     
     if (data.status === 'success' && data.result) {
+      // Extract artwork from external metadata
+      let imageUrl: string | undefined;
+      
+      if (data.result.spotify?.album?.images?.length > 0) {
+        imageUrl = data.result.spotify.album.images[0].url;
+      } else if (data.result.apple_music?.artwork?.url) {
+        imageUrl = data.result.apple_music.artwork.url;
+      } else if (data.result.deezer?.album?.cover_big) {
+        imageUrl = data.result.deezer.album.cover_big;
+      }
+      
       return {
         success: true,
         track: {
           artist: data.result.artist || 'Unknown Artist',
           title: data.result.title || 'Unknown Title',
           album: data.result.album,
-          confidence: 0.8, // AudD doesn't provide confidence scores
+          image_url: imageUrl,
+          confidence: 0.8,
           service: 'AudD'
-        }
+        },
+        candidates: [] // AudD typically only returns one result
       };
     }
     
@@ -357,17 +369,10 @@ export async function GET(): Promise<NextResponse> {
     message: 'Enhanced Multi-Service Audio Recognition API',
     enabledServices: enabledServices.map(s => s.name),
     disabledServices: disabledServices.map(s => `${s.name} (${s.config})`),
-    usage: 'POST audio file - will try services in order: ACRCloud → AudD',
-    envVariablesNeeded: [
-      'ACRCLOUD_ACCESS_KEY + ACRCLOUD_SECRET_KEY (recommended)',
-      'AUDD_API_TOKEN (fallback)',
-      'ACRCLOUD_ENDPOINT (optional, defaults to identify-us-west-2.acrcloud.com)'
-    ],
-    improvements: [
-      'Configurable sample duration (5-60 seconds)',
-      'Continuous recognition mode',
-      'Better audio format handling',
-      'Improved ACRCloud signature generation',
+    features: [
+      'Multiple recognition candidates for correction',
+      'Album artwork extraction from Spotify/Apple/Deezer',
+      'Fallback service ordering',
       'Enhanced error reporting'
     ]
   });
