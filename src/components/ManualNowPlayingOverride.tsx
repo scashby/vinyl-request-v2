@@ -1,4 +1,6 @@
+// Add this to your admin audio recognition page or create a separate component
 // src/components/ManualNowPlayingOverride.tsx
+
 "use client";
 
 import { useState } from 'react';
@@ -121,6 +123,8 @@ export default function ManualNowPlayingOverride() {
     }
   };
 
+
+
   const handleInputChange = (field: keyof FormData) => 
     (e: React.ChangeEvent<HTMLInputElement>): void => {
       setFormData(prev => ({ ...prev, [field]: e.target.value }));
@@ -214,6 +218,8 @@ export default function ManualNowPlayingOverride() {
                 ×
               </button>
             </div>
+
+
 
             <form onSubmit={handleManualSet} style={{ marginBottom: '20px' }}>
               <div style={{ marginBottom: '16px' }}>
@@ -410,7 +416,7 @@ export default function ManualNowPlayingOverride() {
               fontSize: '13px',
               color: '#92400e'
             }}>
-              <strong>💡 Pro Tip:</strong> Use this when audio recognition fails or for testing the TV display. The manual override will appear immediately on your now-playing display.
+              <strong>💡 Pro Tip:</strong> Use this to test your TV display while debugging audio recognition. You can manually set any track to verify your TV display is working.
             </div>
           </div>
         </div>

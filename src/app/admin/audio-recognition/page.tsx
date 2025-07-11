@@ -41,13 +41,20 @@ type RecognitionService = 'shazam' | 'audd' | 'gracenote' | 'spotify';
 
 export default function AudioRecognitionPage() {
   const [isListening, setIsListening] = useState<boolean>(false);
+  const [isContinuous, setIsContinuous] = useState<boolean>(false);
   const [recognitionService, setRecognitionService] = useState<RecognitionService>('shazam');
   const [lastRecognition, setLastRecognition] = useState<RecognitionResult | null>(null);
   const [status, setStatus] = useState<string>('');
   const [apiKey, setApiKey] = useState<string>('');
   const [servicesStatus, setServicesStatus] = useState<ServiceStatus | null>(null);
+  const [sampleDuration, setSampleDuration] = useState<number>(15); // Default 15 seconds
+  const [continuousInterval, setContinuousInterval] = useState<number>(30); // Default 30 seconds between samples
+  
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
+  const continuousTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const recordingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     // Check service configuration
@@ -74,11 +81,21 @@ export default function AudioRecognitionPage() {
 
     checkServices();
 
-    // Load saved settings for manual config fallback
+    // Load saved settings
     const savedService = localStorage.getItem('recognitionService') as RecognitionService;
     const savedApiKey = localStorage.getItem('audioApiKey');
+    const savedDuration = localStorage.getItem('sampleDuration');
+    const savedInterval = localStorage.getItem('continuousInterval');
+    
     if (savedService) setRecognitionService(savedService);
     if (savedApiKey) setApiKey(savedApiKey);
+    if (savedDuration) setSampleDuration(parseInt(savedDuration));
+    if (savedInterval) setContinuousInterval(parseInt(savedInterval));
+
+    // Cleanup on unmount
+    return () => {
+      stopListening();
+    };
   }, []);
 
   const startListening = async (): Promise<void> => {
@@ -92,7 +109,67 @@ export default function AudioRecognitionPage() {
         } 
       });
       
-      const mediaRecorder = new MediaRecorder(stream, {
+      streamRef.current = stream;
+      
+      if (isContinuous) {
+        startContinuousRecognition();
+      } else {
+        startSingleRecognition();
+      }
+      
+      setIsListening(true);
+      setStatus(isContinuous ? 'Starting continuous recognition...' : `Recording ${sampleDuration} seconds of audio...`);
+
+    } catch (error: unknown) {
+      console.error('Error accessing microphone:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      setStatus(`Error: Could not access microphone - ${errorMessage}`);
+    }
+  };
+
+  const startSingleRecognition = (): void => {
+    if (!streamRef.current) return;
+
+    const mediaRecorder = new MediaRecorder(streamRef.current, {
+      mimeType: 'audio/webm;codecs=opus'
+    });
+    
+    mediaRecorderRef.current = mediaRecorder;
+    audioChunksRef.current = [];
+
+    mediaRecorder.ondataavailable = (event: BlobEvent) => {
+      if (event.data.size > 0) {
+        audioChunksRef.current.push(event.data);
+      }
+    };
+
+    mediaRecorder.onstop = async () => {
+      const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+      await recognizeAudio(audioBlob);
+      
+      // Clean up stream after single recognition
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
+    };
+
+    mediaRecorder.start();
+
+    // Stop recording after specified duration
+    recordingTimeoutRef.current = setTimeout(() => {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+        mediaRecorderRef.current.stop();
+        setIsListening(false);
+      }
+    }, sampleDuration * 1000);
+  };
+
+  const startContinuousRecognition = (): void => {
+    const recordSample = () => {
+      if (!streamRef.current || !isListening) return;
+
+      const mediaRecorder = new MediaRecorder(streamRef.current, {
         mimeType: 'audio/webm;codecs=opus'
       });
       
@@ -108,33 +185,53 @@ export default function AudioRecognitionPage() {
       mediaRecorder.onstop = async () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         await recognizeAudio(audioBlob);
-        stream.getTracks().forEach(track => track.stop());
+        
+        // Schedule next sample if still in continuous mode
+        if (isListening && isContinuous) {
+          continuousTimeoutRef.current = setTimeout(recordSample, continuousInterval * 1000);
+        }
       };
 
+      setStatus(`Recording sample ${sampleDuration}s...`);
       mediaRecorder.start();
-      setIsListening(true);
-      setStatus('Listening for audio...');
 
-      // Record for 10 seconds, then analyze
-      setTimeout(() => {
+      // Stop this sample after specified duration
+      recordingTimeoutRef.current = setTimeout(() => {
         if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
           mediaRecorderRef.current.stop();
-          setIsListening(false);
         }
-      }, 10000);
+      }, sampleDuration * 1000);
+    };
 
-    } catch (error: unknown) {
-      console.error('Error accessing microphone:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      setStatus(`Error: Could not access microphone - ${errorMessage}`);
-    }
+    // Start first sample
+    recordSample();
   };
 
   const stopListening = (): void => {
+    setIsListening(false);
+    
+    // Clear timeouts
+    if (continuousTimeoutRef.current) {
+      clearTimeout(continuousTimeoutRef.current);
+      continuousTimeoutRef.current = null;
+    }
+    
+    if (recordingTimeoutRef.current) {
+      clearTimeout(recordingTimeoutRef.current);
+      recordingTimeoutRef.current = null;
+    }
+
+    // Stop current recording
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.stop();
     }
-    setIsListening(false);
+
+    // Stop stream
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+
     setStatus('Stopped listening');
   };
 
@@ -169,7 +266,7 @@ export default function AudioRecognitionPage() {
         // Update now playing in database
         await updateNowPlaying(result.track);
       } else {
-        setStatus(result.error || 'No match found');
+        setStatus(isContinuous ? 'No match found, continuing...' : (result.error || 'No match found'));
       }
     } catch (error: unknown) {
       console.error('Recognition error:', error);
@@ -190,7 +287,6 @@ export default function AudioRecognitionPage() {
 
       if (queryError) {
         console.error('Query error:', queryError);
-        setStatus('Error querying collection');
         return;
       }
 
@@ -214,23 +310,23 @@ export default function AudioRecognitionPage() {
         if (upsertError) {
           console.error('Upsert error:', upsertError);
           const error = upsertError as SupabaseError;
-          setStatus(`Database error: ${error.message}`);
+          console.log(`Database error: ${error.message}`);
         } else {
-          setStatus('✅ Updated now playing in database');
+          console.log('✅ Updated now playing in database');
         }
-      } else {
-        setStatus('No matching album found in collection');
       }
     } catch (error: unknown) {
       console.error('Database update error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown database error';
-      setStatus(`Database update failed: ${errorMessage}`);
+      console.log(`Database update failed: ${errorMessage}`);
     }
   };
 
   const saveSettings = (): void => {
     localStorage.setItem('recognitionService', recognitionService);
     localStorage.setItem('audioApiKey', apiKey);
+    localStorage.setItem('sampleDuration', sampleDuration.toString());
+    localStorage.setItem('continuousInterval', continuousInterval.toString());
     setStatus('Settings saved');
   };
 
@@ -244,9 +340,9 @@ export default function AudioRecognitionPage() {
 
   return (
     <div style={{ padding: 24, background: "#fff", color: "#222", minHeight: "100vh" }}>
-      <h1 style={{ marginBottom: 32 }}>Audio Recognition Setup</h1>
+      <h1 style={{ marginBottom: 32 }}>Enhanced Audio Recognition</h1>
       
-      {/* Service Configuration - Only show if manual config needed */}
+      {/* Service Configuration */}
       {servicesStatus?.needsManualConfig && (
         <div style={{ 
           background: "#f9f9f9", 
@@ -256,18 +352,6 @@ export default function AudioRecognitionPage() {
           border: "1px solid #ddd"
         }}>
           <h2 style={{ marginTop: 0, marginBottom: 16 }}>Manual Service Configuration</h2>
-          <div style={{
-            background: "#fef3c7",
-            border: "1px solid #f59e0b",
-            color: "#92400e",
-            padding: 12,
-            borderRadius: 4,
-            marginBottom: 16,
-            fontSize: 14
-          }}>
-            <strong>⚠️ Notice:</strong> No services configured via environment variables. 
-            Add ACRCLOUD_ACCESS_KEY or AUDD_API_TOKEN to your .env.local for automatic configuration.
-          </div>
           
           <div style={{ marginBottom: 16 }}>
             <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>
@@ -286,8 +370,6 @@ export default function AudioRecognitionPage() {
             >
               <option value="shazam">Shazam (ACRCloud)</option>
               <option value="audd">AudD.io</option>
-              <option value="gracenote">Gracenote</option>
-              <option value="spotify">Spotify Web API</option>
             </select>
           </div>
 
@@ -328,58 +410,88 @@ export default function AudioRecognitionPage() {
         </div>
       )}
 
-      {/* Service Status - Show for environment-configured services */}
-      {servicesStatus && !servicesStatus.needsManualConfig && (
-        <div style={{ 
-          background: "#f0fdf4", 
-          padding: 24, 
-          borderRadius: 8, 
-          marginBottom: 24,
-          border: "1px solid #16a34a"
-        }}>
-          <h2 style={{ marginTop: 0, marginBottom: 16 }}>Service Status</h2>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-            <div>
-              <strong style={{ color: "#16a34a" }}>✅ Enabled Services:</strong>
-              <div style={{ marginTop: 8 }}>
-                {servicesStatus.enabledServices.map((service, index) => (
-                  <div key={index} style={{ 
-                    background: "#dcfce7", 
-                    padding: "6px 12px", 
-                    borderRadius: 6, 
-                    marginBottom: 4,
-                    color: "#166534",
-                    fontSize: 14
-                  }}>
-                    {service}
-                  </div>
-                ))}
-              </div>
-            </div>
-            {servicesStatus.disabledServices.length > 0 && (
-              <div>
-                <strong style={{ color: "#6b7280" }}>⚠️ Available Services:</strong>
-                <div style={{ marginTop: 8 }}>
-                  {servicesStatus.disabledServices.map((service, index) => (
-                    <div key={index} style={{ 
-                      background: "#f3f4f6", 
-                      padding: "6px 12px", 
-                      borderRadius: 6, 
-                      marginBottom: 4,
-                      color: "#6b7280",
-                      fontSize: 14
-                    }}>
-                      {service} (not configured)
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+      {/* Recognition Settings */}
+      <div style={{ 
+        background: "#f0f9ff", 
+        padding: 24, 
+        borderRadius: 8, 
+        marginBottom: 24,
+        border: "1px solid #0369a1"
+      }}>
+        <h2 style={{ marginTop: 0, marginBottom: 16 }}>Recognition Settings</h2>
+        
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 16 }}>
+          <div>
+            <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>
+              Sample Duration (seconds)
+            </label>
+            <input 
+              type="number"
+              min="5"
+              max="60"
+              value={sampleDuration}
+              onChange={(e) => setSampleDuration(parseInt(e.target.value) || 15)}
+              style={{ 
+                width: "100%", 
+                padding: "8px 12px", 
+                border: "1px solid #ddd", 
+                borderRadius: 4,
+                fontSize: 14
+              }}
+            />
+          </div>
+          
+          <div>
+            <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>
+              Continuous Interval (seconds)
+            </label>
+            <input 
+              type="number"
+              min="10"
+              max="300"
+              value={continuousInterval}
+              onChange={(e) => setContinuousInterval(parseInt(e.target.value) || 30)}
+              style={{ 
+                width: "100%", 
+                padding: "8px 12px", 
+                border: "1px solid #ddd", 
+                borderRadius: 4,
+                fontSize: 14
+              }}
+            />
+          </div>
+          
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 28 }}>
+            <input
+              type="checkbox"
+              id="continuous"
+              checked={isContinuous}
+              onChange={(e) => setIsContinuous(e.target.checked)}
+            />
+            <label htmlFor="continuous" style={{ fontWeight: 600 }}>
+              Continuous Recognition
+            </label>
           </div>
         </div>
-      )}
+        
+        <button 
+          onClick={saveSettings}
+          style={{
+            background: "#059669",
+            color: "white",
+            border: "none",
+            padding: "8px 16px",
+            borderRadius: 4,
+            cursor: "pointer",
+            fontSize: 14,
+            fontWeight: 500
+          }}
+        >
+          Save Recognition Settings
+        </button>
+      </div>
 
-      {/* Audio Recognition */}
+      {/* Audio Recognition Controls */}
       <div style={{ 
         background: "#f0f9ff", 
         padding: 24, 
@@ -406,7 +518,10 @@ export default function AudioRecognitionPage() {
               opacity: (servicesStatus?.needsManualConfig && !apiKey) ? 0.5 : 1
             }}
           >
-            {isListening ? "🔴 Stop Listening" : "🎵 Start Recognition"}
+            {isListening 
+              ? (isContinuous ? "🔴 Stop Continuous Recognition" : "🔴 Stop Recording") 
+              : (isContinuous ? "🎵 Start Continuous Recognition" : "🎵 Start Single Recognition")
+            }
           </button>
           
           {isListening && (
@@ -417,7 +532,10 @@ export default function AudioRecognitionPage() {
               borderRadius: 4,
               fontSize: 14
             }}>
-              Recording 10 seconds of audio...
+              {isContinuous 
+                ? `Continuous recognition active (${sampleDuration}s samples every ${continuousInterval}s)`
+                : `Recording ${sampleDuration} seconds of audio...`
+              }
             </span>
           )}
         </div>
@@ -434,19 +552,6 @@ export default function AudioRecognitionPage() {
             <strong>Status:</strong> {status}
           </div>
         )}
-
-        {servicesStatus?.needsManualConfig && !apiKey && (
-          <div style={{ 
-            background: "#fef2f2", 
-            border: "1px solid #fca5a5", 
-            color: "#dc2626", 
-            padding: 12, 
-            borderRadius: 4,
-            fontSize: 14
-          }}>
-            Please enter an API key above or configure services via environment variables
-          </div>
-        )}
       </div>
 
       {/* Last Recognition */}
@@ -455,7 +560,8 @@ export default function AudioRecognitionPage() {
           background: "#f0fdf4", 
           padding: 24, 
           borderRadius: 8, 
-          border: "1px solid #16a34a"
+          border: "1px solid #16a34a",
+          marginBottom: 24
         }}>
           <h2 style={{ marginTop: 0, marginBottom: 16 }}>Last Recognition</h2>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
@@ -480,31 +586,16 @@ export default function AudioRecognitionPage() {
         background: "#fffbeb", 
         padding: 24, 
         borderRadius: 8, 
-        marginTop: 24,
         border: "1px solid #f59e0b"
       }}>
-        <h3 style={{ marginTop: 0, color: "#92400e" }}>Setup Instructions</h3>
-        {servicesStatus?.needsManualConfig ? (
-          <ol style={{ color: "#92400e", lineHeight: 1.6 }}>
-            <li><strong>Recommended:</strong> Add environment variables to .env.local:
-              <ul style={{ marginTop: 8, marginLeft: 20 }}>
-                <li>ACRCLOUD_ACCESS_KEY=your_key_here</li>
-                <li>AUDD_API_TOKEN=your_token_here</li>
-              </ul>
-            </li>
-            <li>Restart your development server</li>
-            <li>Or use manual configuration above as a temporary solution</li>
-            <li>Allow microphone access when prompted</li>
-            <li>Click &quot;Start Recognition&quot; to begin listening</li>
-          </ol>
-        ) : (
-          <ol style={{ color: "#92400e", lineHeight: 1.6 }}>
-            <li>✅ Services are configured via environment variables</li>
-            <li>Allow microphone access when prompted</li>
-            <li>Click &quot;Start Recognition&quot; to begin listening</li>
-            <li>Recognition results will automatically update the now-playing display</li>
-          </ol>
-        )}
+        <h3 style={{ marginTop: 0, color: "#92400e" }}>Enhanced Features</h3>
+        <ul style={{ color: "#92400e", lineHeight: 1.6 }}>
+          <li><strong>Configurable Duration:</strong> Set sample length from 5-60 seconds for better recognition</li>
+          <li><strong>Continuous Recognition:</strong> Automatically recognize tracks every X seconds</li>
+          <li><strong>Multiple Services:</strong> Supports ACRCloud (Shazam-like) and AudD.io</li>
+          <li><strong>Automatic Updates:</strong> Recognized tracks automatically update the now-playing display</li>
+          <li><strong>Persistent Settings:</strong> Your preferences are saved between sessions</li>
+        </ul>
       </div>
     </div>
   );
