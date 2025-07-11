@@ -1,9 +1,8 @@
-// src/app/admin/audio-recognition/page.tsx - Fixed Album Follow Mode
+// src/app/admin/audio-recognition/page.tsx - Recognition-First System
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from 'lib/supabaseClient';
-import Image from 'next/image';
 
 interface RecognitionResult {
   artist: string;
@@ -14,39 +13,20 @@ interface RecognitionResult {
   service?: string;
 }
 
-interface CollectionMatch {
+interface CollectionMetadata {
   id: number;
   artist: string;
-  title: string; // This is the ALBUM title
+  title: string; // Album title in collection
   year: string;
   image_url?: string;
-  folder?: string;
-  format?: string;
-  match_type: 'exact' | 'fuzzy_artist' | 'fuzzy_title' | 'album_context';
-  match_score: number;
+  folder?: string; // Format info
 }
 
-interface AlbumContext {
-  album_id?: number;
-  artist: string;
-  album_title?: string;
-  last_recognized: string;
-  track_sequence: string[];
-}
-
-interface RecognitionCandidate {
-  recognition: RecognitionResult;
-  collection_matches: CollectionMatch[];
-  selected_match?: CollectionMatch;
-  confidence_score: number;
-}
-
-export default function SmartAudioRecognitionPage() {
+export default function RecognitionFirstAudioSystem() {
   const [isListening, setIsListening] = useState<boolean>(false);
   const [recognitionMode, setRecognitionMode] = useState<'manual' | 'smart_continuous' | 'album_follow'>('smart_continuous');
   const [lastRecognition, setLastRecognition] = useState<RecognitionResult | null>(null);
-  const [albumContext, setAlbumContext] = useState<AlbumContext | null>(null);
-  const [pendingSelection, setPendingSelection] = useState<RecognitionCandidate | null>(null);
+  const [collectionMetadata, setCollectionMetadata] = useState<CollectionMetadata | null>(null);
   const [status, setStatus] = useState<string>('');
   const [sampleDuration, setSampleDuration] = useState<number>(15);
   const [smartInterval, setSmartInterval] = useState<number>(30);
@@ -146,10 +126,8 @@ export default function SmartAudioRecognitionPage() {
       
       recordAndAnalyze(() => {
         if (isListeningRef.current) {
-          // Smart interval: shorter if we detected a good match, longer if not
-          const interval = lastRecognition ? smartInterval : Math.min(smartInterval * 2, 120);
+          const interval = smartInterval;
           setStatus(`Next sample in ${interval}s (smart mode)`);
-          
           recognitionTimeoutRef.current = setTimeout(smartSample, interval * 1000);
         }
       });
@@ -162,7 +140,6 @@ export default function SmartAudioRecognitionPage() {
     if (!streamRef.current) return;
 
     try {
-      // Initialize audio context for song change detection
       audioContextRef.current = new AudioContext();
       const analyser = audioContextRef.current.createAnalyser();
       const source = audioContextRef.current.createMediaStreamSource(streamRef.current);
@@ -173,10 +150,9 @@ export default function SmartAudioRecognitionPage() {
       
       setStatus('🎵 Album follow mode active - monitoring for song changes...');
       
-      // Start the detection loop
       detectSongChange(analyser);
       
-      // Also do an initial recognition
+      // Initial recognition
       setTimeout(() => {
         if (isListeningRef.current) {
           recordAndAnalyze(() => {});
@@ -195,20 +171,16 @@ export default function SmartAudioRecognitionPage() {
     const dataArray = new Uint8Array(analyser.frequencyBinCount);
     analyser.getByteFrequencyData(dataArray);
     
-    // Calculate average audio level
     const currentLevel = dataArray.reduce((sum, value) => sum + value, 0) / dataArray.length;
     
-    // Detect silence (potential song transition)
-    if (currentLevel < 15) { // Threshold for silence
+    if (currentLevel < 15) {
       silenceCountRef.current++;
       setStatus(`🔇 Silence detected (${silenceCountRef.current}/20) - waiting for song change...`);
     } else {
-      // If we had enough silence and now there's audio, it's likely a new song
-      if (silenceCountRef.current >= 20) { // ~10 seconds of silence
+      if (silenceCountRef.current >= 20) {
         console.log('Song change detected after silence, starting recognition...');
         setStatus('🎵 New song detected! Analyzing...');
         
-        // Wait a moment for the song to get going, then recognize
         setTimeout(() => {
           if (isListeningRef.current) {
             recordAndAnalyze(() => {});
@@ -222,8 +194,6 @@ export default function SmartAudioRecognitionPage() {
     }
     
     lastAudioLevelRef.current = currentLevel;
-    
-    // Continue monitoring
     songChangeTimeoutRef.current = setTimeout(() => detectSongChange(analyser), 500);
   };
 
@@ -245,7 +215,7 @@ export default function SmartAudioRecognitionPage() {
 
     mediaRecorder.onstop = async () => {
       const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-      await analyzeAudioWithContext(audioBlob);
+      await analyzeAudio(audioBlob);
       onComplete();
     };
 
@@ -259,7 +229,7 @@ export default function SmartAudioRecognitionPage() {
     }, sampleDuration * 1000);
   };
 
-  const analyzeAudioWithContext = async (audioBlob: Blob): Promise<void> => {
+  const analyzeAudio = async (audioBlob: Blob): Promise<void> => {
     setStatus('Analyzing audio...');
     
     try {
@@ -280,36 +250,14 @@ export default function SmartAudioRecognitionPage() {
       if (result.success && result.track) {
         console.log('Recognition result:', result.track);
         
-        // Find collection matches with context
-        const matches = await findCollectionMatches(result.track);
+        // ALWAYS update display with recognition data first
+        await updateNowPlaying(result.track);
+        setLastRecognition(result.track);
         
-        if (matches.length === 0) {
-          setStatus(`❌ No collection matches for: ${result.track.artist} - ${result.track.title}`);
-          setLastRecognition(result.track);
-          return;
-        }
-
-        const candidate: RecognitionCandidate = {
-          recognition: result.track,
-          collection_matches: matches,
-          confidence_score: result.track.confidence || 0.8
-        };
-
-        // Always update TV display immediately with best available data
-        if (matches.length > 0) {
-          // Use best collection match
-          await selectMatch(candidate, matches[0], false); // false = don't clear pending selection
-          
-          // Still show selection UI for correction if multiple matches
-          if (matches.length > 1 && matches[0].match_score < 0.95) {
-            setPendingSelection(candidate);
-            setStatus(`🎵 Playing: ${matches[0].artist} - ${matches[0].title} (${matches.length - 1} other matches available)`);
-          }
-        } else {
-          // No collection match - use recognition data directly
-          await updateNowPlayingDirect(result.track);
-          setStatus(`🎵 Playing: ${result.track.artist} - ${result.track.title} (not in collection)`);
-        }
+        // OPTIONALLY try to find supplemental metadata from collection
+        await findSupplementalMetadata(result.track);
+        
+        setStatus(`🎵 Playing: ${result.track.artist} - ${result.track.title}`);
       } else {
         setStatus(result.error || 'No match found');
       }
@@ -320,217 +268,48 @@ export default function SmartAudioRecognitionPage() {
     }
   };
 
-  const findCollectionMatches = async (track: RecognitionResult): Promise<CollectionMatch[]> => {
-    const matches: CollectionMatch[] = [];
-
-    // Strategy 1: Album context match (if we have context)
-    if (albumContext) {
-      const { data: contextMatches } = await supabase
+  const findSupplementalMetadata = async (track: RecognitionResult): Promise<void> => {
+    try {
+      // Look for matching albums in collection for supplemental data only
+      const { data: matches } = await supabase
         .from('collection')
         .select('*')
-        .eq('id', albumContext.album_id)
-        .single();
+        .or(
+          `and(artist.ilike.%${track.artist}%,title.ilike.%${track.album || track.title}%),` +
+          `artist.ilike.%${track.artist}%`
+        )
+        .limit(1);
 
-      if (contextMatches) {
-        matches.push({
-          ...contextMatches,
-          match_type: 'album_context',
-          match_score: 0.95
-        });
-      }
-    }
-
-    // Strategy 2: Exact artist + title
-    const { data: exactMatches } = await supabase
-      .from('collection')
-      .select('*')
-      .ilike('artist', track.artist)
-      .ilike('title', track.title)
-      .limit(3);
-
-    if (exactMatches) {
-      exactMatches.forEach(match => {
-        matches.push({
-          ...match,
-          match_type: 'exact',
-          match_score: 0.9
-        });
-      });
-    }
-
-    // Strategy 3: Fuzzy artist match
-    const { data: artistMatches } = await supabase
-      .from('collection')
-      .select('*')
-      .ilike('artist', `%${track.artist}%`)
-      .limit(5);
-
-    if (artistMatches) {
-      artistMatches.forEach(match => {
-        if (!matches.some(m => m.id === match.id)) {
-          const artistScore = calculateSimilarity(track.artist, match.artist);
-          const titleScore = match.title ? calculateSimilarity(track.title, match.title) : 0;
-          
-          matches.push({
-            ...match,
-            match_type: 'fuzzy_artist',
-            match_score: (artistScore + titleScore) / 2
-          });
-        }
-      });
-    }
-
-    // Strategy 4: Fuzzy title match
-    const { data: titleMatches } = await supabase
-      .from('collection')
-      .select('*')
-      .ilike('title', `%${track.title}%`)
-      .limit(5);
-
-    if (titleMatches) {
-      titleMatches.forEach(match => {
-        if (!matches.some(m => m.id === match.id)) {
-          const titleScore = calculateSimilarity(track.title, match.title);
-          
-          matches.push({
-            ...match,
-            match_type: 'fuzzy_title',
-            match_score: titleScore
-          });
-        }
-      });
-    }
-
-    // Sort by match score
-    return matches
-      .sort((a, b) => b.match_score - a.match_score)
-      .slice(0, 8); // Top 8 matches
-  };
-
-  const calculateSimilarity = (str1: string, str2: string): number => {
-    const s1 = str1.toLowerCase().trim();
-    const s2 = str2.toLowerCase().trim();
-    
-    if (s1 === s2) return 1.0;
-    if (s1.includes(s2) || s2.includes(s1)) return 0.8;
-    
-    // Simple Levenshtein-like scoring
-    const longer = s1.length > s2.length ? s1 : s2;
-    const shorter = s1.length > s2.length ? s2 : s1;
-    
-    if (longer.length === 0) return 1.0;
-    
-    const distance = levenshteinDistance(longer, shorter);
-    return (longer.length - distance) / longer.length;
-  };
-
-  const levenshteinDistance = (str1: string, str2: string): number => {
-    const matrix = [];
-    
-    for (let i = 0; i <= str2.length; i++) {
-      matrix[i] = [i];
-    }
-    
-    for (let j = 0; j <= str1.length; j++) {
-      matrix[0][j] = j;
-    }
-    
-    for (let i = 1; i <= str2.length; i++) {
-      for (let j = 1; j <= str1.length; j++) {
-        if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
-          matrix[i][j] = matrix[i - 1][j - 1];
-        } else {
-          matrix[i][j] = Math.min(
-            matrix[i - 1][j - 1] + 1,
-            matrix[i][j - 1] + 1,
-            matrix[i - 1][j] + 1
-          );
-        }
-      }
-    }
-    
-    return matrix[str2.length][str1.length];
-  };
-
-  const selectMatch = async (candidate: RecognitionCandidate, selectedMatch: CollectionMatch, clearPending: boolean = true): Promise<void> => {
-    console.log('Selected match:', selectedMatch);
-    
-    // Update album context
-    if (selectedMatch.match_type !== 'album_context') {
-      setAlbumContext({
-        album_id: selectedMatch.id,
-        artist: selectedMatch.artist,
-        album_title: selectedMatch.title, // This is the album title
-        last_recognized: candidate.recognition.title,
-        track_sequence: [candidate.recognition.title]
-      });
-    } else if (albumContext) {
-      setAlbumContext({
-        ...albumContext,
-        last_recognized: candidate.recognition.title,
-        track_sequence: [...albumContext.track_sequence, candidate.recognition.title]
-      });
-    }
-
-    // Update now playing with both track and album info
-    await updateNowPlaying(candidate.recognition, selectedMatch);
-    
-    setLastRecognition(candidate.recognition);
-    
-    if (clearPending) {
-      setPendingSelection(null);
-      setStatus(`✅ Playing: ${selectedMatch.artist} - ${selectedMatch.title}`);
-    }
-  };
-
-  const updateNowPlayingDirect = async (track: RecognitionResult): Promise<void> => {
-    try {
-      // Update now playing without collection link
-      const nowPlayingData = {
-        id: 1,
-        artist: track.artist,
-        title: track.title, // Track title
-        album_title: track.album || null, // Album title from recognition
-        recognition_image_url: track.image_url || null, // Artwork from recognition service
-        album_id: null, // No collection match
-        track_number: null,
-        track_side: null,
-        started_at: new Date().toISOString(),
-        recognition_confidence: track.confidence || 0.8,
-        service_used: track.service || 'ACRCloud',
-        updated_at: new Date().toISOString()
-      };
-
-      const { error } = await supabase
-        .from('now_playing')
-        .upsert(nowPlayingData);
-
-      if (error) {
-        console.error('Database update error:', error);
-      } else {
-        console.log('✅ Now playing updated (no collection match)');
-        setLastRecognition(track);
+      if (matches && matches.length > 0) {
+        const bestMatch = matches[0];
+        setCollectionMetadata(bestMatch);
         
-        // Clear album context since this isn't from collection
-        setAlbumContext(null);
+        // Update with collection metadata (format, year) while keeping recognition data
+        await updateNowPlayingWithMetadata(track, bestMatch);
+        
+        console.log('Found collection metadata:', bestMatch);
+        setStatus(`🎵 Playing: ${track.artist} - ${track.title} (+ collection metadata)`);
+      } else {
+        setCollectionMetadata(null);
+        console.log('No collection metadata found - using recognition data only');
       }
     } catch (error) {
-      console.error('Failed to update now playing:', error);
+      console.error('Error finding collection metadata:', error);
+      setCollectionMetadata(null);
     }
   };
 
-  const updateNowPlaying = async (track: RecognitionResult, match: CollectionMatch): Promise<void> => {
+  const updateNowPlaying = async (track: RecognitionResult): Promise<void> => {
     try {
-      // Extract track number and side from track title if possible
       const trackInfo = extractTrackInfo(track.title);
       
       const nowPlayingData = {
         id: 1,
-        artist: track.artist,
-        title: track.title, // Track title from recognition
-        album_title: track.album || null, // Album title ONLY from recognition - never from collection
-        recognition_image_url: track.image_url || null, // Artwork from recognition service
-        album_id: match.id, // Link to collection for artwork/format only
+        artist: track.artist, // ALWAYS from recognition
+        title: track.title, // ALWAYS from recognition  
+        album_title: track.album || null, // ALWAYS from recognition
+        recognition_image_url: track.image_url || null, // ALWAYS from recognition
+        album_id: null, // No collection dependency
         track_number: trackInfo.number,
         track_side: trackInfo.side,
         started_at: new Date().toISOString(),
@@ -546,7 +325,40 @@ export default function SmartAudioRecognitionPage() {
       if (error) {
         console.error('Database update error:', error);
       } else {
-        console.log('✅ Now playing updated successfully');
+        console.log('✅ Now playing updated with recognition data');
+      }
+    } catch (error) {
+      console.error('Failed to update now playing:', error);
+    }
+  };
+
+  const updateNowPlayingWithMetadata = async (track: RecognitionResult, metadata: CollectionMetadata): Promise<void> => {
+    try {
+      const trackInfo = extractTrackInfo(track.title);
+      
+      const nowPlayingData = {
+        id: 1,
+        artist: track.artist, // STILL from recognition
+        title: track.title, // STILL from recognition
+        album_title: track.album || null, // STILL from recognition
+        recognition_image_url: track.image_url || null, // STILL from recognition
+        album_id: metadata.id, // Link for supplemental data only
+        track_number: trackInfo.number,
+        track_side: trackInfo.side,
+        started_at: new Date().toISOString(),
+        recognition_confidence: track.confidence || 0.8,
+        service_used: track.service || 'ACRCloud',
+        updated_at: new Date().toISOString()
+      };
+
+      const { error } = await supabase
+        .from('now_playing')
+        .upsert(nowPlayingData);
+
+      if (error) {
+        console.error('Database update error:', error);
+      } else {
+        console.log('✅ Now playing updated with recognition + metadata');
       }
     } catch (error) {
       console.error('Failed to update now playing:', error);
@@ -554,8 +366,6 @@ export default function SmartAudioRecognitionPage() {
   };
 
   const extractTrackInfo = (trackTitle: string): { number: string | null, side: string | null } => {
-    // Try to extract track number and side from title
-    // Common patterns: "Track 1", "A1", "Side A", "1.", etc.
     const sideMatch = trackTitle.match(/\b(Side\s+)?([AB])\b/i);
     const trackMatch = trackTitle.match(/\b([AB]?)(\d+)\b/);
     
@@ -565,14 +375,9 @@ export default function SmartAudioRecognitionPage() {
     };
   };
 
-  const clearAlbumContext = (): void => {
-    setAlbumContext(null);
-    setStatus('Album context cleared');
-  };
-
   return (
     <div style={{ padding: 24, background: "#fff", color: "#222", minHeight: "100vh" }}>
-      <h1 style={{ marginBottom: 32 }}>Smart Audio Recognition</h1>
+      <h1 style={{ marginBottom: 32 }}>Recognition-First Audio System</h1>
       
       {/* Recognition Mode Selection */}
       <div style={{ 
@@ -659,8 +464,8 @@ export default function SmartAudioRecognitionPage() {
         </div>
       </div>
 
-      {/* Album Context Display */}
-      {albumContext && (
+      {/* Collection Metadata Display */}
+      {collectionMetadata && (
         <div style={{ 
           background: "#f0fdf4", 
           padding: 20, 
@@ -668,27 +473,14 @@ export default function SmartAudioRecognitionPage() {
           marginBottom: 24,
           border: "1px solid #16a34a"
         }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-            <h3 style={{ margin: 0, color: "#16a34a" }}>Album Context Active</h3>
-            <button 
-              onClick={clearAlbumContext}
-              style={{
-                background: "#ef4444",
-                color: "white",
-                border: "none",
-                padding: "6px 12px",
-                borderRadius: 4,
-                fontSize: 12,
-                cursor: "pointer"
-              }}
-            >
-              Clear Context
-            </button>
-          </div>
+          <h3 style={{ margin: 0, marginBottom: 12, color: "#16a34a" }}>Collection Metadata Found</h3>
           <div style={{ fontSize: 14 }}>
-            <strong>Album:</strong> {albumContext.album_title} by {albumContext.artist}<br/>
-            <strong>Track Sequence:</strong> {albumContext.track_sequence.join(' → ')}<br/>
-            <strong>Last Recognized:</strong> {albumContext.last_recognized}
+            <strong>Format:</strong> {collectionMetadata.folder || 'Unknown'} • 
+            <strong> Release Year:</strong> {collectionMetadata.year} • 
+            <strong> Collection ID:</strong> {collectionMetadata.id}
+          </div>
+          <div style={{ fontSize: 12, color: "#666", marginTop: 8 }}>
+            This adds format badges and release year to the display while using recognition data for all track info.
           </div>
         </div>
       )}
@@ -723,6 +515,28 @@ export default function SmartAudioRecognitionPage() {
               : `🎵 Start ${recognitionMode.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}`
             }
           </button>
+          
+          <button 
+            onClick={() => {
+              if (lastRecognition) {
+                updateNowPlaying(lastRecognition);
+                setStatus("🔄 Forced TV display update with last recognition");
+              }
+            }}
+            disabled={!lastRecognition}
+            style={{
+              background: lastRecognition ? "#0369a1" : "#9ca3af",
+              color: "white",
+              border: "none",
+              padding: "12px 24px",
+              borderRadius: 8,
+              cursor: lastRecognition ? "pointer" : "not-allowed",
+              fontSize: 16,
+              fontWeight: 600
+            }}
+          >
+            🔄 Force TV Update
+          </button>
         </div>
 
         {status && (
@@ -738,106 +552,6 @@ export default function SmartAudioRecognitionPage() {
         )}
       </div>
 
-      {/* Match Selection/Correction */}
-      {pendingSelection && (
-        <div style={{ 
-          background: "#fffbeb", 
-          padding: 24, 
-          borderRadius: 8, 
-          marginBottom: 24,
-          border: "1px solid #f59e0b"
-        }}>
-          <h3 style={{ marginTop: 0, color: "#92400e" }}>
-            Improve Match for: &ldquo;{pendingSelection.recognition.artist} - {pendingSelection.recognition.title}&rdquo;
-          </h3>
-          <p style={{ fontSize: 14, color: "#92400e", marginBottom: 16 }}>
-            Currently playing the first option below. Click a different match to correct it:
-          </p>
-          
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-            {pendingSelection.collection_matches.map((match) => (
-              <div 
-                key={match.id}
-                onClick={() => selectMatch(pendingSelection, match)}
-                style={{
-                  background: "#fff",
-                  border: "2px solid #e5e7eb",
-                  borderRadius: 8,
-                  padding: 16,
-                  cursor: "pointer",
-                  transition: "all 0.2s",
-                  display: "flex",
-                  gap: 12,
-                  alignItems: "center"
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = "#2563eb";
-                  e.currentTarget.style.background = "#eff6ff";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = "#e5e7eb";
-                  e.currentTarget.style.background = "#fff";
-                }}
-              >
-                {match.image_url && (
-                  <Image 
-                    src={match.image_url}
-                    alt={match.title}
-                    width={60}
-                    height={60}
-                    style={{ objectFit: "cover", borderRadius: 6 }}
-                    unoptimized
-                  />
-                )}
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600, marginBottom: 4 }}>{match.title}</div>
-                  <div style={{ fontSize: 14, color: "#666", marginBottom: 4 }}>{match.artist} • {match.year}</div>
-                  <div style={{ fontSize: 12, color: "#888" }}>
-                    {match.match_type} • {Math.round(match.match_score * 100)}% match
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-          
-          <div style={{ marginTop: 16, textAlign: "center" }}>
-            <button 
-              onClick={() => {
-                updateNowPlayingDirect(pendingSelection.recognition);
-                setPendingSelection(null);
-                setStatus(`✅ Playing: ${pendingSelection.recognition.artist} - ${pendingSelection.recognition.title} (not in collection)`);
-              }}
-              style={{
-                background: "#059669",
-                color: "white",
-                border: "none",
-                padding: "8px 16px",
-                borderRadius: 4,
-                fontSize: 14,
-                cursor: "pointer",
-                marginRight: 12
-              }}
-            >
-              None of These - Use Recognition Data
-            </button>
-            <button 
-              onClick={() => setPendingSelection(null)}
-              style={{
-                background: "#6b7280",
-                color: "white",
-                border: "none",
-                padding: "8px 16px",
-                borderRadius: 4,
-                fontSize: 14,
-                cursor: "pointer"
-              }}
-            >
-              Keep Current Selection
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Last Recognition */}
       {lastRecognition && (
         <div style={{ 
@@ -849,9 +563,20 @@ export default function SmartAudioRecognitionPage() {
           <h3 style={{ marginTop: 0, marginBottom: 16 }}>Last Recognition</h3>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
             <div><strong>Artist:</strong> {lastRecognition.artist}</div>
-            <div><strong>Title:</strong> {lastRecognition.title}</div>
+            <div><strong>Track:</strong> {lastRecognition.title}</div>
             <div><strong>Album:</strong> {lastRecognition.album || 'Unknown'}</div>
             <div><strong>Confidence:</strong> {Math.round((lastRecognition.confidence || 0.8) * 100)}%</div>
+            <div><strong>Has Artwork:</strong> {lastRecognition.image_url ? 'Yes' : 'No'}</div>
+            <div><strong>Service:</strong> {lastRecognition.service || 'ACRCloud'}</div>
+          </div>
+          
+          <div style={{ marginTop: 16, padding: 12, background: "#fff", borderRadius: 4, fontSize: 14 }}>
+            <strong>System Design:</strong> All display data comes from recognition service. 
+            Collection only provides format badges and release year as supplemental metadata.
+            {collectionMetadata ? 
+              ` ✅ Found metadata: ${collectionMetadata.folder} ${collectionMetadata.year}` : 
+              ' 🔍 No collection metadata found (guest vinyl)'
+            }
           </div>
         </div>
       )}
