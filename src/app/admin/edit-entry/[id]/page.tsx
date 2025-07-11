@@ -83,7 +83,21 @@ export default function Page() {
     return data as CollectionEntry;
   }
 
-  if (!entry) return <div style={{ color: "#222" }}>Loading...</div>;
+  if (!entry) {
+    return (
+      <div style={{ 
+        maxWidth: 750, 
+        margin: '32px auto', 
+        padding: 24, 
+        background: '#fff', 
+        borderRadius: 8, 
+        color: "#222",
+        textAlign: 'center'
+      }}>
+        Loading...
+      </div>
+    );
+  }
 
   function handleChange(field: string, value: unknown) {
     setEntry((e) => ({ ...(e as CollectionEntry), [field]: value }));
@@ -107,9 +121,9 @@ export default function Page() {
       } else {
         handleChange(field, val);
       }
-      setStatus(`Updated ${field} from Discogs.`);
+      setStatus(`Updated ${field} from Discogs`);
     } catch {
-      setStatus(`Failed to fetch ${field} from Discogs.`);
+      setStatus(`Failed to fetch ${field} from Discogs`);
     }
   }
 
@@ -120,6 +134,7 @@ export default function Page() {
   function addTrack() {
     setTracks((tks) => [...tks, { position: '', title: '', duration: '' }]);
   }
+  
   function removeTrack(i: number) {
     setTracks((tks) => tks.filter((_, j) => j !== i));
   }
@@ -127,16 +142,27 @@ export default function Page() {
   async function handleSave() {
     if (!entry) return;
     setSaving(true);
+    setStatus('Saving...');
+    
     const update = {
       ...entry,
       blocked_sides: blockedSides,
       blocked: !!entry.blocked,
       tracklists: JSON.stringify(tracks),
     };
+    
     const { error } = await supabase.from('collection').update(update).eq('id', entry.id);
-    setStatus(error ? `Error: ${error.message}` : 'Saved!');
-    setSaving(false);
-    if (!error) setTimeout(() => router.push('/admin/collection'), 900);
+    
+    if (error) {
+      setStatus(`Error: ${error.message}`);
+      setSaving(false);
+    } else {
+      setStatus('Saved successfully!');
+      setSaving(false);
+      setTimeout(() => {
+        router.push('/admin/edit-collection');
+      }, 1000);
+    }
   }
 
   // For blocking sides (gather all unique sides)
@@ -144,114 +170,385 @@ export default function Page() {
     new Set(tracks.map(t => t.position?.[0]).filter(Boolean))
   );
 
+  const inputStyle = {
+    padding: '8px 12px',
+    border: '1px solid #d1d5db',
+    borderRadius: '6px',
+    fontSize: '14px',
+    width: '100%',
+    boxSizing: 'border-box' as const,
+  };
+
+  const buttonStyle = {
+    padding: '6px 12px',
+    fontSize: '13px',
+    border: '1px solid #d1d5db',
+    borderRadius: '6px',
+    background: '#f9fafb',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+  };
+
+  const primaryButtonStyle = {
+    ...buttonStyle,
+    background: '#2563eb',
+    color: 'white',
+    border: '1px solid #2563eb',
+    fontWeight: '500',
+  };
+
   return (
-    <div style={{ maxWidth: 750, margin: '32px auto', padding: 24, background: '#fff', borderRadius: 8, color: "#222" }}>
-      <h2 style={{ color: "#222" }}>Edit Entry #{entry.id}</h2>
-      <div style={{ display: 'flex', gap: 32, alignItems: 'flex-start' }}>
-        <div style={{ flex: 2, color: "#222" }}>
-          <div>
-            <label style={{ color: "#222" }}>Artist:</label>
-            <input value={entry.artist || ''} onChange={e => handleChange('artist', e.target.value)} />
-          </div>
-          <div>
-            <label style={{ color: "#222" }}>Title:</label>
-            <input value={entry.title || ''} onChange={e => handleChange('title', e.target.value)} />
-          </div>
-          <div>
-            <label style={{ color: "#222" }}>Year:</label>
-            <input value={entry.year || ''} onChange={e => handleChange('year', e.target.value)} />
-            <button type="button" style={{ marginLeft: 8 }} onClick={() => fetchDiscogs('year')}>Fetch from Discogs</button>
-          </div>
-          <div>
-            <label style={{ color: "#222" }}>Folder:</label>
-            <input value={entry.folder || ''} onChange={e => handleChange('folder', e.target.value)} />
-          </div>
-          <div>
-            <label style={{ color: "#222" }}>Format:</label>
-            <input value={entry.format || ''} onChange={e => handleChange('format', e.target.value)} />
-          </div>
-          <div>
-            <label style={{ color: "#222" }}>Image URL:</label>
-            <input value={entry.image_url || ''} onChange={e => handleChange('image_url', e.target.value)} />
-            <button type="button" style={{ marginLeft: 8 }} onClick={() => fetchDiscogs('image_url')}>Fetch from Discogs</button>
-            <div style={{ margin: '6px 0' }}>
-              {entry.image_url && (
-                <Image
-                  src={entry.image_url}
-                  alt="cover"
-                  width={80}
-                  height={80}
-                  style={{ borderRadius: 4, objectFit: 'cover' }}
-                  unoptimized // Remove this if you add the domain to next.config.js
+    <div style={{ 
+      maxWidth: 900, 
+      margin: '32px auto', 
+      padding: 32, 
+      background: '#fff', 
+      borderRadius: 12, 
+      color: "#222",
+      boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+    }}>
+      {/* Header */}
+      <div style={{ marginBottom: 32, paddingBottom: 16, borderBottom: '1px solid #e5e7eb' }}>
+        <h2 style={{ color: "#222", margin: 0, fontSize: '24px', fontWeight: '600' }}>
+          Edit Entry #{entry.id}
+        </h2>
+        <p style={{ color: "#6b7280", margin: '8px 0 0 0', fontSize: '14px' }}>
+          {entry.artist} - {entry.title}
+        </p>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: 32, alignItems: 'flex-start' }}>
+        
+        {/* Left Column - Basic Info */}
+        <div style={{ color: "#222" }}>
+          <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: 16, color: '#374151' }}>
+            Basic Information
+          </h3>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div>
+              <label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>Artist</label>
+              <input 
+                style={inputStyle}
+                value={entry.artist || ''} 
+                onChange={e => handleChange('artist', e.target.value)} 
+                placeholder="Enter artist name"
+              />
+            </div>
+            
+            <div>
+              <label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>Title</label>
+              <input 
+                style={inputStyle}
+                value={entry.title || ''} 
+                onChange={e => handleChange('title', e.target.value)}
+                placeholder="Enter album title" 
+              />
+            </div>
+            
+            <div>
+              <label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>Year</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input 
+                  style={{...inputStyle, flex: 1}}
+                  value={entry.year || ''} 
+                  onChange={e => handleChange('year', e.target.value)}
+                  placeholder="e.g. 1969" 
                 />
+                <button 
+                  type="button" 
+                  style={buttonStyle} 
+                  onClick={() => fetchDiscogs('year')}
+                  title="Fetch from Discogs"
+                >
+                  Discogs
+                </button>
+              </div>
+            </div>
+            
+            <div>
+              <label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>Folder</label>
+              <input 
+                style={inputStyle}
+                value={entry.folder || ''} 
+                onChange={e => handleChange('folder', e.target.value)}
+                placeholder="Collection folder" 
+              />
+            </div>
+            
+            <div>
+              <label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>Format</label>
+              <input 
+                style={inputStyle}
+                value={entry.format || ''} 
+                onChange={e => handleChange('format', e.target.value)}
+                placeholder="e.g. Vinyl, LP, 12 inch" 
+              />
+            </div>
+            
+            <div>
+              <label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>Media Condition</label>
+              <input 
+                style={inputStyle}
+                value={entry.media_condition || ''} 
+                onChange={e => handleChange('media_condition', e.target.value)}
+                placeholder="e.g. VG+, NM, M" 
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>Image URL</label>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                <input 
+                  style={{...inputStyle, flex: 1}}
+                  value={entry.image_url || ''} 
+                  onChange={e => handleChange('image_url', e.target.value)}
+                  placeholder="Cover image URL" 
+                />
+                <button 
+                  type="button" 
+                  style={buttonStyle} 
+                  onClick={() => fetchDiscogs('image_url')}
+                  title="Fetch from Discogs"
+                >
+                  Discogs
+                </button>
+              </div>
+              {entry.image_url && (
+                <div style={{ 
+                  padding: 12, 
+                  background: '#f9fafb', 
+                  borderRadius: 8, 
+                  display: 'flex', 
+                  justifyContent: 'center' 
+                }}>
+                  <Image
+                    src={entry.image_url}
+                    alt="cover"
+                    width={120}
+                    height={120}
+                    style={{ borderRadius: 8, objectFit: 'cover', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}
+                    unoptimized
+                  />
+                </div>
               )}
             </div>
           </div>
-          <div>
-            <label style={{ color: "#222" }}>Media Condition:</label>
-            <input value={entry.media_condition || ''} onChange={e => handleChange('media_condition', e.target.value)} />
-          </div>
         </div>
-        <div style={{ flex: 3, color: "#222" }}>
-          <div>
-            <label style={{ color: "#222", fontWeight: 600 }}>Tracklists:</label>
-            <button type="button" style={{ marginLeft: 8 }} onClick={() => fetchDiscogs('tracklists')}>Fetch from Discogs</button>
-            <table style={{ width: '100%', fontSize: 13, marginTop: 6, color: "#222" }}>
-              <thead>
-                <tr>
-                  <th>Position</th>
-                  <th>Title</th>
-                  <th>Duration</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {tracks.map((t, i) => (
-                  <tr key={i}>
-                    <td><input value={t.position} onChange={e => handleTrackChange(i, 'position', e.target.value)} style={{ width: 44 }} /></td>
-                    <td><input value={t.title} onChange={e => handleTrackChange(i, 'title', e.target.value)} style={{ width: 180 }} /></td>
-                    <td><input value={t.duration} onChange={e => handleTrackChange(i, 'duration', e.target.value)} style={{ width: 60 }} /></td>
-                    <td>
-                      <button type="button" onClick={() => removeTrack(i)} style={{ color: "#c00", fontWeight: 600, border: 0, background: "none", fontSize: 16 }}>&times;</button>
-                    </td>
+
+        {/* Right Column - Tracklist & Blocking */}
+        <div style={{ color: "#222" }}>
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <h3 style={{ fontSize: '18px', fontWeight: '600', margin: 0, color: '#374151' }}>
+                Tracklist
+              </h3>
+              <button 
+                type="button" 
+                style={buttonStyle} 
+                onClick={() => fetchDiscogs('tracklists')}
+              >
+                Fetch from Discogs
+              </button>
+            </div>
+            
+            <div style={{ 
+              border: '1px solid #e5e7eb', 
+              borderRadius: 8, 
+              overflow: 'hidden',
+              maxHeight: 400,
+              overflowY: 'auto'
+            }}>
+              <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+                <thead style={{ background: '#f9fafb', position: 'sticky', top: 0 }}>
+                  <tr>
+                    <th style={{ padding: '12px 8px', textAlign: 'left', fontWeight: '600', borderBottom: '1px solid #e5e7eb' }}>Pos</th>
+                    <th style={{ padding: '12px 8px', textAlign: 'left', fontWeight: '600', borderBottom: '1px solid #e5e7eb' }}>Title</th>
+                    <th style={{ padding: '12px 8px', textAlign: 'left', fontWeight: '600', borderBottom: '1px solid #e5e7eb' }}>Duration</th>
+                    <th style={{ padding: '12px 8px', width: 40, borderBottom: '1px solid #e5e7eb' }}></th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-            <button type="button" onClick={addTrack} style={{ marginTop: 8 }}>Add Track</button>
+                </thead>
+                <tbody>
+                  {tracks.map((t, i) => (
+                    <tr key={i} style={{ borderBottom: i < tracks.length - 1 ? '1px solid #f3f4f6' : 'none' }}>
+                      <td style={{ padding: '8px' }}>
+                        <input 
+                          value={t.position} 
+                          onChange={e => handleTrackChange(i, 'position', e.target.value)} 
+                          style={{ 
+                            ...inputStyle, 
+                            width: 50, 
+                            padding: '4px 6px', 
+                            fontSize: '12px',
+                            textAlign: 'center'
+                          }} 
+                          placeholder="A1"
+                        />
+                      </td>
+                      <td style={{ padding: '8px' }}>
+                        <input 
+                          value={t.title} 
+                          onChange={e => handleTrackChange(i, 'title', e.target.value)} 
+                          style={{ 
+                            ...inputStyle, 
+                            padding: '4px 6px', 
+                            fontSize: '12px'
+                          }} 
+                          placeholder="Track title"
+                        />
+                      </td>
+                      <td style={{ padding: '8px' }}>
+                        <input 
+                          value={t.duration} 
+                          onChange={e => handleTrackChange(i, 'duration', e.target.value)} 
+                          style={{ 
+                            ...inputStyle, 
+                            width: 70, 
+                            padding: '4px 6px', 
+                            fontSize: '12px',
+                            textAlign: 'center'
+                          }} 
+                          placeholder="3:45"
+                        />
+                      </td>
+                      <td style={{ padding: '8px', textAlign: 'center' }}>
+                        <button 
+                          type="button" 
+                          onClick={() => removeTrack(i)} 
+                          style={{ 
+                            color: "#dc2626", 
+                            background: 'none', 
+                            border: 'none', 
+                            fontSize: 16, 
+                            cursor: 'pointer',
+                            padding: '4px',
+                            borderRadius: '4px'
+                          }}
+                          title="Remove track"
+                        >
+                          ×
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <button 
+              type="button" 
+              onClick={addTrack} 
+              style={{ 
+                ...buttonStyle, 
+                marginTop: 12, 
+                width: '100%',
+                background: '#f0f9ff',
+                color: '#0369a1',
+                border: '1px solid #0369a1'
+              }}
+            >
+              + Add Track
+            </button>
           </div>
-          <div style={{ marginTop: 12 }}>
-            <strong style={{ color: "#222" }}>Block:</strong>
-            <label style={{ marginLeft: 10, color: "#222" }}>
+
+          {/* Blocking Section */}
+          <div style={{ 
+            padding: 20, 
+            background: '#fef3c7', 
+            borderRadius: 8, 
+            border: '1px solid #f59e0b' 
+          }}>
+            <h4 style={{ fontSize: '16px', fontWeight: '600', margin: '0 0 12px 0', color: '#92400e' }}>
+              Blocking Options
+            </h4>
+            
+            <label style={{ display: 'flex', alignItems: 'center', marginBottom: 12, color: "#374151", cursor: 'pointer' }}>
               <input
                 type="checkbox"
                 checked={!!entry.blocked}
                 onChange={e => handleChange('blocked', e.target.checked)}
-              />{' '}
-              Block Album
+                style={{ marginRight: 8 }}
+              />
+              <strong>Block Entire Album</strong>
             </label>
+            
             {sides.length > 0 && (
-              <div style={{ marginTop: 8 }}>
-                <strong style={{ color: "#222" }}>Block Sides:</strong>
-                {sides.map(side => (
-                  <label key={side} style={{ marginLeft: 12, color: "#222" }}>
-                    <input
-                      type="checkbox"
-                      checked={blockedSides.includes(side)}
-                      onChange={() => handleBlockSide(side)}
-                    />{' '}
-                    {side}
-                  </label>
-                ))}
+              <div>
+                <div style={{ fontWeight: '600', marginBottom: 8, color: "#374151" }}>Block Individual Sides:</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {sides.map(side => (
+                    <label 
+                      key={side} 
+                      style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        padding: '6px 12px',
+                        background: blockedSides.includes(side) ? '#fee2e2' : '#fff',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '13px'
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={blockedSides.includes(side)}
+                        onChange={() => handleBlockSide(side)}
+                        style={{ marginRight: 6 }}
+                      />
+                      Side {side}
+                    </label>
+                  ))}
+                </div>
               </div>
             )}
           </div>
         </div>
       </div>
-      <div style={{ marginTop: 18 }}>
-        <button onClick={handleSave} disabled={saving} style={{ marginRight: 8 }}>Save</button>
-        <button onClick={() => router.push('/admin/edit-collection')}>Cancel</button>
-        <span style={{ marginLeft: 16, color: '#222' }}>{status}</span>
+
+      {/* Footer Actions */}
+      <div style={{ 
+        marginTop: 32, 
+        paddingTop: 24, 
+        borderTop: '1px solid #e5e7eb',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between'
+      }}>
+        <div style={{ display: 'flex', gap: 12 }}>
+          <button 
+            onClick={handleSave} 
+            disabled={saving} 
+            style={{
+              ...primaryButtonStyle,
+              padding: '12px 24px',
+              fontSize: '14px',
+              opacity: saving ? 0.6 : 1,
+              cursor: saving ? 'not-allowed' : 'pointer'
+            }}
+          >
+            {saving ? 'Saving...' : 'Save Changes'}
+          </button>
+          <button 
+            onClick={() => router.push('/admin/edit-collection')}
+            style={{
+              ...buttonStyle,
+              padding: '12px 24px',
+              fontSize: '14px'
+            }}
+          >
+            Back to Collection
+          </button>
+        </div>
+        
+        {status && (
+          <div style={{ 
+            color: status.includes('Error') ? '#dc2626' : status.includes('success') ? '#059669' : '#374151',
+            fontWeight: '500',
+            fontSize: '14px'
+          }}>
+            {status}
+          </div>
+        )}
       </div>
     </div>
   );
