@@ -250,7 +250,7 @@ export default function Page() {
       </div>
       <div style={{ marginTop: 18 }}>
         <button onClick={handleSave} disabled={saving} style={{ marginRight: 8 }}>Save</button>
-        <button onClick={() => router.push('/admin/collection')}>Cancel</button>
+        <button onClick={() => router.push('/admin/edit-collection')}>Cancel</button>
         <span style={{ marginLeft: 16, color: '#222' }}>{status}</span>
       </div>
     </div>
