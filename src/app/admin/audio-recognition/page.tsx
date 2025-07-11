@@ -1,4 +1,4 @@
-// src/app/admin/audio-recognition/page.tsx - Recognition-First System
+// src/app/admin/audio-recognition/page.tsx - Clean Recognition System
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
@@ -8,7 +8,7 @@ interface RecognitionResult {
   artist: string;
   title: string;
   album?: string;
-  image_url?: string; // Album artwork from recognition service
+  image_url?: string;
   confidence?: number;
   service?: string;
 }
@@ -16,13 +16,13 @@ interface RecognitionResult {
 interface CollectionMetadata {
   id: number;
   artist: string;
-  title: string; // Album title in collection
+  title: string;
   year: string;
   image_url?: string;
-  folder?: string; // Format info
+  folder?: string;
 }
 
-export default function RecognitionFirstAudioSystem() {
+export default function CleanRecognitionSystem() {
   const [isListening, setIsListening] = useState<boolean>(false);
   const [recognitionMode, setRecognitionMode] = useState<'manual' | 'smart_continuous' | 'album_follow'>('smart_continuous');
   const [lastRecognition, setLastRecognition] = useState<RecognitionResult | null>(null);
@@ -148,11 +148,10 @@ export default function RecognitionFirstAudioSystem() {
       analyser.smoothingTimeConstant = 0.8;
       source.connect(analyser);
       
-      setStatus('🎵 Album follow mode active - monitoring for song changes...');
+      setStatus('Album follow mode active - monitoring for song changes...');
       
       detectSongChange(analyser);
       
-      // Initial recognition
       setTimeout(() => {
         if (isListeningRef.current) {
           recordAndAnalyze(() => {});
@@ -175,11 +174,11 @@ export default function RecognitionFirstAudioSystem() {
     
     if (currentLevel < 15) {
       silenceCountRef.current++;
-      setStatus(`🔇 Silence detected (${silenceCountRef.current}/20) - waiting for song change...`);
+      setStatus(`Silence detected (${silenceCountRef.current}/20) - waiting for song change...`);
     } else {
       if (silenceCountRef.current >= 20) {
         console.log('Song change detected after silence, starting recognition...');
-        setStatus('🎵 New song detected! Analyzing...');
+        setStatus('New song detected! Analyzing...');
         
         setTimeout(() => {
           if (isListeningRef.current) {
@@ -246,55 +245,49 @@ export default function RecognitionFirstAudioSystem() {
       }
 
       const result = await response.json();
+      console.log('Full API response:', result);
       
       if (result.success && result.track) {
         console.log('Recognition result:', result.track);
         
-        // ALWAYS update display with recognition data first
         await updateNowPlaying(result.track);
         setLastRecognition(result.track);
         
-        // OPTIONALLY try to find supplemental metadata from collection
-        await findSupplementalMetadata(result.track);
+        await checkForCollectionMetadata(result.track);
         
-        setStatus(`🎵 Playing: ${result.track.artist} - ${result.track.title}`);
+        setStatus(`Now Playing: ${result.track.artist} - ${result.track.title} ${result.track.album ? `(${result.track.album})` : ''}`);
       } else {
-        setStatus(result.error || 'No match found');
+        setStatus(result.error || 'No recognition found');
+        console.log('Recognition failed:', result);
       }
     } catch (error: unknown) {
       console.error('Recognition error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      setStatus(`Error during recognition: ${errorMessage}`);
+      setStatus(`Recognition error: ${errorMessage}`);
     }
   };
 
-  const findSupplementalMetadata = async (track: RecognitionResult): Promise<void> => {
+  const checkForCollectionMetadata = async (track: RecognitionResult): Promise<void> => {
     try {
-      // Look for matching albums in collection for supplemental data only
       const { data: matches } = await supabase
         .from('collection')
         .select('*')
-        .or(
-          `and(artist.ilike.%${track.artist}%,title.ilike.%${track.album || track.title}%),` +
-          `artist.ilike.%${track.artist}%`
-        )
+        .ilike('artist', track.artist.trim())
         .limit(1);
 
       if (matches && matches.length > 0) {
-        const bestMatch = matches[0];
-        setCollectionMetadata(bestMatch);
+        const match = matches[0];
+        setCollectionMetadata(match);
         
-        // Update with collection metadata (format, year) while keeping recognition data
-        await updateNowPlayingWithMetadata(track, bestMatch);
+        await updateNowPlayingWithMetadata(track, match);
         
-        console.log('Found collection metadata:', bestMatch);
-        setStatus(`🎵 Playing: ${track.artist} - ${track.title} (+ collection metadata)`);
+        console.log('Found collection metadata for format badge:', match.folder);
       } else {
         setCollectionMetadata(null);
-        console.log('No collection metadata found - using recognition data only');
+        console.log('No collection metadata - guest vinyl (this is fine!)');
       }
     } catch (error) {
-      console.error('Error finding collection metadata:', error);
+      console.error('Error checking collection metadata:', error);
       setCollectionMetadata(null);
     }
   };
@@ -305,11 +298,11 @@ export default function RecognitionFirstAudioSystem() {
       
       const nowPlayingData = {
         id: 1,
-        artist: track.artist, // ALWAYS from recognition
-        title: track.title, // ALWAYS from recognition  
-        album_title: track.album || null, // ALWAYS from recognition
-        recognition_image_url: track.image_url || null, // ALWAYS from recognition
-        album_id: null, // No collection dependency
+        artist: track.artist,
+        title: track.title,
+        album_title: track.album || null,
+        recognition_image_url: track.image_url || null,
+        album_id: null,
         track_number: trackInfo.number,
         track_side: trackInfo.side,
         started_at: new Date().toISOString(),
@@ -324,11 +317,13 @@ export default function RecognitionFirstAudioSystem() {
 
       if (error) {
         console.error('Database update error:', error);
+        setStatus('Failed to update TV display');
       } else {
-        console.log('✅ Now playing updated with recognition data');
+        console.log('TV display updated with recognition data');
       }
     } catch (error) {
       console.error('Failed to update now playing:', error);
+      setStatus('Failed to update TV display');
     }
   };
 
@@ -338,11 +333,11 @@ export default function RecognitionFirstAudioSystem() {
       
       const nowPlayingData = {
         id: 1,
-        artist: track.artist, // STILL from recognition
-        title: track.title, // STILL from recognition
-        album_title: track.album || null, // STILL from recognition
-        recognition_image_url: track.image_url || null, // STILL from recognition
-        album_id: metadata.id, // Link for supplemental data only
+        artist: track.artist,
+        title: track.title,
+        album_title: track.album || null,
+        recognition_image_url: track.image_url || null,
+        album_id: metadata.id,
         track_number: trackInfo.number,
         track_side: trackInfo.side,
         started_at: new Date().toISOString(),
@@ -358,7 +353,7 @@ export default function RecognitionFirstAudioSystem() {
       if (error) {
         console.error('Database update error:', error);
       } else {
-        console.log('✅ Now playing updated with recognition + metadata');
+        console.log('TV display updated with recognition + format badge');
       }
     } catch (error) {
       console.error('Failed to update now playing:', error);
@@ -375,11 +370,33 @@ export default function RecognitionFirstAudioSystem() {
     };
   };
 
+  const forceRecognitionUpdate = async (): Promise<void> => {
+    if (!lastRecognition) return;
+    
+    setStatus('Forcing TV display update...');
+    await updateNowPlaying(lastRecognition);
+    setStatus('TV display force updated');
+  };
+
   return (
     <div style={{ padding: 24, background: "#fff", color: "#222", minHeight: "100vh" }}>
-      <h1 style={{ marginBottom: 32 }}>Recognition-First Audio System</h1>
+      <h1 style={{ marginBottom: 32 }}>Pure Recognition System</h1>
       
-      {/* Recognition Mode Selection */}
+      <div style={{ 
+        background: "#e0f2fe", 
+        padding: 20, 
+        borderRadius: 8, 
+        marginBottom: 24,
+        border: "1px solid #0369a1"
+      }}>
+        <h3 style={{ margin: 0, marginBottom: 12, color: "#0c4a6e" }}>System Design</h3>
+        <div style={{ fontSize: 14, lineHeight: 1.5 }}>
+          <strong>Works for ANY album:</strong> Guest vinyls show recognition data + artwork<br/>
+          <strong>Collection independent:</strong> Your collection only adds format badges<br/>
+          <strong>No matching required:</strong> Recognition service provides all display data
+        </div>
+      </div>
+      
       <div style={{ 
         background: "#f0f9ff", 
         padding: 24, 
@@ -464,7 +481,6 @@ export default function RecognitionFirstAudioSystem() {
         </div>
       </div>
 
-      {/* Collection Metadata Display */}
       {collectionMetadata && (
         <div style={{ 
           background: "#f0fdf4", 
@@ -473,19 +489,17 @@ export default function RecognitionFirstAudioSystem() {
           marginBottom: 24,
           border: "1px solid #16a34a"
         }}>
-          <h3 style={{ margin: 0, marginBottom: 12, color: "#16a34a" }}>Collection Metadata Found</h3>
+          <h3 style={{ margin: 0, marginBottom: 12, color: "#16a34a" }}>Bonus: Collection Metadata Found</h3>
           <div style={{ fontSize: 14 }}>
-            <strong>Format:</strong> {collectionMetadata.folder || 'Unknown'} • 
-            <strong> Release Year:</strong> {collectionMetadata.year} • 
-            <strong> Collection ID:</strong> {collectionMetadata.id}
+            <strong>Format Badge:</strong> {collectionMetadata.folder || 'Unknown'} • 
+            <strong> Your Release Year:</strong> {collectionMetadata.year}
           </div>
           <div style={{ fontSize: 12, color: "#666", marginTop: 8 }}>
-            This adds format badges and release year to the display while using recognition data for all track info.
+            This adds a format badge to the display. Recognition data is still used for all text content.
           </div>
         </div>
       )}
 
-      {/* Recognition Controls */}
       <div style={{ 
         background: "#f0f9ff", 
         padding: 24, 
@@ -511,18 +525,13 @@ export default function RecognitionFirstAudioSystem() {
             }}
           >
             {isListening 
-              ? "🔴 Stop Recognition" 
-              : `🎵 Start ${recognitionMode.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}`
+              ? "Stop Recognition" 
+              : `Start ${recognitionMode.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}`
             }
           </button>
           
           <button 
-            onClick={() => {
-              if (lastRecognition) {
-                updateNowPlaying(lastRecognition);
-                setStatus("🔄 Forced TV display update with last recognition");
-              }
-            }}
+            onClick={forceRecognitionUpdate}
             disabled={!lastRecognition}
             style={{
               background: lastRecognition ? "#0369a1" : "#9ca3af",
@@ -535,7 +544,7 @@ export default function RecognitionFirstAudioSystem() {
               fontWeight: 600
             }}
           >
-            🔄 Force TV Update
+            Force TV Update
           </button>
         </div>
 
@@ -552,7 +561,6 @@ export default function RecognitionFirstAudioSystem() {
         )}
       </div>
 
-      {/* Last Recognition */}
       {lastRecognition && (
         <div style={{ 
           background: "#f0fdf4", 
@@ -560,23 +568,39 @@ export default function RecognitionFirstAudioSystem() {
           borderRadius: 8, 
           border: "1px solid #16a34a"
         }}>
-          <h3 style={{ marginTop: 0, marginBottom: 16 }}>Last Recognition</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+          <h3 style={{ marginTop: 0, marginBottom: 16 }}>Recognition Results</h3>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
             <div><strong>Artist:</strong> {lastRecognition.artist}</div>
             <div><strong>Track:</strong> {lastRecognition.title}</div>
-            <div><strong>Album:</strong> {lastRecognition.album || 'Unknown'}</div>
+            <div><strong>Album:</strong> {lastRecognition.album || 'Not provided'}</div>
             <div><strong>Confidence:</strong> {Math.round((lastRecognition.confidence || 0.8) * 100)}%</div>
-            <div><strong>Has Artwork:</strong> {lastRecognition.image_url ? 'Yes' : 'No'}</div>
             <div><strong>Service:</strong> {lastRecognition.service || 'ACRCloud'}</div>
+            <div><strong>Has Artwork:</strong> {lastRecognition.image_url ? 'Yes' : 'No'}</div>
           </div>
           
+          {lastRecognition.image_url ? (
+            <div style={{ marginTop: 12, padding: 12, background: "#fff", borderRadius: 4, fontSize: 12 }}>
+              <strong>Artwork URL:</strong><br/>
+              <a href={lastRecognition.image_url} target="_blank" rel="noopener noreferrer" style={{ color: "#2563eb", wordBreak: "break-all" }}>
+                {lastRecognition.image_url}
+              </a>
+            </div>
+          ) : (
+            <div style={{ marginTop: 12, padding: 12, background: "#fef3c7", borderRadius: 4, fontSize: 12, color: "#92400e" }}>
+              <strong>No artwork provided by recognition service</strong><br/>
+              Check your /api/audio-recognition endpoint to ensure it extracts image_url from the ACRCloud response.
+            </div>
+          )}
+          
           <div style={{ marginTop: 16, padding: 12, background: "#fff", borderRadius: 4, fontSize: 14 }}>
-            <strong>System Design:</strong> All display data comes from recognition service. 
-            Collection only provides format badges and release year as supplemental metadata.
-            {collectionMetadata ? 
-              ` ✅ Found metadata: ${collectionMetadata.folder} ${collectionMetadata.year}` : 
-              ' 🔍 No collection metadata found (guest vinyl)'
-            }
+            <strong>Guest Vinyl Support:</strong> This system works for ANY album, even ones you do not own. 
+            Recognition service provides all the data needed for display.
+            {collectionMetadata && (
+              <span> Bonus: Found {collectionMetadata.folder} badge for your collection.</span>
+            )}
+            {!collectionMetadata && (
+              <span> Perfect for guest vinyls!</span>
+            )}
           </div>
         </div>
       )}

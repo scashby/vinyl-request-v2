@@ -179,14 +179,14 @@ export default function EnhancedNowPlayingTVPage() {
   }
 
   // Display logic: ALWAYS use recognition data for track/album/artist names
-  // Collection data is ONLY used for artwork, format, and year
+  // Collection data is ONLY used for artwork fallback, format, and year
   const displayArtist = currentTrack.artist; // Always from recognition
   const displayTrackTitle = currentTrack.title; // Always from recognition  
   const displayAlbumTitle = currentTrack.album_title; // Always from recognition
   const displayYear = currentTrack.collection?.year; // Collection metadata only
-  const displayImage = currentTrack.recognition_image_url || currentTrack.collection?.image_url; // Recognition first, then collection
+  const displayImage = currentTrack.recognition_image_url || currentTrack.collection?.image_url; // Recognition first, then collection fallback
   const displayFormat = currentTrack.collection?.folder; // Collection metadata only
-  const isFromCollection = !!currentTrack.collection;
+  const isGuestVinyl = !currentTrack.collection; // No collection metadata = guest vinyl
 
   // Format track info
   const trackInfo = [];
@@ -260,7 +260,7 @@ export default function EnhancedNowPlayingTVPage() {
               priority
             />
             
-            {/* Format badge - only if we have format info, or show "Guest" if not from collection */}
+            {/* Format badge - show format if from collection, or "GUEST" if guest vinyl */}
             {displayFormat ? (
               <div style={{
                 position: 'absolute',
@@ -278,7 +278,7 @@ export default function EnhancedNowPlayingTVPage() {
               }}>
                 {displayFormat}
               </div>
-            ) : !isFromCollection ? (
+            ) : isGuestVinyl ? (
               <div style={{
                 position: 'absolute',
                 top: '-15px',
@@ -361,8 +361,7 @@ export default function EnhancedNowPlayingTVPage() {
             opacity: 0.7,
             fontWeight: 400
           }}>
-            {displayYear || (isFromCollection ? 'Unknown Year' : 'Guest Vinyl')}
-          </p>
+            {displayYear || (isGuestVinyl ? 'Guest Vinyl' : 'Unknown Year')}</p>
 
           {/* Playing indicator */}
           <div style={{
@@ -432,7 +431,7 @@ export default function EnhancedNowPlayingTVPage() {
           minWidth: 300
         }}>
           <div><strong>Connection:</strong> {isConnected ? '🟢' : '🔴'}</div>
-          <div><strong>Source:</strong> {isFromCollection ? 'Collection' : 'Guest Vinyl'}</div>
+          <div><strong>Source:</strong> {isGuestVinyl ? 'Guest Vinyl' : 'Collection'}</div>
           <div><strong>Album ID:</strong> {currentTrack.album_id || 'None'}</div>
           <div><strong>Track Title:</strong> {displayTrackTitle || 'None'}</div>
           <div><strong>Album Title:</strong> {displayAlbumTitle || 'None'}</div>
