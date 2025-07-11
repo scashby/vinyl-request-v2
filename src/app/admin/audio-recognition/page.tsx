@@ -18,6 +18,12 @@ interface ApiResponse {
   error?: string;
 }
 
+interface ServiceStatus {
+  enabledServices: string[];
+  disabledServices: string[];
+  needsManualConfig: boolean;
+}
+
 interface CollectionItem {
   id: string;
   artist: string;
@@ -39,11 +45,36 @@ export default function AudioRecognitionPage() {
   const [lastRecognition, setLastRecognition] = useState<RecognitionResult | null>(null);
   const [status, setStatus] = useState<string>('');
   const [apiKey, setApiKey] = useState<string>('');
+  const [servicesStatus, setServicesStatus] = useState<ServiceStatus | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
   useEffect(() => {
-    // Load saved settings
+    // Check service configuration
+    const checkServices = async () => {
+      try {
+        const response = await fetch('/api/audio-recognition');
+        const data = await response.json();
+        setServicesStatus({
+          enabledServices: data.enabledServices || [],
+          disabledServices: data.disabledServices || [],
+          needsManualConfig: (data.enabledServices || []).length === 0
+        });
+        
+        if (data.enabledServices && data.enabledServices.length > 0) {
+          setStatus(`✅ Services configured: ${data.enabledServices.join(', ')}`);
+        } else {
+          setStatus('⚠️ No services configured in environment variables');
+        }
+      } catch (error) {
+        console.error('Error checking services:', error);
+        setServicesStatus({ enabledServices: [], disabledServices: [], needsManualConfig: true });
+      }
+    };
+
+    checkServices();
+
+    // Load saved settings for manual config fallback
     const savedService = localStorage.getItem('recognitionService') as RecognitionService;
     const savedApiKey = localStorage.getItem('audioApiKey');
     if (savedService) setRecognitionService(savedService);
@@ -113,8 +144,12 @@ export default function AudioRecognitionPage() {
     try {
       const formData = new FormData();
       formData.append('audio', audioBlob);
-      formData.append('service', recognitionService);
-      formData.append('apiKey', apiKey);
+      
+      // Only send manual API key if no services are configured via environment
+      if (servicesStatus?.needsManualConfig) {
+        formData.append('service', recognitionService);
+        formData.append('apiKey', apiKey);
+      }
 
       const response = await fetch('/api/audio-recognition', {
         method: 'POST',
@@ -129,7 +164,7 @@ export default function AudioRecognitionPage() {
       
       if (result.success && result.track) {
         setLastRecognition(result.track);
-        setStatus(`Recognized: ${result.track.artist} - ${result.track.title}`);
+        setStatus(`✅ Recognized: ${result.track.artist} - ${result.track.title} (via ${result.track.service})`);
         
         // Update now playing in database
         await updateNowPlaying(result.track);
@@ -211,73 +246,138 @@ export default function AudioRecognitionPage() {
     <div style={{ padding: 24, background: "#fff", color: "#222", minHeight: "100vh" }}>
       <h1 style={{ marginBottom: 32 }}>Audio Recognition Setup</h1>
       
-      {/* Service Configuration */}
-      <div style={{ 
-        background: "#f9f9f9", 
-        padding: 24, 
-        borderRadius: 8, 
-        marginBottom: 24,
-        border: "1px solid #ddd"
-      }}>
-        <h2 style={{ marginTop: 0, marginBottom: 16 }}>Recognition Service</h2>
-        
-        <div style={{ marginBottom: 16 }}>
-          <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>
-            Service Provider
-          </label>
-          <select 
-            value={recognitionService}
-            onChange={handleServiceChange}
-            style={{ 
-              width: "100%", 
-              padding: "8px 12px", 
-              border: "1px solid #ddd", 
+      {/* Service Configuration - Only show if manual config needed */}
+      {servicesStatus?.needsManualConfig && (
+        <div style={{ 
+          background: "#f9f9f9", 
+          padding: 24, 
+          borderRadius: 8, 
+          marginBottom: 24,
+          border: "1px solid #ddd"
+        }}>
+          <h2 style={{ marginTop: 0, marginBottom: 16 }}>Manual Service Configuration</h2>
+          <div style={{
+            background: "#fef3c7",
+            border: "1px solid #f59e0b",
+            color: "#92400e",
+            padding: 12,
+            borderRadius: 4,
+            marginBottom: 16,
+            fontSize: 14
+          }}>
+            <strong>⚠️ Notice:</strong> No services configured via environment variables. 
+            Add ACRCLOUD_ACCESS_KEY or AUDD_API_TOKEN to your .env.local for automatic configuration.
+          </div>
+          
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>
+              Service Provider
+            </label>
+            <select 
+              value={recognitionService}
+              onChange={handleServiceChange}
+              style={{ 
+                width: "100%", 
+                padding: "8px 12px", 
+                border: "1px solid #ddd", 
+                borderRadius: 4,
+                fontSize: 14
+              }}
+            >
+              <option value="shazam">Shazam (ACRCloud)</option>
+              <option value="audd">AudD.io</option>
+              <option value="gracenote">Gracenote</option>
+              <option value="spotify">Spotify Web API</option>
+            </select>
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>
+              API Key
+            </label>
+            <input 
+              type="password"
+              value={apiKey}
+              onChange={handleApiKeyChange}
+              placeholder="Enter your API key"
+              style={{ 
+                width: "100%", 
+                padding: "8px 12px", 
+                border: "1px solid #ddd", 
+                borderRadius: 4,
+                fontSize: 14
+              }}
+            />
+          </div>
+
+          <button 
+            onClick={saveSettings}
+            style={{
+              background: "#2563eb",
+              color: "white",
+              border: "none",
+              padding: "8px 16px",
               borderRadius: 4,
-              fontSize: 14
+              cursor: "pointer",
+              fontSize: 14,
+              fontWeight: 500
             }}
           >
-            <option value="shazam">Shazam (ACRCloud)</option>
-            <option value="audd">AudD.io</option>
-            <option value="gracenote">Gracenote</option>
-            <option value="spotify">Spotify Web API</option>
-          </select>
+            Save Settings
+          </button>
         </div>
+      )}
 
-        <div style={{ marginBottom: 16 }}>
-          <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>
-            API Key
-          </label>
-          <input 
-            type="password"
-            value={apiKey}
-            onChange={handleApiKeyChange}
-            placeholder="Enter your API key"
-            style={{ 
-              width: "100%", 
-              padding: "8px 12px", 
-              border: "1px solid #ddd", 
-              borderRadius: 4,
-              fontSize: 14
-            }}
-          />
+      {/* Service Status - Show for environment-configured services */}
+      {servicesStatus && !servicesStatus.needsManualConfig && (
+        <div style={{ 
+          background: "#f0fdf4", 
+          padding: 24, 
+          borderRadius: 8, 
+          marginBottom: 24,
+          border: "1px solid #16a34a"
+        }}>
+          <h2 style={{ marginTop: 0, marginBottom: 16 }}>Service Status</h2>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+            <div>
+              <strong style={{ color: "#16a34a" }}>✅ Enabled Services:</strong>
+              <div style={{ marginTop: 8 }}>
+                {servicesStatus.enabledServices.map((service, index) => (
+                  <div key={index} style={{ 
+                    background: "#dcfce7", 
+                    padding: "6px 12px", 
+                    borderRadius: 6, 
+                    marginBottom: 4,
+                    color: "#166534",
+                    fontSize: 14
+                  }}>
+                    {service}
+                  </div>
+                ))}
+              </div>
+            </div>
+            {servicesStatus.disabledServices.length > 0 && (
+              <div>
+                <strong style={{ color: "#6b7280" }}>⚠️ Available Services:</strong>
+                <div style={{ marginTop: 8 }}>
+                  {servicesStatus.disabledServices.map((service, index) => (
+                    <div key={index} style={{ 
+                      background: "#f3f4f6", 
+                      padding: "6px 12px", 
+                      borderRadius: 6, 
+                      marginBottom: 4,
+                      color: "#6b7280",
+                      fontSize: 14
+                    }}>
+                      {service} (not configured)
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
-
-        <button 
-          onClick={saveSettings}
-          style={{
-            background: "#2563eb",
-            color: "white",
-            border: "none",
-            padding: "8px 16px",
-            borderRadius: 4,
-            cursor: "pointer",
-            fontSize: 14,
-            fontWeight: 500
-          }}
-        >
-          Save Settings
-        </button>
-      </div>
+      )}
 
       {/* Audio Recognition */}
       <div style={{ 
@@ -292,18 +392,18 @@ export default function AudioRecognitionPage() {
         <div style={{ marginBottom: 16 }}>
           <button 
             onClick={isListening ? stopListening : startListening}
-            disabled={!apiKey}
+            disabled={servicesStatus?.needsManualConfig && !apiKey}
             style={{
               background: isListening ? "#dc2626" : "#16a34a",
               color: "white",
               border: "none",
               padding: "12px 24px",
               borderRadius: 8,
-              cursor: apiKey ? "pointer" : "not-allowed",
+              cursor: (servicesStatus?.needsManualConfig && !apiKey) ? "not-allowed" : "pointer",
               fontSize: 16,
               fontWeight: 600,
               marginRight: 12,
-              opacity: apiKey ? 1 : 0.5
+              opacity: (servicesStatus?.needsManualConfig && !apiKey) ? 0.5 : 1
             }}
           >
             {isListening ? "🔴 Stop Listening" : "🎵 Start Recognition"}
@@ -335,7 +435,7 @@ export default function AudioRecognitionPage() {
           </div>
         )}
 
-        {!apiKey && (
+        {servicesStatus?.needsManualConfig && !apiKey && (
           <div style={{ 
             background: "#fef2f2", 
             border: "1px solid #fca5a5", 
@@ -344,7 +444,7 @@ export default function AudioRecognitionPage() {
             borderRadius: 4,
             fontSize: 14
           }}>
-            Please enter an API key to enable audio recognition
+            Please enter an API key above or configure services via environment variables
           </div>
         )}
       </div>
@@ -384,13 +484,27 @@ export default function AudioRecognitionPage() {
         border: "1px solid #f59e0b"
       }}>
         <h3 style={{ marginTop: 0, color: "#92400e" }}>Setup Instructions</h3>
-        <ol style={{ color: "#92400e", lineHeight: 1.6 }}>
-          <li>Sign up for an audio recognition service (ACRCloud recommended)</li>
-          <li>Get your API key and enter it above</li>
-          <li>Allow microphone access when prompted</li>
-          <li>Click &quot;Start Recognition&quot; to begin listening</li>
-          <li>Recognition results will automatically update the now-playing display</li>
-        </ol>
+        {servicesStatus?.needsManualConfig ? (
+          <ol style={{ color: "#92400e", lineHeight: 1.6 }}>
+            <li><strong>Recommended:</strong> Add environment variables to .env.local:
+              <ul style={{ marginTop: 8, marginLeft: 20 }}>
+                <li>ACRCLOUD_ACCESS_KEY=your_key_here</li>
+                <li>AUDD_API_TOKEN=your_token_here</li>
+              </ul>
+            </li>
+            <li>Restart your development server</li>
+            <li>Or use manual configuration above as a temporary solution</li>
+            <li>Allow microphone access when prompted</li>
+            <li>Click &quot;Start Recognition&quot; to begin listening</li>
+          </ol>
+        ) : (
+          <ol style={{ color: "#92400e", lineHeight: 1.6 }}>
+            <li>✅ Services are configured via environment variables</li>
+            <li>Allow microphone access when prompted</li>
+            <li>Click &quot;Start Recognition&quot; to begin listening</li>
+            <li>Recognition results will automatically update the now-playing display</li>
+          </ol>
+        )}
       </div>
     </div>
   );
