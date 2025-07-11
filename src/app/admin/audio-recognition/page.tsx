@@ -167,7 +167,11 @@ export default function AudioRecognitionPage() {
 
   const startContinuousRecognition = (): void => {
     const recordSample = () => {
-      if (!streamRef.current || !isListening) return;
+      // Check if we should still be running
+      if (!streamRef.current || !isListening) {
+        console.log('Stopping continuous recognition - no stream or not listening');
+        return;
+      }
 
       const mediaRecorder = new MediaRecorder(streamRef.current, {
         mimeType: 'audio/webm;codecs=opus'
@@ -183,27 +187,38 @@ export default function AudioRecognitionPage() {
       };
 
       mediaRecorder.onstop = async () => {
+        console.log('Sample recording stopped, analyzing...');
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         await recognizeAudio(audioBlob);
         
         // Schedule next sample if still in continuous mode
-        if (isListening && isContinuous) {
-          continuousTimeoutRef.current = setTimeout(recordSample, continuousInterval * 1000);
+        if (isListening && isContinuous && streamRef.current) {
+          console.log(`Scheduling next sample in ${continuousInterval} seconds`);
+          setStatus(`Next sample in ${continuousInterval} seconds...`);
+          continuousTimeoutRef.current = setTimeout(() => {
+            console.log('Starting next sample...');
+            recordSample();
+          }, continuousInterval * 1000);
+        } else {
+          console.log('Not scheduling next sample - continuous mode ended');
         }
       };
 
-      setStatus(`Recording sample ${sampleDuration}s...`);
+      console.log(`Starting continuous sample ${sampleDuration}s...`);
+      setStatus(`Recording sample ${sampleDuration}s... (continuous mode)`);
       mediaRecorder.start();
 
       // Stop this sample after specified duration
       recordingTimeoutRef.current = setTimeout(() => {
         if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+          console.log('Stopping sample recording after duration');
           mediaRecorderRef.current.stop();
         }
       }, sampleDuration * 1000);
     };
 
-    // Start first sample
+    // Start first sample immediately
+    console.log('Starting continuous recognition mode');
     recordSample();
   };
 
@@ -277,6 +292,8 @@ export default function AudioRecognitionPage() {
 
   const updateNowPlaying = async (track: RecognitionResult): Promise<void> => {
     try {
+      console.log('Updating now playing with:', track);
+      
       // Find matching album in collection
       const { data: albums, error: queryError } = await supabase
         .from('collection')
@@ -287,38 +304,62 @@ export default function AudioRecognitionPage() {
 
       if (queryError) {
         console.error('Query error:', queryError);
+        setStatus('Error querying collection');
         return;
       }
 
+      let albumId = null;
       if (albums && albums.length > 0) {
         const album = albums[0] as CollectionItem;
-        
-        // Update or create now playing entry
-        const { error: upsertError } = await supabase
-          .from('now_playing')
-          .upsert({
-            id: 1, // Single row for current track
-            artist: track.artist,
-            title: track.title,
-            album_id: album.id,
-            started_at: new Date().toISOString(),
-            recognition_confidence: track.confidence || 0.8,
-            service_used: track.service || recognitionService,
-            updated_at: new Date().toISOString()
-          });
+        albumId = album.id;
+        console.log('Found matching album in collection:', album.artist, '-', album.title);
+      } else {
+        console.log('No matching album found in collection, updating anyway');
+      }
+      
+      // Update or create now playing entry
+      const nowPlayingData = {
+        id: 1, // Single row for current track
+        artist: track.artist,
+        title: track.title,
+        album_id: albumId,
+        started_at: new Date().toISOString(),
+        recognition_confidence: track.confidence || 0.8,
+        service_used: track.service || recognitionService,
+        updated_at: new Date().toISOString()
+      };
 
-        if (upsertError) {
-          console.error('Upsert error:', upsertError);
-          const error = upsertError as SupabaseError;
-          console.log(`Database error: ${error.message}`);
+      console.log('Upserting now playing data:', nowPlayingData);
+
+      const { error: upsertError } = await supabase
+        .from('now_playing')
+        .upsert(nowPlayingData);
+
+      if (upsertError) {
+        console.error('Upsert error:', upsertError);
+        const error = upsertError as SupabaseError;
+        setStatus(`Database error: ${error.message}`);
+      } else {
+        console.log('✅ Successfully updated now playing in database');
+        setStatus(`✅ Updated: ${track.artist} - ${track.title} (DB updated)`);
+        
+        // Verify the update worked
+        const { data: verification, error: verifyError } = await supabase
+          .from('now_playing')
+          .select('*')
+          .eq('id', 1)
+          .single();
+          
+        if (verifyError) {
+          console.error('Verification failed:', verifyError);
         } else {
-          console.log('✅ Updated now playing in database');
+          console.log('Database verification successful:', verification);
         }
       }
     } catch (error: unknown) {
       console.error('Database update error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown database error';
-      console.log(`Database update failed: ${errorMessage}`);
+      setStatus(`Database update failed: ${errorMessage}`);
     }
   };
 
