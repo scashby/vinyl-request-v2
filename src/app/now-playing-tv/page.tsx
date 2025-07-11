@@ -1,4 +1,4 @@
-// src/app/now-playing-tv/page.tsx - Clean, focused display
+// src/app/now-playing-tv/page.tsx - Enhanced with Album Info
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -17,13 +17,17 @@ interface CollectionAlbum {
 interface NowPlayingData {
   id: number;
   artist?: string;
-  title?: string;
+  title?: string; // Track title
+  album_title?: string; // Album title (separate from track)
+  recognition_image_url?: string; // Artwork from recognition service
   album_id?: number;
+  track_number?: string;
+  track_side?: string;
   started_at?: string;
   collection?: CollectionAlbum;
 }
 
-export default function CleanNowPlayingTVPage() {
+export default function EnhancedNowPlayingTVPage() {
   const [currentTrack, setCurrentTrack] = useState<NowPlayingData | null>(null);
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [showDebug, setShowDebug] = useState<boolean>(false);
@@ -67,7 +71,7 @@ export default function CleanNowPlayingTVPage() {
 
     // Real-time subscription
     subscriptionChannel = supabase
-      .channel('now_playing_clean')
+      .channel('now_playing_enhanced')
       .on('postgres_changes', 
         { event: '*', schema: 'public', table: 'now_playing' },
         () => {
@@ -174,12 +178,25 @@ export default function CleanNowPlayingTVPage() {
     );
   }
 
-  const displayArtist = currentTrack.collection?.artist || currentTrack.artist;
-  const displayTitle = currentTrack.collection?.title || currentTrack.title;
-  const displayYear = currentTrack.collection?.year;
-  const displayImage = currentTrack.collection?.image_url;
-  const displayFormat = currentTrack.collection?.folder;
+  // Display logic: ALWAYS use recognition data for track/album/artist names
+  // Collection data is ONLY used for artwork, format, and year
+  const displayArtist = currentTrack.artist; // Always from recognition
+  const displayTrackTitle = currentTrack.title; // Always from recognition  
+  const displayAlbumTitle = currentTrack.album_title; // Always from recognition
+  const displayYear = currentTrack.collection?.year; // Collection metadata only
+  const displayImage = currentTrack.recognition_image_url || currentTrack.collection?.image_url; // Recognition first, then collection
+  const displayFormat = currentTrack.collection?.folder; // Collection metadata only
   const isFromCollection = !!currentTrack.collection;
+
+  // Format track info
+  const trackInfo = [];
+  if (currentTrack.track_side) {
+    trackInfo.push(`Side ${currentTrack.track_side}`);
+  }
+  if (currentTrack.track_number) {
+    trackInfo.push(`Track ${currentTrack.track_number}`);
+  }
+  const trackInfoString = trackInfo.length > 0 ? trackInfo.join(' • ') : '';
 
   return (
     <div 
@@ -230,7 +247,7 @@ export default function CleanNowPlayingTVPage() {
           <div style={{ position: 'relative' }}>
             <Image
               src={displayImage || '/images/coverplaceholder.png'}
-              alt={displayTitle || 'Album cover'}
+              alt={displayAlbumTitle || 'Album cover'}
               width={450}
               height={450}
               style={{
@@ -287,17 +304,31 @@ export default function CleanNowPlayingTVPage() {
           flex: 1,
           paddingTop: '2rem'
         }}>
-          {/* Title */}
+          {/* Track Title */}
           <h1 style={{ 
             fontSize: '4.5rem', 
             fontWeight: 'bold', 
-            margin: '0 0 1.5rem 0',
+            margin: '0 0 1rem 0',
             lineHeight: 1.1,
             letterSpacing: '-0.03em',
             textShadow: '0 4px 20px rgba(0,0,0,0.5)'
           }}>
-            {displayTitle}
+            {displayTrackTitle}
           </h1>
+          
+          {/* Album Title - if different from track title */}
+          {displayAlbumTitle && displayAlbumTitle !== displayTrackTitle && (
+            <h2 style={{ 
+              fontSize: '2.2rem', 
+              margin: '0 0 1rem 0',
+              opacity: 0.8,
+              fontWeight: 400,
+              fontStyle: 'italic',
+              textShadow: '0 2px 10px rgba(0,0,0,0.5)'
+            }}>
+              from &ldquo;{displayAlbumTitle}&rdquo;
+            </h2>
+          )}
           
           {/* Artist */}
           <p style={{ 
@@ -310,7 +341,20 @@ export default function CleanNowPlayingTVPage() {
             {displayArtist}
           </p>
           
-          {/* Year or source indicator */}
+          {/* Track/Side Info */}
+          {trackInfoString && (
+            <p style={{ 
+              fontSize: '1.6rem', 
+              margin: '0 0 1rem 0',
+              opacity: 0.7,
+              fontWeight: 400,
+              color: '#fbbf24'
+            }}>
+              {trackInfoString}
+            </p>
+          )}
+          
+          {/* Year */}
           <p style={{ 
             fontSize: '1.8rem', 
             margin: '0 0 3rem 0',
@@ -385,12 +429,17 @@ export default function CleanNowPlayingTVPage() {
           fontSize: 11,
           fontFamily: 'monospace',
           zIndex: 10,
-          minWidth: 250
+          minWidth: 300
         }}>
           <div><strong>Connection:</strong> {isConnected ? '🟢' : '🔴'}</div>
           <div><strong>Source:</strong> {isFromCollection ? 'Collection' : 'Guest Vinyl'}</div>
           <div><strong>Album ID:</strong> {currentTrack.album_id || 'None'}</div>
-          <div><strong>Image:</strong> {displayImage ? 'Yes' : 'Placeholder'}</div>
+          <div><strong>Track Title:</strong> {displayTrackTitle || 'None'}</div>
+          <div><strong>Album Title:</strong> {displayAlbumTitle || 'None'}</div>
+          <div><strong>Track Info:</strong> {trackInfoString || 'None'}</div>
+          <div><strong>Recognition Art:</strong> {currentTrack.recognition_image_url ? 'Yes' : 'No'}</div>
+          <div><strong>Collection Art:</strong> {currentTrack.collection?.image_url ? 'Yes' : 'No'}</div>
+          <div><strong>Using:</strong> {displayImage ? (currentTrack.recognition_image_url ? 'Recognition' : 'Collection') : 'Placeholder'}</div>
           <div><strong>Started:</strong> {currentTrack.started_at ? new Date(currentTrack.started_at).toLocaleTimeString() : 'Unknown'}</div>
         </div>
       )}

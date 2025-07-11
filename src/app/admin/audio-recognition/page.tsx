@@ -1,4 +1,4 @@
-// src/app/admin/audio-recognition/page.tsx - Smart Recognition with Album Context
+// src/app/admin/audio-recognition/page.tsx - Fixed Album Follow Mode
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
@@ -9,6 +9,7 @@ interface RecognitionResult {
   artist: string;
   title: string;
   album?: string;
+  image_url?: string; // Album artwork from recognition service
   confidence?: number;
   service?: string;
 }
@@ -16,7 +17,7 @@ interface RecognitionResult {
 interface CollectionMatch {
   id: number;
   artist: string;
-  title: string;
+  title: string; // This is the ALBUM title
   year: string;
   image_url?: string;
   folder?: string;
@@ -57,6 +58,8 @@ export default function SmartAudioRecognitionPage() {
   const isListeningRef = useRef<boolean>(false);
   const lastAudioLevelRef = useRef<number>(0);
   const silenceCountRef = useRef<number>(0);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const songChangeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     return () => {
@@ -108,8 +111,18 @@ export default function SmartAudioRecognitionPage() {
       recognitionTimeoutRef.current = null;
     }
 
+    if (songChangeTimeoutRef.current) {
+      clearTimeout(songChangeTimeoutRef.current);
+      songChangeTimeoutRef.current = null;
+    }
+
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.stop();
+    }
+
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
     }
 
     if (streamRef.current) {
@@ -146,45 +159,72 @@ export default function SmartAudioRecognitionPage() {
   };
 
   const startAlbumFollowMode = (): void => {
-    // TODO: Implement song change detection using audio level analysis
-    const followAlbum = () => {
-      if (!streamRef.current || !isListeningRef.current) return;
+    if (!streamRef.current) return;
+
+    try {
+      // Initialize audio context for song change detection
+      audioContextRef.current = new AudioContext();
+      const analyser = audioContextRef.current.createAnalyser();
+      const source = audioContextRef.current.createMediaStreamSource(streamRef.current);
       
-      // Monitor audio levels for song changes
-      const audioContext = new AudioContext();
-      const analyser = audioContext.createAnalyser();
-      const source = audioContext.createMediaStreamSource(streamRef.current);
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.8;
       source.connect(analyser);
       
-      const detectSongChange = () => {
-        const dataArray = new Uint8Array(analyser.frequencyBinCount);
-        analyser.getByteFrequencyData(dataArray);
-        
-        const currentLevel = dataArray.reduce((sum, value) => sum + value, 0) / dataArray.length;
-        
-        // Simple silence detection for song transitions
-        if (currentLevel < 10) {
-          silenceCountRef.current++;
-        } else {
-          if (silenceCountRef.current > 10) { // Detected song change
-            console.log('Song change detected, sampling...');
-            recordAndAnalyze(() => {});
-            silenceCountRef.current = 0;
-          }
-          silenceCountRef.current = 0;
-        }
-        
-        lastAudioLevelRef.current = currentLevel;
-        
-        if (isListeningRef.current) {
-          setTimeout(detectSongChange, 500); // Check every 500ms
-        }
-      };
+      setStatus('🎵 Album follow mode active - monitoring for song changes...');
       
-      detectSongChange();
-    };
+      // Start the detection loop
+      detectSongChange(analyser);
+      
+      // Also do an initial recognition
+      setTimeout(() => {
+        if (isListeningRef.current) {
+          recordAndAnalyze(() => {});
+        }
+      }, 2000);
+      
+    } catch (error) {
+      console.error('Error setting up audio analysis:', error);
+      setStatus('Error setting up song change detection');
+    }
+  };
+
+  const detectSongChange = (analyser: AnalyserNode): void => {
+    if (!isListeningRef.current) return;
     
-    followAlbum();
+    const dataArray = new Uint8Array(analyser.frequencyBinCount);
+    analyser.getByteFrequencyData(dataArray);
+    
+    // Calculate average audio level
+    const currentLevel = dataArray.reduce((sum, value) => sum + value, 0) / dataArray.length;
+    
+    // Detect silence (potential song transition)
+    if (currentLevel < 15) { // Threshold for silence
+      silenceCountRef.current++;
+      setStatus(`🔇 Silence detected (${silenceCountRef.current}/20) - waiting for song change...`);
+    } else {
+      // If we had enough silence and now there's audio, it's likely a new song
+      if (silenceCountRef.current >= 20) { // ~10 seconds of silence
+        console.log('Song change detected after silence, starting recognition...');
+        setStatus('🎵 New song detected! Analyzing...');
+        
+        // Wait a moment for the song to get going, then recognize
+        setTimeout(() => {
+          if (isListeningRef.current) {
+            recordAndAnalyze(() => {});
+          }
+        }, 3000);
+        
+        silenceCountRef.current = 0;
+      } else {
+        silenceCountRef.current = 0;
+      }
+    }
+    
+    lastAudioLevelRef.current = currentLevel;
+    
+    // Continue monitoring
+    songChangeTimeoutRef.current = setTimeout(() => detectSongChange(analyser), 500);
   };
 
   const recordAndAnalyze = (onComplete: () => void): void => {
@@ -420,7 +460,7 @@ export default function SmartAudioRecognitionPage() {
       setAlbumContext({
         album_id: selectedMatch.id,
         artist: selectedMatch.artist,
-        album_title: selectedMatch.title,
+        album_title: selectedMatch.title, // This is the album title
         last_recognized: candidate.recognition.title,
         track_sequence: [candidate.recognition.title]
       });
@@ -432,7 +472,7 @@ export default function SmartAudioRecognitionPage() {
       });
     }
 
-    // Update now playing
+    // Update now playing with both track and album info
     await updateNowPlaying(candidate.recognition, selectedMatch);
     
     setLastRecognition(candidate.recognition);
@@ -449,8 +489,12 @@ export default function SmartAudioRecognitionPage() {
       const nowPlayingData = {
         id: 1,
         artist: track.artist,
-        title: track.title,
+        title: track.title, // Track title
+        album_title: track.album || null, // Album title from recognition
+        recognition_image_url: track.image_url || null, // Artwork from recognition service
         album_id: null, // No collection match
+        track_number: null,
+        track_side: null,
         started_at: new Date().toISOString(),
         recognition_confidence: track.confidence || 0.8,
         service_used: track.service || 'ACRCloud',
@@ -477,11 +521,18 @@ export default function SmartAudioRecognitionPage() {
 
   const updateNowPlaying = async (track: RecognitionResult, match: CollectionMatch): Promise<void> => {
     try {
+      // Extract track number and side from track title if possible
+      const trackInfo = extractTrackInfo(track.title);
+      
       const nowPlayingData = {
         id: 1,
         artist: track.artist,
-        title: track.title,
-        album_id: match.id,
+        title: track.title, // Track title from recognition
+        album_title: track.album || null, // Album title ONLY from recognition - never from collection
+        recognition_image_url: track.image_url || null, // Artwork from recognition service
+        album_id: match.id, // Link to collection for artwork/format only
+        track_number: trackInfo.number,
+        track_side: trackInfo.side,
         started_at: new Date().toISOString(),
         recognition_confidence: track.confidence || 0.8,
         service_used: track.service || 'ACRCloud',
@@ -500,6 +551,18 @@ export default function SmartAudioRecognitionPage() {
     } catch (error) {
       console.error('Failed to update now playing:', error);
     }
+  };
+
+  const extractTrackInfo = (trackTitle: string): { number: string | null, side: string | null } => {
+    // Try to extract track number and side from title
+    // Common patterns: "Track 1", "A1", "Side A", "1.", etc.
+    const sideMatch = trackTitle.match(/\b(Side\s+)?([AB])\b/i);
+    const trackMatch = trackTitle.match(/\b([AB]?)(\d+)\b/);
+    
+    return {
+      number: trackMatch ? trackMatch[2] : null,
+      side: sideMatch ? sideMatch[2].toUpperCase() : (trackMatch && trackMatch[1] ? trackMatch[1].toUpperCase() : null)
+    };
   };
 
   const clearAlbumContext = (): void => {
