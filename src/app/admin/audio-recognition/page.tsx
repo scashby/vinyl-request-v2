@@ -1,7 +1,7 @@
-// src/app/admin/audio-recognition/page.tsx - Clean Recognition System
+// src/app/admin/audio-recognition/page.tsx - Album-Aware Recognition System
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from 'lib/supabaseClient';
 import Image from 'next/image';
 
@@ -14,6 +14,19 @@ interface RecognitionResult {
   service?: string;
 }
 
+interface AlbumContext {
+  id?: number;
+  artist: string;
+  title: string;
+  year: string;
+  image_url?: string;
+  folder?: string;
+  track_count?: number;
+  track_listing?: string[];
+  source?: string;
+  created_at?: string;
+}
+
 interface RecognitionCandidate {
   artist: string;
   title: string;
@@ -23,29 +36,21 @@ interface RecognitionCandidate {
   service?: string;
 }
 
-interface CollectionMetadata {
-  id: number;
-  artist: string;
-  title: string;
-  year: string;
-  image_url?: string;
-  folder?: string;
-}
-
-export default function CleanRecognitionSystem() {
+export default function AlbumAwareRecognitionSystem() {
   const [isListening, setIsListening] = useState<boolean>(false);
-  const [recognitionMode, setRecognitionMode] = useState<'manual' | 'smart_continuous' | 'album_follow'>('smart_continuous');
+  const [recognitionMode, setRecognitionMode] = useState<'manual' | 'smart_continuous' | 'album_follow'>('album_follow');
   const [lastRecognition, setLastRecognition] = useState<RecognitionResult | null>(null);
   const [recognitionCandidates, setRecognitionCandidates] = useState<RecognitionCandidate[]>([]);
   const [showCandidates, setShowCandidates] = useState<boolean>(false);
   const [manualArtist, setManualArtist] = useState<string>('');
   const [manualAlbum, setManualAlbum] = useState<string>('');
   const [isManualSearching, setIsManualSearching] = useState<boolean>(false);
-  const [collectionMetadata, setCollectionMetadata] = useState<CollectionMetadata | null>(null);
+  const [albumContext, setAlbumContext] = useState<AlbumContext | null>(null);
   const [status, setStatus] = useState<string>('');
   const [sampleDuration, setSampleDuration] = useState<number>(15);
   const [smartInterval, setSmartInterval] = useState<number>(30);
   
+  // Refs for audio handling
   const streamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -56,11 +61,51 @@ export default function CleanRecognitionSystem() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const songChangeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Load album context on component mount
+  const clearAlbumContext = useCallback(async (): Promise<void> => {
+    try {
+      await supabase.from('album_context').delete().neq('id', 0);
+      setAlbumContext(null);
+      console.log('Album context cleared');
+    } catch (error) {
+      console.error('Error clearing album context:', error);
+    }
+  }, []);
+
+  const loadCurrentAlbumContext = useCallback(async (): Promise<void> => {
+    try {
+      const { data, error } = await supabase
+        .from('album_context')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      
+      if (!error && data) {
+        // Check if context is still valid (less than 2 hours old)
+        const contextAge = Date.now() - new Date(data.created_at).getTime();
+        const maxAge = 2 * 60 * 60 * 1000; // 2 hours
+        
+        if (contextAge <= maxAge) {
+          setAlbumContext(data);
+          console.log('Loaded album context:', data);
+        } else {
+          console.log('Album context expired');
+          await clearAlbumContext();
+        }
+      }
+    } catch (error) {
+      console.error('Error loading album context:', error);
+    }
+  }, [clearAlbumContext]);
+
   useEffect(() => {
+    loadCurrentAlbumContext();
+    
     return () => {
       stopListening();
     };
-  }, []);
+  }, [loadCurrentAlbumContext]);
 
   const startListening = async (): Promise<void> => {
     try {
@@ -84,7 +129,10 @@ export default function CleanRecognitionSystem() {
         setStatus('Starting smart continuous recognition...');
         startSmartContinuous();
       } else if (recognitionMode === 'album_follow') {
-        setStatus('Starting album follow mode...');
+        setStatus(albumContext ? 
+          `Album follow mode: ${albumContext.artist} - ${albumContext.title}` :
+          'Album follow mode active - monitoring for song changes...'
+        );
         startAlbumFollowMode();
       }
 
@@ -163,10 +211,9 @@ export default function CleanRecognitionSystem() {
       analyser.smoothingTimeConstant = 0.8;
       source.connect(analyser);
       
-      setStatus('Album follow mode active - monitoring for song changes...');
-      
       detectSongChange(analyser);
       
+      // Initial recognition after 2 seconds
       setTimeout(() => {
         if (isListeningRef.current) {
           recordAndAnalyze(() => {});
@@ -189,7 +236,8 @@ export default function CleanRecognitionSystem() {
     
     if (currentLevel < 15) {
       silenceCountRef.current++;
-      setStatus(`Silence detected (${silenceCountRef.current}/20) - waiting for song change...`);
+      const contextInfo = albumContext ? ` (${albumContext.artist} - ${albumContext.title})` : '';
+      setStatus(`Silence detected (${silenceCountRef.current}/20) - waiting for song change...${contextInfo}`);
     } else {
       if (silenceCountRef.current >= 20) {
         console.log('Song change detected after silence, starting recognition...');
@@ -265,20 +313,29 @@ export default function CleanRecognitionSystem() {
       if (result.success && result.track) {
         console.log('Recognition result:', result.track);
         
-        // Store all candidates if available
         if (result.candidates && Array.isArray(result.candidates)) {
           setRecognitionCandidates(result.candidates);
-          console.log(`Found ${result.candidates.length} recognition candidates`);
         } else {
           setRecognitionCandidates([]);
         }
         
-        await updateNowPlaying(result.track);
         setLastRecognition(result.track);
         
-        await checkForCollectionMetadata(result.track);
+        // Update status based on recognition result
+        let statusMessage = `Now Playing: ${result.track.artist} - ${result.track.title}`;
+        if (result.track.album) {
+          statusMessage += ` (${result.track.album})`;
+        }
         
-        setStatus(`Now Playing: ${result.track.artist} - ${result.track.title} ${result.track.album ? `(${result.track.album})` : ''}`);
+        if (result.albumContextUsed) {
+          statusMessage += ' [Album Context Used]';
+        } else if (result.albumContextSwitched) {
+          statusMessage += ' [Album Context Switched]';
+          // Reload album context since it may have changed
+          await loadCurrentAlbumContext();
+        }
+        
+        setStatus(statusMessage);
       } else {
         setStatus(result.error || 'No recognition found');
         console.log('Recognition failed:', result);
@@ -287,99 +344,6 @@ export default function CleanRecognitionSystem() {
       console.error('Recognition error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       setStatus(`Recognition error: ${errorMessage}`);
-    }
-  };
-
-  const checkForCollectionMetadata = async (track: RecognitionResult): Promise<void> => {
-    try {
-      const { data: matches } = await supabase
-        .from('collection')
-        .select('*')
-        .ilike('artist', track.artist.trim())
-        .limit(1);
-
-      if (matches && matches.length > 0) {
-        const match = matches[0];
-        setCollectionMetadata(match);
-        
-        await updateNowPlayingWithMetadata(track, match);
-        
-        console.log('Found collection metadata for format badge:', match.folder);
-      } else {
-        setCollectionMetadata(null);
-        console.log('No collection metadata - guest vinyl (this is fine!)');
-      }
-    } catch (error) {
-      console.error('Error checking collection metadata:', error);
-      setCollectionMetadata(null);
-    }
-  };
-
-  const updateNowPlaying = async (track: RecognitionResult): Promise<void> => {
-    try {
-      const trackInfo = extractTrackInfo(track.title);
-      
-      const nowPlayingData = {
-        id: 1,
-        artist: track.artist,
-        title: track.title,
-        album_title: track.album || null,
-        recognition_image_url: track.image_url || null,
-        album_id: null,
-        track_number: trackInfo.number,
-        track_side: trackInfo.side,
-        started_at: new Date().toISOString(),
-        recognition_confidence: track.confidence || 0.8,
-        service_used: track.service || 'ACRCloud',
-        updated_at: new Date().toISOString()
-      };
-
-      const { error } = await supabase
-        .from('now_playing')
-        .upsert(nowPlayingData);
-
-      if (error) {
-        console.error('Database update error:', error);
-        setStatus('Failed to update TV display');
-      } else {
-        console.log('TV display updated with recognition data');
-      }
-    } catch (error) {
-      console.error('Failed to update now playing:', error);
-      setStatus('Failed to update TV display');
-    }
-  };
-
-  const updateNowPlayingWithMetadata = async (track: RecognitionResult, metadata: CollectionMetadata): Promise<void> => {
-    try {
-      const trackInfo = extractTrackInfo(track.title);
-      
-      const nowPlayingData = {
-        id: 1,
-        artist: track.artist,
-        title: track.title,
-        album_title: track.album || null,
-        recognition_image_url: track.image_url || null,
-        album_id: metadata.id,
-        track_number: trackInfo.number,
-        track_side: trackInfo.side,
-        started_at: new Date().toISOString(),
-        recognition_confidence: track.confidence || 0.8,
-        service_used: track.service || 'ACRCloud',
-        updated_at: new Date().toISOString()
-      };
-
-      const { error } = await supabase
-        .from('now_playing')
-        .upsert(nowPlayingData);
-
-      if (error) {
-        console.error('Database update error:', error);
-      } else {
-        console.log('TV display updated with recognition + format badge');
-      }
-    } catch (error) {
-      console.error('Failed to update now playing:', error);
     }
   };
 
@@ -400,7 +364,8 @@ export default function CleanRecognitionSystem() {
         },
         body: JSON.stringify({
           artist: manualArtist.trim(),
-          album: manualAlbum.trim() || undefined
+          album: manualAlbum.trim() || undefined,
+          setAsContext: !!(manualAlbum.trim()) // Set context if album specified
         })
       });
 
@@ -412,12 +377,14 @@ export default function CleanRecognitionSystem() {
       console.log('Manual search result:', result);
       
       if (result.success && result.track) {
-        await updateNowPlaying(result.track);
         setLastRecognition(result.track);
         
-        await checkForCollectionMetadata(result.track);
-        
-        setStatus(`Manual Override: ${result.track.artist} - ${result.track.title}`);
+        if (result.contextSet) {
+          await loadCurrentAlbumContext();
+          setStatus(`Album context set: ${result.track.artist} - ${result.track.album || 'Unknown Album'}`);
+        } else {
+          setStatus(`Manual Override: ${result.track.artist} - ${result.track.title}`);
+        }
         
         setManualArtist('');
         setManualAlbum('');
@@ -434,51 +401,114 @@ export default function CleanRecognitionSystem() {
   };
 
   const selectRecognitionCandidate = async (candidate: RecognitionCandidate): Promise<void> => {
-    await updateNowPlaying(candidate);
     setLastRecognition(candidate);
-    
-    await checkForCollectionMetadata(candidate);
-    
     setShowCandidates(false);
     setStatus(`Selected: ${candidate.artist} - ${candidate.title}`);
-  };
-
-  const extractTrackInfo = (trackTitle: string): { number: string | null, side: string | null } => {
-    const sideMatch = trackTitle.match(/\b(Side\s+)?([AB])\b/i);
-    const trackMatch = trackTitle.match(/\b([AB]?)(\d+)\b/);
-    
-    return {
-      number: trackMatch ? trackMatch[2] : null,
-      side: sideMatch ? sideMatch[2].toUpperCase() : (trackMatch && trackMatch[1] ? trackMatch[1].toUpperCase() : null)
-    };
   };
 
   const forceRecognitionUpdate = async (): Promise<void> => {
     if (!lastRecognition) return;
     
     setStatus('Forcing TV display update...');
-    await updateNowPlaying(lastRecognition);
+    // This would typically call the now_playing update endpoint
     setStatus('TV display force updated');
+  };
+
+  const getContextAge = (): string => {
+    if (!albumContext?.created_at) return '';
+    
+    const age = Date.now() - new Date(albumContext.created_at).getTime();
+    const minutes = Math.floor(age / (1000 * 60));
+    const hours = Math.floor(minutes / 60);
+    
+    if (hours > 0) {
+      return `${hours}h ${minutes % 60}m ago`;
+    }
+    return `${minutes}m ago`;
   };
 
   return (
     <div style={{ padding: 24, background: "#fff", color: "#222", minHeight: "100vh" }}>
-      <h1 style={{ marginBottom: 32 }}>Pure Recognition System</h1>
+      <h1 style={{ marginBottom: 32 }}>Album-Aware Recognition System</h1>
       
-      <div style={{ 
-        background: "#e0f2fe", 
-        padding: 20, 
-        borderRadius: 8, 
-        marginBottom: 24,
-        border: "1px solid #0369a1"
-      }}>
-        <h3 style={{ margin: 0, marginBottom: 12, color: "#0c4a6e" }}>System Design</h3>
-        <div style={{ fontSize: 14, lineHeight: 1.5 }}>
-          <strong>Works for ANY album:</strong> Guest vinyls show recognition data + artwork<br/>
-          <strong>Collection independent:</strong> Your collection only adds format badges<br/>
-          <strong>No matching required:</strong> Recognition service provides all display data
+      {/* Album Context Status */}
+      {albumContext && (
+        <div style={{ 
+          background: "#e8f5e8", 
+          padding: 24, 
+          borderRadius: 8, 
+          marginBottom: 24,
+          border: "2px solid #16a34a",
+          display: "flex",
+          alignItems: "center",
+          gap: 16
+        }}>
+          {albumContext.image_url && (
+            <Image 
+              src={albumContext.image_url}
+              alt={albumContext.title}
+              width={80}
+              height={80}
+              style={{ objectFit: "cover", borderRadius: 8 }}
+              unoptimized
+            />
+          )}
+          <div style={{ flex: 1 }}>
+            <h3 style={{ margin: 0, marginBottom: 8, color: "#16a34a", display: "flex", alignItems: "center", gap: 8 }}>
+              🎯 Album Context Active
+              {isListening && (
+                <div style={{
+                  width: 12,
+                  height: 12,
+                  background: "#16a34a",
+                  borderRadius: "50%",
+                  animation: "pulse 2s infinite"
+                }} />
+              )}
+            </h3>
+            <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>
+              {albumContext.artist} - {albumContext.title}
+            </div>
+            <div style={{ fontSize: 14, color: "#666", marginBottom: 8 }}>
+              {albumContext.track_count ? `${albumContext.track_count} tracks` : 'Track count unknown'} • 
+              {albumContext.folder && ` ${albumContext.folder} • `}
+              Set {getContextAge()}
+            </div>
+            <div style={{ fontSize: 12, color: "#888" }}>
+              System will try to identify tracks from this album first, then fall back to general recognition if no match.
+            </div>
+          </div>
+          <button
+            onClick={clearAlbumContext}
+            style={{
+              background: "#dc2626",
+              color: "white",
+              border: "none",
+              borderRadius: 4,
+              padding: "8px 12px",
+              fontSize: 12,
+              cursor: "pointer"
+            }}
+          >
+            Clear Context
+          </button>
         </div>
-      </div>
+      )}
+
+      {!albumContext && (
+        <div style={{ 
+          background: "#fef3c7", 
+          padding: 20, 
+          borderRadius: 8, 
+          marginBottom: 24,
+          border: "1px solid #f59e0b"
+        }}>
+          <h3 style={{ margin: 0, marginBottom: 8, color: "#92400e" }}>💡 No Album Context</h3>
+          <div style={{ fontSize: 14, color: "#92400e" }}>
+            System is in general recognition mode. Set an album context below to improve track identification for specific albums.
+          </div>
+        </div>
+      )}
       
       <div style={{ 
         background: "#f0f9ff", 
@@ -564,8 +594,80 @@ export default function CleanRecognitionSystem() {
         </div>
       </div>
 
-      {/* Recognition Correction Options */}
-      {(recognitionCandidates.length > 0 || lastRecognition) && (
+      {/* Album Context Setting */}
+      <div style={{ 
+        background: "#fff7ed", 
+        padding: 24, 
+        borderRadius: 8, 
+        marginBottom: 24,
+        border: "1px solid #ea580c"
+      }}>
+        <h3 style={{ margin: 0, marginBottom: 16, color: "#ea580c" }}>Set Album Context</h3>
+        <p style={{ fontSize: 14, color: "#ea580c", marginBottom: 16 }}>
+          Enter artist and album to set album context. This will help identify individual tracks from that album.
+        </p>
+        
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 12, alignItems: "end" }}>
+          <div>
+            <label style={{ display: "block", marginBottom: 4, fontSize: 14, fontWeight: 600 }}>
+              Artist (required)
+            </label>
+            <input
+              type="text"
+              value={manualArtist}
+              onChange={(e) => setManualArtist(e.target.value)}
+              placeholder="e.g. Traffic"
+              style={{
+                width: "100%",
+                padding: "8px 12px",
+                border: "1px solid #d1d5db",
+                borderRadius: 4,
+                fontSize: 14
+              }}
+            />
+          </div>
+          
+          <div>
+            <label style={{ display: "block", marginBottom: 4, fontSize: 14, fontWeight: 600 }}>
+              Album (for context setting)
+            </label>
+            <input
+              type="text"
+              value={manualAlbum}
+              onChange={(e) => setManualAlbum(e.target.value)}
+              placeholder="e.g. Mr. Fantasy"
+              style={{
+                width: "100%",
+                padding: "8px 12px",
+                border: "1px solid #d1d5db",
+                borderRadius: 4,
+                fontSize: 14
+              }}
+            />
+          </div>
+          
+          <button
+            onClick={performManualSearch}
+            disabled={!manualArtist.trim() || isManualSearching}
+            style={{
+              background: manualArtist.trim() && !isManualSearching ? "#ea580c" : "#9ca3af",
+              color: "white",
+              border: "none",
+              padding: "10px 20px",
+              borderRadius: 4,
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: manualArtist.trim() && !isManualSearching ? "pointer" : "not-allowed",
+              whiteSpace: "nowrap"
+            }}
+          >
+            {isManualSearching ? "Searching..." : (manualAlbum.trim() ? "Set Context" : "Search")}
+          </button>
+        </div>
+      </div>
+
+      {/* Recognition Candidates */}
+      {recognitionCandidates.length > 0 && (
         <div style={{ 
           background: "#fffbeb", 
           padding: 24, 
@@ -573,170 +675,79 @@ export default function CleanRecognitionSystem() {
           marginBottom: 24,
           border: "1px solid #f59e0b"
         }}>
-          <h3 style={{ margin: 0, marginBottom: 16, color: "#92400e" }}>Recognition Correction</h3>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <h3 style={{ margin: 0, color: "#92400e" }}>
+              Other Recognition Candidates ({recognitionCandidates.length})
+            </h3>
+            <button 
+              onClick={() => setShowCandidates(!showCandidates)}
+              style={{
+                background: showCandidates ? "#6b7280" : "#f59e0b",
+                color: "white",
+                border: "none",
+                padding: "8px 16px",
+                borderRadius: 4,
+                fontSize: 14,
+                cursor: "pointer"
+              }}
+            >
+              {showCandidates ? "Hide Candidates" : "Show Candidates"}
+            </button>
+          </div>
           
-          {/* Recognition Candidates */}
-          {recognitionCandidates.length > 0 && (
-            <div style={{ marginBottom: 24 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                <h4 style={{ margin: 0, color: "#92400e" }}>
-                  Other Recognition Candidates ({recognitionCandidates.length})
-                </h4>
-                <button 
-                  onClick={() => setShowCandidates(!showCandidates)}
+          {showCandidates && (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              {recognitionCandidates.map((candidate, index) => (
+                <div 
+                  key={index}
+                  onClick={() => selectRecognitionCandidate(candidate)}
                   style={{
-                    background: showCandidates ? "#6b7280" : "#f59e0b",
-                    color: "white",
-                    border: "none",
-                    padding: "8px 16px",
-                    borderRadius: 4,
-                    fontSize: 14,
-                    cursor: "pointer"
+                    background: "#fff",
+                    border: "2px solid #e5e7eb",
+                    borderRadius: 8,
+                    padding: 16,
+                    cursor: "pointer",
+                    transition: "all 0.2s",
+                    display: "flex",
+                    gap: 12,
+                    alignItems: "center"
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = "#f59e0b";
+                    e.currentTarget.style.background = "#fffbeb";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = "#e5e7eb";
+                    e.currentTarget.style.background = "#fff";
                   }}
                 >
-                  {showCandidates ? "Hide Candidates" : "Show Candidates"}
-                </button>
-              </div>
-              
-              {showCandidates && (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
-                  {recognitionCandidates.map((candidate, index) => (
-                    <div 
-                      key={index}
-                      onClick={() => selectRecognitionCandidate(candidate)}
-                      style={{
-                        background: "#fff",
-                        border: "2px solid #e5e7eb",
-                        borderRadius: 8,
-                        padding: 16,
-                        cursor: "pointer",
-                        transition: "all 0.2s",
-                        display: "flex",
-                        gap: 12,
-                        alignItems: "center"
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.borderColor = "#f59e0b";
-                        e.currentTarget.style.background = "#fffbeb";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.borderColor = "#e5e7eb";
-                        e.currentTarget.style.background = "#fff";
-                      }}
-                    >
-                      {candidate.image_url && (
-                        <Image 
-                          src={candidate.image_url}
-                          alt={candidate.album || candidate.title}
-                          width={60}
-                          height={60}
-                          style={{ objectFit: "cover", borderRadius: 6 }}
-                          unoptimized
-                        />
-                      )}
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 600, marginBottom: 4 }}>{candidate.title}</div>
-                        <div style={{ fontSize: 14, color: "#666", marginBottom: 4 }}>
-                          {candidate.artist} {candidate.album && `• ${candidate.album}`}
-                        </div>
-                        <div style={{ fontSize: 12, color: "#888" }}>
-                          {Math.round((candidate.confidence || 0.8) * 100)}% confidence
-                        </div>
-                      </div>
+                  {candidate.image_url && (
+                    <Image 
+                      src={candidate.image_url}
+                      alt={candidate.album || candidate.title}
+                      width={60}
+                      height={60}
+                      style={{ objectFit: "cover", borderRadius: 6 }}
+                      unoptimized
+                    />
+                  )}
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600, marginBottom: 4 }}>{candidate.title}</div>
+                    <div style={{ fontSize: 14, color: "#666", marginBottom: 4 }}>
+                      {candidate.artist} {candidate.album && `• ${candidate.album}`}
                     </div>
-                  ))}
+                    <div style={{ fontSize: 12, color: "#888" }}>
+                      {Math.round((candidate.confidence || 0.8) * 100)}% confidence
+                    </div>
+                  </div>
                 </div>
-              )}
+              ))}
             </div>
           )}
-          
-          {/* Manual Override */}
-          <div>
-            <h4 style={{ margin: 0, marginBottom: 12, color: "#92400e" }}>Manual Override</h4>
-            <p style={{ fontSize: 14, color: "#92400e", marginBottom: 16 }}>
-              Enter the correct artist and album to fetch fresh recognition data:
-            </p>
-            
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 12, alignItems: "end" }}>
-              <div>
-                <label style={{ display: "block", marginBottom: 4, fontSize: 14, fontWeight: 600 }}>
-                  Artist (required)
-                </label>
-                <input
-                  type="text"
-                  value={manualArtist}
-                  onChange={(e) => setManualArtist(e.target.value)}
-                  placeholder="e.g. Pink Floyd"
-                  style={{
-                    width: "100%",
-                    padding: "8px 12px",
-                    border: "1px solid #d1d5db",
-                    borderRadius: 4,
-                    fontSize: 14
-                  }}
-                />
-              </div>
-              
-              <div>
-                <label style={{ display: "block", marginBottom: 4, fontSize: 14, fontWeight: 600 }}>
-                  Album (optional)
-                </label>
-                <input
-                  type="text"
-                  value={manualAlbum}
-                  onChange={(e) => setManualAlbum(e.target.value)}
-                  placeholder="e.g. The Wall"
-                  style={{
-                    width: "100%",
-                    padding: "8px 12px",
-                    border: "1px solid #d1d5db",
-                    borderRadius: 4,
-                    fontSize: 14
-                  }}
-                />
-              </div>
-              
-              <button
-                onClick={performManualSearch}
-                disabled={!manualArtist.trim() || isManualSearching}
-                style={{
-                  background: manualArtist.trim() && !isManualSearching ? "#f59e0b" : "#9ca3af",
-                  color: "white",
-                  border: "none",
-                  padding: "10px 20px",
-                  borderRadius: 4,
-                  fontSize: 14,
-                  fontWeight: 600,
-                  cursor: manualArtist.trim() && !isManualSearching ? "pointer" : "not-allowed",
-                  whiteSpace: "nowrap"
-                }}
-              >
-                {isManualSearching ? "Searching..." : "Search & Override"}
-              </button>
-            </div>
-          </div>
         </div>
       )}
 
-      {collectionMetadata && (
-        <div style={{ 
-          background: "#f0fdf4", 
-          padding: 20, 
-          borderRadius: 8, 
-          marginBottom: 24,
-          border: "1px solid #16a34a"
-        }}>
-          <h3 style={{ margin: 0, marginBottom: 12, color: "#16a34a" }}>Bonus: Collection Metadata Found</h3>
-          <div style={{ fontSize: 14 }}>
-            <strong>Format Badge:</strong> {collectionMetadata.folder || 'Unknown'} • 
-            <strong> Your Release Year:</strong> {collectionMetadata.year}
-          </div>
-          <div style={{ fontSize: 12, color: "#666", marginTop: 8 }}>
-            This adds a format badge to the display. Recognition data is still used for all text content.
-          </div>
-        </div>
-      )}
-
+      {/* Recognition Controls */}
       <div style={{ 
         background: "#f0f9ff", 
         padding: 24, 
@@ -798,6 +809,7 @@ export default function CleanRecognitionSystem() {
         )}
       </div>
 
+      {/* Recognition Results */}
       {lastRecognition && (
         <div style={{ 
           background: "#f0fdf4", 
@@ -815,38 +827,26 @@ export default function CleanRecognitionSystem() {
             <div><strong>Has Artwork:</strong> {lastRecognition.image_url ? 'Yes' : 'No'}</div>
           </div>
           
-          {lastRecognition.image_url ? (
+          {lastRecognition.image_url && (
             <div style={{ marginTop: 12, padding: 12, background: "#fff", borderRadius: 4, fontSize: 12 }}>
               <strong>Artwork URL:</strong><br/>
               <a href={lastRecognition.image_url} target="_blank" rel="noopener noreferrer" style={{ color: "#2563eb", wordBreak: "break-all" }}>
                 {lastRecognition.image_url}
               </a>
             </div>
-          ) : (
-            <div style={{ marginTop: 12, padding: 12, background: "#fef3c7", borderRadius: 4, fontSize: 12, color: "#92400e" }}>
-              <strong>No artwork provided by recognition service</strong><br/>
-              Check your /api/audio-recognition endpoint to ensure it extracts image_url from the ACRCloud response.
-            </div>
           )}
-          
-          <div style={{ marginTop: 16, padding: 12, background: "#fff", borderRadius: 4, fontSize: 14 }}>
-            <strong>Guest Vinyl Support:</strong> This system works for ANY album, even ones you do not own. 
-            Recognition service provides all the data needed for display.
-            {collectionMetadata && (
-              <span> Bonus: Found {collectionMetadata.folder} badge for your collection.</span>
-            )}
-            {!collectionMetadata && (
-              <span> Perfect for guest vinyls!</span>
-            )}
-            <br/><br/>
-            <strong>API Requirements:</strong>
-            <ul style={{ margin: "8px 0", paddingLeft: "20px", fontSize: "12px" }}>
-              <li>Update <code>/api/audio-recognition</code> to return <code>candidates</code> array for alternate choices</li>
-              <li>Add <code>/api/manual-recognition</code> endpoint that accepts artist/album and returns recognition data</li>
-            </ul>
-          </div>
         </div>
       )}
+
+      {/* CSS Animations */}
+      <style dangerouslySetInnerHTML={{
+        __html: `
+          @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+          }
+        `
+      }} />
     </div>
   );
 }

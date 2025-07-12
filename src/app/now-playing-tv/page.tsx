@@ -1,4 +1,4 @@
-// src/app/now-playing-tv/page.tsx - Enhanced with Album Info
+// src/app/now-playing-tv/page.tsx - Enhanced TV Display with Album Context
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -14,26 +14,44 @@ interface CollectionAlbum {
   folder?: string;
 }
 
+interface AlbumContext {
+  id: number;
+  artist: string;
+  title: string;
+  year: string;
+  image_url?: string;
+  folder?: string;
+  track_count?: number;
+  track_listing?: string[];
+  source?: string;
+  created_at?: string;
+}
+
 interface NowPlayingData {
   id: number;
   artist?: string;
-  title?: string; // Track title
-  album_title?: string; // Album title (separate from track)
-  recognition_image_url?: string; // Artwork from recognition service
+  title?: string;
+  album_title?: string;
+  recognition_image_url?: string;
   album_id?: number;
   track_number?: string;
   track_side?: string;
   started_at?: string;
+  recognition_confidence?: number;
+  service_used?: string;
   collection?: CollectionAlbum;
 }
 
-export default function EnhancedNowPlayingTVPage() {
+export default function EnhancedTVDisplay() {
   const [currentTrack, setCurrentTrack] = useState<NowPlayingData | null>(null);
+  const [albumContext, setAlbumContext] = useState<AlbumContext | null>(null);
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [showDebug, setShowDebug] = useState<boolean>(false);
+  const [recognitionMode, setRecognitionMode] = useState<string>('unknown');
 
   useEffect(() => {
-    let subscriptionChannel: ReturnType<typeof supabase.channel> | null = null;
+    let nowPlayingChannel: ReturnType<typeof supabase.channel> | null = null;
+    let albumContextChannel: ReturnType<typeof supabase.channel> | null = null;
 
     const fetchNowPlaying = async (): Promise<void> => {
       try {
@@ -66,11 +84,44 @@ export default function EnhancedNowPlayingTVPage() {
       }
     };
 
+    const fetchAlbumContext = async (): Promise<void> => {
+      try {
+        const { data, error } = await supabase
+          .from('album_context')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (!error && data) {
+          // Check if context is still valid (less than 2 hours old)
+          const contextAge = Date.now() - new Date(data.created_at).getTime();
+          const maxAge = 2 * 60 * 60 * 1000; // 2 hours
+          
+          if (contextAge <= maxAge) {
+            setAlbumContext(data);
+            setRecognitionMode('Album Context Active');
+          } else {
+            setAlbumContext(null);
+            setRecognitionMode('General Recognition');
+          }
+        } else {
+          setAlbumContext(null);
+          setRecognitionMode('General Recognition');
+        }
+      } catch (error) {
+        console.error('Error fetching album context:', error);
+        setAlbumContext(null);
+        setRecognitionMode('General Recognition');
+      }
+    };
+
     // Initial fetch
     fetchNowPlaying();
+    fetchAlbumContext();
 
-    // Real-time subscription
-    subscriptionChannel = supabase
+    // Real-time subscriptions
+    nowPlayingChannel = supabase
       .channel('now_playing_enhanced')
       .on('postgres_changes', 
         { event: '*', schema: 'public', table: 'now_playing' },
@@ -81,12 +132,29 @@ export default function EnhancedNowPlayingTVPage() {
       )
       .subscribe();
 
+    albumContextChannel = supabase
+      .channel('album_context_changes')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'album_context' },
+        () => {
+          console.log('Album context updated');
+          fetchAlbumContext();
+        }
+      )
+      .subscribe();
+
     // Refresh every 15 seconds as backup
-    const interval = setInterval(fetchNowPlaying, 15000);
+    const interval = setInterval(() => {
+      fetchNowPlaying();
+      fetchAlbumContext();
+    }, 15000);
 
     return () => {
-      if (subscriptionChannel) {
-        supabase.removeChannel(subscriptionChannel);
+      if (nowPlayingChannel) {
+        supabase.removeChannel(nowPlayingChannel);
+      }
+      if (albumContextChannel) {
+        supabase.removeChannel(albumContextChannel);
       }
       clearInterval(interval);
     };
@@ -102,6 +170,19 @@ export default function EnhancedNowPlayingTVPage() {
     const mins = Math.floor(elapsed / 60);
     const secs = elapsed % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const getAlbumContextAge = (): string => {
+    if (!albumContext?.created_at) return '';
+    
+    const age = Date.now() - new Date(albumContext.created_at).getTime();
+    const minutes = Math.floor(age / (1000 * 60));
+    
+    if (minutes < 1) return 'just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    
+    const hours = Math.floor(minutes / 60);
+    return `${hours}h ${minutes % 60}m ago`;
   };
 
   // Toggle debug info with key press
@@ -130,7 +211,7 @@ export default function EnhancedNowPlayingTVPage() {
           justifyContent: 'center'
         }}
       >
-        {/* Simple waiting state */}
+        {/* Waiting state with album context info */}
         <div style={{ 
           textAlign: 'center',
           opacity: 0.8
@@ -152,12 +233,42 @@ export default function EnhancedNowPlayingTVPage() {
           </h1>
           <p style={{ 
             fontSize: '1.2rem', 
-            margin: 0,
+            margin: '0 0 2rem 0',
             fontStyle: 'italic',
             opacity: 0.7
           }}>
             Drop the needle. Let the side play.
           </p>
+
+          {/* Album context status */}
+          {albumContext && (
+            <div style={{
+              background: 'rgba(34, 197, 94, 0.2)',
+              border: '1px solid rgba(34, 197, 94, 0.5)',
+              borderRadius: 12,
+              padding: '16px 24px',
+              marginBottom: '1rem',
+              fontSize: '1rem',
+              opacity: 0.9
+            }}>
+              🎯 Album Context: <strong>{albumContext.artist} - {albumContext.title}</strong>
+              <br />
+              <span style={{ fontSize: '0.85rem', opacity: 0.8 }}>
+                Set {getAlbumContextAge()} • Ready for track recognition
+              </span>
+            </div>
+          )}
+
+          <div style={{
+            fontSize: '0.9rem',
+            opacity: 0.6,
+            background: 'rgba(255,255,255,0.1)',
+            padding: '12px 20px',
+            borderRadius: 8,
+            display: 'inline-block'
+          }}>
+            Mode: {recognitionMode}
+          </div>
           
           {showDebug && (
             <div style={{
@@ -170,7 +281,9 @@ export default function EnhancedNowPlayingTVPage() {
               fontSize: 12,
               fontFamily: 'monospace'
             }}>
-              Status: {isConnected ? 'Connected' : 'Disconnected'}
+              Status: {isConnected ? 'Connected' : 'Disconnected'}<br/>
+              Context: {albumContext ? 'Active' : 'None'}<br/>
+              Mode: {recognitionMode}
             </div>
           )}
         </div>
@@ -179,14 +292,21 @@ export default function EnhancedNowPlayingTVPage() {
   }
 
   // Display logic: ALWAYS use recognition data for track/album/artist names
-  // Collection data is ONLY used for artwork fallback, format, and year
-  const displayArtist = currentTrack.artist; // Always from recognition
-  const displayTrackTitle = currentTrack.title; // Always from recognition  
-  const displayAlbumTitle = currentTrack.album_title; // Always from recognition
-  const displayYear = currentTrack.collection?.year; // Collection metadata only
-  const displayImage = currentTrack.recognition_image_url || currentTrack.collection?.image_url; // Recognition first, then collection fallback
-  const displayFormat = currentTrack.collection?.folder; // Collection metadata only
-  const isGuestVinyl = !currentTrack.collection; // No collection metadata = guest vinyl
+  const displayArtist = currentTrack.artist;
+  const displayTrackTitle = currentTrack.title;
+  const displayAlbumTitle = currentTrack.album_title;
+  const displayYear = currentTrack.collection?.year;
+  const displayImage = currentTrack.recognition_image_url || currentTrack.collection?.image_url;
+  const displayFormat = currentTrack.collection?.folder;
+  const isGuestVinyl = !currentTrack.collection;
+
+  // Determine if this track is part of the current album context
+  const isFromAlbumContext = albumContext && 
+    albumContext.artist.toLowerCase() === currentTrack.artist?.toLowerCase() &&
+    (albumContext.title.toLowerCase() === currentTrack.album_title?.toLowerCase() ||
+     albumContext.track_listing?.some(track => 
+       track.toLowerCase() === currentTrack.title?.toLowerCase()
+     ));
 
   // Format track info
   const trackInfo = [];
@@ -260,7 +380,7 @@ export default function EnhancedNowPlayingTVPage() {
               priority
             />
             
-            {/* Format badge - show format if from collection, or "GUEST" if guest vinyl */}
+            {/* Format/Context badge */}
             {displayFormat ? (
               <div style={{
                 position: 'absolute',
@@ -296,6 +416,27 @@ export default function EnhancedNowPlayingTVPage() {
                 GUEST
               </div>
             ) : null}
+
+            {/* Album context indicator */}
+            {isFromAlbumContext && (
+              <div style={{
+                position: 'absolute',
+                bottom: '-15px',
+                left: '-15px',
+                background: '#22c55e',
+                color: 'white',
+                padding: '8px 16px',
+                borderRadius: '20px',
+                fontSize: '0.9rem',
+                fontWeight: 'bold',
+                boxShadow: '0 4px 15px rgba(0,0,0,0.4)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}>
+                🎯 CONTEXT
+              </div>
+            )}
           </div>
         </div>
 
@@ -357,19 +498,21 @@ export default function EnhancedNowPlayingTVPage() {
           {/* Year */}
           <p style={{ 
             fontSize: '1.8rem', 
-            margin: '0 0 3rem 0',
+            margin: '0 0 2rem 0',
             opacity: 0.7,
             fontWeight: 400
           }}>
-            {displayYear || (isGuestVinyl ? 'Guest Vinyl' : 'Unknown Year')}</p>
+            {displayYear || (isGuestVinyl ? 'Guest Vinyl' : 'Unknown Year')}
+          </p>
 
-          {/* Playing indicator */}
+          {/* Recognition info */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '1.5rem',
-            fontSize: '1.4rem',
-            opacity: 0.8
+            gap: '2rem',
+            fontSize: '1.2rem',
+            opacity: 0.8,
+            marginBottom: '2rem'
           }}>
             <div style={{
               display: 'flex',
@@ -386,18 +529,62 @@ export default function EnhancedNowPlayingTVPage() {
               <span>Now Playing</span>
             </div>
             
-            {/* Elapsed time - only if meaningful */}
+            {/* Elapsed time */}
             {getElapsedTime() && getElapsedTime() !== '0:00' && (
               <>
                 <span>•</span>
                 <span>{getElapsedTime()}</span>
               </>
             )}
+
+            {/* Confidence indicator */}
+            {currentTrack.recognition_confidence && (
+              <>
+                <span>•</span>
+                <span>{Math.round(currentTrack.recognition_confidence * 100)}% confidence</span>
+              </>
+            )}
           </div>
+
+          {/* Album context info */}
+          {albumContext && (
+            <div style={{
+              background: 'rgba(34, 197, 94, 0.2)',
+              border: '1px solid rgba(34, 197, 94, 0.5)',
+              borderRadius: 12,
+              padding: '16px 20px',
+              fontSize: '1rem',
+              opacity: 0.9
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                <span>🎯</span>
+                <strong>Album Context Active</strong>
+                {isFromAlbumContext && (
+                  <span style={{ 
+                    background: '#22c55e',
+                    color: 'white',
+                    padding: '2px 8px',
+                    borderRadius: '10px',
+                    fontSize: '0.8rem',
+                    fontWeight: 'bold'
+                  }}>
+                    MATCHED
+                  </span>
+                )}
+              </div>
+              <div style={{ fontSize: '0.9rem', opacity: 0.9 }}>
+                {albumContext.artist} - {albumContext.title}
+                {albumContext.track_count && ` (${albumContext.track_count} tracks)`}
+              </div>
+              <div style={{ fontSize: '0.8rem', opacity: 0.7, marginTop: '4px' }}>
+                Set {getAlbumContextAge()} • Source: {albumContext.source || 'unknown'}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Minimal footer */}
+      {/* Enhanced footer */}
       <div style={{ 
         position: 'absolute',
         bottom: '2rem',
@@ -411,9 +598,13 @@ export default function EnhancedNowPlayingTVPage() {
         zIndex: 1
       }}>
         <span>Dead Wax Dialogues</span>
-        <span style={{ fontSize: '0.8rem' }}>
-          Press &apos;D&apos; for debug • {isConnected ? 'Live' : 'Offline'}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', fontSize: '0.8rem' }}>
+          <span>Mode: {recognitionMode}</span>
+          <span>•</span>
+          <span>Press &apos;D&apos; for debug</span>
+          <span>•</span>
+          <span>{isConnected ? 'Live' : 'Offline'}</span>
+        </div>
       </div>
 
       {/* Debug overlay */}
@@ -428,9 +619,10 @@ export default function EnhancedNowPlayingTVPage() {
           fontSize: 11,
           fontFamily: 'monospace',
           zIndex: 10,
-          minWidth: 300
+          minWidth: 350
         }}>
           <div><strong>Connection:</strong> {isConnected ? '🟢' : '🔴'}</div>
+          <div><strong>Recognition Mode:</strong> {recognitionMode}</div>
           <div><strong>Source:</strong> {isGuestVinyl ? 'Guest Vinyl' : 'Collection'}</div>
           <div><strong>Album ID:</strong> {currentTrack.album_id || 'None'}</div>
           <div><strong>Track Title:</strong> {displayTrackTitle || 'None'}</div>
@@ -439,7 +631,20 @@ export default function EnhancedNowPlayingTVPage() {
           <div><strong>Recognition Art:</strong> {currentTrack.recognition_image_url ? 'Yes' : 'No'}</div>
           <div><strong>Collection Art:</strong> {currentTrack.collection?.image_url ? 'Yes' : 'No'}</div>
           <div><strong>Using:</strong> {displayImage ? (currentTrack.recognition_image_url ? 'Recognition' : 'Collection') : 'Placeholder'}</div>
+          <div><strong>Service:</strong> {currentTrack.service_used || 'Unknown'}</div>
+          <div><strong>Confidence:</strong> {currentTrack.recognition_confidence ? Math.round(currentTrack.recognition_confidence * 100) + '%' : 'Unknown'}</div>
           <div><strong>Started:</strong> {currentTrack.started_at ? new Date(currentTrack.started_at).toLocaleTimeString() : 'Unknown'}</div>
+          <hr style={{ margin: '8px 0', opacity: 0.3 }} />
+          <div><strong>Album Context:</strong> {albumContext ? 'Active' : 'None'}</div>
+          {albumContext && (
+            <>
+              <div><strong>Context Album:</strong> {albumContext.title}</div>
+              <div><strong>Context Artist:</strong> {albumContext.artist}</div>
+              <div><strong>Track Count:</strong> {albumContext.track_count || 'Unknown'}</div>
+              <div><strong>From Context:</strong> {isFromAlbumContext ? 'Yes' : 'No'}</div>
+              <div><strong>Context Age:</strong> {getAlbumContextAge()}</div>
+            </>
+          )}
         </div>
       )}
 
