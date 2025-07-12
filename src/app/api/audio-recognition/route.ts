@@ -1,4 +1,4 @@
-// src/app/api/audio-recognition/route.ts - Enhanced with proper collection matching
+// src/app/api/audio-recognition/route.ts - Fixed with proper collection matching and better candidate handling
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from 'lib/supabaseClient';
 import crypto from 'crypto';
@@ -127,22 +127,24 @@ function generateACRCloudSignature(
   return crypto.createHmac('sha1', accessSecret).update(stringToSign).digest('base64');
 }
 
-// Enhanced collection matching function
+// FIXED: Enhanced collection matching function with better artist matching
 async function findCollectionMatch(artist: string, album?: string): Promise<CollectionMatch | null> {
   try {
-    console.log(`Searching collection for: ${artist}${album ? ` - ${album}` : ''}`);
+    console.log(`🔍 Searching collection for: ${artist}${album ? ` - ${album}` : ''}`);
     
-    // Try exact matches first
-    const { data: exactMatches } = await supabase
+    // Step 1: Exact artist match first
+    const { data: exactArtistMatches } = await supabase
       .from('collection')
       .select('id, artist, title, year, image_url, folder')
       .ilike('artist', artist)
-      .limit(5);
+      .limit(10);
 
-    if (exactMatches && exactMatches.length > 0) {
+    console.log(`Found ${exactArtistMatches?.length || 0} exact artist matches`);
+
+    if (exactArtistMatches && exactArtistMatches.length > 0) {
       // If we have an album, try to match it too
       if (album) {
-        const albumMatch = exactMatches.find(match => 
+        const albumMatch = exactArtistMatches.find(match => 
           match.title.toLowerCase().includes(album.toLowerCase()) ||
           album.toLowerCase().includes(match.title.toLowerCase())
         );
@@ -152,21 +154,26 @@ async function findCollectionMatch(artist: string, album?: string): Promise<Coll
         }
       }
       
-      // Return best artist match
-      console.log(`✅ Found collection artist match: ${exactMatches[0].artist} - ${exactMatches[0].title}`);
-      return exactMatches[0];
+      // Return best artist match if no album match
+      console.log(`✅ Found collection artist match: ${exactArtistMatches[0].artist} - ${exactArtistMatches[0].title}`);
+      return exactArtistMatches[0];
     }
 
-    // Try fuzzy matching
-    const { data: fuzzyMatches } = await supabase
-      .from('collection')
-      .select('id, artist, title, year, image_url, folder')
-      .or(`artist.ilike.%${artist}%, title.ilike.%${artist}%`)
-      .limit(3);
+    // Step 2: Fuzzy artist matching
+    const artistWords = artist.toLowerCase().split(' ').filter(word => word.length > 2);
+    if (artistWords.length > 0) {
+      console.log(`Trying fuzzy search with artist words: ${artistWords.join(', ')}`);
+      
+      const { data: fuzzyMatches } = await supabase
+        .from('collection')
+        .select('id, artist, title, year, image_url, folder')
+        .or(artistWords.map(word => `artist.ilike.%${word}%`).join(','))
+        .limit(5);
 
-    if (fuzzyMatches && fuzzyMatches.length > 0) {
-      console.log(`✅ Found fuzzy collection match: ${fuzzyMatches[0].artist} - ${fuzzyMatches[0].title}`);
-      return fuzzyMatches[0];
+      if (fuzzyMatches && fuzzyMatches.length > 0) {
+        console.log(`✅ Found fuzzy collection match: ${fuzzyMatches[0].artist} - ${fuzzyMatches[0].title}`);
+        return fuzzyMatches[0];
+      }
     }
 
     console.log(`❌ No collection match found for: ${artist}${album ? ` - ${album}` : ''}`);
@@ -179,7 +186,7 @@ async function findCollectionMatch(artist: string, album?: string): Promise<Coll
 
 // Enhanced artwork search across multiple services
 async function searchForArtwork(artist: string, album?: string): Promise<string | undefined> {
-  console.log(`Searching for artwork: ${artist}${album ? ` - ${album}` : ''}`);
+  console.log(`🎨 Searching for artwork: ${artist}${album ? ` - ${album}` : ''}`);
   
   // Try Spotify first
   try {
@@ -306,7 +313,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    console.log(`Received audio file: ${audioFile.name}, size: ${audioFile.size}, type: ${audioFile.type}`);
+    console.log(`🎵 Received audio file: ${audioFile.name}, size: ${audioFile.size}, type: ${audioFile.type}`);
 
     // Service configuration with fallback order
     const services: ServiceConfig[] = [
@@ -331,12 +338,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }, { status: 500 });
     }
 
-    console.log(`Attempting recognition with ${enabledServices.length} services:`, enabledServices.map(s => s.name));
+    console.log(`🔧 Attempting recognition with ${enabledServices.length} services:`, enabledServices.map(s => s.name));
 
     // Try each service in order until one succeeds
     for (const service of enabledServices) {
       try {
-        console.log(`Trying ${service.name}...`);
+        console.log(`🎯 Trying ${service.name}...`);
         
         let result: RecognitionResult;
         
@@ -354,7 +361,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         if (result.success && result.track) {
           console.log(`✅ Success with ${service.name}:`, result.track);
           
-          // Check for collection match
+          // FIXED: Enhanced collection matching for primary track
           const collectionMatch = await findCollectionMatch(result.track.artist, result.track.album);
           
           if (collectionMatch) {
@@ -377,22 +384,27 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             result.track.image_url = await searchForArtwork(result.track.artist, result.track.album);
           }
 
-          // Also enhance candidates with collection matching and artwork
+          // FIXED: Also enhance candidates with collection matching and artwork
           if (result.candidates) {
-            for (const candidate of result.candidates) {
+            console.log(`🔍 Processing ${result.candidates.length} candidates...`);
+            for (let i = 0; i < result.candidates.length; i++) {
+              const candidate = result.candidates[i];
               const candidateMatch = await findCollectionMatch(candidate.artist, candidate.album);
               const enhancedCandidate = candidate as EnhancedRecognitionTrack;
+              
               if (candidateMatch) {
                 enhancedCandidate.collection_match = candidateMatch;
                 enhancedCandidate.is_guest_vinyl = false;
                 if (!candidate.image_url && candidateMatch.image_url) {
                   candidate.image_url = candidateMatch.image_url;
                 }
+                console.log(`📀 Candidate ${i+1} collection match: ${candidateMatch.artist} - ${candidateMatch.title}`);
               } else {
                 enhancedCandidate.is_guest_vinyl = true;
                 if (!candidate.image_url) {
                   candidate.image_url = await searchForArtwork(candidate.artist, candidate.album);
                 }
+                console.log(`👤 Candidate ${i+1} is guest vinyl: ${candidate.artist} - ${candidate.title}`);
               }
             }
           }
@@ -421,7 +433,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             // Don't fail the recognition for this
           }
 
-          console.log(`Found ${result.candidates?.length || 0} additional candidates`);
+          console.log(`📊 Found ${result.candidates?.length || 0} additional candidates`);
           return NextResponse.json(result);
         } else {
           console.log(`❌ No match with ${service.name}: ${result.error}`);
@@ -496,7 +508,7 @@ async function recognizeWithACRCloud(audioFile: File): Promise<RecognitionResult
     }
 
     const data: ACRCloudResponse = await response.json();
-    console.log('ACRCloud response:', JSON.stringify(data, null, 2));
+    console.log('ACRCloud response received');
     
     if (data.status?.code === 0 && data.metadata?.music && data.metadata.music.length > 0) {
       const tracks = data.metadata.music;
@@ -545,8 +557,8 @@ async function recognizeWithACRCloud(audioFile: File): Promise<RecognitionResult
       const primaryTrack = convertTrack(tracks[0], 0);
       const candidates = tracks.slice(1, 6).map((track: ACRCloudTrack, index: number) => convertTrack(track, index + 1));
       
-      console.log(`ACRCloud found primary track: ${primaryTrack.title} by ${primaryTrack.artist}`);
-      console.log(`ACRCloud found ${candidates.length} additional candidates`);
+      console.log(`✅ ACRCloud found primary track: ${primaryTrack.title} by ${primaryTrack.artist}`);
+      console.log(`📊 ACRCloud found ${candidates.length} additional candidates`);
       
       return {
         success: true,
@@ -594,7 +606,7 @@ async function recognizeWithAudD(audioFile: File, apiKey: string): Promise<Recog
     }
 
     const data = await response.json();
-    console.log('AudD response:', data.status);
+    console.log('AudD response received');
     
     if (data.status === 'success' && data.result) {
       // Extract artwork from external metadata with priority
@@ -659,17 +671,18 @@ export async function GET(): Promise<NextResponse> {
   const disabledServices = services.filter(s => !s.enabled);
 
   return NextResponse.json({ 
-    message: 'Enhanced Multi-Service Audio Recognition API with Collection Matching',
+    message: 'Enhanced Multi-Service Audio Recognition API with Fixed Collection Matching',
     enabledServices: enabledServices.map(s => s.name),
     disabledServices: disabledServices.map(s => `${s.name} (${s.config})`),
     features: [
-      'Collection matching for owned vs guest vinyl detection',
+      'Fixed collection matching for owned vs guest vinyl detection',
       'Multiple recognition candidates for correction',
-      'Intelligent artwork search across Spotify, Last.fm, and MusicBrainz',
+      'Intelligent artwork search across Spotify, Last.fm',
       'Fallback service ordering',
       'Automatic TV display updates',
       'Enhanced error reporting',
-      'Album artwork for all candidates'
+      'Album artwork for all candidates',
+      'Improved fuzzy matching for artist names'
     ]
   });
 }

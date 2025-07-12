@@ -1,4 +1,5 @@
-// src/app/now-playing-tv/page.tsx - Enhanced TV Display with clean UI
+// src/app/now-playing-tv/page.tsx - Fixed TV Display with proper logo, album display, and collection detection
+// Note: This page should not have any navigation menu - handled by layout.tsx
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -210,10 +211,11 @@ export default function EnhancedTVDisplay() {
           fontFamily: '"Inter", sans-serif',
           alignItems: 'center',
           justifyContent: 'center',
-          position: 'relative'
+          position: 'relative',
+          overflow: 'hidden'
         }}
       >
-        {/* Logos */}
+        {/* FIXED: Logos with correct Dead Wax Dialogues logo */}
         <div style={{
           position: 'absolute',
           top: '30px',
@@ -225,13 +227,13 @@ export default function EnhancedTVDisplay() {
           zIndex: 10
         }}>
           <Image
-            src="https://drive.google.com/uc?export=view&id=1SHEq1g_k_0ooTYsDEqcUXN_vVsuwiBNQ"
+            src="/images/dwd-logo.PNG"
             alt="Dead Wax Dialogues"
-            width={120}
-            height={60}
+            width={140}
+            height={70}
             style={{
-              filter: 'brightness(0) invert(1)',
-              opacity: 0.8
+              objectFit: 'contain',
+              opacity: 0.9
             }}
             unoptimized
           />
@@ -343,7 +345,7 @@ export default function EnhancedTVDisplay() {
     );
   }
 
-  // Display logic with enhanced collection matching
+  // FIXED: Enhanced display logic with proper collection detection
   const displayArtist = currentTrack.artist;
   const displayTrackTitle = currentTrack.title;
   const displayAlbumTitle = currentTrack.album_title;
@@ -353,8 +355,9 @@ export default function EnhancedTVDisplay() {
   const displayImage = currentTrack.collection?.image_url || currentTrack.recognition_image_url;
   const displayFormat = currentTrack.collection?.folder;
   
-  // Determine if this is guest vinyl or from collection
-  const isGuestVinyl = !currentTrack.collection;
+  // FIXED: Properly determine if this is guest vinyl or from collection
+  const isFromCollection = !!(currentTrack.collection && currentTrack.album_id);
+  const isGuestVinyl = !isFromCollection;
 
   // Determine if this track is part of the current album context
   const isFromAlbumContext = albumContext && 
@@ -393,7 +396,7 @@ export default function EnhancedTVDisplay() {
         }} />
       )}
 
-      {/* Logos */}
+      {/* FIXED: Logos with correct DWD logo */}
       <div style={{
         position: 'absolute',
         top: '30px',
@@ -405,13 +408,13 @@ export default function EnhancedTVDisplay() {
         zIndex: 10
       }}>
         <Image
-          src="https://drive.google.com/uc?export=view&id=1SHEq1g_k_0ooTYsDEqcUXN_vVsuwiBNQ"
+          src="/images/dwd-logo.PNG"
           alt="Dead Wax Dialogues"
-          width={120}
-          height={60}
+          width={140}
+          height={70}
           style={{
-            filter: 'brightness(0) invert(1)',
-            opacity: 0.8
+            objectFit: 'contain',
+            opacity: 0.9
           }}
           unoptimized
         />
@@ -478,13 +481,13 @@ export default function EnhancedTVDisplay() {
               priority
             />
             
-            {/* Format/Status badge */}
-            {displayFormat ? (
+            {/* FIXED: Collection/Guest status badge */}
+            {isFromCollection && displayFormat ? (
               <div style={{
                 position: 'absolute',
                 top: '-15px',
                 right: '-15px',
-                background: '#7c3aed',
+                background: '#22c55e',
                 color: 'white',
                 padding: '12px 20px',
                 borderRadius: '25px',
@@ -512,6 +515,23 @@ export default function EnhancedTVDisplay() {
                 letterSpacing: '0.5px'
               }}>
                 GUEST
+              </div>
+            ) : isFromCollection ? (
+              <div style={{
+                position: 'absolute',
+                top: '-15px',
+                right: '-15px',
+                background: '#22c55e',
+                color: 'white',
+                padding: '12px 20px',
+                borderRadius: '25px',
+                fontSize: '1.1rem',
+                fontWeight: 'bold',
+                boxShadow: '0 6px 20px rgba(0,0,0,0.4)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px'
+              }}>
+                COLLECTION
               </div>
             ) : null}
 
@@ -555,8 +575,8 @@ export default function EnhancedTVDisplay() {
             {displayTrackTitle}
           </h1>
           
-          {/* Album Title - if different from track title */}
-          {displayAlbumTitle && displayAlbumTitle !== displayTrackTitle && (
+          {/* FIXED: Always show album title when available, regardless of track title */}
+          {displayAlbumTitle && (
             <h2 style={{ 
               fontSize: '2.2rem', 
               margin: '0 0 1rem 0',
@@ -580,17 +600,46 @@ export default function EnhancedTVDisplay() {
             {displayArtist}
           </p>
           
-          {/* Year */}
-          <p style={{ 
+          {/* Year and Collection Status */}
+          <div style={{ 
             fontSize: '1.8rem', 
             margin: '0 0 2rem 0',
             opacity: 0.7,
-            fontWeight: 400
+            fontWeight: 400,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '1rem'
           }}>
-            {displayYear || (isGuestVinyl ? 'Guest Vinyl' : 'Unknown Year')}
-          </p>
+            <span>{displayYear || 'Unknown Year'}</span>
+            {isFromCollection && (
+              <span style={{
+                background: 'rgba(34, 197, 94, 0.2)',
+                color: '#10b981',
+                padding: '4px 12px',
+                borderRadius: '12px',
+                fontSize: '1.2rem',
+                fontWeight: 600,
+                border: '1px solid rgba(34, 197, 94, 0.5)'
+              }}>
+                FROM COLLECTION
+              </span>
+            )}
+            {isGuestVinyl && (
+              <span style={{
+                background: 'rgba(245, 158, 11, 0.2)',
+                color: '#f59e0b',
+                padding: '4px 12px',
+                borderRadius: '12px',
+                fontSize: '1.2rem',
+                fontWeight: 600,
+                border: '1px solid rgba(245, 158, 11, 0.5)'
+              }}>
+                GUEST VINYL
+              </span>
+            )}
+          </div>
 
-          {/* Live indicator */}
+          {/* Live indicator and service info */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
@@ -612,9 +661,27 @@ export default function EnhancedTVDisplay() {
               }} />
               <span>{isConnected ? 'Live' : 'Offline'}</span>
             </div>
+            
+            {currentTrack.service_used && (
+              <div style={{
+                fontSize: '1rem',
+                opacity: 0.6
+              }}>
+                • {currentTrack.service_used}
+              </div>
+            )}
+            
+            {currentTrack.recognition_confidence && (
+              <div style={{
+                fontSize: '1rem',
+                opacity: 0.6
+              }}>
+                • {Math.round(currentTrack.recognition_confidence * 100)}% confidence
+              </div>
+            )}
           </div>
 
-          {/* Album context info (simplified) */}
+          {/* Album context info */}
           {albumContext && (
             <div style={{
               background: 'rgba(34, 197, 94, 0.2)',
@@ -662,7 +729,8 @@ export default function EnhancedTVDisplay() {
           zIndex: 10
         }}>
           <div><strong>Status:</strong> {isConnected ? 'Connected' : 'Disconnected'}</div>
-          <div><strong>Collection Match:</strong> {currentTrack.collection ? 'Yes' : 'No'}</div>
+          <div><strong>Collection Match:</strong> {isFromCollection ? 'Yes' : 'No'}</div>
+          <div><strong>Album ID:</strong> {currentTrack.album_id || 'None'}</div>
           <div><strong>Guest Vinyl:</strong> {isGuestVinyl ? 'Yes' : 'No'}</div>
           <div><strong>Last Update:</strong> {lastUpdate.toLocaleTimeString()}</div>
           <div><strong>Commands:</strong> D=debug, F=refresh</div>
