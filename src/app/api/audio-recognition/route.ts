@@ -1,5 +1,6 @@
-// src/app/api/audio-recognition/route.ts - Enhanced with multi-service artwork fallback
+// src/app/api/audio-recognition/route.ts - Enhanced with proper collection matching
 import { NextRequest, NextResponse } from 'next/server';
+import { supabase } from 'lib/supabaseClient';
 import crypto from 'crypto';
 
 interface RecognitionTrack {
@@ -11,19 +12,69 @@ interface RecognitionTrack {
   service?: string;
 }
 
+interface CollectionMatch {
+  id: number;
+  artist: string;
+  title: string;
+  year: string;
+  image_url?: string;
+  folder?: string;
+}
+
 interface RecognitionResult {
   success: boolean;
-  track?: RecognitionTrack;
+  track?: RecognitionTrack & {
+    collection_match?: CollectionMatch;
+    is_guest_vinyl?: boolean;
+  };
   candidates?: RecognitionTrack[]; 
   error?: string;
   albumContextUsed?: boolean;
   albumContextSwitched?: boolean;
 }
 
+interface LastFmImage {
+  '#text'?: string;
+  size?: string;
+}
+
+interface LastFmAlbum {
+  name: string;
+  image?: LastFmImage[];
+}
+
+interface LastFmAlbumResponse {
+  album?: LastFmAlbum;
+  error?: number;
+}
+
+interface LastFmTopAlbumsResponse {
+  topalbums?: {
+    album?: LastFmAlbum | LastFmAlbum[];
+  };
+}
+
 interface ServiceConfig {
   name: string;
   apiKey: string | undefined;
   enabled: boolean;
+}
+
+interface NowPlayingUpdate {
+  artist: string;
+  title: string;
+  album_title?: string;
+  recognition_image_url?: string;
+  album_id?: number | null;
+  started_at: string;
+  recognition_confidence: number;
+  service_used: string;
+  updated_at: string;
+}
+
+interface EnhancedRecognitionTrack extends RecognitionTrack {
+  collection_match?: CollectionMatch;
+  is_guest_vinyl?: boolean;
 }
 
 // ACRCloud API response types
@@ -76,6 +127,56 @@ function generateACRCloudSignature(
   return crypto.createHmac('sha1', accessSecret).update(stringToSign).digest('base64');
 }
 
+// Enhanced collection matching function
+async function findCollectionMatch(artist: string, album?: string): Promise<CollectionMatch | null> {
+  try {
+    console.log(`Searching collection for: ${artist}${album ? ` - ${album}` : ''}`);
+    
+    // Try exact matches first
+    const { data: exactMatches } = await supabase
+      .from('collection')
+      .select('id, artist, title, year, image_url, folder')
+      .ilike('artist', artist)
+      .limit(5);
+
+    if (exactMatches && exactMatches.length > 0) {
+      // If we have an album, try to match it too
+      if (album) {
+        const albumMatch = exactMatches.find(match => 
+          match.title.toLowerCase().includes(album.toLowerCase()) ||
+          album.toLowerCase().includes(match.title.toLowerCase())
+        );
+        if (albumMatch) {
+          console.log(`✅ Found exact collection match: ${albumMatch.artist} - ${albumMatch.title}`);
+          return albumMatch;
+        }
+      }
+      
+      // Return best artist match
+      console.log(`✅ Found collection artist match: ${exactMatches[0].artist} - ${exactMatches[0].title}`);
+      return exactMatches[0];
+    }
+
+    // Try fuzzy matching
+    const { data: fuzzyMatches } = await supabase
+      .from('collection')
+      .select('id, artist, title, year, image_url, folder')
+      .or(`artist.ilike.%${artist}%, title.ilike.%${artist}%`)
+      .limit(3);
+
+    if (fuzzyMatches && fuzzyMatches.length > 0) {
+      console.log(`✅ Found fuzzy collection match: ${fuzzyMatches[0].artist} - ${fuzzyMatches[0].title}`);
+      return fuzzyMatches[0];
+    }
+
+    console.log(`❌ No collection match found for: ${artist}${album ? ` - ${album}` : ''}`);
+    return null;
+  } catch (error) {
+    console.error('Collection matching error:', error);
+    return null;
+  }
+}
+
 // Enhanced artwork search across multiple services
 async function searchForArtwork(artist: string, album?: string): Promise<string | undefined> {
   console.log(`Searching for artwork: ${artist}${album ? ` - ${album}` : ''}`);
@@ -102,40 +203,8 @@ async function searchForArtwork(artist: string, album?: string): Promise<string 
     console.warn('Last.fm artwork search failed:', error);
   }
 
-  // Try MusicBrainz + Cover Art Archive as final fallback
-  try {
-    const mbArtwork = await searchMusicBrainzArtwork(artist, album);
-    if (mbArtwork) {
-      console.log('Found artwork via MusicBrainz/Cover Art Archive');
-      return mbArtwork;
-    }
-  } catch (error) {
-    console.warn('MusicBrainz artwork search failed:', error);
-  }
-
   console.log('No artwork found across all services');
   return undefined;
-}
-
-interface LastFmImage {
-  '#text': string;
-  size: string;
-}
-
-interface LastFmAlbum {
-  name: string;
-  image?: LastFmImage[];
-}
-
-interface LastFmAlbumResponse {
-  album?: LastFmAlbum;
-  error?: number;
-}
-
-interface LastFmTopAlbumsResponse {
-  topalbums?: {
-    album?: LastFmAlbum | LastFmAlbum[];
-  };
 }
 
 async function searchSpotifyArtwork(artist: string, album?: string): Promise<string | undefined> {
@@ -225,41 +294,6 @@ async function searchLastFmArtwork(artist: string, album?: string): Promise<stri
   return undefined;
 }
 
-async function searchMusicBrainzArtwork(artist: string, album?: string): Promise<string | undefined> {
-  try {
-    // Search MusicBrainz for release
-    let query = `artist:"${artist}"`;
-    if (album) {
-      query += ` AND release:"${album}"`;
-    }
-    
-    const searchUrl = `https://musicbrainz.org/ws/2/release?query=${encodeURIComponent(query)}&fmt=json&limit=1`;
-    const response = await fetch(searchUrl, {
-      headers: { 'User-Agent': 'DeadWaxDialogues/1.0 (contact@deadwaxdialogues.com)' }
-    });
-
-    if (!response.ok) return undefined;
-
-    const data = await response.json();
-    
-    if (data.releases && data.releases.length > 0) {
-      const releaseId = data.releases[0].id;
-      
-      // Try to get cover art from Cover Art Archive
-      const coverArtUrl = `https://coverartarchive.org/release/${releaseId}/front`;
-      const coverResponse = await fetch(coverArtUrl, { method: 'HEAD' });
-      
-      if (coverResponse.ok) {
-        return coverArtUrl;
-      }
-    }
-  } catch (error) {
-    console.error('MusicBrainz artwork search error:', error);
-  }
-
-  return undefined;
-}
-
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const formData = await request.formData();
@@ -320,19 +354,71 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         if (result.success && result.track) {
           console.log(`✅ Success with ${service.name}:`, result.track);
           
-          // Enhanced artwork fallback search
+          // Check for collection match
+          const collectionMatch = await findCollectionMatch(result.track.artist, result.track.album);
+          
+          if (collectionMatch) {
+            result.track.collection_match = collectionMatch;
+            result.track.is_guest_vinyl = false;
+            console.log(`🎵 Collection match found: ${collectionMatch.artist} - ${collectionMatch.title}`);
+            
+            // Use collection artwork if recognition doesn't have it
+            if (!result.track.image_url && collectionMatch.image_url) {
+              result.track.image_url = collectionMatch.image_url;
+            }
+          } else {
+            result.track.is_guest_vinyl = true;
+            console.log(`👤 Guest vinyl: ${result.track.artist} - ${result.track.title}`);
+          }
+          
+          // Enhanced artwork fallback search only if no image found
           if (!result.track.image_url) {
-            console.log('No artwork from recognition service, searching other services...');
+            console.log('No artwork from recognition or collection, searching other services...');
             result.track.image_url = await searchForArtwork(result.track.artist, result.track.album);
           }
 
-          // Also enhance candidates with artwork
+          // Also enhance candidates with collection matching and artwork
           if (result.candidates) {
             for (const candidate of result.candidates) {
-              if (!candidate.image_url) {
-                candidate.image_url = await searchForArtwork(candidate.artist, candidate.album);
+              const candidateMatch = await findCollectionMatch(candidate.artist, candidate.album);
+              const enhancedCandidate = candidate as EnhancedRecognitionTrack;
+              if (candidateMatch) {
+                enhancedCandidate.collection_match = candidateMatch;
+                enhancedCandidate.is_guest_vinyl = false;
+                if (!candidate.image_url && candidateMatch.image_url) {
+                  candidate.image_url = candidateMatch.image_url;
+                }
+              } else {
+                enhancedCandidate.is_guest_vinyl = true;
+                if (!candidate.image_url) {
+                  candidate.image_url = await searchForArtwork(candidate.artist, candidate.album);
+                }
               }
             }
+          }
+
+          // Update now playing in database with enhanced info
+          try {
+            const updateData: NowPlayingUpdate = {
+              artist: result.track.artist,
+              title: result.track.title,
+              album_title: result.track.album,
+              recognition_image_url: result.track.image_url,
+              album_id: collectionMatch?.id || null,
+              started_at: new Date().toISOString(),
+              recognition_confidence: result.track.confidence || 0.8,
+              service_used: result.track.service || service.name,
+              updated_at: new Date().toISOString()
+            };
+
+            await supabase
+              .from('now_playing')
+              .upsert({ id: 1, ...updateData });
+
+            console.log('✅ Now playing updated in database');
+          } catch (dbError) {
+            console.error('Database update error:', dbError);
+            // Don't fail the recognition for this
           }
 
           console.log(`Found ${result.candidates?.length || 0} additional candidates`);
@@ -573,10 +659,11 @@ export async function GET(): Promise<NextResponse> {
   const disabledServices = services.filter(s => !s.enabled);
 
   return NextResponse.json({ 
-    message: 'Enhanced Multi-Service Audio Recognition API with Intelligent Artwork Search',
+    message: 'Enhanced Multi-Service Audio Recognition API with Collection Matching',
     enabledServices: enabledServices.map(s => s.name),
     disabledServices: disabledServices.map(s => `${s.name} (${s.config})`),
     features: [
+      'Collection matching for owned vs guest vinyl detection',
       'Multiple recognition candidates for correction',
       'Intelligent artwork search across Spotify, Last.fm, and MusicBrainz',
       'Fallback service ordering',

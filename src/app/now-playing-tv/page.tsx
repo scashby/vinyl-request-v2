@@ -1,4 +1,4 @@
-// src/app/now-playing-tv/page.tsx - Enhanced TV Display with better debugging
+// src/app/now-playing-tv/page.tsx - Enhanced TV Display with clean UI
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -48,10 +48,7 @@ export default function EnhancedTVDisplay() {
   const [albumContext, setAlbumContext] = useState<AlbumContext | null>(null);
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [showDebug, setShowDebug] = useState<boolean>(false);
-  const [recognitionMode, setRecognitionMode] = useState<string>('unknown');
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
-  const [connectionAttempts, setConnectionAttempts] = useState<number>(0);
-  const [forceRefreshCount, setForceRefreshCount] = useState<number>(0);
 
   useEffect(() => {
     let nowPlayingChannel: ReturnType<typeof supabase.channel> | null = null;
@@ -61,7 +58,6 @@ export default function EnhancedTVDisplay() {
     const fetchNowPlaying = async (): Promise<void> => {
       try {
         console.log('Fetching now playing data...');
-        setConnectionAttempts(prev => prev + 1);
         
         const { data, error } = await supabase
           .from('now_playing')
@@ -122,19 +118,15 @@ export default function EnhancedTVDisplay() {
           
           if (contextAge <= maxAge) {
             setAlbumContext(data);
-            setRecognitionMode('Album Context Active');
           } else {
             setAlbumContext(null);
-            setRecognitionMode('General Recognition');
           }
         } else {
           setAlbumContext(null);
-          setRecognitionMode('General Recognition');
         }
       } catch (error) {
         console.error('Error fetching album context:', error);
         setAlbumContext(null);
-        setRecognitionMode('General Recognition');
       }
     };
 
@@ -142,7 +134,7 @@ export default function EnhancedTVDisplay() {
     fetchNowPlaying();
     fetchAlbumContext();
 
-    // Enhanced real-time subscriptions with better error handling
+    // Enhanced real-time subscriptions
     nowPlayingChannel = supabase
       .channel('now_playing_enhanced_tv')
       .on('postgres_changes', 
@@ -158,7 +150,6 @@ export default function EnhancedTVDisplay() {
           setIsConnected(true);
         } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
           setIsConnected(false);
-          console.log('Subscription error, will attempt manual refresh');
         }
       });
 
@@ -171,29 +162,21 @@ export default function EnhancedTVDisplay() {
           fetchAlbumContext();
         }
       )
-      .subscribe((status) => {
-        console.log('Album context subscription status:', status);
-      });
+      .subscribe();
 
-    // Aggressive refresh as backup - every 10 seconds
+    // Refresh every 10 seconds
     const interval = setInterval(() => {
-      console.log('Performing scheduled refresh...');
       fetchNowPlaying();
       fetchAlbumContext();
     }, 10000);
 
-    // Force refresh with 'F' key
+    // Keyboard controls
     const handleKeyPress = (e: KeyboardEvent) => {
       if (e.key === 'd' || e.key === 'D') {
         setShowDebug(prev => !prev);
       } else if (e.key === 'f' || e.key === 'F') {
-        console.log('Force refresh triggered by user');
-        setForceRefreshCount(prev => prev + 1);
         fetchNowPlaying();
         fetchAlbumContext();
-      } else if (e.key === 'c' || e.key === 'C') {
-        // Clear now playing
-        clearNowPlaying();
       }
     };
 
@@ -215,58 +198,6 @@ export default function EnhancedTVDisplay() {
     };
   }, []);
 
-  const clearNowPlaying = async (): Promise<void> => {
-    try {
-      console.log('Clearing now playing...');
-      const { error } = await supabase
-        .from('now_playing')
-        .update({
-          artist: null,
-          title: null,
-          album_title: null,
-          recognition_image_url: null,
-          album_id: null,
-          track_number: null,
-          track_side: null,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', 1);
-
-      if (error) {
-        console.error('Error clearing now playing:', error);
-      } else {
-        console.log('Now playing cleared successfully');
-      }
-    } catch (error) {
-      console.error('Error clearing now playing:', error);
-    }
-  };
-
-  const getElapsedTime = (): string => {
-    if (!currentTrack?.started_at) return '';
-    
-    const startTime = new Date(currentTrack.started_at);
-    const now = new Date();
-    const elapsed = Math.floor((now.getTime() - startTime.getTime()) / 1000);
-    
-    const mins = Math.floor(elapsed / 60);
-    const secs = elapsed % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const getAlbumContextAge = (): string => {
-    if (!albumContext?.created_at) return '';
-    
-    const age = Date.now() - new Date(albumContext.created_at).getTime();
-    const minutes = Math.floor(age / (1000 * 60));
-    
-    if (minutes < 1) return 'just now';
-    if (minutes < 60) return `${minutes}m ago`;
-    
-    const hours = Math.floor(minutes / 60);
-    return `${hours}h ${minutes % 60}m ago`;
-  };
-
   if (!currentTrack || (!currentTrack.artist && !currentTrack.title)) {
     return (
       <div 
@@ -278,12 +209,64 @@ export default function EnhancedTVDisplay() {
           flexDirection: 'column',
           fontFamily: '"Inter", sans-serif',
           alignItems: 'center',
-          justifyContent: 'center'
+          justifyContent: 'center',
+          position: 'relative'
         }}
       >
+        {/* Logos */}
+        <div style={{
+          position: 'absolute',
+          top: '30px',
+          left: '30px',
+          right: '30px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          zIndex: 10
+        }}>
+          <Image
+            src="https://drive.google.com/uc?export=view&id=1SHEq1g_k_0ooTYsDEqcUXN_vVsuwiBNQ"
+            alt="Dead Wax Dialogues"
+            width={120}
+            height={60}
+            style={{
+              filter: 'brightness(0) invert(1)',
+              opacity: 0.8
+            }}
+            unoptimized
+          />
+          <Image
+            src="https://byo.com/wp-content/uploads/Devils-Purse-logo.jpg"
+            alt="Devil's Purse"
+            width={120}
+            height={60}
+            style={{
+              opacity: 0.8,
+              borderRadius: '8px'
+            }}
+            unoptimized
+          />
+        </div>
+
+        {/* Now Playing Header */}
+        <div style={{
+          position: 'absolute',
+          top: '120px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          fontSize: '2.5rem',
+          fontWeight: 'bold',
+          opacity: 0.9,
+          letterSpacing: '0.1em',
+          textTransform: 'uppercase'
+        }}>
+          Now Playing
+        </div>
+
         <div style={{ 
           textAlign: 'center',
-          opacity: 0.8
+          opacity: 0.8,
+          marginTop: '100px'
         }}>
           <div style={{ 
             fontSize: '4rem', 
@@ -319,11 +302,7 @@ export default function EnhancedTVDisplay() {
             fontSize: '1rem',
             opacity: 0.9
           }}>
-            {isConnected ? '🟢' : '🔴'} Database: {isConnected ? 'Connected' : 'Reconnecting...'}
-            <br />
-            <span style={{ fontSize: '0.85rem', opacity: 0.8 }}>
-              Last update: {lastUpdate.toLocaleTimeString()} • Attempts: {connectionAttempts}
-            </span>
+            {isConnected ? '🟢' : '🔴'} System: {isConnected ? 'Ready' : 'Connecting...'}
           </div>
 
           {/* Album context status */}
@@ -338,78 +317,43 @@ export default function EnhancedTVDisplay() {
               opacity: 0.9
             }}>
               🎯 Album Context: <strong>{albumContext.artist} - {albumContext.title}</strong>
-              <br />
-              <span style={{ fontSize: '0.85rem', opacity: 0.8 }}>
-                Set {getAlbumContextAge()} • Ready for track recognition
-              </span>
             </div>
           )}
-
-          <div style={{
-            fontSize: '0.9rem',
-            opacity: 0.6,
-            background: 'rgba(255,255,255,0.1)',
-            padding: '12px 20px',
-            borderRadius: 8,
-            display: 'inline-block'
-          }}>
-            Mode: {recognitionMode} • Press &apos;F&apos; to force refresh • Press &apos;C&apos; to clear • Press &apos;D&apos; for debug
-          </div>
         </div>
 
-        {/* Enhanced Debug overlay */}
+        {/* Debug overlay */}
         {showDebug && (
           <div style={{
             position: 'absolute',
-            top: 20,
+            bottom: 20,
             right: 20,
             background: 'rgba(0,0,0,0.9)',
             padding: 16,
             borderRadius: 8,
             fontSize: 11,
             fontFamily: 'monospace',
-            zIndex: 10,
-            minWidth: 400,
-            maxHeight: '80vh',
-            overflowY: 'auto'
+            maxWidth: 400
           }}>
-            <div><strong>Connection Status:</strong> {isConnected ? '🟢 Connected' : '🔴 Disconnected'}</div>
-            <div><strong>Recognition Mode:</strong> {recognitionMode}</div>
-            <div><strong>Last Update:</strong> {lastUpdate.toLocaleString()}</div>
-            <div><strong>Connection Attempts:</strong> {connectionAttempts}</div>
-            <div><strong>Force Refreshes:</strong> {forceRefreshCount}</div>
-            <hr style={{ margin: '8px 0', opacity: 0.3 }} />
-            <div><strong>Current Track Data:</strong></div>
-            <pre style={{ fontSize: 10, maxHeight: 200, overflow: 'auto', background: 'rgba(255,255,255,0.1)', padding: 8, borderRadius: 4 }}>
-              {JSON.stringify(currentTrack, null, 2)}
-            </pre>
-            <hr style={{ margin: '8px 0', opacity: 0.3 }} />
-            <div><strong>Album Context:</strong> {albumContext ? 'Active' : 'None'}</div>
-            {albumContext && (
-              <pre style={{ fontSize: 10, maxHeight: 150, overflow: 'auto', background: 'rgba(255,255,255,0.1)', padding: 8, borderRadius: 4 }}>
-                {JSON.stringify(albumContext, null, 2)}
-              </pre>
-            )}
-            <hr style={{ margin: '8px 0', opacity: 0.3 }} />
-            <div><strong>Keyboard Commands:</strong></div>
-            <div style={{ fontSize: 10 }}>
-              • F: Force refresh<br/>
-              • C: Clear now playing<br/>
-              • D: Toggle debug
-            </div>
+            <div><strong>Status:</strong> {isConnected ? 'Connected' : 'Disconnected'}</div>
+            <div><strong>Last Update:</strong> {lastUpdate.toLocaleTimeString()}</div>
+            <div><strong>Commands:</strong> D=debug, F=refresh</div>
           </div>
         )}
       </div>
     );
   }
 
-  // Display logic: ALWAYS use recognition data for track/album/artist names
+  // Display logic with enhanced collection matching
   const displayArtist = currentTrack.artist;
   const displayTrackTitle = currentTrack.title;
   const displayAlbumTitle = currentTrack.album_title;
   const displayYear = currentTrack.collection?.year;
-  const displayImage = currentTrack.recognition_image_url || currentTrack.collection?.image_url;
+  
+  // Use collection image if available, otherwise recognition image
+  const displayImage = currentTrack.collection?.image_url || currentTrack.recognition_image_url;
   const displayFormat = currentTrack.collection?.folder;
+  
+  // Determine if this is guest vinyl or from collection
   const isGuestVinyl = !currentTrack.collection;
 
   // Determine if this track is part of the current album context
@@ -419,16 +363,6 @@ export default function EnhancedTVDisplay() {
      albumContext.track_listing?.some(track => 
        track.toLowerCase() === currentTrack.title?.toLowerCase()
      ));
-
-  // Format track info
-  const trackInfo = [];
-  if (currentTrack.track_side) {
-    trackInfo.push(`Side ${currentTrack.track_side}`);
-  }
-  if (currentTrack.track_number) {
-    trackInfo.push(`Track ${currentTrack.track_number}`);
-  }
-  const trackInfoString = trackInfo.length > 0 ? trackInfo.join(' • ') : '';
 
   return (
     <div 
@@ -459,6 +393,57 @@ export default function EnhancedTVDisplay() {
         }} />
       )}
 
+      {/* Logos */}
+      <div style={{
+        position: 'absolute',
+        top: '30px',
+        left: '30px',
+        right: '30px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        zIndex: 10
+      }}>
+        <Image
+          src="https://drive.google.com/uc?export=view&id=1SHEq1g_k_0ooTYsDEqcUXN_vVsuwiBNQ"
+          alt="Dead Wax Dialogues"
+          width={120}
+          height={60}
+          style={{
+            filter: 'brightness(0) invert(1)',
+            opacity: 0.8
+          }}
+          unoptimized
+        />
+        <Image
+          src="https://byo.com/wp-content/uploads/Devils-Purse-logo.jpg"
+          alt="Devil's Purse"
+          width={120}
+          height={60}
+          style={{
+            opacity: 0.8,
+            borderRadius: '8px'
+          }}
+          unoptimized
+        />
+      </div>
+
+      {/* Now Playing Header */}
+      <div style={{
+        position: 'absolute',
+        top: '120px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        fontSize: '2.5rem',
+        fontWeight: 'bold',
+        opacity: 0.9,
+        letterSpacing: '0.1em',
+        textTransform: 'uppercase',
+        zIndex: 10
+      }}>
+        Now Playing
+      </div>
+
       {/* Main content */}
       <div style={{ 
         display: 'flex',
@@ -468,7 +453,8 @@ export default function EnhancedTVDisplay() {
         position: 'relative',
         zIndex: 1,
         maxWidth: '1400px',
-        margin: '0 auto'
+        margin: '120px auto 0',
+        height: 'calc(100vh - 240px)'
       }}>
         
         {/* Album Art */}
@@ -492,7 +478,7 @@ export default function EnhancedTVDisplay() {
               priority
             />
             
-            {/* Format/Context badge */}
+            {/* Format/Status badge */}
             {displayFormat ? (
               <div style={{
                 position: 'absolute',
@@ -586,26 +572,13 @@ export default function EnhancedTVDisplay() {
           {/* Artist */}
           <p style={{ 
             fontSize: '2.8rem', 
-            margin: '0 0 1rem 0',
+            margin: '0 0 2rem 0',
             opacity: 0.9,
             fontWeight: 500,
             textShadow: '0 2px 10px rgba(0,0,0,0.5)'
           }}>
             {displayArtist}
           </p>
-          
-          {/* Track/Side Info */}
-          {trackInfoString && (
-            <p style={{ 
-              fontSize: '1.6rem', 
-              margin: '0 0 1rem 0',
-              opacity: 0.7,
-              fontWeight: 400,
-              color: '#fbbf24'
-            }}>
-              {trackInfoString}
-            </p>
-          )}
           
           {/* Year */}
           <p style={{ 
@@ -617,14 +590,13 @@ export default function EnhancedTVDisplay() {
             {displayYear || (isGuestVinyl ? 'Guest Vinyl' : 'Unknown Year')}
           </p>
 
-          {/* Recognition info */}
+          {/* Live indicator */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '2rem',
+            gap: '1rem',
             fontSize: '1.2rem',
-            opacity: 0.8,
-            marginBottom: '2rem'
+            opacity: 0.8
           }}>
             <div style={{
               display: 'flex',
@@ -638,33 +610,11 @@ export default function EnhancedTVDisplay() {
                 borderRadius: '50%',
                 animation: isConnected ? 'pulse 2s infinite' : 'none'
               }} />
-              <span>{isConnected ? 'Live' : 'Offline'} • Now Playing</span>
+              <span>{isConnected ? 'Live' : 'Offline'}</span>
             </div>
-            
-            {/* Elapsed time */}
-            {getElapsedTime() && getElapsedTime() !== '0:00' && (
-              <>
-                <span>•</span>
-                <span>{getElapsedTime()}</span>
-              </>
-            )}
-
-            {/* Confidence indicator */}
-            {currentTrack.recognition_confidence && (
-              <>
-                <span>•</span>
-                <span>{Math.round(currentTrack.recognition_confidence * 100)}% confidence</span>
-              </>
-            )}
-
-            {/* Update info */}
-            <span>•</span>
-            <span style={{ fontSize: '1rem' }}>
-              Updated: {new Date(currentTrack.updated_at || Date.now()).toLocaleTimeString()}
-            </span>
           </div>
 
-          {/* Album context info */}
+          {/* Album context info (simplified) */}
           {albumContext && (
             <div style={{
               background: 'rgba(34, 197, 94, 0.2)',
@@ -672,11 +622,12 @@ export default function EnhancedTVDisplay() {
               borderRadius: 12,
               padding: '16px 20px',
               fontSize: '1rem',
-              opacity: 0.9
+              opacity: 0.9,
+              marginTop: '2rem'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span>🎯</span>
-                <strong>Album Context Active</strong>
+                <strong>Album Context: {albumContext.artist} - {albumContext.title}</strong>
                 {isFromAlbumContext && (
                   <span style={{ 
                     background: '#22c55e',
@@ -684,118 +635,37 @@ export default function EnhancedTVDisplay() {
                     padding: '2px 8px',
                     borderRadius: '10px',
                     fontSize: '0.8rem',
-                    fontWeight: 'bold'
+                    fontWeight: 'bold',
+                    marginLeft: '8px'
                   }}>
                     MATCHED
                   </span>
                 )}
-              </div>
-              <div style={{ fontSize: '0.9rem', opacity: 0.9 }}>
-                {albumContext.artist} - {albumContext.title}
-                {albumContext.track_count && ` (${albumContext.track_count} tracks)`}
-              </div>
-              <div style={{ fontSize: '0.8rem', opacity: 0.7, marginTop: '4px' }}>
-                Set {getAlbumContextAge()} • Source: {albumContext.source || 'unknown'}
               </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* Enhanced footer */}
-      <div style={{ 
-        position: 'absolute',
-        bottom: '2rem',
-        left: '2rem',
-        right: '2rem',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        fontSize: '0.9rem',
-        opacity: 0.6,
-        zIndex: 1
-      }}>
-        <span>Dead Wax Dialogues</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', fontSize: '0.8rem' }}>
-          <span>Mode: {recognitionMode}</span>
-          <span>•</span>
-          <span>F=refresh, C=clear, D=debug</span>
-          <span>•</span>
-          <span>{isConnected ? '🟢 Live' : '🔴 Offline'}</span>
-          <span>•</span>
-          <span>Refreshes: {forceRefreshCount}</span>
-        </div>
-      </div>
-
-      {/* Enhanced Debug overlay */}
+      {/* Debug overlay */}
       {showDebug && (
         <div style={{
           position: 'absolute',
-          top: 20,
+          bottom: 20,
           right: 20,
-          background: 'rgba(0,0,0,0.95)',
-          padding: 20,
-          borderRadius: 12,
+          background: 'rgba(0,0,0,0.9)',
+          padding: 16,
+          borderRadius: 8,
           fontSize: 11,
           fontFamily: 'monospace',
-          zIndex: 10,
-          minWidth: 400,
-          maxHeight: '80vh',
-          overflowY: 'auto',
-          border: '1px solid rgba(255,255,255,0.2)'
+          maxWidth: 400,
+          zIndex: 10
         }}>
-          <div style={{ marginBottom: 12, fontSize: 14, fontWeight: 'bold', color: '#fbbf24' }}>🔧 TV Display Debug</div>
-          
-          <div><strong>Connection:</strong> {isConnected ? '🟢 Connected' : '🔴 Disconnected'}</div>
-          <div><strong>Last Update:</strong> {lastUpdate.toLocaleString()}</div>
-          <div><strong>Connection Attempts:</strong> {connectionAttempts}</div>
-          <div><strong>Force Refreshes:</strong> {forceRefreshCount}</div>
-          <div><strong>Recognition Mode:</strong> {recognitionMode}</div>
-          <div><strong>Source:</strong> {isGuestVinyl ? 'Guest Vinyl' : 'Collection'}</div>
-          <div><strong>Album ID:</strong> {currentTrack.album_id || 'None'}</div>
-          <div><strong>Track Title:</strong> {displayTrackTitle || 'None'}</div>
-          <div><strong>Album Title:</strong> {displayAlbumTitle || 'None'}</div>
-          <div><strong>Track Info:</strong> {trackInfoString || 'None'}</div>
-          <div><strong>Recognition Art:</strong> {currentTrack.recognition_image_url ? 'Yes' : 'No'}</div>
-          <div><strong>Collection Art:</strong> {currentTrack.collection?.image_url ? 'Yes' : 'No'}</div>
-          <div><strong>Using:</strong> {displayImage ? (currentTrack.recognition_image_url ? 'Recognition' : 'Collection') : 'Placeholder'}</div>
-          <div><strong>Service:</strong> {currentTrack.service_used || 'Unknown'}</div>
-          <div><strong>Confidence:</strong> {currentTrack.recognition_confidence ? Math.round(currentTrack.recognition_confidence * 100) + '%' : 'Unknown'}</div>
-          <div><strong>Started:</strong> {currentTrack.started_at ? new Date(currentTrack.started_at).toLocaleTimeString() : 'Unknown'}</div>
-          <div><strong>Updated:</strong> {currentTrack.updated_at ? new Date(currentTrack.updated_at).toLocaleTimeString() : 'Unknown'}</div>
-          
-          <hr style={{ margin: '12px 0', opacity: 0.3 }} />
-          <div><strong>Album Context:</strong> {albumContext ? 'Active' : 'None'}</div>
-          {albumContext && (
-            <>
-              <div><strong>Context Album:</strong> {albumContext.title}</div>
-              <div><strong>Context Artist:</strong> {albumContext.artist}</div>
-              <div><strong>Track Count:</strong> {albumContext.track_count || 'Unknown'}</div>
-              <div><strong>From Context:</strong> {isFromAlbumContext ? 'Yes' : 'No'}</div>
-              <div><strong>Context Age:</strong> {getAlbumContextAge()}</div>
-            </>
-          )}
-          
-          <hr style={{ margin: '12px 0', opacity: 0.3 }} />
-          <div><strong>Raw Data:</strong></div>
-          <pre style={{ 
-            fontSize: 9, 
-            maxHeight: 200, 
-            overflow: 'auto', 
-            background: 'rgba(255,255,255,0.1)', 
-            padding: 8, 
-            borderRadius: 4,
-            margin: '8px 0'
-          }}>
-            {JSON.stringify(currentTrack, null, 2)}
-          </pre>
-          
-          <div style={{ marginTop: 12, fontSize: 10, color: '#888' }}>
-            <strong>Keyboard Commands:</strong><br/>
-            • F: Force refresh all data<br/>
-            • C: Clear now playing<br/>
-            • D: Toggle this debug panel
-          </div>
+          <div><strong>Status:</strong> {isConnected ? 'Connected' : 'Disconnected'}</div>
+          <div><strong>Collection Match:</strong> {currentTrack.collection ? 'Yes' : 'No'}</div>
+          <div><strong>Guest Vinyl:</strong> {isGuestVinyl ? 'Yes' : 'No'}</div>
+          <div><strong>Last Update:</strong> {lastUpdate.toLocaleTimeString()}</div>
+          <div><strong>Commands:</strong> D=debug, F=refresh</div>
         </div>
       )}
 
