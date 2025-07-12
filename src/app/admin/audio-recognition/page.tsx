@@ -1,4 +1,4 @@
-// src/app/admin/audio-recognition/page.tsx - Album-Aware Recognition System
+// src/app/admin/audio-recognition/page.tsx - Enhanced with visual feedback and history
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -36,6 +36,14 @@ interface RecognitionCandidate {
   service?: string;
 }
 
+interface RecognitionHistoryItem {
+  timestamp: string;
+  result: RecognitionResult;
+  candidates?: RecognitionCandidate[];
+  success: boolean;
+  error?: string;
+}
+
 export default function AlbumAwareRecognitionSystem() {
   const [isListening, setIsListening] = useState<boolean>(false);
   const [recognitionMode, setRecognitionMode] = useState<'manual' | 'smart_continuous' | 'album_follow'>('album_follow');
@@ -50,6 +58,12 @@ export default function AlbumAwareRecognitionSystem() {
   const [sampleDuration, setSampleDuration] = useState<number>(15);
   const [smartInterval, setSmartInterval] = useState<number>(30);
   
+  // New state for visual feedback
+  const [nextRecognitionCountdown, setNextRecognitionCountdown] = useState<number>(0);
+  const [recognitionHistory, setRecognitionHistory] = useState<RecognitionHistoryItem[]>([]);
+  const [isRecording, setIsRecording] = useState<boolean>(false);
+  const [recordingProgress, setRecordingProgress] = useState<number>(0);
+  
   // Refs for audio handling
   const streamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -60,6 +74,8 @@ export default function AlbumAwareRecognitionSystem() {
   const silenceCountRef = useRef<number>(0);
   const audioContextRef = useRef<AudioContext | null>(null);
   const songChangeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Load album context on component mount
   const clearAlbumContext = useCallback(async (): Promise<void> => {
@@ -82,7 +98,6 @@ export default function AlbumAwareRecognitionSystem() {
         .single();
       
       if (!error && data) {
-        // Check if context is still valid (less than 2 hours old)
         const contextAge = Date.now() - new Date(data.created_at).getTime();
         const maxAge = 2 * 60 * 60 * 1000; // 2 hours
         
@@ -107,6 +122,7 @@ export default function AlbumAwareRecognitionSystem() {
     };
   }, [loadCurrentAlbumContext]);
 
+  // Enhanced startListening with visual feedback
   const startListening = async (): Promise<void> => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -148,16 +164,17 @@ export default function AlbumAwareRecognitionSystem() {
   const stopListening = (): void => {
     setIsListening(false);
     isListeningRef.current = false;
+    setIsRecording(false);
+    setRecordingProgress(0);
+    setNextRecognitionCountdown(0);
     
-    if (recognitionTimeoutRef.current) {
-      clearTimeout(recognitionTimeoutRef.current);
-      recognitionTimeoutRef.current = null;
-    }
-
-    if (songChangeTimeoutRef.current) {
-      clearTimeout(songChangeTimeoutRef.current);
-      songChangeTimeoutRef.current = null;
-    }
+    // Clear all intervals and timeouts
+    [recognitionTimeoutRef, songChangeTimeoutRef, countdownIntervalRef, recordingIntervalRef].forEach(ref => {
+      if (ref.current) {
+        clearTimeout(ref.current);
+        ref.current = null;
+      }
+    });
 
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.stop();
@@ -191,7 +208,7 @@ export default function AlbumAwareRecognitionSystem() {
         if (isListeningRef.current) {
           const interval = smartInterval;
           setStatus(`Next sample in ${interval}s (smart mode)`);
-          recognitionTimeoutRef.current = setTimeout(smartSample, interval * 1000);
+          startCountdown(interval, smartSample);
         }
       });
     };
@@ -259,6 +276,7 @@ export default function AlbumAwareRecognitionSystem() {
     songChangeTimeoutRef.current = setTimeout(() => detectSongChange(analyser), 500);
   };
 
+  // Enhanced recording with progress tracking
   const recordAndAnalyze = (onComplete: () => void): void => {
     if (!streamRef.current) return;
 
@@ -268,6 +286,16 @@ export default function AlbumAwareRecognitionSystem() {
     
     mediaRecorderRef.current = mediaRecorder;
     audioChunksRef.current = [];
+    setIsRecording(true);
+    setRecordingProgress(0);
+
+    // Track recording progress
+    const startTime = Date.now();
+    recordingIntervalRef.current = setInterval(() => {
+      const elapsed = (Date.now() - startTime) / 1000;
+      const progress = Math.min((elapsed / sampleDuration) * 100, 100);
+      setRecordingProgress(progress);
+    }, 100);
 
     mediaRecorder.ondataavailable = (event: BlobEvent) => {
       if (event.data.size > 0) {
@@ -276,6 +304,13 @@ export default function AlbumAwareRecognitionSystem() {
     };
 
     mediaRecorder.onstop = async () => {
+      setIsRecording(false);
+      setRecordingProgress(0);
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current);
+        recordingIntervalRef.current = null;
+      }
+      
       const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
       await analyzeAudio(audioBlob);
       onComplete();
@@ -291,6 +326,26 @@ export default function AlbumAwareRecognitionSystem() {
     }, sampleDuration * 1000);
   };
 
+  // Enhanced countdown with visual feedback
+  const startCountdown = (seconds: number, callback: () => void): void => {
+    setNextRecognitionCountdown(seconds);
+    
+    countdownIntervalRef.current = setInterval(() => {
+      setNextRecognitionCountdown(prev => {
+        if (prev <= 1) {
+          if (countdownIntervalRef.current) {
+            clearInterval(countdownIntervalRef.current);
+            countdownIntervalRef.current = null;
+          }
+          callback();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  // Enhanced analysis with history tracking and TV update
   const analyzeAudio = async (audioBlob: Blob): Promise<void> => {
     setStatus('Analyzing audio...');
     
@@ -310,6 +365,16 @@ export default function AlbumAwareRecognitionSystem() {
       const result = await response.json();
       console.log('Full API response:', result);
       
+      const historyItem: RecognitionHistoryItem = {
+        timestamp: new Date().toISOString(),
+        success: result.success,
+        result: result.track || { artist: '', title: '' },
+        candidates: result.candidates || [],
+        error: result.error
+      };
+      
+      setRecognitionHistory(prev => [historyItem, ...prev.slice(0, 9)]); // Keep last 10
+      
       if (result.success && result.track) {
         console.log('Recognition result:', result.track);
         
@@ -321,8 +386,10 @@ export default function AlbumAwareRecognitionSystem() {
         
         setLastRecognition(result.track);
         
-        // Update status based on recognition result
-        let statusMessage = `Now Playing: ${result.track.artist} - ${result.track.title}`;
+        // Update TV display automatically
+        await updateNowPlaying(result.track);
+        
+        let statusMessage = `✅ Now Playing: ${result.track.artist} - ${result.track.title}`;
         if (result.track.album) {
           statusMessage += ` (${result.track.album})`;
         }
@@ -331,7 +398,6 @@ export default function AlbumAwareRecognitionSystem() {
           statusMessage += ' [Album Context Used]';
         } else if (result.albumContextSwitched) {
           statusMessage += ' [Album Context Switched]';
-          // Reload album context since it may have changed
           await loadCurrentAlbumContext();
         }
         
@@ -343,7 +409,41 @@ export default function AlbumAwareRecognitionSystem() {
     } catch (error: unknown) {
       console.error('Recognition error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      const errorHistoryItem: RecognitionHistoryItem = {
+        timestamp: new Date().toISOString(),
+        success: false,
+        result: { artist: '', title: '' },
+        error: errorMessage
+      };
+      setRecognitionHistory(prev => [errorHistoryItem, ...prev.slice(0, 9)]);
       setStatus(`Recognition error: ${errorMessage}`);
+    }
+  };
+
+  // New function to update TV display
+  const updateNowPlaying = async (track: RecognitionResult): Promise<void> => {
+    try {
+      const { error } = await supabase
+        .from('now_playing')
+        .upsert({
+          id: 1,
+          artist: track.artist,
+          title: track.title,
+          album_title: track.album,
+          recognition_image_url: track.image_url,
+          started_at: new Date().toISOString(),
+          recognition_confidence: track.confidence || 0.8,
+          service_used: track.service || 'Unknown',
+          updated_at: new Date().toISOString()
+        });
+
+      if (error) {
+        console.error('Error updating now playing:', error);
+      } else {
+        console.log('TV display updated successfully');
+      }
+    } catch (error) {
+      console.error('Error updating TV display:', error);
     }
   };
 
@@ -365,7 +465,7 @@ export default function AlbumAwareRecognitionSystem() {
         body: JSON.stringify({
           artist: manualArtist.trim(),
           album: manualAlbum.trim() || undefined,
-          setAsContext: !!(manualAlbum.trim()) // Set context if album specified
+          setAsContext: !!(manualAlbum.trim())
         })
       });
 
@@ -403,15 +503,18 @@ export default function AlbumAwareRecognitionSystem() {
   const selectRecognitionCandidate = async (candidate: RecognitionCandidate): Promise<void> => {
     setLastRecognition(candidate);
     setShowCandidates(false);
-    setStatus(`Selected: ${candidate.artist} - ${candidate.title}`);
+    
+    // Update TV display with selected candidate
+    await updateNowPlaying(candidate);
+    setStatus(`✅ Selected: ${candidate.artist} - ${candidate.title}`);
   };
 
   const forceRecognitionUpdate = async (): Promise<void> => {
     if (!lastRecognition) return;
     
     setStatus('Forcing TV display update...');
-    // This would typically call the now_playing update endpoint
-    setStatus('TV display force updated');
+    await updateNowPlaying(lastRecognition);
+    setStatus('✅ TV display force updated');
   };
 
   const getContextAge = (): string => {
@@ -474,9 +577,6 @@ export default function AlbumAwareRecognitionSystem() {
               {albumContext.folder && ` ${albumContext.folder} • `}
               Set {getContextAge()}
             </div>
-            <div style={{ fontSize: 12, color: "#888" }}>
-              System will try to identify tracks from this album first, then fall back to general recognition if no match.
-            </div>
           </div>
           <button
             onClick={clearAlbumContext}
@@ -495,21 +595,106 @@ export default function AlbumAwareRecognitionSystem() {
         </div>
       )}
 
-      {!albumContext && (
+      {/* Recognition Status with Visual Feedback */}
+      <div style={{ 
+        background: "#f0f9ff", 
+        padding: 24, 
+        borderRadius: 8, 
+        marginBottom: 24,
+        border: "1px solid #0369a1"
+      }}>
+        <h2 style={{ marginTop: 0, marginBottom: 16 }}>Recognition Status</h2>
+        
+        {/* Live Status Display */}
         <div style={{ 
-          background: "#fef3c7", 
-          padding: 20, 
-          borderRadius: 8, 
-          marginBottom: 24,
-          border: "1px solid #f59e0b"
+          display: "flex", 
+          alignItems: "center", 
+          gap: 16, 
+          marginBottom: 16,
+          padding: 16,
+          background: isListening ? "#dcfce7" : "#f1f5f9",
+          borderRadius: 8,
+          border: `2px solid ${isListening ? "#16a34a" : "#64748b"}`
         }}>
-          <h3 style={{ margin: 0, marginBottom: 8, color: "#92400e" }}>💡 No Album Context</h3>
-          <div style={{ fontSize: 14, color: "#92400e" }}>
-            System is in general recognition mode. Set an album context below to improve track identification for specific albums.
+          <div style={{
+            width: 20,
+            height: 20,
+            borderRadius: "50%",
+            background: isListening ? "#16a34a" : "#64748b",
+            animation: isListening ? "pulse 2s infinite" : "none"
+          }} />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 600, marginBottom: 4 }}>
+              Status: {isListening ? "Active" : "Stopped"}
+            </div>
+            <div style={{ fontSize: 14, color: "#666" }}>
+              {status || "Ready to start recognition"}
+            </div>
           </div>
         </div>
-      )}
-      
+
+        {/* Recording Progress */}
+        {isRecording && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ 
+              display: "flex", 
+              justifyContent: "space-between", 
+              marginBottom: 8,
+              fontSize: 14,
+              fontWeight: 600
+            }}>
+              <span>Recording Audio Sample</span>
+              <span>{Math.round(recordingProgress)}%</span>
+            </div>
+            <div style={{
+              width: "100%",
+              height: 8,
+              background: "#e5e7eb",
+              borderRadius: 4,
+              overflow: "hidden"
+            }}>
+              <div style={{
+                width: `${recordingProgress}%`,
+                height: "100%",
+                background: "#16a34a",
+                transition: "width 0.1s ease"
+              }} />
+            </div>
+          </div>
+        )}
+
+        {/* Countdown Timer */}
+        {nextRecognitionCountdown > 0 && !isRecording && (
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            padding: 12,
+            background: "#fbbf24",
+            color: "white",
+            borderRadius: 6,
+            marginBottom: 16
+          }}>
+            <div style={{
+              width: 16,
+              height: 16,
+              borderRadius: "50%",
+              background: "white",
+              color: "#fbbf24",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 12,
+              fontWeight: "bold"
+            }}>
+              {nextRecognitionCountdown}
+            </div>
+            <span>Next recognition in {nextRecognitionCountdown} seconds...</span>
+          </div>
+        )}
+      </div>
+
+      {/* Recognition Mode Configuration - keeping existing code */}
       <div style={{ 
         background: "#f0f9ff", 
         padding: 24, 
@@ -551,7 +736,7 @@ export default function AlbumAwareRecognitionSystem() {
           ))}
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
           <div>
             <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>
               Sample Duration (seconds)
@@ -594,7 +779,7 @@ export default function AlbumAwareRecognitionSystem() {
         </div>
       </div>
 
-      {/* Album Context Setting */}
+      {/* Album Context Setting - keeping existing code */}
       <div style={{ 
         background: "#fff7ed", 
         padding: 24, 
@@ -666,7 +851,71 @@ export default function AlbumAwareRecognitionSystem() {
         </div>
       </div>
 
-      {/* Recognition Candidates */}
+      {/* Recognition History */}
+      {recognitionHistory.length > 0 && (
+        <div style={{ 
+          background: "#f8fafc", 
+          padding: 24, 
+          borderRadius: 8, 
+          marginBottom: 24,
+          border: "1px solid #cbd5e1"
+        }}>
+          <h3 style={{ margin: 0, marginBottom: 16, color: "#1e293b" }}>Recognition History</h3>
+          <div style={{ display: "grid", gap: 12 }}>
+            {recognitionHistory.map((item, index) => (
+              <div 
+                key={index}
+                style={{
+                  background: item.success ? "#f0fdf4" : "#fef2f2",
+                  border: `1px solid ${item.success ? "#bbf7d0" : "#fca5a5"}`,
+                  borderRadius: 8,
+                  padding: 16,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12
+                }}
+              >
+                <div style={{
+                  width: 12,
+                  height: 12,
+                  borderRadius: "50%",
+                  background: item.success ? "#16a34a" : "#dc2626",
+                  flexShrink: 0
+                }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                    {item.success ? (
+                      `${item.result.artist} - ${item.result.title}`
+                    ) : (
+                      "Recognition Failed"
+                    )}
+                  </div>
+                  <div style={{ fontSize: 12, color: "#666" }}>
+                    {new Date(item.timestamp).toLocaleTimeString()} • 
+                    {item.success ? (
+                      <span> Confidence: {Math.round((item.result.confidence || 0.8) * 100)}%</span>
+                    ) : (
+                      <span> Error: {item.error}</span>
+                    )}
+                  </div>
+                </div>
+                {item.success && item.result.image_url && (
+                  <Image
+                    src={item.result.image_url}
+                    alt={item.result.title}
+                    width={40}
+                    height={40}
+                    style={{ objectFit: "cover", borderRadius: 4 }}
+                    unoptimized
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Enhanced Recognition Candidates with images */}
       {recognitionCandidates.length > 0 && (
         <div style={{ 
           background: "#fffbeb", 
@@ -721,23 +970,21 @@ export default function AlbumAwareRecognitionSystem() {
                     e.currentTarget.style.background = "#fff";
                   }}
                 >
-                  {candidate.image_url && (
-                    <Image 
-                      src={candidate.image_url}
-                      alt={candidate.album || candidate.title}
-                      width={60}
-                      height={60}
-                      style={{ objectFit: "cover", borderRadius: 6 }}
-                      unoptimized
-                    />
-                  )}
+                  <Image 
+                    src={candidate.image_url || '/images/coverplaceholder.png'}
+                    alt={candidate.album || candidate.title}
+                    width={60}
+                    height={60}
+                    style={{ objectFit: "cover", borderRadius: 6 }}
+                    unoptimized
+                  />
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 600, marginBottom: 4 }}>{candidate.title}</div>
                     <div style={{ fontSize: 14, color: "#666", marginBottom: 4 }}>
                       {candidate.artist} {candidate.album && `• ${candidate.album}`}
                     </div>
                     <div style={{ fontSize: 12, color: "#888" }}>
-                      {Math.round((candidate.confidence || 0.8) * 100)}% confidence
+                      {Math.round((candidate.confidence || 0.8) * 100)}% confidence • {candidate.service || 'Unknown'}
                     </div>
                   </div>
                 </div>
@@ -795,21 +1042,9 @@ export default function AlbumAwareRecognitionSystem() {
             Force TV Update
           </button>
         </div>
-
-        {status && (
-          <div style={{ 
-            background: "#fff", 
-            padding: 12, 
-            borderRadius: 4, 
-            fontSize: 14,
-            border: "1px solid #d1d5db"
-          }}>
-            <strong>Status:</strong> {status}
-          </div>
-        )}
       </div>
 
-      {/* Recognition Results */}
+      {/* Recognition Results - keeping existing code but enhanced */}
       {lastRecognition && (
         <div style={{ 
           background: "#f0fdf4", 
@@ -817,24 +1052,34 @@ export default function AlbumAwareRecognitionSystem() {
           borderRadius: 8, 
           border: "1px solid #16a34a"
         }}>
-          <h3 style={{ marginTop: 0, marginBottom: 16 }}>Recognition Results</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
-            <div><strong>Artist:</strong> {lastRecognition.artist}</div>
-            <div><strong>Track:</strong> {lastRecognition.title}</div>
-            <div><strong>Album:</strong> {lastRecognition.album || 'Not provided'}</div>
-            <div><strong>Confidence:</strong> {Math.round((lastRecognition.confidence || 0.8) * 100)}%</div>
-            <div><strong>Service:</strong> {lastRecognition.service || 'ACRCloud'}</div>
-            <div><strong>Has Artwork:</strong> {lastRecognition.image_url ? 'Yes' : 'No'}</div>
-          </div>
-          
-          {lastRecognition.image_url && (
-            <div style={{ marginTop: 12, padding: 12, background: "#fff", borderRadius: 4, fontSize: 12 }}>
-              <strong>Artwork URL:</strong><br/>
-              <a href={lastRecognition.image_url} target="_blank" rel="noopener noreferrer" style={{ color: "#2563eb", wordBreak: "break-all" }}>
-                {lastRecognition.image_url}
-              </a>
+          <h3 style={{ marginTop: 0, marginBottom: 16 }}>Last Recognition Result</h3>
+          <div style={{ display: "flex", gap: 16, alignItems: "center", marginBottom: 16 }}>
+            <Image 
+              src={lastRecognition.image_url || '/images/coverplaceholder.png'}
+              alt={lastRecognition.album || lastRecognition.title}
+              width={80}
+              height={80}
+              style={{ objectFit: "cover", borderRadius: 8 }}
+              unoptimized
+            />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 4 }}>
+                {lastRecognition.title}
+              </div>
+              <div style={{ fontSize: 16, color: "#666", marginBottom: 4 }}>
+                {lastRecognition.artist}
+              </div>
+              {lastRecognition.album && (
+                <div style={{ fontSize: 14, color: "#888", marginBottom: 4 }}>
+                  Album: {lastRecognition.album}
+                </div>
+              )}
+              <div style={{ fontSize: 12, color: "#888" }}>
+                {Math.round((lastRecognition.confidence || 0.8) * 100)}% confidence • 
+                Service: {lastRecognition.service || 'Unknown'}
+              </div>
             </div>
-          )}
+          </div>
         </div>
       )}
 

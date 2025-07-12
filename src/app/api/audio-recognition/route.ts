@@ -1,4 +1,4 @@
-// src/app/api/audio-recognition/route.ts - Enhanced with candidates
+// src/app/api/audio-recognition/route.ts - Enhanced with multi-service artwork fallback
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 
@@ -14,8 +14,10 @@ interface RecognitionTrack {
 interface RecognitionResult {
   success: boolean;
   track?: RecognitionTrack;
-  candidates?: RecognitionTrack[]; // Additional matches for correction
+  candidates?: RecognitionTrack[]; 
   error?: string;
+  albumContextUsed?: boolean;
+  albumContextSwitched?: boolean;
 }
 
 interface ServiceConfig {
@@ -74,6 +76,190 @@ function generateACRCloudSignature(
   return crypto.createHmac('sha1', accessSecret).update(stringToSign).digest('base64');
 }
 
+// Enhanced artwork search across multiple services
+async function searchForArtwork(artist: string, album?: string): Promise<string | undefined> {
+  console.log(`Searching for artwork: ${artist}${album ? ` - ${album}` : ''}`);
+  
+  // Try Spotify first
+  try {
+    const spotifyArtwork = await searchSpotifyArtwork(artist, album);
+    if (spotifyArtwork) {
+      console.log('Found artwork via Spotify');
+      return spotifyArtwork;
+    }
+  } catch (error) {
+    console.warn('Spotify artwork search failed:', error);
+  }
+
+  // Try Last.fm as fallback
+  try {
+    const lastfmArtwork = await searchLastFmArtwork(artist, album);
+    if (lastfmArtwork) {
+      console.log('Found artwork via Last.fm');
+      return lastfmArtwork;
+    }
+  } catch (error) {
+    console.warn('Last.fm artwork search failed:', error);
+  }
+
+  // Try MusicBrainz + Cover Art Archive as final fallback
+  try {
+    const mbArtwork = await searchMusicBrainzArtwork(artist, album);
+    if (mbArtwork) {
+      console.log('Found artwork via MusicBrainz/Cover Art Archive');
+      return mbArtwork;
+    }
+  } catch (error) {
+    console.warn('MusicBrainz artwork search failed:', error);
+  }
+
+  console.log('No artwork found across all services');
+  return undefined;
+}
+
+interface LastFmImage {
+  '#text': string;
+  size: string;
+}
+
+interface LastFmAlbum {
+  name: string;
+  image?: LastFmImage[];
+}
+
+interface LastFmAlbumResponse {
+  album?: LastFmAlbum;
+  error?: number;
+}
+
+interface LastFmTopAlbumsResponse {
+  topalbums?: {
+    album?: LastFmAlbum | LastFmAlbum[];
+  };
+}
+
+async function searchSpotifyArtwork(artist: string, album?: string): Promise<string | undefined> {
+  if (!process.env.SPOTIFY_CLIENT_ID || !process.env.SPOTIFY_CLIENT_SECRET) {
+    return undefined;
+  }
+
+  try {
+    // Get access token
+    const tokenResponse = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': `Basic ${Buffer.from(`${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`).toString('base64')}`
+      },
+      body: 'grant_type=client_credentials'
+    });
+
+    if (!tokenResponse.ok) return undefined;
+
+    const tokenData = await tokenResponse.json();
+    const accessToken = tokenData.access_token;
+
+    // Search for the album
+    const query = album ? `artist:"${artist}" album:"${album}"` : `artist:"${artist}"`;
+    const searchUrl = `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=album&limit=1`;
+    
+    const searchResponse = await fetch(searchUrl, {
+      headers: { 'Authorization': `Bearer ${accessToken}` }
+    });
+
+    if (!searchResponse.ok) return undefined;
+
+    const searchData = await searchResponse.json();
+    const albums = searchData.albums?.items;
+    
+    if (albums && albums.length > 0 && albums[0].images && albums[0].images.length > 0) {
+      return albums[0].images[0].url;
+    }
+  } catch (error) {
+    console.error('Spotify artwork search error:', error);
+  }
+
+  return undefined;
+}
+
+async function searchLastFmArtwork(artist: string, album?: string): Promise<string | undefined> {
+  if (!process.env.LASTFM_API_KEY) {
+    return undefined;
+  }
+
+  try {
+    const apiKey = process.env.LASTFM_API_KEY;
+    
+    if (album) {
+      // Search for specific album
+      const url = `https://ws.audioscrobbler.com/2.0/?method=album.getinfo&api_key=${apiKey}&artist=${encodeURIComponent(artist)}&album=${encodeURIComponent(album)}&format=json`;
+      const response = await fetch(url);
+      const data: LastFmAlbumResponse = await response.json();
+      
+      if (data.album && data.album.image) {
+        const largeImage = data.album.image.find((img: LastFmImage) => img.size === 'extralarge');
+        if (largeImage && largeImage['#text']) {
+          return largeImage['#text'];
+        }
+      }
+    }
+    
+    // Try artist's top albums as fallback
+    const url = `https://ws.audioscrobbler.com/2.0/?method=artist.gettopalbums&artist=${encodeURIComponent(artist)}&api_key=${apiKey}&format=json&limit=1`;
+    const response = await fetch(url);
+    const data: LastFmTopAlbumsResponse = await response.json();
+    
+    if (data.topalbums && data.topalbums.album) {
+      const albums = Array.isArray(data.topalbums.album) ? data.topalbums.album : [data.topalbums.album];
+      if (albums.length > 0 && albums[0].image) {
+        const largeImage = albums[0].image.find((img: LastFmImage) => img.size === 'extralarge');
+        if (largeImage && largeImage['#text']) {
+          return largeImage['#text'];
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Last.fm artwork search error:', error);
+  }
+
+  return undefined;
+}
+
+async function searchMusicBrainzArtwork(artist: string, album?: string): Promise<string | undefined> {
+  try {
+    // Search MusicBrainz for release
+    let query = `artist:"${artist}"`;
+    if (album) {
+      query += ` AND release:"${album}"`;
+    }
+    
+    const searchUrl = `https://musicbrainz.org/ws/2/release?query=${encodeURIComponent(query)}&fmt=json&limit=1`;
+    const response = await fetch(searchUrl, {
+      headers: { 'User-Agent': 'DeadWaxDialogues/1.0 (contact@deadwaxdialogues.com)' }
+    });
+
+    if (!response.ok) return undefined;
+
+    const data = await response.json();
+    
+    if (data.releases && data.releases.length > 0) {
+      const releaseId = data.releases[0].id;
+      
+      // Try to get cover art from Cover Art Archive
+      const coverArtUrl = `https://coverartarchive.org/release/${releaseId}/front`;
+      const coverResponse = await fetch(coverArtUrl, { method: 'HEAD' });
+      
+      if (coverResponse.ok) {
+        return coverArtUrl;
+      }
+    }
+  } catch (error) {
+    console.error('MusicBrainz artwork search error:', error);
+  }
+
+  return undefined;
+}
+
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const formData = await request.formData();
@@ -102,7 +288,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     ];
 
-    // Filter to only enabled services
     const enabledServices = services.filter(service => service.enabled);
     
     if (enabledServices.length === 0) {
@@ -134,6 +319,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
         if (result.success && result.track) {
           console.log(`✅ Success with ${service.name}:`, result.track);
+          
+          // Enhanced artwork fallback search
+          if (!result.track.image_url) {
+            console.log('No artwork from recognition service, searching other services...');
+            result.track.image_url = await searchForArtwork(result.track.artist, result.track.album);
+          }
+
+          // Also enhance candidates with artwork
+          if (result.candidates) {
+            for (const candidate of result.candidates) {
+              if (!candidate.image_url) {
+                candidate.image_url = await searchForArtwork(candidate.artist, candidate.album);
+              }
+            }
+          }
+
           console.log(`Found ${result.candidates?.length || 0} additional candidates`);
           return NextResponse.json(result);
         } else {
@@ -160,7 +361,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 }
 
-// Enhanced ACRCloud with candidates and image extraction
+// Enhanced ACRCloud with better artwork extraction
 async function recognizeWithACRCloud(audioFile: File): Promise<RecognitionResult> {
   try {
     const accessKey = process.env.ACRCLOUD_ACCESS_KEY!;
@@ -169,11 +370,9 @@ async function recognizeWithACRCloud(audioFile: File): Promise<RecognitionResult
     
     console.log('ACRCloud: Converting audio file...');
     
-    // Convert audio file to buffer
     const arrayBuffer = await audioFile.arrayBuffer();
     const audioBuffer = Buffer.from(arrayBuffer);
     
-    // Prepare timestamp and signature
     const timestamp = Math.floor(Date.now() / 1000);
     const signature = generateACRCloudSignature(
       'POST',
@@ -185,7 +384,6 @@ async function recognizeWithACRCloud(audioFile: File): Promise<RecognitionResult
       secretKey
     );
     
-    // Create form data for ACRCloud
     const formData = new FormData();
     formData.append('sample', new Blob([audioBuffer], { type: 'audio/wav' }));
     formData.append('sample_bytes', audioBuffer.length.toString());
@@ -217,7 +415,7 @@ async function recognizeWithACRCloud(audioFile: File): Promise<RecognitionResult
     if (data.status?.code === 0 && data.metadata?.music && data.metadata.music.length > 0) {
       const tracks = data.metadata.music;
       
-      // Extract artwork URL from various sources
+      // Enhanced artwork extraction with priority order
       const extractImageUrl = (track: ACRCloudTrack): string | undefined => {
         // Try Spotify first (usually highest quality)
         if (track.external_metadata?.spotify?.album?.images && 
@@ -243,7 +441,6 @@ async function recognizeWithACRCloud(audioFile: File): Promise<RecognitionResult
         return undefined;
       };
       
-      // Convert all tracks to our format
       const convertTrack = (track: ACRCloudTrack, index: number): RecognitionTrack => {
         const confidence = tracks.length > 1 ? 
           Math.max(0.5, (data.status?.score || 80) / 100 - (index * 0.1)) : 
@@ -314,7 +511,7 @@ async function recognizeWithAudD(audioFile: File, apiKey: string): Promise<Recog
     console.log('AudD response:', data.status);
     
     if (data.status === 'success' && data.result) {
-      // Extract artwork from external metadata
+      // Extract artwork from external metadata with priority
       let imageUrl: string | undefined;
       
       if (data.result.spotify?.album?.images?.length > 0) {
@@ -359,6 +556,16 @@ export async function GET(): Promise<NextResponse> {
       name: 'AudD', 
       enabled: !!process.env.AUDD_API_TOKEN,
       config: process.env.AUDD_API_TOKEN ? 'Configured' : 'Missing AUDD_API_TOKEN'
+    },
+    {
+      name: 'Spotify (artwork)',
+      enabled: !!(process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET),
+      config: process.env.SPOTIFY_CLIENT_ID ? 'Configured' : 'Missing SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET'
+    },
+    {
+      name: 'Last.fm (artwork)',
+      enabled: !!process.env.LASTFM_API_KEY,
+      config: process.env.LASTFM_API_KEY ? 'Configured' : 'Missing LASTFM_API_KEY'
     }
   ];
 
@@ -366,14 +573,16 @@ export async function GET(): Promise<NextResponse> {
   const disabledServices = services.filter(s => !s.enabled);
 
   return NextResponse.json({ 
-    message: 'Enhanced Multi-Service Audio Recognition API',
+    message: 'Enhanced Multi-Service Audio Recognition API with Intelligent Artwork Search',
     enabledServices: enabledServices.map(s => s.name),
     disabledServices: disabledServices.map(s => `${s.name} (${s.config})`),
     features: [
       'Multiple recognition candidates for correction',
-      'Album artwork extraction from Spotify/Apple/Deezer',
+      'Intelligent artwork search across Spotify, Last.fm, and MusicBrainz',
       'Fallback service ordering',
-      'Enhanced error reporting'
+      'Automatic TV display updates',
+      'Enhanced error reporting',
+      'Album artwork for all candidates'
     ]
   });
 }

@@ -1,4 +1,4 @@
-// src/app/now-playing-tv/page.tsx - Enhanced TV Display with Album Context
+// src/app/now-playing-tv/page.tsx - Enhanced TV Display with better debugging
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -39,6 +39,7 @@ interface NowPlayingData {
   started_at?: string;
   recognition_confidence?: number;
   service_used?: string;
+  updated_at?: string;
   collection?: CollectionAlbum;
 }
 
@@ -48,13 +49,20 @@ export default function EnhancedTVDisplay() {
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [showDebug, setShowDebug] = useState<boolean>(false);
   const [recognitionMode, setRecognitionMode] = useState<string>('unknown');
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  const [connectionAttempts, setConnectionAttempts] = useState<number>(0);
+  const [forceRefreshCount, setForceRefreshCount] = useState<number>(0);
 
   useEffect(() => {
     let nowPlayingChannel: ReturnType<typeof supabase.channel> | null = null;
     let albumContextChannel: ReturnType<typeof supabase.channel> | null = null;
+    let reconnectTimeout: NodeJS.Timeout | null = null;
 
     const fetchNowPlaying = async (): Promise<void> => {
       try {
+        console.log('Fetching now playing data...');
+        setConnectionAttempts(prev => prev + 1);
+        
         const { data, error } = await supabase
           .from('now_playing')
           .select(`
@@ -74,9 +82,24 @@ export default function EnhancedTVDisplay() {
         if (error) {
           console.error('Fetch error:', error);
           setIsConnected(false);
+          
+          // Try to reconnect after a delay
+          if (reconnectTimeout) clearTimeout(reconnectTimeout);
+          reconnectTimeout = setTimeout(() => {
+            console.log('Attempting to reconnect...');
+            fetchNowPlaying();
+          }, 5000);
         } else {
+          console.log('Successfully fetched now playing:', data);
           setCurrentTrack(data);
           setIsConnected(true);
+          setLastUpdate(new Date());
+          
+          // Clear any pending reconnect attempts
+          if (reconnectTimeout) {
+            clearTimeout(reconnectTimeout);
+            reconnectTimeout = null;
+          }
         }
       } catch (error) {
         console.error('Error fetching now playing:', error);
@@ -94,7 +117,6 @@ export default function EnhancedTVDisplay() {
           .single();
 
         if (!error && data) {
-          // Check if context is still valid (less than 2 hours old)
           const contextAge = Date.now() - new Date(data.created_at).getTime();
           const maxAge = 2 * 60 * 60 * 1000; // 2 hours
           
@@ -120,45 +142,105 @@ export default function EnhancedTVDisplay() {
     fetchNowPlaying();
     fetchAlbumContext();
 
-    // Real-time subscriptions
+    // Enhanced real-time subscriptions with better error handling
     nowPlayingChannel = supabase
-      .channel('now_playing_enhanced')
+      .channel('now_playing_enhanced_tv')
       .on('postgres_changes', 
         { event: '*', schema: 'public', table: 'now_playing' },
-        () => {
-          console.log('Now playing updated');
+        (payload) => {
+          console.log('Now playing updated via real-time:', payload);
           fetchNowPlaying();
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Now playing subscription status:', status);
+        if (status === 'SUBSCRIBED') {
+          setIsConnected(true);
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          setIsConnected(false);
+          console.log('Subscription error, will attempt manual refresh');
+        }
+      });
 
     albumContextChannel = supabase
-      .channel('album_context_changes')
+      .channel('album_context_changes_tv')
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'album_context' },
-        () => {
-          console.log('Album context updated');
+        (payload) => {
+          console.log('Album context updated via real-time:', payload);
           fetchAlbumContext();
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Album context subscription status:', status);
+      });
 
-    // Refresh every 15 seconds as backup
+    // Aggressive refresh as backup - every 10 seconds
     const interval = setInterval(() => {
+      console.log('Performing scheduled refresh...');
       fetchNowPlaying();
       fetchAlbumContext();
-    }, 15000);
+    }, 10000);
+
+    // Force refresh with 'F' key
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.key === 'd' || e.key === 'D') {
+        setShowDebug(prev => !prev);
+      } else if (e.key === 'f' || e.key === 'F') {
+        console.log('Force refresh triggered by user');
+        setForceRefreshCount(prev => prev + 1);
+        fetchNowPlaying();
+        fetchAlbumContext();
+      } else if (e.key === 'c' || e.key === 'C') {
+        // Clear now playing
+        clearNowPlaying();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
 
     return () => {
+      window.removeEventListener('keydown', handleKeyPress);
+      
       if (nowPlayingChannel) {
         supabase.removeChannel(nowPlayingChannel);
       }
       if (albumContextChannel) {
         supabase.removeChannel(albumContextChannel);
       }
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+      }
       clearInterval(interval);
     };
   }, []);
+
+  const clearNowPlaying = async (): Promise<void> => {
+    try {
+      console.log('Clearing now playing...');
+      const { error } = await supabase
+        .from('now_playing')
+        .update({
+          artist: null,
+          title: null,
+          album_title: null,
+          recognition_image_url: null,
+          album_id: null,
+          track_number: null,
+          track_side: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', 1);
+
+      if (error) {
+        console.error('Error clearing now playing:', error);
+      } else {
+        console.log('Now playing cleared successfully');
+      }
+    } catch (error) {
+      console.error('Error clearing now playing:', error);
+    }
+  };
 
   const getElapsedTime = (): string => {
     if (!currentTrack?.started_at) return '';
@@ -185,18 +267,6 @@ export default function EnhancedTVDisplay() {
     return `${hours}h ${minutes % 60}m ago`;
   };
 
-  // Toggle debug info with key press
-  useEffect(() => {
-    const handleKeyPress = (e: KeyboardEvent) => {
-      if (e.key === 'd' || e.key === 'D') {
-        setShowDebug(prev => !prev);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyPress);
-    return () => window.removeEventListener('keydown', handleKeyPress);
-  }, []);
-
   if (!currentTrack || (!currentTrack.artist && !currentTrack.title)) {
     return (
       <div 
@@ -211,7 +281,6 @@ export default function EnhancedTVDisplay() {
           justifyContent: 'center'
         }}
       >
-        {/* Waiting state with album context info */}
         <div style={{ 
           textAlign: 'center',
           opacity: 0.8
@@ -240,6 +309,23 @@ export default function EnhancedTVDisplay() {
             Drop the needle. Let the side play.
           </p>
 
+          {/* Connection Status */}
+          <div style={{
+            background: isConnected ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+            border: `1px solid ${isConnected ? 'rgba(34, 197, 94, 0.5)' : 'rgba(239, 68, 68, 0.5)'}`,
+            borderRadius: 12,
+            padding: '16px 24px',
+            marginBottom: '1rem',
+            fontSize: '1rem',
+            opacity: 0.9
+          }}>
+            {isConnected ? '🟢' : '🔴'} Database: {isConnected ? 'Connected' : 'Reconnecting...'}
+            <br />
+            <span style={{ fontSize: '0.85rem', opacity: 0.8 }}>
+              Last update: {lastUpdate.toLocaleTimeString()} • Attempts: {connectionAttempts}
+            </span>
+          </div>
+
           {/* Album context status */}
           {albumContext && (
             <div style={{
@@ -267,26 +353,52 @@ export default function EnhancedTVDisplay() {
             borderRadius: 8,
             display: 'inline-block'
           }}>
-            Mode: {recognitionMode}
+            Mode: {recognitionMode} • Press &apos;F&apos; to force refresh • Press &apos;C&apos; to clear • Press &apos;D&apos; for debug
           </div>
-          
-          {showDebug && (
-            <div style={{
-              position: 'absolute',
-              top: 20,
-              right: 20,
-              background: 'rgba(0,0,0,0.8)',
-              padding: 12,
-              borderRadius: 8,
-              fontSize: 12,
-              fontFamily: 'monospace'
-            }}>
-              Status: {isConnected ? 'Connected' : 'Disconnected'}<br/>
-              Context: {albumContext ? 'Active' : 'None'}<br/>
-              Mode: {recognitionMode}
-            </div>
-          )}
         </div>
+
+        {/* Enhanced Debug overlay */}
+        {showDebug && (
+          <div style={{
+            position: 'absolute',
+            top: 20,
+            right: 20,
+            background: 'rgba(0,0,0,0.9)',
+            padding: 16,
+            borderRadius: 8,
+            fontSize: 11,
+            fontFamily: 'monospace',
+            zIndex: 10,
+            minWidth: 400,
+            maxHeight: '80vh',
+            overflowY: 'auto'
+          }}>
+            <div><strong>Connection Status:</strong> {isConnected ? '🟢 Connected' : '🔴 Disconnected'}</div>
+            <div><strong>Recognition Mode:</strong> {recognitionMode}</div>
+            <div><strong>Last Update:</strong> {lastUpdate.toLocaleString()}</div>
+            <div><strong>Connection Attempts:</strong> {connectionAttempts}</div>
+            <div><strong>Force Refreshes:</strong> {forceRefreshCount}</div>
+            <hr style={{ margin: '8px 0', opacity: 0.3 }} />
+            <div><strong>Current Track Data:</strong></div>
+            <pre style={{ fontSize: 10, maxHeight: 200, overflow: 'auto', background: 'rgba(255,255,255,0.1)', padding: 8, borderRadius: 4 }}>
+              {JSON.stringify(currentTrack, null, 2)}
+            </pre>
+            <hr style={{ margin: '8px 0', opacity: 0.3 }} />
+            <div><strong>Album Context:</strong> {albumContext ? 'Active' : 'None'}</div>
+            {albumContext && (
+              <pre style={{ fontSize: 10, maxHeight: 150, overflow: 'auto', background: 'rgba(255,255,255,0.1)', padding: 8, borderRadius: 4 }}>
+                {JSON.stringify(albumContext, null, 2)}
+              </pre>
+            )}
+            <hr style={{ margin: '8px 0', opacity: 0.3 }} />
+            <div><strong>Keyboard Commands:</strong></div>
+            <div style={{ fontSize: 10 }}>
+              • F: Force refresh<br/>
+              • C: Clear now playing<br/>
+              • D: Toggle debug
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -522,11 +634,11 @@ export default function EnhancedTVDisplay() {
               <div style={{
                 width: '12px',
                 height: '12px',
-                background: '#10b981',
+                background: isConnected ? '#10b981' : '#ef4444',
                 borderRadius: '50%',
-                animation: 'pulse 2s infinite'
+                animation: isConnected ? 'pulse 2s infinite' : 'none'
               }} />
-              <span>Now Playing</span>
+              <span>{isConnected ? 'Live' : 'Offline'} • Now Playing</span>
             </div>
             
             {/* Elapsed time */}
@@ -544,6 +656,12 @@ export default function EnhancedTVDisplay() {
                 <span>{Math.round(currentTrack.recognition_confidence * 100)}% confidence</span>
               </>
             )}
+
+            {/* Update info */}
+            <span>•</span>
+            <span style={{ fontSize: '1rem' }}>
+              Updated: {new Date(currentTrack.updated_at || Date.now()).toLocaleTimeString()}
+            </span>
           </div>
 
           {/* Album context info */}
@@ -601,27 +719,37 @@ export default function EnhancedTVDisplay() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', fontSize: '0.8rem' }}>
           <span>Mode: {recognitionMode}</span>
           <span>•</span>
-          <span>Press &apos;D&apos; for debug</span>
+          <span>F=refresh, C=clear, D=debug</span>
           <span>•</span>
-          <span>{isConnected ? 'Live' : 'Offline'}</span>
+          <span>{isConnected ? '🟢 Live' : '🔴 Offline'}</span>
+          <span>•</span>
+          <span>Refreshes: {forceRefreshCount}</span>
         </div>
       </div>
 
-      {/* Debug overlay */}
+      {/* Enhanced Debug overlay */}
       {showDebug && (
         <div style={{
           position: 'absolute',
           top: 20,
           right: 20,
-          background: 'rgba(0,0,0,0.9)',
-          padding: 16,
-          borderRadius: 8,
+          background: 'rgba(0,0,0,0.95)',
+          padding: 20,
+          borderRadius: 12,
           fontSize: 11,
           fontFamily: 'monospace',
           zIndex: 10,
-          minWidth: 350
+          minWidth: 400,
+          maxHeight: '80vh',
+          overflowY: 'auto',
+          border: '1px solid rgba(255,255,255,0.2)'
         }}>
-          <div><strong>Connection:</strong> {isConnected ? '🟢' : '🔴'}</div>
+          <div style={{ marginBottom: 12, fontSize: 14, fontWeight: 'bold', color: '#fbbf24' }}>🔧 TV Display Debug</div>
+          
+          <div><strong>Connection:</strong> {isConnected ? '🟢 Connected' : '🔴 Disconnected'}</div>
+          <div><strong>Last Update:</strong> {lastUpdate.toLocaleString()}</div>
+          <div><strong>Connection Attempts:</strong> {connectionAttempts}</div>
+          <div><strong>Force Refreshes:</strong> {forceRefreshCount}</div>
           <div><strong>Recognition Mode:</strong> {recognitionMode}</div>
           <div><strong>Source:</strong> {isGuestVinyl ? 'Guest Vinyl' : 'Collection'}</div>
           <div><strong>Album ID:</strong> {currentTrack.album_id || 'None'}</div>
@@ -634,7 +762,9 @@ export default function EnhancedTVDisplay() {
           <div><strong>Service:</strong> {currentTrack.service_used || 'Unknown'}</div>
           <div><strong>Confidence:</strong> {currentTrack.recognition_confidence ? Math.round(currentTrack.recognition_confidence * 100) + '%' : 'Unknown'}</div>
           <div><strong>Started:</strong> {currentTrack.started_at ? new Date(currentTrack.started_at).toLocaleTimeString() : 'Unknown'}</div>
-          <hr style={{ margin: '8px 0', opacity: 0.3 }} />
+          <div><strong>Updated:</strong> {currentTrack.updated_at ? new Date(currentTrack.updated_at).toLocaleTimeString() : 'Unknown'}</div>
+          
+          <hr style={{ margin: '12px 0', opacity: 0.3 }} />
           <div><strong>Album Context:</strong> {albumContext ? 'Active' : 'None'}</div>
           {albumContext && (
             <>
@@ -645,6 +775,27 @@ export default function EnhancedTVDisplay() {
               <div><strong>Context Age:</strong> {getAlbumContextAge()}</div>
             </>
           )}
+          
+          <hr style={{ margin: '12px 0', opacity: 0.3 }} />
+          <div><strong>Raw Data:</strong></div>
+          <pre style={{ 
+            fontSize: 9, 
+            maxHeight: 200, 
+            overflow: 'auto', 
+            background: 'rgba(255,255,255,0.1)', 
+            padding: 8, 
+            borderRadius: 4,
+            margin: '8px 0'
+          }}>
+            {JSON.stringify(currentTrack, null, 2)}
+          </pre>
+          
+          <div style={{ marginTop: 12, fontSize: 10, color: '#888' }}>
+            <strong>Keyboard Commands:</strong><br/>
+            • F: Force refresh all data<br/>
+            • C: Clear now playing<br/>
+            • D: Toggle this debug panel
+          </div>
         </div>
       )}
 
