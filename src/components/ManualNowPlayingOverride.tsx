@@ -1,4 +1,4 @@
-// src/components/ManualNowPlayingOverride.tsx - Enhanced manual override with better search
+// src/components/ManualNowPlayingOverride.tsx - Fixed ESLint error and enhanced with service testing
 "use client";
 
 import { useState } from 'react';
@@ -21,6 +21,13 @@ interface SearchResult {
   folder?: string;
 }
 
+interface ServiceTestResult {
+  service: string;
+  status: 'success' | 'error' | 'testing';
+  message?: string;
+  details?: unknown;
+}
+
 export default function ManualNowPlayingOverride() {
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [formData, setFormData] = useState<FormData>({
@@ -31,6 +38,8 @@ export default function ManualNowPlayingOverride() {
   });
   const [status, setStatus] = useState<string>('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [serviceTestResults, setServiceTestResults] = useState<ServiceTestResult[]>([]);
+  const [isTesting, setIsTesting] = useState<boolean>(false);
 
   const searchCollection = async (query: string): Promise<void> => {
     if (query.length < 2) {
@@ -72,7 +81,6 @@ export default function ManualNowPlayingOverride() {
     setStatus('Setting now playing...');
 
     try {
-      // Enhanced now playing update with all fields
       const { error } = await supabase
         .from('now_playing')
         .upsert({
@@ -85,7 +93,6 @@ export default function ManualNowPlayingOverride() {
           recognition_confidence: 1.0,
           service_used: 'manual_override',
           updated_at: new Date().toISOString(),
-          // Clear recognition image so collection image is used
           recognition_image_url: null
         });
 
@@ -94,13 +101,11 @@ export default function ManualNowPlayingOverride() {
       } else {
         setStatus('✅ Now playing updated successfully!');
         
-        // Also try to set album context if we have album info
+        // Set album context if we have album info
         if (formData.albumTitle && formData.artist) {
           try {
-            // Clear existing context first
             await supabase.from('album_context').delete().neq('id', 0);
             
-            // Set new context
             await supabase.from('album_context').insert({
               artist: formData.artist,
               title: formData.albumTitle,
@@ -113,7 +118,6 @@ export default function ManualNowPlayingOverride() {
             setStatus('✅ Now playing and album context updated!');
           } catch (contextError) {
             console.warn('Failed to set album context:', contextError);
-            // Don't fail the whole operation for this
           }
         }
         
@@ -152,29 +156,62 @@ export default function ManualNowPlayingOverride() {
   };
 
   const testRecognitionServices = async (): Promise<void> => {
-    setStatus('Testing recognition services...');
+    setIsTesting(true);
+    setStatus('Testing all recognition services...');
+    setServiceTestResults([]);
     
-    try {
-      // Test recognition API
-      const recognitionResponse = await fetch('/api/audio-recognition');
+    const services = [
+      { name: 'Audio Recognition API', endpoint: '/api/audio-recognition' },
+      { name: 'Manual Recognition API', endpoint: '/api/manual-recognition' },
+      { name: 'Album Context API', endpoint: '/api/album-context' }
+    ];
+
+    const results: ServiceTestResult[] = [];
+
+    for (const service of services) {
+      try {
+        results.push({ service: service.name, status: 'testing' });
+        setServiceTestResults([...results]);
+        
+        const response = await fetch(service.endpoint, {
+          method: 'GET',
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          results[results.length - 1] = {
+            service: service.name,
+            status: 'success',
+            message: `✅ Available - ${data.message || 'OK'}`,
+            details: data
+          };
+        } else {
+          results[results.length - 1] = {
+            service: service.name,
+            status: 'error',
+            message: `❌ HTTP ${response.status}`,
+          };
+        }
+      } catch (error) {
+        results[results.length - 1] = {
+          service: service.name,
+          status: 'error',
+          message: `❌ ${error instanceof Error ? error.message : 'Network error'}`,
+        };
+      }
       
-      // Test manual API  
-      const manualResponse = await fetch('/api/manual-recognition');
-      
-      const recognitionStatus = recognitionResponse.ok ? '✅' : '❌';
-      const manualStatus = manualResponse.ok ? '✅' : '❌';
-      
-      setStatus(`${recognitionStatus} Recognition API | ${manualStatus} Manual API | Check console for details`);
-    } catch {
-      setStatus('❌ Error testing services');
+      setServiceTestResults([...results]);
     }
+
+    const successCount = results.filter(r => r.status === 'success').length;
+    setStatus(`Testing complete: ${successCount}/${services.length} services available`);
+    setIsTesting(false);
   };
 
   const handleInputChange = (field: keyof FormData) => 
     (e: React.ChangeEvent<HTMLInputElement>): void => {
       setFormData(prev => ({ ...prev, [field]: e.target.value }));
       
-      // Auto-search when typing in artist field
       if (field === 'artist' && e.target.value.length > 1) {
         searchCollection(e.target.value);
       }
@@ -190,7 +227,6 @@ export default function ManualNowPlayingOverride() {
 
   return (
     <>
-      {/* Enhanced Trigger Button */}
       <button
         onClick={() => setIsOpen(true)}
         style={{
@@ -224,7 +260,6 @@ export default function ManualNowPlayingOverride() {
         🎵 Manual Override
       </button>
 
-      {/* Enhanced Modal */}
       {isOpen && (
         <div style={{
           position: 'fixed',
@@ -243,7 +278,7 @@ export default function ManualNowPlayingOverride() {
             background: 'white',
             borderRadius: '20px',
             padding: '32px',
-            maxWidth: '600px',
+            maxWidth: '700px',
             width: '100%',
             maxHeight: '90vh',
             overflowY: 'auto',
@@ -297,19 +332,20 @@ export default function ManualNowPlayingOverride() {
             }}>
               <button
                 onClick={testRecognitionServices}
+                disabled={isTesting}
                 style={{
-                  background: '#0369a1',
+                  background: isTesting ? '#9ca3af' : '#0369a1',
                   color: 'white',
                   border: 'none',
                   borderRadius: '8px',
                   padding: '8px 16px',
                   fontSize: '14px',
                   fontWeight: 600,
-                  cursor: 'pointer',
+                  cursor: isTesting ? 'not-allowed' : 'pointer',
                   flex: 1
                 }}
               >
-                🔧 Test Services
+                {isTesting ? '🔧 Testing...' : '🔧 Test All Services'}
               </button>
               <button
                 onClick={clearNowPlaying}
@@ -328,6 +364,48 @@ export default function ManualNowPlayingOverride() {
                 🗑️ Clear All
               </button>
             </div>
+
+            {/* Service Test Results */}
+            {serviceTestResults.length > 0 && (
+              <div style={{
+                marginBottom: '24px',
+                padding: '16px',
+                background: '#f0f9ff',
+                borderRadius: '12px',
+                border: '1px solid #0369a1'
+              }}>
+                <h3 style={{
+                  fontSize: '16px',
+                  fontWeight: 600,
+                  color: '#0369a1',
+                  margin: '0 0 12px 0'
+                }}>
+                  Service Test Results
+                </h3>
+                <div style={{ fontSize: '14px', lineHeight: 1.6 }}>
+                  {serviceTestResults.map((result, index) => (
+                    <div key={index} style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginBottom: '8px',
+                      padding: '8px',
+                      background: result.status === 'success' ? '#f0fdf4' : 
+                                 result.status === 'error' ? '#fef2f2' : '#f3f4f6',
+                      borderRadius: '6px'
+                    }}>
+                      <span style={{ fontWeight: 600 }}>{result.service}:</span>
+                      <span style={{
+                        color: result.status === 'success' ? '#16a34a' : 
+                               result.status === 'error' ? '#dc2626' : '#6b7280'
+                      }}>
+                        {result.status === 'testing' ? '⏳ Testing...' : result.message}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <form onSubmit={handleManualSet} style={{ marginBottom: '20px' }}>
               <div style={{ marginBottom: '20px' }}>
@@ -358,7 +436,6 @@ export default function ManualNowPlayingOverride() {
                   onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
                 />
                 
-                {/* Enhanced Search Results */}
                 {searchResults.length > 0 && (
                   <div style={{
                     marginTop: '12px',
@@ -413,7 +490,6 @@ export default function ManualNowPlayingOverride() {
                 )}
               </div>
 
-              {/* Enhanced Form Fields */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
                 <div>
                   <label style={{
@@ -505,34 +581,27 @@ export default function ManualNowPlayingOverride() {
                 />
               </div>
 
-              <div style={{
-                display: 'flex',
-                gap: '12px',
-                justifyContent: 'stretch'
-              }}>
-                <button
-                  type="submit"
-                  style={{
-                    flex: 1,
-                    background: 'linear-gradient(135deg, #7c3aed 0%, #a855f7 100%)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '10px',
-                    padding: '14px',
-                    fontSize: '16px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    transition: 'transform 0.2s'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-1px)'}
-                  onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
-                >
-                  🎵 Set Now Playing
-                </button>
-              </div>
+              <button
+                type="submit"
+                style={{
+                  width: '100%',
+                  background: 'linear-gradient(135deg, #7c3aed 0%, #a855f7 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '10px',
+                  padding: '14px',
+                  fontSize: '16px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'transform 0.2s'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-1px)'}
+                onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+              >
+                🎵 Set Now Playing
+              </button>
             </form>
 
-            {/* Status Display */}
             {status && (
               <div style={{
                 padding: '16px',
@@ -549,7 +618,6 @@ export default function ManualNowPlayingOverride() {
               </div>
             )}
 
-            {/* Enhanced Help Section */}
             <div style={{
               marginTop: '24px',
               padding: '20px',
@@ -560,14 +628,14 @@ export default function ManualNowPlayingOverride() {
               color: '#1e40af'
             }}>
               <div style={{ fontWeight: 600, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                💡 <span>Pro Tips</span>
+                💡 <span>Enhanced Features</span>
               </div>
               <ul style={{ margin: 0, paddingLeft: '20px', lineHeight: 1.6 }}>
-                <li>Search your collection first to get album artwork and metadata automatically</li>
-                <li>Use this to test your TV display while debugging audio recognition</li>
-                <li>Setting an album title will also create album context for future recognitions</li>
-                <li>Test Services button checks if your recognition APIs are working</li>
-                <li>Clear All removes everything from the TV display</li>
+                <li>Comprehensive service testing shows which APIs are working</li>
+                <li>Search your collection first for automatic metadata</li>
+                <li>Service testing now includes Album Context API</li>
+                <li>Enhanced error reporting and status updates</li>
+                <li>Setting album title creates album context for future recognitions</li>
               </ul>
             </div>
           </div>
