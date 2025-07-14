@@ -1,8 +1,7 @@
-// src/app/now-playing-tv/page.tsx - Fixed TV Display with proper logo, album display, and collection detection
-// Note: This page should not have any navigation menu - handled by layout.tsx
+// src/app/now-playing-tv/page.tsx - Fixed TV Display
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from 'lib/supabaseClient';
 import Image from 'next/image';
 
@@ -50,94 +49,91 @@ export default function EnhancedTVDisplay() {
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [showDebug, setShowDebug] = useState<boolean>(false);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  // Memoized fetch functions to prevent infinite loops
+  const fetchNowPlaying = useCallback(async (): Promise<void> => {
+    try {
+      console.log('Fetching now playing data...');
+      
+      const { data, error } = await supabase
+        .from('now_playing')
+        .select(`
+          *,
+          collection (
+            id,
+            artist,
+            title,
+            year,
+            image_url,
+            folder
+          )
+        `)
+        .eq('id', 1)
+        .single();
+
+      if (error) {
+        console.error('Fetch error:', error);
+        setIsConnected(false);
+      } else {
+        console.log('Successfully fetched now playing:', data);
+        setCurrentTrack(data);
+        setIsConnected(true);
+        setLastUpdate(new Date());
+      }
+    } catch (error) {
+      console.error('Error fetching now playing:', error);
+      setIsConnected(false);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const fetchAlbumContext = useCallback(async (): Promise<void> => {
+    try {
+      const { data, error } = await supabase
+        .from('album_context')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (error) {
+        console.warn('Album context fetch error (non-critical):', error);
+        // Don't set albumContext to null on error - keep existing value
+        return;
+      }
+
+      if (data) {
+        const contextAge = Date.now() - new Date(data.created_at).getTime();
+        const maxAge = 2 * 60 * 60 * 1000; // 2 hours
+        
+        if (contextAge <= maxAge) {
+          setAlbumContext(data);
+        } else {
+          setAlbumContext(null);
+        }
+      } else {
+        setAlbumContext(null);
+      }
+    } catch (error) {
+      console.warn('Album context fetch failed (non-critical):', error);
+      // Don't crash the app or clear existing context on network errors
+    }
+  }, []);
 
   useEffect(() => {
     let nowPlayingChannel: ReturnType<typeof supabase.channel> | null = null;
     let albumContextChannel: ReturnType<typeof supabase.channel> | null = null;
-    let reconnectTimeout: NodeJS.Timeout | null = null;
-
-    const fetchNowPlaying = async (): Promise<void> => {
-      try {
-        console.log('Fetching now playing data...');
-        
-        const { data, error } = await supabase
-          .from('now_playing')
-          .select(`
-            *,
-            collection (
-              id,
-              artist,
-              title,
-              year,
-              image_url,
-              folder
-            )
-          `)
-          .eq('id', 1)
-          .single();
-
-        if (error) {
-          console.error('Fetch error:', error);
-          setIsConnected(false);
-          
-          // Try to reconnect after a delay
-          if (reconnectTimeout) clearTimeout(reconnectTimeout);
-          reconnectTimeout = setTimeout(() => {
-            console.log('Attempting to reconnect...');
-            fetchNowPlaying();
-          }, 5000);
-        } else {
-          console.log('Successfully fetched now playing:', data);
-          setCurrentTrack(data);
-          setIsConnected(true);
-          setLastUpdate(new Date());
-          
-          // Clear any pending reconnect attempts
-          if (reconnectTimeout) {
-            clearTimeout(reconnectTimeout);
-            reconnectTimeout = null;
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching now playing:', error);
-        setIsConnected(false);
-      }
-    };
-
-    const fetchAlbumContext = async (): Promise<void> => {
-      try {
-        const { data, error } = await supabase
-          .from('album_context')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single();
-
-        if (!error && data) {
-          const contextAge = Date.now() - new Date(data.created_at).getTime();
-          const maxAge = 2 * 60 * 60 * 1000; // 2 hours
-          
-          if (contextAge <= maxAge) {
-            setAlbumContext(data);
-          } else {
-            setAlbumContext(null);
-          }
-        } else {
-          setAlbumContext(null);
-        }
-      } catch (error) {
-        console.error('Error fetching album context:', error);
-        setAlbumContext(null);
-      }
-    };
+    let intervalId: NodeJS.Timeout | null = null;
 
     // Initial fetch
     fetchNowPlaying();
     fetchAlbumContext();
 
-    // Enhanced real-time subscriptions
+    // Set up real-time subscriptions
     nowPlayingChannel = supabase
-      .channel('now_playing_enhanced_tv')
+      .channel('now_playing_tv_simple')
       .on('postgres_changes', 
         { event: '*', schema: 'public', table: 'now_playing' },
         (payload) => {
@@ -147,15 +143,12 @@ export default function EnhancedTVDisplay() {
       )
       .subscribe((status) => {
         console.log('Now playing subscription status:', status);
-        if (status === 'SUBSCRIBED') {
-          setIsConnected(true);
-        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          setIsConnected(false);
-        }
+        setIsConnected(status === 'SUBSCRIBED');
       });
 
+    // Album context subscription (gracefully handles errors)
     albumContextChannel = supabase
-      .channel('album_context_changes_tv')
+      .channel('album_context_tv')
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'album_context' },
         (payload) => {
@@ -163,13 +156,16 @@ export default function EnhancedTVDisplay() {
           fetchAlbumContext();
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Album context subscription status:', status);
+        // Don't affect main connection status if album context fails
+      });
 
-    // Refresh every 10 seconds
-    const interval = setInterval(() => {
+    // Polling fallback every 30 seconds
+    intervalId = setInterval(() => {
       fetchNowPlaying();
       fetchAlbumContext();
-    }, 10000);
+    }, 30000);
 
     // Keyboard controls
     const handleKeyPress = (e: KeyboardEvent) => {
@@ -192,30 +188,49 @@ export default function EnhancedTVDisplay() {
       if (albumContextChannel) {
         supabase.removeChannel(albumContextChannel);
       }
-      if (reconnectTimeout) {
-        clearTimeout(reconnectTimeout);
+      if (intervalId) {
+        clearInterval(intervalId);
       }
-      clearInterval(interval);
     };
-  }, []);
+  }, [fetchNowPlaying, fetchAlbumContext]);
 
+  // Loading state
+  if (isLoading) {
+    return (
+      <div style={{
+        background: 'linear-gradient(135deg, #1e1b4b 0%, #7c3aed 100%)',
+        color: 'white',
+        height: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontFamily: '"Inter", sans-serif'
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🎵</div>
+          <div style={{ fontSize: '1.5rem' }}>Loading...</div>
+        </div>
+      </div>
+    );
+  }
+
+  // No track state
   if (!currentTrack || (!currentTrack.artist && !currentTrack.title)) {
     return (
-      <div 
-        style={{
-          background: 'linear-gradient(135deg, #1e1b4b 0%, #7c3aed 100%)',
-          color: 'white',
-          height: '100vh',
-          display: 'flex',
-          flexDirection: 'column',
-          fontFamily: '"Inter", sans-serif',
-          alignItems: 'center',
-          justifyContent: 'center',
-          position: 'relative',
-          overflow: 'hidden'
-        }}
-      >
-        {/* FIXED: Logos with correct Dead Wax Dialogues logo */}
+      <div style={{
+        background: 'linear-gradient(135deg, #1e1b4b 0%, #7c3aed 100%)',
+        color: 'white',
+        height: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        fontFamily: '"Inter", sans-serif',
+        alignItems: 'center',
+        justifyContent: 'center',
+        position: 'relative',
+        overflow: 'hidden',
+        padding: '2rem'
+      }}>
+        {/* Logos */}
         <div style={{
           position: 'absolute',
           top: '30px',
@@ -231,10 +246,7 @@ export default function EnhancedTVDisplay() {
             alt="Dead Wax Dialogues"
             width={140}
             height={70}
-            style={{
-              objectFit: 'contain',
-              opacity: 0.9
-            }}
+            style={{ objectFit: 'contain', opacity: 0.9 }}
             unoptimized
           />
           <Image
@@ -242,10 +254,7 @@ export default function EnhancedTVDisplay() {
             alt="Devil's Purse"
             width={120}
             height={60}
-            style={{
-              opacity: 0.8,
-              borderRadius: '8px'
-            }}
+            style={{ opacity: 0.8, borderRadius: '8px' }}
             unoptimized
           />
         </div>
@@ -265,18 +274,8 @@ export default function EnhancedTVDisplay() {
           Now Playing
         </div>
 
-        <div style={{ 
-          textAlign: 'center',
-          opacity: 0.8,
-          marginTop: '100px'
-        }}>
-          <div style={{ 
-            fontSize: '4rem', 
-            marginBottom: '2rem',
-            opacity: 0.5 
-          }}>
-            🎵
-          </div>
+        <div style={{ textAlign: 'center', opacity: 0.8, marginTop: '100px' }}>
+          <div style={{ fontSize: '4rem', marginBottom: '2rem', opacity: 0.5 }}>🎵</div>
           <h1 style={{ 
             fontSize: '3rem', 
             fontWeight: 'bold', 
@@ -300,27 +299,11 @@ export default function EnhancedTVDisplay() {
             border: `1px solid ${isConnected ? 'rgba(34, 197, 94, 0.5)' : 'rgba(239, 68, 68, 0.5)'}`,
             borderRadius: 12,
             padding: '16px 24px',
-            marginBottom: '1rem',
             fontSize: '1rem',
             opacity: 0.9
           }}>
-            {isConnected ? '🟢' : '🔴'} System: {isConnected ? 'Ready' : 'Connecting...'}
+            {isConnected ? '🟢 System: Ready' : '🔴 System: Connecting...'}
           </div>
-
-          {/* Album context status */}
-          {albumContext && (
-            <div style={{
-              background: 'rgba(34, 197, 94, 0.2)',
-              border: '1px solid rgba(34, 197, 94, 0.5)',
-              borderRadius: 12,
-              padding: '16px 24px',
-              marginBottom: '1rem',
-              fontSize: '1rem',
-              opacity: 0.9
-            }}>
-              🎯 Album Context: <strong>{albumContext.artist} - {albumContext.title}</strong>
-            </div>
-          )}
         </div>
 
         {/* Debug overlay */}
@@ -345,17 +328,13 @@ export default function EnhancedTVDisplay() {
     );
   }
 
-  // FIXED: Enhanced display logic with proper collection detection
+  // Main display with track
   const displayArtist = currentTrack.artist;
   const displayTrackTitle = currentTrack.title;
   const displayAlbumTitle = currentTrack.album_title;
   const displayYear = currentTrack.collection?.year;
-  
-  // Use collection image if available, otherwise recognition image
   const displayImage = currentTrack.collection?.image_url || currentTrack.recognition_image_url;
   const displayFormat = currentTrack.collection?.folder;
-  
-  // FIXED: Properly determine if this is guest vinyl or from collection
   const isFromCollection = !!(currentTrack.collection && currentTrack.album_id);
   const isGuestVinyl = !isFromCollection;
 
@@ -368,17 +347,15 @@ export default function EnhancedTVDisplay() {
      ));
 
   return (
-    <div 
-      style={{
-        background: 'linear-gradient(135deg, #1e1b4b 0%, #7c3aed 100%)',
-        color: 'white',
-        height: '100vh',
-        display: 'flex',
-        fontFamily: '"Inter", sans-serif',
-        overflow: 'hidden',
-        position: 'relative'
-      }}
-    >
+    <div style={{
+      background: 'linear-gradient(135deg, #1e1b4b 0%, #7c3aed 100%)',
+      color: 'white',
+      height: '100vh',
+      display: 'flex',
+      fontFamily: '"Inter", sans-serif',
+      overflow: 'hidden',
+      position: 'relative'
+    }}>
       {/* Background blur */}
       {displayImage && (
         <div style={{
@@ -396,7 +373,7 @@ export default function EnhancedTVDisplay() {
         }} />
       )}
 
-      {/* FIXED: Logos with correct DWD logo */}
+      {/* Logos */}
       <div style={{
         position: 'absolute',
         top: '30px',
@@ -412,10 +389,7 @@ export default function EnhancedTVDisplay() {
           alt="Dead Wax Dialogues"
           width={140}
           height={70}
-          style={{
-            objectFit: 'contain',
-            opacity: 0.9
-          }}
+          style={{ objectFit: 'contain', opacity: 0.9 }}
           unoptimized
         />
         <Image
@@ -423,10 +397,7 @@ export default function EnhancedTVDisplay() {
           alt="Devil's Purse"
           width={120}
           height={60}
-          style={{
-            opacity: 0.8,
-            borderRadius: '8px'
-          }}
+          style={{ opacity: 0.8, borderRadius: '8px' }}
           unoptimized
         />
       </div>
@@ -461,10 +432,7 @@ export default function EnhancedTVDisplay() {
       }}>
         
         {/* Album Art */}
-        <div style={{ 
-          marginRight: '4rem',
-          flexShrink: 0
-        }}>
+        <div style={{ marginRight: '4rem', flexShrink: 0 }}>
           <div style={{ position: 'relative' }}>
             <Image
               src={displayImage || '/images/coverplaceholder.png'}
@@ -481,7 +449,7 @@ export default function EnhancedTVDisplay() {
               priority
             />
             
-            {/* FIXED: Collection/Guest status badge */}
+            {/* Collection/Guest status badge */}
             {isFromCollection && displayFormat ? (
               <div style={{
                 position: 'absolute',
@@ -556,13 +524,41 @@ export default function EnhancedTVDisplay() {
               </div>
             )}
           </div>
+
+          {/* Album context info */}
+          {albumContext && (
+            <div style={{
+              background: 'rgba(34, 197, 94, 0.2)',
+              border: '1px solid rgba(34, 197, 94, 0.5)',
+              borderRadius: 12,
+              padding: '16px 20px',
+              fontSize: '1rem',
+              opacity: 0.9,
+              marginTop: '2rem'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span>🎯</span>
+                <strong>Album Context: {albumContext.artist} - {albumContext.title}</strong>
+                {isFromAlbumContext && (
+                  <span style={{ 
+                    background: '#22c55e',
+                    color: 'white',
+                    padding: '2px 8px',
+                    borderRadius: '10px',
+                    fontSize: '0.8rem',
+                    fontWeight: 'bold',
+                    marginLeft: '8px'
+                  }}>
+                    MATCHED
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Track Info */}
-        <div style={{ 
-          flex: 1,
-          paddingTop: '2rem'
-        }}>
+        <div style={{ flex: 1, paddingTop: '2rem' }}>
           {/* Track Title */}
           <h1 style={{ 
             fontSize: '4.5rem', 
@@ -575,7 +571,7 @@ export default function EnhancedTVDisplay() {
             {displayTrackTitle}
           </h1>
           
-          {/* FIXED: Always show album title when available, regardless of track title */}
+          {/* Album title */}
           {displayAlbumTitle && (
             <h2 style={{ 
               fontSize: '2.2rem', 
@@ -663,54 +659,17 @@ export default function EnhancedTVDisplay() {
             </div>
             
             {currentTrack.service_used && (
-              <div style={{
-                fontSize: '1rem',
-                opacity: 0.6
-              }}>
+              <div style={{ fontSize: '1rem', opacity: 0.6 }}>
                 • {currentTrack.service_used}
               </div>
             )}
             
             {currentTrack.recognition_confidence && (
-              <div style={{
-                fontSize: '1rem',
-                opacity: 0.6
-              }}>
+              <div style={{ fontSize: '1rem', opacity: 0.6 }}>
                 • {Math.round(currentTrack.recognition_confidence * 100)}% confidence
               </div>
             )}
           </div>
-
-          {/* Album context info */}
-          {albumContext && (
-            <div style={{
-              background: 'rgba(34, 197, 94, 0.2)',
-              border: '1px solid rgba(34, 197, 94, 0.5)',
-              borderRadius: 12,
-              padding: '16px 20px',
-              fontSize: '1rem',
-              opacity: 0.9,
-              marginTop: '2rem'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span>🎯</span>
-                <strong>Album Context: {albumContext.artist} - {albumContext.title}</strong>
-                {isFromAlbumContext && (
-                  <span style={{ 
-                    background: '#22c55e',
-                    color: 'white',
-                    padding: '2px 8px',
-                    borderRadius: '10px',
-                    fontSize: '0.8rem',
-                    fontWeight: 'bold',
-                    marginLeft: '8px'
-                  }}>
-                    MATCHED
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
