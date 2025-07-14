@@ -404,25 +404,7 @@ function analyzeAudioForSilence(audioBuffer: Buffer): boolean {
   }
 }
 
-// Get current album context to check if this is a continuing track
-async function getCurrentAlbumContext(): Promise<{
-  artist?: string;
-  title?: string;
-  track_listing?: string[];
-} | null> {
-  try {
-    const { data } = await supabase
-      .from('album_context')
-      .select('artist, title, track_listing')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
-    
-    return data || null;
-  } catch {
-    return null;
-  }
-}
+
 
 // Check if this is the same track as last recognition
 async function getLastRecognition(): Promise<{
