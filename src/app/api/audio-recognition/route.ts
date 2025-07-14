@@ -1,4 +1,4 @@
-// src/app/api/audio-recognition/route.ts - Enhanced to pull candidates from ALL services
+// src/app/api/audio-recognition/route.ts - Complete TypeScript fix for all issues
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from 'lib/supabaseClient';
 import crypto from 'crypto';
@@ -24,10 +24,9 @@ interface CollectionMatch {
 interface EnhancedRecognitionTrack extends RecognitionTrack {
   collection_match?: CollectionMatch;
   is_guest_vinyl?: boolean;
-  source_priority?: number; // For ranking results
+  source_priority?: number;
 }
 
-// Enhanced recognition result interface
 interface EnhancedRecognitionResult {
   success: boolean;
   track?: EnhancedRecognitionTrack;
@@ -110,7 +109,7 @@ async function findAllCollectionMatches(artist: string, title: string, album?: s
     
     // 2. Fuzzy artist matching (split words)
     const artistWords = artist.toLowerCase().split(' ').filter(word => word.length > 2);
-    for (const word of artistWords.slice(0, 2)) { // Limit to prevent too many queries
+    for (const word of artistWords.slice(0, 2)) {
       const { data: fuzzyArtist } = await supabase
         .from('collection')
         .select('id, artist, title, year, image_url, folder')
@@ -146,7 +145,7 @@ async function findAllCollectionMatches(artist: string, title: string, album?: s
     );
     
     console.log(`✅ Found ${uniqueMatches.length} collection matches`);
-    return uniqueMatches.slice(0, 5); // Limit to top 5
+    return uniqueMatches.slice(0, 5);
     
   } catch (error) {
     console.error('Collection matching error:', error);
@@ -157,11 +156,9 @@ async function findAllCollectionMatches(artist: string, title: string, album?: s
 // Enhanced artwork search
 async function searchForArtwork(artist: string, album?: string): Promise<string | undefined> {
   try {
-    // Try Spotify first
     const spotifyArtwork = await searchSpotifyArtwork(artist, album);
     if (spotifyArtwork) return spotifyArtwork;
     
-    // Try Last.fm as fallback
     const lastfmArtwork = await searchLastFmArtwork(artist, album);
     if (lastfmArtwork) return lastfmArtwork;
     
@@ -242,7 +239,7 @@ async function searchLastFmArtwork(artist: string, album?: string): Promise<stri
   return undefined;
 }
 
-// ENHANCED: Search Spotify for additional candidates
+// Search Spotify for additional candidates
 async function searchSpotifyTracks(artist: string, title: string): Promise<EnhancedRecognitionTrack[]> {
   if (!process.env.SPOTIFY_CLIENT_ID || !process.env.SPOTIFY_CLIENT_SECRET) {
     return [];
@@ -291,7 +288,7 @@ async function searchSpotifyTracks(artist: string, title: string): Promise<Enhan
   }
 }
 
-// ENHANCED: Search Last.fm for additional candidates
+// Search Last.fm for additional candidates
 async function searchLastFmTracks(artist: string, title: string): Promise<EnhancedRecognitionTrack[]> {
   if (!process.env.LASTFM_API_KEY) return [];
 
@@ -458,7 +455,7 @@ async function recognizeWithAudD(audioFile: File): Promise<EnhancedRecognitionTr
   }
 }
 
-// Main POST handler for enhanced multi-service audio recognition
+// Main POST handler
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const formData = await request.formData();
@@ -473,7 +470,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     console.log(`🎵 Starting COMPREHENSIVE recognition for: ${audioFile.name}`);
 
-    // PHASE 1: Audio Recognition Services (parallel execution)
+    // PHASE 1: Audio Recognition Services
     console.log('🔊 Phase 1: Audio recognition services...');
     const audioRecognitionPromises = [
       recognizeWithACRCloud(audioFile),
@@ -493,7 +490,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     });
 
-    // Select primary track from audio recognition (highest confidence)
+    // Select primary track from audio recognition
     const primaryTrack = allAudioCandidates.sort((a, b) => 
       (b.confidence || 0) - (a.confidence || 0)
     )[0];
@@ -512,33 +509,40 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // PHASE 2: Comprehensive candidate gathering
     console.log('🔍 Phase 2: Gathering candidates from ALL sources...');
     
-    const candidatePromises = [
-      // Collection matches
-      findAllCollectionMatches(primaryTrack.artist, primaryTrack.title, primaryTrack.album),
-      // Spotify search
-      searchSpotifyTracks(primaryTrack.artist, primaryTrack.title),
-      // Last.fm search  
-      searchLastFmTracks(primaryTrack.artist, primaryTrack.title)
-    ];
+    // Execute all searches in parallel
+    const collectionMatchesPromise = findAllCollectionMatches(primaryTrack.artist, primaryTrack.title, primaryTrack.album);
+    const spotifyTracksPromise = searchSpotifyTracks(primaryTrack.artist, primaryTrack.title);
+    const lastfmTracksPromise = searchLastFmTracks(primaryTrack.artist, primaryTrack.title);
 
-    const [collectionMatches, spotifyTracks, lastfmTracks] = await Promise.allSettled(candidatePromises);
+    // Wait for all to complete
+    const [collectionMatchesResult, spotifyTracksResult, lastfmTracksResult] = await Promise.allSettled([
+      collectionMatchesPromise,
+      spotifyTracksPromise,
+      lastfmTracksPromise
+    ]);
     
     // PHASE 3: Process and enhance all candidates
     console.log('⚡ Phase 3: Processing and enhancing candidates...');
     
     const allCandidates: EnhancedRecognitionTrack[] = [...allAudioCandidates];
     
+    // Extract collection matches safely
+    let collectionMatches: CollectionMatch[] = [];
+    if (collectionMatchesResult.status === 'fulfilled') {
+      collectionMatches = collectionMatchesResult.value;
+    }
+    
     // Add collection-based candidates
-    if (collectionMatches.status === 'fulfilled') {
-      const collectionCandidates = collectionMatches.value.map((match): EnhancedRecognitionTrack => ({
+    if (collectionMatches.length > 0) {
+      const collectionCandidates: EnhancedRecognitionTrack[] = collectionMatches.map((match: CollectionMatch): EnhancedRecognitionTrack => ({
         artist: match.artist,
-        title: match.title, // This is the album title in collection
+        title: match.title,
         album: match.title,
         image_url: match.image_url,
-        confidence: 0.85, // High confidence for collection matches
+        confidence: 0.85,
         service: 'Collection Match',
-        source_priority: 0, // Highest priority
-        collection_match: match, // This is the correct CollectionMatch type
+        source_priority: 0,
+        collection_match: match,
         is_guest_vinyl: false
       }));
       allCandidates.push(...collectionCandidates);
@@ -546,29 +550,27 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
     
     // Add Spotify candidates
-    if (spotifyTracks.status === 'fulfilled') {
-      allCandidates.push(...spotifyTracks.value);
-      console.log(`🎶 Added ${spotifyTracks.value.length} Spotify candidates`);
+    if (spotifyTracksResult.status === 'fulfilled') {
+      allCandidates.push(...spotifyTracksResult.value);
+      console.log(`🎶 Added ${spotifyTracksResult.value.length} Spotify candidates`);
     }
     
     // Add Last.fm candidates
-    if (lastfmTracks.status === 'fulfilled') {
-      allCandidates.push(...lastfmTracks.value);
-      console.log(`🎵 Added ${lastfmTracks.value.length} Last.fm candidates`);
+    if (lastfmTracksResult.status === 'fulfilled') {
+      allCandidates.push(...lastfmTracksResult.value);
+      console.log(`🎵 Added ${lastfmTracksResult.value.length} Last.fm candidates`);
     }
 
     // PHASE 4: Enhance primary track with collection info
     console.log('🔧 Phase 4: Enhancing primary track...');
     
-    const primaryCollectionMatch = collectionMatches.status === 'fulfilled' 
-      ? collectionMatches.value.find((match: CollectionMatch) => 
-          match.artist.toLowerCase().includes(primaryTrack.artist.toLowerCase()) ||
-          primaryTrack.artist.toLowerCase().includes(match.artist.toLowerCase())
-        )
-      : null;
+    const primaryCollectionMatch: CollectionMatch | undefined = collectionMatches.find((match: CollectionMatch) => 
+      match.artist.toLowerCase().includes(primaryTrack.artist.toLowerCase()) ||
+      primaryTrack.artist.toLowerCase().includes(match.artist.toLowerCase())
+    );
 
     if (primaryCollectionMatch) {
-      primaryTrack.collection_match = primaryCollectionMatch; // Correctly typed as CollectionMatch
+      primaryTrack.collection_match = primaryCollectionMatch;
       primaryTrack.is_guest_vinyl = false;
       if (!primaryTrack.image_url && primaryCollectionMatch.image_url) {
         primaryTrack.image_url = primaryCollectionMatch.image_url;
@@ -576,7 +578,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       console.log(`✅ Primary track matched to collection: ${primaryCollectionMatch.artist} - ${primaryCollectionMatch.title}`);
     } else {
       primaryTrack.is_guest_vinyl = true;
-      // Try to get artwork from search APIs
       if (!primaryTrack.image_url) {
         primaryTrack.image_url = await searchForArtwork(primaryTrack.artist, primaryTrack.album);
       }
@@ -586,24 +587,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // PHASE 5: Deduplicate and rank candidates
     console.log('📊 Phase 5: Ranking and deduplicating candidates...');
     
-    // Remove primary track from candidates to avoid duplication
     const otherCandidates = allCandidates.filter(candidate => 
       !(candidate.artist === primaryTrack.artist && 
         candidate.title === primaryTrack.title && 
         candidate.service === primaryTrack.service)
     );
     
-    // Sort by priority and confidence
     const rankedCandidates = otherCandidates
       .sort((a, b) => {
-        // First by source priority (0 = collection, 1 = ACRCloud, etc.)
         if (a.source_priority !== b.source_priority) {
           return (a.source_priority || 999) - (b.source_priority || 999);
         }
-        // Then by confidence
         return (b.confidence || 0) - (a.confidence || 0);
       })
-      .slice(0, 15); // Limit to 15 candidates
+      .slice(0, 15);
     
     // Enhance candidates with artwork if missing
     for (const candidate of rankedCandidates) {
@@ -642,7 +639,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       'Spotify Search',
       'Last.fm Search'
     ].filter(service => {
-      // Only include services that are actually configured
       switch (service) {
         case 'ACRCloud': return !!(process.env.ACRCLOUD_ACCESS_KEY && process.env.ACRCLOUD_SECRET_KEY);
         case 'AudD': return !!process.env.AUDD_API_TOKEN;
@@ -660,7 +656,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       candidates: rankedCandidates,
       servicesQueried,
       totalCandidatesFound: allCandidates.length,
-      albumContextUsed: false, // You can implement album context logic here
+      albumContextUsed: false,
       albumContextSwitched: false
     } satisfies EnhancedRecognitionResult);
 
