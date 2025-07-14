@@ -1,7 +1,7 @@
 // src/app/now-playing-tv/page.tsx - Fixed TV Display
 "use client";
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from 'lib/supabaseClient';
 import Image from 'next/image';
 
@@ -51,81 +51,79 @@ export default function EnhancedTVDisplay() {
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Memoized fetch functions to prevent infinite loops
-  const fetchNowPlaying = useCallback(async (): Promise<void> => {
-    try {
-      console.log('Fetching now playing data...');
-      
-      const { data, error } = await supabase
-        .from('now_playing')
-        .select(`
-          *,
-          collection (
-            id,
-            artist,
-            title,
-            year,
-            image_url,
-            folder
-          )
-        `)
-        .eq('id', 1)
-        .single();
-
-      if (error) {
-        console.error('Fetch error:', error);
-        setIsConnected(false);
-      } else {
-        console.log('Successfully fetched now playing:', data);
-        setCurrentTrack(data);
-        setIsConnected(true);
-        setLastUpdate(new Date());
-      }
-    } catch (error) {
-      console.error('Error fetching now playing:', error);
-      setIsConnected(false);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  const fetchAlbumContext = useCallback(async (): Promise<void> => {
-    try {
-      const { data, error } = await supabase
-        .from('album_context')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-
-      if (error) {
-        console.warn('Album context fetch error (non-critical):', error);
-        // Don't set albumContext to null on error - keep existing value
-        return;
-      }
-
-      if (data) {
-        const contextAge = Date.now() - new Date(data.created_at).getTime();
-        const maxAge = 2 * 60 * 60 * 1000; // 2 hours
-        
-        if (contextAge <= maxAge) {
-          setAlbumContext(data);
-        } else {
-          setAlbumContext(null);
-        }
-      } else {
-        setAlbumContext(null);
-      }
-    } catch (error) {
-      console.warn('Album context fetch failed (non-critical):', error);
-      // Don't crash the app or clear existing context on network errors
-    }
-  }, []);
-
   useEffect(() => {
     let nowPlayingChannel: ReturnType<typeof supabase.channel> | null = null;
     let albumContextChannel: ReturnType<typeof supabase.channel> | null = null;
     let intervalId: NodeJS.Timeout | null = null;
+
+    // Define fetch functions inside useEffect to avoid dependency issues
+    const fetchNowPlaying = async (): Promise<void> => {
+      try {
+        console.log('Fetching now playing data...');
+        
+        const { data, error } = await supabase
+          .from('now_playing')
+          .select(`
+            *,
+            collection (
+              id,
+              artist,
+              title,
+              year,
+              image_url,
+              folder
+            )
+          `)
+          .eq('id', 1)
+          .single();
+
+        if (error) {
+          console.error('Fetch error:', error);
+          setIsConnected(false);
+        } else {
+          console.log('Successfully fetched now playing:', data);
+          setCurrentTrack(data);
+          setIsConnected(true);
+          setLastUpdate(new Date());
+        }
+      } catch (error) {
+        console.error('Error fetching now playing:', error);
+        setIsConnected(false);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    const fetchAlbumContext = async (): Promise<void> => {
+      try {
+        const { data, error } = await supabase
+          .from('album_context')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (error) {
+          console.warn('Album context fetch error (non-critical):', error);
+          return;
+        }
+
+        if (data) {
+          const contextAge = Date.now() - new Date(data.created_at).getTime();
+          const maxAge = 2 * 60 * 60 * 1000; // 2 hours
+          
+          if (contextAge <= maxAge) {
+            setAlbumContext(data);
+          } else {
+            setAlbumContext(null);
+          }
+        } else {
+          setAlbumContext(null);
+        }
+      } catch (error) {
+        console.warn('Album context fetch failed (non-critical):', error);
+      }
+    };
 
     // Initial fetch
     fetchNowPlaying();
@@ -192,7 +190,7 @@ export default function EnhancedTVDisplay() {
         clearInterval(intervalId);
       }
     };
-  }, [fetchNowPlaying, fetchAlbumContext]);
+  }, []); // No dependencies needed since all functions are defined inside
 
   // Loading state
   if (isLoading) {
@@ -304,6 +302,21 @@ export default function EnhancedTVDisplay() {
           }}>
             {isConnected ? '🟢 System: Ready' : '🔴 System: Connecting...'}
           </div>
+
+          {/* Album context status */}
+          {albumContext && (
+            <div style={{
+              background: 'rgba(34, 197, 94, 0.2)',
+              border: '1px solid rgba(34, 197, 94, 0.5)',
+              borderRadius: 12,
+              padding: '16px 24px',
+              marginTop: '1rem',
+              fontSize: '1rem',
+              opacity: 0.9
+            }}>
+              🎯 Album Context: <strong>{albumContext.artist} - {albumContext.title}</strong>
+            </div>
+          )}
         </div>
 
         {/* Debug overlay */}
@@ -524,37 +537,6 @@ export default function EnhancedTVDisplay() {
               </div>
             )}
           </div>
-
-          {/* Album context info */}
-          {albumContext && (
-            <div style={{
-              background: 'rgba(34, 197, 94, 0.2)',
-              border: '1px solid rgba(34, 197, 94, 0.5)',
-              borderRadius: 12,
-              padding: '16px 20px',
-              fontSize: '1rem',
-              opacity: 0.9,
-              marginTop: '2rem'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span>🎯</span>
-                <strong>Album Context: {albumContext.artist} - {albumContext.title}</strong>
-                {isFromAlbumContext && (
-                  <span style={{ 
-                    background: '#22c55e',
-                    color: 'white',
-                    padding: '2px 8px',
-                    borderRadius: '10px',
-                    fontSize: '0.8rem',
-                    fontWeight: 'bold',
-                    marginLeft: '8px'
-                  }}>
-                    MATCHED
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Track Info */}
@@ -670,6 +652,37 @@ export default function EnhancedTVDisplay() {
               </div>
             )}
           </div>
+
+          {/* Album context info */}
+          {albumContext && (
+            <div style={{
+              background: 'rgba(34, 197, 94, 0.2)',
+              border: '1px solid rgba(34, 197, 94, 0.5)',
+              borderRadius: 12,
+              padding: '16px 20px',
+              fontSize: '1rem',
+              opacity: 0.9,
+              marginTop: '2rem'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span>🎯</span>
+                <strong>Album Context: {albumContext.artist} - {albumContext.title}</strong>
+                {isFromAlbumContext && (
+                  <span style={{ 
+                    background: '#22c55e',
+                    color: 'white',
+                    padding: '2px 8px',
+                    borderRadius: '10px',
+                    fontSize: '0.8rem',
+                    fontWeight: 'bold',
+                    marginLeft: '8px'
+                  }}>
+                    MATCHED
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
