@@ -1,9 +1,10 @@
 // File: src/app/admin/audio-recognition/page.tsx
-// PROPERLY FIXED VERSION - Addresses all core issues
+// RESTORED VERSION - Album Context Manager functionality restored
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
+import ManualNowPlayingOverride from 'components/ManualNowPlayingOverride';
 import AlbumContextManager from 'components/AlbumContextManager';
 
 interface RecognitionResult {
@@ -69,7 +70,6 @@ export default function AudioRecognitionSystem() {
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const continuousTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const silenceDetectionRef = useRef<boolean>(true);
 
   useEffect(() => {
     return () => {
@@ -105,19 +105,14 @@ export default function AudioRecognitionSystem() {
     }, 1000);
   }, []);
 
-  // FIXED: Detect silence in audio and filter ALL candidates by confidence
+  // Enhanced audio analysis with proper error handling and candidate display
   const analyzeAudio = useCallback(async (audioBlob: Blob): Promise<void> => {
     setStatus('🎯 Analyzing audio...');
-    
-    // FIXED: Check for silence before sending to API
-    if (await detectSilence(audioBlob)) {
-      setStatus('🔇 Silence detected - skipping recognition');
-      return;
-    }
     
     try {
       const formData = new FormData();
       formData.append('audio', audioBlob);
+      formData.append('confidence_threshold', confidenceThreshold.toString());
 
       console.log('📤 Sending audio for recognition...');
       
@@ -137,45 +132,28 @@ export default function AudioRecognitionSystem() {
         console.log('✅ Recognition successful:', result.track);
         
         const track = result.track;
-        const allCandidates = [track, ...(result.candidates || [])];
+        const candidates = result.candidates || [];
         
-        // FIXED: Filter ALL candidates by confidence threshold
-        const filteredCandidates = allCandidates.filter(candidate => 
-          (candidate.confidence || 0) >= confidenceThreshold
-        );
-        
-        if (filteredCandidates.length === 0) {
-          setStatus(`❌ No candidates above ${Math.round(confidenceThreshold * 100)}% confidence threshold`);
-          return;
-        }
-        
-        const primaryTrack = filteredCandidates[0];
-        const candidates = filteredCandidates.slice(1);
-        
-        setLastRecognition(primaryTrack);
+        setLastRecognition(track);
         setRecognitionCandidates(candidates);
         
-        // FIXED: Calculate smart timing from CURRENT track, not previous
-        if (primaryTrack.duration && isSmartTimingEnabled) {
-          const currentSmartTiming = {
-            track_duration: primaryTrack.duration,
-            next_sample_in: calculateNextSampleTime(primaryTrack.duration),
-            reasoning: `Using current track duration: ${primaryTrack.duration}s`
-          };
-          setSmartTiming(currentSmartTiming);
-          setDynamicInterval(currentSmartTiming.next_sample_in);
-          console.log(`🧠 FIXED: Using CURRENT track duration: ${primaryTrack.duration}s -> ${currentSmartTiming.next_sample_in}s`);
+        // Handle smart timing
+        if (result.smart_timing) {
+          setSmartTiming(result.smart_timing);
+          if (isSmartTimingEnabled && result.smart_timing.next_sample_in) {
+            setDynamicInterval(result.smart_timing.next_sample_in);
+          }
         }
         
         // Add to recognition history
         setRecognitionHistory(prev => [
           {
             time: new Date(),
-            track: `${primaryTrack.artist} - ${primaryTrack.title}`,
-            source: primaryTrack.collection_match ? `Collection (${primaryTrack.collection_match.folder})` : 
-                   primaryTrack.service || 'External Service',
-            duration: primaryTrack.duration,
-            nextSampleIn: isSmartTimingEnabled && primaryTrack.duration ? calculateNextSampleTime(primaryTrack.duration) : dynamicInterval
+            track: `${track.artist} - ${track.title}`,
+            source: track.collection_match ? `Collection (${track.collection_match.folder})` : 
+                   track.service || 'External Service',
+            duration: track.duration,
+            nextSampleIn: track.next_recognition_delay
           },
           ...prev.slice(0, 9) // Keep last 10
         ]);
@@ -183,33 +161,38 @@ export default function AudioRecognitionSystem() {
         // Build status message
         let statusMessage = '';
         
-        if (primaryTrack.collection_match) {
-          statusMessage = `🏆 COLLECTION: ${primaryTrack.title} by ${primaryTrack.artist}`;
-          statusMessage += ` [${primaryTrack.collection_match.folder}]`;
+        if (track.collection_match) {
+          statusMessage = `🏆 COLLECTION: ${track.title} by ${track.artist}`;
+          statusMessage += ` [${track.collection_match.folder}]`;
         } else {
-          statusMessage = `🎵 RECOGNIZED: ${primaryTrack.title} by ${primaryTrack.artist}`;
+          statusMessage = `🎵 RECOGNIZED: ${track.title} by ${track.artist}`;
         }
         
-        if (primaryTrack.album) {
-          statusMessage += ` (${primaryTrack.album})`;
+        if (track.album) {
+          statusMessage += ` (${track.album})`;
         }
         
-        statusMessage += ` | ${Math.round((primaryTrack.confidence || 0.8) * 100)}% confidence`;
-        statusMessage += ` | ${primaryTrack.service || 'Multi-Service'}`;
+        statusMessage += ` | ${Math.round((track.confidence || 0.8) * 100)}% confidence`;
+        statusMessage += ` | ${track.service || 'Multi-Service'}`;
         
-        if (primaryTrack.duration) {
-          statusMessage += ` | ${Math.floor(primaryTrack.duration / 60)}:${(primaryTrack.duration % 60).toString().padStart(2, '0')}`;
+        if (track.duration) {
+          statusMessage += ` | ${Math.floor(track.duration / 60)}:${(track.duration % 60).toString().padStart(2, '0')}`;
         }
         
-        statusMessage += ` | ${candidates.length} more candidates`;
+        if (candidates.length > 0) {
+          statusMessage += ` | +${candidates.length} alternatives`;
+        }
         
-        if (isSmartTimingEnabled && primaryTrack.duration) {
-          const nextSample = calculateNextSampleTime(primaryTrack.duration);
-          statusMessage += ` | Next: ${nextSample}s`;
+        if (isSmartTimingEnabled && track.next_recognition_delay) {
+          statusMessage += ` | Next: ${track.next_recognition_delay}s`;
         }
         
         setStatus(statusMessage);
         
+      } else if (result.is_silence) {
+        setStatus('🔇 Silence detected - cleared now playing');
+        setLastRecognition(null);
+        setRecognitionCandidates([]);
       } else {
         const errorMsg = result.error || 'No recognition found';
         setStatus(`❌ Recognition failed: ${errorMsg}`);
@@ -222,44 +205,7 @@ export default function AudioRecognitionSystem() {
       setStatus(`❌ Analysis error: ${errorMessage}`);
       setRecognitionCandidates([]);
     }
-  }, [isSmartTimingEnabled, confidenceThreshold, dynamicInterval]);
-
-  // FIXED: Add silence detection
-  const detectSilence = async (audioBlob: Blob): Promise<boolean> => {
-    if (!silenceDetectionRef.current) return false;
-    
-    try {
-      const audioContext = new AudioContext();
-      const arrayBuffer = await audioBlob.arrayBuffer();
-      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-      
-      const channelData = audioBuffer.getChannelData(0);
-      const samples = channelData.length;
-      let sum = 0;
-      
-      for (let i = 0; i < samples; i++) {
-        sum += Math.abs(channelData[i]);
-      }
-      
-      const average = sum / samples;
-      const isSilent = average < 0.01; // Threshold for silence
-      
-      console.log(`🔇 Audio level: ${average.toFixed(4)}, Silent: ${isSilent}`);
-      
-      await audioContext.close();
-      return isSilent;
-    } catch (error) {
-      console.error('Silence detection error:', error);
-      return false;
-    }
-  };
-
-  // FIXED: Calculate smart timing from current track
-  const calculateNextSampleTime = (trackDuration: number): number => {
-    if (trackDuration < 120) return 30; // Short tracks: 30s
-    if (trackDuration < 300) return 60; // Medium tracks: 60s  
-    return Math.min(Math.round(trackDuration * 0.3), 180); // Long tracks: 30% of duration, max 3min
-  };
+  }, [isSmartTimingEnabled, confidenceThreshold]);
 
   const recordAndAnalyze = useCallback((onComplete: () => void): void => {
     if (!streamRef.current) {
@@ -388,10 +334,10 @@ export default function AudioRecognitionSystem() {
     
     recordAndAnalyze(() => {
       if (isListeningRef.current) {
-        // FIXED: Always use current dynamic interval (updated by current track)
-        const nextInterval = dynamicInterval;
+        const nextInterval = (isSmartTimingEnabled && smartTiming?.next_sample_in) ? 
+                            smartTiming.next_sample_in : dynamicInterval;
         
-        console.log(`⏱️ Next recognition in ${nextInterval} seconds (updated from current track)`);
+        console.log(`⏱️ Next recognition in ${nextInterval} seconds`);
         setStatus(`✅ Recognition complete. Next sample in ${nextInterval}s...`);
         
         startCountdown(nextInterval, () => {
@@ -401,7 +347,7 @@ export default function AudioRecognitionSystem() {
         });
       }
     });
-  }, [dynamicInterval, recordAndAnalyze, startCountdown]);
+  }, [dynamicInterval, isSmartTimingEnabled, smartTiming, recordAndAnalyze, startCountdown]);
 
   const stopListening = (): void => {
     console.log('🛑 Stopping recognition system...');
@@ -545,6 +491,7 @@ export default function AudioRecognitionSystem() {
             )}
             <span><strong>Mode:</strong> {recognitionMode.replace('_', ' ')}</span>
             <span><strong>Smart Timing:</strong> {isSmartTimingEnabled ? 'ON' : 'OFF'}</span>
+            <span><strong>Confidence:</strong> {Math.round(confidenceThreshold * 100)}%</span>
           </div>
         </div>
         
@@ -698,7 +645,7 @@ export default function AudioRecognitionSystem() {
         </div>
       </div>
 
-      {/* FIXED: Configuration with confidence threshold */}
+      {/* Configuration */}
       {!isListening && (
         <div style={{ 
           background: "#f0f9ff", 
@@ -727,24 +674,14 @@ export default function AudioRecognitionSystem() {
               />
               Enable Smart Timing (recommended)
             </label>
-            
-            <label style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              fontSize: 16,
-              fontWeight: 600,
-              cursor: 'pointer',
-              marginBottom: 12
+            <p style={{ 
+              fontSize: 14, 
+              color: '#6b7280', 
+              margin: '0 0 16px 28px',
+              lineHeight: 1.5
             }}>
-              <input
-                type="checkbox"
-                checked={silenceDetectionRef.current}
-                onChange={(e) => { silenceDetectionRef.current = e.target.checked; }}
-                style={{ transform: 'scale(1.2)' }}
-              />
-              Enable Silence Detection
-            </label>
+              When enabled, uses track duration to calculate optimal timing. Falls back to manual interval when no duration available.
+            </p>
           </div>
           
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 16 }}>
@@ -802,7 +739,7 @@ export default function AudioRecognitionSystem() {
             
             <div>
               <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>
-                {isSmartTimingEnabled ? 'Fallback Interval' : 'Recognition Interval'} (seconds)
+                {isSmartTimingEnabled ? 'Fallback Interval (when no duration)' : 'Recognition Interval (seconds)'}
               </label>
               <input 
                 type="number"
@@ -818,28 +755,35 @@ export default function AudioRecognitionSystem() {
                   fontSize: 14
                 }}
               />
+              <p style={{ fontSize: 12, color: '#666', margin: '4px 0 0 0' }}>
+                {isSmartTimingEnabled ? 
+                  'Used when track duration unavailable' : 
+                  'Fixed interval between recognitions'
+                }
+              </p>
             </div>
-            
+
             <div>
               <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>
-                Confidence Threshold ({Math.round(confidenceThreshold * 100)}%)
+                Confidence Threshold (%)
               </label>
               <input 
-                type="range"
-                min="0.3"
-                max="0.9"
-                step="0.05"
-                value={confidenceThreshold}
-                onChange={(e) => setConfidenceThreshold(parseFloat(e.target.value))}
+                type="number"
+                min="10"
+                max="100"
+                value={Math.round(confidenceThreshold * 100)}
+                onChange={(e) => setConfidenceThreshold((parseInt(e.target.value) || 45) / 100)}
                 style={{ 
                   width: "100%", 
                   padding: "8px 12px", 
+                  border: "1px solid #ddd", 
+                  borderRadius: 6,
                   fontSize: 14
                 }}
               />
-              <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
-                Only show results above {Math.round(confidenceThreshold * 100)}% confidence
-              </div>
+              <p style={{ fontSize: 12, color: '#666', margin: '4px 0 0 0' }}>
+                Minimum confidence for valid recognition
+              </p>
             </div>
           </div>
         </div>
@@ -883,7 +827,7 @@ export default function AudioRecognitionSystem() {
         </div>
       )}
 
-      {/* FIXED: ALL Recognition Candidates above threshold */}
+      {/* Recognition Candidates */}
       {recognitionCandidates.length > 0 && (
         <div style={{ 
           background: "#fff7ed", 
@@ -893,7 +837,7 @@ export default function AudioRecognitionSystem() {
           border: "1px solid #ea580c"
         }}>
           <h3 style={{ margin: 0, marginBottom: 16, color: "#ea580c" }}>
-            🎯 All Recognition Candidates ({recognitionCandidates.length}) - Above {Math.round(confidenceThreshold * 100)}% Threshold
+            🎯 Recognition Candidates ({recognitionCandidates.length})
           </h3>
           
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 16 }}>
@@ -957,6 +901,9 @@ export default function AudioRecognitionSystem() {
           }
         `
       }} />
+      
+      {/* Manual Override Component */}
+      <ManualNowPlayingOverride />
     </div>
   );
 }
