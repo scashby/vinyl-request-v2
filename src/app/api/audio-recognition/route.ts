@@ -1,4 +1,4 @@
-// src/app/api/audio-recognition/route.ts - Complete TypeScript fix for all issues
+// src/app/api/audio-recognition/route.ts - FIXED VERSION with proper track title handling
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from 'lib/supabaseClient';
 import crypto from 'crypto';
@@ -15,7 +15,7 @@ interface RecognitionTrack {
 interface CollectionMatch {
   id: number;
   artist: string;
-  title: string;
+  title: string; // This is the ALBUM title in the collection
   year: string;
   image_url?: string;
   folder?: string;
@@ -91,64 +91,61 @@ interface LastFmSearchResponse {
   };
 }
 
-// Enhanced collection matching with fuzzy search
-async function findAllCollectionMatches(artist: string, title: string, album?: string): Promise<CollectionMatch[]> {
+// FIXED: Enhanced collection matching for BYO Vinyl only
+async function findBYOCollectionMatches(artist: string, title: string, album?: string): Promise<CollectionMatch[]> {
   try {
-    console.log(`🔍 Comprehensive collection search for: ${artist} - ${title}${album ? ` (${album})` : ''}`);
+    console.log(`🔍 BYO Collection search for: ${artist} - ${title}${album ? ` (${album})` : ''}`);
     
     const allMatches: CollectionMatch[] = [];
     
-    // 1. Exact artist match
+    // FIXED: Only search BYO vinyl folders (Vinyl, 45s, Cassettes)
+    const byoFolders = ['Vinyl', '45s', 'Cassettes'];
+    
+    // 1. Exact artist match in BYO folders
     const { data: exactArtist } = await supabase
       .from('collection')
       .select('id, artist, title, year, image_url, folder')
       .ilike('artist', artist)
-      .limit(3);
+      .in('folder', byoFolders)
+      .limit(5);
     
     if (exactArtist) allMatches.push(...exactArtist);
     
-    // 2. Fuzzy artist matching (split words)
+    // 2. Album title search if available (album title should match collection title)
+    if (album) {
+      const { data: albumMatches } = await supabase
+        .from('collection')
+        .select('id, artist, title, year, image_url, folder')
+        .ilike('title', `%${album}%`)
+        .in('folder', byoFolders)
+        .limit(3);
+      
+      if (albumMatches) allMatches.push(...albumMatches);
+    }
+    
+    // 3. Fuzzy artist matching (split words) in BYO folders
     const artistWords = artist.toLowerCase().split(' ').filter(word => word.length > 2);
     for (const word of artistWords.slice(0, 2)) {
       const { data: fuzzyArtist } = await supabase
         .from('collection')
         .select('id, artist, title, year, image_url, folder')
         .ilike('artist', `%${word}%`)
+        .in('folder', byoFolders)
         .limit(2);
       
       if (fuzzyArtist) allMatches.push(...fuzzyArtist);
     }
-    
-    // 3. Album title search if available
-    if (album) {
-      const { data: albumMatches } = await supabase
-        .from('collection')
-        .select('id, artist, title, year, image_url, folder')
-        .ilike('title', `%${album}%`)
-        .limit(2);
-      
-      if (albumMatches) allMatches.push(...albumMatches);
-    }
-    
-    // 4. Track title search (in case track title matches album title in collection)
-    const { data: titleMatches } = await supabase
-      .from('collection')
-      .select('id, artist, title, year, image_url, folder')
-      .ilike('title', `%${title}%`)
-      .limit(2);
-    
-    if (titleMatches) allMatches.push(...titleMatches);
     
     // Remove duplicates by ID
     const uniqueMatches = allMatches.filter((match, index, self) => 
       index === self.findIndex(m => m.id === match.id)
     );
     
-    console.log(`✅ Found ${uniqueMatches.length} collection matches`);
+    console.log(`✅ Found ${uniqueMatches.length} BYO collection matches`);
     return uniqueMatches.slice(0, 5);
     
   } catch (error) {
-    console.error('Collection matching error:', error);
+    console.error('BYO Collection matching error:', error);
     return [];
   }
 }
@@ -274,7 +271,7 @@ async function searchSpotifyTracks(artist: string, title: string): Promise<Enhan
     
     return tracks.map((track, index): EnhancedRecognitionTrack => ({
       artist: track.artists[0]?.name || artist,
-      title: track.name,
+      title: track.name, // FIXED: Keep the actual track title
       album: track.album.name,
       image_url: track.album.images[0]?.url,
       confidence: Math.max(0.6, 0.9 - (index * 0.1)),
@@ -304,7 +301,7 @@ async function searchLastFmTracks(artist: string, title: string): Promise<Enhanc
     
     return tracks.map((track, index): EnhancedRecognitionTrack => ({
       artist: typeof track.artist === 'string' ? track.artist : track.artist?.name || artist,
-      title: track.name || title,
+      title: track.name || title, // FIXED: Keep the actual track title
       album: track.album?.name,
       image_url: track.image?.find((img: LastFmImage) => img.size === 'extralarge')?.['#text'],
       confidence: Math.max(0.5, 0.8 - (index * 0.1)),
@@ -387,7 +384,7 @@ async function recognizeWithACRCloud(audioFile: File): Promise<EnhancedRecogniti
 
         return {
           artist: track.artists?.[0]?.name || 'Unknown Artist',
-          title: track.title || 'Unknown Title',
+          title: track.title || 'Unknown Title', // FIXED: Keep actual track title
           album: track.album?.name,
           image_url: extractImageUrl(track),
           confidence: Math.max(0.7, (data.status?.score || 80) / 100 - (index * 0.05)),
@@ -438,7 +435,7 @@ async function recognizeWithAudD(audioFile: File): Promise<EnhancedRecognitionTr
       
       return [{
         artist: data.result.artist || 'Unknown Artist',
-        title: data.result.title || 'Unknown Title',
+        title: data.result.title || 'Unknown Title', // FIXED: Keep actual track title
         album: data.result.album,
         image_url: imageUrl,
         confidence: 0.8,
@@ -455,7 +452,7 @@ async function recognizeWithAudD(audioFile: File): Promise<EnhancedRecognitionTr
   }
 }
 
-// Main POST handler
+// FIXED: Main POST handler with proper track title preservation
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const formData = await request.formData();
@@ -468,7 +465,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    console.log(`🎵 Starting COMPREHENSIVE recognition for: ${audioFile.name}`);
+    console.log(`🎵 Starting BYO VINYL recognition for: ${audioFile.name}`);
 
     // PHASE 1: Audio Recognition Services
     console.log('🔊 Phase 1: Audio recognition services...');
@@ -506,15 +503,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     console.log(`🎯 Primary track: ${primaryTrack.artist} - ${primaryTrack.title} (${primaryTrack.service})`);
 
-    // PHASE 2: Comprehensive candidate gathering
-    console.log('🔍 Phase 2: Gathering candidates from ALL sources...');
+    // PHASE 2: BYO Collection matching and candidate gathering
+    console.log('🔍 Phase 2: BYO collection matching and candidate gathering...');
     
-    // Execute all searches in parallel
-    const collectionMatchesPromise = findAllCollectionMatches(primaryTrack.artist, primaryTrack.title, primaryTrack.album);
+    const collectionMatchesPromise = findBYOCollectionMatches(primaryTrack.artist, primaryTrack.title, primaryTrack.album);
     const spotifyTracksPromise = searchSpotifyTracks(primaryTrack.artist, primaryTrack.title);
     const lastfmTracksPromise = searchLastFmTracks(primaryTrack.artist, primaryTrack.title);
 
-    // Wait for all to complete
     const [collectionMatchesResult, spotifyTracksResult, lastfmTracksResult] = await Promise.allSettled([
       collectionMatchesPromise,
       spotifyTracksPromise,
@@ -532,21 +527,21 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       collectionMatches = collectionMatchesResult.value;
     }
     
-    // Add collection-based candidates
+    // FIXED: Add collection-based candidates - preserve the TRACK title, use collection title as ALBUM
     if (collectionMatches.length > 0) {
       const collectionCandidates: EnhancedRecognitionTrack[] = collectionMatches.map((match: CollectionMatch): EnhancedRecognitionTrack => ({
         artist: match.artist,
-        title: match.title,
-        album: match.title,
+        title: primaryTrack.title, // FIXED: Keep the recognized TRACK title
+        album: match.title, // FIXED: Use collection title as ALBUM title
         image_url: match.image_url,
         confidence: 0.85,
-        service: 'Collection Match',
+        service: 'BYO Collection Match',
         source_priority: 0,
         collection_match: match,
         is_guest_vinyl: false
       }));
       allCandidates.push(...collectionCandidates);
-      console.log(`📀 Added ${collectionCandidates.length} collection candidates`);
+      console.log(`📀 Added ${collectionCandidates.length} BYO collection candidates`);
     }
     
     // Add Spotify candidates
@@ -561,21 +556,30 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       console.log(`🎵 Added ${lastfmTracksResult.value.length} Last.fm candidates`);
     }
 
-    // PHASE 4: Enhance primary track with collection info
+    // PHASE 4: FIXED - Enhanced primary track with proper collection matching
     console.log('🔧 Phase 4: Enhancing primary track...');
     
-    const primaryCollectionMatch: CollectionMatch | undefined = collectionMatches.find((match: CollectionMatch) => 
-      match.artist.toLowerCase().includes(primaryTrack.artist.toLowerCase()) ||
-      primaryTrack.artist.toLowerCase().includes(match.artist.toLowerCase())
-    );
+    // Find the best collection match for the primary track
+    const primaryCollectionMatch: CollectionMatch | undefined = collectionMatches.find((match: CollectionMatch) => {
+      // Check if artist matches and album matches (if we have album info)
+      const artistMatch = match.artist.toLowerCase().includes(primaryTrack.artist.toLowerCase()) ||
+                         primaryTrack.artist.toLowerCase().includes(match.artist.toLowerCase());
+      
+      const albumMatch = !primaryTrack.album || 
+                        match.title.toLowerCase().includes(primaryTrack.album.toLowerCase()) ||
+                        primaryTrack.album.toLowerCase().includes(match.title.toLowerCase());
+      
+      return artistMatch && albumMatch;
+    });
 
     if (primaryCollectionMatch) {
       primaryTrack.collection_match = primaryCollectionMatch;
       primaryTrack.is_guest_vinyl = false;
+      primaryTrack.album = primaryCollectionMatch.title; // FIXED: Set album to collection title
       if (!primaryTrack.image_url && primaryCollectionMatch.image_url) {
         primaryTrack.image_url = primaryCollectionMatch.image_url;
       }
-      console.log(`✅ Primary track matched to collection: ${primaryCollectionMatch.artist} - ${primaryCollectionMatch.title}`);
+      console.log(`✅ Primary track matched to BYO collection: ${primaryCollectionMatch.artist} - ${primaryCollectionMatch.title}`);
     } else {
       primaryTrack.is_guest_vinyl = true;
       if (!primaryTrack.image_url) {
@@ -618,8 +622,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         .upsert({
           id: 1,
           artist: primaryTrack.artist,
-          title: primaryTrack.title,
-          album_title: primaryTrack.album,
+          title: primaryTrack.title, // FIXED: This is the actual TRACK title
+          album_title: primaryTrack.album, // FIXED: This is the ALBUM title
           recognition_image_url: primaryTrack.image_url,
           album_id: primaryTrack.collection_match?.id || null,
           started_at: new Date().toISOString(),
@@ -635,7 +639,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const servicesQueried = [
       'ACRCloud',
       'AudD', 
-      'Collection Search',
+      'BYO Collection Search',
       'Spotify Search',
       'Last.fm Search'
     ].filter(service => {
@@ -648,7 +652,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     });
 
-    console.log(`🎉 Recognition complete! Primary: ${primaryTrack.service}, Candidates: ${rankedCandidates.length}, Services: ${servicesQueried.length}`);
+    console.log(`🎉 BYO Recognition complete! Primary: ${primaryTrack.service}, Candidates: ${rankedCandidates.length}, Services: ${servicesQueried.length}`);
 
     return NextResponse.json({
       success: true,
@@ -687,9 +691,10 @@ export async function GET(): Promise<NextResponse> {
       priority: 2
     },
     {
-      name: 'Collection Search',
+      name: 'BYO Collection Search',
       enabled: true,
-      priority: 0
+      priority: 0,
+      description: 'Searches only Vinyl, 45s, and Cassettes folders'
     },
     {
       name: 'Spotify Search',
@@ -706,22 +711,23 @@ export async function GET(): Promise<NextResponse> {
   const enabledServices = services.filter(s => s.enabled);
 
   return NextResponse.json({ 
-    message: 'Comprehensive Multi-Service Audio Recognition API',
-    version: '2.0.0',
+    message: 'BYO Vinyl Multi-Service Audio Recognition API',
+    version: '3.0.0',
     enabledServices: enabledServices.map(s => `${s.name} (Priority: ${s.priority})`),
     features: [
-      'Parallel querying of ALL available services',
-      'Comprehensive candidate collection from every source',
-      'Smart collection matching with fuzzy search',
+      'BYO Vinyl focus - only Vinyl, 45s, Cassettes folders',
+      'Proper track title preservation',
+      'Album title mapping from collection titles',
       'Priority-based result ranking',
       'Enhanced artwork discovery',
-      'No early stopping - queries everything',
-      'Detailed service reporting'
+      'Album Follow mode support',
+      'Comprehensive candidate collection'
     ],
+    byoVinylFolders: ['Vinyl', '45s', 'Cassettes'],
     serviceDetails: {
       audioRecognition: ['ACRCloud', 'AudD'],
       searchAPIs: ['Spotify', 'Last.fm'],
-      internal: ['Collection Search'],
+      internal: ['BYO Collection Search'],
       total: enabledServices.length
     }
   });
