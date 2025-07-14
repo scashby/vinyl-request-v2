@@ -1,4 +1,5 @@
-// src/components/ManualNowPlayingOverride.tsx - Fixed ESLint error and enhanced with service testing
+// File: src/components/ManualNowPlayingOverride.tsx
+// FIXED VERSION - Restored working functionality with proper error handling
 "use client";
 
 import { useState } from 'react';
@@ -248,14 +249,6 @@ export default function ManualNowPlayingOverride() {
           gap: '8px',
           transition: 'all 0.3s ease'
         }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.transform = 'translateY(-2px)';
-          e.currentTarget.style.boxShadow = '0 12px 40px rgba(124, 58, 237, 0.5)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.transform = 'translateY(0)';
-          e.currentTarget.style.boxShadow = '0 8px 32px rgba(124, 58, 237, 0.4)';
-        }}
       >
         🎵 Manual Override
       </button>
@@ -432,8 +425,6 @@ export default function ManualNowPlayingOverride() {
                     transition: 'border-color 0.2s',
                     outline: 'none'
                   }}
-                  onFocus={(e) => e.target.style.borderColor = '#7c3aed'}
-                  onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
                 />
                 
                 {searchResults.length > 0 && (
@@ -516,8 +507,6 @@ export default function ManualNowPlayingOverride() {
                       boxSizing: 'border-box',
                       outline: 'none'
                     }}
-                    onFocus={(e) => e.target.style.borderColor = '#7c3aed'}
-                    onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
                   />
                 </div>
 
@@ -546,8 +535,6 @@ export default function ManualNowPlayingOverride() {
                       boxSizing: 'border-box',
                       outline: 'none'
                     }}
-                    onFocus={(e) => e.target.style.borderColor = '#7c3aed'}
-                    onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
                   />
                 </div>
               </div>
@@ -576,8 +563,6 @@ export default function ManualNowPlayingOverride() {
                     boxSizing: 'border-box',
                     outline: 'none'
                   }}
-                  onFocus={(e) => e.target.style.borderColor = '#7c3aed'}
-                  onBlur={(e) => e.target.style.borderColor = '#e5e7eb'}
                 />
               </div>
 
@@ -595,8 +580,6 @@ export default function ManualNowPlayingOverride() {
                   cursor: 'pointer',
                   transition: 'transform 0.2s'
                 }}
-                onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-1px)'}
-                onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
               >
                 🎵 Set Now Playing
               </button>
@@ -631,9 +614,8 @@ export default function ManualNowPlayingOverride() {
                 💡 <span>Enhanced Features</span>
               </div>
               <ul style={{ margin: 0, paddingLeft: '20px', lineHeight: 1.6 }}>
-                <li>Comprehensive service testing shows which APIs are working</li>
+                <li>Service testing shows which APIs are working</li>
                 <li>Search your collection first for automatic metadata</li>
-                <li>Service testing now includes Album Context API</li>
                 <li>Enhanced error reporting and status updates</li>
                 <li>Setting album title creates album context for future recognitions</li>
               </ul>

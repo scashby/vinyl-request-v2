@@ -1,4 +1,5 @@
-// src/app/api/audio-recognition/route.ts - FIXED VERSION with Collection Priority & Smart Timing
+// File: src/app/api/audio-recognition/route.ts
+// FIXED VERSION with proper error handling and candidate display
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from 'lib/supabaseClient';
 import crypto from 'crypto';
@@ -71,7 +72,7 @@ interface ACRCloudResponse {
   metadata?: { music?: ACRCloudTrack[] };
 }
 
-// FIXED: Enhanced collection matching with STRICT PRIORITY for BYO Collection
+// Enhanced collection matching with STRICT PRIORITY for BYO Collection
 async function findBYOCollectionMatches(artist: string, title: string, album?: string): Promise<CollectionMatch[]> {
   try {
     console.log(`🎯 PRIORITY COLLECTION SEARCH: ${artist} - ${title}${album ? ` (${album})` : ''}`);
@@ -198,16 +199,20 @@ function calculateSmartTiming(trackDuration?: number, currentSampleDuration: num
 // Enhanced ACRCloud recognition with duration extraction
 async function recognizeWithACRCloud(audioFile: File): Promise<EnhancedRecognitionTrack[]> {
   if (!process.env.ACRCLOUD_ACCESS_KEY || !process.env.ACRCLOUD_SECRET_KEY) {
+    console.log('ACRCloud: Missing API credentials');
     return [];
   }
 
   try {
+    console.log('🔊 ACRCloud: Starting recognition...');
     const accessKey = process.env.ACRCLOUD_ACCESS_KEY;
     const secretKey = process.env.ACRCLOUD_SECRET_KEY;
     const endpoint = process.env.ACRCLOUD_ENDPOINT || 'identify-us-west-2.acrcloud.com';
     
     const arrayBuffer = await audioFile.arrayBuffer();
     const audioBuffer = Buffer.from(arrayBuffer);
+    
+    console.log(`📊 Audio buffer size: ${audioBuffer.length} bytes`);
     
     const timestamp = Math.floor(Date.now() / 1000);
     const signature = generateACRCloudSignature(
@@ -235,11 +240,18 @@ async function recognizeWithACRCloud(audioFile: File): Promise<EnhancedRecogniti
       headers: { 'User-Agent': 'DeadWaxDialogues/1.0' }
     });
 
-    if (!response.ok) return [];
+    console.log(`🔊 ACRCloud response status: ${response.status}`);
+
+    if (!response.ok) {
+      console.warn(`ACRCloud HTTP error: ${response.status}`);
+      return [];
+    }
 
     const data: ACRCloudResponse = await response.json();
+    console.log('🔊 ACRCloud response:', JSON.stringify(data, null, 2));
     
     if (data.status?.code === 0 && data.metadata?.music) {
+      console.log(`✅ ACRCloud: Found ${data.metadata.music.length} results`);
       return data.metadata.music.slice(0, 5).map((track, index): EnhancedRecognitionTrack => {
         const extractImageUrl = (track: ACRCloudTrack): string | undefined => {
           return track.external_metadata?.spotify?.album?.images?.[0]?.url ||
@@ -261,6 +273,8 @@ async function recognizeWithACRCloud(audioFile: File): Promise<EnhancedRecogniti
           duration: duration
         };
       });
+    } else {
+      console.log(`❌ ACRCloud: No results. Status code: ${data.status?.code}, Message: ${data.status?.msg}`);
     }
     
     return [];
@@ -286,9 +300,13 @@ function generateACRCloudSignature(
 
 // Enhanced AudD recognition
 async function recognizeWithAudD(audioFile: File): Promise<EnhancedRecognitionTrack[]> {
-  if (!process.env.AUDD_API_TOKEN) return [];
+  if (!process.env.AUDD_API_TOKEN) {
+    console.log('AudD: Missing API token');
+    return [];
+  }
 
   try {
+    console.log('🔊 AudD: Starting recognition...');
     const formData = new FormData();
     formData.append('api_token', process.env.AUDD_API_TOKEN);
     formData.append('audio', audioFile);
@@ -300,11 +318,18 @@ async function recognizeWithAudD(audioFile: File): Promise<EnhancedRecognitionTr
       headers: { 'User-Agent': 'DeadWaxDialogues/1.0' }
     });
 
-    if (!response.ok) return [];
+    console.log(`🔊 AudD response status: ${response.status}`);
+
+    if (!response.ok) {
+      console.warn(`AudD HTTP error: ${response.status}`);
+      return [];
+    }
 
     const data = await response.json();
+    console.log('🔊 AudD response:', JSON.stringify(data, null, 2));
     
     if (data.status === 'success' && data.result) {
+      console.log('✅ AudD: Found result');
       let imageUrl: string | undefined;
       let duration: number | undefined;
       
@@ -334,6 +359,8 @@ async function recognizeWithAudD(audioFile: File): Promise<EnhancedRecognitionTr
         is_guest_vinyl: true,
         duration: duration
       }];
+    } else {
+      console.log(`❌ AudD: No results. Status: ${data.status}, Error: ${data.error}`);
     }
     
     return [];
@@ -343,7 +370,7 @@ async function recognizeWithAudD(audioFile: File): Promise<EnhancedRecognitionTr
   }
 }
 
-// FIXED: Main POST handler with COLLECTION PRIORITY and Smart Timing
+// FIXED: Main POST handler with proper error handling and candidate display
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const formData = await request.formData();
@@ -356,9 +383,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    console.log(`🎵 COLLECTION-PRIORITY BYO VINYL RECOGNITION: ${audioFile.name}`);
+    console.log(`🎵 AUDIO RECOGNITION: ${audioFile.name}, size: ${audioFile.size} bytes`);
 
-    // PHASE 1: Audio Recognition Services (for external identification)
+    if (audioFile.size === 0) {
+      return NextResponse.json(
+        { success: false, error: 'Empty audio file' },
+        { status: 400 }
+      );
+    }
+
+    // PHASE 1: Audio Recognition Services (run in parallel for faster response)
     console.log('🔊 Phase 1: Audio recognition services...');
     const audioRecognitionPromises = [
       recognizeWithACRCloud(audioFile),
@@ -378,12 +412,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     });
 
-    // Get the best external recognition for artist/track info
-    const bestExternalTrack = allAudioCandidates.sort((a, b) => 
-      (b.confidence || 0) - (a.confidence || 0)
-    )[0];
+    console.log(`📊 Total external candidates found: ${allAudioCandidates.length}`);
 
-    if (!bestExternalTrack) {
+    // Check if we have any results at all
+    if (allAudioCandidates.length === 0) {
       return NextResponse.json({
         success: false,
         error: 'No audio recognition results from any service',
@@ -392,9 +424,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       } satisfies EnhancedRecognitionResult);
     }
 
+    // Get the best external recognition for artist/track info
+    const bestExternalTrack = allAudioCandidates.sort((a, b) => 
+      (b.confidence || 0) - (a.confidence || 0)
+    )[0];
+
     console.log(`🎯 Best external recognition: ${bestExternalTrack.artist} - ${bestExternalTrack.title} (${bestExternalTrack.service})`);
 
-    // PHASE 2: COLLECTION SEARCH FIRST - HIGHEST PRIORITY
+    // PHASE 2: COLLECTION SEARCH - HIGHEST PRIORITY
     console.log('🏆 Phase 2: PRIORITY COLLECTION SEARCH (Vinyl > Cassettes > 45s)...');
     
     const collectionMatches = await findBYOCollectionMatches(
@@ -425,7 +462,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         duration: bestExternalTrack.duration // Keep duration from recognition
       };
 
-      // Add other collection matches as candidates
+      // RESTORED: Add other collection matches as candidates
       candidates = collectionMatches.slice(1, 6).map((match: CollectionMatch): EnhancedRecognitionTrack => ({
         artist: match.artist,
         title: bestExternalTrack.title,
@@ -439,8 +476,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         duration: bestExternalTrack.duration
       }));
 
-      // Add external candidates as backup
-      candidates.push(...allAudioCandidates.slice(0, 3).map(track => ({
+      // RESTORED: Add ALL external candidates as alternatives
+      candidates.push(...allAudioCandidates.map(track => ({
         ...track,
         is_guest_vinyl: true,
         source_priority: 10 // Lower priority
@@ -458,13 +495,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         source_priority: 1
       };
 
-      // Add other external results as candidates
-      candidates = allAudioCandidates.slice(1, 10).map(track => ({
+      // RESTORED: Add ALL other external results as candidates
+      candidates = allAudioCandidates.slice(1).map(track => ({
         ...track,
         is_guest_vinyl: true,
         source_priority: 1
       }));
     }
+
+    console.log(`📊 Final result: Primary + ${candidates.length} candidates`);
 
     // PHASE 3: Smart Timing Calculation
     console.log('⏰ Phase 3: Smart timing calculation...');
@@ -503,12 +542,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
       console.log('✅ Database updated - TV display should refresh automatically');
       
-      // Force a notification to ensure TV updates
-      await supabase
-        .from('now_playing')
-        .update({ updated_at: new Date().toISOString() })
-        .eq('id', 1);
-        
     } catch (dbError) {
       console.error('❌ Database update error:', dbError);
     }
@@ -525,8 +558,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     });
 
-    console.log(`🎉 COLLECTION-PRIORITY Recognition complete!`);
-    console.log(`📊 Primary: ${finalTrack.service} | Collection: ${!!finalTrack.collection_match} | Duration: ${finalTrack.duration}s | Next sample: ${finalTrack.next_recognition_delay}s`);
+    console.log(`🎉 Recognition complete!`);
+    console.log(`📊 Primary: ${finalTrack.service} | Collection: ${!!finalTrack.collection_match} | Candidates: ${candidates.length} | Duration: ${finalTrack.duration}s`);
 
     return NextResponse.json({
       success: true,
@@ -581,15 +614,15 @@ export async function GET(): Promise<NextResponse> {
 
   return NextResponse.json({ 
     message: 'BYO Vinyl Collection-Priority Audio Recognition API',
-    version: '4.0.0',
+    version: '4.1.0',
     enabledServices: enabledServices.map(s => `${s.name} (Priority: ${s.priority})`),
     features: [
       'COLLECTION ABSOLUTE PRIORITY - Vinyl > Cassettes > 45s',
       'Smart timing based on track duration',
-      'Proper track title preservation',
+      'ALL candidates from ALL services displayed',
       'Real-time TV display updates',
       'Enhanced duration extraction',
-      'Fallback to external only if no collection match'
+      'Proper error handling and logging'
     ],
     collectionPriority: {
       1: 'Vinyl (highest priority)',

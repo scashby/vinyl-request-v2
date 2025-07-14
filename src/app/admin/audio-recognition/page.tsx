@@ -1,8 +1,10 @@
-// src/app/admin/audio-recognition/page.tsx - FIXED with Smart Timing & Collection Priority
+// File: src/app/admin/audio-recognition/page.tsx
+// FIXED VERSION - Restored working functionality
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
+import ManualNowPlayingOverride from 'components/ManualNowPlayingOverride';
 
 interface RecognitionResult {
   artist: string;
@@ -30,7 +32,7 @@ interface SmartTiming {
   reasoning?: string;
 }
 
-export default function SmartAudioRecognitionSystem() {
+export default function AudioRecognitionSystem() {
   const [isListening, setIsListening] = useState<boolean>(false);
   const [recognitionMode, setRecognitionMode] = useState<'manual' | 'smart_continuous' | 'album_follow'>('smart_continuous');
   const [lastRecognition, setLastRecognition] = useState<RecognitionResult | null>(null);
@@ -38,8 +40,7 @@ export default function SmartAudioRecognitionSystem() {
   const [status, setStatus] = useState<string>('');
   const [sampleDuration, setSampleDuration] = useState<number>(15);
 
-  
-  // Smart timing state
+  // Smart timing state  
   const [smartTiming, setSmartTiming] = useState<SmartTiming | null>(null);
   const [dynamicInterval, setDynamicInterval] = useState<number>(30);
   const [isSmartTimingEnabled, setIsSmartTimingEnabled] = useState<boolean>(true);
@@ -75,7 +76,7 @@ export default function SmartAudioRecognitionSystem() {
   }, []);
 
   const startCountdown = useCallback((seconds: number, callback: () => void): void => {
-    console.log(`⏱️ Starting ${isSmartTimingEnabled ? 'smart' : 'fixed'} countdown: ${seconds} seconds`);
+    console.log(`⏱️ Starting countdown: ${seconds} seconds`);
     
     setNextRecognitionCountdown(seconds);
     setIsCountdownActive(true);
@@ -100,16 +101,18 @@ export default function SmartAudioRecognitionSystem() {
         return newValue;
       });
     }, 1000);
-  }, [isSmartTimingEnabled]);
+  }, []);
 
-  // FIXED: Enhanced audio analysis with COLLECTION PRIORITY
+  // FIXED: Enhanced audio analysis with proper error handling and candidate display
   const analyzeAudio = useCallback(async (audioBlob: Blob): Promise<void> => {
-    setStatus('🎯 Analyzing audio with COLLECTION PRIORITY (Vinyl > Cassettes > 45s)...');
+    setStatus('🎯 Analyzing audio...');
     
     try {
       const formData = new FormData();
       formData.append('audio', audioBlob);
 
+      console.log('📤 Sending audio for recognition...');
+      
       const response = await fetch('/api/audio-recognition', {
         method: 'POST',
         body: formData
@@ -144,40 +147,41 @@ export default function SmartAudioRecognitionSystem() {
           {
             time: new Date(),
             track: `${track.artist} - ${track.title}`,
-            source: track.collection_match ? `Collection (${track.collection_match.folder})` : 'Guest Vinyl',
+            source: track.collection_match ? `Collection (${track.collection_match.folder})` : 
+                   track.service || 'External Service',
             duration: track.duration,
             nextSampleIn: track.next_recognition_delay
           },
           ...prev.slice(0, 9) // Keep last 10
         ]);
         
-        // Build status message with collection priority info
+        // Build status message
         let statusMessage = '';
         
         if (track.collection_match) {
-          statusMessage = `🏆 COLLECTION MATCH: ${track.title} by ${track.artist}`;
-          statusMessage += ` [FROM ${track.collection_match.folder.toUpperCase()}]`;
+          statusMessage = `🏆 COLLECTION: ${track.title} by ${track.artist}`;
+          statusMessage += ` [${track.collection_match.folder}]`;
         } else {
-          statusMessage = `👤 GUEST VINYL: ${track.title} by ${track.artist}`;
+          statusMessage = `🎵 RECOGNIZED: ${track.title} by ${track.artist}`;
         }
         
         if (track.album) {
           statusMessage += ` (${track.album})`;
         }
         
-        statusMessage += ` | Confidence: ${Math.round((track.confidence || 0.8) * 100)}%`;
-        statusMessage += ` | Service: ${track.service || 'Unknown'}`;
+        statusMessage += ` | ${Math.round((track.confidence || 0.8) * 100)}% confidence`;
+        statusMessage += ` | ${track.service || 'Multi-Service'}`;
         
         if (track.duration) {
-          statusMessage += ` | Duration: ${Math.floor(track.duration / 60)}:${(track.duration % 60).toString().padStart(2, '0')}`;
+          statusMessage += ` | ${Math.floor(track.duration / 60)}:${(track.duration % 60).toString().padStart(2, '0')}`;
         }
         
         if (candidates.length > 0) {
-          statusMessage += ` | +${candidates.length} candidates`;
+          statusMessage += ` | +${candidates.length} alternatives`;
         }
         
         if (isSmartTimingEnabled && track.next_recognition_delay) {
-          statusMessage += ` | Next sample: ${track.next_recognition_delay}s`;
+          statusMessage += ` | Next: ${track.next_recognition_delay}s`;
         }
         
         setStatus(statusMessage);
@@ -199,6 +203,7 @@ export default function SmartAudioRecognitionSystem() {
   const recordAndAnalyze = useCallback((onComplete: () => void): void => {
     if (!streamRef.current) {
       console.error('No audio stream available');
+      setStatus('❌ No audio stream available');
       return;
     }
 
@@ -244,15 +249,32 @@ export default function SmartAudioRecognitionSystem() {
       }
       
       const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+      console.log(`📁 Audio blob size: ${audioBlob.size} bytes`);
+      
+      if (audioBlob.size === 0) {
+        setStatus('❌ No audio data captured');
+        onComplete();
+        return;
+      }
+      
       await analyzeAudio(audioBlob);
       setLastRecognitionTime(new Date());
       setRecognitionCount(prev => prev + 1);
       onComplete();
     };
 
+    mediaRecorder.onerror = (event) => {
+      console.error('❌ MediaRecorder error:', event);
+      setStatus('❌ Recording error occurred');
+      setIsRecording(false);
+      setRecordingProgress(0);
+      onComplete();
+    };
+
     setStatus(`🎤 Recording ${sampleDuration}s audio sample...`);
     mediaRecorder.start();
 
+    // Stop recording after specified duration
     setTimeout(() => {
       if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
         mediaRecorderRef.current.stop();
@@ -285,8 +307,8 @@ export default function SmartAudioRecognitionSystem() {
           isListeningRef.current = false;
         });
       } else {
-        setStatus('🔄 Starting smart continuous recognition...');
-        startSmartContinuous();
+        setStatus('🔄 Starting continuous recognition...');
+        startContinuous();
       }
 
     } catch (error: unknown) {
@@ -298,26 +320,28 @@ export default function SmartAudioRecognitionSystem() {
     }
   };
 
-  const startSmartContinuous = useCallback((): void => {
+  const startContinuous = useCallback((): void => {
     if (!isListeningRef.current) return;
     
-    console.log('🔄 Smart continuous: Starting recognition cycle...');
+    console.log('🔄 Starting recognition cycle...');
     
     recordAndAnalyze(() => {
       if (isListeningRef.current) {
-        // Use smart timing if available, otherwise fall back to default
-        const nextInterval = isSmartTimingEnabled ? dynamicInterval : 30;
-        console.log(`⏱️ Next recognition in ${nextInterval} seconds (${isSmartTimingEnabled ? 'smart' : 'fixed'} timing)`);
-        setStatus(`✅ Recognition complete. Next sample in ${nextInterval}s (${isSmartTimingEnabled ? 'smart timing' : 'fixed timing'})...`);
+        // FIXED: Use smart timing if available, otherwise use configured interval
+        const nextInterval = (isSmartTimingEnabled && smartTiming?.next_sample_in) ? 
+                            smartTiming.next_sample_in : dynamicInterval;
+        
+        console.log(`⏱️ Next recognition in ${nextInterval} seconds`);
+        setStatus(`✅ Recognition complete. Next sample in ${nextInterval}s...`);
         
         startCountdown(nextInterval, () => {
           if (isListeningRef.current) {
-            startSmartContinuous();
+            startContinuous();
           }
         });
       }
     });
-  }, [dynamicInterval, isSmartTimingEnabled, recordAndAnalyze, startCountdown]);
+  }, [dynamicInterval, isSmartTimingEnabled, smartTiming, recordAndAnalyze, startCountdown]);
 
   const stopListening = (): void => {
     console.log('🛑 Stopping recognition system...');
@@ -363,32 +387,10 @@ export default function SmartAudioRecognitionSystem() {
   return (
     <div style={{ padding: 24, background: "#fff", color: "#222", minHeight: "100vh" }}>
       <h1 style={{ marginBottom: 32, fontSize: '28px', fontWeight: 'bold' }}>
-        🎯 Smart BYO Vinyl Recognition System
+        🎵 Audio Recognition System
       </h1>
       
-      {/* Collection Priority Info Banner */}
-      <div style={{
-        background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-        color: 'white',
-        padding: 20,
-        borderRadius: 12,
-        marginBottom: 24,
-        display: 'flex',
-        alignItems: 'center',
-        gap: 16
-      }}>
-        <div style={{ fontSize: '2rem' }}>🏆</div>
-        <div>
-          <div style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: 4 }}>
-            Collection Priority System Active
-          </div>
-          <div style={{ fontSize: '14px', opacity: 0.9 }}>
-            Searches YOUR collection FIRST: Vinyl (highest) → Cassettes → 45s. External services only as fallback.
-          </div>
-        </div>
-      </div>
-      
-      {/* FIXED: Current Recognition at the top */}
+      {/* RESTORED: Current Recognition at the top */}
       {lastRecognition && (
         <div style={{ 
           background: lastRecognition.collection_match ? "#f0fdf4" : "#fff7ed", 
@@ -398,7 +400,7 @@ export default function SmartAudioRecognitionSystem() {
           marginBottom: 24
         }}>
           <h2 style={{ marginTop: 0, marginBottom: 16 }}>
-            {lastRecognition.collection_match ? '🏆 Collection Match' : '👤 Guest Vinyl'}
+            {lastRecognition.collection_match ? '🏆 Collection Match' : '🎵 Recognition Result'}
           </h2>
           <div style={{ display: "flex", gap: 16, alignItems: "center", marginBottom: 16 }}>
             <Image 
@@ -436,8 +438,8 @@ export default function SmartAudioRecognitionSystem() {
                 fontWeight: 600
               }}>
                 {lastRecognition.collection_match ? 
-                  `FROM ${lastRecognition.collection_match.folder?.toUpperCase()} COLLECTION` : 
-                  "GUEST VINYL (not in collection)"
+                  `Collection: ${lastRecognition.collection_match.folder}` : 
+                  `Source: ${lastRecognition.service || 'External'}`
                 }
               </div>
             </div>
@@ -540,7 +542,7 @@ export default function SmartAudioRecognitionSystem() {
           </div>
         )}
 
-        {/* Smart Countdown Timer */}
+        {/* Countdown Timer */}
         {isCountdownActive && nextRecognitionCountdown > 0 && !isRecording && (
           <div style={{
             display: "flex",
@@ -594,7 +596,7 @@ export default function SmartAudioRecognitionSystem() {
           </div>
         )}
 
-        {/* Recognition Controls */}
+        {/* FIXED: Recognition Controls - restored simple button text */}
         <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
           <button 
             onClick={isListening ? stopListening : startListening}
@@ -611,7 +613,7 @@ export default function SmartAudioRecognitionSystem() {
           >
             {isListening 
               ? "🛑 Stop Recognition" 
-              : `🎯 Start Collection-Priority Recognition`
+              : `🎵 Start Recognition`
             }
           </button>
           
@@ -633,7 +635,7 @@ export default function SmartAudioRecognitionSystem() {
         </div>
       </div>
 
-      {/* Smart Timing Controls - Hidden when listening */}
+      {/* FIXED: Configuration - allow editing interval even with smart timing */}
       {!isListening && (
         <div style={{ 
           background: "#f0f9ff", 
@@ -642,7 +644,7 @@ export default function SmartAudioRecognitionSystem() {
           marginBottom: 24,
           border: "1px solid #0369a1"
         }}>
-          <h2 style={{ marginTop: 0, marginBottom: 16 }}>🧠 Smart Recognition Configuration</h2>
+          <h2 style={{ marginTop: 0, marginBottom: 16 }}>🧠 Recognition Configuration</h2>
           
           <div style={{ marginBottom: 20 }}>
             <label style={{
@@ -668,8 +670,7 @@ export default function SmartAudioRecognitionSystem() {
               margin: '0 0 16px 28px',
               lineHeight: 1.5
             }}>
-              When enabled, the system calculates optimal timing for next recognition based on track duration. 
-              Reduces unnecessary API calls and improves accuracy.
+              When enabled, uses track duration to calculate optimal timing. Falls back to manual interval when no duration available.
             </p>
           </div>
           
@@ -677,7 +678,7 @@ export default function SmartAudioRecognitionSystem() {
             {[
               { value: 'manual', label: 'Manual Sample', desc: 'Single recognition sample' },
               { value: 'smart_continuous', label: 'Smart Continuous', desc: 'Automatic sampling with smart timing' },
-              { value: 'album_follow', label: 'Album Follow', desc: 'Context-aware recognition with collection priority' }
+              { value: 'album_follow', label: 'Album Follow', desc: 'Context-aware recognition' }
             ].map(mode => (
               <label 
                 key={mode.value}
@@ -728,7 +729,7 @@ export default function SmartAudioRecognitionSystem() {
             
             <div>
               <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>
-                Fallback Interval (when no duration available)
+                {isSmartTimingEnabled ? 'Fallback Interval (when no duration)' : 'Recognition Interval (seconds)'}
               </label>
               <input 
                 type="number"
@@ -736,16 +737,20 @@ export default function SmartAudioRecognitionSystem() {
                 max="300"
                 value={dynamicInterval}
                 onChange={(e) => setDynamicInterval(parseInt(e.target.value) || 30)}
-                disabled={isSmartTimingEnabled}
                 style={{ 
                   width: "100%", 
                   padding: "8px 12px", 
                   border: "1px solid #ddd", 
                   borderRadius: 6,
-                  fontSize: 14,
-                  opacity: isSmartTimingEnabled ? 0.6 : 1
+                  fontSize: 14
                 }}
               />
+              <p style={{ fontSize: 12, color: '#666', margin: '4px 0 0 0' }}>
+                {isSmartTimingEnabled ? 
+                  'Used when track duration unavailable' : 
+                  'Fixed interval between recognitions'
+                }
+              </p>
             </div>
           </div>
         </div>
@@ -789,7 +794,7 @@ export default function SmartAudioRecognitionSystem() {
         </div>
       )}
 
-      {/* Recognition Candidates */}
+      {/* RESTORED: Recognition Candidates */}
       {recognitionCandidates.length > 0 && (
         <div style={{ 
           background: "#fff7ed", 
@@ -811,21 +816,9 @@ export default function SmartAudioRecognitionSystem() {
                   border: candidate.collection_match ? "2px solid #16a34a" : "2px solid #e5e7eb",
                   borderRadius: 12,
                   padding: 16,
-                  cursor: "pointer",
-                  transition: "all 0.2s",
                   display: "flex",
                   gap: 12,
                   alignItems: "center"
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = candidate.collection_match ? "#15803d" : "#f59e0b";
-                  e.currentTarget.style.background = candidate.collection_match ? "#f0fdf4" : "#fffbeb";
-                  e.currentTarget.style.transform = "translateY(-2px)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = candidate.collection_match ? "#16a34a" : "#e5e7eb";
-                  e.currentTarget.style.background = "#fff";
-                  e.currentTarget.style.transform = "translateY(0)";
                 }}
               >
                 <Image 
@@ -855,8 +848,8 @@ export default function SmartAudioRecognitionSystem() {
                     fontWeight: 600
                   }}>
                     {candidate.collection_match ? 
-                      `COLLECTION: ${candidate.collection_match.folder?.toUpperCase()}` : 
-                      "GUEST VINYL"
+                      `Collection: ${candidate.collection_match.folder}` : 
+                      `Source: ${candidate.service || 'External'}`
                     }
                   </div>
                 </div>
@@ -875,6 +868,9 @@ export default function SmartAudioRecognitionSystem() {
           }
         `
       }} />
+      
+      {/* Manual Override Component */}
+      <ManualNowPlayingOverride />
     </div>
   );
 }
