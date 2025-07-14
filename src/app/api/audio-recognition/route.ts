@@ -1,4 +1,4 @@
-// src/app/api/audio-recognition/route.ts - FIXED VERSION with proper track title handling
+// src/app/api/audio-recognition/route.ts - FIXED VERSION with Collection Priority & Smart Timing
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from 'lib/supabaseClient';
 import crypto from 'crypto';
@@ -10,6 +10,7 @@ interface RecognitionTrack {
   image_url?: string;
   confidence?: number;
   service?: string;
+  duration?: number; // Track duration in seconds
 }
 
 interface CollectionMatch {
@@ -19,12 +20,14 @@ interface CollectionMatch {
   year: string;
   image_url?: string;
   folder?: string;
+  priority?: number; // For sorting: Vinyl=1, Cassettes=2, 45s=3
 }
 
 interface EnhancedRecognitionTrack extends RecognitionTrack {
   collection_match?: CollectionMatch;
   is_guest_vinyl?: boolean;
   source_priority?: number;
+  next_recognition_delay?: number; // Smart timing for next recognition
 }
 
 interface EnhancedRecognitionResult {
@@ -36,6 +39,11 @@ interface EnhancedRecognitionResult {
   albumContextSwitched?: boolean;
   servicesQueried?: string[];
   totalCandidatesFound?: number;
+  smart_timing?: {
+    track_duration?: number;
+    next_sample_in?: number;
+    reasoning?: string;
+  };
 }
 
 // ACRCloud types
@@ -43,10 +51,17 @@ interface ACRCloudTrack {
   title?: string;
   artists?: Array<{ name?: string }>;
   album?: { name?: string };
+  duration_ms?: number; // Track duration in milliseconds
   external_metadata?: {
-    spotify?: { album?: { images?: Array<{ url?: string }> } };
+    spotify?: { 
+      album?: { images?: Array<{ url?: string }> };
+      duration_ms?: number;
+    };
     apple_music?: { album?: { artwork?: { url?: string } } };
-    deezer?: { album?: { cover_big?: string } };
+    deezer?: { 
+      album?: { cover_big?: string };
+      duration?: number; // Duration in seconds
+    };
     youtube?: { thumbnail?: string };
   };
 }
@@ -56,93 +71,82 @@ interface ACRCloudResponse {
   metadata?: { music?: ACRCloudTrack[] };
 }
 
-// Spotify types
-interface SpotifyTrack {
-  name: string;
-  artists: Array<{ name: string }>;
-  album: {
-    name: string;
-    images: Array<{ url: string }>;
-  };
-}
-
-interface SpotifySearchResponse {
-  tracks?: { items?: SpotifyTrack[] };
-}
-
-// Last.fm types
-interface LastFmImage {
-  '#text'?: string;
-  size?: string;
-}
-
-interface LastFmTrack {
-  name?: string;
-  artist?: { name?: string } | string;
-  album?: { name?: string };
-  image?: LastFmImage[];
-}
-
-interface LastFmSearchResponse {
-  results?: {
-    trackmatches?: {
-      track?: LastFmTrack | LastFmTrack[];
-    };
-  };
-}
-
-// FIXED: Enhanced collection matching for BYO Vinyl only
+// FIXED: Enhanced collection matching with STRICT PRIORITY for BYO Collection
 async function findBYOCollectionMatches(artist: string, title: string, album?: string): Promise<CollectionMatch[]> {
   try {
-    console.log(`🔍 BYO Collection search for: ${artist} - ${title}${album ? ` (${album})` : ''}`);
+    console.log(`🎯 PRIORITY COLLECTION SEARCH: ${artist} - ${title}${album ? ` (${album})` : ''}`);
     
-    const allMatches: CollectionMatch[] = [];
+    // Define folder priorities: Vinyl=1 (highest), Cassettes=2, 45s=3
+    const folderPriority: Record<string, number> = {
+      'Vinyl': 1,
+      'Cassettes': 2, 
+      '45s': 3
+    };
     
-    // FIXED: Only search BYO vinyl folders (Vinyl, 45s, Cassettes)
-    const byoFolders = ['Vinyl', '45s', 'Cassettes'];
+    const byoFolders = ['Vinyl', 'Cassettes', '45s'];
     
-    // 1. Exact artist match in BYO folders
-    const { data: exactArtist } = await supabase
+    // 1. EXACT artist match in BYO folders ONLY
+    const { data: exactMatches } = await supabase
       .from('collection')
       .select('id, artist, title, year, image_url, folder')
       .ilike('artist', artist)
       .in('folder', byoFolders)
-      .limit(5);
+      .limit(20);
     
-    if (exactArtist) allMatches.push(...exactArtist);
-    
-    // 2. Album title search if available (album title should match collection title)
+    // 2. If we have album info, also search by album title
+    let albumMatches: CollectionMatch[] = [];
     if (album) {
-      const { data: albumMatches } = await supabase
+      const { data: albumSearch } = await supabase
         .from('collection')
         .select('id, artist, title, year, image_url, folder')
         .ilike('title', `%${album}%`)
         .in('folder', byoFolders)
-        .limit(3);
+        .limit(10);
       
-      if (albumMatches) allMatches.push(...albumMatches);
+      if (albumSearch) albumMatches = albumSearch;
     }
     
-    // 3. Fuzzy artist matching (split words) in BYO folders
+    // 3. Fuzzy artist search for variations
     const artistWords = artist.toLowerCase().split(' ').filter(word => word.length > 2);
+    let fuzzyMatches: CollectionMatch[] = [];
     for (const word of artistWords.slice(0, 2)) {
-      const { data: fuzzyArtist } = await supabase
+      const { data: fuzzySearch } = await supabase
         .from('collection')
         .select('id, artist, title, year, image_url, folder')
         .ilike('artist', `%${word}%`)
         .in('folder', byoFolders)
-        .limit(2);
+        .limit(5);
       
-      if (fuzzyArtist) allMatches.push(...fuzzyArtist);
+      if (fuzzySearch) fuzzyMatches = fuzzyMatches.concat(fuzzySearch);
     }
     
-    // Remove duplicates by ID
-    const uniqueMatches = allMatches.filter((match, index, self) => 
-      index === self.findIndex(m => m.id === match.id)
-    );
+    // Combine all matches
+    const allMatches = [...(exactMatches || []), ...albumMatches, ...fuzzyMatches];
     
-    console.log(`✅ Found ${uniqueMatches.length} BYO collection matches`);
-    return uniqueMatches.slice(0, 5);
+    // Remove duplicates and add priority
+    const uniqueMatches = allMatches
+      .filter((match, index, self) => index === self.findIndex(m => m.id === match.id))
+      .map(match => ({
+        ...match,
+        priority: folderPriority[match.folder || ''] || 999
+      }))
+      .sort((a, b) => {
+        // Sort by folder priority first (Vinyl > Cassettes > 45s)
+        if (a.priority !== b.priority) return a.priority - b.priority;
+        
+        // Then by how well the artist matches
+        const aArtistMatch = a.artist.toLowerCase().includes(artist.toLowerCase()) ? 1 : 0;
+        const bArtistMatch = b.artist.toLowerCase().includes(artist.toLowerCase()) ? 1 : 0;
+        return bArtistMatch - aArtistMatch;
+      })
+      .slice(0, 10);
+    
+    console.log(`✅ Found ${uniqueMatches.length} BYO collection matches (prioritized by Vinyl > Cassettes > 45s)`);
+    if (uniqueMatches.length > 0) {
+      console.log('Top collection matches:', uniqueMatches.slice(0, 3).map(m => `${m.artist} - ${m.title} (${m.folder})`));
+    }
+    
+    return uniqueMatches;
     
   } catch (error) {
     console.error('BYO Collection matching error:', error);
@@ -150,186 +154,48 @@ async function findBYOCollectionMatches(artist: string, title: string, album?: s
   }
 }
 
-// Enhanced artwork search
-async function searchForArtwork(artist: string, album?: string): Promise<string | undefined> {
-  try {
-    const spotifyArtwork = await searchSpotifyArtwork(artist, album);
-    if (spotifyArtwork) return spotifyArtwork;
-    
-    const lastfmArtwork = await searchLastFmArtwork(artist, album);
-    if (lastfmArtwork) return lastfmArtwork;
-    
-  } catch (error) {
-    console.warn('Artwork search failed:', error);
-  }
+// Extract track duration from various sources
+function extractTrackDuration(track: ACRCloudTrack): number | undefined {
+  // Try different duration sources
+  if (track.duration_ms) return Math.round(track.duration_ms / 1000);
+  if (track.external_metadata?.spotify?.duration_ms) return Math.round(track.external_metadata.spotify.duration_ms / 1000);
+  if (track.external_metadata?.deezer?.duration) return track.external_metadata.deezer.duration;
   
   return undefined;
 }
 
-async function searchSpotifyArtwork(artist: string, album?: string): Promise<string | undefined> {
-  if (!process.env.SPOTIFY_CLIENT_ID || !process.env.SPOTIFY_CLIENT_SECRET) {
-    return undefined;
-  }
-
-  try {
-    const tokenResponse = await fetch('https://accounts.spotify.com/api/token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': `Basic ${Buffer.from(`${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`).toString('base64')}`
-      },
-      body: 'grant_type=client_credentials'
-    });
-
-    if (!tokenResponse.ok) return undefined;
-
-    const tokenData = await tokenResponse.json();
-    const accessToken = tokenData.access_token;
-
-    const query = album ? `artist:"${artist}" album:"${album}"` : `artist:"${artist}"`;
-    const searchUrl = `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=album&limit=1`;
-    
-    const searchResponse = await fetch(searchUrl, {
-      headers: { 'Authorization': `Bearer ${accessToken}` }
-    });
-
-    if (!searchResponse.ok) return undefined;
-
-    const searchData = await searchResponse.json();
-    const albums = searchData.albums?.items;
-    
-    return albums?.[0]?.images?.[0]?.url;
-  } catch (error) {
-    console.error('Spotify artwork search error:', error);
-    return undefined;
-  }
-}
-
-async function searchLastFmArtwork(artist: string, album?: string): Promise<string | undefined> {
-  if (!process.env.LASTFM_API_KEY) return undefined;
-
-  try {
-    const apiKey = process.env.LASTFM_API_KEY;
-    let url: string;
-    
-    if (album) {
-      url = `https://ws.audioscrobbler.com/2.0/?method=album.getinfo&api_key=${apiKey}&artist=${encodeURIComponent(artist)}&album=${encodeURIComponent(album)}&format=json`;
-    } else {
-      url = `https://ws.audioscrobbler.com/2.0/?method=artist.gettopalbums&artist=${encodeURIComponent(artist)}&api_key=${apiKey}&format=json&limit=1`;
-    }
-    
-    const response = await fetch(url);
-    const data = await response.json();
-    
-    if (album && data.album?.image) {
-      const largeImage = data.album.image.find((img: LastFmImage) => img.size === 'extralarge');
-      return largeImage?.['#text'];
-    } else if (data.topalbums?.album) {
-      const albums = Array.isArray(data.topalbums.album) ? data.topalbums.album : [data.topalbums.album];
-      const largeImage = albums[0]?.image?.find((img: LastFmImage) => img.size === 'extralarge');
-      return largeImage?.['#text'];
-    }
-  } catch (error) {
-    console.error('Last.fm artwork search error:', error);
+// Smart timing calculation
+function calculateSmartTiming(trackDuration?: number, currentSampleDuration: number = 15): {
+  next_sample_in: number;
+  reasoning: string;
+} {
+  if (!trackDuration) {
+    return {
+      next_sample_in: 30, // Default fallback
+      reasoning: 'No duration info - using default 30s interval'
+    };
   }
   
-  return undefined;
-}
-
-// Search Spotify for additional candidates
-async function searchSpotifyTracks(artist: string, title: string): Promise<EnhancedRecognitionTrack[]> {
-  if (!process.env.SPOTIFY_CLIENT_ID || !process.env.SPOTIFY_CLIENT_SECRET) {
-    return [];
+  // If track is very short (< 2 minutes), sample every 30 seconds
+  if (trackDuration < 120) {
+    return {
+      next_sample_in: 30,
+      reasoning: `Short track (${trackDuration}s) - frequent sampling every 30s`
+    };
   }
-
-  try {
-    const tokenResponse = await fetch('https://accounts.spotify.com/api/token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': `Basic ${Buffer.from(`${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`).toString('base64')}`
-      },
-      body: 'grant_type=client_credentials'
-    });
-
-    if (!tokenResponse.ok) return [];
-
-    const tokenData = await tokenResponse.json();
-    const accessToken = tokenData.access_token;
-
-    const query = `track:"${title}" artist:"${artist}"`;
-    const searchUrl = `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=5`;
-    
-    const searchResponse = await fetch(searchUrl, {
-      headers: { 'Authorization': `Bearer ${accessToken}` }
-    });
-
-    if (!searchResponse.ok) return [];
-
-    const data: SpotifySearchResponse = await searchResponse.json();
-    const tracks = data.tracks?.items || [];
-    
-    return tracks.map((track, index): EnhancedRecognitionTrack => ({
-      artist: track.artists[0]?.name || artist,
-      title: track.name, // FIXED: Keep the actual track title
-      album: track.album.name,
-      image_url: track.album.images[0]?.url,
-      confidence: Math.max(0.6, 0.9 - (index * 0.1)),
-      service: 'Spotify Search',
-      source_priority: 3,
-      is_guest_vinyl: true
-    }));
-  } catch (error) {
-    console.error('Spotify search error:', error);
-    return [];
-  }
+  
+  // For longer tracks, calculate smart interval
+  // Sample again when ~80% through the track, but at least 45 seconds from now
+  const timeUntilEnd = trackDuration - currentSampleDuration;
+  const smartDelay = Math.max(45, Math.round(timeUntilEnd * 0.8));
+  
+  return {
+    next_sample_in: Math.min(smartDelay, 300), // Cap at 5 minutes
+    reasoning: `Track is ${trackDuration}s long - next sample in ${smartDelay}s (80% through track)`
+  };
 }
 
-// Search Last.fm for additional candidates
-async function searchLastFmTracks(artist: string, title: string): Promise<EnhancedRecognitionTrack[]> {
-  if (!process.env.LASTFM_API_KEY) return [];
-
-  try {
-    const apiKey = process.env.LASTFM_API_KEY;
-    const url = `https://ws.audioscrobbler.com/2.0/?method=track.search&track=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}&api_key=${apiKey}&format=json&limit=3`;
-    
-    const response = await fetch(url);
-    const data: LastFmSearchResponse = await response.json();
-    
-    const trackMatches = data.results?.trackmatches?.track;
-    const tracks = Array.isArray(trackMatches) ? trackMatches : (trackMatches ? [trackMatches] : []);
-    
-    return tracks.map((track, index): EnhancedRecognitionTrack => ({
-      artist: typeof track.artist === 'string' ? track.artist : track.artist?.name || artist,
-      title: track.name || title, // FIXED: Keep the actual track title
-      album: track.album?.name,
-      image_url: track.image?.find((img: LastFmImage) => img.size === 'extralarge')?.['#text'],
-      confidence: Math.max(0.5, 0.8 - (index * 0.1)),
-      service: 'Last.fm Search',
-      source_priority: 4,
-      is_guest_vinyl: true
-    }));
-  } catch (error) {
-    console.error('Last.fm search error:', error);
-    return [];
-  }
-}
-
-// ACRCloud signature generation
-function generateACRCloudSignature(
-  method: string,
-  uri: string,
-  accessKey: string,
-  dataType: string,
-  signatureVersion: string,
-  timestamp: number,
-  accessSecret: string
-): string {
-  const stringToSign = [method, uri, accessKey, dataType, signatureVersion, timestamp].join('\n');
-  return crypto.createHmac('sha1', accessSecret).update(stringToSign).digest('base64');
-}
-
-// Enhanced ACRCloud recognition
+// Enhanced ACRCloud recognition with duration extraction
 async function recognizeWithACRCloud(audioFile: File): Promise<EnhancedRecognitionTrack[]> {
   if (!process.env.ACRCLOUD_ACCESS_KEY || !process.env.ACRCLOUD_SECRET_KEY) {
     return [];
@@ -378,19 +244,21 @@ async function recognizeWithACRCloud(audioFile: File): Promise<EnhancedRecogniti
         const extractImageUrl = (track: ACRCloudTrack): string | undefined => {
           return track.external_metadata?.spotify?.album?.images?.[0]?.url ||
                  track.external_metadata?.apple_music?.album?.artwork?.url ||
-                 track.external_metadata?.deezer?.album?.cover_big ||
-                 track.external_metadata?.youtube?.thumbnail;
+                 track.external_metadata?.deezer?.album?.cover_big;
         };
+
+        const duration = extractTrackDuration(track);
 
         return {
           artist: track.artists?.[0]?.name || 'Unknown Artist',
-          title: track.title || 'Unknown Title', // FIXED: Keep actual track title
+          title: track.title || 'Unknown Title',
           album: track.album?.name,
           image_url: extractImageUrl(track),
           confidence: Math.max(0.7, (data.status?.score || 80) / 100 - (index * 0.05)),
           service: 'ACRCloud',
           source_priority: 1,
-          is_guest_vinyl: true
+          is_guest_vinyl: true,
+          duration: duration
         };
       });
     }
@@ -400,6 +268,20 @@ async function recognizeWithACRCloud(audioFile: File): Promise<EnhancedRecogniti
     console.error('ACRCloud error:', error);
     return [];
   }
+}
+
+// ACRCloud signature generation
+function generateACRCloudSignature(
+  method: string,
+  uri: string,
+  accessKey: string,
+  dataType: string,
+  signatureVersion: string,
+  timestamp: number,
+  accessSecret: string
+): string {
+  const stringToSign = [method, uri, accessKey, dataType, signatureVersion, timestamp].join('\n');
+  return crypto.createHmac('sha1', accessSecret).update(stringToSign).digest('base64');
 }
 
 // Enhanced AudD recognition
@@ -424,6 +306,7 @@ async function recognizeWithAudD(audioFile: File): Promise<EnhancedRecognitionTr
     
     if (data.status === 'success' && data.result) {
       let imageUrl: string | undefined;
+      let duration: number | undefined;
       
       if (data.result.spotify?.album?.images?.length > 0) {
         imageUrl = data.result.spotify.album.images[0].url;
@@ -432,16 +315,24 @@ async function recognizeWithAudD(audioFile: File): Promise<EnhancedRecognitionTr
       } else if (data.result.deezer?.album?.cover_big) {
         imageUrl = data.result.deezer.album.cover_big;
       }
+
+      // Extract duration from various sources
+      if (data.result.spotify?.duration_ms) {
+        duration = Math.round(data.result.spotify.duration_ms / 1000);
+      } else if (data.result.deezer?.duration) {
+        duration = data.result.deezer.duration;
+      }
       
       return [{
         artist: data.result.artist || 'Unknown Artist',
-        title: data.result.title || 'Unknown Title', // FIXED: Keep actual track title
+        title: data.result.title || 'Unknown Title',
         album: data.result.album,
         image_url: imageUrl,
         confidence: 0.8,
         service: 'AudD',
         source_priority: 2,
-        is_guest_vinyl: true
+        is_guest_vinyl: true,
+        duration: duration
       }];
     }
     
@@ -452,7 +343,7 @@ async function recognizeWithAudD(audioFile: File): Promise<EnhancedRecognitionTr
   }
 }
 
-// FIXED: Main POST handler with proper track title preservation
+// FIXED: Main POST handler with COLLECTION PRIORITY and Smart Timing
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const formData = await request.formData();
@@ -465,9 +356,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    console.log(`🎵 Starting BYO VINYL recognition for: ${audioFile.name}`);
+    console.log(`🎵 COLLECTION-PRIORITY BYO VINYL RECOGNITION: ${audioFile.name}`);
 
-    // PHASE 1: Audio Recognition Services
+    // PHASE 1: Audio Recognition Services (for external identification)
     console.log('🔊 Phase 1: Audio recognition services...');
     const audioRecognitionPromises = [
       recognizeWithACRCloud(audioFile),
@@ -487,12 +378,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     });
 
-    // Select primary track from audio recognition
-    const primaryTrack = allAudioCandidates.sort((a, b) => 
+    // Get the best external recognition for artist/track info
+    const bestExternalTrack = allAudioCandidates.sort((a, b) => 
       (b.confidence || 0) - (a.confidence || 0)
     )[0];
 
-    if (!primaryTrack) {
+    if (!bestExternalTrack) {
       return NextResponse.json({
         success: false,
         error: 'No audio recognition results from any service',
@@ -501,167 +392,155 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       } satisfies EnhancedRecognitionResult);
     }
 
-    console.log(`🎯 Primary track: ${primaryTrack.artist} - ${primaryTrack.title} (${primaryTrack.service})`);
+    console.log(`🎯 Best external recognition: ${bestExternalTrack.artist} - ${bestExternalTrack.title} (${bestExternalTrack.service})`);
 
-    // PHASE 2: BYO Collection matching and candidate gathering
-    console.log('🔍 Phase 2: BYO collection matching and candidate gathering...');
+    // PHASE 2: COLLECTION SEARCH FIRST - HIGHEST PRIORITY
+    console.log('🏆 Phase 2: PRIORITY COLLECTION SEARCH (Vinyl > Cassettes > 45s)...');
     
-    const collectionMatchesPromise = findBYOCollectionMatches(primaryTrack.artist, primaryTrack.title, primaryTrack.album);
-    const spotifyTracksPromise = searchSpotifyTracks(primaryTrack.artist, primaryTrack.title);
-    const lastfmTracksPromise = searchLastFmTracks(primaryTrack.artist, primaryTrack.title);
+    const collectionMatches = await findBYOCollectionMatches(
+      bestExternalTrack.artist, 
+      bestExternalTrack.title, 
+      bestExternalTrack.album
+    );
 
-    const [collectionMatchesResult, spotifyTracksResult, lastfmTracksResult] = await Promise.allSettled([
-      collectionMatchesPromise,
-      spotifyTracksPromise,
-      lastfmTracksPromise
-    ]);
-    
-    // PHASE 3: Process and enhance all candidates
-    console.log('⚡ Phase 3: Processing and enhancing candidates...');
-    
-    const allCandidates: EnhancedRecognitionTrack[] = [...allAudioCandidates];
-    
-    // Extract collection matches safely
-    let collectionMatches: CollectionMatch[] = [];
-    if (collectionMatchesResult.status === 'fulfilled') {
-      collectionMatches = collectionMatchesResult.value;
-    }
-    
-    // FIXED: Add collection-based candidates - preserve the TRACK title, use collection title as ALBUM
+    let finalTrack: EnhancedRecognitionTrack;
+    let candidates: EnhancedRecognitionTrack[] = [];
+
+    // COLLECTION TAKES ABSOLUTE PRIORITY
     if (collectionMatches.length > 0) {
-      const collectionCandidates: EnhancedRecognitionTrack[] = collectionMatches.map((match: CollectionMatch): EnhancedRecognitionTrack => ({
+      console.log(`🎉 COLLECTION MATCH FOUND! Using collection priority.`);
+      
+      const topCollectionMatch = collectionMatches[0]; // Already sorted by priority
+      
+      finalTrack = {
+        artist: topCollectionMatch.artist,
+        title: bestExternalTrack.title, // Keep the recognized track title
+        album: topCollectionMatch.title, // Collection album title
+        image_url: topCollectionMatch.image_url || bestExternalTrack.image_url,
+        confidence: 0.95, // High confidence for collection matches
+        service: `Collection Match (${topCollectionMatch.folder})`,
+        source_priority: 0, // Highest priority
+        collection_match: topCollectionMatch,
+        is_guest_vinyl: false,
+        duration: bestExternalTrack.duration // Keep duration from recognition
+      };
+
+      // Add other collection matches as candidates
+      candidates = collectionMatches.slice(1, 6).map((match: CollectionMatch): EnhancedRecognitionTrack => ({
         artist: match.artist,
-        title: primaryTrack.title, // FIXED: Keep the recognized TRACK title
-        album: match.title, // FIXED: Use collection title as ALBUM title
+        title: bestExternalTrack.title,
+        album: match.title,
         image_url: match.image_url,
-        confidence: 0.85,
-        service: 'BYO Collection Match',
+        confidence: 0.90,
+        service: `Collection Match (${match.folder})`,
         source_priority: 0,
         collection_match: match,
-        is_guest_vinyl: false
+        is_guest_vinyl: false,
+        duration: bestExternalTrack.duration
       }));
-      allCandidates.push(...collectionCandidates);
-      console.log(`📀 Added ${collectionCandidates.length} BYO collection candidates`);
-    }
-    
-    // Add Spotify candidates
-    if (spotifyTracksResult.status === 'fulfilled') {
-      allCandidates.push(...spotifyTracksResult.value);
-      console.log(`🎶 Added ${spotifyTracksResult.value.length} Spotify candidates`);
-    }
-    
-    // Add Last.fm candidates
-    if (lastfmTracksResult.status === 'fulfilled') {
-      allCandidates.push(...lastfmTracksResult.value);
-      console.log(`🎵 Added ${lastfmTracksResult.value.length} Last.fm candidates`);
-    }
 
-    // PHASE 4: FIXED - Enhanced primary track with proper collection matching
-    console.log('🔧 Phase 4: Enhancing primary track...');
-    
-    // Find the best collection match for the primary track
-    const primaryCollectionMatch: CollectionMatch | undefined = collectionMatches.find((match: CollectionMatch) => {
-      // Check if artist matches and album matches (if we have album info)
-      const artistMatch = match.artist.toLowerCase().includes(primaryTrack.artist.toLowerCase()) ||
-                         primaryTrack.artist.toLowerCase().includes(match.artist.toLowerCase());
-      
-      const albumMatch = !primaryTrack.album || 
-                        match.title.toLowerCase().includes(primaryTrack.album.toLowerCase()) ||
-                        primaryTrack.album.toLowerCase().includes(match.title.toLowerCase());
-      
-      return artistMatch && albumMatch;
-    });
+      // Add external candidates as backup
+      candidates.push(...allAudioCandidates.slice(0, 3).map(track => ({
+        ...track,
+        is_guest_vinyl: true,
+        source_priority: 10 // Lower priority
+      })));
 
-    if (primaryCollectionMatch) {
-      primaryTrack.collection_match = primaryCollectionMatch;
-      primaryTrack.is_guest_vinyl = false;
-      primaryTrack.album = primaryCollectionMatch.title; // FIXED: Set album to collection title
-      if (!primaryTrack.image_url && primaryCollectionMatch.image_url) {
-        primaryTrack.image_url = primaryCollectionMatch.image_url;
-      }
-      console.log(`✅ Primary track matched to BYO collection: ${primaryCollectionMatch.artist} - ${primaryCollectionMatch.title}`);
+      console.log(`✅ PRIMARY: Collection match from ${topCollectionMatch.folder} folder`);
+      
     } else {
-      primaryTrack.is_guest_vinyl = true;
-      if (!primaryTrack.image_url) {
-        primaryTrack.image_url = await searchForArtwork(primaryTrack.artist, primaryTrack.album);
-      }
-      console.log(`👤 Primary track marked as guest vinyl`);
+      console.log(`⚠️  NO COLLECTION MATCH - Using external recognition as fallback`);
+      
+      // No collection match found, use external as primary
+      finalTrack = {
+        ...bestExternalTrack,
+        is_guest_vinyl: true,
+        source_priority: 1
+      };
+
+      // Add other external results as candidates
+      candidates = allAudioCandidates.slice(1, 10).map(track => ({
+        ...track,
+        is_guest_vinyl: true,
+        source_priority: 1
+      }));
     }
 
-    // PHASE 5: Deduplicate and rank candidates
-    console.log('📊 Phase 5: Ranking and deduplicating candidates...');
+    // PHASE 3: Smart Timing Calculation
+    console.log('⏰ Phase 3: Smart timing calculation...');
     
-    const otherCandidates = allCandidates.filter(candidate => 
-      !(candidate.artist === primaryTrack.artist && 
-        candidate.title === primaryTrack.title && 
-        candidate.service === primaryTrack.service)
-    );
+    const smartTiming = calculateSmartTiming(finalTrack.duration, 15);
+    finalTrack.next_recognition_delay = smartTiming.next_sample_in;
     
-    const rankedCandidates = otherCandidates
-      .sort((a, b) => {
-        if (a.source_priority !== b.source_priority) {
-          return (a.source_priority || 999) - (b.source_priority || 999);
-        }
-        return (b.confidence || 0) - (a.confidence || 0);
-      })
-      .slice(0, 15);
-    
-    // Enhance candidates with artwork if missing
-    for (const candidate of rankedCandidates) {
-      if (!candidate.image_url && !candidate.collection_match) {
-        candidate.image_url = await searchForArtwork(candidate.artist, candidate.album);
-      }
-    }
+    console.log(`🧠 Smart timing: ${smartTiming.reasoning}`);
 
-    // PHASE 6: Update database and return results
-    console.log('💾 Phase 6: Updating database...');
+    // PHASE 4: Database Update with TV Display Refresh
+    console.log('💾 Phase 4: Updating database and triggering TV refresh...');
     
     try {
+      const updateData = {
+        id: 1,
+        artist: finalTrack.artist,
+        title: finalTrack.title,
+        album_title: finalTrack.album,
+        recognition_image_url: finalTrack.image_url,
+        album_id: finalTrack.collection_match?.id || null,
+        started_at: new Date().toISOString(),
+        recognition_confidence: finalTrack.confidence || 0.8,
+        service_used: finalTrack.service || 'Multi-Service',
+        updated_at: new Date().toISOString(),
+        track_duration: finalTrack.duration || null,
+        next_recognition_in: finalTrack.next_recognition_delay || 30
+      };
+
+      const { error: nowPlayingError } = await supabase
+        .from('now_playing')
+        .upsert(updateData);
+
+      if (nowPlayingError) {
+        throw nowPlayingError;
+      }
+
+      console.log('✅ Database updated - TV display should refresh automatically');
+      
+      // Force a notification to ensure TV updates
       await supabase
         .from('now_playing')
-        .upsert({
-          id: 1,
-          artist: primaryTrack.artist,
-          title: primaryTrack.title, // FIXED: This is the actual TRACK title
-          album_title: primaryTrack.album, // FIXED: This is the ALBUM title
-          recognition_image_url: primaryTrack.image_url,
-          album_id: primaryTrack.collection_match?.id || null,
-          started_at: new Date().toISOString(),
-          recognition_confidence: primaryTrack.confidence || 0.8,
-          service_used: primaryTrack.service || 'Multi-Service',
-          updated_at: new Date().toISOString()
-        });
-      console.log('✅ Database updated successfully');
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', 1);
+        
     } catch (dbError) {
-      console.error('Database update error:', dbError);
+      console.error('❌ Database update error:', dbError);
     }
 
     const servicesQueried = [
       'ACRCloud',
       'AudD', 
-      'BYO Collection Search',
-      'Spotify Search',
-      'Last.fm Search'
+      'BYO Collection Search (PRIORITY)',
     ].filter(service => {
       switch (service) {
         case 'ACRCloud': return !!(process.env.ACRCLOUD_ACCESS_KEY && process.env.ACRCLOUD_SECRET_KEY);
         case 'AudD': return !!process.env.AUDD_API_TOKEN;
-        case 'Spotify Search': return !!(process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET);
-        case 'Last.fm Search': return !!process.env.LASTFM_API_KEY;
         default: return true;
       }
     });
 
-    console.log(`🎉 BYO Recognition complete! Primary: ${primaryTrack.service}, Candidates: ${rankedCandidates.length}, Services: ${servicesQueried.length}`);
+    console.log(`🎉 COLLECTION-PRIORITY Recognition complete!`);
+    console.log(`📊 Primary: ${finalTrack.service} | Collection: ${!!finalTrack.collection_match} | Duration: ${finalTrack.duration}s | Next sample: ${finalTrack.next_recognition_delay}s`);
 
     return NextResponse.json({
       success: true,
-      track: primaryTrack,
-      candidates: rankedCandidates,
+      track: finalTrack,
+      candidates: candidates,
       servicesQueried,
-      totalCandidatesFound: allCandidates.length,
+      totalCandidatesFound: allAudioCandidates.length + collectionMatches.length,
       albumContextUsed: false,
-      albumContextSwitched: false
+      albumContextSwitched: false,
+      smart_timing: {
+        track_duration: finalTrack.duration,
+        next_sample_in: finalTrack.next_recognition_delay,
+        reasoning: smartTiming.reasoning
+      }
     } satisfies EnhancedRecognitionResult);
 
   } catch (error) {
@@ -681,6 +560,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 export async function GET(): Promise<NextResponse> {
   const services = [
     { 
+      name: 'BYO Collection Search', 
+      enabled: true,
+      priority: 0,
+      description: 'PRIORITY: Vinyl > Cassettes > 45s folders ONLY'
+    },
+    { 
       name: 'ACRCloud', 
       enabled: !!(process.env.ACRCLOUD_ACCESS_KEY && process.env.ACRCLOUD_SECRET_KEY),
       priority: 1
@@ -689,46 +574,33 @@ export async function GET(): Promise<NextResponse> {
       name: 'AudD', 
       enabled: !!process.env.AUDD_API_TOKEN,
       priority: 2
-    },
-    {
-      name: 'BYO Collection Search',
-      enabled: true,
-      priority: 0,
-      description: 'Searches only Vinyl, 45s, and Cassettes folders'
-    },
-    {
-      name: 'Spotify Search',
-      enabled: !!(process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET),
-      priority: 3
-    },
-    {
-      name: 'Last.fm Search',
-      enabled: !!process.env.LASTFM_API_KEY,
-      priority: 4
     }
   ];
 
   const enabledServices = services.filter(s => s.enabled);
 
   return NextResponse.json({ 
-    message: 'BYO Vinyl Multi-Service Audio Recognition API',
-    version: '3.0.0',
+    message: 'BYO Vinyl Collection-Priority Audio Recognition API',
+    version: '4.0.0',
     enabledServices: enabledServices.map(s => `${s.name} (Priority: ${s.priority})`),
     features: [
-      'BYO Vinyl focus - only Vinyl, 45s, Cassettes folders',
+      'COLLECTION ABSOLUTE PRIORITY - Vinyl > Cassettes > 45s',
+      'Smart timing based on track duration',
       'Proper track title preservation',
-      'Album title mapping from collection titles',
-      'Priority-based result ranking',
-      'Enhanced artwork discovery',
-      'Album Follow mode support',
-      'Comprehensive candidate collection'
+      'Real-time TV display updates',
+      'Enhanced duration extraction',
+      'Fallback to external only if no collection match'
     ],
-    byoVinylFolders: ['Vinyl', '45s', 'Cassettes'],
-    serviceDetails: {
-      audioRecognition: ['ACRCloud', 'AudD'],
-      searchAPIs: ['Spotify', 'Last.fm'],
-      internal: ['BYO Collection Search'],
-      total: enabledServices.length
+    collectionPriority: {
+      1: 'Vinyl (highest priority)',
+      2: 'Cassettes', 
+      3: '45s',
+      999: 'External services (fallback only)'
+    },
+    smartTiming: {
+      enabled: true,
+      description: 'Calculates optimal next sample time based on track duration',
+      fallback: '30s if no duration available'
     }
   });
 }

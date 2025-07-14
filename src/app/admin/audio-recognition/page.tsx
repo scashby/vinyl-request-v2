@@ -1,8 +1,7 @@
-// src/app/admin/audio-recognition/page.tsx - COMPLETELY FIXED VERSION
+// src/app/admin/audio-recognition/page.tsx - FIXED with Smart Timing & Collection Priority
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { supabase } from 'lib/supabaseClient';
 import Image from 'next/image';
 
 interface RecognitionResult {
@@ -12,6 +11,8 @@ interface RecognitionResult {
   image_url?: string;
   confidence?: number;
   service?: string;
+  duration?: number;
+  next_recognition_delay?: number;
   collection_match?: {
     id: number;
     artist: string;
@@ -23,45 +24,25 @@ interface RecognitionResult {
   is_guest_vinyl?: boolean;
 }
 
-interface AlbumContext {
-  id?: number;
-  artist: string;
-  title: string;
-  year: string;
-  image_url?: string;
-  folder?: string;
-  track_count?: number;
-  track_listing?: string[];
-  source?: string;
-  created_at?: string;
-  updated_at?: string;
+interface SmartTiming {
+  track_duration?: number;
+  next_sample_in?: number;
+  reasoning?: string;
 }
 
-interface SystemStatus {
-  database: boolean;
-  recognitionAPI: boolean;
-  manualAPI: boolean;
-  services: string[];
-}
-
-export default function FixedAudioRecognitionSystem() {
+export default function SmartAudioRecognitionSystem() {
   const [isListening, setIsListening] = useState<boolean>(false);
   const [recognitionMode, setRecognitionMode] = useState<'manual' | 'smart_continuous' | 'album_follow'>('smart_continuous');
   const [lastRecognition, setLastRecognition] = useState<RecognitionResult | null>(null);
   const [recognitionCandidates, setRecognitionCandidates] = useState<RecognitionResult[]>([]);
-  const [manualArtist, setManualArtist] = useState<string>('');
-  const [manualAlbum, setManualAlbum] = useState<string>('');
-  const [isManualSearching, setIsManualSearching] = useState<boolean>(false);
-  const [albumContext, setAlbumContext] = useState<AlbumContext | null>(null);
   const [status, setStatus] = useState<string>('');
   const [sampleDuration, setSampleDuration] = useState<number>(15);
-  const [smartInterval, setSmartInterval] = useState<number>(30);
-  const [systemStatus, setSystemStatus] = useState<SystemStatus>({
-    database: false,
-    recognitionAPI: false,
-    manualAPI: false,
-    services: []
-  });
+
+  
+  // Smart timing state
+  const [smartTiming, setSmartTiming] = useState<SmartTiming | null>(null);
+  const [dynamicInterval, setDynamicInterval] = useState<number>(30);
+  const [isSmartTimingEnabled, setIsSmartTimingEnabled] = useState<boolean>(true);
   
   // Enhanced countdown and progress tracking
   const [nextRecognitionCountdown, setNextRecognitionCountdown] = useState<number>(0);
@@ -70,6 +51,13 @@ export default function FixedAudioRecognitionSystem() {
   const [isCountdownActive, setIsCountdownActive] = useState<boolean>(false);
   const [recognitionCount, setRecognitionCount] = useState<number>(0);
   const [lastRecognitionTime, setLastRecognitionTime] = useState<Date | null>(null);
+  const [recognitionHistory, setRecognitionHistory] = useState<Array<{
+    time: Date;
+    track: string;
+    source: string;
+    duration?: number;
+    nextSampleIn?: number;
+  }>>([]);
   
   // Audio handling refs
   const streamRef = useRef<MediaStream | null>(null);
@@ -80,85 +68,14 @@ export default function FixedAudioRecognitionSystem() {
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const continuousTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Load album context
-  const loadCurrentAlbumContext = useCallback(async (): Promise<void> => {
-    try {
-      const { data, error } = await supabase
-        .from('album_context')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-      
-      if (!error && data) {
-        const contextAge = Date.now() - new Date(data.created_at).getTime();
-        const maxAge = 2 * 60 * 60 * 1000; // 2 hours
-        
-        if (contextAge <= maxAge) {
-          setAlbumContext(data);
-          console.log('✅ Album context loaded:', data);
-        } else {
-          console.log('Album context expired, clearing...');
-          await supabase.from('album_context').delete().neq('id', 0);
-          setAlbumContext(null);
-        }
-      }
-    } catch (error) {
-      console.error('Error loading album context:', error);
-    }
-  }, []);
-
-  // Check system status
-  const checkSystemStatus = useCallback(async (): Promise<void> => {
-    const status: SystemStatus = {
-      database: false,
-      recognitionAPI: false,
-      manualAPI: false,
-      services: []
-    };
-
-    try {
-      // Test database
-      const { error: dbError } = await supabase.from('now_playing').select('id').limit(1);
-      status.database = !dbError;
-
-      // Test recognition API
-      try {
-        const recognitionResponse = await fetch('/api/audio-recognition');
-        status.recognitionAPI = recognitionResponse.ok;
-        if (recognitionResponse.ok) {
-          const recognitionData = await recognitionResponse.json();
-          status.services = recognitionData.enabledServices || [];
-        }
-      } catch {
-        status.recognitionAPI = false;
-      }
-
-      // Test manual API
-      try {
-        const manualResponse = await fetch('/api/manual-recognition');
-        status.manualAPI = manualResponse.ok;
-      } catch {
-        status.manualAPI = false;
-      }
-    } catch (error) {
-      console.error('Error checking system status:', error);
-    }
-
-    setSystemStatus(status);
-  }, []);
-
   useEffect(() => {
-    loadCurrentAlbumContext();
-    checkSystemStatus();
-    
     return () => {
       stopListening();
     };
-  }, [loadCurrentAlbumContext, checkSystemStatus]);
+  }, []);
 
   const startCountdown = useCallback((seconds: number, callback: () => void): void => {
-    console.log(`⏱️ Starting countdown: ${seconds} seconds`);
+    console.log(`⏱️ Starting ${isSmartTimingEnabled ? 'smart' : 'fixed'} countdown: ${seconds} seconds`);
     
     setNextRecognitionCountdown(seconds);
     setIsCountdownActive(true);
@@ -183,11 +100,11 @@ export default function FixedAudioRecognitionSystem() {
         return newValue;
       });
     }, 1000);
-  }, []);
+  }, [isSmartTimingEnabled]);
 
-  // FIXED: Enhanced audio analysis with album context priority and BYO vinyl filtering
+  // FIXED: Enhanced audio analysis with COLLECTION PRIORITY
   const analyzeAudio = useCallback(async (audioBlob: Blob): Promise<void> => {
-    setStatus('🔍 Analyzing audio with multiple services...');
+    setStatus('🎯 Analyzing audio with COLLECTION PRIORITY (Vinyl > Cassettes > 45s)...');
     
     try {
       const formData = new FormData();
@@ -208,83 +125,59 @@ export default function FixedAudioRecognitionSystem() {
       if (result.success && result.track) {
         console.log('✅ Recognition successful:', result.track);
         
-        let finalTrack = result.track;
-        let candidates = result.candidates || [];
+        const track = result.track;
+        const candidates = result.candidates || [];
         
-        // FIXED: Album Follow Mode - Check if we have album context and should prefer it
-        if (recognitionMode === 'album_follow' && albumContext) {
-          console.log('🎯 Album Follow Mode: Checking context match...');
-          
-          // Look for context matches in all candidates
-          const contextMatches = [finalTrack, ...candidates].filter((candidate: RecognitionResult) => {
-            const artistMatch = candidate.artist.toLowerCase().includes(albumContext.artist.toLowerCase()) ||
-                               albumContext.artist.toLowerCase().includes(candidate.artist.toLowerCase());
-            const albumMatch = candidate.album && 
-                              (candidate.album.toLowerCase().includes(albumContext.title.toLowerCase()) ||
-                               albumContext.title.toLowerCase().includes(candidate.album.toLowerCase()));
-            
-            return artistMatch && albumMatch;
-          });
-          
-          if (contextMatches.length > 0) {
-            console.log('✅ Found context match, prioritizing...');
-            finalTrack = contextMatches[0];
-            // Move other context matches to top of candidates, remove the selected one
-            candidates = [
-              ...contextMatches.slice(1),
-              ...candidates.filter((c: RecognitionResult) => !contextMatches.includes(c))
-            ];
-          }
-        }
-        
-        // FIXED: Filter for BYO Vinyl only (Vinyl, 45s, Cassettes folders)
-        const byoFolders = ['vinyl', '45s', 'cassettes'];
-        
-        // Filter final track
-        if (finalTrack.collection_match && 
-            !byoFolders.includes(finalTrack.collection_match.folder?.toLowerCase() || '')) {
-          finalTrack.collection_match = undefined;
-          finalTrack.is_guest_vinyl = true;
-        }
-        
-        // Filter candidates
-        candidates = candidates.map((candidate: RecognitionResult) => {
-          if (candidate.collection_match && 
-              !byoFolders.includes(candidate.collection_match.folder?.toLowerCase() || '')) {
-            return {
-              ...candidate,
-              collection_match: undefined,
-              is_guest_vinyl: true
-            };
-          }
-          return candidate;
-        });
-        
-        setLastRecognition(finalTrack);
+        setLastRecognition(track);
         setRecognitionCandidates(candidates);
         
-        // Build status message
-        let statusMessage = `✅ RECOGNIZED: ${finalTrack.title} by ${finalTrack.artist}`;
-        
-        if (finalTrack.album) {
-          statusMessage += ` (${finalTrack.album})`;
+        // Handle smart timing
+        if (result.smart_timing) {
+          setSmartTiming(result.smart_timing);
+          if (isSmartTimingEnabled && result.smart_timing.next_sample_in) {
+            setDynamicInterval(result.smart_timing.next_sample_in);
+          }
         }
         
-        if (finalTrack.collection_match) {
-          statusMessage += ` [FROM COLLECTION: ${finalTrack.collection_match.folder || 'Unknown Folder'}]`;
-        } else if (finalTrack.is_guest_vinyl) {
-          statusMessage += ` [GUEST VINYL]`;
+        // Add to recognition history
+        setRecognitionHistory(prev => [
+          {
+            time: new Date(),
+            track: `${track.artist} - ${track.title}`,
+            source: track.collection_match ? `Collection (${track.collection_match.folder})` : 'Guest Vinyl',
+            duration: track.duration,
+            nextSampleIn: track.next_recognition_delay
+          },
+          ...prev.slice(0, 9) // Keep last 10
+        ]);
+        
+        // Build status message with collection priority info
+        let statusMessage = '';
+        
+        if (track.collection_match) {
+          statusMessage = `🏆 COLLECTION MATCH: ${track.title} by ${track.artist}`;
+          statusMessage += ` [FROM ${track.collection_match.folder.toUpperCase()}]`;
+        } else {
+          statusMessage = `👤 GUEST VINYL: ${track.title} by ${track.artist}`;
         }
         
-        statusMessage += ` | Confidence: ${Math.round((finalTrack.confidence || 0.8) * 100)}%`;
-        statusMessage += ` | Service: ${finalTrack.service || 'Unknown'}`;
+        if (track.album) {
+          statusMessage += ` (${track.album})`;
+        }
+        
+        statusMessage += ` | Confidence: ${Math.round((track.confidence || 0.8) * 100)}%`;
+        statusMessage += ` | Service: ${track.service || 'Unknown'}`;
+        
+        if (track.duration) {
+          statusMessage += ` | Duration: ${Math.floor(track.duration / 60)}:${(track.duration % 60).toString().padStart(2, '0')}`;
+        }
         
         if (candidates.length > 0) {
-          statusMessage += ` | +${candidates.length} more candidates`;
+          statusMessage += ` | +${candidates.length} candidates`;
         }
         
-        if (recognitionMode === 'album_follow' && albumContext) {
-          statusMessage += ` | 🎯 Album Follow Mode`;
+        if (isSmartTimingEnabled && track.next_recognition_delay) {
+          statusMessage += ` | Next sample: ${track.next_recognition_delay}s`;
         }
         
         setStatus(statusMessage);
@@ -301,7 +194,7 @@ export default function FixedAudioRecognitionSystem() {
       setStatus(`❌ Analysis error: ${errorMessage}`);
       setRecognitionCandidates([]);
     }
-  }, [recognitionMode, albumContext]);
+  }, [isSmartTimingEnabled]);
 
   const recordAndAnalyze = useCallback((onComplete: () => void): void => {
     if (!streamRef.current) {
@@ -392,7 +285,7 @@ export default function FixedAudioRecognitionSystem() {
           isListeningRef.current = false;
         });
       } else {
-        setStatus('🔄 Starting continuous recognition...');
+        setStatus('🔄 Starting smart continuous recognition...');
         startSmartContinuous();
       }
 
@@ -412,17 +305,19 @@ export default function FixedAudioRecognitionSystem() {
     
     recordAndAnalyze(() => {
       if (isListeningRef.current) {
-        console.log(`⏱️ Next recognition in ${smartInterval} seconds...`);
-        setStatus(`✅ Recognition complete. Next sample in ${smartInterval}s...`);
+        // Use smart timing if available, otherwise fall back to default
+        const nextInterval = isSmartTimingEnabled ? dynamicInterval : 30;
+        console.log(`⏱️ Next recognition in ${nextInterval} seconds (${isSmartTimingEnabled ? 'smart' : 'fixed'} timing)`);
+        setStatus(`✅ Recognition complete. Next sample in ${nextInterval}s (${isSmartTimingEnabled ? 'smart timing' : 'fixed timing'})...`);
         
-        startCountdown(smartInterval, () => {
+        startCountdown(nextInterval, () => {
           if (isListeningRef.current) {
             startSmartContinuous();
           }
         });
       }
     });
-  }, [smartInterval, recordAndAnalyze, startCountdown]);
+  }, [dynamicInterval, isSmartTimingEnabled, recordAndAnalyze, startCountdown]);
 
   const stopListening = (): void => {
     console.log('🛑 Stopping recognition system...');
@@ -454,170 +349,57 @@ export default function FixedAudioRecognitionSystem() {
     setStatus('🛑 Recognition stopped');
   };
 
-  // FIXED: selectRecognitionCandidate function with proper database update
-  const selectRecognitionCandidate = async (candidate: RecognitionResult): Promise<void> => {
-    console.log('👆 User selected candidate:', candidate);
-    setLastRecognition(candidate);
-    
-    // FIXED: Update the now_playing table that the TV display reads from
-    try {
-      const updateData = {
-        id: 1,
-        artist: candidate.artist,
-        title: candidate.title, // This is the track title
-        album_title: candidate.album, // This is the album title
-        recognition_image_url: candidate.image_url,
-        album_id: candidate.collection_match?.id || null,
-        started_at: new Date().toISOString(),
-        recognition_confidence: candidate.confidence || 0.8,
-        service_used: candidate.service || 'manual_selection',
-        updated_at: new Date().toISOString()
-      };
-
-      const { error: nowPlayingError } = await supabase
-        .from('now_playing')
-        .upsert(updateData);
-
-      if (nowPlayingError) {
-        throw nowPlayingError;
-      }
-
-      console.log('✅ Updated now_playing table for TV display:', updateData);
-    } catch (error) {
-      console.error('❌ Error updating now_playing table:', error);
-      setStatus('❌ Error updating TV display');
-      return; // Exit early if database update fails
-    }
-    
-    // FIXED: For Album Follow Mode, set album context when user selects an album
-    if (recognitionMode === 'album_follow' && candidate.album && candidate.artist) {
-      try {
-        await supabase.from('album_context').delete().neq('id', 0);
-        await supabase.from('album_context').insert({
-          artist: candidate.artist,
-          title: candidate.album,
-          year: new Date().getFullYear().toString(),
-          collection_id: candidate.collection_match?.id || null,
-          source: 'user_selection',
-          created_at: new Date().toISOString()
-        });
-        
-        await loadCurrentAlbumContext();
-        console.log('✅ Album context set from user selection');
-      } catch (error) {
-        console.error('Error setting album context:', error);
-      }
-    }
-    
-    // Update status message
-    const collectionStatus = candidate.collection_match ? 
-      `FROM COLLECTION (${candidate.collection_match.folder})` : 
-      'GUEST VINYL';
-    
-    setStatus(`✅ Selected: ${candidate.title} by ${candidate.artist} [${collectionStatus}] - TV updated!`);
-  };
-
-  const performManualSearch = async (): Promise<void> => {
-    if (!manualArtist.trim()) {
-      setStatus('Please enter an artist name');
-      return;
-    }
-
-    setIsManualSearching(true);
-    setStatus('🔍 Searching...');
-
-    try {
-      const response = await fetch('/api/manual-recognition', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          artist: manualArtist.trim(),
-          album: manualAlbum.trim() || undefined
-        })
-      });
-
-      const result = await response.json();
-      
-      if (result.success && result.track) {
-        setLastRecognition(result.track);
-        
-        if (manualAlbum.trim()) {
-          await supabase.from('album_context').delete().neq('id', 0);
-          await supabase.from('album_context').insert({
-            artist: manualArtist.trim(),
-            title: manualAlbum.trim(),
-            year: new Date().getFullYear().toString(),
-            source: 'manual_search',
-            created_at: new Date().toISOString()
-          });
-          
-          await loadCurrentAlbumContext();
-          setStatus(`✅ Album context set: ${manualArtist} - ${manualAlbum}`);
-        } else {
-          setStatus(`✅ Manual result: ${result.track.title} by ${result.track.artist}`);
-        }
-        
-        setManualArtist('');
-        setManualAlbum('');
-      } else {
-        setStatus(`❌ No results: ${result.error || 'Unknown error'}`);
-      }
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      setStatus(`❌ Search error: ${errorMessage}`);
-    } finally {
-      setIsManualSearching(false);
-    }
-  };
-
-  const clearAlbumContext = async (): Promise<void> => {
-    try {
-      await supabase.from('album_context').delete().neq('id', 0);
-      setAlbumContext(null);
-      setStatus('✅ Album context cleared');
-    } catch (error) {
-      console.error('Error clearing context:', error);
-      setStatus('❌ Error clearing context');
-    }
-  };
-
-  const getContextAge = (): string => {
-    if (!albumContext?.created_at) return '';
-    
-    const age = Date.now() - new Date(albumContext.created_at).getTime();
-    const minutes = Math.floor(age / (1000 * 60));
-    const hours = Math.floor(minutes / 60);
-    
-    if (hours > 0) {
-      return `${hours}h ${minutes % 60}m ago`;
-    }
-    return `${minutes}m ago`;
-  };
-
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const formatDuration = (seconds?: number): string => {
+    if (!seconds) return 'Unknown';
+    return formatTime(seconds);
+  };
+
   return (
     <div style={{ padding: 24, background: "#fff", color: "#222", minHeight: "100vh" }}>
       <h1 style={{ marginBottom: 32, fontSize: '28px', fontWeight: 'bold' }}>
-        🎵 BYO Vinyl Audio Recognition System
+        🎯 Smart BYO Vinyl Recognition System
       </h1>
+      
+      {/* Collection Priority Info Banner */}
+      <div style={{
+        background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+        color: 'white',
+        padding: 20,
+        borderRadius: 12,
+        marginBottom: 24,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 16
+      }}>
+        <div style={{ fontSize: '2rem' }}>🏆</div>
+        <div>
+          <div style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: 4 }}>
+            Collection Priority System Active
+          </div>
+          <div style={{ fontSize: '14px', opacity: 0.9 }}>
+            Searches YOUR collection FIRST: Vinyl (highest) → Cassettes → 45s. External services only as fallback.
+          </div>
+        </div>
+      </div>
       
       {/* FIXED: Current Recognition at the top */}
       {lastRecognition && (
         <div style={{ 
-          background: "#f0fdf4", 
+          background: lastRecognition.collection_match ? "#f0fdf4" : "#fff7ed", 
           padding: 24, 
           borderRadius: 12, 
-          border: "2px solid #16a34a",
+          border: `2px solid ${lastRecognition.collection_match ? "#16a34a" : "#f59e0b"}`,
           marginBottom: 24
         }}>
-          <h2 style={{ marginTop: 0, marginBottom: 16 }}>✅ Current Recognition</h2>
+          <h2 style={{ marginTop: 0, marginBottom: 16 }}>
+            {lastRecognition.collection_match ? '🏆 Collection Match' : '👤 Guest Vinyl'}
+          </h2>
           <div style={{ display: "flex", gap: 16, alignItems: "center", marginBottom: 16 }}>
             <Image 
               src={lastRecognition.image_url || '/images/coverplaceholder.png'}
@@ -642,6 +424,7 @@ export default function FixedAudioRecognitionSystem() {
               <div style={{ fontSize: 12, color: "#888", marginBottom: 6 }}>
                 {Math.round((lastRecognition.confidence || 0.8) * 100)}% confidence • 
                 Service: {lastRecognition.service || 'Unknown'}
+                {lastRecognition.duration && ` • Duration: ${formatDuration(lastRecognition.duration)}`}
               </div>
               <div style={{ 
                 fontSize: 12, 
@@ -653,16 +436,34 @@ export default function FixedAudioRecognitionSystem() {
                 fontWeight: 600
               }}>
                 {lastRecognition.collection_match ? 
-                  `FROM COLLECTION (${lastRecognition.collection_match.folder || 'Unknown'})` : 
-                  "GUEST VINYL"
+                  `FROM ${lastRecognition.collection_match.folder?.toUpperCase()} COLLECTION` : 
+                  "GUEST VINYL (not in collection)"
                 }
               </div>
             </div>
           </div>
+          
+          {/* Smart Timing Info */}
+          {smartTiming && (
+            <div style={{
+              background: 'rgba(59, 130, 246, 0.1)',
+              border: '1px solid #3b82f6',
+              borderRadius: 8,
+              padding: 12,
+              marginTop: 12
+            }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: '#1d4ed8', marginBottom: 4 }}>
+                🧠 Smart Timing Active
+              </div>
+              <div style={{ fontSize: 12, color: '#1e40af' }}>
+                {smartTiming.reasoning}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
-      {/* FIXED: System Status with Recognition Controls integrated */}
+      {/* System Status & Controls */}
       <div style={{ 
         background: "#f0fdf4", 
         padding: 24, 
@@ -678,6 +479,7 @@ export default function FixedAudioRecognitionSystem() {
               <span><strong>Last:</strong> {lastRecognitionTime.toLocaleTimeString()}</span>
             )}
             <span><strong>Mode:</strong> {recognitionMode.replace('_', ' ')}</span>
+            <span><strong>Smart Timing:</strong> {isSmartTimingEnabled ? 'ON' : 'OFF'}</span>
           </div>
         </div>
         
@@ -704,58 +506,6 @@ export default function FixedAudioRecognitionSystem() {
             </div>
             <div style={{ fontSize: 14, color: "#666" }}>
               {status || "Ready to start recognition"}
-            </div>
-          </div>
-        </div>
-
-        {/* System Health */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 12, marginBottom: 16 }}>
-          <div style={{ 
-            padding: 8, 
-            background: systemStatus.database ? '#dcfce7' : '#fee2e2',
-            borderRadius: 6,
-            fontSize: 12,
-            textAlign: 'center'
-          }}>
-            <div style={{ fontWeight: 600 }}>Database</div>
-            <div style={{ color: systemStatus.database ? '#16a34a' : '#dc2626' }}>
-              {systemStatus.database ? '✅ Connected' : '❌ Error'}
-            </div>
-          </div>
-          <div style={{ 
-            padding: 8, 
-            background: systemStatus.recognitionAPI ? '#dcfce7' : '#fee2e2',
-            borderRadius: 6,
-            fontSize: 12,
-            textAlign: 'center'
-          }}>
-            <div style={{ fontWeight: 600 }}>Recognition API</div>
-            <div style={{ color: systemStatus.recognitionAPI ? '#16a34a' : '#dc2626' }}>
-              {systemStatus.recognitionAPI ? '✅ Ready' : '❌ Error'}
-            </div>
-          </div>
-          <div style={{ 
-            padding: 8, 
-            background: systemStatus.manualAPI ? '#dcfce7' : '#fee2e2',
-            borderRadius: 6,
-            fontSize: 12,
-            textAlign: 'center'
-          }}>
-            <div style={{ fontWeight: 600 }}>Manual API</div>
-            <div style={{ color: systemStatus.manualAPI ? '#16a34a' : '#dc2626' }}>
-              {systemStatus.manualAPI ? '✅ Ready' : '❌ Error'}
-            </div>
-          </div>
-          <div style={{ 
-            padding: 8, 
-            background: '#f0f9ff',
-            borderRadius: 6,
-            fontSize: 12,
-            textAlign: 'center'
-          }}>
-            <div style={{ fontWeight: 600 }}>Services</div>
-            <div style={{ color: '#0369a1' }}>
-              {systemStatus.services.length} Active
             </div>
           </div>
         </div>
@@ -790,14 +540,14 @@ export default function FixedAudioRecognitionSystem() {
           </div>
         )}
 
-        {/* Countdown Timer */}
+        {/* Smart Countdown Timer */}
         {isCountdownActive && nextRecognitionCountdown > 0 && !isRecording && (
           <div style={{
             display: "flex",
             alignItems: "center",
             gap: 16,
             padding: 20,
-            background: "#fbbf24",
+            background: smartTiming ? "#3b82f6" : "#fbbf24",
             color: "white",
             borderRadius: 12,
             marginBottom: 16,
@@ -808,7 +558,7 @@ export default function FixedAudioRecognitionSystem() {
               height: 48,
               borderRadius: "50%",
               background: "white",
-              color: "#fbbf24",
+              color: smartTiming ? "#3b82f6" : "#fbbf24",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -819,10 +569,11 @@ export default function FixedAudioRecognitionSystem() {
             </div>
             <div style={{ flex: 1 }}>
               <div style={{ fontWeight: 600, marginBottom: 4, fontSize: 16 }}>
-                ⏰ Next Recognition Sample
+                {isSmartTimingEnabled && smartTiming ? '🧠 Smart Timing' : '⏰ Next Recognition Sample'}
               </div>
               <div style={{ fontSize: 14, opacity: 0.9 }}>
-                Starting in {nextRecognitionCountdown} seconds... ({formatTime(nextRecognitionCountdown)} remaining)
+                Starting in {nextRecognitionCountdown} seconds... 
+                {isSmartTimingEnabled && smartTiming && ` (${smartTiming.reasoning?.split(' - ')[0]})`}
               </div>
             </div>
             <div style={{
@@ -833,7 +584,7 @@ export default function FixedAudioRecognitionSystem() {
               overflow: "hidden"
             }}>
               <div style={{
-                width: `${((smartInterval - nextRecognitionCountdown) / smartInterval) * 100}%`,
+                width: `${((dynamicInterval - nextRecognitionCountdown) / dynamicInterval) * 100}%`,
                 height: "100%",
                 background: "white",
                 borderRadius: "4px",
@@ -860,7 +611,7 @@ export default function FixedAudioRecognitionSystem() {
           >
             {isListening 
               ? "🛑 Stop Recognition" 
-              : `🎵 Start ${recognitionMode.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}`
+              : `🎯 Start Collection-Priority Recognition`
             }
           </button>
           
@@ -879,109 +630,10 @@ export default function FixedAudioRecognitionSystem() {
           >
             🖥️ Open TV Display
           </button>
-
-          <button 
-            onClick={checkSystemStatus}
-            style={{
-              background: "#0369a1",
-              color: "white",
-              border: "none",
-              padding: "16px 32px",
-              borderRadius: 10,
-              cursor: "pointer",
-              fontSize: 16,
-              fontWeight: 600
-            }}
-          >
-            🔧 Test System
-          </button>
         </div>
       </div>
 
-      {/* Album Context Display */}
-      {albumContext && (
-        <div style={{ 
-          background: "#e8f5e8", 
-          padding: 24, 
-          borderRadius: 12, 
-          marginBottom: 24,
-          border: "2px solid #16a34a",
-          display: "flex",
-          alignItems: "center",
-          gap: 16
-        }}>
-          {albumContext.image_url && (
-            <Image 
-              src={albumContext.image_url}
-              alt={albumContext.title}
-              width={80}
-              height={80}
-              style={{ objectFit: "cover", borderRadius: 8 }}
-              unoptimized
-            />
-          )}
-          <div style={{ flex: 1 }}>
-            <div style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              marginBottom: 8
-            }}>
-              <span style={{ fontSize: 18 }}>🎯</span>
-              <h3 style={{ 
-                margin: 0, 
-                color: "#16a34a", 
-                fontSize: "16px" 
-              }}>
-                Album Context Active - {recognitionMode === 'album_follow' ? 'PRIORITY MODE' : 'Background Mode'}
-              </h3>
-            </div>
-            <div style={{ 
-              fontSize: '16px', 
-              fontWeight: 600, 
-              marginBottom: 4 
-            }}>
-              {albumContext.artist} - {albumContext.title}
-            </div>
-            <div style={{ 
-              fontSize: '14px', 
-              color: '#666', 
-              marginBottom: 8 
-            }}>
-              {albumContext.track_count && albumContext.track_count > 0 ? 
-                `${albumContext.track_count} tracks` : 
-                'Track count unknown'
-              } • 
-              {albumContext.folder && ` ${albumContext.folder} • `}
-              Set {getContextAge()} • 
-              Source: {albumContext.source || 'unknown'}
-            </div>
-            
-            {albumContext.track_listing && albumContext.track_listing.length > 0 && (
-              <div style={{ fontSize: 12, color: '#065f46' }}>
-                Tracks: {albumContext.track_listing.slice(0, 3).join(', ')}
-                {albumContext.track_listing.length > 3 && ` (+${albumContext.track_listing.length - 3} more)`}
-              </div>
-            )}
-          </div>
-          <button
-            onClick={clearAlbumContext}
-            style={{
-              background: "#dc2626",
-              color: "white",
-              border: "none",
-              borderRadius: 6,
-              padding: "8px 12px",
-              fontSize: "12px",
-              cursor: "pointer"
-            }}
-          >
-            Clear
-          </button>
-        </div>
-      )}
-
-      {/* FIXED: Recognition Configuration - Hidden when listening */}
+      {/* Smart Timing Controls - Hidden when listening */}
       {!isListening && (
         <div style={{ 
           background: "#f0f9ff", 
@@ -990,13 +642,42 @@ export default function FixedAudioRecognitionSystem() {
           marginBottom: 24,
           border: "1px solid #0369a1"
         }}>
-          <h2 style={{ marginTop: 0, marginBottom: 16 }}>Recognition Configuration</h2>
+          <h2 style={{ marginTop: 0, marginBottom: 16 }}>🧠 Smart Recognition Configuration</h2>
+          
+          <div style={{ marginBottom: 20 }}>
+            <label style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              fontSize: 16,
+              fontWeight: 600,
+              cursor: 'pointer',
+              marginBottom: 12
+            }}>
+              <input
+                type="checkbox"
+                checked={isSmartTimingEnabled}
+                onChange={(e) => setIsSmartTimingEnabled(e.target.checked)}
+                style={{ transform: 'scale(1.2)' }}
+              />
+              Enable Smart Timing (recommended)
+            </label>
+            <p style={{ 
+              fontSize: 14, 
+              color: '#6b7280', 
+              margin: '0 0 16px 28px',
+              lineHeight: 1.5
+            }}>
+              When enabled, the system calculates optimal timing for next recognition based on track duration. 
+              Reduces unnecessary API calls and improves accuracy.
+            </p>
+          </div>
           
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 16 }}>
             {[
               { value: 'manual', label: 'Manual Sample', desc: 'Single recognition sample' },
-              { value: 'smart_continuous', label: 'Smart Continuous', desc: 'Automatic sampling with countdown' },
-              { value: 'album_follow', label: 'Album Follow', desc: 'Context-aware recognition - PRIORITIZES album context matches' }
+              { value: 'smart_continuous', label: 'Smart Continuous', desc: 'Automatic sampling with smart timing' },
+              { value: 'album_follow', label: 'Album Follow', desc: 'Context-aware recognition with collection priority' }
             ].map(mode => (
               <label 
                 key={mode.value}
@@ -1047,20 +728,22 @@ export default function FixedAudioRecognitionSystem() {
             
             <div>
               <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>
-                Smart Interval (seconds)
+                Fallback Interval (when no duration available)
               </label>
               <input 
                 type="number"
                 min="15"
                 max="300"
-                value={smartInterval}
-                onChange={(e) => setSmartInterval(parseInt(e.target.value) || 30)}
+                value={dynamicInterval}
+                onChange={(e) => setDynamicInterval(parseInt(e.target.value) || 30)}
+                disabled={isSmartTimingEnabled}
                 style={{ 
                   width: "100%", 
                   padding: "8px 12px", 
                   border: "1px solid #ddd", 
                   borderRadius: 6,
-                  fontSize: 14
+                  fontSize: 14,
+                  opacity: isSmartTimingEnabled ? 0.6 : 1
                 }}
               />
             </div>
@@ -1068,158 +751,120 @@ export default function FixedAudioRecognitionSystem() {
         </div>
       )}
 
-      {/* FIXED: Combined Album Context Search and Recognition Candidates */}
-      <div style={{ 
-        background: "#fff7ed", 
-        padding: 24, 
-        borderRadius: 12, 
-        marginBottom: 24,
-        border: "1px solid #ea580c"
-      }}>
-        <h3 style={{ margin: 0, marginBottom: 16, color: "#ea580c" }}>Set Album Context & Recognition Candidates</h3>
-        
-        {/* Manual Search Section */}
-        <div style={{ marginBottom: 24 }}>
-          <p style={{ fontSize: 14, color: "#ea580c", marginBottom: 16 }}>
-            Enter artist and album to set album context for better track recognition in Album Follow mode.
-          </p>
-          
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 12, alignItems: "end" }}>
-            <div>
-              <label style={{ display: "block", marginBottom: 4, fontSize: 14, fontWeight: 600 }}>
-                Artist (required)
-              </label>
-              <input
-                type="text"
-                value={manualArtist}
-                onChange={(e) => setManualArtist(e.target.value)}
-                placeholder="e.g. Wilco"
-                style={{
-                  width: "100%",
-                  padding: "8px 12px",
-                  border: "1px solid #d1d5db",
-                  borderRadius: 6,
-                  fontSize: 14
-                }}
-              />
-            </div>
-            
-            <div>
-              <label style={{ display: "block", marginBottom: 4, fontSize: 14, fontWeight: 600 }}>
-                Album (for context setting)
-              </label>
-              <input
-                type="text"
-                value={manualAlbum}
-                onChange={(e) => setManualAlbum(e.target.value)}
-                placeholder="e.g. Yankee Hotel Foxtrot"
-                style={{
-                  width: "100%",
-                  padding: "8px 12px",
-                  border: "1px solid #d1d5db",
-                  borderRadius: 6,
-                  fontSize: 14
-                }}
-              />
-            </div>
-            
-            <button
-              onClick={performManualSearch}
-              disabled={!manualArtist.trim() || isManualSearching}
-              style={{
-                background: manualArtist.trim() && !isManualSearching ? "#ea580c" : "#9ca3af",
-                color: "white",
-                border: "none",
-                padding: "10px 20px",
+      {/* Recognition History */}
+      {recognitionHistory.length > 0 && (
+        <div style={{
+          background: "#f8fafc",
+          padding: 20,
+          borderRadius: 12,
+          marginBottom: 24,
+          border: "1px solid #e2e8f0"
+        }}>
+          <h3 style={{ margin: '0 0 16px 0', fontSize: 16, fontWeight: 600 }}>
+            📊 Recognition History ({recognitionHistory.length})
+          </h3>
+          <div style={{ fontSize: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {recognitionHistory.map((entry, index) => (
+              <div key={index} style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: 8,
+                background: entry.source.includes('Collection') ? '#f0fdf4' : '#fff7ed',
                 borderRadius: 6,
-                fontSize: 14,
-                fontWeight: 600,
-                cursor: manualArtist.trim() && !isManualSearching ? "pointer" : "not-allowed",
-                whiteSpace: "nowrap"
-              }}
-            >
-              {isManualSearching ? "Searching..." : (manualAlbum.trim() ? "Set Context" : "Search")}
-            </button>
+                border: `1px solid ${entry.source.includes('Collection') ? '#bbf7d0' : '#fed7aa'}`
+              }}>
+                <div>
+                  <span style={{ fontWeight: 600 }}>{entry.track}</span>
+                  <span style={{ color: '#666', marginLeft: 8 }}>({entry.source})</span>
+                </div>
+                <div style={{ fontSize: 11, color: '#888' }}>
+                  {entry.time.toLocaleTimeString()}
+                  {entry.duration && ` • ${formatDuration(entry.duration)}`}
+                  {entry.nextSampleIn && ` • Next: ${entry.nextSampleIn}s`}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
+      )}
 
-        {/* Recognition Candidates */}
-        {recognitionCandidates.length > 0 && (
-          <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <h4 style={{ margin: 0, color: "#92400e" }}>
-                🎯 Recognition Candidates ({recognitionCandidates.length})
-              </h4>
-              <div style={{ fontSize: 14, color: "#92400e" }}>
-                Click any candidate to select it for TV display
-                {recognitionMode === 'album_follow' && ' and set album context'}
-              </div>
-            </div>
-            
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 16 }}>
-              {recognitionCandidates.map((candidate, index) => (
-                <div 
-                  key={index}
-                  onClick={() => selectRecognitionCandidate(candidate)}
-                  style={{
-                    background: "#fff",
-                    border: "2px solid #e5e7eb",
-                    borderRadius: 12,
-                    padding: 16,
-                    cursor: "pointer",
-                    transition: "all 0.2s",
-                    display: "flex",
-                    gap: 12,
-                    alignItems: "center"
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = "#f59e0b";
-                    e.currentTarget.style.background = "#fffbeb";
-                    e.currentTarget.style.transform = "translateY(-2px)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = "#e5e7eb";
-                    e.currentTarget.style.background = "#fff";
-                    e.currentTarget.style.transform = "translateY(0)";
-                  }}
-                >
-                  <Image 
-                    src={candidate.image_url || '/images/coverplaceholder.png'}
-                    alt={candidate.album || candidate.title}
-                    width={64}
-                    height={64}
-                    style={{ objectFit: "cover", borderRadius: 8, flexShrink: 0 }}
-                    unoptimized
-                  />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600, marginBottom: 4, fontSize: 14 }}>{candidate.title}</div>
-                    <div style={{ fontSize: 13, color: "#666", marginBottom: 4 }}>
-                      {candidate.artist} {candidate.album && `• ${candidate.album}`}
-                    </div>
-                    <div style={{ fontSize: 12, color: "#888", marginBottom: 6 }}>
-                      {Math.round((candidate.confidence || 0.8) * 100)}% confidence • {candidate.service || 'Unknown'}
-                    </div>
-                    <div style={{ 
-                      fontSize: 11, 
-                      padding: "3px 8px", 
-                      borderRadius: 6,
-                      background: candidate.collection_match ? "#dcfce7" : "#fef3c7",
-                      color: candidate.collection_match ? "#16a34a" : "#92400e",
-                      display: "inline-block",
-                      fontWeight: 600
-                    }}>
-                      {candidate.collection_match ? 
-                        `BYO COLLECTION (${candidate.collection_match.folder || 'Unknown'})` : 
-                        "GUEST VINYL"
-                      }
-                    </div>
+      {/* Recognition Candidates */}
+      {recognitionCandidates.length > 0 && (
+        <div style={{ 
+          background: "#fff7ed", 
+          padding: 24, 
+          borderRadius: 12, 
+          marginBottom: 24,
+          border: "1px solid #ea580c"
+        }}>
+          <h3 style={{ margin: 0, marginBottom: 16, color: "#ea580c" }}>
+            🎯 Recognition Candidates ({recognitionCandidates.length})
+          </h3>
+          
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 16 }}>
+            {recognitionCandidates.map((candidate, index) => (
+              <div 
+                key={index}
+                style={{
+                  background: "#fff",
+                  border: candidate.collection_match ? "2px solid #16a34a" : "2px solid #e5e7eb",
+                  borderRadius: 12,
+                  padding: 16,
+                  cursor: "pointer",
+                  transition: "all 0.2s",
+                  display: "flex",
+                  gap: 12,
+                  alignItems: "center"
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = candidate.collection_match ? "#15803d" : "#f59e0b";
+                  e.currentTarget.style.background = candidate.collection_match ? "#f0fdf4" : "#fffbeb";
+                  e.currentTarget.style.transform = "translateY(-2px)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = candidate.collection_match ? "#16a34a" : "#e5e7eb";
+                  e.currentTarget.style.background = "#fff";
+                  e.currentTarget.style.transform = "translateY(0)";
+                }}
+              >
+                <Image 
+                  src={candidate.image_url || '/images/coverplaceholder.png'}
+                  alt={candidate.album || candidate.title}
+                  width={64}
+                  height={64}
+                  style={{ objectFit: "cover", borderRadius: 8, flexShrink: 0 }}
+                  unoptimized
+                />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600, marginBottom: 4, fontSize: 14 }}>{candidate.title}</div>
+                  <div style={{ fontSize: 13, color: "#666", marginBottom: 4 }}>
+                    {candidate.artist} {candidate.album && `• ${candidate.album}`}
+                  </div>
+                  <div style={{ fontSize: 12, color: "#888", marginBottom: 6 }}>
+                    {Math.round((candidate.confidence || 0.8) * 100)}% confidence • {candidate.service || 'Unknown'}
+                    {candidate.duration && ` • ${formatDuration(candidate.duration)}`}
+                  </div>
+                  <div style={{ 
+                    fontSize: 11, 
+                    padding: "3px 8px", 
+                    borderRadius: 6,
+                    background: candidate.collection_match ? "#dcfce7" : "#fef3c7",
+                    color: candidate.collection_match ? "#16a34a" : "#92400e",
+                    display: "inline-block",
+                    fontWeight: 600
+                  }}>
+                    {candidate.collection_match ? 
+                      `COLLECTION: ${candidate.collection_match.folder?.toUpperCase()}` : 
+                      "GUEST VINYL"
+                    }
                   </div>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* CSS Animations */}
       <style dangerouslySetInnerHTML={{

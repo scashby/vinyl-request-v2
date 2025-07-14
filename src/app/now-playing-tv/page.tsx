@@ -1,7 +1,7 @@
-// src/app/now-playing-tv/page.tsx - Cleaned TV Display (removed unwanted features)
+// src/app/now-playing-tv/page.tsx - FIXED TV Display with Enhanced Real-time Updates
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from 'lib/supabaseClient';
 import Image from 'next/image';
 
@@ -27,102 +27,229 @@ interface NowPlayingData {
   recognition_confidence?: number;
   service_used?: string;
   updated_at?: string;
+  track_duration?: number;
+  next_recognition_in?: number;
   collection?: CollectionAlbum;
 }
 
-export default function CleanedTVDisplay() {
+export default function FixedTVDisplay() {
   const [currentTrack, setCurrentTrack] = useState<NowPlayingData | null>(null);
   const [isConnected, setIsConnected] = useState<boolean>(false);
-  const [showDebug, setShowDebug] = useState<boolean>(false);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [updateCount, setUpdateCount] = useState<number>(0);
+  const [connectionRetries, setConnectionRetries] = useState<number>(0);
+  
+  // Refs to prevent memory leaks and manage subscriptions
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastDataRef = useRef<string>('');
 
-  useEffect(() => {
-    let nowPlayingChannel: ReturnType<typeof supabase.channel> | null = null;
-    let intervalId: NodeJS.Timeout | null = null;
+  // Enhanced data fetching with change detection
+  const fetchNowPlaying = useCallback(async (source: string = 'manual'): Promise<void> => {
+    try {
+      console.log(`🔄 [${source}] Fetching now playing data... (attempt ${updateCount + 1})`);
+      
+      const { data, error } = await supabase
+        .from('now_playing')
+        .select(`
+          *,
+          collection (
+            id,
+            artist,
+            title,
+            year,
+            image_url,
+            folder
+          )
+        `)
+        .eq('id', 1)
+        .single();
 
-    const fetchNowPlaying = async (): Promise<void> => {
-      try {
-        console.log('Fetching now playing data...');
-        
-        const { data, error } = await supabase
-          .from('now_playing')
-          .select(`
-            *,
-            collection (
-              id,
-              artist,
-              title,
-              year,
-              image_url,
-              folder
-            )
-          `)
-          .eq('id', 1)
-          .single();
-
-        if (error) {
-          console.error('Fetch error:', error);
-          setIsConnected(false);
-        } else {
-          console.log('Successfully fetched now playing:', data);
-          setCurrentTrack(data);
-          setIsConnected(true);
-          setLastUpdate(new Date());
-        }
-      } catch (error) {
-        console.error('Error fetching now playing:', error);
+      if (error) {
+        console.error(`❌ [${source}] Fetch error:`, error);
         setIsConnected(false);
-      } finally {
-        setIsLoading(false);
+        
+        // Retry logic for connection errors
+        if (connectionRetries < 5) {
+          const retryDelay = Math.min(1000 * Math.pow(2, connectionRetries), 10000);
+          console.log(`🔄 Retrying in ${retryDelay}ms... (retry ${connectionRetries + 1}/5)`);
+          
+          retryTimeoutRef.current = setTimeout(() => {
+            setConnectionRetries(prev => prev + 1);
+            fetchNowPlaying(`${source}-retry-${connectionRetries + 1}`);
+          }, retryDelay);
+        }
+        return;
       }
-    };
 
-    // Initial fetch
-    fetchNowPlaying();
+      // Check if data actually changed
+      const dataString = JSON.stringify(data);
+      const hasDataChanged = dataString !== lastDataRef.current;
+      
+      if (hasDataChanged || source === 'manual') {
+        console.log(`✅ [${source}] Data ${hasDataChanged ? 'changed' : 'fetched'}, updating display:`, {
+          artist: data?.artist,
+          title: data?.title,
+          album: data?.album_title,
+          collection_id: data?.album_id,
+          service: data?.service_used,
+          updated_at: data?.updated_at
+        });
+        
+        setCurrentTrack(data);
+        setLastUpdate(new Date());
+        setUpdateCount(prev => prev + 1);
+        setConnectionRetries(0); // Reset retry counter on success
+        lastDataRef.current = dataString;
+      } else {
+        console.log(`📍 [${source}] No data changes detected`);
+      }
+      
+      setIsConnected(true);
+      
+    } catch (error) {
+      console.error(`❌ [${source}] Error fetching now playing:`, error);
+      setIsConnected(false);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [updateCount, connectionRetries]);
 
-    // Set up real-time subscription
-    nowPlayingChannel = supabase
-      .channel('now_playing_tv_simple')
+  // Enhanced real-time subscription setup
+  const setupRealtimeSubscription = useCallback(() => {
+    console.log('🔗 Setting up enhanced real-time subscription...');
+    
+    // Clean up existing subscription
+    if (channelRef.current) {
+      console.log('🧹 Cleaning up existing subscription');
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+
+    // Create new subscription with multiple event listeners
+    channelRef.current = supabase
+      .channel('now_playing_tv_enhanced', {
+        config: {
+          broadcast: { self: true },
+          presence: { key: `tv-display-${Date.now()}` }
+        }
+      })
       .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'now_playing' },
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'now_playing',
+          filter: 'id=eq.1'
+        },
         (payload) => {
-          console.log('Now playing updated via real-time:', payload);
-          fetchNowPlaying();
+          console.log('📡 Real-time update received:', {
+            eventType: payload.eventType,
+            new: payload.new,
+            old: payload.old,
+            timestamp: new Date().toISOString()
+          });
+          
+          // Immediate fetch on any change
+          fetchNowPlaying(`realtime-${payload.eventType}`);
         }
       )
-      .subscribe((status) => {
-        console.log('Now playing subscription status:', status);
+      .on('broadcast', 
+        { event: 'now_playing_update' }, 
+        (payload) => {
+          console.log('📢 Broadcast update received:', payload);
+          fetchNowPlaying('broadcast');
+        }
+      )
+      .subscribe((status, err) => {
+        console.log('📡 Subscription status changed:', status, err);
         setIsConnected(status === 'SUBSCRIBED');
+        
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Real-time subscription active');
+          setConnectionRetries(0);
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('❌ Channel error, will retry...', err);
+          
+          // Retry subscription after a delay
+          setTimeout(() => {
+            setupRealtimeSubscription();
+          }, 2000);
+        }
       });
+  }, [fetchNowPlaying]);
 
-    // Polling fallback every 30 seconds
-    intervalId = setInterval(() => {
-      fetchNowPlaying();
-    }, 30000);
+  // Setup polling fallback
+  const setupPollingFallback = useCallback(() => {
+    console.log('⏰ Setting up polling fallback (every 15 seconds)...');
+    
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+    }
+    
+    intervalRef.current = setInterval(() => {
+      fetchNowPlaying('polling');
+    }, 15000); // More frequent polling
+  }, [fetchNowPlaying]);
 
-    // Keyboard controls
+  // Main initialization effect
+  useEffect(() => {
+    console.log('🚀 Initializing TV Display with enhanced real-time updates...');
+    
+    // Initial fetch
+    fetchNowPlaying('initial');
+    
+    // Setup real-time subscription
+    setupRealtimeSubscription();
+    
+    // Setup polling fallback
+    setupPollingFallback();
+
+    // Cleanup function
+    return () => {
+      console.log('🧹 Cleaning up TV Display...');
+      
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+      
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+        retryTimeoutRef.current = null;
+      }
+    };
+  }, [fetchNowPlaying, setupRealtimeSubscription, setupPollingFallback]);
+
+  // Keyboard controls for refresh and reconnect
+  useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
-      if (e.key === 'd' || e.key === 'D') {
-        setShowDebug(prev => !prev);
-      } else if (e.key === 'f' || e.key === 'F') {
-        fetchNowPlaying();
+      if (e.key === 'f' || e.key === 'F') {
+        console.log('🔄 Manual refresh requested');
+        fetchNowPlaying('manual-keyboard');
+      } else if (e.key === 'r' || e.key === 'R') {
+        console.log('🔄 Reconnecting real-time subscription...');
+        setupRealtimeSubscription();
       }
     };
 
     window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [fetchNowPlaying, setupRealtimeSubscription]);
 
-    return () => {
-      window.removeEventListener('keydown', handleKeyPress);
-      
-      if (nowPlayingChannel) {
-        supabase.removeChannel(nowPlayingChannel);
-      }
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
-    };
-  }, []);
+  // Format duration helper
+  const formatDuration = (seconds?: number): string => {
+    if (!seconds) return '';
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
   // Loading state
   if (isLoading) {
@@ -138,7 +265,10 @@ export default function CleanedTVDisplay() {
       }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🎵</div>
-          <div style={{ fontSize: '1.5rem' }}>Loading...</div>
+          <div style={{ fontSize: '1.5rem' }}>Loading Enhanced TV Display...</div>
+          <div style={{ fontSize: '1rem', opacity: 0.8, marginTop: '0.5rem' }}>
+            Setting up real-time updates...
+          </div>
         </div>
       </div>
     );
@@ -223,37 +353,32 @@ export default function CleanedTVDisplay() {
             Drop the needle. Let the side play.
           </p>
 
-          {/* Connection Status */}
+          {/* Enhanced Connection Status */}
           <div style={{
             background: isConnected ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)',
             border: `1px solid ${isConnected ? 'rgba(34, 197, 94, 0.5)' : 'rgba(239, 68, 68, 0.5)'}`,
             borderRadius: 12,
             padding: '16px 24px',
             fontSize: '1rem',
-            opacity: 0.9
+            opacity: 0.9,
+            marginBottom: '1rem'
           }}>
-            {isConnected ? '🟢 System: Ready' : '🔴 System: Connecting...'}
+            {isConnected ? '🟢 System: Ready & Listening' : '🔴 System: Connecting...'}
+          </div>
+          
+          <div style={{
+            fontSize: '0.9rem',
+            opacity: 0.6,
+            display: 'flex',
+            justifyContent: 'center',
+            gap: '2rem',
+            flexWrap: 'wrap'
+          }}>
+            <span>Updates: {updateCount}</span>
+            <span>Last Check: {lastUpdate.toLocaleTimeString()}</span>
+            {connectionRetries > 0 && <span>Retries: {connectionRetries}</span>}
           </div>
         </div>
-
-        {/* Debug overlay */}
-        {showDebug && (
-          <div style={{
-            position: 'absolute',
-            bottom: 20,
-            right: 20,
-            background: 'rgba(0,0,0,0.9)',
-            padding: 16,
-            borderRadius: 8,
-            fontSize: 11,
-            fontFamily: 'monospace',
-            maxWidth: 400
-          }}>
-            <div><strong>Status:</strong> {isConnected ? 'Connected' : 'Disconnected'}</div>
-            <div><strong>Last Update:</strong> {lastUpdate.toLocaleTimeString()}</div>
-            <div><strong>Commands:</strong> D=debug, F=refresh</div>
-          </div>
-        )}
       </div>
     );
   }
@@ -267,6 +392,8 @@ export default function CleanedTVDisplay() {
   const displayFormat = currentTrack.collection?.folder;
   const isFromCollection = !!(currentTrack.collection && currentTrack.album_id);
   const isGuestVinyl = !isFromCollection;
+  const trackDuration = currentTrack.track_duration;
+  const nextRecognition = currentTrack.next_recognition_in;
 
   return (
     <div style={{
@@ -371,7 +498,7 @@ export default function CleanedTVDisplay() {
               priority
             />
             
-            {/* Collection/Guest status badge */}
+            {/* Enhanced Collection/Guest status badge */}
             {isFromCollection && displayFormat ? (
               <div style={{
                 position: 'absolute',
@@ -387,7 +514,7 @@ export default function CleanedTVDisplay() {
                 textTransform: 'uppercase',
                 letterSpacing: '0.5px'
               }}>
-                {displayFormat}
+                🏆 {displayFormat}
               </div>
             ) : isGuestVinyl ? (
               <div style={{
@@ -404,24 +531,7 @@ export default function CleanedTVDisplay() {
                 textTransform: 'uppercase',
                 letterSpacing: '0.5px'
               }}>
-                GUEST
-              </div>
-            ) : isFromCollection ? (
-              <div style={{
-                position: 'absolute',
-                top: '-15px',
-                right: '-15px',
-                background: '#22c55e',
-                color: 'white',
-                padding: '12px 20px',
-                borderRadius: '25px',
-                fontSize: '1.1rem',
-                fontWeight: 'bold',
-                boxShadow: '0 6px 20px rgba(0,0,0,0.4)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px'
-              }}>
-                COLLECTION
+                👤 GUEST
               </div>
             ) : null}
           </div>
@@ -466,7 +576,7 @@ export default function CleanedTVDisplay() {
             {displayArtist}
           </p>
           
-          {/* Year and Collection Status */}
+          {/* Enhanced metadata */}
           <div style={{ 
             fontSize: '1.8rem', 
             margin: '0 0 2rem 0',
@@ -474,9 +584,23 @@ export default function CleanedTVDisplay() {
             fontWeight: 400,
             display: 'flex',
             alignItems: 'center',
-            gap: '1rem'
+            gap: '1rem',
+            flexWrap: 'wrap'
           }}>
             <span>{displayYear || 'Unknown Year'}</span>
+            {trackDuration && (
+              <span style={{
+                background: 'rgba(59, 130, 246, 0.2)',
+                color: '#60a5fa',
+                padding: '4px 12px',
+                borderRadius: '12px',
+                fontSize: '1.2rem',
+                fontWeight: 600,
+                border: '1px solid rgba(59, 130, 246, 0.5)'
+              }}>
+                ⏱️ {formatDuration(trackDuration)}
+              </span>
+            )}
             {isFromCollection && (
               <span style={{
                 background: 'rgba(34, 197, 94, 0.2)',
@@ -487,7 +611,7 @@ export default function CleanedTVDisplay() {
                 fontWeight: 600,
                 border: '1px solid rgba(34, 197, 94, 0.5)'
               }}>
-                FROM COLLECTION
+                🏆 FROM COLLECTION
               </span>
             )}
             {isGuestVinyl && (
@@ -500,35 +624,47 @@ export default function CleanedTVDisplay() {
                 fontWeight: 600,
                 border: '1px solid rgba(245, 158, 11, 0.5)'
               }}>
-                GUEST VINYL
+                👤 GUEST VINYL
+              </span>
+            )}
+            {nextRecognition && (
+              <span style={{
+                background: 'rgba(147, 51, 234, 0.2)',
+                color: '#a855f7',
+                padding: '4px 12px',
+                borderRadius: '12px',
+                fontSize: '1.2rem',
+                fontWeight: 600,
+                border: '1px solid rgba(147, 51, 234, 0.5)'
+              }}>
+                🧠 Next: {nextRecognition}s
               </span>
             )}
           </div>
+
+          {/* Connection Status Indicator */}
+          <div style={{
+            position: 'absolute',
+            bottom: '2rem',
+            right: '2rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            fontSize: '0.9rem',
+            opacity: 0.6
+          }}>
+            <div style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              background: isConnected ? '#10b981' : '#ef4444',
+              animation: isConnected ? 'pulse 2s infinite' : 'none'
+            }} />
+            <span>Live Updates {isConnected ? 'Active' : 'Disconnected'}</span>
+            <span>• Updates: {updateCount}</span>
+          </div>
         </div>
       </div>
-
-      {/* Debug overlay */}
-      {showDebug && (
-        <div style={{
-          position: 'absolute',
-          bottom: 20,
-          right: 20,
-          background: 'rgba(0,0,0,0.9)',
-          padding: 16,
-          borderRadius: 8,
-          fontSize: 11,
-          fontFamily: 'monospace',
-          maxWidth: 400,
-          zIndex: 10
-        }}>
-          <div><strong>Status:</strong> {isConnected ? 'Connected' : 'Disconnected'}</div>
-          <div><strong>Collection Match:</strong> {isFromCollection ? 'Yes' : 'No'}</div>
-          <div><strong>Album ID:</strong> {currentTrack.album_id || 'None'}</div>
-          <div><strong>Guest Vinyl:</strong> {isGuestVinyl ? 'Yes' : 'No'}</div>
-          <div><strong>Last Update:</strong> {lastUpdate.toLocaleTimeString()}</div>
-          <div><strong>Commands:</strong> D=debug, F=refresh</div>
-        </div>
-      )}
 
       {/* CSS Animations */}
       <style dangerouslySetInnerHTML={{
