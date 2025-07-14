@@ -454,9 +454,40 @@ export default function FixedAudioRecognitionSystem() {
     setStatus('🛑 Recognition stopped');
   };
 
+  // FIXED: selectRecognitionCandidate function with proper database update
   const selectRecognitionCandidate = async (candidate: RecognitionResult): Promise<void> => {
     console.log('👆 User selected candidate:', candidate);
     setLastRecognition(candidate);
+    
+    // FIXED: Update the now_playing table that the TV display reads from
+    try {
+      const updateData = {
+        id: 1,
+        artist: candidate.artist,
+        title: candidate.title, // This is the track title
+        album_title: candidate.album, // This is the album title
+        recognition_image_url: candidate.image_url,
+        album_id: candidate.collection_match?.id || null,
+        started_at: new Date().toISOString(),
+        recognition_confidence: candidate.confidence || 0.8,
+        service_used: candidate.service || 'manual_selection',
+        updated_at: new Date().toISOString()
+      };
+
+      const { error: nowPlayingError } = await supabase
+        .from('now_playing')
+        .upsert(updateData);
+
+      if (nowPlayingError) {
+        throw nowPlayingError;
+      }
+
+      console.log('✅ Updated now_playing table for TV display:', updateData);
+    } catch (error) {
+      console.error('❌ Error updating now_playing table:', error);
+      setStatus('❌ Error updating TV display');
+      return; // Exit early if database update fails
+    }
     
     // FIXED: For Album Follow Mode, set album context when user selects an album
     if (recognitionMode === 'album_follow' && candidate.album && candidate.artist) {
@@ -478,32 +509,12 @@ export default function FixedAudioRecognitionSystem() {
       }
     }
     
-    // Update TV display
-    try {
-      await supabase
-        .from('now_playing')
-        .upsert({
-          id: 1,
-          artist: candidate.artist,
-          title: candidate.title,
-          album_title: candidate.album,
-          recognition_image_url: candidate.image_url,
-          album_id: candidate.collection_match?.id || null,
-          started_at: new Date().toISOString(),
-          recognition_confidence: candidate.confidence || 0.8,
-          service_used: candidate.service || 'manual_selection',
-          updated_at: new Date().toISOString()
-        });
-      
-      const collectionStatus = candidate.collection_match ? 
-        `FROM COLLECTION (${candidate.collection_match.folder})` : 
-        'GUEST VINYL';
-      
-      setStatus(`✅ Selected: ${candidate.title} by ${candidate.artist} [${collectionStatus}]`);
-    } catch (error) {
-      console.error('Error updating selection:', error);
-      setStatus('❌ Error updating TV display');
-    }
+    // Update status message
+    const collectionStatus = candidate.collection_match ? 
+      `FROM COLLECTION (${candidate.collection_match.folder})` : 
+      'GUEST VINYL';
+    
+    setStatus(`✅ Selected: ${candidate.title} by ${candidate.artist} [${collectionStatus}] - TV updated!`);
   };
 
   const performManualSearch = async (): Promise<void> => {

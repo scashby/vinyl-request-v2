@@ -1,4 +1,4 @@
-// src/app/now-playing-tv/page.tsx - Fixed TV Display
+// src/app/now-playing-tv/page.tsx - Cleaned TV Display (removed unwanted features)
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -12,19 +12,6 @@ interface CollectionAlbum {
   year: string;
   image_url?: string;
   folder?: string;
-}
-
-interface AlbumContext {
-  id: number;
-  artist: string;
-  title: string;
-  year: string;
-  image_url?: string;
-  folder?: string;
-  track_count?: number;
-  track_listing?: string[];
-  source?: string;
-  created_at?: string;
 }
 
 interface NowPlayingData {
@@ -43,9 +30,8 @@ interface NowPlayingData {
   collection?: CollectionAlbum;
 }
 
-export default function EnhancedTVDisplay() {
+export default function CleanedTVDisplay() {
   const [currentTrack, setCurrentTrack] = useState<NowPlayingData | null>(null);
-  const [albumContext, setAlbumContext] = useState<AlbumContext | null>(null);
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [showDebug, setShowDebug] = useState<boolean>(false);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
@@ -53,10 +39,8 @@ export default function EnhancedTVDisplay() {
 
   useEffect(() => {
     let nowPlayingChannel: ReturnType<typeof supabase.channel> | null = null;
-    let albumContextChannel: ReturnType<typeof supabase.channel> | null = null;
     let intervalId: NodeJS.Timeout | null = null;
 
-    // Define fetch functions inside useEffect to avoid dependency issues
     const fetchNowPlaying = async (): Promise<void> => {
       try {
         console.log('Fetching now playing data...');
@@ -94,42 +78,10 @@ export default function EnhancedTVDisplay() {
       }
     };
 
-    const fetchAlbumContext = async (): Promise<void> => {
-      try {
-        const { data, error } = await supabase
-          .from('album_context')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single();
-
-        if (error) {
-          console.warn('Album context fetch error (non-critical):', error);
-          return;
-        }
-
-        if (data) {
-          const contextAge = Date.now() - new Date(data.created_at).getTime();
-          const maxAge = 2 * 60 * 60 * 1000; // 2 hours
-          
-          if (contextAge <= maxAge) {
-            setAlbumContext(data);
-          } else {
-            setAlbumContext(null);
-          }
-        } else {
-          setAlbumContext(null);
-        }
-      } catch (error) {
-        console.warn('Album context fetch failed (non-critical):', error);
-      }
-    };
-
     // Initial fetch
     fetchNowPlaying();
-    fetchAlbumContext();
 
-    // Set up real-time subscriptions
+    // Set up real-time subscription
     nowPlayingChannel = supabase
       .channel('now_playing_tv_simple')
       .on('postgres_changes', 
@@ -144,25 +96,9 @@ export default function EnhancedTVDisplay() {
         setIsConnected(status === 'SUBSCRIBED');
       });
 
-    // Album context subscription (gracefully handles errors)
-    albumContextChannel = supabase
-      .channel('album_context_tv')
-      .on('postgres_changes',
-        { event: '*', schema: 'public', table: 'album_context' },
-        (payload) => {
-          console.log('Album context updated via real-time:', payload);
-          fetchAlbumContext();
-        }
-      )
-      .subscribe((status) => {
-        console.log('Album context subscription status:', status);
-        // Don't affect main connection status if album context fails
-      });
-
     // Polling fallback every 30 seconds
     intervalId = setInterval(() => {
       fetchNowPlaying();
-      fetchAlbumContext();
     }, 30000);
 
     // Keyboard controls
@@ -171,7 +107,6 @@ export default function EnhancedTVDisplay() {
         setShowDebug(prev => !prev);
       } else if (e.key === 'f' || e.key === 'F') {
         fetchNowPlaying();
-        fetchAlbumContext();
       }
     };
 
@@ -183,14 +118,11 @@ export default function EnhancedTVDisplay() {
       if (nowPlayingChannel) {
         supabase.removeChannel(nowPlayingChannel);
       }
-      if (albumContextChannel) {
-        supabase.removeChannel(albumContextChannel);
-      }
       if (intervalId) {
         clearInterval(intervalId);
       }
     };
-  }, []); // No dependencies needed since all functions are defined inside
+  }, []);
 
   // Loading state
   if (isLoading) {
@@ -302,21 +234,6 @@ export default function EnhancedTVDisplay() {
           }}>
             {isConnected ? '🟢 System: Ready' : '🔴 System: Connecting...'}
           </div>
-
-          {/* Album context status */}
-          {albumContext && (
-            <div style={{
-              background: 'rgba(34, 197, 94, 0.2)',
-              border: '1px solid rgba(34, 197, 94, 0.5)',
-              borderRadius: 12,
-              padding: '16px 24px',
-              marginTop: '1rem',
-              fontSize: '1rem',
-              opacity: 0.9
-            }}>
-              🎯 Album Context: <strong>{albumContext.artist} - {albumContext.title}</strong>
-            </div>
-          )}
         </div>
 
         {/* Debug overlay */}
@@ -350,14 +267,6 @@ export default function EnhancedTVDisplay() {
   const displayFormat = currentTrack.collection?.folder;
   const isFromCollection = !!(currentTrack.collection && currentTrack.album_id);
   const isGuestVinyl = !isFromCollection;
-
-  // Determine if this track is part of the current album context
-  const isFromAlbumContext = albumContext && 
-    albumContext.artist.toLowerCase() === currentTrack.artist?.toLowerCase() &&
-    (albumContext.title.toLowerCase() === currentTrack.album_title?.toLowerCase() ||
-     albumContext.track_listing?.some(track => 
-       track.toLowerCase() === currentTrack.title?.toLowerCase()
-     ));
 
   return (
     <div style={{
@@ -515,27 +424,6 @@ export default function EnhancedTVDisplay() {
                 COLLECTION
               </div>
             ) : null}
-
-            {/* Album context indicator */}
-            {isFromAlbumContext && (
-              <div style={{
-                position: 'absolute',
-                bottom: '-15px',
-                left: '-15px',
-                background: '#22c55e',
-                color: 'white',
-                padding: '8px 16px',
-                borderRadius: '20px',
-                fontSize: '0.9rem',
-                fontWeight: 'bold',
-                boxShadow: '0 4px 15px rgba(0,0,0,0.4)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}>
-                🎯 CONTEXT
-              </div>
-            )}
           </div>
         </div>
 
@@ -616,73 +504,6 @@ export default function EnhancedTVDisplay() {
               </span>
             )}
           </div>
-
-          {/* Live indicator and service info */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '1rem',
-            fontSize: '1.2rem',
-            opacity: 0.8
-          }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem'
-            }}>
-              <div style={{
-                width: '12px',
-                height: '12px',
-                background: isConnected ? '#10b981' : '#ef4444',
-                borderRadius: '50%',
-                animation: isConnected ? 'pulse 2s infinite' : 'none'
-              }} />
-              <span>{isConnected ? 'Live' : 'Offline'}</span>
-            </div>
-            
-            {currentTrack.service_used && (
-              <div style={{ fontSize: '1rem', opacity: 0.6 }}>
-                • {currentTrack.service_used}
-              </div>
-            )}
-            
-            {currentTrack.recognition_confidence && (
-              <div style={{ fontSize: '1rem', opacity: 0.6 }}>
-                • {Math.round(currentTrack.recognition_confidence * 100)}% confidence
-              </div>
-            )}
-          </div>
-
-          {/* Album context info */}
-          {albumContext && (
-            <div style={{
-              background: 'rgba(34, 197, 94, 0.2)',
-              border: '1px solid rgba(34, 197, 94, 0.5)',
-              borderRadius: 12,
-              padding: '16px 20px',
-              fontSize: '1rem',
-              opacity: 0.9,
-              marginTop: '2rem'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span>🎯</span>
-                <strong>Album Context: {albumContext.artist} - {albumContext.title}</strong>
-                {isFromAlbumContext && (
-                  <span style={{ 
-                    background: '#22c55e',
-                    color: 'white',
-                    padding: '2px 8px',
-                    borderRadius: '10px',
-                    fontSize: '0.8rem',
-                    fontWeight: 'bold',
-                    marginLeft: '8px'
-                  }}>
-                    MATCHED
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
