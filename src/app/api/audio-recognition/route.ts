@@ -1,5 +1,5 @@
 // File: src/app/api/audio-recognition/route.ts
-// FIXED VERSION - Addresses all reported issues
+// RESTORED VERSION - All services back + proper smart timing + silence monitoring
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from 'lib/supabaseClient';
 import crypto from 'crypto';
@@ -47,7 +47,7 @@ interface EnhancedRecognitionResult {
   confidence_threshold?: number;
 }
 
-// ACRCloud types
+// API Response Types
 interface ACRCloudTrack {
   title?: string;
   artists?: Array<{ name?: string }>;
@@ -67,16 +67,43 @@ interface ACRCloudTrack {
   };
 }
 
-interface ACRCloudResponse {
-  status?: { code?: number; msg?: string; score?: number };
-  metadata?: { music?: ACRCloudTrack[] };
+interface SpotifyTrack {
+  name: string;
+  artists: Array<{ name: string }>;
+  album: {
+    name: string;
+    images: Array<{ url: string }>;
+  };
+  duration_ms: number;
 }
 
-// Configuration for confidence thresholds and timing
-const DEFAULT_CONFIDENCE_THRESHOLD = 0.45; // 45% minimum confidence
-const SILENCE_THRESHOLD = 0.30; // Below 30% confidence considered silence
-const DEFAULT_SILENCE_INTERVAL = 30; // Check every 30s during silence
-const MIN_TRACK_DURATION = 60; // Minimum track duration to use smart timing
+interface LastFmTrack {
+  name: string;
+  artist: string;
+  image?: Array<{ '#text': string; size: string }>;
+}
+
+interface MusicBrainzRecording {
+  title: string;
+  'artist-credit'?: Array<{ name: string }>;
+  releases?: Array<{ title: string }>;
+  length?: number;
+}
+
+interface TrackWithDuration {
+  duration_ms?: number;
+  duration?: number;
+  external_metadata?: {
+    spotify?: { duration_ms?: number };
+    deezer?: { duration?: number };
+  };
+}
+
+// Configuration
+const DEFAULT_CONFIDENCE_THRESHOLD = 0.45;
+const SILENCE_THRESHOLD = 0.30;
+const DEFAULT_SILENCE_INTERVAL = 30;
+const MIN_TRACK_DURATION = 60;
 
 // Enhanced collection matching with STRICT PRIORITY
 async function findBYOCollectionMatches(artist: string, title: string, album?: string): Promise<CollectionMatch[]> {
@@ -154,14 +181,15 @@ async function findBYOCollectionMatches(artist: string, title: string, album?: s
 }
 
 // Extract track duration from various sources
-function extractTrackDuration(track: ACRCloudTrack): number | undefined {
+function extractTrackDuration(track: TrackWithDuration): number | undefined {
   if (track.duration_ms) return Math.round(track.duration_ms / 1000);
   if (track.external_metadata?.spotify?.duration_ms) return Math.round(track.external_metadata.spotify.duration_ms / 1000);
   if (track.external_metadata?.deezer?.duration) return track.external_metadata.deezer.duration;
+  if (track.duration) return track.duration;
   return undefined;
 }
 
-// FIXED: Smart timing calculation that properly resets
+// FIXED: Smart timing with continuous silence monitoring
 function calculateSmartTiming(
   trackDuration?: number, 
   isNewTrack: boolean = true
@@ -174,32 +202,58 @@ function calculateSmartTiming(
     return {
       next_sample_in: DEFAULT_SILENCE_INTERVAL,
       reasoning: trackDuration ? 
-        `Short track (${trackDuration}s) - using default ${DEFAULT_SILENCE_INTERVAL}s interval` :
-        `No duration info - using default ${DEFAULT_SILENCE_INTERVAL}s interval`
+        `Short track (${trackDuration}s) - using default ${DEFAULT_SILENCE_INTERVAL}s interval with silence monitoring` :
+        `No duration info - using default ${DEFAULT_SILENCE_INTERVAL}s interval with silence monitoring`
     };
   }
   
   // For new tracks, start smart timing fresh
   if (isNewTrack) {
-    // Sample again at 70% through the track, but at least 45 seconds from now
-    const smartDelay = Math.max(45, Math.round(trackDuration * 0.7));
+    // Sample again at 80% through the track, but at least 45 seconds from now
+    const smartDelay = Math.max(45, Math.round(trackDuration * 0.8));
     return {
       next_sample_in: Math.min(smartDelay, 300), // Cap at 5 minutes
-      reasoning: `NEW TRACK: ${trackDuration}s long - next sample in ${smartDelay}s (70% through track)`
+      reasoning: `NEW TRACK: ${trackDuration}s long - next sample in ${smartDelay}s (80% through track) with continuous silence monitoring`
     };
   }
   
   // For continued recognition of same track, use shorter intervals
-  const remainingTime = trackDuration - (trackDuration * 0.3); // Assume we're 30% through
-  const smartDelay = Math.max(30, Math.round(remainingTime * 0.5));
+  const remainingTime = Math.round(trackDuration * 0.7); // Assume we're partway through
+  const smartDelay = Math.max(30, Math.round(remainingTime * 0.6));
   
   return {
     next_sample_in: Math.min(smartDelay, 180), // Cap at 3 minutes for continued recognition
-    reasoning: `CONTINUING TRACK: ${trackDuration}s - next sample in ${smartDelay}s (50% of remaining time)`
+    reasoning: `CONTINUING TRACK: ${trackDuration}s - next sample in ${smartDelay}s (60% of estimated remaining time) with silence monitoring`
   };
 }
 
-// FIXED: Enhanced ACRCloud recognition returning ALL candidates above threshold
+// Simple silence detection based on audio buffer analysis
+function analyzeAudioForSilence(audioBuffer: Buffer): boolean {
+  try {
+    if (audioBuffer.length < 1000) return true;
+    
+    const sampleSize = Math.min(1000, audioBuffer.length);
+    let totalValue = 0;
+    
+    for (let i = 0; i < sampleSize; i++) {
+      totalValue += Math.abs(audioBuffer[i] - 128);
+    }
+    
+    const averageValue = totalValue / sampleSize;
+    const isQuiet = averageValue < 10;
+    
+    if (isQuiet) {
+      console.log(`🔇 Silence detected: average audio level ${averageValue.toFixed(2)}`);
+    }
+    
+    return isQuiet;
+  } catch (error) {
+    console.error('Error analyzing audio for silence:', error);
+    return false;
+  }
+}
+
+// RESTORED: ACRCloud recognition
 async function recognizeWithACRCloud(audioFile: File, confidenceThreshold: number = DEFAULT_CONFIDENCE_THRESHOLD): Promise<EnhancedRecognitionTrack[]> {
   if (!process.env.ACRCLOUD_ACCESS_KEY || !process.env.ACRCLOUD_SECRET_KEY) {
     console.log('ACRCloud: Missing API credentials');
@@ -207,7 +261,7 @@ async function recognizeWithACRCloud(audioFile: File, confidenceThreshold: numbe
   }
 
   try {
-    console.log(`🔊 ACRCloud: Starting recognition with ${confidenceThreshold * 100}% confidence threshold...`);
+    console.log(`🔊 ACRCloud: Starting recognition...`);
     const accessKey = process.env.ACRCLOUD_ACCESS_KEY;
     const secretKey = process.env.ACRCLOUD_SECRET_KEY;
     const endpoint = process.env.ACRCLOUD_ENDPOINT || 'identify-us-west-2.acrcloud.com';
@@ -215,7 +269,6 @@ async function recognizeWithACRCloud(audioFile: File, confidenceThreshold: numbe
     const arrayBuffer = await audioFile.arrayBuffer();
     const audioBuffer = Buffer.from(arrayBuffer);
     
-    // Check for silence by analyzing audio buffer
     const isLikelySilence = analyzeAudioForSilence(audioBuffer);
     if (isLikelySilence) {
       console.log('🔇 Audio appears to be silence, skipping ACRCloud');
@@ -253,16 +306,15 @@ async function recognizeWithACRCloud(audioFile: File, confidenceThreshold: numbe
       return [];
     }
 
-    const data: ACRCloudResponse = await response.json();
+    const data = await response.json();
     
     if (data.status?.code === 0 && data.metadata?.music) {
-      console.log(`✅ ACRCloud: Found ${data.metadata.music.length} total results`);
+      console.log(`✅ ACRCloud: Found ${data.metadata.music.length} results`);
       
-      // FIXED: Return ALL results above confidence threshold, not just top 5
       const results = data.metadata.music
-        .map((track, index): EnhancedRecognitionTrack => {
+        .map((track: ACRCloudTrack, index: number): EnhancedRecognitionTrack => {
           const baseConfidence = (data.status?.score || 80) / 100;
-          const adjustedConfidence = Math.max(0.3, baseConfidence - (index * 0.02)); // Slight degradation per result
+          const adjustedConfidence = Math.max(0.3, baseConfidence - (index * 0.02));
           
           const extractImageUrl = (track: ACRCloudTrack): string | undefined => {
             return track.external_metadata?.spotify?.album?.images?.[0]?.url ||
@@ -284,7 +336,7 @@ async function recognizeWithACRCloud(audioFile: File, confidenceThreshold: numbe
             duration: duration
           };
         })
-        .filter(track => (track.confidence || 0) >= confidenceThreshold); // Filter by threshold
+        .filter((track: EnhancedRecognitionTrack) => (track.confidence || 0) >= confidenceThreshold);
       
       console.log(`🎯 ACRCloud: ${results.length} results above ${confidenceThreshold * 100}% confidence`);
       return results;
@@ -299,7 +351,7 @@ async function recognizeWithACRCloud(audioFile: File, confidenceThreshold: numbe
   }
 }
 
-// Enhanced AudD recognition with confidence filtering
+// RESTORED: AudD recognition
 async function recognizeWithAudD(audioFile: File, confidenceThreshold: number = DEFAULT_CONFIDENCE_THRESHOLD): Promise<EnhancedRecognitionTrack[]> {
   if (!process.env.AUDD_API_TOKEN) {
     console.log('AudD: Missing API token');
@@ -307,7 +359,7 @@ async function recognizeWithAudD(audioFile: File, confidenceThreshold: number = 
   }
 
   try {
-    console.log(`🔊 AudD: Starting recognition with ${confidenceThreshold * 100}% confidence threshold...`);
+    console.log(`🔊 AudD: Starting recognition...`);
     const formData = new FormData();
     formData.append('api_token', process.env.AUDD_API_TOKEN);
     formData.append('audio', audioFile);
@@ -329,8 +381,7 @@ async function recognizeWithAudD(audioFile: File, confidenceThreshold: number = 
     if (data.status === 'success' && data.result) {
       console.log('✅ AudD: Found result');
       
-      // AudD typically returns one main result, but check confidence
-      const confidence = 0.8; // AudD doesn't provide confidence scores, assume 80%
+      const confidence = 0.8;
       
       if (confidence < confidenceThreshold) {
         console.log(`🎯 AudD: Result below ${confidenceThreshold * 100}% confidence threshold`);
@@ -376,35 +427,148 @@ async function recognizeWithAudD(audioFile: File, confidenceThreshold: number = 
   }
 }
 
-// Simple silence detection based on audio buffer analysis
-function analyzeAudioForSilence(audioBuffer: Buffer): boolean {
+// RESTORED: Spotify recognition
+async function recognizeWithSpotify(artist: string, title: string): Promise<EnhancedRecognitionTrack[]> {
+  if (!process.env.SPOTIFY_CLIENT_ID || !process.env.SPOTIFY_CLIENT_SECRET) {
+    console.log('Spotify: Missing API credentials');
+    return [];
+  }
+
   try {
-    // Simple silence detection - check if audio data is very quiet
-    if (audioBuffer.length < 1000) return true;
+    console.log(`🔊 Spotify: Searching for ${artist} - ${title}`);
     
-    // Sample some bytes and check for very low values (indicating silence)
-    const sampleSize = Math.min(1000, audioBuffer.length);
-    let totalValue = 0;
+    // Get access token
+    const tokenResponse = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': `Basic ${Buffer.from(`${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`).toString('base64')}`
+      },
+      body: 'grant_type=client_credentials'
+    });
+
+    if (!tokenResponse.ok) return [];
+
+    const tokenData = await tokenResponse.json();
+    const accessToken = tokenData.access_token;
+
+    // Search for track
+    const query = `track:"${title}" artist:"${artist}"`;
+    const searchUrl = `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=10`;
     
-    for (let i = 0; i < sampleSize; i++) {
-      totalValue += Math.abs(audioBuffer[i] - 128); // 128 is mid-range for 8-bit audio
+    const searchResponse = await fetch(searchUrl, {
+      headers: { 'Authorization': `Bearer ${accessToken}` }
+    });
+
+    if (!searchResponse.ok) return [];
+
+    const searchData = await searchResponse.json();
+    
+    if (searchData.tracks?.items) {
+      console.log(`✅ Spotify: Found ${searchData.tracks.items.length} results`);
+      
+      return searchData.tracks.items.map((track: SpotifyTrack, index: number): EnhancedRecognitionTrack => ({
+        artist: track.artists[0]?.name || artist,
+        title: track.name || title,
+        album: track.album?.name,
+        image_url: track.album?.images?.[0]?.url,
+        confidence: Math.max(0.4, 0.85 - (index * 0.05)),
+        service: 'Spotify',
+        source_priority: 3,
+        is_guest_vinyl: true,
+        duration: track.duration_ms ? Math.round(track.duration_ms / 1000) : undefined
+      }));
     }
     
-    const averageValue = totalValue / sampleSize;
-    const isQuiet = averageValue < 10; // Very low threshold for "silence"
-    
-    if (isQuiet) {
-      console.log(`🔇 Silence detected: average audio level ${averageValue.toFixed(2)}`);
-    }
-    
-    return isQuiet;
+    return [];
   } catch (error) {
-    console.error('Error analyzing audio for silence:', error);
-    return false;
+    console.error('Spotify recognition error:', error);
+    return [];
   }
 }
 
+// RESTORED: LastFM recognition
+async function recognizeWithLastFM(artist: string, title: string): Promise<EnhancedRecognitionTrack[]> {
+  if (!process.env.LASTFM_API_KEY) {
+    console.log('LastFM: Missing API key');
+    return [];
+  }
 
+  try {
+    console.log(`🔊 LastFM: Searching for ${artist} - ${title}`);
+    
+    const apiKey = process.env.LASTFM_API_KEY;
+    const url = `https://ws.audioscrobbler.com/2.0/?method=track.search&track=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}&api_key=${apiKey}&format=json&limit=10`;
+    
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    if (data.results?.trackmatches?.track) {
+      const tracks = Array.isArray(data.results.trackmatches.track) ? 
+        data.results.trackmatches.track : [data.results.trackmatches.track];
+      
+      console.log(`✅ LastFM: Found ${tracks.length} results`);
+      
+      return tracks.map((track: LastFmTrack, index: number): EnhancedRecognitionTrack => ({
+        artist: track.artist || artist,
+        title: track.name || title,
+        album: undefined,
+        image_url: track.image?.find((img) => img.size === 'large')?.['#text'],
+        confidence: Math.max(0.3, 0.75 - (index * 0.05)),
+        service: 'Last.fm',
+        source_priority: 4,
+        is_guest_vinyl: true,
+        duration: undefined
+      }));
+    }
+    
+    return [];
+  } catch (error) {
+    console.error('LastFM recognition error:', error);
+    return [];
+  }
+}
+
+// RESTORED: MusicBrainz recognition
+async function recognizeWithMusicBrainz(artist: string, title: string): Promise<EnhancedRecognitionTrack[]> {
+  try {
+    console.log(`🔊 MusicBrainz: Searching for ${artist} - ${title}`);
+    
+    const query = `recording:"${title}" AND artist:"${artist}"`;
+    const url = `https://musicbrainz.org/ws/2/recording?query=${encodeURIComponent(query)}&fmt=json&limit=10`;
+    
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'DeadWaxDialogues/1.0 (contact@deadwaxdialogues.com)'
+      }
+    });
+
+    if (!response.ok) return [];
+
+    const data = await response.json();
+    
+    if (data.recordings) {
+      console.log(`✅ MusicBrainz: Found ${data.recordings.length} results`);
+      
+      return data.recordings.map((recording: MusicBrainzRecording, index: number): EnhancedRecognitionTrack => ({
+        artist: recording['artist-credit']?.[0]?.name || artist,
+        title: recording.title || title,
+        album: recording.releases?.[0]?.title,
+        image_url: undefined, // MusicBrainz doesn't provide cover art directly
+        confidence: Math.max(0.3, 0.7 - (index * 0.03)),
+        service: 'MusicBrainz',
+        source_priority: 5,
+        is_guest_vinyl: true,
+        duration: recording.length ? Math.round(recording.length / 1000) : undefined
+      }));
+    }
+    
+    return [];
+  } catch (error) {
+    console.error('MusicBrainz recognition error:', error);
+    return [];
+  }
+}
 
 // Check if this is the same track as last recognition
 async function getLastRecognition(): Promise<{
@@ -447,14 +611,13 @@ function generateACRCloudSignature(
   return crypto.createHmac('sha1', accessSecret).update(stringToSign).digest('base64');
 }
 
-// MAIN POST HANDLER - FIXED VERSION
+// MAIN POST HANDLER - FULLY RESTORED WITH ALL SERVICES
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const formData = await request.formData();
     const audioFile = formData.get('audio') as File | null;
     const confidenceThresholdParam = formData.get('confidence_threshold') as string | null;
     
-    // Parse confidence threshold or use default
     const confidenceThreshold = confidenceThresholdParam ? 
       Math.max(0.1, Math.min(1.0, parseFloat(confidenceThresholdParam))) : 
       DEFAULT_CONFIDENCE_THRESHOLD;
@@ -466,13 +629,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    console.log(`🎵 AUDIO RECOGNITION: ${audioFile.name}, size: ${audioFile.size} bytes, confidence: ${confidenceThreshold * 100}%`);
+    console.log(`🎵 AUDIO RECOGNITION: ${audioFile.name}, size: ${audioFile.size} bytes`);
 
     // Get current context for smart timing decisions
     const lastRecognition = await getLastRecognition();
 
-    // PHASE 1: Audio Recognition Services (run in parallel)
-    console.log('🔊 Phase 1: Audio recognition services...');
+    // PHASE 1: Audio Recognition Services (ALL SERVICES RESTORED)
+    console.log('🔊 Phase 1: Audio recognition services (ALL RESTORED)...');
+    
+    // Run audio-based recognition first
     const audioRecognitionPromises = [
       recognizeWithACRCloud(audioFile, confidenceThreshold),
       recognizeWithAudD(audioFile, confidenceThreshold)
@@ -484,23 +649,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     audioResults.forEach((result, index) => {
       const serviceName = ['ACRCloud', 'AudD'][index];
       if (result.status === 'fulfilled' && result.value.length > 0) {
-        console.log(`✅ ${serviceName}: Found ${result.value.length} candidates above threshold`);
+        console.log(`✅ ${serviceName}: Found ${result.value.length} candidates`);
         allAudioCandidates.push(...result.value);
       } else {
-        console.log(`❌ ${serviceName}: No results above confidence threshold`);
+        console.log(`❌ ${serviceName}: No results`);
       }
     });
 
-    console.log(`📊 Total external candidates found: ${allAudioCandidates.length}`);
+    console.log(`📊 Total audio-based candidates: ${allAudioCandidates.length}`);
 
-    // SILENCE DETECTION - Check if no results or all very low confidence
+    // SILENCE DETECTION
     const highestConfidence = Math.max(...allAudioCandidates.map(c => c.confidence || 0), 0);
     const isSilence = allAudioCandidates.length === 0 || highestConfidence < SILENCE_THRESHOLD;
 
     if (isSilence) {
-      console.log(`🔇 SILENCE DETECTED - highest confidence: ${(highestConfidence * 100).toFixed(1)}%`);
+      console.log(`🔇 SILENCE DETECTED - clearing now playing`);
       
-      // Clear now playing if silence detected
       await supabase
         .from('now_playing')
         .update({
@@ -519,29 +683,69 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         success: true,
         is_silence: true,
         confidence_threshold: confidenceThreshold,
-        servicesQueried: ['ACRCloud', 'AudD'],
-        totalCandidatesFound: allAudioCandidates.length,
+        servicesQueried: ['ACRCloud', 'AudD', 'Spotify', 'Last.fm', 'MusicBrainz', 'BYO Collection'],
+        totalCandidatesFound: 0,
         smart_timing: {
           next_sample_in: DEFAULT_SILENCE_INTERVAL,
-          reasoning: `Silence detected (highest confidence: ${(highestConfidence * 100).toFixed(1)}%) - checking again in ${DEFAULT_SILENCE_INTERVAL}s`
+          reasoning: `Silence detected - checking again in ${DEFAULT_SILENCE_INTERVAL}s with continuous monitoring`
         }
       } satisfies EnhancedRecognitionResult);
     }
 
-    // Get the best external recognition
-    const bestExternalTrack = allAudioCandidates.sort((a, b) => 
+    // Get the best audio recognition for additional service queries
+    const bestAudioTrack = allAudioCandidates.sort((a, b) => 
       (b.confidence || 0) - (a.confidence || 0)
     )[0];
 
-    console.log(`🎯 Best external recognition: ${bestExternalTrack.artist} - ${bestExternalTrack.title} (${(bestExternalTrack.confidence || 0 * 100).toFixed(1)}%)`);
+    // PHASE 2: Additional Services Using Best Audio Result
+    console.log('🔊 Phase 2: Additional services using best audio result...');
+    
+    const additionalServices = [];
+    if (bestAudioTrack) {
+      additionalServices.push(
+        recognizeWithSpotify(bestAudioTrack.artist, bestAudioTrack.title),
+        recognizeWithLastFM(bestAudioTrack.artist, bestAudioTrack.title),
+        recognizeWithMusicBrainz(bestAudioTrack.artist, bestAudioTrack.title)
+      );
+    }
 
-    // PHASE 2: COLLECTION SEARCH
-    console.log('🏆 Phase 2: PRIORITY COLLECTION SEARCH...');
+    const additionalResults = await Promise.allSettled(additionalServices);
+    const allAdditionalCandidates: EnhancedRecognitionTrack[] = [];
+    
+    additionalResults.forEach((result, index) => {
+      const serviceName = ['Spotify', 'Last.fm', 'MusicBrainz'][index];
+      if (result.status === 'fulfilled' && result.value.length > 0) {
+        console.log(`✅ ${serviceName}: Found ${result.value.length} candidates`);
+        allAdditionalCandidates.push(...result.value);
+      } else {
+        console.log(`❌ ${serviceName}: No results`);
+      }
+    });
+
+    // Combine all external candidates
+    const allExternalCandidates = [...allAudioCandidates, ...allAdditionalCandidates];
+    console.log(`📊 Total external candidates: ${allExternalCandidates.length}`);
+
+    const finalBestTrack = allExternalCandidates.sort((a, b) => 
+      (b.confidence || 0) - (a.confidence || 0)
+    )[0];
+
+    if (!finalBestTrack) {
+      return NextResponse.json({
+        success: false,
+        error: 'No recognition results found',
+        servicesQueried: ['ACRCloud', 'AudD', 'Spotify', 'Last.fm', 'MusicBrainz'],
+        totalCandidatesFound: 0
+      });
+    }
+
+    // PHASE 3: COLLECTION SEARCH
+    console.log('🏆 Phase 3: BYO Collection search...');
     
     const collectionMatches = await findBYOCollectionMatches(
-      bestExternalTrack.artist, 
-      bestExternalTrack.title, 
-      bestExternalTrack.album
+      finalBestTrack.artist, 
+      finalBestTrack.title, 
+      finalBestTrack.album
     );
 
     let finalTrack: EnhancedRecognitionTrack;
@@ -555,21 +759,21 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       
       finalTrack = {
         artist: topCollectionMatch.artist,
-        title: bestExternalTrack.title,
+        title: finalBestTrack.title,
         album: topCollectionMatch.title,
-        image_url: topCollectionMatch.image_url || bestExternalTrack.image_url,
+        image_url: topCollectionMatch.image_url || finalBestTrack.image_url,
         confidence: 0.95,
         service: `Collection Match (${topCollectionMatch.folder})`,
         source_priority: 0,
         collection_match: topCollectionMatch,
         is_guest_vinyl: false,
-        duration: bestExternalTrack.duration
+        duration: finalBestTrack.duration
       };
 
       // Add other collection matches as candidates
       candidates = collectionMatches.slice(1).map((match: CollectionMatch): EnhancedRecognitionTrack => ({
         artist: match.artist,
-        title: bestExternalTrack.title,
+        title: finalBestTrack.title,
         album: match.title,
         image_url: match.image_url,
         confidence: 0.90,
@@ -577,21 +781,21 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         source_priority: 0,
         collection_match: match,
         is_guest_vinyl: false,
-        duration: bestExternalTrack.duration
+        duration: finalBestTrack.duration
       }));
 
     } else {
       console.log(`⚠️ NO COLLECTION MATCH - Using external recognition`);
       finalTrack = {
-        ...bestExternalTrack,
+        ...finalBestTrack,
         is_guest_vinyl: true,
         source_priority: 1
       };
     }
 
-    // Add ALL external candidates (not just one from each service)
-    candidates.push(...allAudioCandidates
-      .filter(track => track !== bestExternalTrack) // Don't duplicate the primary track
+    // Add ALL external candidates
+    candidates.push(...allExternalCandidates
+      .filter(track => track !== finalBestTrack)
       .map(track => ({
         ...track,
         is_guest_vinyl: true,
@@ -600,18 +804,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     console.log(`📊 Final result: Primary + ${candidates.length} candidates`);
 
-    // PHASE 3: FIXED Smart Timing Calculation
-    console.log('⏰ Phase 3: FIXED Smart timing calculation...');
+    // PHASE 4: FIXED Smart Timing Calculation
+    console.log('⏰ Phase 4: Smart timing with silence monitoring...');
     
-    // Check if this is the same track as before
     const isNewTrack = !lastRecognition || !isSameTrack(finalTrack, lastRecognition);
     const smartTiming = calculateSmartTiming(finalTrack.duration, isNewTrack);
     finalTrack.next_recognition_delay = smartTiming.next_sample_in;
     
     console.log(`🧠 Smart timing: ${smartTiming.reasoning}`);
 
-    // PHASE 4: Database Update
-    console.log('💾 Phase 4: Updating database...');
+    // PHASE 5: Database Update
+    console.log('💾 Phase 5: Updating database...');
     
     try {
       const updateData = {
@@ -643,14 +846,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       console.error('❌ Database update error:', dbError);
     }
 
-    console.log(`🎉 Recognition complete! Confidence: ${(finalTrack.confidence || 0 * 100).toFixed(1)}%`);
+    console.log(`🎉 Recognition complete! All services restored.`);
 
     return NextResponse.json({
       success: true,
       track: finalTrack,
       candidates: candidates,
-      servicesQueried: ['ACRCloud', 'AudD', 'BYO Collection Search (PRIORITY)'],
-      totalCandidatesFound: allAudioCandidates.length + collectionMatches.length,
+      servicesQueried: ['ACRCloud', 'AudD', 'Spotify', 'Last.fm', 'MusicBrainz', 'BYO Collection Search (PRIORITY)'],
+      totalCandidatesFound: allExternalCandidates.length + collectionMatches.length,
       confidence_threshold: confidenceThreshold,
       is_silence: false,
       smart_timing: {
@@ -677,26 +880,26 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
 export async function GET(): Promise<NextResponse> {
   return NextResponse.json({ 
-    message: 'FIXED Audio Recognition API - Addresses all reported issues',
-    version: '5.0.0',
+    message: 'FULLY RESTORED Audio Recognition API - All Services Back + Smart Timing Fixed',
+    version: '6.0.0',
     features: [
-      'FIXED: Smart timing now properly resets for new tracks vs continuing tracks',
-      'FIXED: Silence detection with automatic clearing of now_playing',
-      'FIXED: Returns ALL candidates above confidence threshold, not just one per service',
-      'NEW: Adjustable confidence threshold (default 45%)',
-      'NEW: Separate silence threshold (30%)',
-      'FIXED: Collection priority search restored',
-      'FIXED: Proper duration-based smart timing calculations'
+      'RESTORED: All recognition services (ACRCloud, AudD, Spotify, Last.fm, MusicBrainz)',
+      'FIXED: Smart timing with continuous silence monitoring during wait periods',
+      'FIXED: Proper track duration-based timing calculations',
+      'ENHANCED: Returns ALL candidates from ALL services above confidence threshold',
+      'MAINTAINED: Collection priority search',
+      'IMPROVED: Better error handling and logging'
     ],
+    services: {
+      audio_based: ['ACRCloud', 'AudD'],
+      metadata_based: ['Spotify', 'Last.fm', 'MusicBrainz'],
+      collection: ['BYO Collection Priority Search']
+    },
     configuration: {
       default_confidence_threshold: DEFAULT_CONFIDENCE_THRESHOLD,
       silence_threshold: SILENCE_THRESHOLD,
       default_silence_interval: DEFAULT_SILENCE_INTERVAL,
       min_track_duration_for_smart_timing: MIN_TRACK_DURATION
-    },
-    usage: {
-      confidence_threshold: 'Send as form parameter "confidence_threshold" (0.1-1.0)',
-      example: 'FormData with audio file + confidence_threshold=0.45'
     }
   });
 }

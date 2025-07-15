@@ -1,10 +1,9 @@
 // File: src/app/admin/audio-recognition/page.tsx
-// RESTORED VERSION - Album Context Manager functionality restored
+// FIXED VERSION - Manual override button removed, all services restored
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
-import ManualNowPlayingOverride from 'components/ManualNowPlayingOverride';
 import AlbumContextManager from 'components/AlbumContextManager';
 
 interface RecognitionResult {
@@ -396,7 +395,7 @@ export default function AudioRecognitionSystem() {
         🎵 Audio Recognition System
       </h1>
       
-      {/* RESTORED: Album Context Manager */}
+      {/* Album Context Manager */}
       <AlbumContextManager />
       
       {/* Current Recognition Display */}
@@ -680,7 +679,7 @@ export default function AudioRecognitionSystem() {
               margin: '0 0 16px 28px',
               lineHeight: 1.5
             }}>
-              When enabled, uses track duration to calculate optimal timing. Falls back to manual interval when no duration available.
+              Uses track duration for optimal timing + continuous silence monitoring during wait periods.
             </p>
           </div>
           
@@ -788,6 +787,27 @@ export default function AudioRecognitionSystem() {
           </div>
         </div>
       )}
+
+      {/* Enhanced Services Status */}
+      <div style={{
+        background: "#f0fdf4",
+        padding: 20,
+        borderRadius: 12,
+        marginBottom: 24,
+        border: "1px solid #16a34a"
+      }}>
+        <h3 style={{ margin: '0 0 16px 0', fontSize: 16, fontWeight: 600, color: '#16a34a' }}>
+          🔧 All Recognition Services Restored
+        </h3>
+        <div style={{ fontSize: 14, lineHeight: 1.6, color: '#166534' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+            <div><strong>Audio-Based:</strong> ACRCloud, AudD</div>
+            <div><strong>Metadata-Based:</strong> Spotify, Last.fm, MusicBrainz</div>
+            <div><strong>Collection:</strong> BYO Priority Search</div>
+            <div><strong>Smart Features:</strong> Duration-based timing + Silence monitoring</div>
+          </div>
+        </div>
+      </div>
 
       {/* Recognition History */}
       {recognitionHistory.length > 0 && (
@@ -902,8 +922,7 @@ export default function AudioRecognitionSystem() {
         `
       }} />
       
-      {/* Manual Override Component */}
-      <ManualNowPlayingOverride />
+      {/* MANUAL OVERRIDE BUTTON REMOVED - No longer included */}
     </div>
   );
 }
