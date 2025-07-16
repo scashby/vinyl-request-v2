@@ -1,5 +1,5 @@
 // File: src/app/admin/audio-recognition/page.tsx
-// FIXED VERSION - Manual override button removed, all services restored
+// CLEANED VERSION - Removed unnecessary "All Recognition Services Restored" section
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -679,7 +679,7 @@ export default function AudioRecognitionSystem() {
               margin: '0 0 16px 28px',
               lineHeight: 1.5
             }}>
-              Uses track duration for optimal timing + continuous silence monitoring during wait periods.
+              Uses track duration for optimal timing with silence monitoring during wait periods.
             </p>
           </div>
           
@@ -787,27 +787,6 @@ export default function AudioRecognitionSystem() {
           </div>
         </div>
       )}
-
-      {/* Enhanced Services Status */}
-      <div style={{
-        background: "#f0fdf4",
-        padding: 20,
-        borderRadius: 12,
-        marginBottom: 24,
-        border: "1px solid #16a34a"
-      }}>
-        <h3 style={{ margin: '0 0 16px 0', fontSize: 16, fontWeight: 600, color: '#16a34a' }}>
-          🔧 All Recognition Services Restored
-        </h3>
-        <div style={{ fontSize: 14, lineHeight: 1.6, color: '#166534' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
-            <div><strong>Audio-Based:</strong> ACRCloud, AudD</div>
-            <div><strong>Metadata-Based:</strong> Spotify, Last.fm, MusicBrainz</div>
-            <div><strong>Collection:</strong> BYO Priority Search</div>
-            <div><strong>Smart Features:</strong> Duration-based timing + Silence monitoring</div>
-          </div>
-        </div>
-      </div>
 
       {/* Recognition History */}
       {recognitionHistory.length > 0 && (
@@ -921,8 +900,6 @@ export default function AudioRecognitionSystem() {
           }
         `
       }} />
-      
-      {/* MANUAL OVERRIDE BUTTON REMOVED - No longer included */}
     </div>
   );
 }

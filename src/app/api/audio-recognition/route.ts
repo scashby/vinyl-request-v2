@@ -1,5 +1,5 @@
 // File: src/app/api/audio-recognition/route.ts
-// RESTORED VERSION - All services back + proper smart timing + silence monitoring
+// FIXED VERSION - Smart timing + album context validation + ALL SERVICES RESTORED
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from 'lib/supabaseClient';
 import crypto from 'crypto';
@@ -47,7 +47,16 @@ interface EnhancedRecognitionResult {
   confidence_threshold?: number;
 }
 
-// API Response Types
+interface AlbumContext {
+  id: number;
+  artist: string;
+  title: string;
+  track_listing?: string[];
+  collection_id?: number;
+  created_at: string;
+}
+
+// API Response Types for External Services
 interface ACRCloudTrack {
   title?: string;
   artists?: Array<{ name?: string }>;
@@ -104,6 +113,62 @@ const DEFAULT_CONFIDENCE_THRESHOLD = 0.45;
 const SILENCE_THRESHOLD = 0.30;
 const DEFAULT_SILENCE_INTERVAL = 30;
 const MIN_TRACK_DURATION = 60;
+
+// Get current album context for track validation
+async function getCurrentAlbumContext(): Promise<AlbumContext | null> {
+  try {
+    const { data } = await supabase
+      .from('album_context')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (!data) return null;
+
+    // Check if context is still valid (less than 2 hours old)
+    const contextAge = Date.now() - new Date(data.created_at).getTime();
+    const maxAge = 2 * 60 * 60 * 1000; // 2 hours
+
+    if (contextAge > maxAge) {
+      // Clear expired context
+      await supabase.from('album_context').delete().eq('id', data.id);
+      return null;
+    }
+
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+// Validate if recognized track matches expected next track in album context
+function validateTrackAgainstAlbumContext(
+  recognizedTrack: RecognitionTrack,
+  albumContext: AlbumContext | null
+): boolean {
+  if (!albumContext || !albumContext.track_listing || albumContext.track_listing.length === 0) {
+    return false;
+  }
+
+  // Simple track title matching (case-insensitive, normalized)
+  const normalizeTitle = (title: string): string => 
+    title.toLowerCase().trim().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ');
+
+  const recognizedTitle = normalizeTitle(recognizedTrack.title);
+
+  return albumContext.track_listing.some(contextTrack => {
+    const contextTitle = normalizeTitle(contextTrack);
+    
+    // Check for exact match or significant overlap
+    return contextTitle.includes(recognizedTitle) || 
+           recognizedTitle.includes(contextTitle) ||
+           // Also check for substring matches (at least 70% overlap)
+           (contextTitle.length > 3 && recognizedTitle.length > 3 && 
+            (contextTitle.includes(recognizedTitle.substring(0, Math.floor(recognizedTitle.length * 0.7))) ||
+             recognizedTitle.includes(contextTitle.substring(0, Math.floor(contextTitle.length * 0.7)))));
+  });
+}
 
 // Enhanced collection matching with STRICT PRIORITY
 async function findBYOCollectionMatches(artist: string, title: string, album?: string): Promise<CollectionMatch[]> {
@@ -189,7 +254,7 @@ function extractTrackDuration(track: TrackWithDuration): number | undefined {
   return undefined;
 }
 
-// FIXED: Smart timing with continuous silence monitoring
+// FIXED: Smart timing calculation with proper application
 function calculateSmartTiming(
   trackDuration?: number, 
   isNewTrack: boolean = true
@@ -202,8 +267,8 @@ function calculateSmartTiming(
     return {
       next_sample_in: DEFAULT_SILENCE_INTERVAL,
       reasoning: trackDuration ? 
-        `Short track (${trackDuration}s) - using default ${DEFAULT_SILENCE_INTERVAL}s interval with silence monitoring` :
-        `No duration info - using default ${DEFAULT_SILENCE_INTERVAL}s interval with silence monitoring`
+        `Short track (${trackDuration}s) - using default ${DEFAULT_SILENCE_INTERVAL}s interval` :
+        `No duration info - using default ${DEFAULT_SILENCE_INTERVAL}s interval`
     };
   }
   
@@ -213,7 +278,7 @@ function calculateSmartTiming(
     const smartDelay = Math.max(45, Math.round(trackDuration * 0.8));
     return {
       next_sample_in: Math.min(smartDelay, 300), // Cap at 5 minutes
-      reasoning: `NEW TRACK: ${trackDuration}s long - next sample in ${smartDelay}s (80% through track) with continuous silence monitoring`
+      reasoning: `NEW TRACK: ${trackDuration}s long - next sample in ${smartDelay}s (80% through track)`
     };
   }
   
@@ -223,7 +288,7 @@ function calculateSmartTiming(
   
   return {
     next_sample_in: Math.min(smartDelay, 180), // Cap at 3 minutes for continued recognition
-    reasoning: `CONTINUING TRACK: ${trackDuration}s - next sample in ${smartDelay}s (60% of estimated remaining time) with silence monitoring`
+    reasoning: `CONTINUING TRACK: ${trackDuration}s - next sample in ${smartDelay}s (60% of estimated remaining time)`
   };
 }
 
@@ -611,7 +676,7 @@ function generateACRCloudSignature(
   return crypto.createHmac('sha1', accessSecret).update(stringToSign).digest('base64');
 }
 
-// MAIN POST HANDLER - FULLY RESTORED WITH ALL SERVICES
+// MAIN POST HANDLER - FIXED VERSION WITH ALL SERVICES RESTORED
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const formData = await request.formData();
@@ -631,13 +696,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     console.log(`🎵 AUDIO RECOGNITION: ${audioFile.name}, size: ${audioFile.size} bytes`);
 
-    // Get current context for smart timing decisions
-    const lastRecognition = await getLastRecognition();
+    // Get current context and last recognition
+    const [albumContext, lastRecognition] = await Promise.all([
+      getCurrentAlbumContext(),
+      getLastRecognition()
+    ]);
 
-    // PHASE 1: Audio Recognition Services (ALL SERVICES RESTORED)
-    console.log('🔊 Phase 1: Audio recognition services (ALL RESTORED)...');
+    console.log(`📋 Album context: ${albumContext ? `${albumContext.artist} - ${albumContext.title}` : 'None'}`);
+
+    // PHASE 1: Audio Recognition Services
+    console.log('🔊 Phase 1: Audio recognition services...');
     
-    // Run audio-based recognition first
     const audioRecognitionPromises = [
       recognizeWithACRCloud(audioFile, confidenceThreshold),
       recognizeWithAudD(audioFile, confidenceThreshold)
@@ -687,27 +756,32 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         totalCandidatesFound: 0,
         smart_timing: {
           next_sample_in: DEFAULT_SILENCE_INTERVAL,
-          reasoning: `Silence detected - checking again in ${DEFAULT_SILENCE_INTERVAL}s with continuous monitoring`
+          reasoning: `Silence detected - checking again in ${DEFAULT_SILENCE_INTERVAL}s`
         }
       } satisfies EnhancedRecognitionResult);
     }
 
-    // Get the best audio recognition for additional service queries
     const bestAudioTrack = allAudioCandidates.sort((a, b) => 
       (b.confidence || 0) - (a.confidence || 0)
     )[0];
 
-    // PHASE 2: Additional Services Using Best Audio Result
+    if (!bestAudioTrack) {
+      return NextResponse.json({
+        success: false,
+        error: 'No recognition results found',
+        servicesQueried: ['ACRCloud', 'AudD'],
+        totalCandidatesFound: 0
+      });
+    }
+
+    // PHASE 2: Additional Services Using Best Audio Result (RESTORED)
     console.log('🔊 Phase 2: Additional services using best audio result...');
     
-    const additionalServices = [];
-    if (bestAudioTrack) {
-      additionalServices.push(
-        recognizeWithSpotify(bestAudioTrack.artist, bestAudioTrack.title),
-        recognizeWithLastFM(bestAudioTrack.artist, bestAudioTrack.title),
-        recognizeWithMusicBrainz(bestAudioTrack.artist, bestAudioTrack.title)
-      );
-    }
+    const additionalServices = [
+      recognizeWithSpotify(bestAudioTrack.artist, bestAudioTrack.title),
+      recognizeWithLastFM(bestAudioTrack.artist, bestAudioTrack.title),
+      recognizeWithMusicBrainz(bestAudioTrack.artist, bestAudioTrack.title)
+    ];
 
     const additionalResults = await Promise.allSettled(additionalServices);
     const allAdditionalCandidates: EnhancedRecognitionTrack[] = [];
@@ -728,93 +802,125 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const finalBestTrack = allExternalCandidates.sort((a, b) => 
       (b.confidence || 0) - (a.confidence || 0)
-    )[0];
+    )[0] || bestAudioTrack;
 
-    if (!finalBestTrack) {
-      return NextResponse.json({
-        success: false,
-        error: 'No recognition results found',
-        servicesQueried: ['ACRCloud', 'AudD', 'Spotify', 'Last.fm', 'MusicBrainz'],
-        totalCandidatesFound: 0
-      });
-    }
-
-    // PHASE 3: COLLECTION SEARCH
-    console.log('🏆 Phase 3: BYO Collection search...');
+    // PHASE 3: Album Context Validation
+    console.log('🎯 Phase 3: Album context validation...');
     
-    const collectionMatches = await findBYOCollectionMatches(
-      finalBestTrack.artist, 
-      finalBestTrack.title, 
-      finalBestTrack.album
-    );
-
     let finalTrack: EnhancedRecognitionTrack;
     let candidates: EnhancedRecognitionTrack[] = [];
+    let isFromAlbumContext = false;
 
-    // Collection takes priority
-    if (collectionMatches.length > 0) {
-      console.log(`🎉 COLLECTION MATCH FOUND!`);
+    // Check if the recognized track matches the current album context
+    if (albumContext && validateTrackAgainstAlbumContext(finalBestTrack, albumContext)) {
+      console.log(`🎉 ALBUM CONTEXT MATCH: ${finalBestTrack.title} found in ${albumContext.title}`);
       
-      const topCollectionMatch = collectionMatches[0];
+      // Get collection data if available
+      let collectionData = null;
+      if (albumContext.collection_id) {
+        const { data } = await supabase
+          .from('collection')
+          .select('*')
+          .eq('id', albumContext.collection_id)
+          .single();
+        collectionData = data;
+      }
       
-      finalTrack = {
-        artist: topCollectionMatch.artist,
-        title: finalBestTrack.title,
-        album: topCollectionMatch.title,
-        image_url: topCollectionMatch.image_url || finalBestTrack.image_url,
-        confidence: 0.95,
-        service: `Collection Match (${topCollectionMatch.folder})`,
-        source_priority: 0,
-        collection_match: topCollectionMatch,
-        is_guest_vinyl: false,
-        duration: finalBestTrack.duration
-      };
-
-      // Add other collection matches as candidates
-      candidates = collectionMatches.slice(1).map((match: CollectionMatch): EnhancedRecognitionTrack => ({
-        artist: match.artist,
-        title: finalBestTrack.title,
-        album: match.title,
-        image_url: match.image_url,
-        confidence: 0.90,
-        service: `Collection Match (${match.folder})`,
-        source_priority: 0,
-        collection_match: match,
-        is_guest_vinyl: false,
-        duration: finalBestTrack.duration
-      }));
-
-    } else {
-      console.log(`⚠️ NO COLLECTION MATCH - Using external recognition`);
       finalTrack = {
         ...finalBestTrack,
-        is_guest_vinyl: true,
-        source_priority: 1
+        album: albumContext.title,
+        collection_match: collectionData ? {
+          id: collectionData.id,
+          artist: collectionData.artist,
+          title: collectionData.title,
+          year: collectionData.year,
+          image_url: collectionData.image_url,
+          folder: collectionData.folder
+        } : undefined,
+        is_guest_vinyl: false,
+        service: `Album Context Match`,
+        confidence: 0.95,
+        source_priority: 0
       };
-    }
+      
+      isFromAlbumContext = true;
+      candidates = allExternalCandidates.filter(track => track !== finalBestTrack);
+      
+    } else {
+      // PHASE 4: Collection Search (only if not from album context)
+      console.log('🏆 Phase 4: BYO Collection search...');
+      
+      const collectionMatches = await findBYOCollectionMatches(
+        finalBestTrack.artist, 
+        finalBestTrack.title, 
+        finalBestTrack.album
+      );
 
-    // Add ALL external candidates
-    candidates.push(...allExternalCandidates
-      .filter(track => track !== finalBestTrack)
-      .map(track => ({
-        ...track,
-        is_guest_vinyl: true,
-        source_priority: 10
-      })));
+      if (collectionMatches.length > 0) {
+        console.log(`🎉 COLLECTION MATCH FOUND!`);
+        
+        const topCollectionMatch = collectionMatches[0];
+        
+        finalTrack = {
+          artist: topCollectionMatch.artist,
+          title: finalBestTrack.title,
+          album: topCollectionMatch.title,
+          image_url: topCollectionMatch.image_url || finalBestTrack.image_url,
+          confidence: 0.95,
+          service: `Collection Match (${topCollectionMatch.folder})`,
+          source_priority: 0,
+          collection_match: topCollectionMatch,
+          is_guest_vinyl: false,
+          duration: finalBestTrack.duration
+        };
+
+        // Add other collection matches as candidates
+        candidates = collectionMatches.slice(1).map((match: CollectionMatch): EnhancedRecognitionTrack => ({
+          artist: match.artist,
+          title: finalBestTrack.title,
+          album: match.title,
+          image_url: match.image_url,
+          confidence: 0.90,
+          service: `Collection Match (${match.folder})`,
+          source_priority: 0,
+          collection_match: match,
+          is_guest_vinyl: false,
+          duration: finalBestTrack.duration
+        }));
+
+      } else {
+        console.log(`⚠️ NO COLLECTION MATCH - Using external recognition`);
+        finalTrack = {
+          ...finalBestTrack,
+          is_guest_vinyl: true,
+          source_priority: 1
+        };
+      }
+
+      // Add ALL external candidates
+      candidates.push(...allExternalCandidates
+        .filter(track => track !== finalBestTrack)
+        .map(track => ({
+          ...track,
+          is_guest_vinyl: true,
+          source_priority: 10
+        })));
+    }
 
     console.log(`📊 Final result: Primary + ${candidates.length} candidates`);
 
-    // PHASE 4: FIXED Smart Timing Calculation
-    console.log('⏰ Phase 4: Smart timing with silence monitoring...');
+    // PHASE 5: FIXED Smart Timing Calculation and Application
+    console.log('⏰ Phase 5: Smart timing calculation and application...');
     
     const isNewTrack = !lastRecognition || !isSameTrack(finalTrack, lastRecognition);
     const smartTiming = calculateSmartTiming(finalTrack.duration, isNewTrack);
-    finalTrack.next_recognition_delay = smartTiming.next_sample_in;
+    const nextRecognitionDelay = smartTiming.next_sample_in;
     
     console.log(`🧠 Smart timing: ${smartTiming.reasoning}`);
+    console.log(`⏱️ APPLYING smart timing: ${nextRecognitionDelay}s`);
 
-    // PHASE 5: Database Update
-    console.log('💾 Phase 5: Updating database...');
+    // PHASE 6: Database Update with FIXED smart timing application
+    console.log('💾 Phase 6: Updating database with smart timing...');
     
     try {
       const updateData = {
@@ -829,36 +935,39 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         service_used: finalTrack.service || 'Multi-Service',
         updated_at: new Date().toISOString(),
         track_duration: finalTrack.duration || null,
-        next_recognition_in: finalTrack.next_recognition_delay || DEFAULT_SILENCE_INTERVAL
+        next_recognition_in: nextRecognitionDelay // FIXED: Actually applying the smart timing
       };
+
+      console.log(`💾 Updating database with next_recognition_in: ${nextRecognitionDelay}s`);
 
       const { error: nowPlayingError } = await supabase
         .from('now_playing')
         .upsert(updateData);
 
       if (nowPlayingError) {
+        console.error('❌ Database update error:', nowPlayingError);
         throw nowPlayingError;
       }
 
-      console.log('✅ Database updated successfully');
+      console.log('✅ Database updated successfully with smart timing applied');
       
     } catch (dbError) {
       console.error('❌ Database update error:', dbError);
     }
 
-    console.log(`🎉 Recognition complete! All services restored.`);
+    console.log(`🎉 Recognition complete! Smart timing: ${nextRecognitionDelay}s`);
 
     return NextResponse.json({
       success: true,
       track: finalTrack,
       candidates: candidates,
-      servicesQueried: ['ACRCloud', 'AudD', 'Spotify', 'Last.fm', 'MusicBrainz', 'BYO Collection Search (PRIORITY)'],
-      totalCandidatesFound: allExternalCandidates.length + collectionMatches.length,
+      servicesQueried: ['ACRCloud', 'AudD', 'Spotify', 'Last.fm', 'MusicBrainz', isFromAlbumContext ? 'Album Context Match' : 'BYO Collection Search'],
+      totalCandidatesFound: allExternalCandidates.length,
       confidence_threshold: confidenceThreshold,
       is_silence: false,
       smart_timing: {
         track_duration: finalTrack.duration,
-        next_sample_in: finalTrack.next_recognition_delay,
+        next_sample_in: nextRecognitionDelay,
         reasoning: smartTiming.reasoning
       }
     } satisfies EnhancedRecognitionResult);
@@ -880,19 +989,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
 export async function GET(): Promise<NextResponse> {
   return NextResponse.json({ 
-    message: 'FULLY RESTORED Audio Recognition API - All Services Back + Smart Timing Fixed',
-    version: '6.0.0',
+    message: 'Audio Recognition API - Fixed with All Services Restored',
+    version: '7.1.0',
     features: [
+      'FIXED: Smart timing calculation and proper application to database',
+      'FIXED: Album context validation - only matches if track actually found in album track listing',
       'RESTORED: All recognition services (ACRCloud, AudD, Spotify, Last.fm, MusicBrainz)',
-      'FIXED: Smart timing with continuous silence monitoring during wait periods',
-      'FIXED: Proper track duration-based timing calculations',
-      'ENHANCED: Returns ALL candidates from ALL services above confidence threshold',
-      'MAINTAINED: Collection priority search',
-      'IMPROVED: Better error handling and logging'
+      'Collection priority search for owned albums',
+      'Enhanced error handling and logging'
     ],
     services: {
       audio_based: ['ACRCloud', 'AudD'],
       metadata_based: ['Spotify', 'Last.fm', 'MusicBrainz'],
+      context_based: ['Album Context Validation'],
       collection: ['BYO Collection Priority Search']
     },
     configuration: {
