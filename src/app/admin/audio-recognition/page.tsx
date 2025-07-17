@@ -221,7 +221,21 @@ export default function FixedAudioRecognitionSystem() {
       return;
     }
 
-    console.log(`🎤 Starting recording for ${sampleDuration} seconds...`);
+    // FIXED: Check if audio stream is active
+    const audioTracks = streamRef.current.getAudioTracks();
+    if (audioTracks.length === 0 || audioTracks[0].readyState !== 'live') {
+      console.error('Audio stream not ready or active');
+      setStatus('❌ Audio stream not ready');
+      setTimeout(() => {
+        if (isListeningRef.current) {
+          console.log('🔄 Retrying audio capture...');
+          recordAndAnalyze(onComplete);
+        }
+      }, 1000);
+      return;
+    }
+
+    console.log(`🎤 Starting recording for ${sampleDuration} seconds... (Stream ready: ${audioTracks[0].readyState})`);
     
     const mediaRecorder = new MediaRecorder(streamRef.current, {
       mimeType: 'audio/webm;codecs=opus'
@@ -249,6 +263,7 @@ export default function FixedAudioRecognitionSystem() {
     mediaRecorder.ondataavailable = (event: BlobEvent) => {
       if (event.data.size > 0) {
         audioChunksRef.current.push(event.data);
+        console.log(`📊 Audio chunk received: ${event.data.size} bytes`);
       }
     };
 
@@ -263,11 +278,16 @@ export default function FixedAudioRecognitionSystem() {
       }
       
       const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-      console.log(`📁 Audio blob size: ${audioBlob.size} bytes`);
+      console.log(`📁 Audio blob created: ${audioBlob.size} bytes (${audioChunksRef.current.length} chunks)`);
       
       if (audioBlob.size === 0) {
-        setStatus('❌ No audio data captured');
-        onComplete();
+        setStatus('❌ No audio data captured - retrying...');
+        // FIXED: Retry if no audio captured
+        setTimeout(() => {
+          if (isListeningRef.current) {
+            recordAndAnalyze(onComplete);
+          }
+        }, 1000);
         return;
       }
       
@@ -279,25 +299,38 @@ export default function FixedAudioRecognitionSystem() {
 
     mediaRecorder.onerror = (event) => {
       console.error('❌ MediaRecorder error:', event);
-      setStatus('❌ Recording error occurred');
+      setStatus('❌ Recording error occurred - retrying...');
       setIsRecording(false);
       setRecordingProgress(0);
-      onComplete();
+      // FIXED: Retry on error
+      setTimeout(() => {
+        if (isListeningRef.current) {
+          recordAndAnalyze(onComplete);
+        }
+      }, 2000);
     };
 
-    setStatus(`🎤 Recording ${sampleDuration}s audio sample...`);
-    mediaRecorder.start();
-
-    // Stop recording after specified duration
+    setStatus(`🎤 Recording ${sampleDuration}s audio sample (attempt #${recognitionCount + 1})...`);
+    
+    // FIXED: Add small delay before starting recording to ensure stream is fully ready
     setTimeout(() => {
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-        mediaRecorderRef.current.stop();
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'inactive') {
+        mediaRecorder.start();
+
+        // Stop recording after specified duration
+        setTimeout(() => {
+          if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+            console.log('⏹️ Stopping recording after timeout');
+            mediaRecorderRef.current.stop();
+          }
+        }, sampleDuration * 1000);
       }
-    }, sampleDuration * 1000);
-  }, [sampleDuration, analyzeAudio]);
+    }, 100); // Small delay to ensure everything is ready
+  }, [sampleDuration, analyzeAudio, recognitionCount]);
 
   const startListening = async (): Promise<void> => {
     try {
+      console.log('🎤 Requesting microphone access...');
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
           echoCancellation: false,
@@ -308,6 +341,11 @@ export default function FixedAudioRecognitionSystem() {
       });
       
       streamRef.current = stream;
+      
+      // FIXED: Wait for audio tracks to be ready
+      const audioTracks = stream.getAudioTracks();
+      console.log(`🎤 Audio tracks: ${audioTracks.length}, State: ${audioTracks[0]?.readyState}`);
+      
       setIsListening(true);
       isListeningRef.current = true;
       setRecognitionCount(0);
@@ -316,14 +354,23 @@ export default function FixedAudioRecognitionSystem() {
       
       if (recognitionMode === 'manual') {
         setStatus('🎤 Manual mode: Recording single sample...');
-        recordAndAnalyze(() => {
-          setIsListening(false);
-          isListeningRef.current = false;
-        });
+        // Small delay even for manual mode
+        setTimeout(() => {
+          recordAndAnalyze(() => {
+            setIsListening(false);
+            isListeningRef.current = false;
+          });
+        }, 500);
       } else {
-        setStatus('🔄 Starting continuous recognition...');
-        // FIXED: Start immediately, no initial countdown
-        startContinuous();
+        setStatus('🔄 Preparing continuous recognition...');
+        // FIXED: Add small delay to let audio stream stabilize before first sample
+        setTimeout(() => {
+          if (isListeningRef.current) {
+            console.log('🎤 Audio stream stabilized, starting first recognition...');
+            setStatus('🎤 Starting first audio sample...');
+            startContinuous();
+          }
+        }, 1000); // 1 second delay to let audio stream stabilize
       }
 
     } catch (error: unknown) {
