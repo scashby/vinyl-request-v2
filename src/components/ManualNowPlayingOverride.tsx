@@ -1,5 +1,5 @@
 // File: src/components/ManualNowPlayingOverride.tsx
-// FIXED VERSION - Restored working functionality with proper error handling
+// ENHANCED VERSION - Added force TV update and better error handling
 "use client";
 
 import { useState } from 'react';
@@ -29,7 +29,7 @@ interface ServiceTestResult {
   details?: unknown;
 }
 
-export default function ManualNowPlayingOverride() {
+export default function EnhancedManualNowPlayingOverride() {
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [formData, setFormData] = useState<FormData>({
     artist: '',
@@ -71,6 +71,37 @@ export default function ManualNowPlayingOverride() {
     setSearchResults([]);
   };
 
+  // ENHANCED: Force TV display update
+  const forceTVUpdate = async (): Promise<void> => {
+    try {
+      setStatus('🔄 Forcing TV display update...');
+      
+      // Broadcast update to all real-time listeners
+      await supabase.channel('now_playing_updates').send({
+        type: 'broadcast',
+        event: 'now_playing_update',
+        payload: { 
+          forced_update: true,
+          timestamp: new Date().toISOString()
+        }
+      });
+      
+      // Also update the updated_at timestamp to trigger postgres changes
+      await supabase
+        .from('now_playing')
+        .update({
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', 1);
+      
+      setStatus('✅ TV display update broadcasted!');
+      setTimeout(() => setStatus(''), 2000);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      setStatus(`❌ Force update error: ${errorMessage}`);
+    }
+  };
+
   const handleManualSet = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
     
@@ -94,7 +125,8 @@ export default function ManualNowPlayingOverride() {
           recognition_confidence: 1.0,
           service_used: 'manual_override',
           updated_at: new Date().toISOString(),
-          recognition_image_url: null
+          recognition_image_url: null,
+          next_recognition_in: 30 // Default interval
         });
 
       if (error) {
@@ -122,11 +154,14 @@ export default function ManualNowPlayingOverride() {
           }
         }
         
+        // ENHANCED: Auto-broadcast the update
+        await forceTVUpdate();
+        
         setTimeout(() => {
           setIsOpen(false);
           setStatus('');
           setFormData({ artist: '', title: '', albumTitle: '', albumId: '' });
-        }, 2000);
+        }, 3000);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -144,11 +179,16 @@ export default function ManualNowPlayingOverride() {
           album_title: null,
           album_id: null,
           recognition_image_url: null,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
+          next_recognition_in: 30
         })
         .eq('id', 1);
 
       setStatus('✅ Now playing cleared');
+      
+      // ENHANCED: Auto-broadcast the clear
+      await forceTVUpdate();
+      
       setTimeout(() => setStatus(''), 2000);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -290,7 +330,7 @@ export default function ManualNowPlayingOverride() {
                 color: '#1f2937',
                 margin: 0
               }}>
-                Manual Now Playing Override
+                Enhanced Manual Override
               </h2>
               <button
                 onClick={() => setIsOpen(false)}
@@ -313,7 +353,7 @@ export default function ManualNowPlayingOverride() {
               </button>
             </div>
 
-            {/* Quick Actions */}
+            {/* ENHANCED: Quick Actions with Force TV Update */}
             <div style={{
               display: 'flex',
               gap: '12px',
@@ -321,7 +361,8 @@ export default function ManualNowPlayingOverride() {
               padding: '16px',
               background: '#f8fafc',
               borderRadius: '12px',
-              border: '1px solid #e2e8f0'
+              border: '1px solid #e2e8f0',
+              flexWrap: 'wrap'
             }}>
               <button
                 onClick={testRecognitionServices}
@@ -335,10 +376,26 @@ export default function ManualNowPlayingOverride() {
                   fontSize: '14px',
                   fontWeight: 600,
                   cursor: isTesting ? 'not-allowed' : 'pointer',
-                  flex: 1
+                  flex: '1 1 auto'
                 }}
               >
-                {isTesting ? '🔧 Testing...' : '🔧 Test All Services'}
+                {isTesting ? '🔧 Testing...' : '🔧 Test Services'}
+              </button>
+              <button
+                onClick={forceTVUpdate}
+                style={{
+                  background: '#7c3aed',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '8px 16px',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  flex: '1 1 auto'
+                }}
+              >
+                📺 Force TV Update
               </button>
               <button
                 onClick={clearNowPlaying}
@@ -351,7 +408,7 @@ export default function ManualNowPlayingOverride() {
                   fontSize: '14px',
                   fontWeight: 600,
                   cursor: 'pointer',
-                  flex: 1
+                  flex: '1 1 auto'
                 }}
               >
                 🗑️ Clear All
@@ -581,7 +638,7 @@ export default function ManualNowPlayingOverride() {
                   transition: 'transform 0.2s'
                 }}
               >
-                🎵 Set Now Playing
+                🎵 Set Now Playing (+ Auto TV Update)
               </button>
             </form>
 
@@ -614,10 +671,11 @@ export default function ManualNowPlayingOverride() {
                 💡 <span>Enhanced Features</span>
               </div>
               <ul style={{ margin: 0, paddingLeft: '20px', lineHeight: 1.6 }}>
-                <li>Service testing shows which APIs are working</li>
-                <li>Search your collection first for automatic metadata</li>
-                <li>Enhanced error reporting and status updates</li>
-                <li>Setting album title creates album context for future recognitions</li>
+                <li><strong>Force TV Update:</strong> Manually trigger real-time updates to TV display</li>
+                <li><strong>Auto-broadcast:</strong> All changes automatically notify connected displays</li>
+                <li><strong>Service testing:</strong> Check which recognition APIs are working</li>
+                <li><strong>Collection search:</strong> Find albums in your collection for automatic metadata</li>
+                <li><strong>Smart timing:</strong> Setting tracks includes proper recognition intervals</li>
               </ul>
             </div>
           </div>

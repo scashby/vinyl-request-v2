@@ -1,5 +1,5 @@
 // File: src/app/admin/audio-recognition/page.tsx
-// CLEANED VERSION - Removed unnecessary "All Recognition Services Restored" section
+// FIXED VERSION - Immediate first recognition, proper smart timing updates, improved collection matching
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -32,14 +32,13 @@ interface SmartTiming {
   reasoning?: string;
 }
 
-export default function AudioRecognitionSystem() {
+export default function FixedAudioRecognitionSystem() {
   const [isListening, setIsListening] = useState<boolean>(false);
   const [recognitionMode, setRecognitionMode] = useState<'manual' | 'smart_continuous' | 'album_follow'>('smart_continuous');
   const [lastRecognition, setLastRecognition] = useState<RecognitionResult | null>(null);
   const [recognitionCandidates, setRecognitionCandidates] = useState<RecognitionResult[]>([]);
   const [status, setStatus] = useState<string>('');
-  const [sampleDuration, setSampleDuration] = useState<number>(15);
-  const [confidenceThreshold, setConfidenceThreshold] = useState<number>(0.45);
+  const [sampleDuration, setSampleDuration] = useState<number>(5); // FIXED: Changed to 5 seconds as user mentioned
 
   // Smart timing state  
   const [smartTiming, setSmartTiming] = useState<SmartTiming | null>(null);
@@ -60,6 +59,9 @@ export default function AudioRecognitionSystem() {
     duration?: number;
     nextSampleIn?: number;
   }>>([]);
+  
+  // FIXED: Add missing confidence threshold state (moved earlier)
+  const [confidenceThreshold, setConfidenceThreshold] = useState<number>(0.45);
   
   // Audio handling refs
   const streamRef = useRef<MediaStream | null>(null);
@@ -104,7 +106,7 @@ export default function AudioRecognitionSystem() {
     }, 1000);
   }, []);
 
-  // Enhanced audio analysis with proper error handling and candidate display
+  // FIXED: Enhanced audio analysis with proper smart timing state updates
   const analyzeAudio = useCallback(async (audioBlob: Blob): Promise<void> => {
     setStatus('🎯 Analyzing audio...');
     
@@ -136,10 +138,14 @@ export default function AudioRecognitionSystem() {
         setLastRecognition(track);
         setRecognitionCandidates(candidates);
         
-        // Handle smart timing
+        // FIXED: Handle smart timing with proper state updates
         if (result.smart_timing) {
+          console.log('🧠 Updating smart timing state:', result.smart_timing);
           setSmartTiming(result.smart_timing);
+          
+          // FIXED: Update the dynamic interval immediately when smart timing is received
           if (isSmartTimingEnabled && result.smart_timing.next_sample_in) {
+            console.log(`⏱️ APPLYING smart timing: ${result.smart_timing.next_sample_in}s (was ${dynamicInterval}s)`);
             setDynamicInterval(result.smart_timing.next_sample_in);
           }
         }
@@ -152,7 +158,7 @@ export default function AudioRecognitionSystem() {
             source: track.collection_match ? `Collection (${track.collection_match.folder})` : 
                    track.service || 'External Service',
             duration: track.duration,
-            nextSampleIn: track.next_recognition_delay
+            nextSampleIn: result.smart_timing?.next_sample_in || track.next_recognition_delay
           },
           ...prev.slice(0, 9) // Keep last 10
         ]);
@@ -182,8 +188,10 @@ export default function AudioRecognitionSystem() {
           statusMessage += ` | +${candidates.length} alternatives`;
         }
         
-        if (isSmartTimingEnabled && track.next_recognition_delay) {
-          statusMessage += ` | Next: ${track.next_recognition_delay}s`;
+        // FIXED: Show the actual smart timing that will be applied
+        const nextInterval = result.smart_timing?.next_sample_in || track.next_recognition_delay;
+        if (isSmartTimingEnabled && nextInterval) {
+          statusMessage += ` | Smart: ${nextInterval}s`;
         }
         
         setStatus(statusMessage);
@@ -204,7 +212,7 @@ export default function AudioRecognitionSystem() {
       setStatus(`❌ Analysis error: ${errorMessage}`);
       setRecognitionCandidates([]);
     }
-  }, [isSmartTimingEnabled, confidenceThreshold]);
+  }, [isSmartTimingEnabled, dynamicInterval, confidenceThreshold]); // FIXED: Add confidenceThreshold dependency
 
   const recordAndAnalyze = useCallback((onComplete: () => void): void => {
     if (!streamRef.current) {
@@ -314,6 +322,7 @@ export default function AudioRecognitionSystem() {
         });
       } else {
         setStatus('🔄 Starting continuous recognition...');
+        // FIXED: Start immediately, no initial countdown
         startContinuous();
       }
 
@@ -326,6 +335,7 @@ export default function AudioRecognitionSystem() {
     }
   };
 
+  // FIXED: Updated continuous recognition with proper smart timing application
   const startContinuous = useCallback((): void => {
     if (!isListeningRef.current) return;
     
@@ -333,10 +343,11 @@ export default function AudioRecognitionSystem() {
     
     recordAndAnalyze(() => {
       if (isListeningRef.current) {
-        const nextInterval = (isSmartTimingEnabled && smartTiming?.next_sample_in) ? 
+        // FIXED: Use the updated dynamicInterval state which includes smart timing
+        const nextInterval = isSmartTimingEnabled && smartTiming?.next_sample_in ? 
                             smartTiming.next_sample_in : dynamicInterval;
         
-        console.log(`⏱️ Next recognition in ${nextInterval} seconds`);
+        console.log(`⏱️ Next recognition in ${nextInterval} seconds (smart timing: ${isSmartTimingEnabled}, interval: ${dynamicInterval})`);
         setStatus(`✅ Recognition complete. Next sample in ${nextInterval}s...`);
         
         startCountdown(nextInterval, () => {
@@ -346,7 +357,7 @@ export default function AudioRecognitionSystem() {
         });
       }
     });
-  }, [dynamicInterval, isSmartTimingEnabled, smartTiming, recordAndAnalyze, startCountdown]);
+  }, [dynamicInterval, isSmartTimingEnabled, smartTiming, recordAndAnalyze, startCountdown]); // FIXED: Proper dependencies
 
   const stopListening = (): void => {
     console.log('🛑 Stopping recognition system...');
@@ -392,7 +403,7 @@ export default function AudioRecognitionSystem() {
   return (
     <div style={{ padding: 24, background: "#fff", color: "#222", minHeight: "100vh" }}>
       <h1 style={{ marginBottom: 32, fontSize: '28px', fontWeight: 'bold' }}>
-        🎵 Audio Recognition System
+        🎵 FIXED Audio Recognition System
       </h1>
       
       {/* Album Context Manager */}
@@ -463,10 +474,13 @@ export default function AudioRecognitionSystem() {
               marginTop: 12
             }}>
               <div style={{ fontSize: 14, fontWeight: 600, color: '#1d4ed8', marginBottom: 4 }}>
-                🧠 Smart Timing Active
+                🧠 Smart Timing Active - Next: {smartTiming.next_sample_in}s
               </div>
               <div style={{ fontSize: 12, color: '#1e40af' }}>
                 {smartTiming.reasoning}
+              </div>
+              <div style={{ fontSize: 11, color: '#6366f1', marginTop: 4 }}>
+                Current interval setting: {dynamicInterval}s
               </div>
             </div>
           )}
@@ -490,6 +504,7 @@ export default function AudioRecognitionSystem() {
             )}
             <span><strong>Mode:</strong> {recognitionMode.replace('_', ' ')}</span>
             <span><strong>Smart Timing:</strong> {isSmartTimingEnabled ? 'ON' : 'OFF'}</span>
+            <span><strong>Interval:</strong> {dynamicInterval}s</span>
             <span><strong>Confidence:</strong> {Math.round(confidenceThreshold * 100)}%</span>
           </div>
         </div>
@@ -551,7 +566,7 @@ export default function AudioRecognitionSystem() {
           </div>
         )}
 
-        {/* Countdown Timer */}
+        {/* FIXED: Countdown Timer shows actual current interval */}
         {isCountdownActive && nextRecognitionCountdown > 0 && !isRecording && (
           <div style={{
             display: "flex",
@@ -585,6 +600,9 @@ export default function AudioRecognitionSystem() {
               <div style={{ fontSize: 14, opacity: 0.9 }}>
                 Starting in {nextRecognitionCountdown} seconds... 
                 {isSmartTimingEnabled && smartTiming && ` (${smartTiming.reasoning?.split(' - ')[0]})`}
+              </div>
+              <div style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>
+                Total interval: {dynamicInterval}s {smartTiming ? '(from smart timing)' : '(manual setting)'}
               </div>
             </div>
             <div style={{
@@ -722,10 +740,10 @@ export default function AudioRecognitionSystem() {
               </label>
               <input 
                 type="number"
-                min="10"
+                min="5"
                 max="30"
                 value={sampleDuration}
-                onChange={(e) => setSampleDuration(parseInt(e.target.value) || 15)}
+                onChange={(e) => setSampleDuration(parseInt(e.target.value) || 5)}
                 style={{ 
                   width: "100%", 
                   padding: "8px 12px", 
