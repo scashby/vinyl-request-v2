@@ -1,5 +1,5 @@
 // File: src/app/api/audio-recognition/route.ts
-// FIXED VERSION - Smart timing + album context validation + ALL SERVICES RESTORED
+// FIXED VERSION - Fixed collection matching to prevent fabricated track listings
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from 'lib/supabaseClient';
 import crypto from 'crypto';
@@ -22,6 +22,10 @@ interface CollectionMatch {
   image_url?: string;
   folder?: string;
   priority?: number;
+}
+
+interface CollectionMatchWithSimilarity extends CollectionMatch {
+  similarity: number;
 }
 
 interface EnhancedRecognitionTrack extends RecognitionTrack {
@@ -170,10 +174,10 @@ function validateTrackAgainstAlbumContext(
   });
 }
 
-// Enhanced collection matching with STRICT PRIORITY
-async function findBYOCollectionMatches(artist: string, title: string, album?: string): Promise<CollectionMatch[]> {
+// FIXED: Collection matching to prevent fabricated track listings
+async function findBYOCollectionMatches(artist: string, title: string, album?: string): Promise<CollectionMatchWithSimilarity[]> {
   try {
-    console.log(`🎯 PRIORITY COLLECTION SEARCH: ${artist} - ${title}${album ? ` (${album})` : ''}`);
+    console.log(`🎯 COLLECTION SEARCH: ${artist} - ${title}${album ? ` (${album})` : ''}`);
     
     const folderPriority: Record<string, number> = {
       'Vinyl': 1,
@@ -183,64 +187,70 @@ async function findBYOCollectionMatches(artist: string, title: string, album?: s
     
     const byoFolders = ['Vinyl', 'Cassettes', '45s'];
     
-    // 1. EXACT artist match in BYO folders ONLY
-    const { data: exactMatches } = await supabase
+    // Helper function to calculate artist similarity
+    const calculateArtistSimilarity = (recognizedArtist: string, collectionArtist: string): number => {
+      const normalize = (str: string): string => str.toLowerCase().trim().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ');
+      const normalizedRecognized = normalize(recognizedArtist);
+      const normalizedCollection = normalize(collectionArtist);
+      
+      // Exact match
+      if (normalizedRecognized === normalizedCollection) return 1.0;
+      
+      // One contains the other
+      if (normalizedRecognized.includes(normalizedCollection) || normalizedCollection.includes(normalizedRecognized)) {
+        return 0.8;
+      }
+      
+      // Check for significant word overlap
+      const recognizedWords = normalizedRecognized.split(' ');
+      const collectionWords = normalizedCollection.split(' ');
+      const commonWords = recognizedWords.filter(word => 
+        word.length > 2 && collectionWords.some(cWord => cWord.includes(word) || word.includes(cWord))
+      );
+      
+      if (commonWords.length > 0) {
+        return Math.min(0.6, commonWords.length / Math.max(recognizedWords.length, collectionWords.length));
+      }
+      
+      return 0.0;
+    };
+    
+    // Search for albums by the recognized artist (strict artist matching)
+    const { data: artistMatches } = await supabase
       .from('collection')
       .select('id, artist, title, year, image_url, folder')
-      .ilike('artist', artist)
       .in('folder', byoFolders)
-      .limit(20);
+      .limit(50); // Get more to filter properly
     
-    // 2. Album search if available
-    let albumMatches: CollectionMatch[] = [];
-    if (album) {
-      const { data: albumSearch } = await supabase
-        .from('collection')
-        .select('id, artist, title, year, image_url, folder')
-        .ilike('title', `%${album}%`)
-        .in('folder', byoFolders)
-        .limit(10);
-      
-      if (albumSearch) albumMatches = albumSearch;
-    }
+    if (!artistMatches) return [];
     
-    // 3. Fuzzy artist search
-    const artistWords = artist.toLowerCase().split(' ').filter(word => word.length > 2);
-    let fuzzyMatches: CollectionMatch[] = [];
-    for (const word of artistWords.slice(0, 2)) {
-      const { data: fuzzySearch } = await supabase
-        .from('collection')
-        .select('id, artist, title, year, image_url, folder')
-        .ilike('artist', `%${word}%`)
-        .in('folder', byoFolders)
-        .limit(5);
-      
-      if (fuzzySearch) fuzzyMatches = fuzzyMatches.concat(fuzzySearch);
-    }
-    
-    // Combine and prioritize
-    const allMatches = [...(exactMatches || []), ...albumMatches, ...fuzzyMatches];
-    
-    const uniqueMatches = allMatches
-      .filter((match, index, self) => index === self.findIndex(m => m.id === match.id))
+    // Filter to only include albums where artist similarity is high
+    const validMatches = artistMatches
       .map(match => ({
         ...match,
+        similarity: calculateArtistSimilarity(artist, match.artist),
         priority: folderPriority[match.folder || ''] || 999
       }))
+      .filter(match => match.similarity >= 0.7) // Only include high similarity matches
       .sort((a, b) => {
-        if (a.priority !== b.priority) return a.priority - b.priority;
-        
-        const aArtistMatch = a.artist.toLowerCase().includes(artist.toLowerCase()) ? 1 : 0;
-        const bArtistMatch = b.artist.toLowerCase().includes(artist.toLowerCase()) ? 1 : 0;
-        return bArtistMatch - aArtistMatch;
+        // Sort by similarity first, then priority
+        if (Math.abs(a.similarity - b.similarity) > 0.1) {
+          return b.similarity - a.similarity;
+        }
+        return a.priority - b.priority;
       })
       .slice(0, 10);
     
-    console.log(`✅ Found ${uniqueMatches.length} BYO collection matches`);
-    return uniqueMatches;
+    console.log(`✅ Found ${validMatches.length} valid artist matches (similarity >= 0.7)`);
+    
+    if (validMatches.length > 0) {
+      console.log(`🎯 Top match: ${validMatches[0].artist} (similarity: ${validMatches[0].similarity.toFixed(2)})`);
+    }
+    
+    return validMatches;
     
   } catch (error) {
-    console.error('BYO Collection matching error:', error);
+    console.error('Collection matching error:', error);
     return [];
   }
 }
@@ -676,7 +686,7 @@ function generateACRCloudSignature(
   return crypto.createHmac('sha1', accessSecret).update(stringToSign).digest('base64');
 }
 
-// MAIN POST HANDLER - FIXED VERSION WITH ALL SERVICES RESTORED
+// MAIN POST HANDLER - FIXED VERSION WITH PROPER COLLECTION MATCHING
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const formData = await request.formData();
@@ -847,7 +857,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       candidates = allExternalCandidates.filter(track => track !== finalBestTrack);
       
     } else {
-      // PHASE 4: Collection Search (only if not from album context)
+      // PHASE 4: FIXED Collection Search (only if not from album context)
       console.log('🏆 Phase 4: BYO Collection search...');
       
       const collectionMatches = await findBYOCollectionMatches(
@@ -857,31 +867,32 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
 
       if (collectionMatches.length > 0) {
-        console.log(`🎉 COLLECTION MATCH FOUND!`);
+        console.log(`🎉 COLLECTION MATCH FOUND! Artist similarity: ${collectionMatches[0].similarity.toFixed(2)}`);
         
         const topCollectionMatch = collectionMatches[0];
         
+        // FIXED: Don't fabricate track listings - use audio recognition for track info
         finalTrack = {
-          artist: topCollectionMatch.artist,
-          title: finalBestTrack.title,
-          album: topCollectionMatch.title,
+          artist: finalBestTrack.artist,  // Keep the correctly recognized artist
+          title: finalBestTrack.title,   // Keep the correctly recognized title
+          album: finalBestTrack.album || topCollectionMatch.title, // Prefer recognized album, fallback to collection
           image_url: topCollectionMatch.image_url || finalBestTrack.image_url,
-          confidence: 0.95,
-          service: `Collection Match (${topCollectionMatch.folder})`,
+          confidence: Math.min(0.90, (finalBestTrack.confidence || 0.8) + 0.1), // Boost confidence slightly but don't fabricate
+          service: `Collection Enhanced (${topCollectionMatch.folder})`,
           source_priority: 0,
           collection_match: topCollectionMatch,
           is_guest_vinyl: false,
           duration: finalBestTrack.duration
         };
 
-        // Add other collection matches as candidates
-        candidates = collectionMatches.slice(1).map((match: CollectionMatch): EnhancedRecognitionTrack => ({
-          artist: match.artist,
-          title: finalBestTrack.title,
-          album: match.title,
-          image_url: match.image_url,
-          confidence: 0.90,
-          service: `Collection Match (${match.folder})`,
+        // Add other collection matches as candidates (also fixed)
+        candidates = collectionMatches.slice(1).map((match: CollectionMatchWithSimilarity): EnhancedRecognitionTrack => ({
+          artist: finalBestTrack.artist,  // Keep recognized artist
+          title: finalBestTrack.title,   // Keep recognized title
+          album: finalBestTrack.album || match.title,
+          image_url: match.image_url || finalBestTrack.image_url,
+          confidence: Math.min(0.85, (finalBestTrack.confidence || 0.8) + 0.05),
+          service: `Collection Enhanced (${match.folder})`,
           source_priority: 0,
           collection_match: match,
           is_guest_vinyl: false,
@@ -989,12 +1000,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
 export async function GET(): Promise<NextResponse> {
   return NextResponse.json({ 
-    message: 'Audio Recognition API - Fixed with All Services Restored',
-    version: '7.1.0',
+    message: 'Audio Recognition API - Fixed Collection Matching',
+    version: '7.2.0',
     features: [
+      'FIXED: Collection matching no longer fabricates track listings',
+      'FIXED: Artist similarity validation prevents random album matches',
+      'FIXED: Audio recognition data preserved, only enhanced by collection info',
       'FIXED: Smart timing calculation and proper application to database',
       'FIXED: Album context validation - only matches if track actually found in album track listing',
-      'RESTORED: All recognition services (ACRCloud, AudD, Spotify, Last.fm, MusicBrainz)',
+      'All recognition services (ACRCloud, AudD, Spotify, Last.fm, MusicBrainz)',
       'Collection priority search for owned albums',
       'Enhanced error handling and logging'
     ],
@@ -1002,13 +1016,14 @@ export async function GET(): Promise<NextResponse> {
       audio_based: ['ACRCloud', 'AudD'],
       metadata_based: ['Spotify', 'Last.fm', 'MusicBrainz'],
       context_based: ['Album Context Validation'],
-      collection: ['BYO Collection Priority Search']
+      collection: ['BYO Collection Enhancement (Artist Similarity Validated)']
     },
     configuration: {
       default_confidence_threshold: DEFAULT_CONFIDENCE_THRESHOLD,
       silence_threshold: SILENCE_THRESHOLD,
       default_silence_interval: DEFAULT_SILENCE_INTERVAL,
-      min_track_duration_for_smart_timing: MIN_TRACK_DURATION
+      min_track_duration_for_smart_timing: MIN_TRACK_DURATION,
+      collection_artist_similarity_threshold: 0.7
     }
   });
 }
