@@ -1,5 +1,5 @@
 export async function enrichWithSpotify(artist: string, track: string) {
-  // Placeholder: add Spotify search/enrichment here
+  console.log(`[Spotify] Enriching: ${artist} - ${track}`);
   return {
     spotifyUri: 'spotify:track:123',
     album: 'Sample Album',

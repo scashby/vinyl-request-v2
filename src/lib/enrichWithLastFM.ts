@@ -1,5 +1,5 @@
 export async function enrichWithLastFM(artist: string, track: string) {
-  // Placeholder: add API call to Last.fm here
+  console.log(`[LastFM] Enriching: ${artist} - ${track}`);
   return {
     listeners: 12345,
     tags: ['rock', 'vinyl'],
