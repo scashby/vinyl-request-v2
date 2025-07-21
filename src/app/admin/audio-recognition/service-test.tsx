@@ -4,7 +4,7 @@ import { useState } from 'react';
 import 'styles/internal.css';
 
 export default function ServiceTestPage() {
-  const [results, setResults] = useState<Record<string, any>>({});
+  const [results, setResults] = useState<Record<string, unknown>>({});
   const [loading, setLoading] = useState(false);
 
   const testEndpoints = async () => {
@@ -15,13 +15,13 @@ export default function ServiceTestPage() {
       { name: 'AcoustID', url: '/api/audio-recognition/test-acoustid' }
     ];
 
-    const newResults: Record<string, any> = {};
+    const newResults: Record<string, unknown> = {};
     for (const { name, url } of endpoints) {
       try {
         const res = await fetch(url);
         const json = await res.json();
         newResults[name] = json;
-      } catch (err) {
+      } catch {
         newResults[name] = 'Error or invalid response';
       }
     }

@@ -1,49 +1,28 @@
+// src/app/admin/audio-recognition/logs.tsx
 'use client';
 import { useEffect, useState } from 'react';
-import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
-import { Database } from 'types/supabase';
+import supabase from 'lib/supabaseClient';
+import 'styles/internal.css';
 
-export default function LogsPage() {
-  const [logs, setLogs] = useState<any[]>([]);
-  const supabase = createPagesBrowserClient<Database>();
+export default function RecognitionLogsPage() {
+  const [logs, setLogs] = useState<Record<string, unknown>[]>([]);
 
   useEffect(() => {
     const fetchLogs = async () => {
-      const { data, error } = await supabase
-        .from('audio_recognition_logs')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(100);
-      if (!error) setLogs(data || []);
+      const { data } = await supabase.from('audio_recognition_logs').select('*').order('timestamp', { ascending: false });
+      if (data) setLogs(data as Record<string, unknown>[]);
     };
     fetchLogs();
-  }, []);
+  }, [supabase]);
 
   return (
-    <main style={{ padding: '1rem' }}>
+    <main className="p-4">
       <h1>Recognition Logs</h1>
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Source</th>
-            <th>Match</th>
-            <th>Collection ID</th>
-            <th>Created</th>
-          </tr>
-        </thead>
-        <tbody>
-          {logs.map((log) => (
-            <tr key={log.id}>
-              <td>{log.id}</td>
-              <td>{log.source}</td>
-              <td>{log.title} - {log.artist}</td>
-              <td>{log.collection_id ?? '—'}</td>
-              <td>{new Date(log.created_at).toLocaleString()}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <ul>
+        {logs.map((log, i) => (
+          <li key={i}><pre>{JSON.stringify(log, null, 2)}</pre></li>
+        ))}
+      </ul>
     </main>
   );
 }

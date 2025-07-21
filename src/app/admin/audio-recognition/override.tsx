@@ -1,37 +1,28 @@
+// src/app/admin/audio-recognition/override.tsx
 'use client';
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
-import { Database } from 'types/supabase';
+import supabase from 'lib/supabaseClient';
+import 'styles/internal.css';
 
-export default function OverridePage() {
-  const supabase = createPagesBrowserClient<Database>();
-  const searchParams = useSearchParams();
-  const logId = searchParams.get('id');
-  const [log, setLog] = useState<any>(null);
+export default function ManualOverridePage() {
+  const [tracks, setTracks] = useState<Record<string, unknown>[]>([]);
 
   useEffect(() => {
-    if (!logId) return;
-    supabase.from('audio_recognition_logs').select('*').eq('id', logId).single()
-      .then(({ data }) => setLog(data));
-  }, [logId]);
-
-  const updateMatch = async (collectionId: string) => {
-    await supabase.from('audio_recognition_logs')
-      .update({ collection_id: collectionId, manual_override: true })
-      .eq('id', logId);
-    alert('Override saved.');
-  };
+    const fetchTracks = async () => {
+      const { data } = await supabase.from('audio_recognition_logs').select('*').limit(25).order('timestamp', { ascending: false });
+      if (data) setTracks(data as Record<string, unknown>[]);
+    };
+    fetchTracks();
+  }, [supabase]);
 
   return (
-    <main style={{ padding: '1rem' }}>
-      <h1>Override Recognition</h1>
-      {log ? (
-        <>
-          <p><strong>Match:</strong> {log.title} - {log.artist}</p>
-          <input placeholder="Collection ID" onBlur={(e) => updateMatch(e.target.value)} />
-        </>
-      ) : <p>Loading…</p>}
+    <main className="p-4">
+      <h1>Manual Recognition Override</h1>
+      <ul>
+        {tracks.map((track, i) => (
+          <li key={i}><pre>{JSON.stringify(track, null, 2)}</pre></li>
+        ))}
+      </ul>
     </main>
   );
 }
