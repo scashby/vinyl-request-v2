@@ -1,7 +1,7 @@
 // src/app/admin/audio-recognition/page.tsx
 'use client';
 import Link from 'next/link';
-import 'src/styles/internal.css';
+import 'styles/internal.css';
 
 export default function AudioRecognitionDashboard() {
   return (

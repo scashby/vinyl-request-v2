@@ -1,7 +1,7 @@
 // src/app/admin/audio-recognition/settings.tsx
 'use client';
 import { useEffect, useState } from 'react';
-import 'src/styles/internal.css';
+import 'styles/internal.css';
 
 type ProviderKey = 'acrcloud' | 'audd' | 'acoustid';
 const defaultSettings: Record<ProviderKey, boolean> = {
