@@ -1,20 +1,19 @@
-// src/app/admin/audio-recognition/page.tsx
 'use client';
 import Link from 'next/link';
-import 'styles/internal.css';
+import React from 'react';
 
-export default function AudioRecognitionDashboard() {
+export default function AudioRecognitionAdminPage() {
   return (
-    <main className="admin-dashboard">
-      <h1 className="page-title">Audio Recognition Admin</h1>
-      <div className="grid">
-        <Link href="/admin/audio-recognition/logs" className="card">Recognition Logs</Link>
-        <Link href="/admin/audio-recognition/override" className="card">Manual Override</Link>
-        <Link href="/admin/audio-recognition/collection" className="card">Match Collection</Link>
-        <Link href="/admin/audio-recognition/sources" className="card">Sources Debug</Link>
-        <Link href="/admin/audio-recognition/settings" className="card">Settings</Link>
-        <Link href="/admin/audio-recognition/service-test" className="card">Service Test</Link>
-      </div>
-    </main>
+    <div style={{ padding: '2rem' }}>
+      <h1>Audio Recognition Admin</h1>
+      <ul style={{ marginTop: '1rem' }}>
+        <li><Link href="/admin/audio-recognition/collection">Collection Matches</Link></li>
+        <li><Link href="/admin/audio-recognition/override">Manual Override</Link></li>
+        <li><Link href="/admin/audio-recognition/logs">Recognition Logs</Link></li>
+        <li><Link href="/admin/audio-recognition/sources">Source Debug</Link></li>
+        <li><Link href="/admin/audio-recognition/settings">Recognition Settings</Link></li>
+        <li><Link href="/admin/audio-recognition/service-test">Test Services</Link></li>
+      </ul>
+    </div>
   );
 }

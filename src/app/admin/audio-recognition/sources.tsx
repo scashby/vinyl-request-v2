@@ -1,9 +1,11 @@
 'use client';
+import React from 'react';
+
 export default function SourcesPage() {
   return (
-    <main style={{ padding: '1rem' }}>
+    <div style={{ padding: '2rem' }}>
       <h1>Audio Sources</h1>
-      <p>In future: list audio input devices, sample levels, and browser capture capability.</p>
-    </main>
+      <p>Debug input streams and view source metadata.</p>
+    </div>
   );
 }
