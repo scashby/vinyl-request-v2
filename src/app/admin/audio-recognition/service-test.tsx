@@ -1,6 +1,7 @@
 // src/app/admin/audio-recognition/service-test.tsx
 'use client';
 import { useState } from 'react';
+import 'styles/internal.css';
 
 export default function ServiceTestPage() {
   const [results, setResults] = useState<Record<string, any>>({});
