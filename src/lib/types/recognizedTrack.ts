@@ -1,8 +1,8 @@
-export type RecognitionSource =
-  | 'Collection'      // ← your vinyl/cassette/CD/45s collection via album_context
-  | 'ACRCloud'
-  | 'AudD'
-  | 'Spotify'
-  | 'AppleMusic'
-  | 'MusicBrainz'
-  | 'LastFM';
+export interface RecognizedTrack {
+  title: string;
+  artist: string;
+  album?: string;
+  source: string;
+  confidence?: number;
+  image?: string;
+}
