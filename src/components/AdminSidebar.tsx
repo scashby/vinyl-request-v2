@@ -1,5 +1,4 @@
-// src/components/AdminSidebar.tsx - Updated with audio recognition links
-
+// src/components/AdminSidebar.tsx
 "use client";
 
 import Link from "next/link";
@@ -15,6 +14,11 @@ export default function AdminSidebar() {
     
     // Audio Recognition Section
     { label: "Audio Recognition", path: "/admin/audio-recognition", isNew: true },
+    { label: "Recognition Logs", path: "/admin/audio-recognition/logs" },
+    { label: "Collection Match", path: "/admin/audio-recognition/collection" },
+    { label: "Manual Override", path: "/admin/audio-recognition/override" },
+    { label: "Service Test", path: "/admin/audio-recognition/service-test" },
+    { label: "Recognition Settings", path: "/admin/audio-recognition/settings" },
     { label: "Now Playing Control", path: "/admin/set-now-playing" },
     
     // Collection Management
@@ -45,6 +49,8 @@ export default function AdminSidebar() {
       <ul className="space-y-2">
         {navItems.map((item) => {
           const isActive = pathname === item.path;
+          const isAudioRecognition = item.path.includes('/audio-recognition');
+          
           return (
             <li key={item.path}>
               <Link
@@ -55,6 +61,8 @@ export default function AdminSidebar() {
                   flex items-center justify-between p-2 rounded-md text-sm transition-colors
                   ${isActive 
                     ? "bg-blue-100 text-blue-700 font-semibold border-l-4 border-blue-500" 
+                    : isAudioRecognition
+                    ? "text-purple-700 hover:bg-purple-50 hover:text-purple-800 pl-4"
                     : "text-gray-700 hover:bg-gray-200 hover:text-blue-600"
                   }
                   ${item.isExternal ? "hover:bg-purple-50 hover:text-purple-600" : ""}
@@ -89,7 +97,7 @@ export default function AdminSidebar() {
       {/* Audio Recognition Status Widget */}
       <div className="mt-8 p-3 bg-blue-50 border border-blue-200 rounded-lg">
         <h3 className="text-sm font-semibold text-blue-800 mb-2">
-          Audio Recognition
+          🎵 Audio Recognition
         </h3>
         <div className="space-y-1 text-xs">
           <div className="flex justify-between">
@@ -104,6 +112,10 @@ export default function AdminSidebar() {
             <span className="text-gray-600">Last scan:</span>
             <span className="text-gray-800">2 min ago</span>
           </div>
+          <div className="flex justify-between">
+            <span className="text-gray-600">Confidence:</span>
+            <span className="text-green-600 font-medium">95%</span>
+          </div>
         </div>
         
         <Link 
@@ -114,17 +126,36 @@ export default function AdminSidebar() {
         </Link>
       </div>
       
-      {/* Quick Cast Button */}
+      {/* Quick Actions */}
       <div className="mt-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+        <h4 className="text-sm font-semibold text-purple-800 mb-2">Quick Actions</h4>
+        <div className="space-y-2">
+          <Link 
+            href="/admin/audio-recognition/collection"
+            className="block w-full text-center bg-purple-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-purple-700 transition-colors"
+          >
+            💿 Find in Collection
+          </Link>
+          <Link 
+            href="/admin/audio-recognition/override"
+            className="block w-full text-center bg-orange-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-orange-700 transition-colors"
+          >
+            ✏️ Manual Override
+          </Link>
+        </div>
+      </div>
+      
+      {/* Quick Cast Button */}
+      <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
         <Link 
           href="/now-playing-tv"
           target="_blank"
           rel="noopener noreferrer"
-          className="block w-full text-center bg-purple-600 text-white py-2 px-3 rounded text-sm font-medium hover:bg-purple-700 transition-colors"
+          className="block w-full text-center bg-gray-600 text-white py-2 px-3 rounded text-sm font-medium hover:bg-gray-700 transition-colors"
         >
           🖥️ Cast to TV
         </Link>
-        <p className="text-xs text-purple-600 mt-1 text-center">
+        <p className="text-xs text-gray-600 mt-1 text-center">
           Opens TV display for casting
         </p>
       </div>

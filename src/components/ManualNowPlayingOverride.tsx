@@ -1,5 +1,6 @@
-// File: src/components/ManualNowPlayingOverride.tsx
-// ENHANCED VERSION - Added force TV update and better error handling
+// src/components/ManualNowPlayingOverride.tsx
+// CLEAN VERSION - Based on your original with TypeScript fixes only
+
 "use client";
 
 import { useState } from 'react';
@@ -29,7 +30,7 @@ interface ServiceTestResult {
   details?: unknown;
 }
 
-export default function EnhancedManualNowPlayingOverride() {
+export default function ManualNowPlayingOverride() {
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [formData, setFormData] = useState<FormData>({
     artist: '',
@@ -71,7 +72,6 @@ export default function EnhancedManualNowPlayingOverride() {
     setSearchResults([]);
   };
 
-  // ENHANCED: Force TV display update
   const forceTVUpdate = async (): Promise<void> => {
     try {
       setStatus('🔄 Forcing TV display update...');
@@ -126,7 +126,7 @@ export default function EnhancedManualNowPlayingOverride() {
           service_used: 'manual_override',
           updated_at: new Date().toISOString(),
           recognition_image_url: null,
-          next_recognition_in: 30 // Default interval
+          next_recognition_in: 30
         });
 
       if (error) {
@@ -142,6 +142,7 @@ export default function EnhancedManualNowPlayingOverride() {
             await supabase.from('album_context').insert({
               artist: formData.artist,
               title: formData.albumTitle,
+              album: formData.albumTitle,
               year: new Date().getFullYear().toString(),
               collection_id: formData.albumId ? parseInt(formData.albumId) : null,
               source: 'manual_override',
@@ -154,7 +155,7 @@ export default function EnhancedManualNowPlayingOverride() {
           }
         }
         
-        // ENHANCED: Auto-broadcast the update
+        // Auto-broadcast the update
         await forceTVUpdate();
         
         setTimeout(() => {
@@ -186,7 +187,7 @@ export default function EnhancedManualNowPlayingOverride() {
 
       setStatus('✅ Now playing cleared');
       
-      // ENHANCED: Auto-broadcast the clear
+      // Auto-broadcast the clear
       await forceTVUpdate();
       
       setTimeout(() => setStatus(''), 2000);
@@ -330,7 +331,7 @@ export default function EnhancedManualNowPlayingOverride() {
                 color: '#1f2937',
                 margin: 0
               }}>
-                Enhanced Manual Override
+                Manual Override
               </h2>
               <button
                 onClick={() => setIsOpen(false)}
@@ -353,7 +354,7 @@ export default function EnhancedManualNowPlayingOverride() {
               </button>
             </div>
 
-            {/* ENHANCED: Quick Actions with Force TV Update */}
+            {/* Quick Actions */}
             <div style={{
               display: 'flex',
               gap: '12px',
@@ -668,7 +669,7 @@ export default function EnhancedManualNowPlayingOverride() {
               color: '#1e40af'
             }}>
               <div style={{ fontWeight: 600, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                💡 <span>Enhanced Features</span>
+                💡 <span>Features</span>
               </div>
               <ul style={{ margin: 0, paddingLeft: '20px', lineHeight: 1.6 }}>
                 <li><strong>Force TV Update:</strong> Manually trigger real-time updates to TV display</li>
