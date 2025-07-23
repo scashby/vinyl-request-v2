@@ -5,7 +5,17 @@ const execAsync = promisify(exec);
 export async function generateChromaprint(filePath: string): Promise<{ fingerprint: string, duration: number }> {
   const { stdout } = await execAsync(`fpcalc -json "${filePath}"`);
   const parsed = JSON.parse(stdout);
-  return { fingerprint: parsed.fingerprint, duration: parsed.duration };
+  return {
+    success: true,
+    fingerprint: parsed.fingerprint,
+    duration: parsed.duration,
+    artist: undefined,
+    title: undefined,
+    album: undefined,
+    confidence: undefined,
+    source: 'AcoustID',
+    error: undefined
+};
 }
 
 export async function recognizeWithAcoustID(fingerprint: string, duration: number = 10) {

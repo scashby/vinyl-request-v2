@@ -9,11 +9,16 @@ interface RecognitionResult {
 
 export async function recognizeWithACRCloud(): Promise<RecognitionResult> {
   return {
-    source: 'ACRCloud',
-    confidence: 0.92,
+    success: true,
     artist: 'Simulated Artist',
     title: 'Simulated Track',
     album: 'Simulated Album',
-    raw_response: { mock: true },
+    confidence: 0.92,
+    source: 'ACRCloud',
+    fingerprint: 'placeholder_fp',
+    duration: 115,
+    error: undefined,
+    raw_response: { mock: true }
+},
   };
 }

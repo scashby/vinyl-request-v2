@@ -9,11 +9,16 @@ interface RecognitionResult {
 
 export async function recognizeWithAudD(): Promise<RecognitionResult> {
   return {
-    source: 'AudD',
-    confidence: 0.78,
+    success: true,
     artist: 'Fallback Artist',
     title: 'Fallback Track',
     album: 'Fallback Album',
-    raw_response: { mock: true },
+    confidence: 0.78,
+    source: 'AudD',
+    fingerprint: 'placeholder_fp',
+    duration: 120,
+    error: undefined,
+    raw_response: { mock: true }
+},
   };
 }
