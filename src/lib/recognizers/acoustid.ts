@@ -1,28 +1,39 @@
-import { exec } from 'child_process';
-import { promisify } from 'util';
-const execAsync = promisify(exec);
+import axios from 'axios';
+import { RecognizedTrack } from 'lib/types/recognizedTrack';
 
-export async function generateChromaprint(filePath: string): Promise<{ fingerprint: string, duration: number }> {
-  const { stdout } = await execAsync(`fpcalc -json "${filePath}"`);
-  const parsed = JSON.parse(stdout);
-  return {
-    success: true,
-    fingerprint: parsed.fingerprint,
-    duration: parsed.duration,
-    artist: undefined,
-    title: undefined,
-    album: undefined,
-    confidence: undefined,
-    source: 'AcoustID',
-    error: undefined
-};
+interface AcoustIDResponse {
+  results?: {
+    score?: number;
+    recordings?: {
+      title?: string;
+      artists?: { name?: string }[];
+      releasegroups?: { title?: string }[];
+    }[];
+  }[];
 }
 
-export async function recognizeWithAcoustID(fingerprint: string, duration: number = 10) {
-  const client = process.env.ACOUSTID_API_KEY;
-  const url = `https://api.acoustid.org/v2/lookup?client=${client}&meta=recordings+releasegroups+compress&duration=${duration}&fingerprint=${fingerprint}`;
-  const res = await fetch(url);
-  if (!res.ok) return null;
-  const json = await res.json();
-  return json.results?.[0]?.recordings?.[0] ?? null;
+export async function recognizeWithAcoustID(fingerprint: string, duration: number): Promise<RecognizedTrack | null> {
+  try {
+    const response = await axios.get<AcoustIDResponse>('https://api.acoustid.org/v2/lookup', {
+      params: {
+        client: process.env.ACOUSTID_CLIENT_KEY,
+        fingerprint,
+        duration,
+        meta: 'recordings+releasegroups'
+      }
+    });
+
+    const result = response.data.results?.[0]?.recordings?.[0];
+    if (!result) return null;
+
+    return {
+      source: 'AcoustID',
+      confidence: response.data.results?.[0]?.score ?? 0,
+      artist: result.artists?.[0]?.name || 'Unknown',
+      title: result.title || 'Unknown',
+      album: result.releasegroups?.[0]?.title || 'Unknown'
+    };
+  } catch {
+    return null;
+  }
 }

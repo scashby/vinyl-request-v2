@@ -1,24 +1,37 @@
-interface RecognitionResult {
-  source: string;
-  confidence: number;
-  artist: string;
-  title: string;
-  album: string;
-  raw_response: Record<string, unknown>;
+import axios from 'axios';
+import { RecognizedTrack } from 'lib/types/recognizedTrack';
+
+interface ACRCloudResponse {
+  metadata?: {
+    music?: {
+      score?: number;
+      title?: string;
+      album?: { name?: string };
+      artists?: { name?: string }[];
+    }[];
+  };
 }
 
-export async function recognizeWithACRCloud(): Promise<RecognitionResult> {
-  return {
-    success: true,
-    artist: 'Simulated Artist',
-    title: 'Simulated Track',
-    album: 'Simulated Album',
-    confidence: 0.92,
-    source: 'ACRCloud',
-    fingerprint: 'placeholder_fp',
-    duration: 115,
-    error: undefined,
-    raw_response: { mock: true }
-},
-  };
+export async function recognizeWithACRCloud(audioBufferBase64: string): Promise<RecognizedTrack | null> {
+  try {
+    const response = await axios.post<ACRCloudResponse>('https://identify-eu-west-1.acrcloud.com/v1/identify', audioBufferBase64, {
+      headers: {
+        Authorization: `Bearer ${process.env.ACRCLOUD_ACCESS_KEY}`,
+        'Content-Type': 'application/octet-stream'
+      }
+    });
+
+    const track = response.data.metadata?.music?.[0];
+    if (!track) return null;
+
+    return {
+      source: 'ACRCloud',
+      confidence: track.score ?? 0,
+      artist: track.artists?.[0]?.name || 'Unknown',
+      title: track.title || 'Unknown',
+      album: track.album?.name || 'Unknown'
+    };
+  } catch {
+    return null;
+  }
 }
