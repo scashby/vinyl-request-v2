@@ -1,4 +1,4 @@
-// Admin Manage Events page ("/admin/manage-events")
+// Admin Manage Events page ("/admin/manage-events") 
 // Lets admins view, add, edit, and copy events in the Supabase "events" table.
 
 "use client";
