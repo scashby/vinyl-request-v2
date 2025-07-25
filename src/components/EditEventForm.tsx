@@ -30,7 +30,10 @@ function generateRecurringEvents(baseEvent: EventData & { id?: number }): Omit<E
   const events: Omit<EventData, 'id'>[] = [];
   
   if (!baseEvent.is_recurring || !baseEvent.recurrence_end_date) {
-    return [baseEvent];
+    // Return without ID for non-recurring events
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { id: _id, ...eventWithoutId } = baseEvent;
+    return [eventWithoutId];
   }
 
   const startDate = new Date(baseEvent.date);
@@ -42,9 +45,11 @@ function generateRecurringEvents(baseEvent: EventData & { id?: number }): Omit<E
   let currentDate = new Date(startDate);
 
   while (currentDate <= endDate) {
-    // Create event for current date
+    // Create event for current date WITHOUT the ID
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { id: _id, ...baseEventWithoutId } = baseEvent;
     const eventForDate: Omit<EventData, 'id'> = {
-      ...baseEvent,
+      ...baseEventWithoutId,
       date: currentDate.toISOString().split('T')[0],
       parent_event_id: baseEvent.id // Link to parent
     };
