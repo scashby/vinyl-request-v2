@@ -1,120 +1,84 @@
 // src/lib/audio/RecognitionEngine.ts
+
+import { AudioProcessor, AudioProcessorConfig } from './AudioProcessor';
+
 export interface RecognitionResult {
-  artist: string;
-  title: string;
-  album: string;
   confidence: number;
-  service: string;
+  matches: string[];
+  timestamp: number;
+  fingerprint: string;
+  artist?: string;
+  title?: string;
+  album?: string;
+  service?: string;
 }
 
 export interface RecognitionOptions {
-  services: string[];
-  timeout: number;
-  minConfidence: number;
+  threshold: number;
+  maxMatches: number;
+  useCache: boolean;
+  services?: string[];
+  timeout?: number;
+  minConfidence?: number;
 }
+
+export interface ProcessingResult {
+  success: boolean;
+  result?: RecognitionResult;
+  error?: string;
+  processingTime: number;
+}
+
+export const defaultRecognitionOptions: RecognitionOptions = {
+  threshold: 0.7,
+  maxMatches: 10,
+  useCache: true
+};
 
 export class RecognitionEngine {
-  private readonly defaultOptions: RecognitionOptions = {
-    services: ['ACRCloud', 'AudD', 'AcoustID'],
-    timeout: 10000,
-    minConfidence: 0.7
-  };
+  private audioProcessor: AudioProcessor;
+  private options: RecognitionOptions;
 
-  async recognizeAudio(
-    audioData: ArrayBuffer, 
-    options: Partial<RecognitionOptions> = {}
-  ): Promise<RecognitionResult | null> {
-    const opts = { ...this.defaultOptions, ...options };
-    
-    for (const service of opts.services) {
-      try {
-        const result = await this.tryService(service, audioData, opts.timeout);
-        
-        if (result && result.confidence >= opts.minConfidence) {
-          return result;
-        }
-      } catch (error) {
-        console.warn(`Recognition service ${service} failed:`, error);
-        continue;
-      }
-    }
-    
-    return null;
+  constructor(
+    processorConfig?: AudioProcessorConfig,
+    options: RecognitionOptions = defaultRecognitionOptions
+  ) {
+    this.audioProcessor = new AudioProcessor(processorConfig);
+    this.options = options;
   }
 
-  private async tryService(
-    service: string, 
-    audioData: ArrayBuffer, 
-    timeout: number
-  ): Promise<RecognitionResult | null> {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeout);
+  public async processAudio(audioBuffer: Float32Array): Promise<ProcessingResult> {
+    const startTime = performance.now();
     
     try {
-      switch (service) {
-        case 'ACRCloud':
-          return await this.recognizeWithACRCloud(audioData, controller.signal);
-        case 'AudD':
-          return await this.recognizeWithAudD(audioData, controller.signal);
-        case 'AcoustID':
-          return await this.recognizeWithAcoustID(audioData, controller.signal);
-        default:
-          return null;
-      }
-    } finally {
-      clearTimeout(timeoutId);
+      const fingerprint = this.audioProcessor.generateFingerprint(audioBuffer);
+      
+      // Placeholder recognition logic
+      const result: RecognitionResult = {
+        confidence: 0.8,
+        matches: ['sample_match'],
+        timestamp: Date.now(),
+        fingerprint: fingerprint.hash
+      };
+
+      const processingTime = performance.now() - startTime;
+
+      return {
+        success: true,
+        result,
+        processingTime
+      };
+    } catch (error) {
+      const processingTime = performance.now() - startTime;
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        processingTime
+      };
     }
   }
 
-  private async recognizeWithACRCloud(
-    audioData: ArrayBuffer, 
-    signal: AbortSignal
-  ): Promise<RecognitionResult | null> {
-    // Mock implementation - replace with actual ACRCloud API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    if (signal.aborted) return null;
-    
-    return {
-      artist: 'Sample Artist',
-      title: 'Sample Track',
-      album: 'Sample Album',
-      confidence: 0.95,
-      service: 'ACRCloud'
-    };
-  }
-
-  private async recognizeWithAudD(
-    audioData: ArrayBuffer, 
-    signal: AbortSignal
-  ): Promise<RecognitionResult | null> {
-    // Mock implementation
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    if (signal.aborted) return null;
-    
-    return {
-      artist: 'Another Artist',
-      title: 'Another Track',
-      album: 'Another Album',
-      confidence: 0.88,
-      service: 'AudD'
-    };
-  }
-
-  private async recognizeWithAcoustID(
-    audioData: ArrayBuffer, 
-    signal: AbortSignal
-  ): Promise<RecognitionResult | null> {
-    // Mock implementation
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    if (signal.aborted) return null;
-    
-    return null; // Simulate service failure
+  public updateOptions(newOptions: Partial<RecognitionOptions>): void {
+    this.options = { ...this.options, ...newOptions };
   }
 }
-
-// Export all interfaces and classes
-export type { AudioCaptureConfig, ProcessingResult, AudioMetrics, RecognitionResult, RecognitionOptions };
-export { AudioCapture, AudioProcessor, RecognitionEngine };

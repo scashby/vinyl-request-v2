@@ -1,93 +1,113 @@
 // src/lib/audio/AudioProcessor.ts
-export interface ProcessingResult {
-  fingerprint: string;
-  features: number[];
-  duration: number;
-  timestamp: Date;
+
+export interface AudioFeatures {
+  mfcc: number[];
+  spectralCentroid: number;
+  zeroCrossingRate: number;
+  energy: number;
 }
 
-export interface AudioMetrics {
-  volume: number;
-  frequency: number;
-  quality: number;
+export interface AudioFingerprint {
+  hash: string;
+  features: AudioFeatures;
+  timestamp: number;
 }
+
+export interface AudioProcessorConfig {
+  windowSize: number;
+  hopSize: number;
+  sampleRate: number;
+  melFilterCount: number;
+}
+
+export const defaultAudioProcessorConfig: AudioProcessorConfig = {
+  windowSize: 2048,
+  hopSize: 512,
+  sampleRate: 44100,
+  melFilterCount: 13
+};
 
 export class AudioProcessor {
-  private sampleRate: number;
+  private config: AudioProcessorConfig;
 
-  constructor(sampleRate = 44100) {
-    this.sampleRate = sampleRate;
+  constructor(config: AudioProcessorConfig = defaultAudioProcessorConfig) {
+    this.config = config;
   }
 
-  async processAudioBuffer(buffer: ArrayBuffer): Promise<ProcessingResult> {
-    const audioData = new Float32Array(buffer);
-    
+  public extractFeatures(audioBuffer: Float32Array): AudioFeatures {
+    // Calculate basic audio features from the buffer
+    const energy = this.calculateEnergy(audioBuffer);
+    const zeroCrossingRate = this.calculateZeroCrossingRate(audioBuffer);
+    const spectralCentroid = this.calculateSpectralCentroid(audioBuffer);
+    const mfcc = this.calculateMFCC(audioBuffer);
+
     return {
-      fingerprint: this.generateFingerprint(audioData),
-      features: this.extractFeatures(audioData),
-      duration: audioData.length / this.sampleRate,
-      timestamp: new Date()
+      mfcc,
+      spectralCentroid,
+      zeroCrossingRate,
+      energy
     };
   }
 
-  getAudioMetrics(buffer: ArrayBuffer): AudioMetrics {
-    const audioData = new Float32Array(buffer);
-    
-    return {
-      volume: this.calculateVolume(audioData),
-      frequency: this.calculateDominantFrequency(audioData),
-      quality: this.calculateQuality(audioData)
-    };
+  private calculateEnergy(audioBuffer: Float32Array): number {
+    return audioBuffer.reduce((sum, sample) => sum + sample * sample, 0) / audioBuffer.length;
   }
 
-  private generateFingerprint(audioData: Float32Array): string {
-    // Simple fingerprint generation
-    const hash = audioData.reduce((acc, value, index) => {
-      return acc + Math.abs(value) * (index + 1);
-    }, 0);
-    
-    return hash.toString(36);
-  }
-
-  private extractFeatures(audioData: Float32Array): number[] {
-    // Extract basic audio features
-    const features: number[] = [];
-    
-    // Zero crossing rate
-    let zeroCrossings = 0;
-    for (let i = 1; i < audioData.length; i++) {
-      if ((audioData[i] >= 0) !== (audioData[i - 1] >= 0)) {
-        zeroCrossings++;
+  private calculateZeroCrossingRate(audioBuffer: Float32Array): number {
+    let crossings = 0;
+    for (let i = 1; i < audioBuffer.length; i++) {
+      if ((audioBuffer[i] >= 0) !== (audioBuffer[i - 1] >= 0)) {
+        crossings++;
       }
     }
-    features.push(zeroCrossings / audioData.length);
-    
-    // RMS energy
-    const rms = Math.sqrt(
-      audioData.reduce((sum, sample) => sum + sample * sample, 0) / audioData.length
+    return crossings / audioBuffer.length;
+  }
+
+  private calculateSpectralCentroid(audioBuffer: Float32Array): number {
+    // Simplified spectral centroid calculation
+    const fftSize = Math.min(audioBuffer.length, this.config.windowSize);
+    let weightedSum = 0;
+    let magnitudeSum = 0;
+
+    for (let i = 0; i < fftSize / 2; i++) {
+      const magnitude = Math.abs(audioBuffer[i]);
+      const frequency = (i * this.config.sampleRate) / fftSize;
+      weightedSum += frequency * magnitude;
+      magnitudeSum += magnitude;
+    }
+
+    return magnitudeSum > 0 ? weightedSum / magnitudeSum : 0;
+  }
+
+  private calculateMFCC(audioBuffer: Float32Array): number[] {
+    // Simplified MFCC calculation - placeholder implementation
+    // Using audioBuffer length to make calculation deterministic
+    const baseValue = audioBuffer.length > 0 ? audioBuffer[0] * 0.01 : 0;
+    return new Array(this.config.melFilterCount).fill(0).map((_, index) => 
+      baseValue + (index * 0.001) // Deterministic values based on index
     );
-    features.push(rms);
+  }
+
+  public generateFingerprint(audioBuffer: Float32Array): AudioFingerprint {
+    const features = this.extractFeatures(audioBuffer);
+    const hash = this.computeHash(features);
     
-    return features;
+    return {
+      hash,
+      features,
+      timestamp: Date.now()
+    };
   }
 
-  private calculateVolume(audioData: Float32Array): number {
-    const rms = Math.sqrt(
-      audioData.reduce((sum, sample) => sum + sample * sample, 0) / audioData.length
-    );
-    return Math.min(1, rms * 10); // Normalize to 0-1
-  }
-
-  private calculateDominantFrequency(audioData: Float32Array): number {
-    // Simple frequency detection - in real implementation, use FFT
-    return 440; // Placeholder
-  }
-
-  private calculateQuality(audioData: Float32Array): number {
-    // Calculate signal quality based on noise floor
-    const maxAmplitude = Math.max(...audioData.map(Math.abs));
-    const avgAmplitude = audioData.reduce((sum, sample) => sum + Math.abs(sample), 0) / audioData.length;
-    
-    return avgAmplitude / maxAmplitude;
+  private computeHash(features: AudioFeatures): string {
+    // Simple hash implementation for now
+    const str = JSON.stringify(features);
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    return hash.toString(16);
   }
 }
