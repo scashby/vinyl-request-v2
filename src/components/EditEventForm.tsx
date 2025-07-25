@@ -180,26 +180,52 @@ export default function EditEventForm() {
     e.preventDefault();
     
     try {
+      // Basic validation for recurring events
+      if (eventData.is_recurring) {
+        if (!eventData.date) {
+          alert('Please set a start date for the recurring event');
+          return;
+        }
+        if (!eventData.recurrence_end_date) {
+          alert('Please set an end date for the recurring event');
+          return;
+        }
+        if (new Date(eventData.recurrence_end_date) <= new Date(eventData.date)) {
+          alert('End date must be after the start date');
+          return;
+        }
+      }
+
       const payload = {
         ...eventData,
         allowed_formats: `{${eventData.allowed_formats.map(f => f.trim()).join(',')}}`,
       };
 
+      console.log('Submitting payload:', payload);
+
       if (eventData.is_recurring && !id) {
         // Creating a new recurring event
+        console.log('Creating recurring event...');
         const { data: savedEvent, error: saveError } = await supabase
           .from('events')
           .insert([payload])
           .select()
           .single();
 
-        if (saveError) throw saveError;
+        if (saveError) {
+          console.error('Error saving main event:', saveError);
+          throw saveError;
+        }
+
+        console.log('Main event saved:', savedEvent);
 
         // Generate and save recurring instances
         const recurringEvents = generateRecurringEvents({
           ...savedEvent,
           id: savedEvent.id
         });
+
+        console.log('Generated recurring events:', recurringEvents.length);
 
         // Remove the first event (it's already saved) and save the rest
         const eventsToInsert = recurringEvents.slice(1).map(e => ({
@@ -208,17 +234,23 @@ export default function EditEventForm() {
           parent_event_id: savedEvent.id
         }));
 
+        console.log('Events to insert:', eventsToInsert);
+
         if (eventsToInsert.length > 0) {
           const { error: insertError } = await supabase
             .from('events')
             .insert(eventsToInsert);
 
-          if (insertError) throw insertError;
+          if (insertError) {
+            console.error('Error inserting recurring events:', insertError);
+            throw insertError;
+          }
         }
 
         alert(`Successfully created ${recurringEvents.length} recurring events!`);
       } else {
         // Single event or updating existing event
+        console.log('Saving single event...');
         let result;
         if (id) {
           result = await supabase.from('events').update(payload).eq('id', id);
@@ -226,13 +258,29 @@ export default function EditEventForm() {
           result = await supabase.from('events').insert([payload]);
         }
 
-        if (result.error) throw result.error;
+        if (result.error) {
+          console.error('Error saving single event:', result.error);
+          throw result.error;
+        }
         alert('Event saved successfully!');
       }
 
       router.push('/admin/manage-events');
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+      console.error('Full error object:', error);
+      
+      let errorMessage = 'An unknown error occurred';
+      
+      if (error && typeof error === 'object') {
+        if ('message' in error && typeof error.message === 'string') {
+          errorMessage = error.message;
+        } else if ('details' in error && typeof error.details === 'string') {
+          errorMessage = error.details;
+        } else if ('hint' in error && typeof error.hint === 'string') {
+          errorMessage = error.hint;
+        }
+      }
+      
       alert(`Error saving event: ${errorMessage}`);
     }
   };
