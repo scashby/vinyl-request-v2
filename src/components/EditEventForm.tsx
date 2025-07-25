@@ -38,6 +38,7 @@ function generateRecurringEvents(baseEvent: EventData & { id?: number }): Omit<E
   const pattern = baseEvent.recurrence_pattern;
   const interval = baseEvent.recurrence_interval || 1;
 
+  // eslint-disable-next-line prefer-const
   let currentDate = new Date(startDate);
 
   while (currentDate <= endDate) {
@@ -230,8 +231,9 @@ export default function EditEventForm() {
       }
 
       router.push('/admin/manage-events');
-    } catch (error: any) {
-      alert(`Error saving event: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+      alert(`Error saving event: ${errorMessage}`);
     }
   };
 
