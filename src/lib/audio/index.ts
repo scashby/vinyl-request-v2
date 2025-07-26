@@ -18,3 +18,12 @@ export {
   type AudioFingerprint,
   type AudioProcessorConfig
 } from './AudioProcessor';
+
+// RecognitionEngine exports
+export {
+  RecognitionEngine,
+  defaultRecognitionOptions,
+  type RecognitionResult,
+  type RecognitionOptions,
+  type ProcessingResult
+} from './RecognitionEngine';
