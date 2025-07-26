@@ -28,7 +28,7 @@ export default function WorkingAudioRecognitionPage() {
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [audioMetrics, setAudioMetrics] = useState<AudioMetrics | null>(null);
-  const [status, setStatus] = useState<string>('Click "Start Audio Capture" to begin');
+  const [status, setStatus] = useState<string>('Click &ldquo;Start Audio Capture&rdquo; to begin');
   
   // Recognition results
   const [results, setResults] = useState<AudioRecognitionResult[]>([]);
@@ -157,7 +157,7 @@ export default function WorkingAudioRecognitionPage() {
       };
 
       setIsRecording(true);
-      setStatus('🎤 Listening for audio... (Click "Recognize Audio" when ready)');
+      setStatus('🎤 Listening for audio... (Click &ldquo;Recognize Audio&rdquo; when ready)');
       addLog('Audio capture started successfully');
       
       // Start audio analysis
@@ -510,12 +510,12 @@ export default function WorkingAudioRecognitionPage() {
         <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-6">
           <h3 className="text-lg font-semibold text-blue-900 mb-3">How to Use</h3>
           <ol className="list-decimal list-inside space-y-2 text-blue-800">
-            <li>Click "Start Audio Capture" and grant microphone permission</li>
+            <li>Click &ldquo;Start Audio Capture&rdquo; and grant microphone permission</li>
             <li>Play music or speak near your microphone</li>
             <li>Watch the audio level indicator turn green when sound is detected</li>
-            <li>Click "Recognize Audio" to capture and identify a 10-second sample</li>
+            <li>Click &ldquo;Recognize Audio&rdquo; to capture and identify a 10-second sample</li>
             <li>View results in the Recognition Results panel</li>
-            <li>Use "Test Services" to check API connectivity</li>
+            <li>Use &ldquo;Test Services&rdquo; to check API connectivity</li>
           </ol>
         </div>
       </div>
