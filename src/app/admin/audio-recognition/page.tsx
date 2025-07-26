@@ -1,4 +1,4 @@
-// src/app/admin/audio-recognition/page.tsx - COMPLETELY REWRITTEN TO ACTUALLY WORK
+// src/app/admin/audio-recognition/page.tsx - WORKING VERSION
 
 'use client';
 
@@ -217,18 +217,22 @@ export default function WorkingAudioRecognitionPage() {
       addLog('Sending audio to recognition service...');
       setStatus('📡 Sending to recognition service...');
 
-      // Call recognition API
+      // Call recognition API with proper format
       const response = await fetch('/api/audio-recognition', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          audioData: base64Audio,
+          audioData: base64Audio, // Send as base64 string
           timestamp: new Date().toISOString(),
           triggeredBy: 'manual_admin'
         })
       });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
 
       const result = await response.json();
       const processingTime = Date.now() - startTime;
@@ -506,11 +510,12 @@ export default function WorkingAudioRecognitionPage() {
         <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-6">
           <h3 className="text-lg font-semibold text-blue-900 mb-3">How to Use</h3>
           <ol className="list-decimal list-inside space-y-2 text-blue-800">
-            <li>Click &ldquo;Start Audio Capture&rdquo; and grant microphone permission</li>
+            <li>Click "Start Audio Capture" and grant microphone permission</li>
             <li>Play music or speak near your microphone</li>
             <li>Watch the audio level indicator turn green when sound is detected</li>
-            <li>Click &ldquo;Recognize Audio&rdquo; to capture and identify a 10-second sample</li>
+            <li>Click "Recognize Audio" to capture and identify a 10-second sample</li>
             <li>View results in the Recognition Results panel</li>
+            <li>Use "Test Services" to check API connectivity</li>
           </ol>
         </div>
       </div>
