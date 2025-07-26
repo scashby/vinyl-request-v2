@@ -1,16 +1,6 @@
-// src/lib/audio/index.ts
+// src/lib/audio/index.ts - Server-safe exports only
 
-// AudioCapture exports
-export {
-  useAudioCapture,
-  defaultAudioCaptureConfig,
-  type AudioMetrics,
-  type UseAudioCaptureReturn,
-  type UseAudioCaptureOptions,
-  type AudioCaptureConfig
-} from './AudioCapture';
-
-// AudioProcessor exports
+// AudioProcessor exports (server-safe)
 export {
   AudioProcessor,
   defaultAudioProcessorConfig,
@@ -19,7 +9,7 @@ export {
   type AudioProcessorConfig
 } from './AudioProcessor';
 
-// RecognitionEngine exports
+// RecognitionEngine exports (server-safe)
 export {
   RecognitionEngine,
   defaultRecognitionOptions,
@@ -27,3 +17,11 @@ export {
   type RecognitionOptions,
   type ProcessingResult
 } from './RecognitionEngine';
+
+// Types only from AudioCapture (no hook implementation)
+export type {
+  AudioMetrics,
+  UseAudioCaptureReturn,
+  UseAudioCaptureOptions,
+  AudioCaptureConfig
+} from './AudioCapture';

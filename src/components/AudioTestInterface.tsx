@@ -1,7 +1,7 @@
 // src/components/AudioTestInterface.tsx
 
 import React, { useState, useCallback } from 'react';
-import { useAudioCapture, ProcessingResult } from 'lib/audio';
+import { useAudioCapture, ProcessingResult } from 'lib/audio/client';
 import AudioRecognitionComponent from 'components/AudioRecognitionComponent';
 
 const AudioTestInterface: React.FC = () => {

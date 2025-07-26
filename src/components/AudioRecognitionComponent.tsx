@@ -1,7 +1,7 @@
 // src/components/AudioRecognitionComponent.tsx
 
 import React, { useState, useCallback, useMemo } from 'react';
-import { useAudioCapture, RecognitionEngine, ProcessingResult } from 'lib/audio';
+import { useAudioCapture, RecognitionEngine, ProcessingResult } from 'lib/audio/client';
 
 interface AudioRecognitionComponentProps {
   onResult?: (result: ProcessingResult) => void;

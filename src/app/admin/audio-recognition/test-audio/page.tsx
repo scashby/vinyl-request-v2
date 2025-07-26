@@ -3,7 +3,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useAudioCapture, ProcessingResult } from 'lib/audio';
+import { useAudioCapture, ProcessingResult } from 'lib/audio/client';
 import AudioRecognitionComponent from 'components/AudioRecognitionComponent';
 import AudioTestInterface from 'components/AudioTestInterface';
 

@@ -1,4 +1,5 @@
 // src/lib/audio/AudioCapture.ts
+"use client";
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 
