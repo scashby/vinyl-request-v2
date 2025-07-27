@@ -1,15 +1,15 @@
-// src/app/admin/audio-recognition/collection.tsx
+// src/app/admin/audio-recognition/collection/page.tsx - FIXED Collection Match
 
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { Database } from 'types/supabase';
 import Image from 'next/image';
 
-interface Match {
+interface CollectionMatch {
   id: number;
   artist: string;
   title: string;
@@ -29,12 +29,12 @@ interface UnmatchedRecognition {
   source: string;
 }
 
-export default function CollectionMatchPage() {
+export default function FixedCollectionMatchPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClientComponentClient<Database>();
 
-  const [matches, setMatches] = useState<Match[]>([]);
+  const [matches, setMatches] = useState<CollectionMatch[]>([]);
   const [selected, setSelected] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [artistQuery, setArtistQuery] = useState('');
@@ -44,165 +44,22 @@ export default function CollectionMatchPage() {
   const [selectedRecognition, setSelectedRecognition] = useState<number | null>(null);
   const [status, setStatus] = useState('');
 
-  // Initialize data on mount
+  // Initialize search from URL params
   useEffect(() => {
-    const initializeData = async () => {
-      // Pre-fill search if coming from a recognition log
-      const artist = searchParams.get('artist') || '';
-      const title = searchParams.get('title') || '';
-      
-      if (artist || title) {
-        setArtistQuery(artist);
-        setTitleQuery(title);
-        
-        // Perform initial search
-        if (artist || title) {
-          setLoading(true);
-          try {
-            let query = supabase
-              .from('album_context')
-              .select('id, artist, title, album, year, image_url, folder');
-
-            if (artist) {
-              query = query.ilike('artist', `%${artist}%`);
-            }
-            if (title) {
-              query = query.ilike('title', `%${title}%`);
-            }
-
-            const { data, error } = await query.limit(20);
-
-            if (error) {
-              console.error('Error fetching collection matches:', error);
-              setStatus('❌ Error searching collection');
-            } else {
-              setMatches(data || []);
-              setStatus(data?.length ? `Found ${data.length} matches` : 'No matches found');
-            }
-          } catch (error) {
-            console.error('Search error:', error);
-            setStatus('❌ Search failed');
-          }
-          setLoading(false);
-          setTimeout(() => setStatus(''), 3000);
-        }
-      }
-
-      // Load unmatched recognitions
-      try {
-        const { data, error } = await supabase
-          .from('audio_recognition_logs')
-          .select('*')
-          .eq('confirmed', false)
-          .order('created_at', { ascending: false })
-          .limit(10);
-
-        if (!error && data) {
-          setUnmatchedRecognitions(data.map(item => ({
-            id: item.id,
-            artist: item.artist || 'Unknown Artist',
-            title: item.title || 'Unknown Title',
-            album: item.album || 'Unknown Album',
-            confidence: item.confidence || 0,
-            created_at: item.created_at || new Date().toISOString(),
-            source: item.source || item.service || 'Unknown'
-          })));
-        }
-      } catch (error) {
-        console.error('Error fetching unmatched recognitions:', error);
-      }
-    };
-
-    initializeData();
-  }, [searchParams, supabase]);
-
-  // Manual search function for user interactions
-  const performSearch = async (artist: string = artistQuery, title: string = titleQuery) => {
-    if (!artist && !title && !searchQuery) {
-      setMatches([]);
-      return;
+    const artist = searchParams.get('artist') || '';
+    const title = searchParams.get('title') || '';
+    
+    if (artist || title) {
+      setArtistQuery(artist);
+      setTitleQuery(title);
+      performSearch(artist, title);
     }
 
-    setLoading(true);
-    try {
-      let query = supabase
-        .from('album_context')
-        .select('id, artist, title, album, year, image_url, folder');
+    loadUnmatchedRecognitions();
+  }, [searchParams]);
 
-      if (searchQuery) {
-        query = query.or(`artist.ilike.%${searchQuery}%,title.ilike.%${searchQuery}%,album.ilike.%${searchQuery}%`);
-      } else {
-        if (artist) {
-          query = query.ilike('artist', `%${artist}%`);
-        }
-        if (title) {
-          query = query.ilike('title', `%${title}%`);
-        }
-      }
-
-      const { data, error } = await query.limit(20);
-
-      if (error) {
-        console.error('Error fetching collection matches:', error);
-        setStatus('❌ Error searching collection');
-        return;
-      }
-
-      setMatches(data || []);
-      setStatus(data?.length ? `Found ${data.length} matches` : 'No matches found');
-    } catch (error) {
-      console.error('Search error:', error);
-      setStatus('❌ Search failed');
-    }
-    setLoading(false);
-    setTimeout(() => setStatus(''), 3000);
-  };
-
-  const handleConfirm = async () => {
-    if (selected === null) return;
-
-    try {
-      setStatus('🔄 Setting now playing...');
-      
-      const selectedMatch = matches.find(m => m.id === selected);
-      if (!selectedMatch) return;
-
-      await supabase.from('now_playing').delete().neq('id', 0);
-      await supabase.from('now_playing').insert({
-        artist: selectedMatch.artist,
-        title: selectedMatch.title,
-        album_title: selectedMatch.album,
-        album_id: selectedMatch.id,
-        started_at: new Date().toISOString(),
-        service_used: 'collection_match'
-      });
-
-      if (selectedRecognition) {
-        await supabase
-          .from('audio_recognition_logs')
-          .update({ confirmed: true })
-          .eq('id', selectedRecognition);
-      }
-
-      setStatus('✅ Track set as now playing!');
-      
-      setTimeout(() => {
-        router.push('/admin/audio-recognition/');
-      }, 2000);
-    } catch (error) {
-      setStatus(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  };
-
-  const selectFromUnmatched = (recognition: UnmatchedRecognition) => {
-    setSelectedRecognition(recognition.id);
-    setArtistQuery(recognition.artist);
-    setTitleQuery(recognition.title);
-    performSearch(recognition.artist, recognition.title);
-    setStatus(`🔍 Searching for: ${recognition.artist} - ${recognition.title}`);
-  };
-
-  const refreshUnmatchedRecognitions = async () => {
+  // Load unmatched recognitions
+  const loadUnmatchedRecognitions = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('audio_recognition_logs')
@@ -225,6 +82,172 @@ export default function CollectionMatchPage() {
     } catch (error) {
       console.error('Error fetching unmatched recognitions:', error);
     }
+  }, [supabase]);
+
+  // Perform collection search
+  const performSearch = useCallback(async (artist: string = artistQuery, title: string = titleQuery) => {
+    if (!artist && !title && !searchQuery) {
+      setMatches([]);
+      setStatus('Enter search terms to find albums in your collection');
+      return;
+    }
+
+    setLoading(true);
+    setStatus('Searching collection...');
+
+    try {
+      let query = supabase
+        .from('collection')
+        .select('id, artist, title, year, image_url, folder');
+
+      if (searchQuery) {
+        // General search across all fields
+        query = query.or(`artist.ilike.%${searchQuery}%,title.ilike.%${searchQuery}%`);
+      } else {
+        // Specific field searches
+        if (artist) {
+          query = query.ilike('artist', `%${artist}%`);
+        }
+        if (title) {
+          query = query.ilike('title', `%${title}%`);
+        }
+      }
+
+      const { data, error } = await query
+        .order('artist', { ascending: true })
+        .limit(50);
+
+      if (error) {
+        console.error('Search error:', error);
+        setStatus('❌ Error searching collection');
+        setMatches([]);
+        return;
+      }
+
+      const collectionMatches = (data || []).map(item => ({
+        id: item.id,
+        artist: item.artist || 'Unknown Artist',
+        title: item.title || 'Unknown Title',
+        album: item.title || 'Unknown Album', // Using title as album for vinyl
+        year: item.year || undefined,
+        image_url: item.image_url || undefined,
+        folder: item.folder || undefined
+      }));
+
+      setMatches(collectionMatches);
+      setStatus(collectionMatches.length ? 
+        `Found ${collectionMatches.length} matches in your collection` : 
+        'No matches found in your collection'
+      );
+
+    } catch (error) {
+      console.error('Search error:', error);
+      setStatus('❌ Search failed');
+      setMatches([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [artistQuery, titleQuery, searchQuery, supabase]);
+
+  // Handle search input change
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchQuery(value);
+    
+    // Clear specific field queries when using general search
+    if (value) {
+      setArtistQuery('');
+      setTitleQuery('');
+    }
+    
+    // Debounced search
+    const timeoutId = setTimeout(() => {
+      performSearch();
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  };
+
+  // Handle field-specific search
+  const handleFieldSearch = () => {
+    setSearchQuery(''); // Clear general search when using specific fields
+    performSearch();
+  };
+
+  // Select from unmatched recognitions
+  const selectFromUnmatched = (recognition: UnmatchedRecognition) => {
+    setSelectedRecognition(recognition.id);
+    setArtistQuery(recognition.artist);
+    setTitleQuery(recognition.title);
+    setSearchQuery('');
+    performSearch(recognition.artist, recognition.title);
+  };
+
+  // Confirm selection and update now playing
+  const handleConfirm = async () => {
+    if (selected === null) {
+      setStatus('Please select a match first');
+      return;
+    }
+
+    const selectedMatch = matches.find(m => m.id === selected);
+    if (!selectedMatch) {
+      setStatus('Selected match not found');
+      return;
+    }
+
+    try {
+      setStatus('🔄 Setting now playing...');
+      
+      // Update now playing
+      const { error: nowPlayingError } = await supabase
+        .from('now_playing')
+        .upsert({
+          id: 1,
+          artist: selectedMatch.artist,
+          title: selectedMatch.title,
+          album_title: selectedMatch.album,
+          album_id: selectedMatch.id,
+          started_at: new Date().toISOString(),
+          service_used: 'collection_match',
+          recognition_confidence: 1.0,
+          updated_at: new Date().toISOString()
+        });
+
+      if (nowPlayingError) {
+        throw nowPlayingError;
+      }
+
+      // Mark recognition as confirmed if we selected from unmatched
+      if (selectedRecognition) {
+        await supabase
+          .from('audio_recognition_logs')
+          .update({ confirmed: true })
+          .eq('id', selectedRecognition);
+      }
+
+      // Set album context
+      await supabase.from('album_context').delete().neq('id', 0);
+      await supabase.from('album_context').insert({
+        artist: selectedMatch.artist,
+        title: selectedMatch.album,
+        album: selectedMatch.album,
+        year: selectedMatch.year || new Date().getFullYear().toString(),
+        collection_id: selectedMatch.id,
+        source: 'collection_match',
+        created_at: new Date().toISOString()
+      });
+
+      setStatus('✅ Track set as now playing and album context updated!');
+      
+      setTimeout(() => {
+        router.push('/admin/audio-recognition/');
+      }, 2000);
+
+    } catch (error) {
+      console.error('Confirm error:', error);
+      setStatus(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   };
 
   return (
@@ -235,7 +258,7 @@ export default function CollectionMatchPage() {
           <div className="flex justify-between items-center">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Collection Match</h1>
-              <p className="text-gray-600">Find and match tracks from your collection</p>
+              <p className="text-gray-600">Search your collection and match recognized tracks</p>
             </div>
             <Link 
               href="/admin/audio-recognition"
@@ -268,24 +291,15 @@ export default function CollectionMatchPage() {
               {/* General Search */}
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  General Search
+                  Quick Search
                 </label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search artist, title, or album..."
-                    className="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                  <button
-                    onClick={() => performSearch()}
-                    disabled={loading}
-                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                  >
-                    {loading ? '🔍' : 'Search'}
-                  </button>
-                </div>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={handleSearchChange}
+                  placeholder="Search artist or album title..."
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
               </div>
 
               <div className="text-center text-gray-500 text-sm my-4">— OR —</div>
@@ -306,20 +320,20 @@ export default function CollectionMatchPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Title
+                    Album Title
                   </label>
                   <input
                     type="text"
                     value={titleQuery}
                     onChange={(e) => setTitleQuery(e.target.value)}
-                    placeholder="Enter title"
+                    placeholder="Enter album title"
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
               </div>
 
               <button
-                onClick={() => performSearch()}
+                onClick={handleFieldSearch}
                 disabled={loading}
                 className="w-full mt-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 transition-colors"
               >
@@ -344,7 +358,10 @@ export default function CollectionMatchPage() {
 
               {!loading && matches.length === 0 && (
                 <div className="p-8 text-center text-gray-500">
-                  {artistQuery || titleQuery || searchQuery ? 'No matches found. Try different search terms.' : 'Enter search terms to find albums in your collection.'}
+                  {artistQuery || titleQuery || searchQuery ? 
+                    'No matches found. Try different search terms.' : 
+                    'Enter search terms to find albums in your collection.'
+                  }
                 </div>
               )}
 
@@ -402,7 +419,7 @@ export default function CollectionMatchPage() {
                     onClick={handleConfirm}
                     className="w-full py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
                   >
-                    ✅ Set as Now Playing
+                    ✅ Set as Now Playing & Update Album Context
                   </button>
                 </div>
               )}
@@ -415,7 +432,7 @@ export default function CollectionMatchPage() {
               <div className="p-6 border-b border-gray-200">
                 <h3 className="text-lg font-semibold">Unmatched Recognitions</h3>
                 <p className="text-sm text-gray-600 mt-1">
-                  Recent recognitions awaiting confirmation
+                  Recent recognitions needing manual matching
                 </p>
               </div>
 
@@ -461,7 +478,7 @@ export default function CollectionMatchPage() {
               {unmatchedRecognitions.length > 0 && (
                 <div className="p-4 border-t border-gray-200 bg-gray-50">
                   <button
-                    onClick={refreshUnmatchedRecognitions}
+                    onClick={loadUnmatchedRecognitions}
                     className="w-full py-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
                   >
                     🔄 Refresh List
@@ -475,20 +492,33 @@ export default function CollectionMatchPage() {
               <h4 className="font-medium text-blue-900 mb-3">Quick Actions</h4>
               <div className="space-y-2">
                 <Link
-                  href="/admin/audio-recognition/override"
+                  href="/admin/audio-recognition"
                   className="block w-full py-2 px-3 bg-blue-600 text-white rounded text-sm text-center hover:bg-blue-700 transition-colors"
                 >
-                  ✏️ Manual Override
+                  🎵 Back to Recognition
                 </Link>
                 <Link
-                  href="/admin/audio-recognition"
-                  className="block w-full py-2 px-3 bg-gray-600 text-white rounded text-sm text-center hover:bg-gray-700 transition-colors"
+                  href="/now-playing-tv"
+                  target="_blank"
+                  className="block w-full py-2 px-3 bg-purple-600 text-white rounded text-sm text-center hover:bg-purple-700 transition-colors"
                 >
-                  📝 View All Logs
+                  📺 View TV Display
                 </Link>
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Instructions */}
+        <div className="mt-8 bg-green-50 border border-green-200 rounded-lg p-6">
+          <h3 className="text-lg font-semibold text-green-900 mb-3">How to Use Collection Match</h3>
+          <ol className="list-decimal list-inside space-y-2 text-green-800">
+            <li><strong>Search:</strong> Use quick search or specific artist/album fields to find matches</li>
+            <li><strong>Select:</strong> Click on a match from your collection to select it</li>
+            <li><strong>Confirm:</strong> Click "Set as Now Playing" to update the TV display</li>
+            <li><strong>Unmatched List:</strong> Click on unmatched recognitions to search for them automatically</li>
+            <li><strong>Priority Order:</strong> Your collection is searched in order: vinyl → cassettes → 45s</li>
+          </ol>
         </div>
       </div>
     </div>
