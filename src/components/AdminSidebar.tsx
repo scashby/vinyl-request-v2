@@ -14,7 +14,6 @@ export default function AdminSidebar() {
     
     // Audio Recognition Section - Only main page and collection match (the working ones)
     { label: "Audio Recognition", path: "/admin/audio-recognition", isNew: true },
-    { label: "Collection Match", path: "/admin/audio-recognition/collection" },
     { label: "Now Playing Control", path: "/admin/set-now-playing" },
     
     // Collection Management

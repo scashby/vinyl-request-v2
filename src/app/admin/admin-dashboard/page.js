@@ -20,7 +20,6 @@ export default function Page() {
         <Link href="/admin/add-customer-vinyl" className="card">Add Customer Vinyl</Link>
         <Link href="/admin/add-album" className="card">Add Album Manually</Link>
         <Link href="/admin/audio-recognition" className="card">Audio Recognition</Link>
-        <Link href="/admin/audio-recognition/collection" className="card">Collection Match</Link>
       </div>
     </div>
   );
