@@ -12,13 +12,9 @@ export default function AdminSidebar() {
     { label: "Manage Events", path: "/admin/manage-events" },
     { label: "Manage Queues", path: "/admin/edit-queue" },
     
-    // Audio Recognition Section
+    // Audio Recognition Section - Only main page and collection match (the working ones)
     { label: "Audio Recognition", path: "/admin/audio-recognition", isNew: true },
-    { label: "Recognition Logs", path: "/admin/audio-recognition/logs" },
     { label: "Collection Match", path: "/admin/audio-recognition/collection" },
-    { label: "Manual Override", path: "/admin/audio-recognition/override" },
-    { label: "Service Test", path: "/admin/audio-recognition/service-test" },
-    { label: "Recognition Settings", path: "/admin/audio-recognition/settings" },
     { label: "Now Playing Control", path: "/admin/set-now-playing" },
     
     // Collection Management
@@ -28,7 +24,6 @@ export default function AdminSidebar() {
     { label: "Add Customer Vinyl", path: "/admin/add-customer-vinyl" },
     
     // Content Management
-    { label: "Edit Playlists", path: "/admin/playlists" },
     { label: "Most Wanted", path: "/admin/most-wanted" },
     { label: "Social Embeds", path: "/admin/socials" },
     
@@ -106,15 +101,11 @@ export default function AdminSidebar() {
           </div>
           <div className="flex justify-between">
             <span className="text-gray-600">Service:</span>
-            <span className="text-gray-800">ACRCloud</span>
+            <span className="text-gray-800">Simulation</span>
           </div>
           <div className="flex justify-between">
             <span className="text-gray-600">Last scan:</span>
-            <span className="text-gray-800">2 min ago</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-600">Confidence:</span>
-            <span className="text-green-600 font-medium">95%</span>
+            <span className="text-gray-800">Ready</span>
           </div>
         </div>
         
@@ -137,10 +128,10 @@ export default function AdminSidebar() {
             💿 Find in Collection
           </Link>
           <Link 
-            href="/admin/audio-recognition/override"
-            className="block w-full text-center bg-orange-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-orange-700 transition-colors"
+            href="/admin/edit-collection"
+            className="block w-full text-center bg-green-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-green-700 transition-colors"
           >
-            ✏️ Manual Override
+            📚 Edit Collection
           </Link>
         </div>
       </div>
