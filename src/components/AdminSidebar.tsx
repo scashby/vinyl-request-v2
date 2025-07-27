@@ -121,12 +121,6 @@ export default function AdminSidebar() {
         <h4 className="text-sm font-semibold text-purple-800 mb-2">Quick Actions</h4>
         <div className="space-y-2">
           <Link 
-            href="/admin/audio-recognition/collection"
-            className="block w-full text-center bg-purple-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-purple-700 transition-colors"
-          >
-            💿 Find in Collection
-          </Link>
-          <Link 
             href="/admin/edit-collection"
             className="block w-full text-center bg-green-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-green-700 transition-colors"
           >
