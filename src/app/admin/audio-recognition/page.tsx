@@ -1,4 +1,4 @@
-// src/app/admin/audio-recognition/page.tsx - WORKING VERSION
+// src/app/admin/audio-recognition/page.tsx - Complete Fixed Version
 
 'use client';
 
@@ -28,7 +28,7 @@ export default function WorkingAudioRecognitionPage() {
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [audioMetrics, setAudioMetrics] = useState<AudioMetrics | null>(null);
-  const [status, setStatus] = useState<string>('Click &ldquo;Start Audio Capture&rdquo; to begin');
+  const [status, setStatus] = useState<string>('Click "Start Audio Capture" to begin');
   
   // Recognition results
   const [results, setResults] = useState<AudioRecognitionResult[]>([]);
@@ -45,6 +45,7 @@ export default function WorkingAudioRecognitionPage() {
   const addLog = useCallback((message: string) => {
     const timestamp = new Date().toLocaleTimeString();
     setLogs(prev => [...prev.slice(-19), `[${timestamp}] ${message}`]);
+    console.log(`🎵 [${timestamp}] ${message}`);
   }, []);
 
   // Cleanup function
@@ -118,13 +119,18 @@ export default function WorkingAudioRecognitionPage() {
       setStatus('Requesting microphone permission...');
       addLog('Requesting microphone access');
       
+      // Check if browser supports required APIs
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Your browser does not support audio capture');
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           sampleRate: 44100,
           channelCount: 1,
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
         }
       });
 
@@ -144,20 +150,29 @@ export default function WorkingAudioRecognitionPage() {
       source.connect(analyser);
       
       // Set up media recorder for actual audio capture
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'audio/webm;codecs=opus'
-      });
+      let mimeType = 'audio/webm;codecs=opus';
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = 'audio/webm';
+        if (!MediaRecorder.isTypeSupported(mimeType)) {
+          mimeType = 'audio/mp4';
+          if (!MediaRecorder.isTypeSupported(mimeType)) {
+            mimeType = ''; // Let browser choose
+          }
+        }
+      }
+
+      const mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
-      mediaRecorder.ondataavailable = (event) => {
+      mediaRecorder.ondataavailable = (event: BlobEvent) => {
         if (event.data.size > 0) {
           audioChunksRef.current.push(event.data);
         }
       };
 
       setIsRecording(true);
-      setStatus('🎤 Listening for audio... (Click &ldquo;Recognize Audio&rdquo; when ready)');
+      setStatus('🎤 Listening for audio... (Click "Recognize Audio" when ready)');
       addLog('Audio capture started successfully');
       
       // Start audio analysis
@@ -168,6 +183,7 @@ export default function WorkingAudioRecognitionPage() {
       setStatus(`❌ Error: ${errorMessage}`);
       addLog(`Error starting capture: ${errorMessage}`);
       setHasPermission(false);
+      console.error('Audio capture error:', error);
     }
   }, [addLog, analyzeAudio]);
 
@@ -186,12 +202,15 @@ export default function WorkingAudioRecognitionPage() {
     }
 
     setIsProcessing(true);
-    setStatus('🔍 Processing audio for recognition...');
+    setStatus('🔍 Recording audio sample...');
     addLog('Starting audio recognition');
     
     const startTime = Date.now();
 
     try {
+      // Clear previous chunks
+      audioChunksRef.current = [];
+      
       // Start recording for recognition
       mediaRecorderRef.current.start();
       
@@ -206,11 +225,26 @@ export default function WorkingAudioRecognitionPage() {
       await new Promise<void>((resolve) => {
         if (mediaRecorderRef.current) {
           mediaRecorderRef.current.onstop = () => resolve();
+        } else {
+          resolve();
         }
       });
 
+      if (audioChunksRef.current.length === 0) {
+        throw new Error('No audio data captured');
+      }
+
       // Convert audio to base64
-      const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+      const audioBlob = new Blob(audioChunksRef.current, { 
+        type: audioChunksRef.current[0]?.type || 'audio/webm' 
+      });
+      
+      if (audioBlob.size === 0) {
+        throw new Error('Empty audio recording');
+      }
+
+      addLog(`Audio recorded: ${Math.round(audioBlob.size / 1024)}KB`);
+
       const arrayBuffer = await audioBlob.arrayBuffer();
       const base64Audio = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
 
@@ -224,17 +258,25 @@ export default function WorkingAudioRecognitionPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          audioData: base64Audio, // Send as base64 string
+          audioData: base64Audio,
           timestamp: new Date().toISOString(),
           triggeredBy: 'manual_admin'
         })
       });
 
+      const responseText = await response.text();
+      
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        throw new Error(`HTTP ${response.status}: ${response.statusText}. Response: ${responseText}`);
       }
 
-      const result = await response.json();
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch {
+        throw new Error(`Invalid JSON response: ${responseText}`);
+      }
+
       const processingTime = Date.now() - startTime;
 
       const recognitionResult: AudioRecognitionResult = {
@@ -271,6 +313,7 @@ export default function WorkingAudioRecognitionPage() {
       setResults(prev => [errorResult, ...prev.slice(0, 9)]);
       setStatus(`❌ Error: ${errorMessage}`);
       addLog(`Recognition error: ${errorMessage}`);
+      console.error('Recognition error:', error);
     } finally {
       setIsProcessing(false);
       audioChunksRef.current = []; // Clear chunks for next recording
@@ -286,22 +329,41 @@ export default function WorkingAudioRecognitionPage() {
       const tests = [
         { name: 'Audio Recognition API', endpoint: '/api/audio-recognition' },
         { name: 'Manual Recognition API', endpoint: '/api/manual-recognition' },
-        { name: 'Album Context API', endpoint: '/api/album-context' }
+        { name: 'Album Context API', endpoint: '/api/album-context' },
+        { name: 'Recognition Logs API', endpoint: '/api/audio-recognition/logs' },
+        { name: 'Service Test API', endpoint: '/api/audio-recognition/service-test' }
       ];
 
       for (const test of tests) {
         try {
-          const response = await fetch(test.endpoint, { method: 'GET' });
+          const response = await fetch(test.endpoint, { 
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          });
           const statusText = response.ok ? '✅ Available' : `❌ Error ${response.status}`;
           addLog(`${test.name}: ${statusText}`);
-        } catch {
+          
+          if (response.ok) {
+            try {
+              const data = await response.json();
+              console.log(`${test.name} response:`, data);
+            } catch {
+              addLog(`${test.name}: ⚠️ Non-JSON response`);
+            }
+          }
+        } catch (fetchError) {
           addLog(`${test.name}: ❌ Connection failed`);
+          console.error(`${test.name} test failed:`, fetchError);
         }
       }
       
       setStatus('🔧 Service test completed');
     } catch (error) {
-      addLog(`Service test failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      addLog(`Service test failed: ${errorMessage}`);
+      console.error('Service test error:', error);
     }
   }, [addLog]);
 
