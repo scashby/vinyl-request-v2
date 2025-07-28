@@ -1,4 +1,4 @@
-// src/app/admin/audio-recognition/page.tsx - FIXED TypeScript Error + Enhanced Auto-Recognition
+// src/app/admin/audio-recognition/page.tsx - FIXED MediaRecorder Lifecycle
 
 'use client';
 
@@ -140,7 +140,7 @@ export default function EnhancedAudioRecognitionPage() {
       const now = Date.now();
       if (now - lastRecognitionRef.current >= autoLoop.interval * 1000) {
         lastRecognitionRef.current = now;
-        addLog(`Auto-trigger: Volume ${volume.toFixed(1)}% ${'>'}= ${autoLoop.minVolume}%`);
+        addLog(`Auto-trigger: Volume ${volume.toFixed(1)}% >= ${autoLoop.minVolume}%`);
         triggerRecognition(true);
       }
     }
@@ -150,7 +150,57 @@ export default function EnhancedAudioRecognitionPage() {
     }
   }, [isRecording, autoLoop, isProcessing, addLog]);
 
-  // Start audio capture with enhanced setup
+  // NEW: Helper function to refresh audio stream when needed
+  const refreshAudioStream = useCallback(async (): Promise<void> => {
+    addLog('🔄 Refreshing audio stream...');
+    
+    try {
+      // Stop existing stream
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
+
+      // Clean up audio context
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+        audioContextRef.current = null;
+      }
+
+      // Request new stream
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          sampleRate: 44100,
+          channelCount: 1,
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false
+        }
+      });
+
+      streamRef.current = stream;
+      
+      // Re-setup audio context for analysis
+      const audioContext = new AudioContext({ sampleRate: 44100 });
+      audioContextRef.current = audioContext;
+      
+      const source = audioContext.createMediaStreamSource(stream);
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 4096;
+      analyser.smoothingTimeConstant = 0.3;
+      
+      analyserRef.current = analyser;
+      source.connect(analyser);
+      
+      addLog('✅ Audio stream refreshed successfully');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      addLog(`❌ Failed to refresh audio stream: ${errorMessage}`);
+      throw error;
+    }
+  }, [addLog]);
+
+  // FIXED: Start audio capture with enhanced setup
   const startCapture = useCallback(async () => {
     try {
       setStatus('Requesting microphone permission...');
@@ -160,31 +210,9 @@ export default function EnhancedAudioRecognitionPage() {
         throw new Error('Your browser does not support audio capture');
       }
 
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          sampleRate: 44100,
-          channelCount: 1,
-          echoCancellation: false, // Disable for music recognition
-          noiseSuppression: false,
-          autoGainControl: false
-        }
-      });
+      await refreshAudioStream(); // Use the new refresh function
 
-      streamRef.current = stream;
       setHasPermission(true);
-      
-      // Set up audio context for analysis
-      const audioContext = new AudioContext({ sampleRate: 44100 });
-      audioContextRef.current = audioContext;
-      
-      const source = audioContext.createMediaStreamSource(stream);
-      const analyser = audioContext.createAnalyser();
-      analyser.fftSize = 4096; // Higher resolution for better frequency analysis
-      analyser.smoothingTimeConstant = 0.3; // Less smoothing for real-time response
-      
-      analyserRef.current = analyser;
-      source.connect(analyser);
-      
       setIsRecording(true);
       setStatus(autoLoop.enabled ? 
         `🎤 Auto-recognition active (every ${autoLoop.interval}s, min volume: ${autoLoop.minVolume}%)` :
@@ -202,7 +230,7 @@ export default function EnhancedAudioRecognitionPage() {
       setHasPermission(false);
       console.error('Audio capture error:', error);
     }
-  }, [addLog, analyzeAudio, autoLoop]);
+  }, [addLog, analyzeAudio, autoLoop, refreshAudioStream]);
 
   // Stop audio capture
   const stopCapture = useCallback(() => {
@@ -212,7 +240,7 @@ export default function EnhancedAudioRecognitionPage() {
     addLog('Audio capture stopped');
   }, [cleanup, addLog]);
 
-  // Enhanced recognition with collection-first approach
+  // FIXED: Enhanced recognition with proper MediaRecorder lifecycle
   const triggerRecognition = useCallback(async (isAutoTrigger = false) => {
     if (!streamRef.current || !isRecording) {
       setStatus('❌ No audio recording available');
@@ -225,38 +253,89 @@ export default function EnhancedAudioRecognitionPage() {
     addLog(`${triggerType} recognition triggered`);
     
     const startTime = Date.now();
+    let mediaRecorder: MediaRecorder | null = null;
 
     try {
-      // Create a fresh MediaRecorder for each recognition to avoid 0KB issue
-      const mediaRecorder = new MediaRecorder(streamRef.current, {
-        mimeType: 'audio/webm;codecs=opus'
-      });
+      // Ensure we have a fresh, active stream
+      if (!streamRef.current.active) {
+        addLog('Stream inactive, refreshing audio stream...');
+        await refreshAudioStream();
+        if (!streamRef.current) {
+          throw new Error('Failed to refresh audio stream');
+        }
+      }
+
+      // Create MediaRecorder with proper error handling
+      try {
+        mediaRecorder = new MediaRecorder(streamRef.current, {
+          mimeType: 'audio/webm;codecs=opus'
+        });
+      } catch (error) {
+        // Fallback to default codec if opus not supported
+        addLog('Opus codec not supported, falling back to default');
+        mediaRecorder = new MediaRecorder(streamRef.current);
+      }
       
       const audioChunks: Blob[] = [];
+      let recordingComplete = false;
       
-      mediaRecorder.ondataavailable = (event: BlobEvent) => {
-        if (event.data.size > 0) {
-          audioChunks.push(event.data);
-        }
-      };
+      // Set up event handlers BEFORE starting recording
+      const dataAvailablePromise = new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error('Recording timeout - no data received'));
+        }, 12000); // 12 second timeout (10s record + 2s buffer)
 
-      // Start recording for recognition
-      mediaRecorder.start();
+        mediaRecorder!.ondataavailable = (event: BlobEvent) => {
+          if (event.data && event.data.size > 0) {
+            audioChunks.push(event.data);
+            addLog(`Data chunk received: ${event.data.size} bytes`);
+          }
+        };
+
+        mediaRecorder!.onstop = () => {
+          clearTimeout(timeout);
+          recordingComplete = true;
+          addLog(`Recording stopped. Total chunks: ${audioChunks.length}`);
+          resolve();
+        };
+
+        mediaRecorder!.onerror = (event) => {
+          clearTimeout(timeout);
+          const error = (event as any).error || new Error('MediaRecorder error');
+          addLog(`MediaRecorder error: ${error.message}`);
+          reject(error);
+        };
+      });
+
+      // Start recording with data collection interval
+      addLog('Starting MediaRecorder...');
+      mediaRecorder.start(100); // Collect data every 100ms for better reliability
+      
+      // Verify recording started
+      await new Promise(resolve => setTimeout(resolve, 100));
+      if (mediaRecorder.state !== 'recording') {
+        throw new Error(`MediaRecorder failed to start. State: ${mediaRecorder.state}`);
+      }
+      
+      addLog(`Recording for 10 seconds... (State: ${mediaRecorder.state})`);
       
       // Record for 10 seconds
       await new Promise(resolve => setTimeout(resolve, 10000));
       
+      // Stop recording safely
       if (mediaRecorder.state === 'recording') {
+        addLog('Stopping MediaRecorder...');
         mediaRecorder.stop();
+      } else {
+        addLog(`Unexpected recorder state when stopping: ${mediaRecorder.state}`);
       }
 
-      // Wait for the recording to be available
-      await new Promise<void>((resolve) => {
-        mediaRecorder.onstop = () => resolve();
-      });
+      // Wait for recording to complete
+      await dataAvailablePromise;
 
+      // Validate recording results
       if (audioChunks.length === 0) {
-        throw new Error('No audio data captured');
+        throw new Error('No audio chunks received during recording');
       }
 
       const audioBlob = new Blob(audioChunks, { 
@@ -264,12 +343,13 @@ export default function EnhancedAudioRecognitionPage() {
       });
       
       if (audioBlob.size === 0) {
-        throw new Error('Empty audio recording');
+        throw new Error('Audio blob is empty despite having chunks');
       }
 
-      addLog(`Audio captured: ${Math.round(audioBlob.size / 1024)}KB`);
+      const sizeKB = Math.round(audioBlob.size / 1024);
+      addLog(`✅ Audio captured successfully: ${sizeKB}KB from ${audioChunks.length} chunks`);
 
-      // Convert to base64
+      // Convert to base64 for API
       const arrayBuffer = await audioBlob.arrayBuffer();
       const base64Audio = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
 
@@ -308,9 +388,25 @@ export default function EnhancedAudioRecognitionPage() {
       addLog(`Recognition error: ${errorMessage}`);
       console.error('Recognition error:', error);
     } finally {
+      // Cleanup MediaRecorder
+      if (mediaRecorder) {
+        try {
+          if (mediaRecorder.state !== 'inactive') {
+            mediaRecorder.stop();
+          }
+        } catch (cleanupError) {
+          addLog(`Cleanup warning: ${cleanupError instanceof Error ? cleanupError.message : 'Unknown error'}`);
+        }
+        
+        // Clear event handlers to prevent memory leaks
+        mediaRecorder.ondataavailable = null;
+        mediaRecorder.onstop = null;
+        mediaRecorder.onerror = null;
+      }
+      
       setIsProcessing(false);
     }
-  }, [isRecording, addLog, autoLoop]);
+  }, [isRecording, addLog, autoLoop, refreshAudioStream]);
 
   // Multi-source recognition function
   const performMultiSourceRecognition = async (base64Audio: string, isAutoTrigger: boolean) => {
@@ -751,7 +847,7 @@ export default function EnhancedAudioRecognitionPage() {
           <h3 className="text-lg font-semibold text-green-900 mb-3">How to Use Enhanced Auto-Recognition</h3>
           <ol className="list-decimal list-inside space-y-2 text-green-800">
             <li><strong>Start Auto-Recognition:</strong> Click the green button to begin continuous listening</li>
-            <li><strong>Automatic Detection:</strong> System will recognize audio every {autoLoop.interval} seconds when volume {'>'} {autoLoop.minVolume}%</li>
+            <li><strong>Automatic Detection:</strong> System will recognize audio every {autoLoop.interval} seconds when volume > {autoLoop.minVolume}%</li>
             <li><strong>Collection-First Matching:</strong> Checks your vinyl collection database before external APIs</li>
             <li><strong>Multi-Source Results:</strong> View matches from both collection and external services</li>
             <li><strong>Adjust Settings:</strong> Fine-tune recognition interval and volume threshold</li>
