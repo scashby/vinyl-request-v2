@@ -1,4 +1,4 @@
-// src/app/admin/audio-recognition/page.tsx - FIXED with Automatic Recognition Loop
+// src/app/admin/audio-recognition/page.tsx - FIXED TypeScript Error + Enhanced Auto-Recognition
 
 'use client';
 
@@ -140,7 +140,7 @@ export default function EnhancedAudioRecognitionPage() {
       const now = Date.now();
       if (now - lastRecognitionRef.current >= autoLoop.interval * 1000) {
         lastRecognitionRef.current = now;
-        addLog(`Auto-trigger: Volume ${volume.toFixed(1)}% > ${autoLoop.minVolume}%`);
+        addLog(`Auto-trigger: Volume ${volume.toFixed(1)}% ${'>'}= ${autoLoop.minVolume}%`);
         triggerRecognition(true);
       }
     }
@@ -751,7 +751,7 @@ export default function EnhancedAudioRecognitionPage() {
           <h3 className="text-lg font-semibold text-green-900 mb-3">How to Use Enhanced Auto-Recognition</h3>
           <ol className="list-decimal list-inside space-y-2 text-green-800">
             <li><strong>Start Auto-Recognition:</strong> Click the green button to begin continuous listening</li>
-            <li><strong>Automatic Detection:</strong> System will recognize audio every {autoLoop.interval} seconds when volume > {autoLoop.minVolume}%</li>
+            <li><strong>Automatic Detection:</strong> System will recognize audio every {autoLoop.interval} seconds when volume {'>'} {autoLoop.minVolume}%</li>
             <li><strong>Collection-First Matching:</strong> Checks your vinyl collection database before external APIs</li>
             <li><strong>Multi-Source Results:</strong> View matches from both collection and external services</li>
             <li><strong>Adjust Settings:</strong> Fine-tune recognition interval and volume threshold</li>

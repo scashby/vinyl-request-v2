@@ -1,4 +1,4 @@
-// src/app/api/audio-recognition/collection/route.ts - Collection-First Matching API
+// src/app/api/audio-recognition/collection/route.ts - Collection-First Matching API - FIXED ESLint
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
@@ -24,6 +24,36 @@ interface AudioFingerprint {
   energy: number;
   mfcc: number[];
   dominantFrequencies: number[];
+}
+
+interface CollectionItem {
+  id: number;
+  artist: string;
+  title: string;
+  year?: string;
+  image_url?: string;
+  folder?: string;
+}
+
+interface LogData {
+  artist: string | null;
+  title: string | null;
+  album: string | null;
+  source: string;
+  service: string;
+  confidence: number;
+  confirmed: boolean;
+  raw_response: Record<string, unknown>;
+  created_at: string;
+  timestamp: string;
+}
+
+interface SupabaseClient {
+  from: (table: string) => {
+    insert: (data: LogData) => Promise<{ error?: Error }>;
+    upsert: (data: Record<string, unknown>) => Promise<{ error?: Error }>;
+    delete: () => { neq: (field: string, value: unknown) => Promise<{ error?: Error }> };
+  };
 }
 
 export async function GET() {
@@ -154,7 +184,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Perform collection matching
-    const matches = await findCollectionMatches(collection, fingerprint, body);
+    const matches = await findCollectionMatches(collection as CollectionItem[], fingerprint, body);
     
     const processingTime = Date.now() - startTime;
     
@@ -162,7 +192,7 @@ export async function POST(request: NextRequest) {
       console.log('❌ No collection matches found');
       
       // Log the attempt
-      await logRecognitionAttempt(supabase, {
+      await logRecognitionAttempt(supabase as unknown as SupabaseClient, {
         artist: null,
         title: null,
         album: null,
@@ -198,7 +228,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Log successful match
-    await logRecognitionAttempt(supabase, {
+    await logRecognitionAttempt(supabase as unknown as SupabaseClient, {
       artist: bestMatch.artist,
       title: bestMatch.title,
       album: bestMatch.album,
@@ -376,9 +406,9 @@ async function extractAudioFingerprint(audioBuffer: Buffer): Promise<AudioFinger
 
 // Find matches in collection using multiple strategies
 async function findCollectionMatches(
-  collection: any[], 
+  collection: CollectionItem[], 
   fingerprint: AudioFingerprint,
-  body: any
+  body: Record<string, unknown>
 ): Promise<CollectionMatch[]> {
   const matches: CollectionMatch[] = [];
 
@@ -395,8 +425,8 @@ async function findCollectionMatches(
 
     // Strategy 1: Exact text matching (highest confidence)
     if (body.knownArtist && body.knownTitle) {
-      const queryArtist = body.knownArtist.toLowerCase().trim();
-      const queryTitle = body.knownTitle.toLowerCase().trim();
+      const queryArtist = (body.knownArtist as string).toLowerCase().trim();
+      const queryTitle = (body.knownTitle as string).toLowerCase().trim();
       
       if (artist === queryArtist && title === queryTitle) {
         confidence = 0.95;
@@ -487,7 +517,7 @@ function calculateHashSimilarity(hash1: string, hash2: string): number {
   return matches / Math.max(hash1.length, hash2.length);
 }
 
-function generateAlbumFingerprint(album: any): AudioFingerprint {
+function generateAlbumFingerprint(album: CollectionItem): AudioFingerprint {
   // Generate a pseudo-fingerprint based on album metadata
   const artistHash = createSimpleHash(album.artist || '');
   const titleHash = createSimpleHash(album.title || '');
@@ -529,8 +559,8 @@ function calculateFingerprintSimilarity(fp1: AudioFingerprint, fp2: AudioFingerp
   }
 }
 
-// Log recognition attempt
-async function logRecognitionAttempt(supabase: any, logData: any) {
+// Log recognition attempt - FIXED: Properly typed parameters
+async function logRecognitionAttempt(supabase: SupabaseClient, logData: LogData) {
   try {
     await supabase
       .from('audio_recognition_logs')
