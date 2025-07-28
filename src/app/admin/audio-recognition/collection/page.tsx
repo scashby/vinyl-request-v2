@@ -1,4 +1,4 @@
-// src/app/admin/audio-recognition/collection/page.tsx - FIXED Collection Match
+// src/app/admin/audio-recognition/collection/page.tsx - FIXED ESLint Errors
 
 'use client';
 
@@ -44,21 +44,7 @@ export default function FixedCollectionMatchPage() {
   const [selectedRecognition, setSelectedRecognition] = useState<number | null>(null);
   const [status, setStatus] = useState('');
 
-  // Initialize search from URL params
-  useEffect(() => {
-    const artist = searchParams.get('artist') || '';
-    const title = searchParams.get('title') || '';
-    
-    if (artist || title) {
-      setArtistQuery(artist);
-      setTitleQuery(title);
-      performSearch(artist, title);
-    }
-
-    loadUnmatchedRecognitions();
-  }, [searchParams]);
-
-  // Load unmatched recognitions
+  // Load unmatched recognitions - FIXED: Added useCallback to resolve exhaustive-deps
   const loadUnmatchedRecognitions = useCallback(async () => {
     try {
       const { data, error } = await supabase
@@ -84,7 +70,7 @@ export default function FixedCollectionMatchPage() {
     }
   }, [supabase]);
 
-  // Perform collection search
+  // Perform collection search - FIXED: Added useCallback to resolve exhaustive-deps
   const performSearch = useCallback(async (artist: string = artistQuery, title: string = titleQuery) => {
     if (!artist && !title && !searchQuery) {
       setMatches([]);
@@ -148,6 +134,20 @@ export default function FixedCollectionMatchPage() {
       setLoading(false);
     }
   }, [artistQuery, titleQuery, searchQuery, supabase]);
+
+  // Initialize search from URL params - FIXED: Added proper dependencies
+  useEffect(() => {
+    const artist = searchParams.get('artist') || '';
+    const title = searchParams.get('title') || '';
+    
+    if (artist || title) {
+      setArtistQuery(artist);
+      setTitleQuery(title);
+      performSearch(artist, title);
+    }
+
+    loadUnmatchedRecognitions();
+  }, [searchParams, performSearch, loadUnmatchedRecognitions]); // FIXED: Added missing dependencies
 
   // Handle search input change
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -419,7 +419,7 @@ export default function FixedCollectionMatchPage() {
                     onClick={handleConfirm}
                     className="w-full py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
                   >
-                    ✅ Set as Now Playing & Update Album Context
+                    ✅ Set as Now Playing &amp; Update Album Context
                   </button>
                 </div>
               )}
@@ -515,7 +515,7 @@ export default function FixedCollectionMatchPage() {
           <ol className="list-decimal list-inside space-y-2 text-green-800">
             <li><strong>Search:</strong> Use quick search or specific artist/album fields to find matches</li>
             <li><strong>Select:</strong> Click on a match from your collection to select it</li>
-            <li><strong>Confirm:</strong> Click "Set as Now Playing" to update the TV display</li>
+            <li><strong>Confirm:</strong> Click &ldquo;Set as Now Playing&rdquo; to update the TV display</li>
             <li><strong>Unmatched List:</strong> Click on unmatched recognitions to search for them automatically</li>
             <li><strong>Priority Order:</strong> Your collection is searched in order: vinyl → cassettes → 45s</li>
           </ol>
