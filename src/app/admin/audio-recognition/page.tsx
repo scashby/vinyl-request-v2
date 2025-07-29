@@ -1,4 +1,4 @@
-// src/app/admin/audio-recognition/page.tsx - FIXED MediaRecorder Lifecycle
+// src/app/admin/audio-recognition/page.tsx - FIXED MediaRecorder Lifecycle + Enhanced Features
 
 'use client';
 
@@ -60,6 +60,7 @@ export default function EnhancedAudioRecognitionPage() {
   const animationFrameRef = useRef<number | null>(null);
   const autoLoopTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastRecognitionRef = useRef<number>(0);
+  const triggerRecognitionRef = useRef<((isAutoTrigger?: boolean) => Promise<void>) | null>(null);
 
   const addLog = useCallback((message: string) => {
     const timestamp = new Date().toLocaleTimeString();
@@ -141,14 +142,14 @@ export default function EnhancedAudioRecognitionPage() {
       if (now - lastRecognitionRef.current >= autoLoop.interval * 1000) {
         lastRecognitionRef.current = now;
         addLog(`Auto-trigger: Volume ${volume.toFixed(1)}% >= ${autoLoop.minVolume}%`);
-        triggerRecognition(true);
+        triggerRecognitionRef.current?.(true);
       }
     }
 
     if (isRecording) {
       animationFrameRef.current = requestAnimationFrame(analyzeAudio);
     }
-  }, [isRecording, autoLoop, isProcessing, addLog]);
+  }, [isRecording, autoLoop.enabled, autoLoop.minVolume, autoLoop.interval, isProcessing, addLog]);
 
   // NEW: Helper function to refresh audio stream when needed
   const refreshAudioStream = useCallback(async (): Promise<void> => {
@@ -220,9 +221,6 @@ export default function EnhancedAudioRecognitionPage() {
       );
       addLog('Audio capture started successfully');
       
-      // Start audio analysis
-      analyzeAudio();
-      
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Permission denied';
       setStatus(`❌ Error: ${errorMessage}`);
@@ -230,7 +228,14 @@ export default function EnhancedAudioRecognitionPage() {
       setHasPermission(false);
       console.error('Audio capture error:', error);
     }
-  }, [addLog, analyzeAudio, autoLoop, refreshAudioStream]);
+  }, [addLog, autoLoop.enabled, autoLoop.interval, autoLoop.minVolume, refreshAudioStream]);
+
+  // Use effect to start analysis when recording begins
+  useEffect(() => {
+    if (isRecording) {
+      analyzeAudio();
+    }
+  }, [isRecording, analyzeAudio]);
 
   // Stop audio capture
   const stopCapture = useCallback(() => {
@@ -239,6 +244,99 @@ export default function EnhancedAudioRecognitionPage() {
     setStatus('Audio capture stopped');
     addLog('Audio capture stopped');
   }, [cleanup, addLog]);
+
+  // Multi-source recognition function
+  const performMultiSourceRecognition = useCallback(async (base64Audio: string, isAutoTrigger: boolean) => {
+    const results: AudioRecognitionResult[] = [];
+    let bestResult: AudioRecognitionResult = {
+      success: false,
+      error: 'No recognition attempted',
+      processingTime: 0
+    };
+
+    // Step 1: Check collection first (if enabled)
+    if (autoLoop.collectionFirst) {
+      try {
+        addLog('Checking local collection...');
+        const collectionResult = await fetch('/api/audio-recognition/collection', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            audioData: base64Audio,
+            triggeredBy: isAutoTrigger ? 'auto_collection' : 'manual_collection',
+            timestamp: new Date().toISOString()
+          })
+        });
+
+        if (collectionResult.ok) {
+          const collectionData = await collectionResult.json();
+          if (collectionData.success) {
+            const result: AudioRecognitionResult = {
+              ...collectionData.result,
+              source: 'collection' as const,
+              success: true,
+              processingTime: 0
+            };
+            results.push(result);
+            bestResult = result; // Collection match is always best
+            addLog(`Collection match found: ${result.artist} - ${result.title}`);
+            return { best: bestResult, all: results };
+          }
+        }
+        addLog('No collection match found, trying external services...');
+      } catch {
+        addLog(`Collection check failed: Unknown error`);
+      }
+    }
+
+    // Step 2: Try external recognition API
+    try {
+      const response = await fetch('/api/audio-recognition', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          audioData: base64Audio,
+          timestamp: new Date().toISOString(),
+          triggeredBy: isAutoTrigger ? 'auto_external' : 'manual_external'
+        })
+      });
+
+      const responseText = await response.text();
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = JSON.parse(responseText);
+
+      if (result.success && result.result) {
+        const externalResult: AudioRecognitionResult = {
+          ...result.result,
+          source: 'external' as const,
+          success: true,
+          processingTime: result.processingTime || 0
+        };
+        results.push(externalResult);
+        
+        if (!bestResult.success) {
+          bestResult = externalResult;
+        }
+      }
+    } catch {
+      const errorMessage = 'External recognition failed';
+      addLog(`External recognition error: ${errorMessage}`);
+      
+      if (!bestResult.success) {
+        bestResult = {
+          success: false,
+          error: errorMessage,
+          processingTime: 0
+        };
+      }
+    }
+
+    return { best: bestResult, all: results };
+  }, [autoLoop.collectionFirst, addLog]);
 
   // FIXED: Enhanced recognition with proper MediaRecorder lifecycle
   const triggerRecognition = useCallback(async (isAutoTrigger = false) => {
@@ -270,14 +368,13 @@ export default function EnhancedAudioRecognitionPage() {
         mediaRecorder = new MediaRecorder(streamRef.current, {
           mimeType: 'audio/webm;codecs=opus'
         });
-      } catch (error) {
+      } catch {
         // Fallback to default codec if opus not supported
         addLog('Opus codec not supported, falling back to default');
         mediaRecorder = new MediaRecorder(streamRef.current);
       }
       
       const audioChunks: Blob[] = [];
-      let recordingComplete = false;
       
       // Set up event handlers BEFORE starting recording
       const dataAvailablePromise = new Promise<void>((resolve, reject) => {
@@ -294,14 +391,14 @@ export default function EnhancedAudioRecognitionPage() {
 
         mediaRecorder!.onstop = () => {
           clearTimeout(timeout);
-          recordingComplete = true;
           addLog(`Recording stopped. Total chunks: ${audioChunks.length}`);
           resolve();
         };
 
-        mediaRecorder!.onerror = (event) => {
+        mediaRecorder!.onerror = (event: Event) => {
           clearTimeout(timeout);
-          const error = (event as any).error || new Error('MediaRecorder error');
+          const errorEvent = event as ErrorEvent;
+          const error = errorEvent.error || new Error('MediaRecorder error');
           addLog(`MediaRecorder error: ${error.message}`);
           reject(error);
         };
@@ -357,8 +454,6 @@ export default function EnhancedAudioRecognitionPage() {
 
       // Enhanced recognition with multiple sources
       const recognitionResults = await performMultiSourceRecognition(base64Audio, isAutoTrigger);
-      
-      const processingTime = Date.now() - startTime;
 
       // Update results
       setResults(prev => [recognitionResults.best, ...prev.slice(0, 9)]);
@@ -406,100 +501,10 @@ export default function EnhancedAudioRecognitionPage() {
       
       setIsProcessing(false);
     }
-  }, [isRecording, addLog, autoLoop, refreshAudioStream]);
+  }, [isRecording, addLog, refreshAudioStream, performMultiSourceRecognition]);
 
-  // Multi-source recognition function
-  const performMultiSourceRecognition = async (base64Audio: string, isAutoTrigger: boolean) => {
-    const results: AudioRecognitionResult[] = [];
-    let bestResult: AudioRecognitionResult = {
-      success: false,
-      error: 'No recognition attempted',
-      processingTime: 0
-    };
-
-    // Step 1: Check collection first (if enabled)
-    if (autoLoop.collectionFirst) {
-      try {
-        addLog('Checking local collection...');
-        const collectionResult = await fetch('/api/audio-recognition/collection', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            audioData: base64Audio,
-            triggeredBy: isAutoTrigger ? 'auto_collection' : 'manual_collection',
-            timestamp: new Date().toISOString()
-          })
-        });
-
-        if (collectionResult.ok) {
-          const collectionData = await collectionResult.json();
-          if (collectionData.success) {
-            const result: AudioRecognitionResult = {
-              ...collectionData.result,
-              source: 'collection' as const,
-              success: true,
-              processingTime: 0
-            };
-            results.push(result);
-            bestResult = result; // Collection match is always best
-            addLog(`Collection match found: ${result.artist} - ${result.title}`);
-            return { best: bestResult, all: results };
-          }
-        }
-        addLog('No collection match found, trying external services...');
-      } catch (error) {
-        addLog(`Collection check failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      }
-    }
-
-    // Step 2: Try external recognition API
-    try {
-      const response = await fetch('/api/audio-recognition', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          audioData: base64Audio,
-          timestamp: new Date().toISOString(),
-          triggeredBy: isAutoTrigger ? 'auto_external' : 'manual_external'
-        })
-      });
-
-      const responseText = await response.text();
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const result = JSON.parse(responseText);
-
-      if (result.success && result.result) {
-        const externalResult: AudioRecognitionResult = {
-          ...result.result,
-          source: 'external' as const,
-          success: true,
-          processingTime: result.processingTime || 0
-        };
-        results.push(externalResult);
-        
-        if (!bestResult.success) {
-          bestResult = externalResult;
-        }
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'External recognition failed';
-      addLog(`External recognition error: ${errorMessage}`);
-      
-      if (!bestResult.success) {
-        bestResult = {
-          success: false,
-          error: errorMessage,
-          processingTime: 0
-        };
-      }
-    }
-
-    return { best: bestResult, all: results };
-  };
+  // Set the ref to the function for use in analyzeAudio
+  triggerRecognitionRef.current = triggerRecognition;
 
   // Toggle auto-loop
   const toggleAutoLoop = useCallback(() => {
@@ -515,7 +520,7 @@ export default function EnhancedAudioRecognitionPage() {
       setStatus(`🎤 Auto-recognition enabled (every ${autoLoop.interval}s)`);
       addLog('Auto-recognition enabled');
     }
-  }, [autoLoop.enabled, isRecording, startCapture]);
+  }, [autoLoop.enabled, isRecording, startCapture, addLog, autoLoop.interval]);
 
   // Test service connectivity
   const testServices = useCallback(async () => {
@@ -631,6 +636,15 @@ export default function EnhancedAudioRecognitionPage() {
                     }`}
                   >
                     {isProcessing ? '🔄 Processing...' : '🎵 Recognize Now (10s)'}
+                  </button>
+                )}
+
+                {isRecording && (
+                  <button
+                    onClick={stopCapture}
+                    className="w-full py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                  >
+                    ⏹️ Stop Capture
                   </button>
                 )}
                 
@@ -847,11 +861,11 @@ export default function EnhancedAudioRecognitionPage() {
           <h3 className="text-lg font-semibold text-green-900 mb-3">How to Use Enhanced Auto-Recognition</h3>
           <ol className="list-decimal list-inside space-y-2 text-green-800">
             <li><strong>Start Auto-Recognition:</strong> Click the green button to begin continuous listening</li>
-            <li><strong>Automatic Detection:</strong> System will recognize audio every {autoLoop.interval} seconds when volume > {autoLoop.minVolume}%</li>
+            <li><strong>Automatic Detection:</strong> System will recognize audio every {autoLoop.interval} seconds when volume &gt; {autoLoop.minVolume}%</li>
             <li><strong>Collection-First Matching:</strong> Checks your vinyl collection database before external APIs</li>
             <li><strong>Multi-Source Results:</strong> View matches from both collection and external services</li>
             <li><strong>Adjust Settings:</strong> Fine-tune recognition interval and volume threshold</li>
-            <li><strong>Manual Override:</strong> Use "Recognize Now" for immediate recognition</li>
+            <li><strong>Manual Override:</strong> Use &ldquo;Recognize Now&rdquo; for immediate recognition</li>
           </ol>
           
           <div className="mt-4 p-3 bg-green-100 rounded-md">
