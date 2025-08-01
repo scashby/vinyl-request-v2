@@ -60,41 +60,42 @@ function BrowseAlbumsContent() {
   }, [eventId, allowedFormatsParam, eventTitleParam]);
 
   useEffect(() => {
-    async function fetchAllAlbums() {
-      let allRows = [];
-      let from = 0;
-      const batchSize = 1000;
-      let keepGoing = true;
-      while (keepGoing) {
-        let { data: batch, error } = await supabase
-          .from('collection')
-          .select('*')
-          .range(from, from + batchSize - 1);
-        if (error) {
-          console.error('Error fetching albums:', error);
-          break;
-        }
-        if (!batch || batch.length === 0) break;
-        allRows = allRows.concat(batch);
-        keepGoing = batch.length === batchSize;
-        from += batchSize;
+  async function fetchAllAlbums() {
+    let allRows = [];
+    let from = 0;
+    const batchSize = 1000;
+    let keepGoing = true;
+    while (keepGoing) {
+      let { data: batch, error } = await supabase
+        .from('collection')
+        .select('*')
+        .or('blocked.is.null,blocked.eq.false') // Exclude blocked items (handles NULL as not blocked)
+        .range(from, from + batchSize - 1);
+      if (error) {
+        console.error('Error fetching albums:', error);
+        break;
       }
-      const parsed = allRows.map(album => ({
-        id: album.id,
-        title: album.title,
-        artist: album.artist,
-        year: album.year,
-        folder: album.folder,
-        mediaType: album.folder,
-        image:
-          album.image_url && album.image_url.trim().toLowerCase() !== 'no'
-            ? album.image_url.trim()
-            : '/images/coverplaceholder.png'
-      }));
-      setAlbums(parsed);
+      if (!batch || batch.length === 0) break;
+      allRows = allRows.concat(batch);
+      keepGoing = batch.length === batchSize;
+      from += batchSize;
     }
-    fetchAllAlbums();
-  }, []);
+    const parsed = allRows.map(album => ({
+      id: album.id,
+      title: album.title,
+      artist: album.artist,
+      year: album.year,
+      folder: album.folder,
+      mediaType: album.folder,
+      image:
+        album.image_url && album.image_url.trim().toLowerCase() !== 'no'
+          ? album.image_url.trim()
+          : '/images/coverplaceholder.png'
+    }));
+    setAlbums(parsed);
+  }
+  fetchAllAlbums();
+}, []);
 
   const formatVariants = (format) => {
     const f = format.trim().toLowerCase();
