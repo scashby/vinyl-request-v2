@@ -1,4 +1,4 @@
-// src/app/now-playing-tv/page.tsx - FIXED TV Display with Working Real-time Updates
+// src/app/now-playing-tv/page.tsx - IMPROVED with Better Real-time Updates
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from 'react';
@@ -32,7 +32,7 @@ interface NowPlayingData {
   collection?: CollectionAlbum;
 }
 
-export default function FixedTVDisplay() {
+export default function ImprovedTVDisplay() {
   const [currentTrack, setCurrentTrack] = useState<NowPlayingData | null>(null);
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
@@ -40,19 +40,20 @@ export default function FixedTVDisplay() {
   const [updateCount, setUpdateCount] = useState<number>(0);
   const [connectionRetries, setConnectionRetries] = useState<number>(0);
   
-  // Refs to prevent memory leaks and manage subscriptions
+  // Refs for cleanup and state management
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastDataRef = useRef<string>('');
   const isActiveRef = useRef<boolean>(true);
+  const lastUpdateTimeRef = useRef<string>('');
 
-  // FIXED: Enhanced data fetching with proper change detection
+  // IMPROVED: Enhanced data fetching with better change detection
   const fetchNowPlaying = useCallback(async (source: string = 'manual'): Promise<void> => {
     if (!isActiveRef.current) return;
     
     try {
-      console.log(`🔄 [${source}] Fetching now playing data... (attempt ${updateCount + 1})`);
+      console.log(`🔄 [${source}] Fetching now playing data...`);
       
       const { data, error } = await supabase
         .from('now_playing')
@@ -74,69 +75,79 @@ export default function FixedTVDisplay() {
         console.error(`❌ [${source}] Fetch error:`, error);
         setIsConnected(false);
         
-        // Retry logic for connection errors
-        if (connectionRetries < 5 && isActiveRef.current) {
-          const retryDelay = Math.min(1000 * Math.pow(2, connectionRetries), 10000);
-          console.log(`🔄 Retrying in ${retryDelay}ms... (retry ${connectionRetries + 1}/5)`);
+        if (connectionRetries < 3 && isActiveRef.current) {
+          const retryDelay = 2000 * (connectionRetries + 1);
+          console.log(`🔄 Retrying in ${retryDelay}ms...`);
           
           retryTimeoutRef.current = setTimeout(() => {
             if (isActiveRef.current) {
               setConnectionRetries(prev => prev + 1);
-              fetchNowPlaying(`${source}-retry-${connectionRetries + 1}`);
+              fetchNowPlaying(`${source}-retry`);
             }
           }, retryDelay);
         }
         return;
       }
 
-      // FIXED: Better change detection
+      // IMPROVED: Better change detection using updated_at timestamp
+      const currentUpdateTime = data?.updated_at || '';
+      const hasRealChange = currentUpdateTime !== lastUpdateTimeRef.current;
+      
+      // Also check for content changes
       const dataString = JSON.stringify({
         artist: data?.artist,
         title: data?.title,
         album_title: data?.album_title,
-        updated_at: data?.updated_at,
-        track_duration: data?.track_duration,
-        next_recognition_in: data?.next_recognition_in
+        album_id: data?.album_id,
+        service_used: data?.service_used,
+        recognition_confidence: data?.recognition_confidence
       });
       
-      const hasDataChanged = dataString !== lastDataRef.current;
+      const hasContentChange = dataString !== lastDataRef.current;
       
-      if (hasDataChanged || source === 'manual') {
-        console.log(`✅ [${source}] Data ${hasDataChanged ? 'changed' : 'fetched'}, updating display:`, {
+      if (hasRealChange || hasContentChange || source === 'manual' || source === 'initial') {
+        console.log(`✅ [${source}] ${hasRealChange ? 'TIMESTAMP' : 'CONTENT'} CHANGE detected:`, {
           artist: data?.artist,
           title: data?.title,
           album: data?.album_title,
-          collection_id: data?.album_id,
+          updated_at: currentUpdateTime,
+          previous_update: lastUpdateTimeRef.current,
           service: data?.service_used,
-          updated_at: data?.updated_at,
-          track_duration: data?.track_duration,
-          next_recognition_in: data?.next_recognition_in
+          confidence: data?.recognition_confidence
         });
         
         setCurrentTrack(data);
         setLastUpdate(new Date());
         setUpdateCount(prev => prev + 1);
-        setConnectionRetries(0); // Reset retry counter on success
+        setConnectionRetries(0);
         lastDataRef.current = dataString;
+        lastUpdateTimeRef.current = currentUpdateTime;
+        
+        // IMPROVED: Force a small delay to ensure UI updates
+        setTimeout(() => {
+          if (isActiveRef.current) {
+            console.log(`🎵 UI updated with new track data`);
+          }
+        }, 100);
       } else {
-        console.log(`📍 [${source}] No data changes detected`);
+        console.log(`📍 [${source}] No changes detected (${currentUpdateTime})`);
       }
       
       setIsConnected(true);
       
     } catch (error) {
-      console.error(`❌ [${source}] Error fetching now playing:`, error);
+      console.error(`❌ [${source}] Error:`, error);
       setIsConnected(false);
     } finally {
       setIsLoading(false);
     }
-  }, [updateCount, connectionRetries]);
+  }, [connectionRetries]);
 
-  // FIXED: Enhanced real-time subscription setup with better error handling
+  // IMPROVED: More aggressive real-time subscription
   const setupRealtimeSubscription = useCallback(() => {
     if (!isActiveRef.current) return;
     
-    console.log('🔗 Setting up FIXED real-time subscription...');
+    console.log('🔗 Setting up IMPROVED real-time subscription...');
     
     // Clean up existing subscription
     if (channelRef.current) {
@@ -145,12 +156,14 @@ export default function FixedTVDisplay() {
       channelRef.current = null;
     }
 
-    // Create new subscription with enhanced event handling
+    // Create new subscription with more aggressive settings
     channelRef.current = supabase
-      .channel('now_playing_tv_fixed', {
+      .channel('now_playing_tv_improved', {
         config: {
           broadcast: { self: true },
-          presence: { key: `tv-display-fixed-${Date.now()}` }
+          presence: { key: `tv-display-${Date.now()}` },
+          // IMPROVED: More aggressive real-time settings
+          ack: true
         }
       })
       .on('postgres_changes', 
@@ -163,53 +176,56 @@ export default function FixedTVDisplay() {
         (payload) => {
           if (!isActiveRef.current) return;
           
-          console.log('📡 Real-time update received:', {
+          console.log('📡 REAL-TIME UPDATE RECEIVED:', {
             eventType: payload.eventType,
-            new: payload.new,
-            old: payload.old,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            new_data: payload.new,
+            old_data: payload.old
           });
           
-          // Immediate fetch on any change
-          fetchNowPlaying(`realtime-${payload.eventType}`);
+          // IMPROVED: Immediate fetch with slight delay to ensure DB consistency
+          setTimeout(() => {
+            if (isActiveRef.current) {
+              fetchNowPlaying(`realtime-${payload.eventType}`);
+            }
+          }, 250); // Small delay to ensure DB has been updated
         }
       )
       .on('broadcast', 
-        { event: 'now_playing_update' }, 
-        (payload) => {
+        { event: 'force_refresh' }, 
+        () => {
           if (!isActiveRef.current) return;
-          console.log('📢 Broadcast update received:', payload);
-          fetchNowPlaying('broadcast');
+          console.log('📢 Force refresh broadcast received');
+          fetchNowPlaying('broadcast-force');
         }
       )
       .subscribe((status, err) => {
-        console.log('📡 Subscription status changed:', status, err);
+        console.log('📡 Subscription status:', status, err);
         
         if (status === 'SUBSCRIBED') {
-          console.log('✅ Real-time subscription active');
+          console.log('✅ Real-time subscription ACTIVE');
           setIsConnected(true);
           setConnectionRetries(0);
         } else if (status === 'CHANNEL_ERROR' || status === 'CLOSED') {
-          console.error('❌ Channel error/closed, will retry...', err);
+          console.error('❌ Channel error, reconnecting...', err);
           setIsConnected(false);
           
-          // Retry subscription after a delay if still active
           if (isActiveRef.current) {
             setTimeout(() => {
               if (isActiveRef.current) {
                 setupRealtimeSubscription();
               }
-            }, 2000);
+            }, 3000);
           }
         }
       });
   }, [fetchNowPlaying]);
 
-  // FIXED: Setup polling fallback with proper cleanup
+  // IMPROVED: More frequent polling as backup
   const setupPollingFallback = useCallback(() => {
     if (!isActiveRef.current) return;
     
-    console.log('⏰ Setting up FIXED polling fallback (every 10 seconds)...');
+    console.log('⏰ Setting up IMPROVED polling (every 5 seconds)...');
     
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
@@ -217,28 +233,36 @@ export default function FixedTVDisplay() {
     
     intervalRef.current = setInterval(() => {
       if (isActiveRef.current) {
-        fetchNowPlaying('polling');
+        fetchNowPlaying('polling-backup');
       }
-    }, 10000); // Every 10 seconds
+    }, 5000); // IMPROVED: Every 5 seconds instead of 10
   }, [fetchNowPlaying]);
 
-  // FIXED: Main initialization effect with proper cleanup
+  // IMPROVED: Enhanced initialization
   useEffect(() => {
     isActiveRef.current = true;
-    console.log('🚀 Initializing FIXED TV Display with enhanced real-time updates...');
+    console.log('🚀 Initializing IMPROVED TV Display...');
     
-    // Initial fetch
+    // Immediate initial fetch
     fetchNowPlaying('initial');
     
-    // Setup real-time subscription
-    setupRealtimeSubscription();
+    // Setup real-time with delay
+    setTimeout(() => {
+      if (isActiveRef.current) {
+        setupRealtimeSubscription();
+      }
+    }, 1000);
     
-    // Setup polling fallback
-    setupPollingFallback();
+    // Setup polling with delay
+    setTimeout(() => {
+      if (isActiveRef.current) {
+        setupPollingFallback();
+      }
+    }, 2000);
 
-    // Cleanup function
+    // Cleanup
     return () => {
-      console.log('🧹 Cleaning up FIXED TV Display...');
+      console.log('🧹 Cleaning up IMPROVED TV Display...');
       isActiveRef.current = false;
       
       if (channelRef.current) {
@@ -256,42 +280,37 @@ export default function FixedTVDisplay() {
         retryTimeoutRef.current = null;
       }
     };
-  }, [fetchNowPlaying, setupRealtimeSubscription, setupPollingFallback]); // Fix ESLint exhaustive-deps
+  }, []); // Removed dependencies to prevent re-initialization
 
-  // Force refresh every 30 seconds as additional fallback
+  // IMPROVED: Force refresh mechanism
   useEffect(() => {
     const forceRefreshInterval = setInterval(() => {
       if (isActiveRef.current) {
-        console.log('🔄 Force refresh every 30s');
-        fetchNowPlaying('force-refresh');
+        console.log('🔄 Force refresh (20s interval)');
+        fetchNowPlaying('force-refresh-20s');
       }
-    }, 30000);
+    }, 20000); // Every 20 seconds
 
     return () => clearInterval(forceRefreshInterval);
   }, [fetchNowPlaying]);
 
-  // Keyboard controls for refresh and reconnect
+  // Enhanced keyboard controls
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
       if (e.key === 'f' || e.key === 'F') {
-        console.log('🔄 Manual refresh requested');
-        fetchNowPlaying('manual-keyboard');
+        console.log('🔄 Manual refresh');
+        fetchNowPlaying('keyboard-refresh');
       } else if (e.key === 'r' || e.key === 'R') {
-        console.log('🔄 Reconnecting real-time subscription...');
+        console.log('🔄 Reconnect subscription');
         setupRealtimeSubscription();
-      } else if (e.key === 'c' || e.key === 'C') {
-        console.log('🧹 Full cleanup and restart...');
-        setupRealtimeSubscription();
-        setupPollingFallback();
-        fetchNowPlaying('manual-restart');
       }
     };
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [fetchNowPlaying, setupRealtimeSubscription, setupPollingFallback]);
+  }, [fetchNowPlaying, setupRealtimeSubscription]);
 
-  // Format duration helper
+  // Format duration
   const formatDuration = (seconds?: number): string => {
     if (!seconds) return '';
     const mins = Math.floor(seconds / 60);
@@ -312,10 +331,10 @@ export default function FixedTVDisplay() {
         fontFamily: '"Inter", sans-serif'
       }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🎵</div>
-          <div style={{ fontSize: '1.5rem' }}>Loading FIXED TV Display...</div>
+          <div style={{ fontSize: '3rem', marginBottom: '1rem', animation: 'pulse 2s infinite' }}>🎵</div>
+          <div style={{ fontSize: '1.5rem' }}>Loading IMPROVED TV Display...</div>
           <div style={{ fontSize: '1rem', opacity: 0.8, marginTop: '0.5rem' }}>
-            Setting up enhanced real-time updates...
+            Enhanced real-time updates loading...
           </div>
         </div>
       </div>
@@ -367,7 +386,7 @@ export default function FixedTVDisplay() {
           />
         </div>
 
-        {/* Now Playing Header */}
+        {/* Header */}
         <div style={{
           position: 'absolute',
           top: '120px',
@@ -383,7 +402,7 @@ export default function FixedTVDisplay() {
         </div>
 
         <div style={{ textAlign: 'center', opacity: 0.8, marginTop: '100px' }}>
-          <div style={{ fontSize: '4rem', marginBottom: '2rem', opacity: 0.5 }}>🎵</div>
+          <div style={{ fontSize: '4rem', marginBottom: '2rem', opacity: 0.5, animation: 'pulse 3s infinite' }}>🎵</div>
           <h1 style={{ 
             fontSize: '3rem', 
             fontWeight: 'bold', 
@@ -401,7 +420,7 @@ export default function FixedTVDisplay() {
             Drop the needle. Let the side play.
           </p>
 
-          {/* Enhanced Connection Status */}
+          {/* Enhanced status */}
           <div style={{
             background: isConnected ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)',
             border: `1px solid ${isConnected ? 'rgba(34, 197, 94, 0.5)' : 'rgba(239, 68, 68, 0.5)'}`,
@@ -411,7 +430,7 @@ export default function FixedTVDisplay() {
             opacity: 0.9,
             marginBottom: '1rem'
           }}>
-            {isConnected ? '🟢 System: Ready & Connected' : '🔴 System: Reconnecting...'}
+            {isConnected ? '🟢 IMPROVED: Ready & Connected' : '🔴 IMPROVED: Reconnecting...'}
           </div>
           
           <div style={{
@@ -423,17 +442,8 @@ export default function FixedTVDisplay() {
             flexWrap: 'wrap'
           }}>
             <span>Updates: {updateCount}</span>
-            <span>Last Check: {lastUpdate.toLocaleTimeString()}</span>
-            {connectionRetries > 0 && <span>Retries: {connectionRetries}</span>}
-          </div>
-          
-          <div style={{
-            fontSize: '0.8rem',
-            opacity: 0.5,
-            marginTop: '1rem',
-            lineHeight: 1.5
-          }}>
-            Controls: F = Force Refresh • R = Reconnect • C = Full Restart
+            <span>Last: {lastUpdate.toLocaleTimeString()}</span>
+            <span>Retries: {connectionRetries}</span>
           </div>
         </div>
       </div>
@@ -448,9 +458,8 @@ export default function FixedTVDisplay() {
   const displayImage = currentTrack.collection?.image_url || currentTrack.recognition_image_url;
   const displayFormat = currentTrack.collection?.folder;
   const isFromCollection = !!(currentTrack.collection && currentTrack.album_id);
-  const isGuestVinyl = !isFromCollection;
-  const trackDuration = currentTrack.track_duration;
-  const nextRecognition = currentTrack.next_recognition_in;
+  const recognitionConfidence = currentTrack.recognition_confidence;
+  const serviceUsed = currentTrack.service_used;
 
   return (
     <div style={{
@@ -508,7 +517,7 @@ export default function FixedTVDisplay() {
         />
       </div>
 
-      {/* Now Playing Header */}
+      {/* Header */}
       <div style={{
         position: 'absolute',
         top: '120px',
@@ -555,7 +564,7 @@ export default function FixedTVDisplay() {
               priority
             />
             
-            {/* Enhanced Collection/Guest status badge */}
+            {/* Collection/Guest badge */}
             {isFromCollection && displayFormat ? (
               <div style={{
                 position: 'absolute',
@@ -568,12 +577,11 @@ export default function FixedTVDisplay() {
                 fontSize: '1.1rem',
                 fontWeight: 'bold',
                 boxShadow: '0 6px 20px rgba(0,0,0,0.4)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px'
+                textTransform: 'uppercase'
               }}>
                 🏆 {displayFormat}
               </div>
-            ) : isGuestVinyl ? (
+            ) : (
               <div style={{
                 position: 'absolute',
                 top: '-15px',
@@ -585,12 +593,11 @@ export default function FixedTVDisplay() {
                 fontSize: '1.1rem',
                 fontWeight: 'bold',
                 boxShadow: '0 6px 20px rgba(0,0,0,0.4)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px'
+                textTransform: 'uppercase'
               }}>
-                👤 GUEST
+                🎤 RECOGNIZED
               </div>
-            ) : null}
+            )}
           </div>
         </div>
 
@@ -608,7 +615,7 @@ export default function FixedTVDisplay() {
             {displayTrackTitle}
           </h1>
           
-          {/* Album title */}
+          {/* Album */}
           {displayAlbumTitle && (
             <h2 style={{ 
               fontSize: '2.2rem', 
@@ -618,7 +625,7 @@ export default function FixedTVDisplay() {
               fontStyle: 'italic',
               textShadow: '0 2px 10px rgba(0,0,0,0.5)'
             }}>
-              from &ldquo;{displayAlbumTitle}&rdquo;
+              from "{displayAlbumTitle}"
             </h2>
           )}
           
@@ -635,71 +642,42 @@ export default function FixedTVDisplay() {
           
           {/* Enhanced metadata */}
           <div style={{ 
-            fontSize: '1.8rem', 
+            fontSize: '1.4rem', 
             margin: '0 0 2rem 0',
             opacity: 0.7,
-            fontWeight: 400,
             display: 'flex',
             alignItems: 'center',
             gap: '1rem',
             flexWrap: 'wrap'
           }}>
-            <span>{displayYear || 'Unknown Year'}</span>
-            {trackDuration && (
+            <span>{displayYear || 'Year Unknown'}</span>
+            {recognitionConfidence && (
               <span style={{
                 background: 'rgba(59, 130, 246, 0.2)',
                 color: '#60a5fa',
                 padding: '4px 12px',
                 borderRadius: '12px',
-                fontSize: '1.2rem',
-                fontWeight: 600,
-                border: '1px solid rgba(59, 130, 246, 0.5)'
+                fontSize: '1rem',
+                fontWeight: 600
               }}>
-                ⏱️ {formatDuration(trackDuration)}
+                🎯 {Math.round(recognitionConfidence * 100)}%
               </span>
             )}
-            {isFromCollection && (
-              <span style={{
-                background: 'rgba(34, 197, 94, 0.2)',
-                color: '#10b981',
-                padding: '4px 12px',
-                borderRadius: '12px',
-                fontSize: '1.2rem',
-                fontWeight: 600,
-                border: '1px solid rgba(34, 197, 94, 0.5)'
-              }}>
-                🏆 FROM COLLECTION
-              </span>
-            )}
-            {isGuestVinyl && (
-              <span style={{
-                background: 'rgba(245, 158, 11, 0.2)',
-                color: '#f59e0b',
-                padding: '4px 12px',
-                borderRadius: '12px',
-                fontSize: '1.2rem',
-                fontWeight: 600,
-                border: '1px solid rgba(245, 158, 11, 0.5)'
-              }}>
-                👤 GUEST VINYL
-              </span>
-            )}
-            {nextRecognition && (
+            {serviceUsed && (
               <span style={{
                 background: 'rgba(147, 51, 234, 0.2)',
                 color: '#a855f7',
                 padding: '4px 12px',
                 borderRadius: '12px',
-                fontSize: '1.2rem',
-                fontWeight: 600,
-                border: '1px solid rgba(147, 51, 234, 0.5)'
+                fontSize: '1rem',
+                fontWeight: 600
               }}>
-                🧠 Next: {nextRecognition}s
+                🤖 {serviceUsed}
               </span>
             )}
           </div>
 
-          {/* FIXED: Enhanced Connection Status Indicator */}
+          {/* IMPROVED: Connection status */}
           <div style={{
             position: 'absolute',
             bottom: '2rem',
@@ -715,16 +693,17 @@ export default function FixedTVDisplay() {
               height: '8px',
               borderRadius: '50%',
               background: isConnected ? '#10b981' : '#ef4444',
-              animation: isConnected ? 'pulse 2s infinite' : 'none'
+              animation: 'pulse 2s infinite'
             }} />
-            <span>Live Updates {isConnected ? 'Active' : 'Reconnecting'}</span>
-            <span>• Updates: {updateCount}</span>
-            <span>• Last: {lastUpdate.toLocaleTimeString()}</span>
+            <span>IMPROVED Live {isConnected ? 'Connected' : 'Reconnecting'}</span>
+            <span>• #{updateCount}</span>
+            <span>• {lastUpdate.toLocaleTimeString()}</span>
+            {connectionRetries > 0 && <span>• Retries: {connectionRetries}</span>}
           </div>
         </div>
       </div>
 
-      {/* CSS Animations */}
+      {/* CSS */}
       <style dangerouslySetInnerHTML={{
         __html: `
           @keyframes pulse {

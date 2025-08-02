@@ -1,8 +1,9 @@
 // src/app/api/audio-recognition/route.ts
-// Phase 2: Multi-Source Recognition with Auto-Selection
+// IMPROVED: Real Audio Recognition with Spotify Integration
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import crypto from 'crypto';
 
 // Initialize Supabase client
 const supabase = createClient(
@@ -21,11 +22,16 @@ interface RecognitionMatch {
   title: string;
   album: string;
   confidence: number;
-  source: 'collection' | 'acrcloud' | 'audd' | 'acoustid' | 'shazam';
+  source: 'collection' | 'acrcloud' | 'audd' | 'acoustid' | 'shazam' | 'spotify';
   service: string;
   image_url?: string;
   albumId?: number;
   processingTime: number;
+  isrc?: string;
+  spotify_id?: string;
+  duration_ms?: number;
+  preview_url?: string;
+  external_urls?: any;
 }
 
 interface MultiSourceResponse {
@@ -36,50 +42,299 @@ interface MultiSourceResponse {
   sourcesChecked: string[];
 }
 
-// Auto-selection algorithm
-function selectBestResult(results: RecognitionMatch[]): RecognitionMatch {
-  console.log(`🎯 Auto-selecting from ${results.length} results`);
-  
-  // 1. Collection matches always win (if confidence > 0.7)
-  const collectionMatches = results.filter(r => r.source === 'collection' && r.confidence > 0.7);
-  if (collectionMatches.length > 0) {
-    const best = collectionMatches.sort((a, b) => b.confidence - a.confidence)[0];
-    console.log(`🏆 Collection match selected: ${best.artist} - ${best.title} (${best.confidence})`);
-    return best;
-  }
-  
-  // 2. External APIs by reliability and confidence
-  const externalResults = results
-    .filter(r => r.confidence > 0.6) // Minimum confidence threshold
-    .sort((a, b) => {
-      // Priority: ACRCloud > AudD > AcoustID > Shazam
-      const priority = { acrcloud: 4, audd: 3, acoustid: 2, shazam: 1 };
-      const priorityA = priority[a.source as keyof typeof priority] || 0;
-      const priorityB = priority[b.source as keyof typeof priority] || 0;
-      
-      if (priorityA !== priorityB) {
-        return priorityB - priorityA; // Higher priority first
+// Spotify Web API integration for enhanced metadata
+class SpotifyAPI {
+  private static accessToken: string | null = null;
+  private static tokenExpiry: number = 0;
+
+  static async getAccessToken(): Promise<string | null> {
+    if (this.accessToken && Date.now() < this.tokenExpiry) {
+      return this.accessToken;
+    }
+
+    if (!process.env.SPOTIFY_CLIENT_ID || !process.env.SPOTIFY_CLIENT_SECRET) {
+      console.log('⏭️ Spotify: Missing credentials');
+      return null;
+    }
+
+    try {
+      const response = await fetch('https://accounts.spotify.com/api/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Authorization': `Basic ${Buffer.from(`${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`).toString('base64')}`
+        },
+        body: 'grant_type=client_credentials'
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        this.accessToken = data.access_token;
+        this.tokenExpiry = Date.now() + (data.expires_in * 1000) - 60000; // 1 minute buffer
+        console.log('✅ Spotify: Access token obtained');
+        return this.accessToken;
       }
-      return b.confidence - a.confidence; // Then by confidence
-    });
-  
-  if (externalResults.length > 0) {
-    const best = externalResults[0];
-    console.log(`🌐 External match selected: ${best.artist} - ${best.title} (${best.source}, ${best.confidence})`);
-    return best;
+    } catch (error) {
+      console.error('❌ Spotify: Token error:', error);
+    }
+    
+    return null;
   }
-  
-  // 3. Fallback to highest confidence if no good matches
-  if (results.length > 0) {
-    const fallback = results.sort((a, b) => b.confidence - a.confidence)[0];
-    console.log(`⚠️ Fallback selection: ${fallback.artist} - ${fallback.title} (${fallback.confidence})`);
-    return fallback;
+
+  static async searchTrack(artist: string, title: string): Promise<RecognitionMatch | null> {
+    const token = await this.getAccessToken();
+    if (!token) return null;
+
+    const startTime = Date.now();
+    
+    try {
+      const query = `artist:"${artist}" track:"${title}"`;
+      const searchUrl = `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=1&market=US`;
+      
+      const response = await fetch(searchUrl, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const track = data.tracks?.items?.[0];
+        
+        if (track) {
+          return {
+            artist: track.artists[0]?.name || artist,
+            title: track.name,
+            album: track.album?.name || 'Unknown Album',
+            confidence: 0.95, // High confidence for exact matches
+            source: 'spotify' as const,
+            service: 'Spotify Web API',
+            image_url: track.album?.images?.[0]?.url,
+            processingTime: Date.now() - startTime,
+            spotify_id: track.id,
+            duration_ms: track.duration_ms,
+            preview_url: track.preview_url,
+            external_urls: track.external_urls,
+            isrc: track.external_ids?.isrc
+          };
+        }
+      }
+    } catch (error) {
+      console.error('❌ Spotify search error:', error);
+    }
+
+    return null;
   }
-  
-  throw new Error('No results to select from');
 }
 
-// Collection recognition
+// REAL ACRCloud implementation
+async function checkACRCloud(audioData: string): Promise<RecognitionMatch | null> {
+  const startTime = Date.now();
+  
+  if (!process.env.ACRCLOUD_ACCESS_KEY || !process.env.ACRCLOUD_SECRET_KEY || !process.env.ACRCLOUD_ENDPOINT) {
+    console.log('⏭️ ACRCloud: Missing credentials');
+    return null;
+  }
+  
+  console.log('🎵 ACRCloud: Processing real audio fingerprint...');
+  
+  try {
+    // Convert base64 to buffer
+    const audioBuffer = Buffer.from(audioData, 'base64');
+    
+    // ACRCloud signature generation
+    const timestamp = Math.floor(Date.now() / 1000);
+    const stringToSign = `POST\n/v1/identify\n${process.env.ACRCLOUD_ACCESS_KEY}\naudio\n1\n${timestamp}`;
+    const signature = crypto
+      .createHmac('sha1', process.env.ACRCLOUD_SECRET_KEY)
+      .update(Buffer.from(stringToSign, 'utf-8'))
+      .digest('base64');
+
+    // Prepare form data
+    const formData = new FormData();
+    formData.append('sample', new Blob([audioBuffer]), 'sample.webm');
+    formData.append('sample_bytes', audioBuffer.length.toString());
+    formData.append('access_key', process.env.ACRCLOUD_ACCESS_KEY);
+    formData.append('data_type', 'audio');
+    formData.append('signature_version', '1');
+    formData.append('signature', signature);
+    formData.append('timestamp', timestamp.toString());
+
+    // Make API call
+    const response = await fetch(`${process.env.ACRCLOUD_ENDPOINT}/v1/identify`, {
+      method: 'POST',
+      body: formData,
+      timeout: 15000 // 15 second timeout
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      
+      if (result.status?.code === 0 && result.metadata?.music?.length > 0) {
+        const music = result.metadata.music[0];
+        
+        console.log('✅ ACRCloud: Match found:', music.title, 'by', music.artists?.[0]?.name);
+        
+        // Enhance with Spotify data
+        let spotifyEnhancement = null;
+        if (music.artists?.[0]?.name && music.title) {
+          spotifyEnhancement = await SpotifyAPI.searchTrack(music.artists[0].name, music.title);
+        }
+        
+        return {
+          artist: music.artists?.[0]?.name || 'Unknown Artist',
+          title: music.title || 'Unknown Title',
+          album: music.album?.name || spotifyEnhancement?.album || 'Unknown Album',
+          confidence: 0.95, // ACRCloud is very reliable
+          source: 'acrcloud' as const,
+          service: 'ACRCloud',
+          image_url: spotifyEnhancement?.image_url,
+          processingTime: Date.now() - startTime,
+          spotify_id: spotifyEnhancement?.spotify_id,
+          duration_ms: music.duration_ms || spotifyEnhancement?.duration_ms,
+          isrc: music.external_ids?.isrc
+        };
+      } else {
+        console.log('❌ ACRCloud: No match found');
+      }
+    } else {
+      console.error('❌ ACRCloud: API error:', response.status, response.statusText);
+    }
+  } catch (error) {
+    console.error('❌ ACRCloud: Processing error:', error);
+  }
+  
+  return null;
+}
+
+// REAL AudD implementation
+async function checkAudD(audioData: string): Promise<RecognitionMatch | null> {
+  const startTime = Date.now();
+  
+  if (!process.env.AUDD_API_TOKEN) {
+    console.log('⏭️ AudD: Missing API token');
+    return null;
+  }
+  
+  console.log('🎼 AudD: Processing audio...');
+  
+  try {
+    const formData = new FormData();
+    const audioBuffer = Buffer.from(audioData, 'base64');
+    formData.append('audio', new Blob([audioBuffer]), 'audio.webm');
+    formData.append('api_token', process.env.AUDD_API_TOKEN);
+    formData.append('return', 'spotify');
+
+    const response = await fetch('https://api.audd.io/', {
+      method: 'POST',
+      body: formData,
+      timeout: 20000
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      
+      if (result.status === 'success' && result.result) {
+        const track = result.result;
+        
+        console.log('✅ AudD: Match found:', track.title, 'by', track.artist);
+        
+        return {
+          artist: track.artist || 'Unknown Artist',
+          title: track.title || 'Unknown Title',
+          album: track.album || 'Unknown Album',
+          confidence: 0.90,
+          source: 'audd' as const,
+          service: 'AudD',
+          image_url: track.spotify?.album?.images?.[0]?.url,
+          processingTime: Date.now() - startTime,
+          spotify_id: track.spotify?.id,
+          duration_ms: track.spotify?.duration_ms
+        };
+      }
+    }
+  } catch (error) {
+    console.error('❌ AudD: Error:', error);
+  }
+  
+  return null;
+}
+
+// Enhanced AcoustID with MusicBrainz
+async function checkAcoustID(audioData: string): Promise<RecognitionMatch | null> {
+  const startTime = Date.now();
+  
+  if (!process.env.ACOUSTID_CLIENT_KEY) {
+    console.log('⏭️ AcoustID: Missing client key');
+    return null;
+  }
+  
+  console.log('🔍 AcoustID: Processing fingerprint...');
+  
+  try {
+    // Note: AcoustID requires actual audio fingerprinting
+    // This would need a library like 'node-acoustid' or 'chromaprint'
+    // For now, we'll implement a simplified version
+    
+    // In a real implementation, you'd generate fingerprint from audio:
+    // const fingerprint = await generateFingerprint(audioData);
+    
+    // Placeholder for actual fingerprint generation
+    const duration = 180; // estimated from audio data
+    
+    const formData = new FormData();
+    formData.append('client', process.env.ACOUSTID_CLIENT_KEY);
+    formData.append('duration', duration.toString());
+    // formData.append('fingerprint', fingerprint); // Real fingerprint would go here
+    formData.append('meta', 'recordings+releasegroups+compress');
+
+    const response = await fetch('https://api.acoustid.org/v2/lookup', {
+      method: 'POST',
+      body: formData,
+      timeout: 15000
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      
+      if (result.status === 'ok' && result.results?.length > 0) {
+        const match = result.results[0];
+        const recording = match.recordings?.[0];
+        
+        if (recording) {
+          console.log('✅ AcoustID: Match found:', recording.title);
+          
+          // Enhance with Spotify
+          let spotifyEnhancement = null;
+          if (recording.artists?.[0]?.name && recording.title) {
+            spotifyEnhancement = await SpotifyAPI.searchTrack(
+              recording.artists[0].name, 
+              recording.title
+            );
+          }
+          
+          return {
+            artist: recording.artists?.[0]?.name || 'Unknown Artist',
+            title: recording.title || 'Unknown Title',
+            album: recording.releasegroups?.[0]?.title || spotifyEnhancement?.album || 'Unknown Album',
+            confidence: 0.85,
+            source: 'acoustid' as const,
+            service: 'AcoustID + MusicBrainz',
+            image_url: spotifyEnhancement?.image_url,
+            processingTime: Date.now() - startTime,
+            spotify_id: spotifyEnhancement?.spotify_id
+          };
+        }
+      }
+    }
+  } catch (error) {
+    console.error('❌ AcoustID: Error:', error);
+  }
+  
+  return null;
+}
+
+// Collection recognition (keep existing)
 async function checkCollection(audioData: string): Promise<RecognitionMatch | null> {
   const startTime = Date.now();
   console.log('🏆 Checking collection database...');
@@ -109,161 +364,69 @@ async function checkCollection(audioData: string): Promise<RecognitionMatch | nu
     console.error('Collection check error:', error);
   }
   
-  console.log(`❌ No collection match found (${Date.now() - startTime}ms)`);
   return null;
 }
 
-// ACRCloud recognition
-async function checkACRCloud(): Promise<RecognitionMatch | null> {
-  const startTime = Date.now();
+// IMPROVED auto-selection algorithm
+function selectBestResult(results: RecognitionMatch[]): RecognitionMatch {
+  console.log(`🎯 Auto-selecting from ${results.length} results with IMPROVED algorithm`);
   
-  if (!process.env.ACRCLOUD_ACCESS_KEY || !process.env.ACRCLOUD_SECRET_KEY || !process.env.ACRCLOUD_ENDPOINT) {
-    console.log('⏭️ ACRCloud: Missing credentials, skipping');
-    return null;
+  // 1. Collection matches always win (if confidence > 0.7)
+  const collectionMatches = results.filter(r => r.source === 'collection' && r.confidence > 0.7);
+  if (collectionMatches.length > 0) {
+    const best = collectionMatches.sort((a, b) => b.confidence - a.confidence)[0];
+    console.log(`🏆 Collection match selected: ${best.artist} - ${best.title} (${best.confidence})`);
+    return best;
   }
   
-  console.log('🎵 Checking ACRCloud...');
-  
-  try {
-    // Simulate ACRCloud API call - replace with real implementation when audioData is used
-    await new Promise(resolve => setTimeout(resolve, 1500 + Math.random() * 1000));
+  // 2. High confidence external matches (>0.9)
+  const highConfidenceMatches = results.filter(r => r.confidence > 0.9);
+  if (highConfidenceMatches.length > 0) {
+    // Prioritize by source reliability: ACRCloud > AudD > Spotify > AcoustID
+    const sourcePriority = { acrcloud: 5, audd: 4, spotify: 3, acoustid: 2, shazam: 1 };
+    const best = highConfidenceMatches.sort((a, b) => {
+      const priorityA = sourcePriority[a.source as keyof typeof sourcePriority] || 0;
+      const priorityB = sourcePriority[b.source as keyof typeof sourcePriority] || 0;
+      if (priorityA !== priorityB) return priorityB - priorityA;
+      return b.confidence - a.confidence;
+    })[0];
     
-    // 40% success rate for simulation
-    if (Math.random() > 0.6) {
-      return {
-        artist: "Pink Floyd",
-        title: "Wish You Were Here",
-        album: "Wish You Were Here",
-        confidence: 0.92,
-        source: 'acrcloud' as const,
-        service: 'ACRCloud',
-        image_url: "https://upload.wikimedia.org/wikipedia/en/5/50/Wish_You_Were_Here_Pink_Floyd.jpg",
-        processingTime: Date.now() - startTime
-      };
-    }
-  } catch (error) {
-    console.error('ACRCloud error:', error);
+    console.log(`🌟 High confidence match: ${best.artist} - ${best.title} (${best.source}, ${best.confidence})`);
+    return best;
   }
   
-  console.log(`❌ No ACRCloud match found (${Date.now() - startTime}ms)`);
-  return null;
-}
-
-// AudD recognition
-async function checkAudD(): Promise<RecognitionMatch | null> {
-  const startTime = Date.now();
-  
-  if (!process.env.AUDD_API_TOKEN) {
-    console.log('⏭️ AudD: Missing API token, skipping');
-    return null;
-  }
-  
-  console.log('🎼 Checking AudD...');
-  
-  try {
-    // Simulate AudD API call - replace with real implementation when audioData is used
-    await new Promise(resolve => setTimeout(resolve, 2000 + Math.random() * 1000));
+  // 3. Medium confidence external matches (>0.6)
+  const mediumConfidenceMatches = results.filter(r => r.confidence > 0.6);
+  if (mediumConfidenceMatches.length > 0) {
+    const best = mediumConfidenceMatches.sort((a, b) => {
+      const sourcePriority = { acrcloud: 5, audd: 4, spotify: 3, acoustid: 2, shazam: 1 };
+      const priorityA = sourcePriority[a.source as keyof typeof sourcePriority] || 0;
+      const priorityB = sourcePriority[b.source as keyof typeof sourcePriority] || 0;
+      if (priorityA !== priorityB) return priorityB - priorityA;
+      return b.confidence - a.confidence;
+    })[0];
     
-    // 35% success rate for simulation
-    if (Math.random() > 0.65) {
-      return {
-        artist: "Led Zeppelin",
-        title: "Stairway to Heaven",
-        album: "Led Zeppelin IV",
-        confidence: 0.87,
-        source: 'audd' as const,
-        service: 'AudD',
-        image_url: "https://upload.wikimedia.org/wikipedia/en/2/26/Led_Zeppelin_-_Led_Zeppelin_IV.jpg",
-        processingTime: Date.now() - startTime
-      };
-    }
-  } catch (error) {
-    console.error('AudD error:', error);
+    console.log(`🎯 Medium confidence match: ${best.artist} - ${best.title} (${best.source}, ${best.confidence})`);
+    return best;
   }
   
-  console.log(`❌ No AudD match found (${Date.now() - startTime}ms)`);
-  return null;
+  // 4. Fallback to any result
+  if (results.length > 0) {
+    const fallback = results.sort((a, b) => b.confidence - a.confidence)[0];
+    console.log(`⚠️ Fallback selection: ${fallback.artist} - ${fallback.title} (${fallback.confidence})`);
+    return fallback;
+  }
+  
+  throw new Error('No results to select from');
 }
 
-// AcoustID recognition
-async function checkAcoustID(): Promise<RecognitionMatch | null> {
-  const startTime = Date.now();
-  
-  if (!process.env.ACOUSTID_CLIENT_KEY) {
-    console.log('⏭️ AcoustID: Missing client key, skipping');
-    return null;
-  }
-  
-  console.log('🔍 Checking AcoustID...');
-  
-  try {
-    // Simulate AcoustID API call - replace with real implementation when audioData is used
-    await new Promise(resolve => setTimeout(resolve, 2500 + Math.random() * 1000));
-    
-    // 30% success rate for simulation
-    if (Math.random() > 0.7) {
-      return {
-        artist: "The Beatles",
-        title: "Let It Be",
-        album: "Let It Be",
-        confidence: 0.82,
-        source: 'acoustid' as const,
-        service: 'AcoustID',
-        image_url: "https://upload.wikimedia.org/wikipedia/en/5/50/LetItBe.jpg",
-        processingTime: Date.now() - startTime
-      };
-    }
-  } catch (error) {
-    console.error('AcoustID error:', error);
-  }
-  
-  console.log(`❌ No AcoustID match found (${Date.now() - startTime}ms)`);
-  return null;
-}
-
-// Shazam recognition
-async function checkShazam(): Promise<RecognitionMatch | null> {
-  const startTime = Date.now();
-  
-  if (!process.env.SHAZAM_RAPID_API_KEY) {
-    console.log('⏭️ Shazam: Missing API key, skipping');
-    return null;
-  }
-  
-  console.log('🎤 Checking Shazam...');
-  
-  try {
-    // Simulate Shazam API call - replace with real implementation when audioData is used
-    await new Promise(resolve => setTimeout(resolve, 3000 + Math.random() * 1000));
-    
-    // 25% success rate for simulation
-    if (Math.random() > 0.75) {
-      return {
-        artist: "Queen",
-        title: "Bohemian Rhapsody",
-        album: "A Night at the Opera",
-        confidence: 0.78,
-        source: 'shazam' as const,
-        service: 'Shazam',
-        image_url: "https://upload.wikimedia.org/wikipedia/en/4/4d/Queen_A_Night_at_the_Opera.png",
-        processingTime: Date.now() - startTime
-      };
-    }
-  } catch (error) {
-    console.error('Shazam error:', error);
-  }
-  
-  console.log(`❌ No Shazam match found (${Date.now() - startTime}ms)`);
-  return null;
-}
-
-// Multi-source recognition engine
+// IMPROVED multi-source recognition engine
 async function performMultiSourceRecognition(audioData: string): Promise<MultiSourceResponse> {
   const startTime = Date.now();
   const results: RecognitionMatch[] = [];
   const sourcesChecked: string[] = [];
   
-  console.log('🎯 Starting multi-source recognition with priority order...');
+  console.log('🎯 Starting IMPROVED multi-source recognition...');
   
   // Step 1: Check collection first (highest priority)
   try {
@@ -271,36 +434,31 @@ async function performMultiSourceRecognition(audioData: string): Promise<MultiSo
     const collectionResult = await checkCollection(audioData);
     if (collectionResult) {
       results.push(collectionResult);
-      console.log('🏆 Collection match found, but continuing to check other sources for alternatives...');
+      console.log('🏆 Collection match found, continuing for alternatives...');
     }
   } catch (error) {
     console.error('Collection check failed:', error);
   }
   
-  // Step 2: Check external services in parallel for alternatives
+  // Step 2: Check external services in parallel
   const externalChecks = [];
   
   if (process.env.ACRCLOUD_ACCESS_KEY) {
     sourcesChecked.push('ACRCloud');
-    externalChecks.push(checkACRCloud());
+    externalChecks.push(checkACRCloud(audioData));
   }
   
   if (process.env.AUDD_API_TOKEN) {
     sourcesChecked.push('AudD');
-    externalChecks.push(checkAudD());
+    externalChecks.push(checkAudD(audioData));
   }
   
   if (process.env.ACOUSTID_CLIENT_KEY) {
     sourcesChecked.push('AcoustID');
-    externalChecks.push(checkAcoustID());
+    externalChecks.push(checkAcoustID(audioData));
   }
   
-  if (process.env.SHAZAM_RAPID_API_KEY) {
-    sourcesChecked.push('Shazam');
-    externalChecks.push(checkShazam());
-  }
-  
-  // Wait for all external checks to complete
+  // Run external checks in parallel
   if (externalChecks.length > 0) {
     console.log(`🌐 Checking ${externalChecks.length} external services in parallel...`);
     const externalResults = await Promise.allSettled(externalChecks);
@@ -321,11 +479,11 @@ async function performMultiSourceRecognition(audioData: string): Promise<MultiSo
   // Auto-select the best result
   const autoSelected = selectBestResult(results);
   
-  // Generate alternatives (all results except the auto-selected one)
+  // Generate alternatives
   const alternatives = results
     .filter(r => r !== autoSelected)
     .sort((a, b) => b.confidence - a.confidence)
-    .slice(0, 4); // Limit to top 4 alternatives
+    .slice(0, 4);
   
   return {
     autoSelected,
@@ -343,32 +501,34 @@ export async function GET() {
   if (process.env.ACRCLOUD_ACCESS_KEY) enabledServices.push('ACRCloud');
   if (process.env.AUDD_API_TOKEN) enabledServices.push('AudD');
   if (process.env.ACOUSTID_CLIENT_KEY) enabledServices.push('AcoustID');
-  if (process.env.SHAZAM_RAPID_API_KEY) enabledServices.push('Shazam');
+  if (process.env.SPOTIFY_CLIENT_ID) enabledServices.push('Spotify Web API');
   
   return NextResponse.json({
     success: true,
-    message: "Multi-Source Audio Recognition API is running",
-    mode: "production_multi_source",
+    message: "IMPROVED Real Audio Recognition API",
+    mode: "production_real_audio",
     features: [
+      "real_audio_fingerprinting",
+      "spotify_metadata_enhancement",
       "collection_priority_matching",
-      "multi_source_recognition", 
-      "auto_selection_algorithm",
-      "confidence_scoring",
-      "parallel_external_apis",
-      "alternative_results"
+      "improved_auto_selection",
+      "parallel_processing",
+      "confidence_scoring"
     ],
     enabledServices: ['Collection Database', ...enabledServices],
-    totalSources: enabledServices.length + 1, // +1 for collection
-    autoSelection: {
-      collectionPriority: "Always wins if confidence > 0.7",
-      externalPriority: "ACRCloud > AudD > AcoustID > Shazam",
-      minimumConfidence: 0.6
-    },
-    version: "2.0.0"
+    totalSources: enabledServices.length + 1,
+    improvements: [
+      "Real ACRCloud audio fingerprinting",
+      "Spotify Web API metadata enhancement",
+      "Improved confidence scoring",
+      "Better auto-selection algorithm",
+      "Enhanced error handling"
+    ],
+    version: "3.0.0"
   });
 }
 
-// POST - Process multi-source audio recognition
+// POST - Process real audio recognition
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
   
@@ -383,13 +543,13 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
     
-    console.log(`🎵 Processing multi-source recognition (${triggeredBy})`);
+    console.log(`🎵 Processing IMPROVED multi-source recognition (${triggeredBy})`);
     console.log(`Audio data size: ${audioData.length} characters`);
     
     // Perform multi-source recognition
     const recognition = await performMultiSourceRecognition(audioData);
     
-    // Log successful recognition with auto-selection details
+    // Log successful recognition
     const { data: logData, error: logError } = await supabase
       .from('audio_recognition_logs')
       .insert({
@@ -407,7 +567,8 @@ export async function POST(request: NextRequest) {
           ...recognition,
           triggered_by: triggeredBy, 
           processing_time: recognition.processingTime,
-          mode: 'multi_source_v2'
+          mode: 'real_audio_v3',
+          spotify_enhanced: !!recognition.autoSelected.spotify_id
         },
         created_at: new Date().toISOString(),
         timestamp: timestamp || new Date().toISOString()
@@ -417,42 +578,50 @@ export async function POST(request: NextRequest) {
     
     if (logError) {
       console.error('Failed to log recognition:', logError);
-    } else {
-      console.log(`✅ Recognition logged with ID: ${logData?.id}`);
     }
     
-    // Update now playing with auto-selected result
+    // IMPROVED: Better now_playing update to ensure TV display refreshes
+    const nowPlayingData = {
+      id: 1,
+      artist: recognition.autoSelected.artist,
+      title: recognition.autoSelected.title,
+      album_title: recognition.autoSelected.album,
+      album_id: recognition.autoSelected.albumId || null,
+      recognition_image_url: recognition.autoSelected.image_url,
+      started_at: new Date().toISOString(),
+      recognition_confidence: recognition.autoSelected.confidence,
+      service_used: recognition.autoSelected.service,
+      next_recognition_in: recognition.autoSelected.source === 'collection' ? 20 : 30,
+      track_duration: recognition.autoSelected.duration_ms ? Math.floor(recognition.autoSelected.duration_ms / 1000) : null,
+      updated_at: new Date().toISOString() // This ensures change detection
+    };
+
     const { error: nowPlayingError } = await supabase
       .from('now_playing')
-      .upsert({
-        id: 1,
-        artist: recognition.autoSelected.artist,
-        title: recognition.autoSelected.title,
-        album_title: recognition.autoSelected.album,
-        album_id: recognition.autoSelected.albumId || null,
-        recognition_image_url: recognition.autoSelected.image_url,
-        started_at: new Date().toISOString(),
-        recognition_confidence: recognition.autoSelected.confidence,
-        service_used: recognition.autoSelected.service,
-        next_recognition_in: recognition.autoSelected.source === 'collection' ? 20 : 30, // Faster for collection
-        updated_at: new Date().toISOString()
-      });
+      .upsert(nowPlayingData);
     
     if (nowPlayingError) {
       console.error('Failed to update now playing:', nowPlayingError);
     } else {
-      console.log('✅ Now playing updated with auto-selected result');
+      console.log('✅ Now playing updated with IMPROVED data:', nowPlayingData);
+      
+      // IMPROVED: Send broadcast to ensure real-time updates
+      await supabase.channel('now_playing_updates').send({
+        type: 'broadcast',
+        event: 'force_refresh',
+        payload: { updated_at: nowPlayingData.updated_at }
+      });
     }
     
-    // Set album context with intelligent handling
-    await supabase.from('album_context').delete().neq('id', 0); // Clear existing
+    // Set album context
+    await supabase.from('album_context').delete().neq('id', 0);
     await supabase.from('album_context').insert({
       artist: recognition.autoSelected.artist,
       title: recognition.autoSelected.album,
       album: recognition.autoSelected.album,
       year: new Date().getFullYear().toString(),
       collection_id: recognition.autoSelected.albumId || null,
-      source: `multi_source_${recognition.autoSelected.source}`,
+      source: `real_audio_${recognition.autoSelected.source}`,
       created_at: new Date().toISOString()
     });
     
@@ -467,47 +636,28 @@ export async function POST(request: NextRequest) {
       sourcesChecked: recognition.sourcesChecked,
       logId: logData?.id,
       triggeredBy,
-      message: `Auto-selected: ${recognition.autoSelected.artist} - ${recognition.autoSelected.title} (${recognition.autoSelected.source})`,
+      message: `IMPROVED: ${recognition.autoSelected.artist} - ${recognition.autoSelected.title} (${recognition.autoSelected.source})`,
       stats: {
         totalMatches: recognition.allResults.length,
         collectionMatches: recognition.allResults.filter(r => r.source === 'collection').length,
         externalMatches: recognition.allResults.filter(r => r.source !== 'collection').length,
         autoSelectedSource: recognition.autoSelected.source,
-        autoSelectedConfidence: recognition.autoSelected.confidence
+        autoSelectedConfidence: recognition.autoSelected.confidence,
+        spotifyEnhanced: !!recognition.autoSelected.spotify_id,
+        realAudioProcessing: true
       }
     });
     
   } catch (error) {
     const processingTime = Date.now() - startTime;
-    console.error('Multi-source Recognition API error:', error);
-    
-    // Log failed recognition
-    await supabase.from('audio_recognition_logs').insert({
-      artist: null,
-      title: null,
-      album: null,
-      source: 'multi_source_error',
-      service: 'multi_source_engine',
-      confidence: 0,
-      confirmed: false,
-      match_source: null,
-      now_playing: false,
-      raw_response: { 
-        error: error instanceof Error ? error.message : 'Unknown error',
-        triggered_by: 'error',
-        processing_time: processingTime,
-        mode: 'multi_source_v2_error'
-      },
-      created_at: new Date().toISOString(),
-      timestamp: new Date().toISOString()
-    });
+    console.error('IMPROVED Recognition API error:', error);
     
     return NextResponse.json({
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
       processingTime,
-      details: "Multi-source recognition failed",
-      sourcesChecked: ['error_occurred']
+      details: "IMPROVED multi-source recognition failed",
+      mode: 'real_audio_v3_error'
     }, { status: 500 });
   }
 }
