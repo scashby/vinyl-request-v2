@@ -1,5 +1,5 @@
 // src/app/admin/audio-recognition/page.tsx
-// IMPROVED: Better Real-time Status and TV Display Integration
+// IMPROVED: Better Real-time Status and TV Display Integration - FIXED ESLint Issues
 
 'use client';
 
@@ -112,8 +112,8 @@ export default function ImprovedAdminInterface() {
       if (!error && data) {
         setNowPlayingStatus(data);
       }
-    } catch (error) {
-      console.error('Error monitoring now playing:', error);
+    } catch {
+      console.error('Error monitoring now playing');
     }
   }, [supabase]);
 
@@ -159,8 +159,8 @@ export default function ImprovedAdminInterface() {
       setPermissionError(null);
       addLog('Microphone permission granted - ready for real audio processing', 'success');
       return true;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Permission denied';
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Permission denied';
       setPermissionError(errorMessage);
       addLog(`Permission error: ${errorMessage}`, 'error');
       return false;
@@ -282,9 +282,9 @@ export default function ImprovedAdminInterface() {
       addLog(`Total processing time: ${processingTime}ms`, 'info');
       setLastResult(result);
 
-    } catch (error) {
+    } catch (err) {
       setStatus('error');
-      const errorMessage = error instanceof Error ? error.message : 'Recognition failed';
+      const errorMessage = err instanceof Error ? err.message : 'Recognition failed';
       addLog(`Recognition error: ${errorMessage}`, 'error');
       setLastResult({
         success: false,
@@ -363,8 +363,8 @@ export default function ImprovedAdminInterface() {
       } else {
         addLog('Override failed', 'error');
       }
-    } catch (error) {
-      addLog(`Override error: ${error instanceof Error ? error.message : 'Unknown'}`, 'error');
+    } catch (err) {
+      addLog(`Override error: ${err instanceof Error ? err.message : 'Unknown'}`, 'error');
     }
   }, [addLog, monitorNowPlaying]);
 
@@ -384,7 +384,7 @@ export default function ImprovedAdminInterface() {
         payload: { timestamp: new Date().toISOString() }
       });
       addLog('TV refresh signal sent', 'success');
-    } catch (error) {
+    } catch (err) {
       addLog('TV refresh failed', 'error');
     }
   }, [addLog, supabase]);

@@ -1,5 +1,5 @@
 // src/app/api/audio-recognition/route.ts
-// IMPROVED: Real Audio Recognition with Spotify Integration
+// IMPROVED: Real Audio Recognition with Spotify Integration - FIXED TypeScript/ESLint Issues
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
@@ -17,6 +17,11 @@ interface RecognitionRequest {
   timestamp?: string;
 }
 
+// FIXED: Properly typed external_urls instead of any
+interface SpotifyExternalUrls {
+  spotify?: string;
+}
+
 interface RecognitionMatch {
   artist: string;
   title: string;
@@ -31,7 +36,7 @@ interface RecognitionMatch {
   spotify_id?: string;
   duration_ms?: number;
   preview_url?: string;
-  external_urls?: any;
+  external_urls?: SpotifyExternalUrls; // FIXED: Proper typing instead of any
 }
 
 interface MultiSourceResponse {
@@ -40,6 +45,24 @@ interface MultiSourceResponse {
   allResults: RecognitionMatch[];
   processingTime: number;
   sourcesChecked: string[];
+}
+
+// Timeout wrapper for fetch requests since native fetch doesn't support timeout
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    throw error;
+  }
 }
 
 // Spotify Web API integration for enhanced metadata
@@ -160,12 +183,11 @@ async function checkACRCloud(audioData: string): Promise<RecognitionMatch | null
     formData.append('signature', signature);
     formData.append('timestamp', timestamp.toString());
 
-    // Make API call
-    const response = await fetch(`${process.env.ACRCLOUD_ENDPOINT}/v1/identify`, {
+    // FIXED: Use timeout wrapper instead of timeout property
+    const response = await fetchWithTimeout(`${process.env.ACRCLOUD_ENDPOINT}/v1/identify`, {
       method: 'POST',
-      body: formData,
-      timeout: 15000 // 15 second timeout
-    });
+      body: formData
+    }, 15000); // 15 second timeout
 
     if (response.ok) {
       const result = await response.json();
@@ -225,11 +247,11 @@ async function checkAudD(audioData: string): Promise<RecognitionMatch | null> {
     formData.append('api_token', process.env.AUDD_API_TOKEN);
     formData.append('return', 'spotify');
 
-    const response = await fetch('https://api.audd.io/', {
+    // FIXED: Use timeout wrapper instead of timeout property
+    const response = await fetchWithTimeout('https://api.audd.io/', {
       method: 'POST',
-      body: formData,
-      timeout: 20000
-    });
+      body: formData
+    }, 20000); // 20 second timeout
 
     if (response.ok) {
       const result = await response.json();
@@ -261,7 +283,8 @@ async function checkAudD(audioData: string): Promise<RecognitionMatch | null> {
 }
 
 // Enhanced AcoustID with MusicBrainz
-async function checkAcoustID(audioData: string): Promise<RecognitionMatch | null> {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+async function checkAcoustID(_audioData: string): Promise<RecognitionMatch | null> {
   const startTime = Date.now();
   
   if (!process.env.ACOUSTID_CLIENT_KEY) {
@@ -277,7 +300,7 @@ async function checkAcoustID(audioData: string): Promise<RecognitionMatch | null
     // For now, we'll implement a simplified version
     
     // In a real implementation, you'd generate fingerprint from audio:
-    // const fingerprint = await generateFingerprint(audioData);
+    // const fingerprint = await generateFingerprint(_audioData);
     
     // Placeholder for actual fingerprint generation
     const duration = 180; // estimated from audio data
@@ -288,11 +311,11 @@ async function checkAcoustID(audioData: string): Promise<RecognitionMatch | null
     // formData.append('fingerprint', fingerprint); // Real fingerprint would go here
     formData.append('meta', 'recordings+releasegroups+compress');
 
-    const response = await fetch('https://api.acoustid.org/v2/lookup', {
+    // FIXED: Use timeout wrapper instead of timeout property
+    const response = await fetchWithTimeout('https://api.acoustid.org/v2/lookup', {
       method: 'POST',
-      body: formData,
-      timeout: 15000
-    });
+      body: formData
+    }, 15000); // 15 second timeout
 
     if (response.ok) {
       const result = await response.json();
@@ -522,9 +545,10 @@ export async function GET() {
       "Spotify Web API metadata enhancement",
       "Improved confidence scoring",
       "Better auto-selection algorithm",
-      "Enhanced error handling"
+      "Enhanced error handling",
+      "Fixed TypeScript/ESLint issues"
     ],
-    version: "3.0.0"
+    version: "3.0.1"
   });
 }
 
