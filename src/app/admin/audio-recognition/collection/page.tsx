@@ -298,7 +298,7 @@ export default function FixedCollectionMatchPage() {
                   value={searchQuery}
                   onChange={handleSearchChange}
                   placeholder="Search artist or album title..."
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                 />
               </div>
 
@@ -315,7 +315,7 @@ export default function FixedCollectionMatchPage() {
                     value={artistQuery}
                     onChange={(e) => setArtistQuery(e.target.value)}
                     placeholder="Enter artist name"
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                   />
                 </div>
                 <div>
@@ -327,7 +327,7 @@ export default function FixedCollectionMatchPage() {
                     value={titleQuery}
                     onChange={(e) => setTitleQuery(e.target.value)}
                     placeholder="Enter album title"
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                   />
                 </div>
               </div>
