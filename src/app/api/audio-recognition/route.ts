@@ -1,9 +1,8 @@
 // src/app/api/audio-recognition/route.ts
-// Updated to use real audio recognition services
+// TEMPORARY FIX for Phase 1 - Full implementation in Phase 2
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { RealRecognitionServices } from 'lib/audio/RecognitionServices';
 
 // Initialize Supabase client
 const supabase = createClient(
@@ -11,34 +10,8 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-// Initialize recognition services with your Vercel environment variables
-const recognitionServices = new RealRecognitionServices({
-  acrcloud: process.env.ACRCLOUD_ACCESS_KEY ? {
-    accessKey: process.env.ACRCLOUD_ACCESS_KEY,
-    accessSecret: process.env.ACRCLOUD_SECRET_KEY!,
-    host: process.env.ACRCLOUD_ENDPOINT || 'identify-us-west-2.acrcloud.com'
-  } : undefined,
-  
-  audd: process.env.AUDD_API_TOKEN ? {
-    apiToken: process.env.AUDD_API_TOKEN
-  } : undefined,
-  
-  acoustid: process.env.ACOUSTID_CLIENT_KEY ? {
-    clientKey: process.env.ACOUSTID_CLIENT_KEY
-  } : undefined,
-  
-  shazam: process.env.SHAZAM_RAPID_API_KEY ? {
-    rapidApiKey: process.env.SHAZAM_RAPID_API_KEY
-  } : undefined
-});
-
-// Check if we're in simulation mode (you have API keys, so this should be false!)
-const isSimulationMode = !process.env.ACRCLOUD_ACCESS_KEY && 
-                         !process.env.AUDD_API_TOKEN && 
-                         !process.env.ACOUSTID_CLIENT_KEY;
-
 interface RecognitionRequest {
-  audioData: string; // base64 encoded audio
+  audioData: string;
   triggeredBy?: string;
   timestamp?: string;
 }
@@ -53,11 +26,11 @@ interface SimulationResult {
   image_url: string;
 }
 
-// Fallback simulation for when no API keys are configured
-async function simulateRecognition(): Promise<SimulationResult | null> {
-  console.log('⚠️  Using simulation mode - configure API keys for real recognition');
+// TEMPORARY: Simple simulation for Phase 1 cleanup
+async function temporarySimulation(): Promise<SimulationResult | null> {
+  console.log('⚠️ TEMPORARY: Using basic simulation during Phase 1 cleanup');
   
-  await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
+  await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 1000));
   
   const scenarios: SimulationResult[] = [
     {
@@ -65,8 +38,8 @@ async function simulateRecognition(): Promise<SimulationResult | null> {
       title: "Come Together", 
       album: "Abbey Road",
       confidence: 0.95,
-      source: "simulation",
-      service: "ACRCloud (simulated)",
+      source: "temp_simulation",
+      service: "Phase1_Cleanup_Mode",
       image_url: "https://upload.wikimedia.org/wikipedia/en/4/42/Beatles_-_Abbey_Road.jpg"
     },
     {
@@ -74,77 +47,34 @@ async function simulateRecognition(): Promise<SimulationResult | null> {
       title: "Time",
       album: "The Dark Side of the Moon", 
       confidence: 0.88,
-      source: "simulation",
-      service: "AudD (simulated)",
+      source: "temp_simulation",
+      service: "Phase1_Cleanup_Mode",
       image_url: "https://upload.wikimedia.org/wikipedia/en/3/3b/Dark_Side_of_the_Moon.png"
     }
   ];
   
-  // 80% success rate
-  if (Math.random() > 0.2) {
+  // 70% success rate during cleanup
+  if (Math.random() > 0.3) {
     return scenarios[Math.floor(Math.random() * scenarios.length)];
   }
   
   return null;
 }
 
-// Convert base64 audio to Float32Array for processing
-function base64ToAudioBuffer(base64Audio: string): Float32Array {
-  try {
-    // Remove data URL prefix if present
-    const audioData = base64Audio.replace(/^data:audio\/[^;]+;base64,/, '');
-    
-    // Decode base64
-    const binaryString = atob(audioData);
-    const bytes = new Uint8Array(binaryString.length);
-    
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-    
-    // Convert to Float32Array (simplified - assumes 16-bit PCM)
-    const samples = new Float32Array(bytes.length / 2);
-    const dataView = new DataView(bytes.buffer);
-    
-    for (let i = 0; i < samples.length; i++) {
-      const sample = dataView.getInt16(i * 2, true); // little-endian
-      samples[i] = sample / 32768.0; // Convert to -1 to 1 range
-    }
-    
-    return samples;
-  } catch (error) {
-    console.error('Error converting audio data:', error);
-    throw new Error('Invalid audio data format');
-  }
-}
-
 // GET - Return service status
 export async function GET() {
-  const enabledServices = [];
-  
-  if (process.env.ACRCLOUD_ACCESS_KEY) enabledServices.push('ACRCloud');
-  if (process.env.AUDD_API_TOKEN) enabledServices.push('AudD');
-  if (process.env.ACOUSTID_CLIENT_KEY) enabledServices.push('AcoustID');
-  if (process.env.SHAZAM_RAPID_API_KEY) enabledServices.push('Shazam');
-  
   return NextResponse.json({
     success: true,
-    message: "Audio Recognition API is running",
-    mode: isSimulationMode ? "simulation" : "production",
-    enabledServices: isSimulationMode ? ["Simulation"] : enabledServices,
-    totalServices: enabledServices.length,
-    simulationMode: isSimulationMode,
-    version: "2.0.0",
-    features: [
-      "real_audio_fingerprinting",
-      "collection_matching", 
-      "external_api_integration",
-      "confidence_scoring"
-    ]
+    message: "TEMPORARY: Audio Recognition API in Phase 1 cleanup mode",
+    mode: "phase1_cleanup_temp",
+    status: "⚠️ Limited functionality during simplification",
+    enabledServices: ["Temporary Simulation"],
+    note: "Full multi-source recognition will be implemented in Phase 2",
+    version: "1.0.0-phase1-temp"
   });
 }
 
-// POST - Process audio recognition
+// POST - Temporary recognition endpoint
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
   
@@ -159,40 +89,10 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
     
-    console.log(`🎵 Processing ${isSimulationMode ? 'simulated' : 'real'} audio recognition (${triggeredBy})`);
-    console.log(`Audio data size: ${audioData.length} characters`);
+    console.log(`🎵 TEMPORARY: Processing recognition in Phase 1 cleanup mode (${triggeredBy})`);
     
-    let result = null;
-    
-    if (isSimulationMode) {
-      // Fall back to simulation
-      result = await simulateRecognition();
-    } else {
-      try {
-        // Convert base64 audio to audio buffer
-        const audioBuffer = base64ToAudioBuffer(audioData);
-        console.log(`Converted to audio buffer: ${audioBuffer.length} samples`);
-        
-        // Use real recognition services
-        result = await recognitionServices.recognizeAudio(audioBuffer);
-        
-        if (!result) {
-          console.log('No matches found in any recognition service');
-        }
-      } catch (conversionError) {
-        console.error('Audio conversion error:', conversionError);
-        
-        // Fall back to simulation if audio conversion fails
-        console.log('Falling back to simulation due to audio conversion error');
-        result = await simulateRecognition();
-        
-        if (result) {
-          result.source = 'simulation_fallback';
-          result.service = `${result.service} (fallback)`;
-        }
-      }
-    }
-    
+    // Use temporary simulation
+    const result = await temporarySimulation();
     const processingTime = Date.now() - startTime;
     
     if (!result) {
@@ -201,16 +101,16 @@ export async function POST(request: NextRequest) {
         artist: null,
         title: null,
         album: null,
-        source: isSimulationMode ? 'simulation' : 'external_api',
-        service: 'multi_service',
+        source: 'temp_simulation',
+        service: 'phase1_cleanup',
         confidence: 0,
         confirmed: false,
         match_source: null,
         now_playing: false,
         raw_response: { 
-          error: 'No match found', 
+          error: 'No match found in temp mode', 
           triggered_by: triggeredBy,
-          mode: isSimulationMode ? 'simulation' : 'production',
+          mode: 'phase1_cleanup',
           processing_time: processingTime
         },
         created_at: new Date().toISOString(),
@@ -219,10 +119,10 @@ export async function POST(request: NextRequest) {
       
       return NextResponse.json({
         success: false,
-        error: "No match found",
+        error: "No match found (Phase 1 cleanup mode)",
         processingTime,
-        mode: isSimulationMode ? 'simulation' : 'production',
-        details: `Recognition completed but no match was found using ${isSimulationMode ? 'simulation' : 'real services'}`
+        mode: "phase1_cleanup_temp",
+        details: "Temporary simulation during system simplification"
       });
     }
     
@@ -237,13 +137,13 @@ export async function POST(request: NextRequest) {
         service: result.service,
         confidence: result.confidence,
         confirmed: false,
-        match_source: 'external',
+        match_source: 'temp_simulation',
         now_playing: false,
         raw_response: { 
           ...result, 
           triggered_by: triggeredBy, 
           processing_time: processingTime,
-          mode: isSimulationMode ? 'simulation' : 'production'
+          mode: 'phase1_cleanup'
         },
         created_at: new Date().toISOString(),
         timestamp: timestamp || new Date().toISOString()
@@ -266,7 +166,7 @@ export async function POST(request: NextRequest) {
         title: result.title,
         album_title: result.album,
         recognition_image_url: result.image_url,
-        album_id: null, // External recognition, no collection match
+        album_id: null,
         started_at: new Date().toISOString(),
         recognition_confidence: result.confidence,
         service_used: result.service,
@@ -277,20 +177,8 @@ export async function POST(request: NextRequest) {
     if (nowPlayingError) {
       console.error('Failed to update now playing:', nowPlayingError);
     } else {
-      console.log('✅ Now playing updated');
+      console.log('✅ Now playing updated (temp mode)');
     }
-    
-    // Set album context
-    await supabase.from('album_context').delete().neq('id', 0);
-    await supabase.from('album_context').insert({
-      artist: result.artist,
-      title: result.album,
-      album: result.album,
-      year: new Date().getFullYear().toString(),
-      collection_id: null,
-      source: isSimulationMode ? 'simulation' : 'external_recognition',
-      created_at: new Date().toISOString()
-    });
     
     return NextResponse.json({
       success: true,
@@ -301,21 +189,21 @@ export async function POST(request: NextRequest) {
       processingTime,
       logId: logData?.id,
       triggeredBy,
-      mode: isSimulationMode ? 'simulation' : 'production',
-      message: `Successfully recognized: ${result.artist} - ${result.title}`,
-      serviceUsed: result.service
+      mode: "phase1_cleanup_temp",
+      message: `TEMPORARY: Simulated recognition: ${result.artist} - ${result.title}`,
+      note: "Full recognition will be available after Phase 2 completion"
     });
     
   } catch (error) {
     const processingTime = Date.now() - startTime;
-    console.error('Recognition API error:', error);
+    console.error('Temporary Recognition API error:', error);
     
     return NextResponse.json({
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
       processingTime,
-      mode: isSimulationMode ? 'simulation' : 'production',
-      details: "Error occurred during audio recognition processing"
+      mode: "phase1_cleanup_temp",
+      details: "Error during Phase 1 cleanup mode"
     }, { status: 500 });
   }
 }
