@@ -1,4 +1,4 @@
-// src/app/now-playing-tv/page.tsx - IMPROVED with Better Real-time Updates
+// src/app/now-playing-tv/page.tsx - IMPROVED with Better Real-time Updates - FINAL ESLint Fix
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from 'react';
@@ -156,14 +156,15 @@ export default function ImprovedTVDisplay() {
       channelRef.current = null;
     }
 
-    // Create new subscription with more aggressive settings
+    // FIXED: Proper Supabase channel config structure
     channelRef.current = supabase
       .channel('now_playing_tv_improved', {
         config: {
-          broadcast: { self: true },
-          presence: { key: `tv-display-${Date.now()}` },
-          // IMPROVED: More aggressive real-time settings
-          ack: true
+          broadcast: { 
+            self: true,
+            ack: true  // FIXED: ack goes inside broadcast config
+          },
+          presence: { key: `tv-display-${Date.now()}` }
         }
       })
       .on('postgres_changes', 
@@ -238,7 +239,7 @@ export default function ImprovedTVDisplay() {
     }, 5000); // IMPROVED: Every 5 seconds instead of 10
   }, [fetchNowPlaying]);
 
-  // IMPROVED: Enhanced initialization
+  // IMPROVED: Enhanced initialization - FIXED dependencies
   useEffect(() => {
     isActiveRef.current = true;
     console.log('🚀 Initializing IMPROVED TV Display...');
@@ -280,7 +281,7 @@ export default function ImprovedTVDisplay() {
         retryTimeoutRef.current = null;
       }
     };
-  }, []); // Removed dependencies to prevent re-initialization
+  }, [fetchNowPlaying, setupPollingFallback, setupRealtimeSubscription]); // FIXED: Added missing dependencies
 
   // IMPROVED: Force refresh mechanism
   useEffect(() => {
@@ -309,14 +310,6 @@ export default function ImprovedTVDisplay() {
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [fetchNowPlaying, setupRealtimeSubscription]);
-
-  // Format duration
-  const formatDuration = (seconds?: number): string => {
-    if (!seconds) return '';
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
 
   // Loading state
   if (isLoading) {
@@ -615,7 +608,7 @@ export default function ImprovedTVDisplay() {
             {displayTrackTitle}
           </h1>
           
-          {/* Album */}
+          {/* Album - FIXED: Escaped quotes */}
           {displayAlbumTitle && (
             <h2 style={{ 
               fontSize: '2.2rem', 
@@ -625,7 +618,7 @@ export default function ImprovedTVDisplay() {
               fontStyle: 'italic',
               textShadow: '0 2px 10px rgba(0,0,0,0.5)'
             }}>
-              from "{displayAlbumTitle}"
+              from &ldquo;{displayAlbumTitle}&rdquo;
             </h2>
           )}
           

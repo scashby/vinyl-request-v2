@@ -1,5 +1,5 @@
 // src/app/admin/audio-recognition/page.tsx
-// IMPROVED: Better Real-time Status and TV Display Integration - FIXED ESLint Issues
+// IMPROVED: Better Real-time Status and TV Display Integration - FINAL ESLint Fix
 
 'use client';
 
@@ -113,7 +113,7 @@ export default function ImprovedAdminInterface() {
         setNowPlayingStatus(data);
       }
     } catch {
-      console.error('Error monitoring now playing');
+      // Silent error handling for monitoring
     }
   }, [supabase]);
 
@@ -363,8 +363,8 @@ export default function ImprovedAdminInterface() {
       } else {
         addLog('Override failed', 'error');
       }
-    } catch (err) {
-      addLog(`Override error: ${err instanceof Error ? err.message : 'Unknown'}`, 'error');
+    } catch {
+      addLog('Override error occurred', 'error');
     }
   }, [addLog, monitorNowPlaying]);
 
@@ -384,7 +384,7 @@ export default function ImprovedAdminInterface() {
         payload: { timestamp: new Date().toISOString() }
       });
       addLog('TV refresh signal sent', 'success');
-    } catch (err) {
+    } catch {
       addLog('TV refresh failed', 'error');
     }
   }, [addLog, supabase]);
