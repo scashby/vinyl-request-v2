@@ -1,5 +1,5 @@
 // src/app/admin/audio-recognition/page.tsx
-// IMPROVED: Better Real-time Status and TV Display Integration - FINAL ESLint Fix
+// CRITICAL FIX: Base64 conversion and stream management
 
 'use client';
 
@@ -58,7 +58,7 @@ interface NowPlayingStatus {
 
 type ListeningStatus = 'idle' | 'listening' | 'recording' | 'searching' | 'results' | 'error';
 
-export default function ImprovedAdminInterface() {
+export default function FixedAudioRecognitionInterface() {
   // Core state
   const [status, setStatus] = useState<ListeningStatus>('idle');
   const [isListening, setIsListening] = useState(false);
@@ -100,6 +100,29 @@ export default function ImprovedAdminInterface() {
     console.log(`${emoji} ${logEntry}`);
   }, []);
 
+  // FIXED: Proper base64 conversion for large audio files
+  const arrayBufferToBase64 = useCallback((buffer: ArrayBuffer): string => {
+    try {
+      addLog(`Converting ${buffer.byteLength} bytes to base64...`, 'info');
+      
+      const bytes = new Uint8Array(buffer);
+      const chunkSize = 8192; // Process in 8KB chunks to avoid stack overflow
+      let binary = '';
+      
+      for (let i = 0; i < bytes.length; i += chunkSize) {
+        const chunk = bytes.slice(i, i + chunkSize);
+        binary += String.fromCharCode.apply(null, Array.from(chunk));
+      }
+      
+      const base64 = btoa(binary);
+      addLog(`Base64 conversion complete: ${base64.length} characters`, 'success');
+      return base64;
+    } catch (error) {
+      addLog(`Base64 conversion failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+      throw new Error('Failed to convert audio to base64');
+    }
+  }, [addLog]);
+
   // Monitor now playing status for TV display verification
   const monitorNowPlaying = useCallback(async () => {
     try {
@@ -117,13 +140,20 @@ export default function ImprovedAdminInterface() {
     }
   }, [supabase]);
 
-  // Cleanup function
+  // FIXED: Better cleanup function with proper stream management
   const cleanup = useCallback(() => {
+    addLog('Cleaning up audio resources...', 'info');
+    
+    // Stop all tracks in the stream
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current.getTracks().forEach(track => {
+        track.stop();
+        addLog(`Stopped track: ${track.kind}`, 'info');
+      });
       streamRef.current = null;
     }
     
+    // Clear intervals
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
@@ -137,12 +167,21 @@ export default function ImprovedAdminInterface() {
     setIsListening(false);
     setStatus('idle');
     setNextRecognitionIn(null);
-  }, []);
+    setHasPermission(false); // Reset permission to force re-request
+    
+    addLog('Cleanup complete', 'success');
+  }, [addLog]);
 
-  // Request microphone permission
-  const requestPermission = useCallback(async () => {
+  // FIXED: Better permission request with error recovery
+  const requestPermission = useCallback(async (): Promise<boolean> => {
     try {
       addLog('Requesting microphone permission...', 'info');
+      
+      // Stop any existing stream first
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
       
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -162,26 +201,31 @@ export default function ImprovedAdminInterface() {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Permission denied';
       setPermissionError(errorMessage);
+      setHasPermission(false);
       addLog(`Permission error: ${errorMessage}`, 'error');
       return false;
     }
   }, [addLog]);
 
-  // IMPROVED: Better audio recording with progress feedback
+  // FIXED: Better audio recording with improved error handling
   const performRecognition = useCallback(async (triggeredBy: string = 'manual') => {
     if (!streamRef.current) {
-      addLog('No audio stream available', 'error');
-      return;
+      addLog('No audio stream available - requesting permission...', 'warning');
+      const granted = await requestPermission();
+      if (!granted) {
+        addLog('Cannot proceed without microphone access', 'error');
+        return;
+      }
     }
 
     setStatus('recording');
-    addLog(`Starting recognition (${triggeredBy}) with real audio processing...`, 'info');
+    addLog(`Starting recognition (${triggeredBy}) with FIXED audio processing...`, 'info');
     setRecognitionCount(prev => prev + 1);
     
     const startTime = Date.now();
 
     try {
-      // Enhanced recording with progress feedback
+      // Enhanced recording with better error handling
       const mediaRecorder = new MediaRecorder(streamRef.current, {
         mimeType: 'audio/webm;codecs=opus'
       });
@@ -215,9 +259,10 @@ export default function ImprovedAdminInterface() {
           resolve(audioBlob);
         };
 
-        mediaRecorder.onerror = () => {
+        mediaRecorder.onerror = (event) => {
           clearTimeout(timeout);
           clearInterval(progressInterval);
+          addLog(`Recording error: ${event.error?.message || 'Unknown error'}`, 'error');
           reject(new Error('Recording failed'));
         };
       });
@@ -232,12 +277,13 @@ export default function ImprovedAdminInterface() {
 
       const audioBlob = await recordingPromise;
       
-      // Convert to base64
+      // FIXED: Use the improved base64 conversion
       const arrayBuffer = await audioBlob.arrayBuffer();
-      const base64Audio = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+      addLog('Converting audio to base64 (this may take a moment)...', 'info');
+      const base64Audio = arrayBufferToBase64(arrayBuffer);
       
       setStatus('searching');
-      addLog('Sending to IMPROVED multi-source recognition engine...', 'info');
+      addLog('Sending to FIXED multi-source recognition engine...', 'info');
 
       // Call the improved recognition API
       const response = await fetch('/api/audio-recognition', {
@@ -245,10 +291,14 @@ export default function ImprovedAdminInterface() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           audioData: base64Audio,
-          triggeredBy: `improved_interface_${triggeredBy}`,
+          triggeredBy: `fixed_interface_${triggeredBy}`,
           timestamp: new Date().toISOString()
         })
       });
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status} ${response.statusText}`);
+      }
 
       const result: RecognitionResponse = await response.json();
       const processingTime = Date.now() - startTime;
@@ -286,6 +336,13 @@ export default function ImprovedAdminInterface() {
       setStatus('error');
       const errorMessage = err instanceof Error ? err.message : 'Recognition failed';
       addLog(`Recognition error: ${errorMessage}`, 'error');
+      
+      // FIXED: Better error recovery
+      if (errorMessage.includes('call stack') || errorMessage.includes('memory')) {
+        addLog('Memory/stack error detected - cleaning up...', 'warning');
+        cleanup();
+      }
+      
       setLastResult({
         success: false,
         error: errorMessage,
@@ -293,7 +350,7 @@ export default function ImprovedAdminInterface() {
         sourcesChecked: []
       });
     }
-  }, [addLog, monitorNowPlaying]);
+  }, [addLog, monitorNowPlaying, arrayBufferToBase64, requestPermission, cleanup]);
 
   // Start countdown for next recognition
   const startCountdown = useCallback(() => {
@@ -309,25 +366,33 @@ export default function ImprovedAdminInterface() {
     }, 1000);
   }, [autoInterval]);
 
-  // Auto-recognition loop
+  // FIXED: Better auto-recognition loop with error recovery
   const startAutoRecognition = useCallback(async () => {
     if (!hasPermission) {
       const granted = await requestPermission();
-      if (!granted) return;
+      if (!granted) {
+        addLog('Cannot start auto-recognition without microphone access', 'error');
+        return;
+      }
     }
 
     setIsListening(true);
     setStatus('listening');
-    addLog(`Auto-recognition started (every ${autoInterval}s) with IMPROVED engine`, 'success');
+    addLog(`Auto-recognition started (every ${autoInterval}s) with FIXED engine`, 'success');
 
     // Immediate recognition
     await performRecognition('auto_initial');
 
-    // Set up interval
+    // Set up interval with error handling
     intervalRef.current = setInterval(async () => {
       if (isActiveRef.current && isListening) {
-        await performRecognition('auto_interval');
-        startCountdown();
+        try {
+          await performRecognition('auto_interval');
+          startCountdown();
+        } catch (error) {
+          addLog(`Auto-recognition error: ${error instanceof Error ? error.message : 'Unknown'}`, 'error');
+          // Continue running despite errors
+        }
       }
     }, autoInterval * 1000);
 
@@ -415,8 +480,8 @@ export default function ImprovedAdminInterface() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">🎵 IMPROVED Audio Recognition</h1>
-              <p className="text-gray-600">Real audio fingerprinting with Spotify enhancement</p>
+              <h1 className="text-2xl font-bold text-gray-900">🎵 FIXED Audio Recognition</h1>
+              <p className="text-gray-600">Real audio fingerprinting with fixed base64 conversion</p>
             </div>
             <div className="flex gap-3">
               <Link 
@@ -444,6 +509,20 @@ export default function ImprovedAdminInterface() {
       </div>
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* FIXED: Error detection warning */}
+        {permissionError && (
+          <div className="mb-6 p-4 bg-red-100 border border-red-300 rounded-lg">
+            <h3 className="text-red-800 font-semibold">Microphone Issue Detected</h3>
+            <p className="text-red-700">{permissionError}</p>
+            <button
+              onClick={requestPermission}
+              className="mt-2 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+            >
+              🔄 Retry Permission
+            </button>
+          </div>
+        )}
+
         {/* Stats Dashboard */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
           <div className="bg-white rounded-lg shadow border p-6">
@@ -459,8 +538,12 @@ export default function ImprovedAdminInterface() {
             <div className="text-sm text-gray-600">Success Rate</div>
           </div>
           <div className="bg-white rounded-lg shadow border p-6">
-            <div className={`text-2xl font-bold ${isListening ? 'text-green-600' : 'text-gray-400'}`}>
-              {isListening ? '🎤 LIVE' : '⏸️ IDLE'}
+            <div className={`text-2xl font-bold ${
+              isListening ? 'text-green-600' : 
+              hasPermission ? 'text-blue-600' : 
+              'text-gray-400'
+            }`}>
+              {isListening ? '🎤 LIVE' : hasPermission ? '🟢 READY' : '⏸️ IDLE'}
             </div>
             <div className="text-sm text-gray-600">Status</div>
           </div>
@@ -501,10 +584,10 @@ export default function ImprovedAdminInterface() {
             {/* Status Message */}
             <div className="mb-6">
               <div className="text-lg font-medium text-gray-900 mb-2">
-                {status === 'idle' && 'Ready for Real Audio Processing'}
+                {status === 'idle' && (hasPermission ? 'Ready for FIXED Audio Processing' : 'Click to Grant Microphone Access')}
                 {status === 'listening' && 'Listening for Music...'}
                 {status === 'recording' && 'Recording Audio (10 seconds)...'}
-                {status === 'searching' && 'Processing with IMPROVED Engine...'}
+                {status === 'searching' && 'Processing with FIXED Engine...'}
                 {status === 'results' && 'Match Found & TV Updated!'}
                 {status === 'error' && 'No Match Found'}
               </div>
@@ -512,12 +595,6 @@ export default function ImprovedAdminInterface() {
               {nextRecognitionIn && (
                 <div className="text-sm text-gray-600">
                   Next recognition in {nextRecognitionIn} seconds
-                </div>
-              )}
-              
-              {permissionError && (
-                <div className="text-sm text-red-600 bg-red-50 p-2 rounded">
-                  Microphone Error: {permissionError}
                 </div>
               )}
             </div>
@@ -529,7 +606,7 @@ export default function ImprovedAdminInterface() {
                   onClick={startAutoRecognition}
                   className="w-full py-4 text-lg font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                 >
-                  🎵 Start IMPROVED Recognition
+                  🎵 Start FIXED Recognition
                 </button>
               ) : (
                 <button
@@ -540,7 +617,7 @@ export default function ImprovedAdminInterface() {
                 </button>
               )}
 
-              {!isListening && hasPermission && (
+              {!isListening && (
                 <button
                   onClick={() => performRecognition('manual_single')}
                   disabled={status === 'recording' || status === 'searching'}
