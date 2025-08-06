@@ -1,5 +1,5 @@
 // src/app/admin/audio-recognition/page.tsx
-// CRITICAL FIX: Base64 conversion and stream management
+// COMPREHENSIVE FIX: Real microphone access + full audio recognition functionality
 
 'use client';
 
@@ -56,13 +56,14 @@ interface NowPlayingStatus {
   updated_at?: string;
 }
 
-type ListeningStatus = 'idle' | 'listening' | 'recording' | 'searching' | 'results' | 'error';
+type ListeningStatus = 'idle' | 'requesting-permission' | 'permission-denied' | 'listening' | 'recording' | 'searching' | 'results' | 'error';
+type PermissionState = 'unknown' | 'granted' | 'denied' | 'prompt' | 'not-supported';
 
-export default function FixedAudioRecognitionInterface() {
+export default function CompleteFixedAudioRecognition() {
   // Core state
   const [status, setStatus] = useState<ListeningStatus>('idle');
   const [isListening, setIsListening] = useState(false);
-  const [hasPermission, setHasPermission] = useState(false);
+  const [permissionState, setPermissionState] = useState<PermissionState>('unknown');
   const [permissionError, setPermissionError] = useState<string | null>(null);
 
   // Recognition results
@@ -78,6 +79,14 @@ export default function FixedAudioRecognitionInterface() {
   const [recognitionCount, setRecognitionCount] = useState(0);
   const [successCount, setSuccessCount] = useState(0);
 
+  // Browser capabilities
+  const [isSecureContext, setIsSecureContext] = useState(false);
+  const [browserSupport, setBrowserSupport] = useState({
+    getUserMedia: false,
+    mediaDevices: false,
+    permissions: false
+  });
+
   // Refs
   const streamRef = useRef<MediaStream | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -88,7 +97,7 @@ export default function FixedAudioRecognitionInterface() {
   const addLog = useCallback((message: string, type: 'info' | 'success' | 'error' | 'warning' = 'info') => {
     const timestamp = new Date().toLocaleTimeString();
     const logEntry = `[${timestamp}] ${message}`;
-    setLogs(prev => [logEntry, ...prev.slice(0, 19)]); // Keep last 20 logs, newest first
+    setLogs(prev => [logEntry, ...prev.slice(0, 19)]);
     
     const emoji = {
       info: '🎵',
@@ -100,30 +109,60 @@ export default function FixedAudioRecognitionInterface() {
     console.log(`${emoji} ${logEntry}`);
   }, []);
 
-  // FIXED: Proper base64 conversion for large audio files
-  const arrayBufferToBase64 = useCallback((buffer: ArrayBuffer): string => {
-    try {
-      addLog(`Converting ${buffer.byteLength} bytes to base64...`, 'info');
-      
-      const bytes = new Uint8Array(buffer);
-      const chunkSize = 8192; // Process in 8KB chunks to avoid stack overflow
-      let binary = '';
-      
-      for (let i = 0; i < bytes.length; i += chunkSize) {
-        const chunk = bytes.slice(i, i + chunkSize);
-        binary += String.fromCharCode.apply(null, Array.from(chunk));
-      }
-      
-      const base64 = btoa(binary);
-      addLog(`Base64 conversion complete: ${base64.length} characters`, 'success');
-      return base64;
-    } catch (error) {
-      addLog(`Base64 conversion failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
-      throw new Error('Failed to convert audio to base64');
+  // CRITICAL: Check browser capabilities and security context
+  const checkBrowserSupport = useCallback(() => {
+    const secure = window.isSecureContext || location.protocol === 'https:' || location.hostname === 'localhost';
+    setIsSecureContext(secure);
+    
+    const support = {
+      getUserMedia: !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia),
+      mediaDevices: !!navigator.mediaDevices,
+      permissions: !!(navigator.permissions && navigator.permissions.query)
+    };
+    setBrowserSupport(support);
+    
+    addLog(`Browser check: HTTPS=${secure}, getUserMedia=${support.getUserMedia}, Permissions=${support.permissions}`, 'info');
+    
+    if (!secure) {
+      addLog('WARNING: Not in secure context - microphone access may be blocked!', 'warning');
+      setPermissionError('Site must be accessed via HTTPS for microphone access');
     }
+    
+    if (!support.getUserMedia) {
+      addLog('ERROR: getUserMedia not supported', 'error');
+      setPermissionError('Browser does not support microphone access');
+    }
+    
+    return secure && support.getUserMedia;
   }, [addLog]);
 
-  // Monitor now playing status for TV display verification
+  // CRITICAL: Check permission state using Permissions API
+  const checkPermissionState = useCallback(async (): Promise<PermissionState> => {
+    try {
+      if (!browserSupport.permissions) {
+        addLog('Permissions API not available - will try direct getUserMedia', 'warning');
+        return 'unknown';
+      }
+
+      const result = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+      addLog(`Current microphone permission: ${result.state}`, 'info');
+      
+      const state = result.state as PermissionState;
+      setPermissionState(state);
+      
+      result.addEventListener('change', () => {
+        addLog(`Permission changed to: ${result.state}`, 'info');
+        setPermissionState(result.state as PermissionState);
+      });
+      
+      return state;
+    } catch (error) {
+      addLog(`Permission check failed: ${error instanceof Error ? error.message : 'Unknown'}`, 'warning');
+      return 'unknown';
+    }
+  }, [browserSupport.permissions, addLog]);
+
+  // Monitor now playing status
   const monitorNowPlaying = useCallback(async () => {
     try {
       const { data, error } = await supabase
@@ -136,54 +175,44 @@ export default function FixedAudioRecognitionInterface() {
         setNowPlayingStatus(data);
       }
     } catch {
-      // Silent error handling for monitoring
+      // Silent error handling
     }
   }, [supabase]);
 
-  // FIXED: Better cleanup function with proper stream management
-  const cleanup = useCallback(() => {
-    addLog('Cleaning up audio resources...', 'info');
-    
-    // Stop all tracks in the stream
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => {
-        track.stop();
-        addLog(`Stopped track: ${track.kind}`, 'info');
-      });
-      streamRef.current = null;
-    }
-    
-    // Clear intervals
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-    
-    if (countdownRef.current) {
-      clearInterval(countdownRef.current);
-      countdownRef.current = null;
-    }
-
-    setIsListening(false);
-    setStatus('idle');
-    setNextRecognitionIn(null);
-    setHasPermission(false); // Reset permission to force re-request
-    
-    addLog('Cleanup complete', 'success');
-  }, [addLog]);
-
-  // FIXED: Better permission request with error recovery
-  const requestPermission = useCallback(async (): Promise<boolean> => {
+  // CRITICAL: Enhanced microphone permission request
+  const requestMicrophonePermission = useCallback(async (): Promise<boolean> => {
     try {
-      addLog('Requesting microphone permission...', 'info');
-      
-      // Stop any existing stream first
+      setStatus('requesting-permission');
+      setPermissionError(null);
+      addLog('🎤 Requesting microphone permission...', 'info');
+
+      // Clean up existing stream
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
         streamRef.current = null;
       }
+
+      // Check permission state first
+      const permState = await checkPermissionState();
       
-      const stream = await navigator.mediaDevices.getUserMedia({
+      if (permState === 'denied') {
+        const message = 'Microphone blocked. Click microphone icon in address bar to allow, then refresh.';
+        setPermissionError(message);
+        addLog(message, 'error');
+        setStatus('permission-denied');
+        return false;
+      }
+
+      addLog('Showing microphone permission dialog...', 'info');
+      
+      // Request with timeout
+      const permissionTimeout = new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          reject(new Error('Permission request timed out'));
+        }, 30000);
+      });
+
+      const streamPromise = navigator.mediaDevices.getUserMedia({
         audio: {
           sampleRate: 44100,
           channelCount: 1,
@@ -193,50 +222,157 @@ export default function FixedAudioRecognitionInterface() {
         }
       });
 
+      const stream = await Promise.race([streamPromise, permissionTimeout]);
+
+      // Verify stream
+      if (stream.getAudioTracks().length === 0) {
+        throw new Error('No audio tracks in stream');
+      }
+
+      const audioTrack = stream.getAudioTracks()[0];
+      if (!audioTrack.enabled || audioTrack.readyState !== 'live') {
+        throw new Error('Audio track not active');
+      }
+
+      addLog(`✅ Microphone access granted! Device: ${audioTrack.label || 'Default'}`, 'success');
+
       streamRef.current = stream;
-      setHasPermission(true);
-      setPermissionError(null);
-      addLog('Microphone permission granted - ready for real audio processing', 'success');
+      setPermissionState('granted');
+      setStatus('idle');
+      
       return true;
+
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Permission denied';
-      setPermissionError(errorMessage);
-      setHasPermission(false);
-      addLog(`Permission error: ${errorMessage}`, 'error');
+      const error = err as Error;
+      let errorMessage = 'Failed to access microphone';
+      let userHelp = '';
+
+      if (error.name === 'NotAllowedError') {
+        errorMessage = 'Microphone access denied';
+        userHelp = 'Click the microphone icon in the address bar to allow';
+      } else if (error.name === 'NotFoundError') {
+        errorMessage = 'No microphone found';
+        userHelp = 'Connect a microphone and try again';
+      } else if (error.name === 'NotReadableError') {
+        errorMessage = 'Microphone busy or unavailable';
+        userHelp = 'Close other apps using the microphone';
+      } else if (error.name === 'SecurityError') {
+        errorMessage = 'Security error - blocked';
+        userHelp = 'Must use HTTPS';
+      } else if (error.message.includes('timeout')) {
+        errorMessage = 'Permission dialog timed out';
+        userHelp = 'Try again and click Allow';
+      }
+
+      addLog(`❌ ${errorMessage}: ${error.message}`, 'error');
+      setPermissionError(`${errorMessage}. ${userHelp}`);
+      setPermissionState('denied');
+      setStatus('permission-denied');
+      
       return false;
+    }
+  }, [addLog, checkPermissionState]);
+
+  // Enhanced cleanup
+  const cleanup = useCallback(() => {
+    addLog('Cleaning up audio resources...', 'info');
+    
+    try {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => {
+          track.stop();
+          addLog(`Stopped track: ${track.kind} (${track.label || 'unnamed'})`, 'info');
+        });
+        streamRef.current = null;
+      }
+      
+      [intervalRef, countdownRef].forEach(ref => {
+        if (ref.current) {
+          clearInterval(ref.current);
+          ref.current = null;
+        }
+      });
+
+      setIsListening(false);
+      setStatus('idle');
+      setNextRecognitionIn(null);
+      
+      addLog('Cleanup complete', 'success');
+    } catch (error) {
+      addLog(`Cleanup error: ${error instanceof Error ? error.message : 'Unknown'}`, 'error');
     }
   }, [addLog]);
 
-  // FIXED: Better audio recording with improved error handling
+  // Stack-safe base64 conversion
+  const arrayBufferToBase64 = useCallback((buffer: ArrayBuffer): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      try {
+        addLog(`Converting ${Math.round(buffer.byteLength / 1024)}KB to base64...`, 'info');
+        
+        const blob = new Blob([buffer]);
+        const reader = new FileReader();
+        
+        reader.onload = () => {
+          try {
+            const result = reader.result as string;
+            const base64 = result.split(',')[1];
+            addLog(`Base64 conversion complete: ${Math.round(base64.length / 1024)}KB`, 'success');
+            resolve(base64);
+          } catch (processingError) {
+            addLog(`Base64 processing failed: ${processingError instanceof Error ? processingError.message : 'Unknown'}`, 'error');
+            reject(new Error('Failed to process base64 result'));
+          }
+        };
+        
+        reader.onerror = () => reject(new Error('FileReader failed'));
+        reader.readAsDataURL(blob);
+        
+      } catch (conversionError) {
+        reject(conversionError);
+      }
+    });
+  }, [addLog]);
+
+  // COMPLETE: Enhanced audio recording with microphone verification
   const performRecognition = useCallback(async (triggeredBy: string = 'manual') => {
-    if (!streamRef.current) {
-      addLog('No audio stream available - requesting permission...', 'warning');
-      const granted = await requestPermission();
+    // Ensure microphone access
+    if (!streamRef.current || streamRef.current.getTracks().length === 0) {
+      addLog('No active microphone stream - requesting permission...', 'warning');
+      const granted = await requestMicrophonePermission();
       if (!granted) {
         addLog('Cannot proceed without microphone access', 'error');
         return;
       }
     }
 
+    // Verify stream is still active
+    const audioTracks = streamRef.current!.getAudioTracks();
+    if (audioTracks.length === 0 || !audioTracks[0].enabled || audioTracks[0].readyState !== 'live') {
+      addLog('Microphone stream inactive - refreshing...', 'warning');
+      const granted = await requestMicrophonePermission();
+      if (!granted) return;
+    }
+
     setStatus('recording');
-    addLog(`Starting recognition (${triggeredBy}) with FIXED audio processing...`, 'info');
+    addLog(`🎤 Starting REAL microphone recognition (${triggeredBy})...`, 'info');
     setRecognitionCount(prev => prev + 1);
     
     const startTime = Date.now();
 
     try {
-      // Enhanced recording with better error handling
-      const mediaRecorder = new MediaRecorder(streamRef.current, {
+      const mediaRecorder = new MediaRecorder(streamRef.current!, {
         mimeType: 'audio/webm;codecs=opus'
       });
       
       const audioChunks: Blob[] = [];
       let recordingProgress = 0;
+      let totalSize = 0;
+      const MAX_AUDIO_SIZE = 8 * 1024 * 1024;
       
       const progressInterval = setInterval(() => {
         recordingProgress += 1;
         if (recordingProgress <= 10) {
-          addLog(`Recording... ${recordingProgress}/10 seconds`, 'info');
+          addLog(`🔴 Recording REAL audio... ${recordingProgress}/10 seconds (${Math.round(totalSize / 1024)}KB)`, 'info');
         }
       }, 1000);
       
@@ -247,6 +383,16 @@ export default function FixedAudioRecognitionInterface() {
 
         mediaRecorder.ondataavailable = (event) => {
           if (event.data.size > 0) {
+            totalSize += event.data.size;
+            
+            if (totalSize > MAX_AUDIO_SIZE) {
+              clearTimeout(timeout);
+              clearInterval(progressInterval);
+              mediaRecorder.stop();
+              reject(new Error(`Audio too large: ${Math.round(totalSize / 1024 / 1024)}MB`));
+              return;
+            }
+            
             audioChunks.push(event.data);
           }
         };
@@ -254,21 +400,26 @@ export default function FixedAudioRecognitionInterface() {
         mediaRecorder.onstop = () => {
           clearTimeout(timeout);
           clearInterval(progressInterval);
+          
+          if (totalSize === 0) {
+            reject(new Error('No audio data captured - check microphone'));
+            return;
+          }
+          
           const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-          addLog(`Recording complete: ${audioBlob.size} bytes captured`, 'success');
+          addLog(`✅ REAL audio recorded: ${Math.round(audioBlob.size / 1024)}KB`, 'success');
           resolve(audioBlob);
         };
 
         mediaRecorder.onerror = (event) => {
           clearTimeout(timeout);
           clearInterval(progressInterval);
-          addLog(`Recording error: ${event.error?.message || 'Unknown error'}`, 'error');
-          reject(new Error('Recording failed'));
+          const error = (event as ErrorEvent).error || new Error('Recording failed');
+          reject(error);
         };
       });
 
       mediaRecorder.start(100);
-      
       setTimeout(() => {
         if (mediaRecorder.state === 'recording') {
           mediaRecorder.stop();
@@ -277,27 +428,31 @@ export default function FixedAudioRecognitionInterface() {
 
       const audioBlob = await recordingPromise;
       
-      // FIXED: Use the improved base64 conversion
       const arrayBuffer = await audioBlob.arrayBuffer();
-      addLog('Converting audio to base64 (this may take a moment)...', 'info');
-      const base64Audio = arrayBufferToBase64(arrayBuffer);
+      const base64Audio = await arrayBufferToBase64(arrayBuffer);
       
       setStatus('searching');
-      addLog('Sending to FIXED multi-source recognition engine...', 'info');
+      addLog('🔍 Sending REAL audio to recognition engine...', 'info');
 
-      // Call the improved recognition API
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 45000);
+
       const response = await fetch('/api/audio-recognition', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           audioData: base64Audio,
-          triggeredBy: `fixed_interface_${triggeredBy}`,
+          triggeredBy: `real_microphone_${triggeredBy}`,
           timestamp: new Date().toISOString()
-        })
+        }),
+        signal: controller.signal
       });
 
+      clearTimeout(timeoutId);
+
       if (!response.ok) {
-        throw new Error(`API error: ${response.status} ${response.statusText}`);
+        const errorText = await response.text();
+        throw new Error(`API error: ${response.status} - ${errorText}`);
       }
 
       const result: RecognitionResponse = await response.json();
@@ -306,11 +461,11 @@ export default function FixedAudioRecognitionInterface() {
       if (result.success && result.autoSelected) {
         setStatus('results');
         setSuccessCount(prev => prev + 1);
-        addLog(`SUCCESS: ${result.autoSelected.artist} - ${result.autoSelected.title}`, 'success');
+        addLog(`🎉 SUCCESS: ${result.autoSelected.artist} - ${result.autoSelected.title}`, 'success');
         addLog(`Source: ${result.autoSelected.source} (${Math.round(result.autoSelected.confidence * 100)}% confidence)`, 'success');
         
         if (result.stats?.realAudioProcessing) {
-          addLog('Real audio fingerprinting used', 'success');
+          addLog('✅ Real audio fingerprinting completed', 'success');
         }
         
         if (result.stats?.spotifyEnhanced) {
@@ -320,28 +475,22 @@ export default function FixedAudioRecognitionInterface() {
         // Monitor TV display update
         setTimeout(() => {
           monitorNowPlaying();
-          addLog('TV display should be updated - check the display', 'info');
+          addLog('TV display should be updated', 'info');
         }, 1000);
         
       } else {
         setStatus('error');
-        addLog(`No match found: ${result.error || 'Unknown error'}`, 'error');
-        addLog(`Checked sources: ${result.sourcesChecked.join(', ')}`, 'warning');
+        addLog(`❌ No match found: ${result.error || 'Unknown error'}`, 'error');
+        addLog(`Sources checked: ${result.sourcesChecked.join(', ')}`, 'warning');
       }
 
-      addLog(`Total processing time: ${processingTime}ms`, 'info');
+      addLog(`Total processing: ${processingTime}ms`, 'info');
       setLastResult(result);
 
     } catch (err) {
       setStatus('error');
       const errorMessage = err instanceof Error ? err.message : 'Recognition failed';
-      addLog(`Recognition error: ${errorMessage}`, 'error');
-      
-      // FIXED: Better error recovery
-      if (errorMessage.includes('call stack') || errorMessage.includes('memory')) {
-        addLog('Memory/stack error detected - cleaning up...', 'warning');
-        cleanup();
-      }
+      addLog(`❌ Recognition error: ${errorMessage}`, 'error');
       
       setLastResult({
         success: false,
@@ -350,7 +499,7 @@ export default function FixedAudioRecognitionInterface() {
         sourcesChecked: []
       });
     }
-  }, [addLog, monitorNowPlaying, arrayBufferToBase64, requestPermission, cleanup]);
+  }, [addLog, requestMicrophonePermission, arrayBufferToBase64, monitorNowPlaying]);
 
   // Start countdown for next recognition
   const startCountdown = useCallback(() => {
@@ -366,10 +515,10 @@ export default function FixedAudioRecognitionInterface() {
     }, 1000);
   }, [autoInterval]);
 
-  // FIXED: Better auto-recognition loop with error recovery
+  // COMPLETE: Auto-recognition loop with enhanced error handling
   const startAutoRecognition = useCallback(async () => {
-    if (!hasPermission) {
-      const granted = await requestPermission();
+    if (permissionState !== 'granted') {
+      const granted = await requestMicrophonePermission();
       if (!granted) {
         addLog('Cannot start auto-recognition without microphone access', 'error');
         return;
@@ -378,12 +527,12 @@ export default function FixedAudioRecognitionInterface() {
 
     setIsListening(true);
     setStatus('listening');
-    addLog(`Auto-recognition started (every ${autoInterval}s) with FIXED engine`, 'success');
+    addLog(`🎤 Auto-recognition started (every ${autoInterval}s) with REAL microphone`, 'success');
 
     // Immediate recognition
     await performRecognition('auto_initial');
 
-    // Set up interval with error handling
+    // Set up interval
     intervalRef.current = setInterval(async () => {
       if (isActiveRef.current && isListening) {
         try {
@@ -391,13 +540,13 @@ export default function FixedAudioRecognitionInterface() {
           startCountdown();
         } catch (error) {
           addLog(`Auto-recognition error: ${error instanceof Error ? error.message : 'Unknown'}`, 'error');
-          // Continue running despite errors
+          // Continue despite errors
         }
       }
     }, autoInterval * 1000);
 
     startCountdown();
-  }, [hasPermission, requestPermission, autoInterval, performRecognition, isListening, startCountdown, addLog]);
+  }, [permissionState, requestMicrophonePermission, autoInterval, performRecognition, isListening, startCountdown, addLog]);
 
   // Stop listening
   const stopListening = useCallback(() => {
@@ -405,7 +554,7 @@ export default function FixedAudioRecognitionInterface() {
     addLog('Auto-recognition stopped', 'warning');
   }, [cleanup, addLog]);
 
-  // Override with alternative
+  // Select alternative result
   const selectAlternative = useCallback(async (alternative: AlternativeResult) => {
     try {
       addLog(`Overriding with: ${alternative.artist} - ${alternative.title}`, 'info');
@@ -439,7 +588,7 @@ export default function FixedAudioRecognitionInterface() {
     window.open('/admin/audio-recognition/collection', '_blank');
   }, [addLog]);
 
-  // Force TV display refresh
+  // Force TV refresh
   const forceRefreshTV = useCallback(async () => {
     try {
       addLog('Forcing TV display refresh...', 'info');
@@ -461,14 +610,20 @@ export default function FixedAudioRecognitionInterface() {
     return () => clearInterval(interval);
   }, [monitorNowPlaying]);
 
-  // Cleanup on unmount
+  // Initialize
   useEffect(() => {
     isActiveRef.current = true;
+    
+    const supported = checkBrowserSupport();
+    if (supported) {
+      checkPermissionState();
+    }
+
     return () => {
       isActiveRef.current = false;
       cleanup();
     };
-  }, [cleanup]);
+  }, [checkBrowserSupport, checkPermissionState, cleanup]);
 
   // Calculate success rate
   const successRate = recognitionCount > 0 ? Math.round((successCount / recognitionCount) * 100) : 0;
@@ -480,8 +635,8 @@ export default function FixedAudioRecognitionInterface() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">🎵 FIXED Audio Recognition</h1>
-              <p className="text-gray-600">Real audio fingerprinting with fixed base64 conversion</p>
+              <h1 className="text-2xl font-bold text-gray-900">🎤 REAL Microphone Audio Recognition</h1>
+              <p className="text-gray-600">Complete system with fixed microphone access</p>
             </div>
             <div className="flex gap-3">
               <Link 
@@ -509,16 +664,20 @@ export default function FixedAudioRecognitionInterface() {
       </div>
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* FIXED: Error detection warning */}
-        {permissionError && (
+        
+        {/* CRITICAL: Microphone Status */}
+        {(!isSecureContext || !browserSupport.getUserMedia || permissionState === 'denied') && (
           <div className="mb-6 p-4 bg-red-100 border border-red-300 rounded-lg">
-            <h3 className="text-red-800 font-semibold">Microphone Issue Detected</h3>
-            <p className="text-red-700">{permissionError}</p>
+            <h3 className="text-red-800 font-semibold">🚨 Microphone Access Issue</h3>
+            {!isSecureContext && <p className="text-red-700">• Site must use HTTPS for microphone access</p>}
+            {!browserSupport.getUserMedia && <p className="text-red-700">• Browser doesn&apos;t support microphone access</p>}
+            {permissionState === 'denied' && <p className="text-red-700">• Microphone access is blocked</p>}
+            {permissionError && <p className="text-red-700">• {permissionError}</p>}
             <button
-              onClick={requestPermission}
+              onClick={requestMicrophonePermission}
               className="mt-2 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
             >
-              🔄 Retry Permission
+              🔄 Fix Microphone Access
             </button>
           </div>
         )}
@@ -540,10 +699,10 @@ export default function FixedAudioRecognitionInterface() {
           <div className="bg-white rounded-lg shadow border p-6">
             <div className={`text-2xl font-bold ${
               isListening ? 'text-green-600' : 
-              hasPermission ? 'text-blue-600' : 
+              permissionState === 'granted' ? 'text-blue-600' : 
               'text-gray-400'
             }`}>
-              {isListening ? '🎤 LIVE' : hasPermission ? '🟢 READY' : '⏸️ IDLE'}
+              {isListening ? '🎤 LIVE' : permissionState === 'granted' ? '🟢 READY' : '⏸️ SETUP'}
             </div>
             <div className="text-sm text-gray-600">Status</div>
           </div>
@@ -574,6 +733,7 @@ export default function FixedAudioRecognitionInterface() {
             {/* Status Icon */}
             <div className="mb-6">
               {status === 'idle' && <div className="text-6xl">🎵</div>}
+              {status === 'requesting-permission' && <div className="text-6xl animate-pulse">🎤</div>}
               {status === 'listening' && <div className="text-6xl animate-pulse">🎤</div>}
               {status === 'recording' && <div className="text-6xl animate-bounce">🔴</div>}
               {status === 'searching' && <div className="text-6xl animate-spin">🔍</div>}
@@ -584,10 +744,11 @@ export default function FixedAudioRecognitionInterface() {
             {/* Status Message */}
             <div className="mb-6">
               <div className="text-lg font-medium text-gray-900 mb-2">
-                {status === 'idle' && (hasPermission ? 'Ready for FIXED Audio Processing' : 'Click to Grant Microphone Access')}
-                {status === 'listening' && 'Listening for Music...'}
-                {status === 'recording' && 'Recording Audio (10 seconds)...'}
-                {status === 'searching' && 'Processing with FIXED Engine...'}
+                {status === 'idle' && (permissionState === 'granted' ? 'Ready for REAL Audio Processing' : 'Click to Enable Microphone')}
+                {status === 'requesting-permission' && 'Requesting Microphone Permission...'}
+                {status === 'listening' && 'Listening for Music with REAL Microphone...'}
+                {status === 'recording' && 'Recording REAL Audio (10 seconds)...'}
+                {status === 'searching' && 'Processing REAL Audio...'}
                 {status === 'results' && 'Match Found & TV Updated!'}
                 {status === 'error' && 'No Match Found'}
               </div>
@@ -604,9 +765,10 @@ export default function FixedAudioRecognitionInterface() {
               {!isListening ? (
                 <button
                   onClick={startAutoRecognition}
-                  className="w-full py-4 text-lg font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  disabled={!isSecureContext || !browserSupport.getUserMedia}
+                  className="w-full py-4 text-lg font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
                 >
-                  🎵 Start FIXED Recognition
+                  🎤 Start REAL Microphone Recognition
                 </button>
               ) : (
                 <button
@@ -620,7 +782,7 @@ export default function FixedAudioRecognitionInterface() {
               {!isListening && (
                 <button
                   onClick={() => performRecognition('manual_single')}
-                  disabled={status === 'recording' || status === 'searching'}
+                  disabled={status === 'recording' || status === 'searching' || permissionState !== 'granted'}
                   className="w-full py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 transition-colors"
                 >
                   {status === 'recording' ? '🔴 Recording...' : 
