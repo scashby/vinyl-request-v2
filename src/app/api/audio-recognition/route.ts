@@ -118,8 +118,23 @@ async function checkCollection(audioData: string): Promise<ServiceResult> {
   const startTime = Date.now();
   
   try {
-    const baseUrl = process.env.NEXTAUTH_URL || process.env.VERCEL_URL || 'http://localhost:3000';
+    // Fix URL construction for Vercel deployments
+    let baseUrl: string;
+    
+    if (process.env.VERCEL_URL) {
+      // On Vercel, use VERCEL_URL (automatically provided)
+      baseUrl = `https://${process.env.VERCEL_URL}`;
+    } else if (process.env.NEXTAUTH_URL) {
+      // Use NEXTAUTH_URL if set
+      baseUrl = process.env.NEXTAUTH_URL;
+    } else {
+      // Fallback for local development
+      baseUrl = 'http://localhost:3000';
+    }
+    
     const collectionUrl = `${baseUrl}/api/audio-recognition/collection`;
+    
+    console.log(`🏆 Collection calling ${collectionUrl}`);
     
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 20000);
@@ -138,10 +153,13 @@ async function checkCollection(audioData: string): Promise<ServiceResult> {
     clearTimeout(timeoutId);
     
     if (!response.ok) {
+      const errorText = await response.text().catch(() => 'Unknown error');
+      console.error(`Collection HTTP ${response.status}: ${errorText}`);
+      
       return {
         service: 'Collection',
         status: 'error',
-        error: `HTTP ${response.status}`,
+        error: `HTTP ${response.status}: ${errorText.substring(0, 50)}...`,
         processingTime: Date.now() - startTime
       };
     }
@@ -184,13 +202,21 @@ async function checkACRCloud(audioData: string): Promise<ServiceResult> {
     return {
       service: 'ACRCloud',
       status: 'skipped',
-      error: 'Missing environment variables',
+      error: 'Missing environment variables (ACCESS_KEY, SECRET_KEY, or ENDPOINT)',
       processingTime: Date.now() - startTime
     };
   }
   
   try {
     const audioBuffer = base64ToBufferSafe(audioData);
+    
+    // Ensure ACRCloud endpoint has proper protocol
+    let endpoint = process.env.ACRCLOUD_ENDPOINT!;
+    if (!endpoint.startsWith('http://') && !endpoint.startsWith('https://')) {
+      endpoint = `https://${endpoint}`;
+    }
+    
+    console.log(`🎵 ACRCloud using endpoint: ${endpoint}`);
     
     // Create ACRCloud signature
     const timestamp = Math.floor(Date.now() / 1000);
@@ -213,7 +239,7 @@ async function checkACRCloud(audioData: string): Promise<ServiceResult> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-    const response = await fetch(`${process.env.ACRCLOUD_ENDPOINT}/v1/identify`, {
+    const response = await fetch(`${endpoint}/v1/identify`, {
       method: 'POST',
       body: formData,
       signal: controller.signal
@@ -384,10 +410,21 @@ async function checkShazam(audioData: string): Promise<ServiceResult> {
     clearTimeout(timeoutId);
     
     if (!response.ok) {
+      const errorText = await response.text().catch(() => 'Unknown error');
+      console.log(`Shazam HTTP ${response.status}: ${errorText}`);
+      
+      // Handle specific error codes
+      let errorMessage = `HTTP ${response.status}`;
+      if (response.status === 403) {
+        errorMessage = 'API key invalid or quota exceeded';
+      } else if (response.status === 429) {
+        errorMessage = 'Rate limit exceeded';
+      }
+      
       return {
         service: 'Shazam',
         status: 'error',
-        error: `HTTP ${response.status}`,
+        error: errorMessage,
         processingTime: Date.now() - startTime
       };
     }
@@ -459,6 +496,11 @@ async function performRecognition(audioData: string): Promise<RecognitionRespons
   const successfulResults: RecognitionMatch[] = [];
   
   console.log('🎵 Starting individual service recognition...');
+  console.log('🌐 Environment check:', {
+    VERCEL_URL: process.env.VERCEL_URL ? 'SET' : 'NOT_SET',
+    NEXTAUTH_URL: process.env.NEXTAUTH_URL ? 'SET' : 'NOT_SET',
+    ACRCLOUD_ENDPOINT: process.env.ACRCLOUD_ENDPOINT ? 'SET' : 'NOT_SET'
+  });
   
   // Check each service individually and log results immediately
   
@@ -550,23 +592,49 @@ async function performRecognition(audioData: string): Promise<RecognitionRespons
   }
 }
 
-// GET - Service status
+// GET - Service status with collection test
 export async function GET() {
-  const enabledServices = [];
-  
-  if (process.env.ACRCLOUD_ACCESS_KEY) enabledServices.push('ACRCloud');
-  if (process.env.AUDD_API_TOKEN) enabledServices.push('AudD');
-  if (process.env.SHAZAM_RAPID_API_KEY) enabledServices.push('Shazam');
-  if (process.env.ACOUSTID_CLIENT_KEY) enabledServices.push('AcoustID');
-  
-  return NextResponse.json({
-    success: true,
-    message: "FIXED: Individual Service Results Audio Recognition API",
-    version: "individual-results-1.0.0",
-    timestamp: new Date().toISOString(),
-    features: ['individual_service_results', 'detailed_logging', 'real_audio_processing'],
-    enabledServices: ['Collection Database', ...enabledServices]
-  });
+  try {
+    console.log('🏆 Audio Recognition API GET - testing all services');
+    
+    // Test collection database connection
+    const { count, error } = await supabase
+      .from('collection')
+      .select('*', { count: 'exact', head: true });
+    
+    if (error) {
+      console.error('Collection DB error:', error);
+    }
+    
+    const enabledServices = [];
+    
+    if (process.env.ACRCLOUD_ACCESS_KEY) enabledServices.push('ACRCloud');
+    if (process.env.AUDD_API_TOKEN) enabledServices.push('AudD');
+    if (process.env.SHAZAM_RAPID_API_KEY) enabledServices.push('Shazam');
+    if (process.env.ACOUSTID_CLIENT_KEY) enabledServices.push('AcoustID');
+    
+    return NextResponse.json({
+      success: true,
+      message: "FIXED: Individual Service Results Audio Recognition API",
+      version: "individual-results-1.0.0",
+      timestamp: new Date().toISOString(),
+      features: ['individual_service_results', 'detailed_logging', 'real_audio_processing'],
+      enabledServices: ['Collection Database', ...enabledServices],
+      collectionSize: error ? 'ERROR' : (count || 0),
+      environment: {
+        VERCEL: process.env.VERCEL ? 'YES' : 'NO',
+        VERCEL_URL: process.env.VERCEL_URL || 'NOT_SET',
+        NEXTAUTH_URL: process.env.NEXTAUTH_URL || 'NOT_SET',
+        NODE_ENV: process.env.NODE_ENV
+      }
+    });
+  } catch (error) {
+    return NextResponse.json({
+      success: false,
+      error: 'Service test failed',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
+  }
 }
 
 // POST - Process audio recognition
@@ -574,6 +642,13 @@ export async function POST(request: NextRequest) {
   const startTime = Date.now();
   
   console.log('🚨 FIXED VERSION: Individual service results, not lumped together');
+  console.log('🌍 Deployment environment:', {
+    VERCEL: process.env.VERCEL ? 'YES' : 'NO',
+    VERCEL_ENV: process.env.VERCEL_ENV || 'NOT_SET',
+    VERCEL_URL: process.env.VERCEL_URL ? `SET (${process.env.VERCEL_URL})` : 'NOT_SET',
+    NEXTAUTH_URL: process.env.NEXTAUTH_URL ? `SET (${process.env.NEXTAUTH_URL})` : 'NOT_SET',
+    NODE_ENV: process.env.NODE_ENV
+  });
   
   try {
     const body: RecognitionRequest = await request.json();
@@ -597,7 +672,7 @@ export async function POST(request: NextRequest) {
       
       // Log successful recognition
       try {
-        await supabase.from('audio_recognition_logs').insert({
+        const logData = {
           artist: recognition.autoSelected.artist,
           title: recognition.autoSelected.title,
           album: recognition.autoSelected.album,
@@ -608,10 +683,18 @@ export async function POST(request: NextRequest) {
           match_source: recognition.autoSelected.source === 'collection' ? 'collection' : 'external',
           matched_id: recognition.autoSelected.albumId || null,
           now_playing: false,
-          raw_response: { ...recognition, individual_service_results: recognition.serviceResults },
+          raw_response: {
+            success: recognition.success,
+            autoSelected: recognition.autoSelected,
+            alternatives: recognition.alternatives || [],
+            processingTime: recognition.processingTime,
+            individualResults: true
+          },
           created_at: new Date().toISOString(),
           timestamp: timestamp || new Date().toISOString()
-        });
+        };
+        
+        await supabase.from('audio_recognition_logs').insert(logData);
       } catch (logError) {
         console.error('Failed to log recognition:', logError);
       }
