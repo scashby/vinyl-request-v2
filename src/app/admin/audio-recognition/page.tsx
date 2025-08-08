@@ -1,5 +1,5 @@
 // src/app/admin/audio-recognition/page.tsx
-// COMPREHENSIVE FIX: Real microphone access + full audio recognition functionality
+// FIXED VERSION: Display individual service results as they happen
 
 'use client';
 
@@ -7,41 +7,49 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
-interface AutoSelectedResult {
-  artist: string;
-  title: string;
-  album: string;
-  confidence: number;
-  source: 'collection' | 'acrcloud' | 'audd' | 'acoustid' | 'shazam' | 'spotify';
+interface ServiceResult {
   service: string;
-  image_url?: string;
-  albumId?: number;
-  spotify_id?: string;
-  duration_ms?: number;
-}
-
-interface AlternativeResult {
-  artist: string;
-  title: string;
-  album: string;
-  confidence: number;
-  source: string;
-  service: string;
+  status: 'success' | 'failed' | 'error' | 'skipped';
+  result?: {
+    artist: string;
+    title: string;
+    album: string;
+    confidence: number;
+    source: string;
+    service: string;
+    image_url?: string;
+  };
+  error?: string;
+  processingTime: number;
 }
 
 interface RecognitionResponse {
   success: boolean;
-  autoSelected?: AutoSelectedResult;
-  alternatives?: AlternativeResult[];
+  autoSelected?: {
+    artist: string;
+    title: string;
+    album: string;
+    confidence: number;
+    source: string;
+    service: string;
+    image_url?: string;
+  };
+  alternatives?: Array<{
+    artist: string;
+    title: string;
+    album: string;
+    confidence: number;
+    source: string;
+    service: string;
+  }>;
+  serviceResults: ServiceResult[];
   processingTime: number;
-  sourcesChecked: string[];
   stats?: {
     totalMatches: number;
     collectionMatches: number;
     externalMatches: number;
     autoSelectedSource: string;
     autoSelectedConfidence: number;
-    spotifyEnhanced?: boolean;
     realAudioProcessing?: boolean;
   };
   error?: string;
@@ -59,7 +67,7 @@ interface NowPlayingStatus {
 type ListeningStatus = 'idle' | 'requesting-permission' | 'permission-denied' | 'listening' | 'recording' | 'searching' | 'results' | 'error';
 type PermissionState = 'unknown' | 'granted' | 'denied' | 'prompt' | 'not-supported';
 
-export default function CompleteFixedAudioRecognition() {
+export default function FixedAudioRecognitionPage() {
   // Core state
   const [status, setStatus] = useState<ListeningStatus>('idle');
   const [isListening, setIsListening] = useState(false);
@@ -109,7 +117,7 @@ export default function CompleteFixedAudioRecognition() {
     console.log(`${emoji} ${logEntry}`);
   }, []);
 
-  // CRITICAL: Check browser capabilities and security context
+  // Check browser capabilities
   const checkBrowserSupport = useCallback(() => {
     const secure = window.isSecureContext || location.protocol === 'https:' || location.hostname === 'localhost';
     setIsSecureContext(secure);
@@ -123,20 +131,10 @@ export default function CompleteFixedAudioRecognition() {
     
     addLog(`Browser check: HTTPS=${secure}, getUserMedia=${support.getUserMedia}, Permissions=${support.permissions}`, 'info');
     
-    if (!secure) {
-      addLog('WARNING: Not in secure context - microphone access may be blocked!', 'warning');
-      setPermissionError('Site must be accessed via HTTPS for microphone access');
-    }
-    
-    if (!support.getUserMedia) {
-      addLog('ERROR: getUserMedia not supported', 'error');
-      setPermissionError('Browser does not support microphone access');
-    }
-    
     return secure && support.getUserMedia;
   }, [addLog]);
 
-  // CRITICAL: Check permission state using Permissions API
+  // Check permission state
   const checkPermissionState = useCallback(async (): Promise<PermissionState> => {
     try {
       if (!browserSupport.permissions) {
@@ -149,11 +147,6 @@ export default function CompleteFixedAudioRecognition() {
       
       const state = result.state as PermissionState;
       setPermissionState(state);
-      
-      result.addEventListener('change', () => {
-        addLog(`Permission changed to: ${result.state}`, 'info');
-        setPermissionState(result.state as PermissionState);
-      });
       
       return state;
     } catch (error) {
@@ -179,7 +172,7 @@ export default function CompleteFixedAudioRecognition() {
     }
   }, [supabase]);
 
-  // CRITICAL: Enhanced microphone permission request
+  // Request microphone permission
   const requestMicrophonePermission = useCallback(async (): Promise<boolean> => {
     try {
       setStatus('requesting-permission');
@@ -205,14 +198,7 @@ export default function CompleteFixedAudioRecognition() {
 
       addLog('Showing microphone permission dialog...', 'info');
       
-      // Request with timeout
-      const permissionTimeout = new Promise<never>((_, reject) => {
-        setTimeout(() => {
-          reject(new Error('Permission request timed out'));
-        }, 30000);
-      });
-
-      const streamPromise = navigator.mediaDevices.getUserMedia({
+      const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           sampleRate: 44100,
           channelCount: 1,
@@ -222,18 +208,12 @@ export default function CompleteFixedAudioRecognition() {
         }
       });
 
-      const stream = await Promise.race([streamPromise, permissionTimeout]);
-
       // Verify stream
       if (stream.getAudioTracks().length === 0) {
         throw new Error('No audio tracks in stream');
       }
 
       const audioTrack = stream.getAudioTracks()[0];
-      if (!audioTrack.enabled || audioTrack.readyState !== 'live') {
-        throw new Error('Audio track not active');
-      }
-
       addLog(`✅ Microphone access granted! Device: ${audioTrack.label || 'Default'}`, 'success');
 
       streamRef.current = stream;
@@ -253,15 +233,6 @@ export default function CompleteFixedAudioRecognition() {
       } else if (error.name === 'NotFoundError') {
         errorMessage = 'No microphone found';
         userHelp = 'Connect a microphone and try again';
-      } else if (error.name === 'NotReadableError') {
-        errorMessage = 'Microphone busy or unavailable';
-        userHelp = 'Close other apps using the microphone';
-      } else if (error.name === 'SecurityError') {
-        errorMessage = 'Security error - blocked';
-        userHelp = 'Must use HTTPS';
-      } else if (error.message.includes('timeout')) {
-        errorMessage = 'Permission dialog timed out';
-        userHelp = 'Try again and click Allow';
       }
 
       addLog(`❌ ${errorMessage}: ${error.message}`, 'error');
@@ -303,7 +274,7 @@ export default function CompleteFixedAudioRecognition() {
     }
   }, [addLog]);
 
-  // Stack-safe base64 conversion
+  // Base64 conversion
   const arrayBufferToBase64 = useCallback((buffer: ArrayBuffer): Promise<string> => {
     return new Promise((resolve, reject) => {
       try {
@@ -333,7 +304,22 @@ export default function CompleteFixedAudioRecognition() {
     });
   }, [addLog]);
 
-  // COMPLETE: Enhanced audio recording with microphone verification
+  // Log individual service results
+  const logServiceResults = useCallback((serviceResults: ServiceResult[]) => {
+    serviceResults.forEach(result => {
+      if (result.status === 'success') {
+        addLog(`Source Checked: ${result.service} - Match found: ${result.result!.artist} - ${result.result!.title}`, 'success');
+      } else if (result.status === 'failed') {
+        addLog(`Source Checked: ${result.service} - No match found`, 'warning');
+      } else if (result.status === 'error') {
+        addLog(`Source Checked: ${result.service} - Error: ${result.error}`, 'error');
+      } else if (result.status === 'skipped') {
+        addLog(`Source Checked: ${result.service} - Skipped: ${result.error}`, 'info');
+      }
+    });
+  }, [addLog]);
+
+  // Enhanced audio recording with individual service logging
   const performRecognition = useCallback(async (triggeredBy: string = 'manual') => {
     // Ensure microphone access
     if (!streamRef.current || streamRef.current.getTracks().length === 0) {
@@ -343,14 +329,6 @@ export default function CompleteFixedAudioRecognition() {
         addLog('Cannot proceed without microphone access', 'error');
         return;
       }
-    }
-
-    // Verify stream is still active
-    const audioTracks = streamRef.current!.getAudioTracks();
-    if (audioTracks.length === 0 || !audioTracks[0].enabled || audioTracks[0].readyState !== 'live') {
-      addLog('Microphone stream inactive - refreshing...', 'warning');
-      const granted = await requestMicrophonePermission();
-      if (!granted) return;
     }
 
     setStatus('recording');
@@ -367,7 +345,6 @@ export default function CompleteFixedAudioRecognition() {
       const audioChunks: Blob[] = [];
       let recordingProgress = 0;
       let totalSize = 0;
-      const MAX_AUDIO_SIZE = 8 * 1024 * 1024;
       
       const progressInterval = setInterval(() => {
         recordingProgress += 1;
@@ -384,15 +361,6 @@ export default function CompleteFixedAudioRecognition() {
         mediaRecorder.ondataavailable = (event) => {
           if (event.data.size > 0) {
             totalSize += event.data.size;
-            
-            if (totalSize > MAX_AUDIO_SIZE) {
-              clearTimeout(timeout);
-              clearInterval(progressInterval);
-              mediaRecorder.stop();
-              reject(new Error(`Audio too large: ${Math.round(totalSize / 1024 / 1024)}MB`));
-              return;
-            }
-            
             audioChunks.push(event.data);
           }
         };
@@ -432,10 +400,10 @@ export default function CompleteFixedAudioRecognition() {
       const base64Audio = await arrayBufferToBase64(arrayBuffer);
       
       setStatus('searching');
-      addLog('🔍 Sending REAL audio to recognition engine...', 'info');
+      addLog('🔍 Sending REAL audio to recognition services...', 'info');
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 45000);
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
 
       const response = await fetch('/api/audio-recognition', {
         method: 'POST',
@@ -458,18 +426,20 @@ export default function CompleteFixedAudioRecognition() {
       const result: RecognitionResponse = await response.json();
       const processingTime = Date.now() - startTime;
       
+      // Log individual service results
+      if (result.serviceResults) {
+        addLog('🔍 Individual service results:', 'info');
+        logServiceResults(result.serviceResults);
+      }
+      
       if (result.success && result.autoSelected) {
         setStatus('results');
         setSuccessCount(prev => prev + 1);
-        addLog(`🎉 SUCCESS: ${result.autoSelected.artist} - ${result.autoSelected.title}`, 'success');
+        addLog(`🎉 AUTO-SELECTED: ${result.autoSelected.artist} - ${result.autoSelected.title}`, 'success');
         addLog(`Source: ${result.autoSelected.source} (${Math.round(result.autoSelected.confidence * 100)}% confidence)`, 'success');
         
         if (result.stats?.realAudioProcessing) {
           addLog('✅ Real audio fingerprinting completed', 'success');
-        }
-        
-        if (result.stats?.spotifyEnhanced) {
-          addLog('Enhanced with Spotify metadata', 'success');
         }
         
         // Monitor TV display update
@@ -480,8 +450,10 @@ export default function CompleteFixedAudioRecognition() {
         
       } else {
         setStatus('error');
-        addLog(`❌ No match found: ${result.error || 'Unknown error'}`, 'error');
-        addLog(`Sources checked: ${result.sourcesChecked.join(', ')}`, 'warning');
+        addLog(`❌ Final result: No match found from any service`, 'error');
+        if (result.error) {
+          addLog(`Details: ${result.error}`, 'error');
+        }
       }
 
       addLog(`Total processing: ${processingTime}ms`, 'info');
@@ -496,10 +468,10 @@ export default function CompleteFixedAudioRecognition() {
         success: false,
         error: errorMessage,
         processingTime: Date.now() - startTime,
-        sourcesChecked: []
+        serviceResults: []
       });
     }
-  }, [addLog, requestMicrophonePermission, arrayBufferToBase64, monitorNowPlaying]);
+  }, [addLog, requestMicrophonePermission, arrayBufferToBase64, monitorNowPlaying, logServiceResults]);
 
   // Start countdown for next recognition
   const startCountdown = useCallback(() => {
@@ -515,7 +487,7 @@ export default function CompleteFixedAudioRecognition() {
     }, 1000);
   }, [autoInterval]);
 
-  // COMPLETE: Auto-recognition loop with enhanced error handling
+  // Auto-recognition loop
   const startAutoRecognition = useCallback(async () => {
     if (permissionState !== 'granted') {
       const granted = await requestMicrophonePermission();
@@ -540,7 +512,6 @@ export default function CompleteFixedAudioRecognition() {
           startCountdown();
         } catch (error) {
           addLog(`Auto-recognition error: ${error instanceof Error ? error.message : 'Unknown'}`, 'error');
-          // Continue despite errors
         }
       }
     }, autoInterval * 1000);
@@ -553,62 +524,6 @@ export default function CompleteFixedAudioRecognition() {
     cleanup();
     addLog('Auto-recognition stopped', 'warning');
   }, [cleanup, addLog]);
-
-  // Select alternative result
-  const selectAlternative = useCallback(async (alternative: AlternativeResult) => {
-    try {
-      addLog(`Overriding with: ${alternative.artist} - ${alternative.title}`, 'info');
-      
-      const response = await fetch('/api/manual-recognition', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          artist: alternative.artist,
-          title: alternative.title,
-          album: alternative.album,
-          confidence: alternative.confidence,
-          source: 'manual_override_alternative'
-        })
-      });
-
-      if (response.ok) {
-        addLog('Override successful - TV display updated', 'success');
-        setTimeout(monitorNowPlaying, 1000);
-      } else {
-        addLog('Override failed', 'error');
-      }
-    } catch {
-      addLog('Override error occurred', 'error');
-    }
-  }, [addLog, monitorNowPlaying]);
-
-  // Manual override
-  const handleManualOverride = useCallback(() => {
-    addLog('Opening collection search for manual override', 'info');
-    window.open('/admin/audio-recognition/collection', '_blank');
-  }, [addLog]);
-
-  // Force TV refresh
-  const forceRefreshTV = useCallback(async () => {
-    try {
-      addLog('Forcing TV display refresh...', 'info');
-      await supabase.channel('now_playing_updates').send({
-        type: 'broadcast',
-        event: 'force_refresh',
-        payload: { timestamp: new Date().toISOString() }
-      });
-      addLog('TV refresh signal sent', 'success');
-    } catch {
-      addLog('TV refresh failed', 'error');
-    }
-  }, [addLog, supabase]);
-
-  // Monitor now playing changes
-  useEffect(() => {
-    monitorNowPlaying();
-    const interval = setInterval(monitorNowPlaying, 5000);
-    return () => clearInterval(interval);
-  }, [monitorNowPlaying]);
 
   // Initialize
   useEffect(() => {
@@ -625,6 +540,13 @@ export default function CompleteFixedAudioRecognition() {
     };
   }, [checkBrowserSupport, checkPermissionState, cleanup]);
 
+  // Monitor now playing changes
+  useEffect(() => {
+    monitorNowPlaying();
+    const interval = setInterval(monitorNowPlaying, 5000);
+    return () => clearInterval(interval);
+  }, [monitorNowPlaying]);
+
   // Calculate success rate
   const successRate = recognitionCount > 0 ? Math.round((successCount / recognitionCount) * 100) : 0;
 
@@ -635,8 +557,8 @@ export default function CompleteFixedAudioRecognition() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">🎤 REAL Microphone Audio Recognition</h1>
-              <p className="text-gray-600">Complete system with fixed microphone access</p>
+              <h1 className="text-2xl font-bold text-gray-900">🎤 Individual Service Results Audio Recognition</h1>
+              <p className="text-gray-600">Fixed version showing each service result individually</p>
             </div>
             <div className="flex gap-3">
               <Link 
@@ -645,12 +567,6 @@ export default function CompleteFixedAudioRecognition() {
               >
                 🔍 Collection
               </Link>
-              <button
-                onClick={forceRefreshTV}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                🔄 Refresh TV
-              </button>
               <Link 
                 href="/now-playing-tv"
                 target="_blank"
@@ -665,7 +581,7 @@ export default function CompleteFixedAudioRecognition() {
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
-        {/* CRITICAL: Microphone Status */}
+        {/* Microphone Status Warning */}
         {(!isSecureContext || !browserSupport.getUserMedia || permissionState === 'denied') && (
           <div className="mb-6 p-4 bg-red-100 border border-red-300 rounded-lg">
             <h3 className="text-red-800 font-semibold">🚨 Microphone Access Issue</h3>
@@ -744,13 +660,13 @@ export default function CompleteFixedAudioRecognition() {
             {/* Status Message */}
             <div className="mb-6">
               <div className="text-lg font-medium text-gray-900 mb-2">
-                {status === 'idle' && (permissionState === 'granted' ? 'Ready for REAL Audio Processing' : 'Click to Enable Microphone')}
+                {status === 'idle' && (permissionState === 'granted' ? 'Ready for Individual Service Recognition' : 'Click to Enable Microphone')}
                 {status === 'requesting-permission' && 'Requesting Microphone Permission...'}
-                {status === 'listening' && 'Listening for Music with REAL Microphone...'}
+                {status === 'listening' && 'Listening - Individual Service Results Will Show Below...'}
                 {status === 'recording' && 'Recording REAL Audio (10 seconds)...'}
-                {status === 'searching' && 'Processing REAL Audio...'}
+                {status === 'searching' && 'Checking Each Service Individually...'}
                 {status === 'results' && 'Match Found & TV Updated!'}
-                {status === 'error' && 'No Match Found'}
+                {status === 'error' && 'Recognition Complete - Check Individual Results Below'}
               </div>
               
               {nextRecognitionIn && (
@@ -768,7 +684,7 @@ export default function CompleteFixedAudioRecognition() {
                   disabled={!isSecureContext || !browserSupport.getUserMedia}
                   className="w-full py-4 text-lg font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
                 >
-                  🎤 Start REAL Microphone Recognition
+                  🎤 Start Individual Service Recognition
                 </button>
               ) : (
                 <button
@@ -786,7 +702,7 @@ export default function CompleteFixedAudioRecognition() {
                   className="w-full py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 transition-colors"
                 >
                   {status === 'recording' ? '🔴 Recording...' : 
-                   status === 'searching' ? '🔄 Processing...' : 
+                   status === 'searching' ? '🔄 Checking Services...' : 
                    '🎯 Single Recognition'}
                 </button>
               )}
@@ -812,122 +728,110 @@ export default function CompleteFixedAudioRecognition() {
           </div>
         </div>
 
-        {/* Results Section */}
-        {lastResult && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            {/* Auto-Selected Result */}
-            {lastResult.success && lastResult.autoSelected && (
-              <div className="bg-white rounded-lg shadow border p-6">
-                <div className="flex items-center gap-2 mb-3">
-                  <h3 className="text-lg font-semibold">🏆 Auto-Selected & TV Updated</h3>
-                  <span className={`px-2 py-1 text-xs rounded ${
-                    lastResult.autoSelected.source === 'collection' 
-                      ? 'bg-purple-100 text-purple-700' 
-                      : 'bg-blue-100 text-blue-700'
-                  }`}>
-                    {lastResult.autoSelected.source}
-                  </span>
-                  {lastResult.stats?.spotifyEnhanced && (
-                    <span className="px-2 py-1 text-xs rounded bg-green-100 text-green-700">
-                      Spotify Enhanced
-                    </span>
-                  )}
-                </div>
-                
-                <div className="space-y-2">
-                  <div className="font-medium text-lg">{lastResult.autoSelected.artist}</div>
-                  <div className="text-gray-900">{lastResult.autoSelected.title}</div>
-                  <div className="text-gray-600 text-sm">{lastResult.autoSelected.album}</div>
-                  <div className="text-xs text-gray-500">
-                    {Math.round(lastResult.autoSelected.confidence * 100)}% confidence • {lastResult.autoSelected.service}
+        {/* Individual Service Results Display */}
+        {lastResult && lastResult.serviceResults && (
+          <div className="bg-white rounded-lg shadow border p-6 mb-6">
+            <h3 className="text-lg font-semibold mb-4">🔍 Individual Service Results</h3>
+            <div className="space-y-3">
+              {lastResult.serviceResults.map((service, index) => (
+                <div key={index} className={`p-4 border rounded-lg ${
+                  service.status === 'success' ? 'bg-green-50 border-green-200' :
+                  service.status === 'failed' ? 'bg-yellow-50 border-yellow-200' :
+                  service.status === 'error' ? 'bg-red-50 border-red-200' :
+                  'bg-gray-50 border-gray-200'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{service.service}</span>
+                      <span className={`px-2 py-1 text-xs rounded ${
+                        service.status === 'success' ? 'bg-green-100 text-green-700' :
+                        service.status === 'failed' ? 'bg-yellow-100 text-yellow-700' :
+                        service.status === 'error' ? 'bg-red-100 text-red-700' :
+                        'bg-gray-100 text-gray-700'
+                      }`}>
+                        {service.status.toUpperCase()}
+                      </span>
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      {service.processingTime}ms
+                    </div>
                   </div>
-                  {lastResult.autoSelected.duration_ms && (
-                    <div className="text-xs text-blue-600">
-                      Duration: {Math.floor(lastResult.autoSelected.duration_ms / 1000 / 60)}:{String(Math.floor((lastResult.autoSelected.duration_ms / 1000) % 60)).padStart(2, '0')}
+                  
+                  {service.status === 'success' && service.result && (
+                    <div className="mt-2">
+                      <div className="font-medium text-green-900">{service.result.artist}</div>
+                      <div className="text-green-700">{service.result.title}</div>
+                      <div className="text-sm text-green-600">{service.result.album}</div>
+                      <div className="text-xs text-green-500">
+                        {Math.round(service.result.confidence * 100)}% confidence
+                      </div>
+                    </div>
+                  )}
+                  
+                  {(service.status === 'failed' || service.status === 'error' || service.status === 'skipped') && (
+                    <div className="mt-2 text-sm text-gray-600">
+                      {service.error}
                     </div>
                   )}
                 </div>
-              </div>
-            )}
-
-            {/* Alternative Results */}
-            {lastResult.alternatives && lastResult.alternatives.length > 0 && (
-              <div className="bg-white rounded-lg shadow border p-6">
-                <h3 className="text-lg font-semibold mb-3">Other Possibilities</h3>
-                <div className="space-y-3 max-h-64 overflow-y-auto">
-                  {lastResult.alternatives.map((alt, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 border rounded hover:bg-gray-50">
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium truncate">{alt.artist}</div>
-                        <div className="text-sm text-gray-600 truncate">{alt.title}</div>
-                        <div className="text-xs text-gray-500">
-                          {Math.round(alt.confidence * 100)}% • {alt.source}
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => selectAlternative(alt)}
-                        className="ml-3 px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
-                      >
-                        ✓ Use This
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+              ))}
+            </div>
           </div>
         )}
 
-        {/* Quick Actions */}
-        <div className="bg-white rounded-lg shadow border p-6 mb-6">
-          <h3 className="text-lg font-semibold mb-3">Quick Actions</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <button
-              onClick={handleManualOverride}
-              className="p-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-            >
-              ❌ Manual Override
-            </button>
-            <button
-              onClick={forceRefreshTV}
-              className="p-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              🔄 Refresh TV
-            </button>
-            <button
-              onClick={() => window.open('/now-playing-tv', '_blank')}
-              className="p-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-            >
-              📺 View TV Display
-            </button>
-            <button
-              onClick={() => setLogs([])}
-              className="p-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
-            >
-              🗑️ Clear Logs
-            </button>
+        {/* Auto-Selected Result */}
+        {lastResult && lastResult.success && lastResult.autoSelected && (
+          <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-6 mb-6">
+            <div className="flex items-center gap-2 mb-3">
+              <h3 className="text-lg font-semibold text-green-800">🏆 Auto-Selected Result (Now on TV)</h3>
+              <span className={`px-2 py-1 text-xs rounded ${
+                lastResult.autoSelected.source === 'collection' 
+                  ? 'bg-purple-100 text-purple-700' 
+                  : 'bg-blue-100 text-blue-700'
+              }`}>
+                {lastResult.autoSelected.source}
+              </span>
+            </div>
+            
+            <div className="space-y-2">
+              <div className="font-medium text-lg text-green-900">{lastResult.autoSelected.artist}</div>
+              <div className="text-green-700">{lastResult.autoSelected.title}</div>
+              <div className="text-green-600 text-sm">{lastResult.autoSelected.album}</div>
+              <div className="text-xs text-green-500">
+                {Math.round(lastResult.autoSelected.confidence * 100)}% confidence • {lastResult.autoSelected.service}
+              </div>
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* Activity Log */}
+        {/* Activity Log with Individual Service Results */}
         <div className="bg-white rounded-lg shadow border p-6">
           <div className="flex justify-between items-center mb-3">
-            <h3 className="text-lg font-semibold">Activity Log</h3>
-            <div className="text-sm text-gray-500">
-              {logs.length} entries (newest first)
+            <h3 className="text-lg font-semibold">Individual Service Activity Log</h3>
+            <div className="flex gap-2">
+              <div className="text-sm text-gray-500">
+                {logs.length} entries (newest first)
+              </div>
+              <button
+                onClick={() => setLogs([])}
+                className="px-3 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600"
+              >
+                Clear
+              </button>
             </div>
           </div>
           
-          <div className="h-40 overflow-y-auto bg-gray-50 rounded p-3 font-mono text-sm">
+          <div className="h-48 overflow-y-auto bg-gray-50 rounded p-3 font-mono text-sm">
             {logs.length === 0 ? (
               <div className="text-gray-500">No activity yet...</div>
             ) : (
               <div className="space-y-1">
                 {logs.map((log, index) => (
                   <div key={index} className={`${
-                    log.includes('✅') ? 'text-green-700' :
-                    log.includes('❌') ? 'text-red-700' :
-                    log.includes('⚠️') ? 'text-yellow-700' :
+                    log.includes('✅') || log.includes('Match found') ? 'text-green-700' :
+                    log.includes('❌') || log.includes('Error:') ? 'text-red-700' :
+                    log.includes('⚠️') || log.includes('No match found') ? 'text-yellow-700' :
+                    log.includes('Source Checked:') ? 'text-blue-700 font-medium' :
                     'text-gray-700'
                   }`}>
                     {log}
