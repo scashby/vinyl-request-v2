@@ -426,19 +426,56 @@ export default function FixedAudioRecognitionPage() {
       const result: RecognitionResponse = await response.json();
       const processingTime = Date.now() - startTime;
       
+      // Create a completely clean result object to avoid React serialization errors
+      const safeResult: RecognitionResponse = JSON.parse(JSON.stringify({
+        success: Boolean(result.success),
+        error: result.error ? String(result.error) : undefined,
+        processingTime: Number(result.processingTime) || processingTime,
+        serviceResults: (result.serviceResults || []).map(sr => ({
+          service: String(sr.service),
+          status: String(sr.status),
+          error: sr.error ? String(sr.error) : undefined,
+          processingTime: Number(sr.processingTime) || 0,
+          result: sr.result ? {
+            artist: String(sr.result.artist || ''),
+            title: String(sr.result.title || ''),
+            album: String(sr.result.album || ''),
+            confidence: Number(sr.result.confidence) || 0,
+            source: String(sr.result.source),
+            service: String(sr.result.service)
+          } : undefined
+        })),
+        autoSelected: result.autoSelected ? {
+          artist: String(result.autoSelected.artist || ''),
+          title: String(result.autoSelected.title || ''),
+          album: String(result.autoSelected.album || ''),
+          confidence: Number(result.autoSelected.confidence) || 0,
+          source: String(result.autoSelected.source),
+          service: String(result.autoSelected.service)
+        } : undefined,
+        alternatives: (result.alternatives || []).slice(0, 3).map(alt => ({
+          artist: String(alt.artist || ''),
+          title: String(alt.title || ''),
+          album: String(alt.album || ''),
+          confidence: Number(alt.confidence) || 0,
+          source: String(alt.source),
+          service: String(alt.service)
+        }))
+      }));
+      
       // Log individual service results
-      if (result.serviceResults) {
+      if (safeResult.serviceResults) {
         addLog('🔍 Individual service results:', 'info');
-        logServiceResults(result.serviceResults);
+        logServiceResults(safeResult.serviceResults);
       }
       
-      if (result.success && result.autoSelected) {
+      if (safeResult.success && safeResult.autoSelected) {
         setStatus('results');
         setSuccessCount(prev => prev + 1);
-        addLog(`🎉 AUTO-SELECTED: ${result.autoSelected.artist} - ${result.autoSelected.title}`, 'success');
-        addLog(`Source: ${result.autoSelected.source} (${Math.round(result.autoSelected.confidence * 100)}% confidence)`, 'success');
+        addLog(`🎉 AUTO-SELECTED: ${safeResult.autoSelected.artist} - ${safeResult.autoSelected.title}`, 'success');
+        addLog(`Source: ${safeResult.autoSelected.source} (${Math.round(safeResult.autoSelected.confidence * 100)}% confidence)`, 'success');
         
-        if (result.stats?.realAudioProcessing) {
+        if (safeResult.stats?.realAudioProcessing) {
           addLog('✅ Real audio fingerprinting completed', 'success');
         }
         
@@ -451,13 +488,13 @@ export default function FixedAudioRecognitionPage() {
       } else {
         setStatus('error');
         addLog(`❌ Final result: No match found from any service`, 'error');
-        if (result.error) {
-          addLog(`Details: ${result.error}`, 'error');
+        if (safeResult.error) {
+          addLog(`Details: ${safeResult.error}`, 'error');
         }
       }
 
       addLog(`Total processing: ${processingTime}ms`, 'info');
-      setLastResult(result);
+      setLastResult(safeResult);
 
     } catch (err) {
       setStatus('error');
