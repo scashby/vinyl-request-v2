@@ -361,10 +361,53 @@ export default function FunctionalAudioRecognition() {
       const result: RecognitionResponse = await response.json();
       const processingTime = Date.now() - startTime;
       
+      // Sanitize the result to prevent React serialization errors
+      const sanitizedResult: RecognitionResponse = {
+        success: Boolean(result.success),
+        autoSelected: result.autoSelected ? {
+          artist: String(result.autoSelected.artist || ''),
+          title: String(result.autoSelected.title || ''),
+          album: String(result.autoSelected.album || ''),
+          confidence: Number(result.autoSelected.confidence) || 0,
+          source: String(result.autoSelected.source),
+          service: String(result.autoSelected.service),
+          image_url: result.autoSelected.image_url ? String(result.autoSelected.image_url) : undefined,
+          albumId: result.autoSelected.albumId ? Number(result.autoSelected.albumId) : undefined
+        } : undefined,
+        alternatives: result.alternatives ? result.alternatives.map(alt => ({
+          artist: String(alt.artist || ''),
+          title: String(alt.title || ''),
+          album: String(alt.album || ''),
+          confidence: Number(alt.confidence) || 0,
+          source: String(alt.source),
+          service: String(alt.service),
+          image_url: alt.image_url ? String(alt.image_url) : undefined,
+          albumId: alt.albumId ? Number(alt.albumId) : undefined
+        })) : [],
+        serviceResults: result.serviceResults ? result.serviceResults.map(sr => ({
+          service: String(sr.service),
+          status: String(sr.status) as 'success' | 'failed' | 'error' | 'skipped',
+          result: sr.result ? {
+            artist: String(sr.result.artist || ''),
+            title: String(sr.result.title || ''),
+            album: String(sr.result.album || ''),
+            confidence: Number(sr.result.confidence) || 0,
+            source: String(sr.result.source),
+            service: String(sr.result.service),
+            image_url: sr.result.image_url ? String(sr.result.image_url) : undefined,
+            albumId: sr.result.albumId ? Number(sr.result.albumId) : undefined
+          } : undefined,
+          error: sr.error ? String(sr.error) : undefined,
+          processingTime: Number(sr.processingTime) || 0
+        })) : [],
+        processingTime: Number(result.processingTime) || processingTime,
+        error: result.error ? String(result.error) : undefined
+      };
+      
       // Log individual service results
-      if (result.serviceResults) {
+      if (sanitizedResult.serviceResults) {
         addLog('🔍 Service results received:', 'info');
-        result.serviceResults.forEach(serviceResult => {
+        sanitizedResult.serviceResults.forEach(serviceResult => {
           if (serviceResult.status === 'success') {
             addLog(`✅ ${serviceResult.service}: ${serviceResult.result!.artist} - ${serviceResult.result!.title}`, 'success');
           } else if (serviceResult.status === 'failed') {
@@ -377,28 +420,35 @@ export default function FunctionalAudioRecognition() {
         });
       }
       
-      if (result.success && result.autoSelected) {
+      if (sanitizedResult.success && sanitizedResult.autoSelected) {
         setStatus('results');
         setSuccessCount(prev => prev + 1);
-        setSelectedResult(result.autoSelected);
-        addLog(`🎉 Recognition successful: ${result.autoSelected.artist} - ${result.autoSelected.title}`, 'success');
-        addLog(`Auto-selected from: ${result.autoSelected.service} (${Math.round(result.autoSelected.confidence * 100)}% confidence)`, 'success');
+        setSelectedResult(sanitizedResult.autoSelected);
+        addLog(`🎉 Recognition successful: ${sanitizedResult.autoSelected.artist} - ${sanitizedResult.autoSelected.title}`, 'success');
+        addLog(`Auto-selected from: ${sanitizedResult.autoSelected.service} (${Math.round(sanitizedResult.autoSelected.confidence * 100)}% confidence)`, 'success');
       } else {
         setStatus('error');
         addLog(`❌ Recognition failed: No matches found`, 'error');
-        if (result.error) {
-          addLog(`Details: ${result.error}`, 'error');
+        if (sanitizedResult.error) {
+          addLog(`Details: ${sanitizedResult.error}`, 'error');
         }
       }
 
       addLog(`Total processing: ${processingTime}ms`, 'info');
-      setLastResult(result);
+      setLastResult(sanitizedResult);
 
     } catch (err) {
       setStatus('error');
       const errorMessage = err instanceof Error ? err.message : 'Recognition failed';
       addLog(`❌ Recognition error: ${errorMessage}`, 'error');
-      setLastResult(null);
+      
+      // Set a safe error result
+      setLastResult({
+        success: false,
+        error: errorMessage,
+        serviceResults: [],
+        processingTime: Date.now() - startTime
+      });
     }
   }, [addLog, requestMicrophonePermission, arrayBufferToBase64]);
 
