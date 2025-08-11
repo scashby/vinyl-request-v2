@@ -1,12 +1,11 @@
 // src/app/now-playing-tv/page.tsx
-// FIXED: Real-time updates that actually work - TypeScript/ESLint compliant
+// FIXED: Real-time updates that actually work
 
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from 'lib/supabaseClient';
 import Image from 'next/image';
-import type { RealtimeChannel } from '@supabase/supabase-js';
 
 interface CollectionAlbum {
   id: number;
@@ -37,20 +36,22 @@ export default function FixedTVDisplay() {
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [updateCount, setUpdateCount] = useState<number>(0);
+  const [connectionStatus, setConnectionStatus] = useState<string>('Initializing...');
   
   // Refs for cleanup and state management
-  const channelRef = useRef<RealtimeChannel | null>(null);
-  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const lastDataRef = useRef<string>('');
   const isActiveRef = useRef<boolean>(true);
-  const connectionAttemptsRef = useRef<number>(0);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // FIXED: Enhanced data fetching with proper change detection
+  // Enhanced data fetching with change detection
   const fetchNowPlaying = useCallback(async (source: string = 'manual'): Promise<void> => {
     if (!isActiveRef.current) return;
     
     try {
       console.log(`🔄 [${source}] Fetching now playing data...`);
+      setConnectionStatus(`Fetching data (${source})...`);
       
       const { data, error } = await supabase
         .from('now_playing')
@@ -71,26 +72,23 @@ export default function FixedTVDisplay() {
       if (error) {
         console.error(`❌ [${source}] Fetch error:`, error);
         setIsConnected(false);
+        setConnectionStatus(`Error: ${error.message}`);
         return;
       }
 
-      // FIXED: Complete change detection using all critical fields
-      const currentDataString = JSON.stringify({
-        artist: data?.artist || null,
-        title: data?.title || null,
-        album_title: data?.album_title || null,
-        album_id: data?.album_id || null,
-        recognition_image_url: data?.recognition_image_url || null,
-        service_used: data?.service_used || null,
-        recognition_confidence: data?.recognition_confidence || null,
-        updated_at: data?.updated_at || null,
-        started_at: data?.started_at || null,
-        collection_artist: data?.collection?.artist || null,
-        collection_title: data?.collection?.title || null,
-        collection_image: data?.collection?.image_url || null
+      // Real change detection
+      const dataString = JSON.stringify({
+        artist: data?.artist,
+        title: data?.title,
+        album_title: data?.album_title,
+        album_id: data?.album_id,
+        service_used: data?.service_used,
+        recognition_confidence: data?.recognition_confidence,
+        updated_at: data?.updated_at,
+        started_at: data?.started_at
       });
       
-      const hasChange = currentDataString !== lastDataRef.current;
+      const hasChange = dataString !== lastDataRef.current;
       
       if (hasChange || source === 'manual' || source === 'initial') {
         console.log(`✅ [${source}] DATA CHANGED:`, {
@@ -105,20 +103,21 @@ export default function FixedTVDisplay() {
         setCurrentTrack(data);
         setLastUpdate(new Date());
         setUpdateCount(prev => prev + 1);
-        lastDataRef.current = currentDataString;
+        lastDataRef.current = dataString;
+        setConnectionStatus('Connected - Live updates active');
         
-        console.log(`🎵 TV Display updated: ${data?.artist || 'Unknown'} - ${data?.title || 'Unknown'}`);
+        console.log(`🎵 TV Display updated: ${data?.artist} - ${data?.title}`);
       } else {
         console.log(`📍 [${source}] No changes detected`);
+        setConnectionStatus('Connected - Monitoring for changes');
       }
       
       setIsConnected(true);
-      connectionAttemptsRef.current = 0; // Reset connection attempts on success
       
     } catch (error) {
       console.error(`❌ [${source}] Error:`, error);
       setIsConnected(false);
-      connectionAttemptsRef.current++;
+      setConnectionStatus(`Connection error: ${error instanceof Error ? error.message : 'Unknown'}`);
     } finally {
       if (source === 'initial') {
         setIsLoading(false);
@@ -126,11 +125,12 @@ export default function FixedTVDisplay() {
     }
   }, []);
 
-  // FIXED: Robust real-time subscription with automatic reconnection
+  // FIXED: Real-time subscription with proper error handling and reconnection
   const setupRealtimeSubscription = useCallback(() => {
     if (!isActiveRef.current) return;
     
     console.log('🔗 Setting up real-time subscription...');
+    setConnectionStatus('Setting up real-time connection...');
     
     // Clean up existing subscription
     if (channelRef.current) {
@@ -139,14 +139,19 @@ export default function FixedTVDisplay() {
       channelRef.current = null;
     }
 
+    // Clear any existing reconnect timeout
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+
     // Create new channel with unique name
-    const channelName = `tv_display_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
+    const channelName = `now_playing_tv_${Date.now()}`;
     channelRef.current = supabase
       .channel(channelName, {
         config: {
           broadcast: { self: false },
-          presence: { key: `tv-${Date.now()}` }
+          presence: { key: `tv-display-${Date.now()}` }
         }
       })
       .on('postgres_changes', 
@@ -166,68 +171,77 @@ export default function FixedTVDisplay() {
             old_data: payload.old
           });
           
-          // Force immediate fetch on any database change
+          setConnectionStatus('Real-time update received!');
+          
+          // Immediate fetch on database change
           setTimeout(() => {
-            if (isActiveRef.current) {
-              void fetchNowPlaying(`realtime-${payload.eventType}`);
-            }
-          }, 100); // Small delay to ensure database consistency
+            fetchNowPlaying(`realtime-${payload.eventType}`);
+          }, 100); // Small delay to ensure DB consistency
         }
       )
       .subscribe((status, err) => {
-        console.log(`📡 Subscription status: ${status}`, err ? `Error: ${err}` : '');
+        console.log('📡 Subscription status changed:', status, err);
         
         if (status === 'SUBSCRIBED') {
           console.log('✅ Real-time subscription ACTIVE');
           setIsConnected(true);
-          connectionAttemptsRef.current = 0;
+          setConnectionStatus('Real-time connected');
         } else if (status === 'CHANNEL_ERROR' || status === 'CLOSED') {
-          console.error('❌ Channel error, will reconnect...', err);
+          console.error('❌ Channel error:', err);
           setIsConnected(false);
+          setConnectionStatus(`Connection lost: ${err?.message || 'Unknown error'}`);
           
-          // Exponential backoff for reconnection
-          if (isActiveRef.current && connectionAttemptsRef.current < 5) {
-            const delay = Math.min(1000 * Math.pow(2, connectionAttemptsRef.current), 30000);
-            console.log(`🔄 Reconnecting in ${delay}ms (attempt ${connectionAttemptsRef.current + 1})`);
-            
-            setTimeout(() => {
+          // Attempt reconnection after delay
+          if (isActiveRef.current) {
+            reconnectTimeoutRef.current = setTimeout(() => {
               if (isActiveRef.current) {
-                connectionAttemptsRef.current++;
+                console.log('🔄 Attempting to reconnect...');
+                setConnectionStatus('Reconnecting...');
                 setupRealtimeSubscription();
               }
-            }, delay);
+            }, 3000);
+          }
+        } else if (status === 'TIMED_OUT') {
+          console.warn('⏰ Subscription timed out, reconnecting...');
+          setConnectionStatus('Connection timed out, reconnecting...');
+          
+          if (isActiveRef.current) {
+            reconnectTimeoutRef.current = setTimeout(() => {
+              if (isActiveRef.current) {
+                setupRealtimeSubscription();
+              }
+            }, 1000);
           }
         }
       });
   }, [fetchNowPlaying]);
 
-  // FIXED: More frequent polling as backup
+  // FIXED: Backup polling with better interval management
   const setupPolling = useCallback(() => {
     if (!isActiveRef.current) return;
     
-    console.log('⏰ Setting up backup polling (every 2 seconds)...');
+    console.log('⏰ Setting up backup polling (every 3 seconds)...');
     
-    if (pollIntervalRef.current) {
-      clearInterval(pollIntervalRef.current);
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
     }
     
-    pollIntervalRef.current = setInterval(() => {
+    intervalRef.current = setInterval(() => {
       if (isActiveRef.current) {
-        void fetchNowPlaying('polling-backup');
+        fetchNowPlaying('polling-backup');
       }
-    }, 2000); // More frequent polling for immediate updates
+    }, 3000); // More frequent polling for better responsiveness
   }, [fetchNowPlaying]);
 
   // FIXED: Initialize with proper cleanup
   useEffect(() => {
     isActiveRef.current = true;
-    connectionAttemptsRef.current = 0;
     console.log('🚀 Initializing Fixed TV Display...');
     
     // Initial fetch
-    void fetchNowPlaying('initial');
+    fetchNowPlaying('initial');
     
-    // Setup real-time with delay to ensure initial data is loaded
+    // Setup real-time with delay to ensure initial fetch completes
     setTimeout(() => {
       if (isActiveRef.current) {
         setupRealtimeSubscription();
@@ -235,7 +249,11 @@ export default function FixedTVDisplay() {
     }, 1000);
     
     // Setup backup polling
-    setupPolling();
+    setTimeout(() => {
+      if (isActiveRef.current) {
+        setupPolling();
+      }
+    }, 2000);
 
     // Cleanup function
     return () => {
@@ -247,43 +265,48 @@ export default function FixedTVDisplay() {
         channelRef.current = null;
       }
       
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-        pollIntervalRef.current = null;
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
       }
     };
   }, [fetchNowPlaying, setupRealtimeSubscription, setupPolling]);
 
-  // FIXED: Manual refresh and visibility handling
+  // Manual refresh on key press
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
-      if (e.key === 'f' || e.key === 'F' || e.key === 'r' || e.key === 'R') {
+      if (e.key === 'f' || e.key === 'F') {
         console.log('🔄 Manual refresh triggered');
-        void fetchNowPlaying('manual-refresh');
-        
-        // Also restart real-time connection
-        if (e.key === 'r' || e.key === 'R') {
-          setupRealtimeSubscription();
-        }
-      }
-    };
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && isActiveRef.current) {
-        console.log('👀 Page became visible, refreshing...');
-        void fetchNowPlaying('visibility-change');
+        setConnectionStatus('Manual refresh...');
+        fetchNowPlaying('manual-refresh');
+      } else if (e.key === 'r' || e.key === 'R') {
+        console.log('🔄 Reconnection triggered');
+        setConnectionStatus('Reconnecting...');
         setupRealtimeSubscription();
       }
     };
 
     window.addEventListener('keydown', handleKeyPress);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    return () => {
-      window.removeEventListener('keydown', handleKeyPress);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
+    return () => window.removeEventListener('keydown', handleKeyPress);
   }, [fetchNowPlaying, setupRealtimeSubscription]);
+
+  // Connection health check
+  useEffect(() => {
+    const healthCheck = setInterval(() => {
+      if (isActiveRef.current && !isConnected) {
+        console.log('🏥 Health check: Attempting reconnection...');
+        setConnectionStatus('Health check - reconnecting...');
+        setupRealtimeSubscription();
+      }
+    }, 10000); // Check every 10 seconds
+
+    return () => clearInterval(healthCheck);
+  }, [isConnected, setupRealtimeSubscription]);
 
   // Loading state
   if (isLoading) {
@@ -299,9 +322,9 @@ export default function FixedTVDisplay() {
       }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: '3rem', marginBottom: '1rem', animation: 'pulse 2s infinite' }}>🎵</div>
-          <div style={{ fontSize: '1.5rem' }}>Loading Fixed TV Display...</div>
+          <div style={{ fontSize: '1.5rem' }}>Loading TV Display...</div>
           <div style={{ fontSize: '1rem', opacity: 0.8, marginTop: '0.5rem' }}>
-            Real-time updates with 2-second polling backup...
+            {connectionStatus}
           </div>
         </div>
       </div>
@@ -397,12 +420,7 @@ export default function FixedTVDisplay() {
             opacity: 0.9,
             marginBottom: '1rem'
           }}>
-            <div>
-              {isConnected ? '🟢 Real-time Connected' : '🔴 Reconnecting...'}
-            </div>
-            <div style={{ fontSize: '0.8rem', opacity: 0.7, marginTop: '4px' }}>
-              Connection attempts: {connectionAttemptsRef.current}
-            </div>
+            {isConnected ? '🟢 ' : '🔴 '}{connectionStatus}
           </div>
           
           <div style={{
@@ -415,7 +433,7 @@ export default function FixedTVDisplay() {
           }}>
             <span>Updates: {updateCount}</span>
             <span>Last: {lastUpdate.toLocaleTimeString()}</span>
-            <span>Real-time + 2s Polling</span>
+            <span>Real-time + Polling</span>
           </div>
           
           <div style={{
@@ -675,10 +693,9 @@ export default function FixedTVDisplay() {
               background: isConnected ? '#10b981' : '#ef4444',
               animation: 'pulse 2s infinite'
             }} />
-            <span>Real-time {isConnected ? 'Connected' : 'Reconnecting'}</span>
+            <span>{connectionStatus}</span>
             <span>• #{updateCount}</span>
             <span>• {lastUpdate.toLocaleTimeString()}</span>
-            <span>• Polling: 2s</span>
           </div>
         </div>
       </div>

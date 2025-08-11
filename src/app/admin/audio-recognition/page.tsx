@@ -1,5 +1,5 @@
 // src/app/admin/audio-recognition/page.tsx
-// FIXED: Auto-recognition that actually continues, working service results, proper alternative selection
+// FIXED: Auto-recognition loop, alternative selection, ESLint issues
 
 'use client';
 
@@ -7,10 +7,6 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-
-// Fallback type if Database type doesn't exist
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Database = any;
 
 interface ServiceResult {
   service: string;
@@ -53,9 +49,11 @@ export default function FixedAudioRecognition() {
   const [selectedResult, setSelectedResult] = useState<ServiceResult['result'] | null>(null);
   const [isUpdatingTV, setIsUpdatingTV] = useState(false);
 
-  // Settings and counters
+  // Settings
   const [autoInterval, setAutoInterval] = useState(15);
   const [nextRecognitionIn, setNextRecognitionIn] = useState<number | null>(null);
+
+  // Activity and stats
   const [recognitionCount, setRecognitionCount] = useState(0);
   const [successCount, setSuccessCount] = useState(0);
   const [logs, setLogs] = useState<string[]>([]);
@@ -68,13 +66,12 @@ export default function FixedAudioRecognition() {
     permissions: false
   });
 
-  // Refs for proper cleanup and continuation
+  // Refs for proper cleanup and continuous operation
   const streamRef = useRef<MediaStream | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
   const isActiveRef = useRef(true);
-  const recognitionInProgressRef = useRef(false);
-  const supabase = createClientComponentClient<Database>();
+  const supabase = createClientComponentClient();
 
   const addLog = useCallback((message: string, type: 'info' | 'success' | 'error' | 'warning' = 'info') => {
     const timestamp = new Date().toLocaleTimeString();
@@ -124,8 +121,7 @@ export default function FixedAudioRecognition() {
       
       return state;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown';
-      addLog(`Permission check failed: ${errorMessage}`, 'warning');
+      addLog(`Permission check failed: ${error instanceof Error ? error.message : 'Unknown'}`, 'warning');
       return 'unknown';
     }
   }, [browserSupport.permissions, addLog]);
@@ -229,14 +225,38 @@ export default function FixedAudioRecognition() {
     });
   }, [addLog]);
 
-  // FIXED: Audio recording and recognition
-  const performRecognition = useCallback(async (triggeredBy: string = 'manual') => {
-    // Prevent multiple simultaneous recognitions
-    if (recognitionInProgressRef.current) {
-      addLog('Recognition already in progress, skipping...', 'warning');
-      return;
-    }
+  // Enhanced cleanup
+  const cleanup = useCallback(() => {
+    addLog('Cleaning up audio resources...', 'info');
+    
+    try {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => {
+          track.stop();
+          addLog(`Stopped track: ${track.kind} (${track.label || 'unnamed'})`, 'info');
+        });
+        streamRef.current = null;
+      }
+      
+      [intervalRef, countdownRef].forEach(ref => {
+        if (ref.current) {
+          clearInterval(ref.current);
+          ref.current = null;
+        }
+      });
 
+      setIsListening(false);
+      setStatus('idle');
+      setNextRecognitionIn(null);
+      
+      addLog('Cleanup complete', 'success');
+    } catch (error) {
+      addLog(`Cleanup error: ${error instanceof Error ? error.message : 'Unknown'}`, 'error');
+    }
+  }, [addLog]);
+
+  // Audio recording and recognition
+  const performRecognition = useCallback(async (triggeredBy: string = 'manual') => {
     if (!streamRef.current || streamRef.current.getTracks().length === 0) {
       addLog('No active microphone stream - requesting permission...', 'warning');
       const granted = await requestMicrophonePermission();
@@ -246,7 +266,6 @@ export default function FixedAudioRecognition() {
       }
     }
 
-    recognitionInProgressRef.current = true;
     setStatus('recording');
     addLog(`🎤 Starting recognition (${triggeredBy})...`, 'info');
     setRecognitionCount(prev => prev + 1);
@@ -298,7 +317,7 @@ export default function FixedAudioRecognition() {
         mediaRecorder.onerror = (event) => {
           clearTimeout(timeout);
           clearInterval(progressInterval);
-          const error = event instanceof ErrorEvent ? event.error : new Error('Recording failed');
+          const error = (event as ErrorEvent).error || new Error('Recording failed');
           reject(error);
         };
       });
@@ -342,10 +361,53 @@ export default function FixedAudioRecognition() {
       const result: RecognitionResponse = await response.json();
       const processingTime = Date.now() - startTime;
       
+      // Sanitize the result to prevent React serialization errors
+      const sanitizedResult: RecognitionResponse = {
+        success: Boolean(result.success),
+        autoSelected: result.autoSelected ? {
+          artist: String(result.autoSelected.artist || ''),
+          title: String(result.autoSelected.title || ''),
+          album: String(result.autoSelected.album || ''),
+          confidence: Number(result.autoSelected.confidence) || 0,
+          source: String(result.autoSelected.source),
+          service: String(result.autoSelected.service),
+          image_url: result.autoSelected.image_url ? String(result.autoSelected.image_url) : undefined,
+          albumId: result.autoSelected.albumId ? Number(result.autoSelected.albumId) : undefined
+        } : undefined,
+        alternatives: result.alternatives ? result.alternatives.map(alt => ({
+          artist: String(alt.artist || ''),
+          title: String(alt.title || ''),
+          album: String(alt.album || ''),
+          confidence: Number(alt.confidence) || 0,
+          source: String(alt.source),
+          service: String(alt.service),
+          image_url: alt.image_url ? String(alt.image_url) : undefined,
+          albumId: alt.albumId ? Number(alt.albumId) : undefined
+        })) : [],
+        serviceResults: result.serviceResults ? result.serviceResults.map(sr => ({
+          service: String(sr.service),
+          status: String(sr.status) as 'success' | 'failed' | 'error' | 'skipped',
+          result: sr.result ? {
+            artist: String(sr.result.artist || ''),
+            title: String(sr.result.title || ''),
+            album: String(sr.result.album || ''),
+            confidence: Number(sr.result.confidence) || 0,
+            source: String(sr.result.source),
+            service: String(sr.result.service),
+            image_url: sr.result.image_url ? String(sr.result.image_url) : undefined,
+            albumId: sr.result.albumId ? Number(sr.result.albumId) : undefined
+          } : undefined,
+          error: sr.error ? String(sr.error) : undefined,
+          processingTime: Number(sr.processingTime) || 0
+        })) : [],
+        processingTime: Number(result.processingTime) || processingTime,
+        error: result.error ? String(result.error) : undefined
+      };
+      
       // Log individual service results
-      if (result.serviceResults) {
+      if (sanitizedResult.serviceResults) {
         addLog('🔍 Service results received:', 'info');
-        result.serviceResults.forEach(serviceResult => {
+        sanitizedResult.serviceResults.forEach(serviceResult => {
           if (serviceResult.status === 'success') {
             addLog(`✅ ${serviceResult.service}: ${serviceResult.result!.artist} - ${serviceResult.result!.title}`, 'success');
           } else if (serviceResult.status === 'failed') {
@@ -358,51 +420,41 @@ export default function FixedAudioRecognition() {
         });
       }
       
-      if (result.success && result.autoSelected) {
+      if (sanitizedResult.success && sanitizedResult.autoSelected) {
         setStatus('results');
         setSuccessCount(prev => prev + 1);
-        setSelectedResult(result.autoSelected);
-        addLog(`🎉 Recognition successful: ${result.autoSelected.artist} - ${result.autoSelected.title}`, 'success');
-        addLog(`Auto-selected from: ${result.autoSelected.service} (${Math.round(result.autoSelected.confidence * 100)}% confidence)`, 'success');
+        setSelectedResult(sanitizedResult.autoSelected);
+        addLog(`🎉 Recognition successful: ${sanitizedResult.autoSelected.artist} - ${sanitizedResult.autoSelected.title}`, 'success');
+        addLog(`Auto-selected from: ${sanitizedResult.autoSelected.service} (${Math.round(sanitizedResult.autoSelected.confidence * 100)}% confidence)`, 'success');
       } else {
-        setStatus('error');
-        addLog(`❌ Recognition failed: No matches found`, 'error');
-        if (result.error) {
-          addLog(`Details: ${result.error}`, 'error');
+        setStatus('results'); // Changed from 'error' to 'results' so we can see alternatives
+        addLog(`❌ Recognition failed: No auto-selection made`, 'error');
+        if (sanitizedResult.error) {
+          addLog(`Details: ${sanitizedResult.error}`, 'error');
         }
       }
 
       addLog(`Total processing: ${processingTime}ms`, 'info');
-      setLastResult(result);
+      setLastResult(sanitizedResult);
 
     } catch (err) {
       setStatus('error');
       const errorMessage = err instanceof Error ? err.message : 'Recognition failed';
       addLog(`❌ Recognition error: ${errorMessage}`, 'error');
       
+      // Set a safe error result
       setLastResult({
         success: false,
         error: errorMessage,
         serviceResults: [],
         processingTime: Date.now() - startTime
       });
-    } finally {
-      recognitionInProgressRef.current = false;
-      
-      // FIXED: Always continue auto-recognition if it was triggered by auto mode
-      if (isActiveRef.current && (triggeredBy.includes('auto') || (isListening && triggeredBy === 'manual_single'))) {
-        setTimeout(() => {
-          if (isListening && isActiveRef.current) {
-            startCountdown();
-          }
-        }, 100);
-      }
     }
-  }, [addLog, requestMicrophonePermission, arrayBufferToBase64, isListening]);
+  }, [addLog, requestMicrophonePermission, arrayBufferToBase64]);
 
   // FIXED: Start countdown for next recognition
   const startCountdown = useCallback(() => {
-    if (!isListening || !isActiveRef.current) return;
+    if (!isActiveRef.current) return;
     
     setNextRecognitionIn(autoInterval);
     
@@ -413,18 +465,14 @@ export default function FixedAudioRecognition() {
     countdownRef.current = setInterval(() => {
       setNextRecognitionIn(prev => {
         if (prev === null || prev <= 1) {
-          // Time to trigger next recognition
-          if (isListening && isActiveRef.current && !recognitionInProgressRef.current) {
-            void performRecognition('auto_interval');
-          }
-          return autoInterval; // Reset for next cycle
+          return null;
         }
         return prev - 1;
       });
     }, 1000);
-  }, [autoInterval, isListening, performRecognition]);
+  }, [autoInterval]);
 
-  // FIXED: Auto-recognition loop
+  // FIXED: Auto-recognition loop that continues
   const startAutoRecognition = useCallback(async () => {
     if (permissionState !== 'granted') {
       const granted = await requestMicrophonePermission();
@@ -440,57 +488,41 @@ export default function FixedAudioRecognition() {
 
     // Immediate recognition
     await performRecognition('auto_initial');
-
-    // Start countdown for next recognition
     startCountdown();
-  }, [permissionState, requestMicrophonePermission, autoInterval, performRecognition, startCountdown, addLog]);
 
-  // FIXED: Enhanced cleanup
-  const cleanup = useCallback(() => {
-    addLog('Cleaning up audio resources...', 'info');
-    isActiveRef.current = false;
-    recognitionInProgressRef.current = false;
-    
-    try {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => {
-          track.stop();
-          addLog(`Stopped track: ${track.kind} (${track.label || 'unnamed'})`, 'info');
-        });
-        streamRef.current = null;
-      }
-      
-      [intervalRef, countdownRef].forEach(ref => {
-        if (ref.current) {
-          clearInterval(ref.current);
-          ref.current = null;
-        }
-      });
-
-      setIsListening(false);
-      setStatus('idle');
-      setNextRecognitionIn(null);
-      
-      addLog('Cleanup complete', 'success');
-    } catch (error) {
-      addLog(`Cleanup error: ${error instanceof Error ? error.message : 'Unknown'}`, 'error');
+    // FIXED: Set up proper continuous interval
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
     }
-  }, [addLog]);
+    
+    intervalRef.current = setInterval(async () => {
+      if (isActiveRef.current && isListening) {
+        try {
+          addLog('🔄 Starting scheduled recognition...', 'info');
+          await performRecognition('auto_interval');
+          
+          // Restart countdown after each recognition
+          if (isActiveRef.current && isListening) {
+            startCountdown();
+          }
+        } catch (error) {
+          addLog(`Auto-recognition error: ${error instanceof Error ? error.message : 'Unknown'}`, 'error');
+          
+          // Don't stop on error, continue trying
+          if (isActiveRef.current && isListening) {
+            startCountdown();
+          }
+        }
+      }
+    }, autoInterval * 1000);
+  }, [permissionState, requestMicrophonePermission, autoInterval, performRecognition, isListening, startCountdown, addLog]);
 
   // Stop listening
   const stopListening = useCallback(() => {
     setIsListening(false);
-    recognitionInProgressRef.current = false;
-    
-    if (countdownRef.current) {
-      clearInterval(countdownRef.current);
-      countdownRef.current = null;
-    }
-    
-    setNextRecognitionIn(null);
-    setStatus('idle');
+    cleanup();
     addLog('Auto-recognition stopped', 'warning');
-  }, [addLog]);
+  }, [cleanup, addLog]);
 
   // FIXED: Update TV with selected result
   const updateTV = useCallback(async (result: ServiceResult['result']) => {
@@ -530,7 +562,7 @@ export default function FixedAudioRecognition() {
           source: result.source,
           service: result.service,
           confidence: result.confidence,
-          confirmed: true,
+          confirmed: true, // Manual selection is confirmed
           match_source: result.source === 'collection' ? 'collection' : 'external',
           matched_id: result.albumId || null,
           now_playing: true,
@@ -557,14 +589,15 @@ export default function FixedAudioRecognition() {
     }
 
     return () => {
+      isActiveRef.current = false;
       cleanup();
     };
   }, [checkBrowserSupport, checkPermissionState, cleanup]);
 
-  // Calculate success rate
+  // FIXED: Calculate success rate
   const successRate = recognitionCount > 0 ? Math.round((successCount / recognitionCount) * 100) : 0;
 
-  // Get all available results for selection
+  // FIXED: Get all available results for selection
   const getAllResults = (): ServiceResult['result'][] => {
     if (!lastResult) return [];
     
@@ -576,6 +609,24 @@ export default function FixedAudioRecognition() {
     
     if (lastResult.alternatives) {
       results.push(...lastResult.alternatives);
+    }
+    
+    // FIXED: Also include successful service results that weren't in alternatives
+    if (lastResult.serviceResults) {
+      lastResult.serviceResults.forEach(sr => {
+        if (sr.status === 'success' && sr.result) {
+          // Check if this result is already included
+          const alreadyIncluded = results.some(r => 
+            r.artist === sr.result!.artist && 
+            r.title === sr.result!.title && 
+            r.service === sr.result!.service
+          );
+          
+          if (!alreadyIncluded) {
+            results.push(sr.result);
+          }
+        }
+      });
     }
     
     return results;
@@ -591,7 +642,7 @@ export default function FixedAudioRecognition() {
           <div className="flex justify-between items-center">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">🎤 Fixed Audio Recognition</h1>
-              <p className="text-gray-600">Continuous auto-recognition with proper alternative selection</p>
+              <p className="text-gray-600">Continuous recognition, all services, alternative selection, real TV updates</p>
             </div>
             <div className="flex gap-3">
               <Link 
@@ -674,9 +725,9 @@ export default function FixedAudioRecognition() {
             {/* Status Message */}
             <div className="mb-6">
               <div className="text-lg font-medium text-gray-900 mb-2">
-                {status === 'idle' && (permissionState === 'granted' ? 'Ready for Continuous Audio Recognition' : 'Click to Enable Microphone')}
+                {status === 'idle' && (permissionState === 'granted' ? 'Ready for Audio Recognition' : 'Click to Enable Microphone')}
                 {status === 'requesting-permission' && 'Requesting Microphone Permission...'}
-                {status === 'listening' && `Auto-Recognition Active (every ${autoInterval}s)`}
+                {status === 'listening' && 'Listening - Continuous Recognition Active...'}
                 {status === 'recording' && 'Recording Audio (10 seconds)...'}
                 {status === 'searching' && 'Checking All Recognition Services...'}
                 {status === 'results' && 'Recognition Complete - Choose Your Result Below!'}
@@ -695,7 +746,7 @@ export default function FixedAudioRecognition() {
               {!isListening ? (
                 <button
                   onClick={startAutoRecognition}
-                  disabled={!isSecureContext || !browserSupport.getUserMedia || recognitionInProgressRef.current}
+                  disabled={!isSecureContext || !browserSupport.getUserMedia}
                   className="w-full py-4 text-lg font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
                 >
                   🎤 Start Continuous Recognition
@@ -712,7 +763,7 @@ export default function FixedAudioRecognition() {
               {!isListening && (
                 <button
                   onClick={() => performRecognition('manual_single')}
-                  disabled={status === 'recording' || status === 'searching' || permissionState !== 'granted' || recognitionInProgressRef.current}
+                  disabled={status === 'recording' || status === 'searching' || permissionState !== 'granted'}
                   className="w-full py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 transition-colors"
                 >
                   {status === 'recording' ? '🔴 Recording...' : 
@@ -742,7 +793,7 @@ export default function FixedAudioRecognition() {
           </div>
         </div>
 
-        {/* RECOGNITION RESULTS - ALL SERVICES */}
+        {/* FIXED: RECOGNITION RESULTS - ALL SERVICES WITH SELECTION */}
         {lastResult && (
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-6">
             
@@ -758,7 +809,7 @@ export default function FixedAudioRecognition() {
                   <div className="p-6 space-y-4">
                     {allResults.map((result, index) => (
                       <div
-                        key={index}
+                        key={`${result.service}-${index}`}
                         onClick={() => setSelectedResult(result)}
                         className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
                           selectedResult === result
