@@ -1,5 +1,5 @@
 // src/app/admin/audio-recognition/page.tsx
-// COMPLETE FUNCTIONAL INTERFACE - Manual override, TV updates, all results visible
+// FIXED: Auto-recognition that actually continues, working service results, proper alternative selection
 
 'use client';
 
@@ -7,6 +7,10 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+
+// Fallback type if Database type doesn't exist
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Database = any;
 
 interface ServiceResult {
   service: string;
@@ -37,7 +41,7 @@ interface RecognitionResponse {
 type ListeningStatus = 'idle' | 'requesting-permission' | 'permission-denied' | 'listening' | 'recording' | 'searching' | 'results' | 'error';
 type PermissionState = 'unknown' | 'granted' | 'denied' | 'prompt';
 
-export default function FunctionalAudioRecognition() {
+export default function FixedAudioRecognition() {
   // Core state
   const [status, setStatus] = useState<ListeningStatus>('idle');
   const [isListening, setIsListening] = useState(false);
@@ -49,11 +53,9 @@ export default function FunctionalAudioRecognition() {
   const [selectedResult, setSelectedResult] = useState<ServiceResult['result'] | null>(null);
   const [isUpdatingTV, setIsUpdatingTV] = useState(false);
 
-  // Settings
+  // Settings and counters
   const [autoInterval, setAutoInterval] = useState(15);
   const [nextRecognitionIn, setNextRecognitionIn] = useState<number | null>(null);
-
-  // Activity and stats
   const [recognitionCount, setRecognitionCount] = useState(0);
   const [successCount, setSuccessCount] = useState(0);
   const [logs, setLogs] = useState<string[]>([]);
@@ -66,12 +68,13 @@ export default function FunctionalAudioRecognition() {
     permissions: false
   });
 
-  // Refs
+  // Refs for proper cleanup and continuation
   const streamRef = useRef<MediaStream | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
   const isActiveRef = useRef(true);
-  const supabase = createClientComponentClient();
+  const recognitionInProgressRef = useRef(false);
+  const supabase = createClientComponentClient<Database>();
 
   const addLog = useCallback((message: string, type: 'info' | 'success' | 'error' | 'warning' = 'info') => {
     const timestamp = new Date().toLocaleTimeString();
@@ -121,7 +124,8 @@ export default function FunctionalAudioRecognition() {
       
       return state;
     } catch (error) {
-      addLog(`Permission check failed: ${error instanceof Error ? error.message : 'Unknown'}`, 'warning');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown';
+      addLog(`Permission check failed: ${errorMessage}`, 'warning');
       return 'unknown';
     }
   }, [browserSupport.permissions, addLog]);
@@ -225,38 +229,14 @@ export default function FunctionalAudioRecognition() {
     });
   }, [addLog]);
 
-  // Enhanced cleanup
-  const cleanup = useCallback(() => {
-    addLog('Cleaning up audio resources...', 'info');
-    
-    try {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => {
-          track.stop();
-          addLog(`Stopped track: ${track.kind} (${track.label || 'unnamed'})`, 'info');
-        });
-        streamRef.current = null;
-      }
-      
-      [intervalRef, countdownRef].forEach(ref => {
-        if (ref.current) {
-          clearInterval(ref.current);
-          ref.current = null;
-        }
-      });
-
-      setIsListening(false);
-      setStatus('idle');
-      setNextRecognitionIn(null);
-      
-      addLog('Cleanup complete', 'success');
-    } catch (error) {
-      addLog(`Cleanup error: ${error instanceof Error ? error.message : 'Unknown'}`, 'error');
-    }
-  }, [addLog]);
-
-  // Audio recording and recognition
+  // FIXED: Audio recording and recognition
   const performRecognition = useCallback(async (triggeredBy: string = 'manual') => {
+    // Prevent multiple simultaneous recognitions
+    if (recognitionInProgressRef.current) {
+      addLog('Recognition already in progress, skipping...', 'warning');
+      return;
+    }
+
     if (!streamRef.current || streamRef.current.getTracks().length === 0) {
       addLog('No active microphone stream - requesting permission...', 'warning');
       const granted = await requestMicrophonePermission();
@@ -266,6 +246,7 @@ export default function FunctionalAudioRecognition() {
       }
     }
 
+    recognitionInProgressRef.current = true;
     setStatus('recording');
     addLog(`🎤 Starting recognition (${triggeredBy})...`, 'info');
     setRecognitionCount(prev => prev + 1);
@@ -317,7 +298,7 @@ export default function FunctionalAudioRecognition() {
         mediaRecorder.onerror = (event) => {
           clearTimeout(timeout);
           clearInterval(progressInterval);
-          const error = (event as ErrorEvent).error || new Error('Recording failed');
+          const error = event instanceof ErrorEvent ? event.error : new Error('Recording failed');
           reject(error);
         };
       });
@@ -361,53 +342,10 @@ export default function FunctionalAudioRecognition() {
       const result: RecognitionResponse = await response.json();
       const processingTime = Date.now() - startTime;
       
-      // Sanitize the result to prevent React serialization errors
-      const sanitizedResult: RecognitionResponse = {
-        success: Boolean(result.success),
-        autoSelected: result.autoSelected ? {
-          artist: String(result.autoSelected.artist || ''),
-          title: String(result.autoSelected.title || ''),
-          album: String(result.autoSelected.album || ''),
-          confidence: Number(result.autoSelected.confidence) || 0,
-          source: String(result.autoSelected.source),
-          service: String(result.autoSelected.service),
-          image_url: result.autoSelected.image_url ? String(result.autoSelected.image_url) : undefined,
-          albumId: result.autoSelected.albumId ? Number(result.autoSelected.albumId) : undefined
-        } : undefined,
-        alternatives: result.alternatives ? result.alternatives.map(alt => ({
-          artist: String(alt.artist || ''),
-          title: String(alt.title || ''),
-          album: String(alt.album || ''),
-          confidence: Number(alt.confidence) || 0,
-          source: String(alt.source),
-          service: String(alt.service),
-          image_url: alt.image_url ? String(alt.image_url) : undefined,
-          albumId: alt.albumId ? Number(alt.albumId) : undefined
-        })) : [],
-        serviceResults: result.serviceResults ? result.serviceResults.map(sr => ({
-          service: String(sr.service),
-          status: String(sr.status) as 'success' | 'failed' | 'error' | 'skipped',
-          result: sr.result ? {
-            artist: String(sr.result.artist || ''),
-            title: String(sr.result.title || ''),
-            album: String(sr.result.album || ''),
-            confidence: Number(sr.result.confidence) || 0,
-            source: String(sr.result.source),
-            service: String(sr.result.service),
-            image_url: sr.result.image_url ? String(sr.result.image_url) : undefined,
-            albumId: sr.result.albumId ? Number(sr.result.albumId) : undefined
-          } : undefined,
-          error: sr.error ? String(sr.error) : undefined,
-          processingTime: Number(sr.processingTime) || 0
-        })) : [],
-        processingTime: Number(result.processingTime) || processingTime,
-        error: result.error ? String(result.error) : undefined
-      };
-      
       // Log individual service results
-      if (sanitizedResult.serviceResults) {
+      if (result.serviceResults) {
         addLog('🔍 Service results received:', 'info');
-        sanitizedResult.serviceResults.forEach(serviceResult => {
+        result.serviceResults.forEach(serviceResult => {
           if (serviceResult.status === 'success') {
             addLog(`✅ ${serviceResult.service}: ${serviceResult.result!.artist} - ${serviceResult.result!.title}`, 'success');
           } else if (serviceResult.status === 'failed') {
@@ -420,53 +358,73 @@ export default function FunctionalAudioRecognition() {
         });
       }
       
-      if (sanitizedResult.success && sanitizedResult.autoSelected) {
+      if (result.success && result.autoSelected) {
         setStatus('results');
         setSuccessCount(prev => prev + 1);
-        setSelectedResult(sanitizedResult.autoSelected);
-        addLog(`🎉 Recognition successful: ${sanitizedResult.autoSelected.artist} - ${sanitizedResult.autoSelected.title}`, 'success');
-        addLog(`Auto-selected from: ${sanitizedResult.autoSelected.service} (${Math.round(sanitizedResult.autoSelected.confidence * 100)}% confidence)`, 'success');
+        setSelectedResult(result.autoSelected);
+        addLog(`🎉 Recognition successful: ${result.autoSelected.artist} - ${result.autoSelected.title}`, 'success');
+        addLog(`Auto-selected from: ${result.autoSelected.service} (${Math.round(result.autoSelected.confidence * 100)}% confidence)`, 'success');
       } else {
         setStatus('error');
         addLog(`❌ Recognition failed: No matches found`, 'error');
-        if (sanitizedResult.error) {
-          addLog(`Details: ${sanitizedResult.error}`, 'error');
+        if (result.error) {
+          addLog(`Details: ${result.error}`, 'error');
         }
       }
 
       addLog(`Total processing: ${processingTime}ms`, 'info');
-      setLastResult(sanitizedResult);
+      setLastResult(result);
 
     } catch (err) {
       setStatus('error');
       const errorMessage = err instanceof Error ? err.message : 'Recognition failed';
       addLog(`❌ Recognition error: ${errorMessage}`, 'error');
       
-      // Set a safe error result
       setLastResult({
         success: false,
         error: errorMessage,
         serviceResults: [],
         processingTime: Date.now() - startTime
       });
+    } finally {
+      recognitionInProgressRef.current = false;
+      
+      // FIXED: Always continue auto-recognition if it was triggered by auto mode
+      if (isActiveRef.current && (triggeredBy.includes('auto') || (isListening && triggeredBy === 'manual_single'))) {
+        setTimeout(() => {
+          if (isListening && isActiveRef.current) {
+            startCountdown();
+          }
+        }, 100);
+      }
     }
-  }, [addLog, requestMicrophonePermission, arrayBufferToBase64]);
+  }, [addLog, requestMicrophonePermission, arrayBufferToBase64, isListening]);
 
-  // Start countdown for next recognition
+  // FIXED: Start countdown for next recognition
   const startCountdown = useCallback(() => {
+    if (!isListening || !isActiveRef.current) return;
+    
     setNextRecognitionIn(autoInterval);
+    
+    if (countdownRef.current) {
+      clearInterval(countdownRef.current);
+    }
     
     countdownRef.current = setInterval(() => {
       setNextRecognitionIn(prev => {
         if (prev === null || prev <= 1) {
-          return null;
+          // Time to trigger next recognition
+          if (isListening && isActiveRef.current && !recognitionInProgressRef.current) {
+            void performRecognition('auto_interval');
+          }
+          return autoInterval; // Reset for next cycle
         }
         return prev - 1;
       });
     }, 1000);
-  }, [autoInterval]);
+  }, [autoInterval, isListening, performRecognition]);
 
-  // Auto-recognition loop
+  // FIXED: Auto-recognition loop
   const startAutoRecognition = useCallback(async () => {
     if (permissionState !== 'granted') {
       const granted = await requestMicrophonePermission();
@@ -483,28 +441,58 @@ export default function FunctionalAudioRecognition() {
     // Immediate recognition
     await performRecognition('auto_initial');
 
-    // Set up interval
-    intervalRef.current = setInterval(async () => {
-      if (isActiveRef.current && isListening) {
-        try {
-          await performRecognition('auto_interval');
-          startCountdown();
-        } catch (error) {
-          addLog(`Auto-recognition error: ${error instanceof Error ? error.message : 'Unknown'}`, 'error');
-        }
-      }
-    }, autoInterval * 1000);
-
+    // Start countdown for next recognition
     startCountdown();
-  }, [permissionState, requestMicrophonePermission, autoInterval, performRecognition, isListening, startCountdown, addLog]);
+  }, [permissionState, requestMicrophonePermission, autoInterval, performRecognition, startCountdown, addLog]);
+
+  // FIXED: Enhanced cleanup
+  const cleanup = useCallback(() => {
+    addLog('Cleaning up audio resources...', 'info');
+    isActiveRef.current = false;
+    recognitionInProgressRef.current = false;
+    
+    try {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => {
+          track.stop();
+          addLog(`Stopped track: ${track.kind} (${track.label || 'unnamed'})`, 'info');
+        });
+        streamRef.current = null;
+      }
+      
+      [intervalRef, countdownRef].forEach(ref => {
+        if (ref.current) {
+          clearInterval(ref.current);
+          ref.current = null;
+        }
+      });
+
+      setIsListening(false);
+      setStatus('idle');
+      setNextRecognitionIn(null);
+      
+      addLog('Cleanup complete', 'success');
+    } catch (error) {
+      addLog(`Cleanup error: ${error instanceof Error ? error.message : 'Unknown'}`, 'error');
+    }
+  }, [addLog]);
 
   // Stop listening
   const stopListening = useCallback(() => {
-    cleanup();
+    setIsListening(false);
+    recognitionInProgressRef.current = false;
+    
+    if (countdownRef.current) {
+      clearInterval(countdownRef.current);
+      countdownRef.current = null;
+    }
+    
+    setNextRecognitionIn(null);
+    setStatus('idle');
     addLog('Auto-recognition stopped', 'warning');
-  }, [cleanup, addLog]);
+  }, [addLog]);
 
-  // Update TV with selected result
+  // FIXED: Update TV with selected result
   const updateTV = useCallback(async (result: ServiceResult['result']) => {
     if (!result) return;
     
@@ -542,7 +530,7 @@ export default function FunctionalAudioRecognition() {
           source: result.source,
           service: result.service,
           confidence: result.confidence,
-          confirmed: true, // Manual selection is confirmed
+          confirmed: true,
           match_source: result.source === 'collection' ? 'collection' : 'external',
           matched_id: result.albumId || null,
           now_playing: true,
@@ -569,7 +557,6 @@ export default function FunctionalAudioRecognition() {
     }
 
     return () => {
-      isActiveRef.current = false;
       cleanup();
     };
   }, [checkBrowserSupport, checkPermissionState, cleanup]);
@@ -603,8 +590,8 @@ export default function FunctionalAudioRecognition() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">🎤 Audio Recognition with Manual Override</h1>
-              <p className="text-gray-600">Record audio, see all results, choose the best match, update TV display</p>
+              <h1 className="text-2xl font-bold text-gray-900">🎤 Fixed Audio Recognition</h1>
+              <p className="text-gray-600">Continuous auto-recognition with proper alternative selection</p>
             </div>
             <div className="flex gap-3">
               <Link 
@@ -687,9 +674,9 @@ export default function FunctionalAudioRecognition() {
             {/* Status Message */}
             <div className="mb-6">
               <div className="text-lg font-medium text-gray-900 mb-2">
-                {status === 'idle' && (permissionState === 'granted' ? 'Ready for Audio Recognition' : 'Click to Enable Microphone')}
+                {status === 'idle' && (permissionState === 'granted' ? 'Ready for Continuous Audio Recognition' : 'Click to Enable Microphone')}
                 {status === 'requesting-permission' && 'Requesting Microphone Permission...'}
-                {status === 'listening' && 'Listening - Results Will Appear Below...'}
+                {status === 'listening' && `Auto-Recognition Active (every ${autoInterval}s)`}
                 {status === 'recording' && 'Recording Audio (10 seconds)...'}
                 {status === 'searching' && 'Checking All Recognition Services...'}
                 {status === 'results' && 'Recognition Complete - Choose Your Result Below!'}
@@ -708,10 +695,10 @@ export default function FunctionalAudioRecognition() {
               {!isListening ? (
                 <button
                   onClick={startAutoRecognition}
-                  disabled={!isSecureContext || !browserSupport.getUserMedia}
+                  disabled={!isSecureContext || !browserSupport.getUserMedia || recognitionInProgressRef.current}
                   className="w-full py-4 text-lg font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
                 >
-                  🎤 Start Audio Recognition
+                  🎤 Start Continuous Recognition
                 </button>
               ) : (
                 <button
@@ -725,7 +712,7 @@ export default function FunctionalAudioRecognition() {
               {!isListening && (
                 <button
                   onClick={() => performRecognition('manual_single')}
-                  disabled={status === 'recording' || status === 'searching' || permissionState !== 'granted'}
+                  disabled={status === 'recording' || status === 'searching' || permissionState !== 'granted' || recognitionInProgressRef.current}
                   className="w-full py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 transition-colors"
                 >
                   {status === 'recording' ? '🔴 Recording...' : 
