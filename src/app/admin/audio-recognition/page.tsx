@@ -1,12 +1,10 @@
-// src/app/admin/audio-recognition/page.tsx
-// FIXED: Auto-recognition loop, alternative selection, ESLint issues
-
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import WavEncoder from 'wav-encoder';
 
 interface ServiceResult {
   service: string;
@@ -34,7 +32,7 @@ interface RecognitionResponse {
   error?: string;
 }
 
-type ListeningStatus = 'idle' | 'requesting-permission' | 'permission-denied' | 'listening' | 'recording' | 'searching' | 'results' | 'error';
+type ListeningStatus = 'processing' | 'idle' | 'requesting-permission' | 'permission-denied' | 'listening' | 'recording' | 'searching' | 'results' | 'error';
 type PermissionState = 'unknown' | 'granted' | 'denied' | 'prompt';
 
 export default function FixedAudioRecognition() {
@@ -225,7 +223,45 @@ export default function FixedAudioRecognition() {
     });
   }, [addLog]);
 
-  // Enhanced cleanup
+  
+
+  // WAV recorder using WebAudio + wav-encoder (10s default)
+  const recordWav = useCallback(async (seconds: number = 10): Promise<{ wav: ArrayBuffer; durationSec: number }> => {
+    if (!streamRef.current) {
+      const granted = await requestMicrophonePermission();
+      if (!granted) throw new Error('Microphone permission required');
+    }
+    const ACtor = ((window as Window & typeof globalThis & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext)
+      ?? window.AudioContext;
+    const ctx = new ACtor({ sampleRate: 44100 });
+    const source = ctx.createMediaStreamSource(streamRef.current!);
+    const processor = ctx.createScriptProcessor(4096, 1, 1);
+
+    const chunks: Float32Array[] = [];
+    source.connect(processor);
+    processor.connect(ctx.destination);
+
+    processor.onaudioprocess = (e: AudioProcessingEvent) => {
+      const ch = e.inputBuffer.getChannelData(0);
+      chunks.push(new Float32Array(ch));
+    };
+
+    await new Promise((resolve) => setTimeout(resolve, seconds * 1000));
+
+    processor.disconnect();
+    source.disconnect();
+
+    const length = chunks.reduce((s, c) => s + c.length, 0);
+    const data = new Float32Array(length);
+    let offset = 0;
+    for (const c of chunks) { data.set(c, offset); offset += c.length; }
+
+    const wav = await WavEncoder.encode({ sampleRate: 44100, channelData: [data] });
+    const durationSec = data.length / 44100;
+    await ctx.close();
+    return { wav, durationSec };
+  }, [requestMicrophonePermission]);
+// Enhanced cleanup
   const cleanup = useCallback(() => {
     addLog('Cleaning up audio resources...', 'info');
     
@@ -273,68 +309,10 @@ export default function FixedAudioRecognition() {
     const startTime = Date.now();
 
     try {
-      const mediaRecorder = new MediaRecorder(streamRef.current!, {
-        mimeType: 'audio/webm;codecs=opus'
-      });
-      
-      const audioChunks: Blob[] = [];
-      let recordingProgress = 0;
-      let totalSize = 0;
-      
-      const progressInterval = setInterval(() => {
-        recordingProgress += 1;
-        if (recordingProgress <= 10) {
-          addLog(`🔴 Recording audio... ${recordingProgress}/10 seconds (${Math.round(totalSize / 1024)}KB)`, 'info');
-        }
-      }, 1000);
-      
-      const recordingPromise = new Promise<Blob>((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          reject(new Error('Recording timeout'));
-        }, 12000);
-
-        mediaRecorder.ondataavailable = (event) => {
-          if (event.data.size > 0) {
-            totalSize += event.data.size;
-            audioChunks.push(event.data);
-          }
-        };
-
-        mediaRecorder.onstop = () => {
-          clearTimeout(timeout);
-          clearInterval(progressInterval);
-          
-          if (totalSize === 0) {
-            reject(new Error('No audio data captured - check microphone'));
-            return;
-          }
-          
-          const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-          addLog(`✅ Audio recorded: ${Math.round(audioBlob.size / 1024)}KB`, 'success');
-          resolve(audioBlob);
-        };
-
-        mediaRecorder.onerror = (event) => {
-          clearTimeout(timeout);
-          clearInterval(progressInterval);
-          const error = (event as ErrorEvent).error || new Error('Recording failed');
-          reject(error);
-        };
-      });
-
-      mediaRecorder.start(100);
-      setTimeout(() => {
-        if (mediaRecorder.state === 'recording') {
-          mediaRecorder.stop();
-        }
-      }, 10000);
-
-      const audioBlob = await recordingPromise;
-      
-      const arrayBuffer = await audioBlob.arrayBuffer();
-      const base64Audio = await arrayBufferToBase64(arrayBuffer);
-      
-      setStatus('searching');
+      // NEW: record WAV 10s with WebAudio
+      const { wav } = await recordWav(10);
+      const base64Audio = await arrayBufferToBase64(wav);
+setStatus('searching');
       addLog('🔍 Sending audio to recognition services...', 'info');
 
       const controller = new AbortController();
@@ -450,7 +428,7 @@ export default function FixedAudioRecognition() {
         processingTime: Date.now() - startTime
       });
     }
-  }, [addLog, requestMicrophonePermission, arrayBufferToBase64]);
+  }, [addLog, requestMicrophonePermission, arrayBufferToBase64, recordWav]);
 
   // FIXED: Start countdown for next recognition
   const startCountdown = useCallback(() => {

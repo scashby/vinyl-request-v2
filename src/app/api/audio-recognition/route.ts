@@ -1,14 +1,15 @@
 // src/app/api/audio-recognition/route.ts
-// REAL FIXES - Keep ALL services, fix actual issues
+/* eslint-disable @typescript-eslint/no-explicit-any */
+export const runtime = 'nodejs';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
+import { supabaseAdmin } from 'lib/supabaseAdmin';
+import { searchSpotifyTrack } from 'lib/spotify';
+import { searchLastFMTrack } from 'lib/lastfm';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+type ServiceStatus = 'success' | 'failed' | 'error' | 'skipped';
 
 interface RecognitionMatch {
   artist: string;
@@ -19,767 +20,335 @@ interface RecognitionMatch {
   service: string;
   image_url?: string;
   albumId?: number;
-  processingTime: number;
+  folder?: string;
 }
 
 interface ServiceResult {
   service: string;
-  status: 'success' | 'failed' | 'error' | 'skipped';
+  status: ServiceStatus;
   result?: RecognitionMatch;
   error?: string;
   processingTime: number;
 }
 
-// COLLECTION - Fix the internal API call
-async function checkCollection(audioData: string): Promise<ServiceResult> {
-  const startTime = Date.now();
-  
-  try {
-    console.log('🏆 Collection: Searching collection database...');
-    
-    // Get collection data directly
-    const { data: collection, error } = await supabase
-      .from('collection')
-      .select('id, artist, title, year, image_url, folder')
-      .limit(500);
-    
-    if (error || !collection || collection.length === 0) {
-      return {
-        service: 'Collection',
-        status: 'failed',
-        error: 'No collection data available',
-        processingTime: Date.now() - startTime
-      };
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+
+// Accept wavBase64 OR audioBase64/webmBase64
+function pickAudioFromBody(body: any): { buffer: Buffer; contentType: string; ext: 'wav'|'webm'|'mp3'|'m4a'; durationSec?: number } {
+  let b64: string | undefined;
+  let ext: 'wav'|'webm'|'mp3'|'m4a' = 'webm';
+  let contentType = 'audio/webm';
+
+  if (body?.wavBase64) {
+    b64 = body.wavBase64;
+    ext = 'wav'; contentType = 'audio/wav';
+  } else if (body?.audioData) {
+    b64 = body.audioData;
+    if (typeof b64 === 'string' && b64.startsWith('data:')) {
+      const hdr = b64.split(';',1)[0];
+      if (hdr.includes('webm')) { ext='webm'; contentType='audio/webm'; }
+      else if (hdr.includes('mp3')||hdr.includes('mpeg')) { ext='mp3'; contentType='audio/mpeg'; }
+      else if (hdr.includes('m4a')||hdr.includes('mp4')) { ext='m4a'; contentType='audio/mp4'; }
+    } else {
+      ext='webm'; contentType='audio/webm';
     }
-    
-    // Audio-based matching using buffer characteristics
-    const audioBuffer = Buffer.from(audioData, 'base64');
-    const audioHash = crypto.createHash('sha256').update(audioBuffer.slice(0, 5000)).digest('hex');
-    const audioScore = parseInt(audioHash.substring(0, 8), 16);
-    
-    // Find a match based on audio characteristics
-    for (const album of collection) {
-      const albumString = `${album.artist}${album.title}${album.year}`;
-      const albumHash = crypto.createHash('sha256').update(albumString).digest('hex');
-      const albumScore = parseInt(albumHash.substring(0, 8), 16);
-      
-      const similarity = 1 - (Math.abs(audioScore - albumScore) / 0xFFFFFFFF);
-      
-      if (similarity > 0.7) {
-        const trackNum = (audioScore % 10) + 1;
-        const side = audioScore % 2 === 0 ? 'A' : 'B';
-        
-        console.log(`✅ Collection: Found match - ${album.artist} - ${album.title}`);
-        
-        return {
-          service: 'Collection',
-          status: 'success',
-          result: {
-            artist: album.artist,
-            title: `Side ${side} Track ${trackNum}`,
-            album: album.title,
-            confidence: similarity,
-            source: 'collection',
-            service: 'Collection',
-            albumId: album.id,
-            image_url: album.image_url || undefined,
-            processingTime: Date.now() - startTime
-          },
-          processingTime: Date.now() - startTime
-        };
-      }
-    }
-    
-    return {
-      service: 'Collection',
-      status: 'failed',
-      error: 'No collection match found',
-      processingTime: Date.now() - startTime
-    };
-    
-  } catch (error) {
-    return {
-      service: 'Collection',
-      status: 'error',
-      error: error instanceof Error ? error.message : 'Collection search failed',
-      processingTime: Date.now() - startTime
-    };
+    if (b64.startsWith('data:')) b64 = b64.split(',')[1];
+  } else if (body?.webmBase64) {
+    b64 = body.webmBase64; ext='webm'; contentType='audio/webm';
   }
+
+  if (!b64) throw new Error('No audio provided (expected wavBase64 or audioData/webmBase64).');
+  const buffer = Buffer.from(b64, 'base64');
+  const durationSec = typeof body?.durationSec === 'number' ? body.durationSec : undefined;
+  return { buffer, contentType, ext, durationSec };
 }
 
-// ACRCLOUD - Fixed implementation
-async function checkACRCloud(audioData: string): Promise<ServiceResult> {
-  const startTime = Date.now();
-  
-  if (!process.env.ACRCLOUD_ACCESS_KEY || !process.env.ACRCLOUD_SECRET_KEY) {
-    return {
-      service: 'ACRCloud',
-      status: 'skipped',
-      error: 'Missing environment variables (ACRCLOUD_ACCESS_KEY, ACRCLOUD_SECRET_KEY)',
-      processingTime: Date.now() - startTime
-    };
-  }
-  
-  try {
-    const audioBuffer = Buffer.from(audioData, 'base64');
-    
-    if (audioBuffer.length < 10000) {
-      throw new Error('Audio buffer too small for recognition');
-    }
-    
-    const timestamp = Math.floor(Date.now() / 1000);
-    const stringToSign = `POST\n/v1/identify\n${process.env.ACRCLOUD_ACCESS_KEY}\naudio\n1\n${timestamp}`;
-    const signature = crypto
-      .createHmac('sha1', process.env.ACRCLOUD_SECRET_KEY!)
-      .update(stringToSign)
-      .digest('base64');
+async function uploadSampleAndGetUrl(filename: string, bytes: Buffer, contentType: string): Promise<string> {
+  const path = `samples/${Date.now()}-${filename}`;
+  const { error } = await supabaseAdmin.storage.from('audio-temp').upload(path, bytes, { contentType, upsert: true });
+  if (error) throw new Error(`Supabase upload failed: ${error.message}`);
+  const { data } = supabaseAdmin.storage.from('audio-temp').getPublicUrl(path);
+  return data.publicUrl;
+}
 
-    const formData = new FormData();
-    const audioBlob = new Blob([audioBuffer], { type: 'audio/webm' });
-    formData.append('sample', audioBlob, 'sample.webm');
-    formData.append('sample_bytes', audioBuffer.length.toString());
-    formData.append('access_key', process.env.ACRCLOUD_ACCESS_KEY);
-    formData.append('data_type', 'audio');
-    formData.append('signature_version', '1');
-    formData.append('signature', signature);
-    formData.append('timestamp', timestamp.toString());
+// ACRCloud (WAV only)
+async function checkACRCloud(audio: Buffer, ext: string): Promise<ServiceResult> {
+  const startTime = Date.now();
+  if (!process.env.ACRCLOUD_ACCESS_KEY || !process.env.ACRCLOUD_SECRET_KEY) {
+    return { service: 'ACRCloud', status: 'skipped', error: 'Missing ACRCLOUD keys', processingTime: Date.now()-startTime };
+  }
+  if (ext !== 'wav') {
+    return { service: 'ACRCloud', status: 'skipped', error: 'Sample not WAV; skipping ACRCloud', processingTime: Date.now()-startTime };
+  }
+  try {
+    const ts = Math.floor(Date.now()/1000);
+    const stringToSign = `POST\n/v1/identify\n${process.env.ACRCLOUD_ACCESS_KEY}\naudio\n1\n${ts}`;
+    const signature = crypto.createHmac('sha1', process.env.ACRCLOUD_SECRET_KEY!).update(stringToSign).digest('base64');
+
+    const form = new FormData();
+    form.append('sample', new Blob([audio], { type: 'audio/wav' }), 'sample.wav');
+    form.append('sample_bytes', String(audio.length));
+    form.append('access_key', process.env.ACRCLOUD_ACCESS_KEY!);
+    form.append('data_type', 'audio');
+    form.append('signature_version', '1');
+    form.append('signature', signature);
+    form.append('timestamp', String(ts));
 
     const endpoint = process.env.ACRCLOUD_ENDPOINT || 'identify-eu-west-1.acrcloud.com';
-    const response = await fetch(`https://${endpoint}/v1/identify`, {
-      method: 'POST',
-      body: formData,
-      signal: AbortSignal.timeout(30000)
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${await response.text()}`);
-    }
-
-    const result = await response.json();
-    
-    if (result.status?.code === 0 && result.metadata?.music?.length > 0) {
-      const music = result.metadata.music[0];
-      
+    const res = await fetch(`https://${endpoint}/v1/identify`, { method: 'POST', body: form });
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+    const json = await res.json();
+    if (json.status?.code === 0 && json.metadata?.music?.length > 0) {
+      const m = json.metadata.music[0];
       return {
         service: 'ACRCloud',
         status: 'success',
         result: {
-          artist: music.artists?.[0]?.name || 'Unknown Artist',
-          title: music.title || 'Unknown Title',
-          album: music.album?.name || 'Unknown Album',
-          confidence: 0.95,
+          artist: m.artists?.map((a:any)=>a.name).join(', ') || 'Unknown Artist',
+          title: m.title || 'Unknown Title',
+          album: m.album?.name || 'Unknown Album',
+          confidence: m.score ? Math.min(0.99, m.score/100) : 0.8,
           source: 'acrcloud',
           service: 'ACRCloud',
-          processingTime: Date.now() - startTime
+          image_url: m.album?.coverart
         },
-        processingTime: Date.now() - startTime
+        processingTime: Date.now()-startTime
       };
     }
-    
-    return {
-      service: 'ACRCloud',
-      status: 'failed',
-      error: `No match found (Code: ${result.status?.code})`,
-      processingTime: Date.now() - startTime
-    };
-    
-  } catch (error) {
-    return {
-      service: 'ACRCloud',
-      status: 'error',
-      error: error instanceof Error ? error.message : 'ACRCloud request failed',
-      processingTime: Date.now() - startTime
-    };
+    return { service:'ACRCloud', status:'failed', error:`No match (code ${json.status?.code})`, processingTime: Date.now()-startTime };
+  } catch (e:any) {
+    return { service:'ACRCloud', status:'error', error:e?.message ?? 'ACRCloud failed', processingTime: Date.now()-startTime };
   }
 }
 
-// AUDD - Fixed implementation
-async function checkAudD(audioData: string): Promise<ServiceResult> {
+// AudD via URL
+async function checkAudDByUrl(publicUrl: string): Promise<ServiceResult> {
   const startTime = Date.now();
-  
-  if (!process.env.AUDD_API_TOKEN) {
-    return {
-      service: 'AudD',
-      status: 'skipped',
-      error: 'Missing environment variable (AUDD_API_TOKEN)',
-      processingTime: Date.now() - startTime
-    };
-  }
-  
+  if (!process.env.AUDD_API_TOKEN) return { service:'AudD', status:'skipped', error:'Missing AUDD_API_TOKEN', processingTime: Date.now()-startTime };
   try {
-    const audioBuffer = Buffer.from(audioData, 'base64');
-    
-    if (audioBuffer.length < 10000) {
-      throw new Error('Audio buffer too small for recognition');
-    }
-    
-    const response = await fetch('https://api.audd.io/', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        'api_token': process.env.AUDD_API_TOKEN,
-        'audio': audioData,
-        'return': 'spotify,apple_music',
-        'method': 'recognize'
-      }),
-      signal: AbortSignal.timeout(30000)
+    const params = new URLSearchParams({
+      api_token: process.env.AUDD_API_TOKEN!,
+      method: 'recognize',
+      url: publicUrl,
+      return: 'spotify,apple_music'
     });
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${await response.text()}`);
-    }
-
-    const result = await response.json();
-    
-    if (result.status === 'success' && result.result) {
-      const track = result.result;
-      
+    const res = await fetch('https://api.audd.io/', { method:'POST', body: params });
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+    const json = await res.json();
+    if (json.status === 'success' && json.result) {
+      const t = json.result;
       return {
         service: 'AudD',
         status: 'success',
         result: {
-          artist: track.artist || 'Unknown Artist',
-          title: track.title || 'Unknown Title',
-          album: track.album || 'Unknown Album',
-          confidence: 0.90,
+          artist: t.artist || 'Unknown Artist',
+          title: t.title || 'Unknown Title',
+          album: t.album || 'Unknown Album',
+          confidence: 0.9,
           source: 'audd',
           service: 'AudD',
-          image_url: track.spotify?.album?.images?.[0]?.url,
-          processingTime: Date.now() - startTime
+          image_url: t.spotify?.album?.images?.[0]?.url
         },
-        processingTime: Date.now() - startTime
+        processingTime: Date.now()-startTime
       };
     }
-    
-    return {
-      service: 'AudD',
-      status: 'failed',
-      error: result.error?.error_message || 'No match found',
-      processingTime: Date.now() - startTime
-    };
-    
-  } catch (error) {
-    return {
-      service: 'AudD',
-      status: 'error',
-      error: error instanceof Error ? error.message : 'AudD request failed',
-      processingTime: Date.now() - startTime
-    };
+    return { service:'AudD', status:'failed', error:'No match', processingTime: Date.now()-startTime };
+  } catch (e:any) {
+    return { service:'AudD', status:'error', error: e?.message ?? 'AudD failed', processingTime: Date.now()-startTime };
   }
 }
 
-// SHAZAM - Fixed implementation
-async function checkShazam(audioData: string): Promise<ServiceResult> {
+// Shazam via URL (RapidAPI)
+async function checkShazamByUrl(publicUrl: string): Promise<ServiceResult> {
   const startTime = Date.now();
-  
-  if (!process.env.SHAZAM_RAPID_API_KEY) {
-    return {
-      service: 'Shazam',
-      status: 'skipped',
-      error: 'Missing environment variable (SHAZAM_RAPID_API_KEY)',
-      processingTime: Date.now() - startTime
-    };
-  }
-  
+  if (!process.env.SHAZAM_RAPID_API_KEY) return { service:'Shazam', status:'skipped', error:'Missing SHAZAM_RAPID_API_KEY', processingTime: Date.now()-startTime };
   try {
-    const audioBuffer = Buffer.from(audioData, 'base64');
-    
-    if (audioBuffer.length < 10000) {
-      throw new Error('Audio buffer too small for recognition');
-    }
-    
-    const formData = new FormData();
-    const audioBlob = new Blob([audioBuffer], { type: 'audio/webm' });
-    formData.append('upload_file', audioBlob, 'audio.webm');
-
-    const response = await fetch('https://shazam-song-recognizer.p.rapidapi.com/recognize/file', {
-      method: 'POST',
+    const res = await fetch(`https://shazam-song-recognizer.p.rapidapi.com/recognize?link=${encodeURIComponent(publicUrl)}`, {
+      method:'GET',
       headers: {
-        'X-RapidAPI-Key': process.env.SHAZAM_RAPID_API_KEY,
+        'X-RapidAPI-Key': process.env.SHAZAM_RAPID_API_KEY!,
         'X-RapidAPI-Host': 'shazam-song-recognizer.p.rapidapi.com'
-      },
-      body: formData,
-      signal: AbortSignal.timeout(30000)
-    });
-    
-    if (!response.ok) {
-      if (response.status === 403) {
-        throw new Error('Invalid RapidAPI key or subscription required');
       }
-      throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+    });
+    if (!res.ok) {
+      if (res.status === 403) throw new Error('Invalid RapidAPI key or subscription required');
+      throw new Error(`HTTP ${res.status}: ${await res.text()}`);
     }
-
-    const result = await response.json();
-    
-    if (result.track) {
-      const track = result.track;
-      const albumMetadata = track.sections?.find((s: { type?: string }) => s.type === 'SONG')
-        ?.metadata?.find((m: { title?: string }) => m.title === 'Album');
-      
+    const json = await res.json();
+    const t = json?.result ?? json?.track ?? json;
+    const title = t?.title || t?.track?.title;
+    const artist = t?.subtitle || t?.track?.subtitle || (t?.artists ? t.artists.map((a:any)=>a.name).join(', ') : undefined);
+    const image = t?.images?.coverart || t?.share?.image;
+    if (title || artist) {
       return {
-        service: 'Shazam',
-        status: 'success',
+        service:'Shazam',
+        status:'success',
         result: {
-          artist: track.subtitle || 'Unknown Artist',
-          title: track.title || 'Unknown Title',
-          album: albumMetadata?.text || 'Unknown Album',
-          confidence: 0.92,
+          artist: artist || 'Unknown Artist',
+          title: title || 'Unknown Title',
+          album: 'Unknown Album',
+          confidence: 0.85,
           source: 'shazam',
           service: 'Shazam',
-          image_url: track.images?.coverart,
-          processingTime: Date.now() - startTime
+          image_url: image
         },
-        processingTime: Date.now() - startTime
+        processingTime: Date.now()-startTime
       };
     }
-    
-    return {
-      service: 'Shazam',
-      status: 'failed',
-      error: 'No track identified',
-      processingTime: Date.now() - startTime
-    };
-    
-  } catch (error) {
-    return {
-      service: 'Shazam',
-      status: 'error',
-      error: error instanceof Error ? error.message : 'Shazam request failed',
-      processingTime: Date.now() - startTime
-    };
+    return { service:'Shazam', status:'failed', error:'No match', processingTime: Date.now()-startTime };
+  } catch (e:any) {
+    return { service:'Shazam', status:'error', error: e?.message ?? 'Shazam failed', processingTime: Date.now()-startTime };
   }
 }
 
-// ACOUSTID - Fixed implementation
-async function checkAcoustID(audioData: string): Promise<ServiceResult> {
+// AcoustID (optional) — use dynamic imports so TS doesn't require types
+async function checkAcoustIDWithChromaprintIfAvailable(wav: Buffer, durationSec?: number): Promise<ServiceResult> {
   const startTime = Date.now();
-  
-  if (!process.env.ACOUSTID_CLIENT_KEY) {
-    return {
-      service: 'AcoustID',
-      status: 'skipped',
-      error: 'Missing environment variable (ACOUSTID_CLIENT_KEY)',
-      processingTime: Date.now() - startTime
-    };
-  }
-  
+  if (!process.env.ACOUSTID_CLIENT_KEY) return { service:'AcoustID', status:'skipped', error:'Missing ACOUSTID_CLIENT_KEY', processingTime: Date.now()-startTime };
   try {
-    const audioBuffer = Buffer.from(audioData, 'base64');
-    
-    if (audioBuffer.length < 10000) {
-      throw new Error('Audio buffer too small for fingerprinting');
+    const wavDecoder = await (new Function("return import('wav-decoder')"))().catch(() => null) as any;
+    const chroma = await (new Function("return import('chromaprint-wasm')"))().catch(() => null) as any;
+    if (!wavDecoder || !chroma) {
+      return { service:'AcoustID', status:'skipped', error:'Chromaprint/WAV decoder not installed', processingTime: Date.now()-startTime };
     }
-    
-    // Better fingerprint generation
-    const hash = crypto.createHash('sha256').update(audioBuffer).digest('hex');
-    const fingerprintParts = [];
-    
-    for (let i = 0; i < Math.min(hash.length, 64); i += 8) {
-      const chunk = hash.substring(i, i + 8);
-      const intVal = parseInt(chunk, 16);
-      fingerprintParts.push(intVal.toString(36));
+    const audio = await wavDecoder.decode(wav);
+    const sampleRate: number = audio.sampleRate;
+    const pcm: Float32Array = audio.channelData[0];
+    const { Chromaprint } = chroma;
+    const ctx = await Chromaprint.create();
+    await ctx.configure(sampleRate, 1);
+    const CHUNK = 8192;
+    for (let i = 0; i < pcm.length; i += CHUNK) {
+      await ctx.feed(pcm.subarray(i, Math.min(i + CHUNK, pcm.length)));
     }
-    
-    const fingerprint = fingerprintParts.join('');
-    const duration = Math.max(10, Math.floor(audioBuffer.length / 8000));
-    
-    const response = await fetch('https://api.acoustid.org/v2/lookup', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        'client': process.env.ACOUSTID_CLIENT_KEY,
-        'duration': duration.toString(),
-        'fingerprint': fingerprint,
-        'meta': 'recordings+releasegroups+releases+tracks'
-      }),
-      signal: AbortSignal.timeout(30000)
-    });
-    
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${await response.text()}`);
-    }
+    const fingerprint: string = await ctx.finish();
+    const dur = Math.round(durationSec || (pcm.length / sampleRate));
 
-    const result = await response.json();
-    
-    if (result.status === 'ok' && result.results?.length > 0) {
-      const match = result.results[0];
-      if (match.recordings?.length > 0) {
-        const recording = match.recordings[0];
-        
-        return {
-          service: 'AcoustID',
-          status: 'success',
-          result: {
-            artist: recording.artists?.[0]?.name || 'Unknown Artist',
-            title: recording.title || 'Unknown Title',
-            album: recording.releases?.[0]?.title || 'Unknown Album',
-            confidence: 0.85,
-            source: 'acoustid',
-            service: 'AcoustID',
-            processingTime: Date.now() - startTime
-          },
-          processingTime: Date.now() - startTime
-        };
-      }
+    const params = new URLSearchParams({
+      client: process.env.ACOUSTID_CLIENT_KEY!,
+      fingerprint,
+      duration: String(dur),
+      meta: 'recordings+releases+releasegroups'
+    });
+    const res = await fetch('https://api.acoustid.org/v2/lookup', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/x-www-form-urlencoded' },
+      body: params
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+    const data = await res.json();
+    const best = data?.results?.[0];
+    const rec = best?.recordings?.[0];
+    if (rec) {
+      return { service:'AcoustID', status:'success', result: {
+        artist: (rec.artists || []).map((a:any)=>a.name).join(', ') || 'Unknown Artist',
+        title: rec.title || 'Unknown Title',
+        album: (rec.releasegroups || rec.releases || [])[0]?.title || 'Unknown Album',
+        confidence: Math.min(0.95, (best?.score || 0.7)),
+        source: 'acoustid',
+        service: 'AcoustID'
+      }, processingTime: Date.now()-startTime };
     }
-    
-    return {
-      service: 'AcoustID',
-      status: 'failed',
-      error: 'No fingerprint match found',
-      processingTime: Date.now() - startTime
-    };
-    
-  } catch (error) {
-    return {
-      service: 'AcoustID',
-      status: 'error',
-      error: error instanceof Error ? error.message : 'AcoustID request failed',
-      processingTime: Date.now() - startTime
-    };
+    return { service:'AcoustID', status:'failed', error:'No match', processingTime: Date.now()-startTime };
+  } catch (e:any) {
+    return { service:'AcoustID', status:'error', error: e?.message ?? 'AcoustID failed', processingTime: Date.now()-startTime };
   }
 }
 
-// Last.fm - Fixed implementation
-async function checkLastFm(audioData: string): Promise<ServiceResult> {
+// Collection lookup
+async function checkCollectionByMetadata(candidate?: { artist?: string; title?: string }): Promise<ServiceResult> {
   const startTime = Date.now();
-  
-  if (!process.env.LASTFM_API_KEY) {
-    return {
-      service: 'Last.fm',
-      status: 'skipped',
-      error: 'Missing environment variable (LASTFM_API_KEY)',
-      processingTime: Date.now() - startTime
-    };
-  }
-  
   try {
-    // Last.fm doesn't do audio recognition, but we can simulate smart search
-    const audioBuffer = Buffer.from(audioData, 'base64');
-    const audioHash = crypto.createHash('md5').update(audioBuffer.slice(0, 3000)).digest('hex');
-    
-    // Use audio characteristics to search for popular tracks
-    const searchQuery = `popular tracks ${audioHash.substring(0, 2)}`;
-    
-    const response = await fetch(`https://ws.audioscrobbler.com/2.0/?method=track.search&track=${encodeURIComponent(searchQuery)}&api_key=${process.env.LASTFM_API_KEY}&format=json&limit=5`, {
-      signal: AbortSignal.timeout(15000)
-    });
-    
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+    if (!candidate?.artist || !candidate?.title) {
+      return { service:'Collection', status:'failed', error:'No metadata to match', processingTime: Date.now()-startTime };
     }
-    
-    const result = await response.json();
-    
-    if (result.results?.trackmatches?.track?.length > 0) {
-      const track = result.results.trackmatches.track[0];
-      
-      return {
-        service: 'Last.fm',
-        status: 'success',
-        result: {
-          artist: track.artist || 'Unknown Artist',
-          title: track.name || 'Unknown Title',
-          album: 'Unknown Album',
-          confidence: 0.75,
-          source: 'lastfm',
-          service: 'Last.fm',
-          processingTime: Date.now() - startTime
-        },
-        processingTime: Date.now() - startTime
-      };
+    const artist = candidate.artist.trim();
+    const title = candidate.title.trim();
+    const { data, error } = await supabase
+      .from('collection')
+      .select('id, artist, title, year, image_url, folder')
+      .in('folder', ['Vinyl', 'Cassettes'])
+      .or(`artist.ilike.%${artist}%,title.ilike.%${title}%`)
+      .limit(20);
+    if (error) throw error;
+
+    const scored = (data ?? []).map(row => {
+      const a = (row.artist || '').toLowerCase();
+      const t = (row.title || '').toLowerCase();
+      const at = artist.toLowerCase();
+      const tt = title.toLowerCase();
+      let score = 0;
+      if (a === at) score += 60; else if (a.startsWith(at)) score += 35; else if (a.includes(at)) score += 20;
+      if (t === tt) score += 60; else if (t.startsWith(tt)) score += 35; else if (t.includes(tt)) score += 20;
+      return { row, score };
+    }).sort((x,y)=>y.score-x.score);
+
+    if (!scored.length || scored[0].score < 50) {
+      return { service:'Collection', status:'failed', error:'Not in collection', processingTime: Date.now()-startTime };
     }
-    
-    return {
-      service: 'Last.fm',
-      status: 'failed',
-      error: 'No matches found in Last.fm database',
-      processingTime: Date.now() - startTime
-    };
-    
-  } catch (error) {
-    return {
-      service: 'Last.fm',
-      status: 'error',
-      error: error instanceof Error ? error.message : 'Last.fm request failed',
-      processingTime: Date.now() - startTime
-    };
+    const best: any = scored[0].row;
+    return { service:'Collection', status:'success', result: {
+      artist: best.artist || 'Unknown Artist',
+      title: best.title || 'Unknown Title',
+      album: best.title || 'Unknown Album',
+      albumId: best.id,
+      confidence: Math.min(0.99, scored[0].score/100),
+      source: 'collection',
+      service: 'Collection',
+      image_url: best.image_url || undefined,
+      folder: best.folder || undefined
+    }, processingTime: Date.now()-startTime };
+  } catch (e:any) {
+    return { service:'Collection', status:'error', error: e?.message ?? 'Collection lookup failed', processingTime: Date.now()-startTime };
   }
 }
 
-// Spotify - Fixed implementation
-async function checkSpotify(audioData: string): Promise<ServiceResult> {
+export async function POST(req: NextRequest) {
   const startTime = Date.now();
-  
-  if (!process.env.SPOTIFY_CLIENT_ID || !process.env.SPOTIFY_CLIENT_SECRET) {
-    return {
-      service: 'Spotify',
-      status: 'skipped',
-      error: 'Missing environment variables (SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET)',
-      processingTime: Date.now() - startTime
-    };
-  }
-  
   try {
-    // Get Spotify access token
-    const tokenResponse = await fetch('https://accounts.spotify.com/api/token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': `Basic ${Buffer.from(`${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`).toString('base64')}`
-      },
-      body: 'grant_type=client_credentials',
-      signal: AbortSignal.timeout(15000)
-    });
-    
-    if (!tokenResponse.ok) {
-      throw new Error('Failed to get Spotify access token');
-    }
-    
-    const tokenData = await tokenResponse.json();
-    const accessToken = tokenData.access_token;
-    
-    // Use audio characteristics to search
-    const audioBuffer = Buffer.from(audioData, 'base64');
-    const audioHash = crypto.createHash('sha1').update(audioBuffer.slice(0, 4000)).digest('hex');
-    const searchTerm = `track genre:rock year:${1970 + (parseInt(audioHash.substring(0, 2), 16) % 50)}`;
-    
-    const searchResponse = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(searchTerm)}&type=track&limit=5`, {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`
-      },
-      signal: AbortSignal.timeout(15000)
-    });
-    
-    if (!searchResponse.ok) {
-      throw new Error(`Spotify search failed: ${searchResponse.status}`);
-    }
-    
-    const searchResult = await searchResponse.json();
-    
-    if (searchResult.tracks?.items?.length > 0) {
-      const track = searchResult.tracks.items[0];
-      
-      return {
-        service: 'Spotify',
-        status: 'success',
-        result: {
-          artist: track.artists?.[0]?.name || 'Unknown Artist',
-          title: track.name || 'Unknown Title',
-          album: track.album?.name || 'Unknown Album',
-          confidence: 0.80,
-          source: 'spotify',
-          service: 'Spotify',
-          image_url: track.album?.images?.[0]?.url,
-          processingTime: Date.now() - startTime
-        },
-        processingTime: Date.now() - startTime
-      };
-    }
-    
-    return {
-      service: 'Spotify',
-      status: 'failed',
-      error: 'No matches found in Spotify catalog',
-      processingTime: Date.now() - startTime
-    };
-    
-  } catch (error) {
-    return {
-      service: 'Spotify',
-      status: 'error',
-      error: error instanceof Error ? error.message : 'Spotify request failed',
-      processingTime: Date.now() - startTime
-    };
-  }
-}
+    const body = await req.json();
+    const { buffer, contentType, ext, durationSec } = pickAudioFromBody(body);
+    if (buffer.length < 4096) return NextResponse.json({ success:false, error:'Audio too small' }, { status: 400 });
 
-// Main recognition function - ALL SERVICES
-async function performRecognition(audioData: string) {
-  const startTime = Date.now();
-  const serviceResults: ServiceResult[] = [];
-  const successfulResults: RecognitionMatch[] = [];
-  
-  console.log('🎵 Starting audio recognition with ALL services...');
-  
-  // Run ALL services in parallel
-  const results = await Promise.allSettled([
-    checkCollection(audioData),
-    checkACRCloud(audioData),
-    checkAudD(audioData),
-    checkShazam(audioData),
-    checkAcoustID(audioData),
-    checkLastFm(audioData),
-    checkSpotify(audioData)
-  ]);
-  
-  const services = ['Collection', 'ACRCloud', 'AudD', 'Shazam', 'AcoustID', 'Last.fm', 'Spotify'];
-  
-  results.forEach((result, index) => {
-    if (result.status === 'fulfilled') {
-      serviceResults.push(result.value);
-      if (result.value.status === 'success' && result.value.result) {
-        successfulResults.push(result.value.result);
-      }
-    } else {
-      serviceResults.push({
-        service: services[index],
-        status: 'error',
-        error: result.reason?.message || 'Service failed',
-        processingTime: 0
-      });
+    const publicUrl = await uploadSampleAndGetUrl(`sample.${ext}`, buffer, contentType);
+
+    const [acr, audd, shazam, acoust] = await Promise.all([
+      checkACRCloud(buffer, ext),
+      checkAudDByUrl(publicUrl),
+      checkShazamByUrl(publicUrl),
+      ext === 'wav' ? checkAcoustIDWithChromaprintIfAvailable(buffer, durationSec) : Promise.resolve({ service:'AcoustID', status:'skipped', error:'Not WAV', processingTime:0 } as ServiceResult)
+    ]);
+
+    const serviceResults: ServiceResult[] = [acr, audd, shazam, acoust];
+
+    const candidates = serviceResults.filter(s => s.status==='success').map(s => s.result!) as RecognitionMatch[];
+    let best: RecognitionMatch | undefined = candidates[0];
+    if (candidates.length > 1) {
+      const order: Record<string, number> = { 'ACRCloud':0, 'AudD':1, 'Shazam':2, 'AcoustID':3 };
+      candidates.sort((a,b)=> (order[a.service]??9) - (order[b.service]??9));
+      best = candidates[0];
     }
-  });
 
-  const processingTime = Date.now() - startTime;
-  
-  console.log(`=== Recognition Results ===`);
-  console.log(`Successful matches: ${successfulResults.length}/${serviceResults.length}`);
-  
-  serviceResults.forEach(service => {
-    const status = service.status === 'success' ? '✅' : 
-                  service.status === 'failed' ? '⚠️' : 
-                  service.status === 'error' ? '❌' : '⏸️';
-    console.log(`${status} ${service.service}: ${service.status}`);
-    if (service.error) console.log(`   Error: ${service.error}`);
-  });
+    const alternatives: RecognitionMatch[] = [];
+    if (best?.artist && best?.title) {
+      const [sp, lf, coll] = await Promise.all([
+        searchSpotifyTrack(best.artist, best.title),
+        searchLastFMTrack(best.artist, best.title),
+        checkCollectionByMetadata(best)
+      ]);
+      if (sp) alternatives.push(sp as any);
+      if (lf) alternatives.push(lf as any);
+      if (coll.status === 'success' && coll.result) alternatives.push(coll.result);
+    }
 
-  if (successfulResults.length > 0) {
-    // Auto-select best result (Collection first, then by confidence)
-    const autoSelected = successfulResults.sort((a, b) => {
-      if (a.source === 'collection' && b.source !== 'collection') return -1;
-      if (b.source === 'collection' && a.source !== 'collection') return 1;
-      return b.confidence - a.confidence;
-    })[0];
-    
-    const alternatives = successfulResults.filter(r => r !== autoSelected);
-    
-    console.log(`✅ Auto-selected: ${autoSelected.service} - ${autoSelected.artist} - ${autoSelected.title}`);
-    
-    return {
-      success: true,
-      autoSelected,
+    return NextResponse.json({
+      success: Boolean(best),
+      autoSelected: best || null,
       alternatives,
       serviceResults,
-      processingTime
-    };
-  }
-  
-  return {
-    success: false,
-    error: 'No matches found from any service',
-    serviceResults,
-    processingTime
-  };
-}
-
-export async function GET() {
-  return NextResponse.json({
-    success: true,
-    message: "Complete Audio Recognition API - All Services",
-    version: "3.0.0",
-    services: ['Collection', 'ACRCloud', 'AudD', 'Shazam', 'AcoustID', 'Last.fm', 'Spotify'],
-    status: "All systems operational"
-  });
-}
-
-export async function POST(request: NextRequest) {
-  const startTime = Date.now();
-  
-  try {
-    const body = await request.json();
-    const { audioData, triggeredBy = 'manual' } = body;
-    
-    if (!audioData) {
-      return NextResponse.json({
-        success: false,
-        error: "No audio data provided"
-      }, { status: 400 });
-    }
-    
-    // Validate audio data
-    try {
-      const audioBuffer = Buffer.from(audioData, 'base64');
-      if (audioBuffer.length < 5000) {
-        return NextResponse.json({
-          success: false,
-          error: "Audio data too small for recognition (minimum 5KB required)"
-        }, { status: 400 });
-      }
-      console.log(`🎵 Processing audio: ${Math.round(audioBuffer.length / 1024)}KB`);
-    } catch {
-      return NextResponse.json({
-        success: false,
-        error: "Invalid base64 audio data"
-      }, { status: 400 });
-    }
-    
-    // Perform recognition with ALL services
-    const recognition = await performRecognition(audioData);
-    
-    // Update database if successful
-    if (recognition.success && recognition.autoSelected) {
-      console.log('✅ Recognition successful, updating database...');
-      
-      // Update now_playing table
-      const { error: nowPlayingError } = await supabase
-        .from('now_playing')
-        .upsert({
-          id: 1,
-          artist: recognition.autoSelected.artist,
-          title: recognition.autoSelected.title,
-          album_title: recognition.autoSelected.album,
-          album_id: recognition.autoSelected.albumId || null,
-          recognition_image_url: recognition.autoSelected.image_url,
-          started_at: new Date().toISOString(),
-          recognition_confidence: recognition.autoSelected.confidence,
-          service_used: recognition.autoSelected.service,
-          updated_at: new Date().toISOString()
-        });
-      
-      if (nowPlayingError) {
-        console.error('❌ Now playing update failed:', nowPlayingError);
-      } else {
-        console.log('✅ Now playing table updated successfully');
-      }
-      
-      // Log the recognition
-      await supabase
-        .from('audio_recognition_logs')
-        .insert({
-          artist: recognition.autoSelected.artist,
-          title: recognition.autoSelected.title,
-          album: recognition.autoSelected.album,
-          source: recognition.autoSelected.source,
-          service: recognition.autoSelected.service,
-          confidence: recognition.autoSelected.confidence,
-          confirmed: false,
-          match_source: recognition.autoSelected.source === 'collection' ? 'collection' : 'external',
-          matched_id: recognition.autoSelected.albumId || null,
-          now_playing: true,
-          raw_response: recognition,
-          created_at: new Date().toISOString()
-        });
-    }
-    
-    return NextResponse.json({
-      ...recognition,
-      totalProcessingTime: Date.now() - startTime,
-      triggeredBy,
-      timestamp: new Date().toISOString(),
-      databaseUpdated: recognition.success && !!recognition.autoSelected
+      processingTime: Date.now()-startTime
     });
-    
-  } catch (error) {
-    return NextResponse.json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-      processingTime: Date.now() - startTime,
-      serviceResults: []
-    }, { status: 500 });
+  } catch (e:any) {
+    return NextResponse.json({ success:false, error: e?.message ?? 'Recognition failed' }, { status: 500 });
   }
 }
