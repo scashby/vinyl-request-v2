@@ -21,7 +21,7 @@
     "react-dom": "^19.1.0",
     "react-icons": "^5.5.0",
     "rss-parser": "^3.13.0",
-    "chromaprint-wasm": "^3.0.1",
+    "chromaprint-wasm": "^0.1.4",
     "wav-encoder": "^1.3.1",
     "wav-decoder": "^1.3.2"
   },
