@@ -86,7 +86,7 @@ async function checkACRCloud(audio: Buffer, ext: string): Promise<ServiceResult>
     const signature = crypto.createHmac('sha1', process.env.ACRCLOUD_SECRET_KEY!).update(stringToSign).digest('base64');
 
     const form = new FormData();
-    form.append('sample', new Blob([audio], { type: 'audio/wav' }), 'sample.wav');
+    form.append('sample', new Blob([new Uint8Array(audio)], { type: 'audio/wav' }), 'sample.wav');
     form.append('sample_bytes', String(audio.length));
     form.append('access_key', process.env.ACRCLOUD_ACCESS_KEY!);
     form.append('data_type', 'audio');
