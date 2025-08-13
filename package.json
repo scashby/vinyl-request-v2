@@ -12,6 +12,7 @@
   "dependencies": {
     "@supabase/auth-helpers-nextjs": "^0.10.0",
     "@supabase/supabase-js": "^2.50.0",
+    "@unimusic/chromaprint": "^0.1.4",
     "@vercel/analytics": "^1.5.0",
     "axios": "^1.10.0",
     "crypto": "^1.0.1",
@@ -21,9 +22,7 @@
     "react-dom": "^19.1.0",
     "react-icons": "^5.5.0",
     "rss-parser": "^3.13.0",
-    "chromaprint-wasm": "^0.1.4",
-    "wav-encoder": "^1.3.1",
-    "wav-decoder": "^1.3.2"
+    "wav-decoder": "^1.3.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
