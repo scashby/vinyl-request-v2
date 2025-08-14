@@ -17,6 +17,11 @@ export default function AdminSidebar() {
 
   const navItems: NavItem[] = [
     { label: "Dashboard", path: "/admin/admin-dashboard" },
+    
+    // Audio Recognition Section
+    { label: "Audio Recognition", path: "/admin/audio-recognition", isNew: true },
+    
+    // Event Management
     { label: "Manage Events", path: "/admin/manage-events" },
     { label: "Manage Queues", path: "/admin/edit-queue" },
     
@@ -31,7 +36,6 @@ export default function AdminSidebar() {
     { label: "Social Embeds", path: "/admin/socials" },
     
     // Quick Links
-
     { label: "Logout", path: "/" },
   ];
 
@@ -59,30 +63,56 @@ export default function AdminSidebar() {
                 `}
               >
                 <span className="flex-1">{item.label}</span>
-                
-
+                {item.isNew && (
+                  <span className="text-xs bg-green-500 text-white px-2 py-1 rounded-full">
+                    NEW
+                  </span>
+                )}
               </Link>
-              
             </li>
           );
         })}
       </ul>
-      
 
-        
-
-        {/* Quick Actions */}
-        <div className="mt-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
-          <h4 className="text-sm font-semibold text-purple-800 mb-2">Quick Actions</h4>
-          <div className="space-y-2">
-            <Link 
-              href="/admin/edit-collection"
-              className="block w-full text-center bg-green-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-green-700 transition-colors"
-            >
-              📚 Edit Collection
-            </Link>
-          </div>
+      {/* Audio Recognition Quick Actions */}
+      <div className="mt-6 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+        <h4 className="text-sm font-semibold text-purple-800 mb-2">🎵 Audio Recognition</h4>
+        <div className="space-y-2">
+          <Link 
+            href="/admin/audio-recognition"
+            className="block w-full text-center bg-purple-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-purple-700 transition-colors"
+          >
+            🎧 Control Panel
+          </Link>
+          <Link 
+            href="/admin/audio-recognition/display"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block w-full text-center bg-gray-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-gray-700 transition-colors"
+          >
+            📺 TV Display
+          </Link>
         </div>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+        <h4 className="text-sm font-semibold text-green-800 mb-2">Quick Actions</h4>
+        <div className="space-y-2">
+          <Link 
+            href="/admin/edit-collection"
+            className="block w-full text-center bg-green-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-green-700 transition-colors"
+          >
+            📚 Edit Collection
+          </Link>
+          <Link 
+            href="/admin/add-album"
+            className="block w-full text-center bg-blue-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-blue-700 transition-colors"
+          >
+            ➕ Add Album
+          </Link>
+        </div>
+      </div>
     </div>
   );
 }
