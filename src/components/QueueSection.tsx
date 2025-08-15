@@ -156,8 +156,8 @@ export default function QueueSection({ eventId }: QueueSectionProps) {
               <th></th>
               <th>Album / Artist</th>
               <th>Side</th>
-              <th></th>
-              <th></th>
+              <th>Upvote</th>
+              <th>Votes</th>
             </tr>
           </thead>
           <tbody>
