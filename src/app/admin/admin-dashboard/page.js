@@ -51,28 +51,28 @@ export default function AdminDashboardPage() {
         events: 'pending'
       };
 
-      // Test audio recognition tables
+      // Test audio recognition tables - FIXED SYNTAX
       try {
-        await supabase.from('now_playing').select('count(*)').limit(1);
-        await supabase.from('audio_recognition_logs').select('count(*)').limit(1);
+        await supabase.from('now_playing').select('id', { head: true, count: 'exact' }).limit(1);
+        await supabase.from('audio_recognition_logs').select('id', { head: true, count: 'exact' }).limit(1);
         dbTests.audioRecognition = 'success';
       } catch (error) {
         dbTests.audioRecognition = 'error';
         console.error('Audio recognition DB test failed:', error);
       }
 
-      // Test collection table
+      // Test collection table - FIXED SYNTAX
       try {
-        await supabase.from('collection').select('count(*)').limit(1);
+        await supabase.from('collection').select('id', { head: true, count: 'exact' }).limit(1);
         dbTests.collection = 'success';
       } catch (error) {
         dbTests.collection = 'error';
         console.error('Collection DB test failed:', error);
       }
 
-      // Test events table
+      // Test events table - FIXED SYNTAX
       try {
-        await supabase.from('events').select('count(*)').limit(1);
+        await supabase.from('events').select('id', { head: true, count: 'exact' }).limit(1);
         dbTests.events = 'success';
       } catch (error) {
         dbTests.events = 'error';
@@ -80,15 +80,16 @@ export default function AdminDashboardPage() {
       }
 
       setDbTestResults(dbTests);
-      // Get collection stats
+
+      // Get collection stats - FIXED SYNTAX
       const { count: albumCount } = await supabase
         .from('collection')
-        .select('*', { count: 'exact', head: true });
+        .select('id', { count: 'exact', head: true });
 
-      // Get events stats
+      // Get events stats - FIXED SYNTAX
       const { count: totalEventsCount } = await supabase
         .from('events')
-        .select('*', { count: 'exact', head: true });
+        .select('id', { count: 'exact', head: true });
 
       // Get upcoming events (next 30 days)
       const today = new Date().toISOString().split('T')[0];
@@ -188,8 +189,6 @@ export default function AdminDashboardPage() {
       weekday: 'short'
     });
   };
-
-
 
   const getTimeAgo = (dateString) => {
     if (!dateString) return 'Unknown time';
@@ -433,6 +432,8 @@ export default function AdminDashboardPage() {
           </div>
         )}
       </div>
+
+      {/* Stats Grid */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
