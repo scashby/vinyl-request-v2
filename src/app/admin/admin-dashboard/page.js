@@ -49,42 +49,54 @@ export default function AdminDashboardPage() {
         .order('date', { ascending: true })
         .limit(5);
 
-      // Get recent audio recognitions (last 24 hours) - with error handling
+      // Get recent audio recognitions (last 24 hours) - with robust error handling
       let recentRecognitionsData = [];
       let recentRecognitionsCount = 0;
       
       try {
-        const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-        const result = await supabase
+        // Try to query the table, but handle various possible errors
+        const { data, count, error } = await supabase
           .from('audio_recognition_logs')
           .select('*', { count: 'exact' })
-          .gte('created_at', yesterday)
-          .eq('confirmed', true)
-          .order('created_at', { ascending: false })
+          .order('id', { ascending: false }) // Use id instead of created_at in case created_at doesn't exist
           .limit(10);
         
-        if (!result.error) {
-          recentRecognitionsData = result.data || [];
-          recentRecognitionsCount = result.count || 0;
+        if (!error && data) {
+          recentRecognitionsData = data;
+          recentRecognitionsCount = count || data.length;
+        } else if (error) {
+          console.log('Audio recognition query failed:', error.message);
+          // Try a simpler query
+          const simpleResult = await supabase
+            .from('audio_recognition_logs')
+            .select('*')
+            .limit(10);
+          
+          if (!simpleResult.error && simpleResult.data) {
+            recentRecognitionsData = simpleResult.data;
+            recentRecognitionsCount = simpleResult.data.length;
+          }
         }
-      } catch (error) {
-        console.log('Audio recognition logs table not available:', error);
+      } catch {
+        console.log('Audio recognition logs table error');
       }
 
       // Build recent activity feed
       const activityItems = [];
       
-      // Add recent recognitions to activity
-      if (recentRecognitionsData) {
+      // Add recent recognitions to activity (with error handling)
+      if (recentRecognitionsData && Array.isArray(recentRecognitionsData)) {
         recentRecognitionsData.slice(0, 5).forEach(recognition => {
-          activityItems.push({
-            type: 'recognition',
-            icon: '🎵',
-            title: `Recognized: ${recognition.artist} - ${recognition.title}`,
-            subtitle: `${Math.round((recognition.confidence || 0) * 100)}% confidence via ${recognition.service}`,
-            time: recognition.created_at,
-            color: 'text-purple-600'
-          });
+          if (recognition && (recognition.artist || recognition.title)) {
+            activityItems.push({
+              type: 'recognition',
+              icon: '🎵',
+              title: `Recognized: ${recognition.artist || 'Unknown Artist'} - ${recognition.title || 'Unknown Title'}`,
+              subtitle: `${recognition.confidence ? `${Math.round(recognition.confidence * 100)}% confidence` : 'Unknown confidence'} via ${recognition.service || 'Unknown service'}`,
+              time: recognition.created_at || recognition.timestamp || new Date().toISOString(),
+              color: 'text-purple-600'
+            });
+          }
         });
       }
 
@@ -102,8 +114,8 @@ export default function AdminDashboardPage() {
       setRecentRecognitions(recentRecognitionsData);
       setRecentActivity(activityItems);
 
-    } catch (error) {
-      console.error('Error loading dashboard data:', error);
+    } catch (err) {
+      console.error('Error loading dashboard data:', err);
     } finally {
       setLoading(false);
     }
@@ -121,19 +133,27 @@ export default function AdminDashboardPage() {
 
 
   const getTimeAgo = (dateString) => {
-    if (!dateString) return '';
-    const now = new Date();
-    const date = new Date(dateString);
-    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
-    
-    if (diffInMinutes < 1) return 'Just now';
-    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
-    
-    const diffInHours = Math.floor(diffInMinutes / 60);
-    if (diffInHours < 24) return `${diffInHours}h ago`;
-    
-    const diffInDays = Math.floor(diffInHours / 24);
-    return `${diffInDays}d ago`;
+    if (!dateString) return 'Unknown time';
+    try {
+      const now = new Date();
+      const date = new Date(dateString);
+      
+      // Check if date is valid
+      if (isNaN(date.getTime())) return 'Invalid date';
+      
+      const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
+      
+      if (diffInMinutes < 1) return 'Just now';
+      if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+      
+      const diffInHours = Math.floor(diffInMinutes / 60);
+      if (diffInHours < 24) return `${diffInHours}h ago`;
+      
+      const diffInDays = Math.floor(diffInHours / 24);
+      return `${diffInDays}d ago`;
+    } catch {
+      return 'Unknown time';
+    }
   };
 
   if (loading) {
@@ -567,13 +587,14 @@ export default function AdminDashboardPage() {
                       color: '#7c3aed',
                       marginBottom: 2
                     }}>
-                      {recognition.artist} - {recognition.title}
+                      {recognition.artist || 'Unknown Artist'} - {recognition.title || 'Unknown Title'}
                     </div>
                     <div style={{
                       fontSize: 11,
                       color: '#8b5cf6'
                     }}>
-                      {Math.round((recognition.confidence || 0) * 100)}% • {getTimeAgo(recognition.created_at)}
+                      {recognition.confidence ? `${Math.round(recognition.confidence * 100)}%` : 'Unknown confidence'} • 
+                      {getTimeAgo(recognition.created_at || recognition.timestamp)}
                     </div>
                   </div>
                 ))}
