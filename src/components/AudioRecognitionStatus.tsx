@@ -80,10 +80,15 @@ export default function AudioRecognitionStatus({ compact = false }: AudioRecogni
           // No rows returned - this is fine
           setCurrentTrack(null);
           setHasError(false);
-        } else {
-          // Actual error (like table doesn't exist)
+        } else if (error.message?.includes('406') || error.message?.includes('Not Acceptable')) {
+          // RLS policy issue
           setHasError(true);
-          setErrorMessage('Audio recognition database not set up');
+          setErrorMessage('Database permissions issue - check RLS policies');
+          console.error('RLS/406 error loading current track:', error);
+        } else {
+          // Other error (like table doesn't exist)
+          setHasError(true);
+          setErrorMessage('Audio recognition database not properly configured');
           console.error('Error loading current track:', error);
         }
       } else {
@@ -91,8 +96,14 @@ export default function AudioRecognitionStatus({ compact = false }: AudioRecogni
         setHasError(false);
       }
     } catch (error) {
-      setHasError(true);
-      setErrorMessage('Failed to connect to audio recognition system');
+      // Network or other errors
+      if (error.message?.includes('406')) {
+        setHasError(true);
+        setErrorMessage('Database permissions issue - check RLS policies');
+      } else {
+        setHasError(true);
+        setErrorMessage('Failed to connect to audio recognition system');
+      }
       setCurrentTrack(null);
       console.error('Exception loading current track:', error);
     }

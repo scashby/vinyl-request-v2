@@ -66,15 +66,21 @@ export default function AdminDashboardPage() {
           recentRecognitionsCount = count || data.length;
         } else if (error) {
           console.log('Audio recognition query failed:', error.message);
-          // Try a simpler query
-          const simpleResult = await supabase
-            .from('audio_recognition_logs')
-            .select('*')
-            .limit(10);
           
-          if (!simpleResult.error && simpleResult.data) {
-            recentRecognitionsData = simpleResult.data;
-            recentRecognitionsCount = simpleResult.data.length;
+          // Check if it's a 406/RLS issue
+          if (error.message?.includes('406') || error.message?.includes('Not Acceptable')) {
+            console.log('RLS policy issue detected - audio recognition may need permission fixes');
+          } else {
+            // Try a simpler query
+            const simpleResult = await supabase
+              .from('audio_recognition_logs')
+              .select('*')
+              .limit(10);
+            
+            if (!simpleResult.error && simpleResult.data) {
+              recentRecognitionsData = simpleResult.data;
+              recentRecognitionsCount = simpleResult.data.length;
+            }
           }
         }
       } catch {
@@ -294,26 +300,28 @@ export default function AdminDashboardPage() {
               }}>
                 <div style={{ fontSize: 32, marginBottom: 12 }}>🎧</div>
                 <div style={{ color: '#6b7280', marginBottom: 8 }}>
-                  Audio Recognition Not Set Up
+                  Audio Recognition System
                 </div>
                 <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 16 }}>
-                  The audio recognition tables need to be created in your database
+                  Tables created but may need permission fixes (check for 406 errors)
                 </div>
-                <Link
-                  href="/admin/audio-recognition"
-                  style={{
-                    display: 'inline-block',
-                    padding: '8px 16px',
-                    background: '#8b5cf6',
-                    color: 'white',
-                    borderRadius: 6,
-                    textDecoration: 'none',
-                    fontSize: 14,
-                    fontWeight: 600
-                  }}
-                >
-                  Set Up Audio Recognition
-                </Link>
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+                  <Link
+                    href="/admin/audio-recognition"
+                    style={{
+                      display: 'inline-block',
+                      padding: '8px 16px',
+                      background: '#8b5cf6',
+                      color: 'white',
+                      borderRadius: 6,
+                      textDecoration: 'none',
+                      fontSize: 14,
+                      fontWeight: 600
+                    }}
+                  >
+                    Control Panel
+                  </Link>
+                </div>
               </div>
             )}
           </div>
@@ -643,24 +651,26 @@ export default function AdminDashboardPage() {
                   Database Setup Required
                 </div>
                 <div style={{ marginBottom: 12 }}>
-                  The audio recognition system needs database tables to be created. 
-                  Run the provided SQL in your Supabase dashboard to get started.
+                  The audio recognition system needs database tables and proper permissions. 
+                  If you see 406 errors, run the RLS policy fix SQL.
                 </div>
-                <Link
-                  href="/admin/audio-recognition"
-                  style={{
-                    display: 'inline-block',
-                    padding: '6px 12px',
-                    background: '#d97706',
-                    color: 'white',
-                    borderRadius: 4,
-                    textDecoration: 'none',
-                    fontSize: 12,
-                    fontWeight: 600
-                  }}
-                >
-                  View Setup Instructions
-                </Link>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <Link
+                    href="/admin/audio-recognition"
+                    style={{
+                      display: 'inline-block',
+                      padding: '6px 12px',
+                      background: '#d97706',
+                      color: 'white',
+                      borderRadius: 4,
+                      textDecoration: 'none',
+                      fontSize: 12,
+                      fontWeight: 600
+                    }}
+                  >
+                    View Setup Instructions
+                  </Link>
+                </div>
               </div>
             </div>
           )}
