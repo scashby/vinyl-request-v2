@@ -17,6 +17,12 @@ export default function AdminDashboardPage() {
   const [upcomingEvents, setUpcomingEvents] = useState([]);
   const [recentRecognitions, setRecentRecognitions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [authStatus, setAuthStatus] = useState('checking');
+  const [dbTestResults, setDbTestResults] = useState({
+    audioRecognition: 'pending',
+    collection: 'pending',
+    events: 'pending'
+  });
 
   useEffect(() => {
     loadDashboardData();
@@ -26,6 +32,54 @@ export default function AdminDashboardPage() {
     setLoading(true);
     
     try {
+      // Check authentication status first
+      const { data: { session }, error: authError } = await supabase.auth.getSession();
+      
+      if (authError) {
+        setAuthStatus('error');
+        console.error('Auth error:', authError);
+      } else if (session) {
+        setAuthStatus('authenticated');
+      } else {
+        setAuthStatus('unauthenticated');
+      }
+
+      // Test database connections
+      const dbTests = {
+        audioRecognition: 'pending',
+        collection: 'pending',
+        events: 'pending'
+      };
+
+      // Test audio recognition tables
+      try {
+        await supabase.from('now_playing').select('count(*)').limit(1);
+        await supabase.from('audio_recognition_logs').select('count(*)').limit(1);
+        dbTests.audioRecognition = 'success';
+      } catch (error) {
+        dbTests.audioRecognition = 'error';
+        console.error('Audio recognition DB test failed:', error);
+      }
+
+      // Test collection table
+      try {
+        await supabase.from('collection').select('count(*)').limit(1);
+        dbTests.collection = 'success';
+      } catch (error) {
+        dbTests.collection = 'error';
+        console.error('Collection DB test failed:', error);
+      }
+
+      // Test events table
+      try {
+        await supabase.from('events').select('count(*)').limit(1);
+        dbTests.events = 'success';
+      } catch (error) {
+        dbTests.events = 'error';
+        console.error('Events DB test failed:', error);
+      }
+
+      setDbTestResults(dbTests);
       // Get collection stats
       const { count: albumCount } = await supabase
         .from('collection')
@@ -203,7 +257,182 @@ export default function AdminDashboardPage() {
         </p>
       </div>
 
-      {/* Stats Grid */}
+      {/* System Health & Authentication Status */}
+      <div style={{
+        background: '#fff',
+        border: '1px solid #e5e7eb',
+        borderRadius: 12,
+        padding: 20,
+        marginBottom: 24,
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+      }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 16
+        }}>
+          <h3 style={{
+            margin: 0,
+            fontSize: 18,
+            fontWeight: 600,
+            color: '#1f2937'
+          }}>
+            🔧 System Health Monitor
+          </h3>
+          <button
+            onClick={loadDashboardData}
+            style={{
+              padding: '4px 8px',
+              background: '#f3f4f6',
+              border: '1px solid #d1d5db',
+              borderRadius: 4,
+              fontSize: 12,
+              cursor: 'pointer'
+            }}
+          >
+            Refresh
+          </button>
+        </div>
+
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: 12
+        }}>
+          {/* Authentication Status */}
+          <div style={{
+            padding: 12,
+            background: authStatus === 'authenticated' ? '#f0fdf4' : 
+                       authStatus === 'error' ? '#fef2f2' : '#fef3c7',
+            border: `1px solid ${authStatus === 'authenticated' ? '#22c55e' : 
+                                  authStatus === 'error' ? '#ef4444' : '#f59e0b'}`,
+            borderRadius: 6
+          }}>
+            <div style={{
+              fontSize: 14,
+              fontWeight: 600,
+              color: authStatus === 'authenticated' ? '#15803d' : 
+                     authStatus === 'error' ? '#dc2626' : '#d97706',
+              marginBottom: 4
+            }}>
+              {authStatus === 'authenticated' ? '✅ Authentication' : 
+               authStatus === 'error' ? '❌ Auth Error' : 
+               authStatus === 'unauthenticated' ? '⚠️ Not Logged In' : '🔄 Checking Auth'}
+            </div>
+            <div style={{
+              fontSize: 12,
+              color: authStatus === 'authenticated' ? '#16a34a' : 
+                     authStatus === 'error' ? '#dc2626' : '#92400e'
+            }}>
+              {authStatus === 'authenticated' ? 'Admin session active' : 
+               authStatus === 'error' ? 'Authentication failed' : 
+               authStatus === 'unauthenticated' ? 'Please log in to admin' : 'Verifying session...'}
+            </div>
+          </div>
+
+          {/* Database Health Checks */}
+          <div style={{
+            padding: 12,
+            background: dbTestResults.collection === 'success' ? '#f0fdf4' : '#fef2f2',
+            border: `1px solid ${dbTestResults.collection === 'success' ? '#22c55e' : '#ef4444'}`,
+            borderRadius: 6
+          }}>
+            <div style={{
+              fontSize: 14,
+              fontWeight: 600,
+              color: dbTestResults.collection === 'success' ? '#15803d' : '#dc2626',
+              marginBottom: 4
+            }}>
+              {dbTestResults.collection === 'success' ? '✅ Collection DB' : '❌ Collection DB'}
+            </div>
+            <div style={{
+              fontSize: 12,
+              color: dbTestResults.collection === 'success' ? '#16a34a' : '#dc2626'
+            }}>
+              {dbTestResults.collection === 'success' ? 'Database accessible' : 'Connection failed'}
+            </div>
+          </div>
+
+          <div style={{
+            padding: 12,
+            background: dbTestResults.audioRecognition === 'success' ? '#f0fdf4' : '#fef2f2',
+            border: `1px solid ${dbTestResults.audioRecognition === 'success' ? '#22c55e' : '#ef4444'}`,
+            borderRadius: 6
+          }}>
+            <div style={{
+              fontSize: 14,
+              fontWeight: 600,
+              color: dbTestResults.audioRecognition === 'success' ? '#15803d' : '#dc2626',
+              marginBottom: 4
+            }}>
+              {dbTestResults.audioRecognition === 'success' ? '✅ Audio Recognition' : '❌ Audio Recognition'}
+            </div>
+            <div style={{
+              fontSize: 12,
+              color: dbTestResults.audioRecognition === 'success' ? '#16a34a' : '#dc2626'
+            }}>
+              {dbTestResults.audioRecognition === 'success' ? 'Tables accessible' : 'Permission issues detected'}
+            </div>
+          </div>
+
+          <div style={{
+            padding: 12,
+            background: dbTestResults.events === 'success' ? '#f0fdf4' : '#fef2f2',
+            border: `1px solid ${dbTestResults.events === 'success' ? '#22c55e' : '#ef4444'}`,
+            borderRadius: 6
+          }}>
+            <div style={{
+              fontSize: 14,
+              fontWeight: 600,
+              color: dbTestResults.events === 'success' ? '#15803d' : '#dc2626',
+              marginBottom: 4
+            }}>
+              {dbTestResults.events === 'success' ? '✅ Events DB' : '❌ Events DB'}
+            </div>
+            <div style={{
+              fontSize: 12,
+              color: dbTestResults.events === 'success' ? '#16a34a' : '#dc2626'
+            }}>
+              {dbTestResults.events === 'success' ? 'Database accessible' : 'Connection failed'}
+            </div>
+          </div>
+        </div>
+
+        {/* Show specific help for authentication issues */}
+        {authStatus !== 'authenticated' && (
+          <div style={{
+            marginTop: 12,
+            padding: 12,
+            background: '#fef3c7',
+            border: '1px solid #f59e0b',
+            borderRadius: 6,
+            fontSize: 12,
+            color: '#92400e'
+          }}>
+            <strong>Authentication Issue:</strong> The 406 errors you&apos;re seeing are likely because you&apos;re not properly logged into the admin system. 
+            <Link href="/admin/login" style={{ color: '#d97706', marginLeft: 4 }}>
+              Go to login page →
+            </Link>
+          </div>
+        )}
+
+        {/* Show specific help for database issues */}
+        {dbTestResults.audioRecognition === 'error' && authStatus === 'authenticated' && (
+          <div style={{
+            marginTop: 12,
+            padding: 12,
+            background: '#fef2f2',
+            border: '1px solid #fca5a5',
+            borderRadius: 6,
+            fontSize: 12,
+            color: '#7f1d1d'
+          }}>
+            <strong>Database Permission Issue:</strong> You&apos;re authenticated but can&apos;t access audio recognition tables. 
+            The RLS policies may need adjustment.
+          </div>
+        )}
+      </div>
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
@@ -272,91 +501,6 @@ export default function AdminDashboardPage() {
       }}>
         {/* Left Column */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-          {/* Audio Recognition Status */}
-          <div style={{
-            background: '#fff',
-            border: '1px solid #e5e7eb',
-            borderRadius: 12,
-            padding: 24
-          }}>
-            <h3 style={{
-              margin: '0 0 20px 0',
-              fontSize: 18,
-              fontWeight: 600,
-              color: '#1f2937'
-            }}>
-              🎵 Audio Recognition System
-            </h3>
-            
-            {/* Show error state if we're getting 406 errors */}
-            <div style={{
-              padding: 16,
-              background: '#fef2f2',
-              borderRadius: 8,
-              border: '1px solid #fca5a5',
-              marginBottom: 16
-            }}>
-              <div style={{ fontSize: 14, color: '#dc2626', marginBottom: 8, fontWeight: 600 }}>
-                ⚠️ Database Permission Issue Detected
-              </div>
-              <div style={{ fontSize: 12, color: '#7f1d1d', marginBottom: 12 }}>
-                Getting 406 errors from Supabase. This could be:<br/>
-                • Row Level Security (RLS) policy issue<br/>
-                • Authentication problem (make sure you&apos;re logged in)<br/>
-                • Missing permissions for authenticated users
-              </div>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <Link
-                  href="/admin/audio-recognition"
-                  style={{
-                    display: 'inline-block',
-                    padding: '6px 12px',
-                    background: '#dc2626',
-                    color: 'white',
-                    borderRadius: 4,
-                    textDecoration: 'none',
-                    fontSize: 12,
-                    fontWeight: 600
-                  }}
-                >
-                  View Setup Instructions
-                </Link>
-                <button
-                  onClick={() => {
-                    // Extract project ID from the current URL or a known pattern
-                    const projectId = 'bntoivaipesuovselglg'; // Your project ID from the error logs
-                    window.open(`https://supabase.com/dashboard/project/${projectId}/sql`, '_blank');
-                  }}
-                  style={{
-                    padding: '6px 12px',
-                    background: '#059669',
-                    color: 'white',
-                    borderRadius: 4,
-                    border: 'none',
-                    fontSize: 12,
-                    fontWeight: 600,
-                    cursor: 'pointer'
-                  }}
-                >
-                  Open Supabase SQL Editor
-                </button>
-              </div>
-            </div>
-
-            {/* Manual test section */}
-            <div style={{
-              padding: 12,
-              background: '#f0fdf4',
-              borderRadius: 6,
-              border: '1px solid #bbf7d0',
-              fontSize: 12,
-              color: '#14532d'
-            }}>
-              <strong>Secure Fix:</strong> Run the &quot;Secure RLS Fix&quot; SQL in your Supabase SQL Editor to properly 
-              configure Row Level Security for authenticated admin access only. This will resolve the 406 errors 
-              while keeping your data secure.
-            </div>
-          </div>
 
           {/* Recent Activity */}
           <div style={{
@@ -450,70 +594,106 @@ export default function AdminDashboardPage() {
               ⚡ Quick Actions
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <Link
-                href="/admin/audio-recognition"
-                style={{
-                  display: 'block',
-                  padding: '12px 16px',
-                  background: 'linear-gradient(135deg, #8b5cf6, #a855f7)',
-                  color: 'white',
-                  borderRadius: 8,
-                  textDecoration: 'none',
-                  fontWeight: 600,
-                  textAlign: 'center',
-                  fontSize: 14
-                }}
-              >
-                🎧 Audio Recognition Control
-              </Link>
-              <Link
-                href="/admin/add-album"
-                style={{
-                  display: 'block',
-                  padding: '12px 16px',
-                  background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
-                  color: 'white',
-                  borderRadius: 8,
-                  textDecoration: 'none',
-                  fontWeight: 600,
-                  textAlign: 'center',
-                  fontSize: 14
-                }}
-              >
-                ➕ Add New Album
-              </Link>
-              <Link
-                href="/admin/manage-events"
-                style={{
-                  display: 'block',
-                  padding: '12px 16px',
-                  background: 'linear-gradient(135deg, #10b981, #047857)',
-                  color: 'white',
-                  borderRadius: 8,
-                  textDecoration: 'none',
-                  fontWeight: 600,
-                  textAlign: 'center',
-                  fontSize: 14
-                }}
-              >
-                📅 Manage Events
-              </Link>
-              <Link
-                href="/admin/edit-collection"
-                style={{
-                  display: 'block',
-                  padding: '12px 16px',
-                  background: 'linear-gradient(135deg, #f59e0b, #d97706)',
-                  color: 'white',
-                  borderRadius: 8,
-                  textDecoration: 'none',
-                  fontWeight: 600,
-                  textAlign: 'center',
-                  fontSize: 14
-                }}
-              >
-                📚 Edit Collection
-              </Link>
+              {authStatus === 'authenticated' ? (
+                <>
+                  <Link
+                    href="/admin/audio-recognition"
+                    style={{
+                      display: 'block',
+                      padding: '12px 16px',
+                      background: dbTestResults.audioRecognition === 'success' ? 
+                                 'linear-gradient(135deg, #8b5cf6, #a855f7)' : 
+                                 'linear-gradient(135deg, #6b7280, #4b5563)',
+                      color: 'white',
+                      borderRadius: 8,
+                      textDecoration: 'none',
+                      fontWeight: 600,
+                      textAlign: 'center',
+                      fontSize: 14
+                    }}
+                  >
+                    🎧 Audio Recognition Control
+                  </Link>
+                  <Link
+                    href="/admin/add-album"
+                    style={{
+                      display: 'block',
+                      padding: '12px 16px',
+                      background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                      color: 'white',
+                      borderRadius: 8,
+                      textDecoration: 'none',
+                      fontWeight: 600,
+                      textAlign: 'center',
+                      fontSize: 14
+                    }}
+                  >
+                    ➕ Add New Album
+                  </Link>
+                  <Link
+                    href="/admin/manage-events"
+                    style={{
+                      display: 'block',
+                      padding: '12px 16px',
+                      background: 'linear-gradient(135deg, #10b981, #047857)',
+                      color: 'white',
+                      borderRadius: 8,
+                      textDecoration: 'none',
+                      fontWeight: 600,
+                      textAlign: 'center',
+                      fontSize: 14
+                    }}
+                  >
+                    📅 Manage Events
+                  </Link>
+                  <Link
+                    href="/admin/edit-collection"
+                    style={{
+                      display: 'block',
+                      padding: '12px 16px',
+                      background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                      color: 'white',
+                      borderRadius: 8,
+                      textDecoration: 'none',
+                      fontWeight: 600,
+                      textAlign: 'center',
+                      fontSize: 14
+                    }}
+                  >
+                    📚 Edit Collection
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <Link
+                    href="/admin/login"
+                    style={{
+                      display: 'block',
+                      padding: '12px 16px',
+                      background: 'linear-gradient(135deg, #dc2626, #b91c1c)',
+                      color: 'white',
+                      borderRadius: 8,
+                      textDecoration: 'none',
+                      fontWeight: 600,
+                      textAlign: 'center',
+                      fontSize: 14
+                    }}
+                  >
+                    🔑 Login Required
+                  </Link>
+                  <div style={{
+                    padding: '8px 12px',
+                    background: '#fef3c7',
+                    border: '1px solid #f59e0b',
+                    borderRadius: 6,
+                    fontSize: 12,
+                    color: '#92400e',
+                    textAlign: 'center'
+                  }}>
+                    Please log in to access admin features
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
