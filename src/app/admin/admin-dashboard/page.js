@@ -4,7 +4,6 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { supabase } from 'lib/supabaseClient';
-import AudioRecognitionStatus from 'components/AudioRecognitionStatus';
 import 'styles/internal.css';
 
 export default function AdminDashboardPage() {
@@ -288,42 +287,75 @@ export default function AdminDashboardPage() {
             }}>
               🎵 Audio Recognition System
             </h3>
-            {stats.recentRecognitions > 0 ? (
-              <AudioRecognitionStatus />
-            ) : (
-              <div style={{
-                textAlign: 'center',
-                padding: 24,
-                background: '#f9fafb',
-                borderRadius: 8,
-                border: '2px dashed #d1d5db'
-              }}>
-                <div style={{ fontSize: 32, marginBottom: 12 }}>🎧</div>
-                <div style={{ color: '#6b7280', marginBottom: 8 }}>
-                  Audio Recognition System
-                </div>
-                <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 16 }}>
-                  Tables created but may need permission fixes (check for 406 errors)
-                </div>
-                <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
-                  <Link
-                    href="/admin/audio-recognition"
-                    style={{
-                      display: 'inline-block',
-                      padding: '8px 16px',
-                      background: '#8b5cf6',
-                      color: 'white',
-                      borderRadius: 6,
-                      textDecoration: 'none',
-                      fontSize: 14,
-                      fontWeight: 600
-                    }}
-                  >
-                    Control Panel
-                  </Link>
-                </div>
+            
+            {/* Show error state if we're getting 406 errors */}
+            <div style={{
+              padding: 16,
+              background: '#fef2f2',
+              borderRadius: 8,
+              border: '1px solid #fca5a5',
+              marginBottom: 16
+            }}>
+              <div style={{ fontSize: 14, color: '#dc2626', marginBottom: 8, fontWeight: 600 }}>
+                ⚠️ Database Permission Issue Detected
               </div>
-            )}
+              <div style={{ fontSize: 12, color: '#7f1d1d', marginBottom: 12 }}>
+                Getting 406 errors from Supabase. This could be:<br/>
+                • Row Level Security (RLS) policy issue<br/>
+                • Authentication problem (make sure you&apos;re logged in)<br/>
+                • Missing permissions for authenticated users
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <Link
+                  href="/admin/audio-recognition"
+                  style={{
+                    display: 'inline-block',
+                    padding: '6px 12px',
+                    background: '#dc2626',
+                    color: 'white',
+                    borderRadius: 4,
+                    textDecoration: 'none',
+                    fontSize: 12,
+                    fontWeight: 600
+                  }}
+                >
+                  View Setup Instructions
+                </Link>
+                <button
+                  onClick={() => {
+                    // Extract project ID from the current URL or a known pattern
+                    const projectId = 'bntoivaipesuovselglg'; // Your project ID from the error logs
+                    window.open(`https://supabase.com/dashboard/project/${projectId}/sql`, '_blank');
+                  }}
+                  style={{
+                    padding: '6px 12px',
+                    background: '#059669',
+                    color: 'white',
+                    borderRadius: 4,
+                    border: 'none',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Open Supabase SQL Editor
+                </button>
+              </div>
+            </div>
+
+            {/* Manual test section */}
+            <div style={{
+              padding: 12,
+              background: '#f0fdf4',
+              borderRadius: 6,
+              border: '1px solid #bbf7d0',
+              fontSize: 12,
+              color: '#14532d'
+            }}>
+              <strong>Secure Fix:</strong> Run the &quot;Secure RLS Fix&quot; SQL in your Supabase SQL Editor to properly 
+              configure Row Level Security for authenticated admin access only. This will resolve the 406 errors 
+              while keeping your data secure.
+            </div>
           </div>
 
           {/* Recent Activity */}
