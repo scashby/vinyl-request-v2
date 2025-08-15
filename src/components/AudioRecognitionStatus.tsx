@@ -25,6 +25,8 @@ export default function AudioRecognitionStatus({ compact = false }: AudioRecogni
   const [currentTrack, setCurrentTrack] = useState<NowPlayingState | null>(null);
   const [playingTime, setPlayingTime] = useState(0);
   const [isConnected, setIsConnected] = useState(false);
+  const [hasError, setHasError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
     loadCurrentTrack();
@@ -37,6 +39,7 @@ export default function AudioRecognitionStatus({ compact = false }: AudioRecogni
         (payload) => {
           if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
             setCurrentTrack(payload.new as NowPlayingState);
+            setHasError(false);
           } else if (payload.eventType === 'DELETE') {
             setCurrentTrack(null);
           }
@@ -65,16 +68,33 @@ export default function AudioRecognitionStatus({ compact = false }: AudioRecogni
 
   const loadCurrentTrack = async () => {
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('now_playing')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(1)
         .single();
 
-      setCurrentTrack(data || null);
-    } catch {
+      if (error) {
+        if (error.code === 'PGRST116') {
+          // No rows returned - this is fine
+          setCurrentTrack(null);
+          setHasError(false);
+        } else {
+          // Actual error (like table doesn't exist)
+          setHasError(true);
+          setErrorMessage('Audio recognition database not set up');
+          console.error('Error loading current track:', error);
+        }
+      } else {
+        setCurrentTrack(data || null);
+        setHasError(false);
+      }
+    } catch (error) {
+      setHasError(true);
+      setErrorMessage('Failed to connect to audio recognition system');
       setCurrentTrack(null);
+      console.error('Exception loading current track:', error);
     }
   };
 
@@ -83,6 +103,83 @@ export default function AudioRecognitionStatus({ compact = false }: AudioRecogni
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
+
+  // Show error state
+  if (hasError) {
+    if (compact) {
+      return (
+        <div style={{
+          background: '#fef2f2',
+          color: '#dc2626',
+          borderRadius: 8,
+          padding: 12,
+          fontSize: 12,
+          border: '2px solid #fca5a5'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div>⚠️</div>
+            <div>{errorMessage}</div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div style={{
+        background: '#fff',
+        border: '1px solid #fca5a5',
+        borderRadius: 12,
+        padding: 20,
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+      }}>
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'space-between',
+          marginBottom: 16 
+        }}>
+          <h3 style={{ 
+            margin: 0, 
+            fontSize: 18, 
+            fontWeight: 600,
+            color: '#dc2626'
+          }}>
+            ⚠️ Audio Recognition Error
+          </h3>
+        </div>
+
+        <div style={{
+          background: '#fef2f2',
+          color: '#dc2626',
+          borderRadius: 12,
+          padding: 20,
+          textAlign: 'center'
+        }}>
+          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>
+            {errorMessage}
+          </div>
+          <div style={{ fontSize: 14, marginBottom: 16 }}>
+            The audio recognition database tables need to be created in Supabase
+          </div>
+          <Link
+            href="/admin/audio-recognition"
+            style={{
+              display: 'inline-block',
+              background: '#dc2626',
+              color: 'white',
+              padding: '8px 16px',
+              borderRadius: 6,
+              textDecoration: 'none',
+              fontSize: 14,
+              fontWeight: 600
+            }}
+          >
+            View Setup Instructions
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   if (compact) {
     return (

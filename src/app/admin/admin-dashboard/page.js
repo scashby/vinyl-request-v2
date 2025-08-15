@@ -49,15 +49,27 @@ export default function AdminDashboardPage() {
         .order('date', { ascending: true })
         .limit(5);
 
-      // Get recent audio recognitions (last 24 hours)
-      const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      const { data: recentRecognitionsData, count: recentRecognitionsCount } = await supabase
-        .from('audio_recognition_logs')
-        .select('*', { count: 'exact' })
-        .gte('created_at', yesterday)
-        .eq('confirmed', true)
-        .order('created_at', { ascending: false })
-        .limit(10);
+      // Get recent audio recognitions (last 24 hours) - with error handling
+      let recentRecognitionsData = [];
+      let recentRecognitionsCount = 0;
+      
+      try {
+        const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        const result = await supabase
+          .from('audio_recognition_logs')
+          .select('*', { count: 'exact' })
+          .gte('created_at', yesterday)
+          .eq('confirmed', true)
+          .order('created_at', { ascending: false })
+          .limit(10);
+        
+        if (!result.error) {
+          recentRecognitionsData = result.data || [];
+          recentRecognitionsCount = result.count || 0;
+        }
+      } catch (error) {
+        console.log('Audio recognition logs table not available:', error);
+      }
 
       // Build recent activity feed
       const activityItems = [];
@@ -83,11 +95,11 @@ export default function AdminDashboardPage() {
         totalAlbums: albumCount || 0,
         totalEvents: totalEventsCount || 0,
         upcomingEvents: upcomingCount || 0,
-        recentRecognitions: recentRecognitionsCount || 0
+        recentRecognitions: recentRecognitionsCount
       });
 
       setUpcomingEvents(upcomingEventsData || []);
-      setRecentRecognitions(recentRecognitionsData || []);
+      setRecentRecognitions(recentRecognitionsData);
       setRecentActivity(activityItems);
 
     } catch (error) {
@@ -236,7 +248,55 @@ export default function AdminDashboardPage() {
         {/* Left Column */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
           {/* Audio Recognition Status */}
-          <AudioRecognitionStatus />
+          <div style={{
+            background: '#fff',
+            border: '1px solid #e5e7eb',
+            borderRadius: 12,
+            padding: 24
+          }}>
+            <h3 style={{
+              margin: '0 0 20px 0',
+              fontSize: 18,
+              fontWeight: 600,
+              color: '#1f2937'
+            }}>
+              🎵 Audio Recognition System
+            </h3>
+            {stats.recentRecognitions > 0 ? (
+              <AudioRecognitionStatus />
+            ) : (
+              <div style={{
+                textAlign: 'center',
+                padding: 24,
+                background: '#f9fafb',
+                borderRadius: 8,
+                border: '2px dashed #d1d5db'
+              }}>
+                <div style={{ fontSize: 32, marginBottom: 12 }}>🎧</div>
+                <div style={{ color: '#6b7280', marginBottom: 8 }}>
+                  Audio Recognition Not Set Up
+                </div>
+                <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 16 }}>
+                  The audio recognition tables need to be created in your database
+                </div>
+                <Link
+                  href="/admin/audio-recognition"
+                  style={{
+                    display: 'inline-block',
+                    padding: '8px 16px',
+                    background: '#8b5cf6',
+                    color: 'white',
+                    borderRadius: 6,
+                    textDecoration: 'none',
+                    fontSize: 14,
+                    fontWeight: 600
+                  }}
+                >
+                  Set Up Audio Recognition
+                </Link>
+              </div>
+            )}
+          </div>
 
           {/* Recent Activity */}
           <div style={{
@@ -477,7 +537,7 @@ export default function AdminDashboardPage() {
           </div>
 
           {/* Recent Recognitions */}
-          {recentRecognitions.length > 0 && (
+          {recentRecognitions.length > 0 ? (
             <div style={{
               background: '#fff',
               border: '1px solid #e5e7eb',
@@ -534,6 +594,53 @@ export default function AdminDashboardPage() {
               >
                 View Recognition Panel →
               </Link>
+            </div>
+          ) : stats.recentRecognitions === 0 && (
+            <div style={{
+              background: '#fff',
+              border: '1px solid #e5e7eb',
+              borderRadius: 12,
+              padding: 24
+            }}>
+              <h3 style={{
+                margin: '0 0 16px 0',
+                fontSize: 18,
+                fontWeight: 600,
+                color: '#1f2937'
+              }}>
+                🎵 Audio Recognition Setup
+              </h3>
+              <div style={{
+                padding: 16,
+                background: '#fef3c7',
+                borderRadius: 8,
+                border: '1px solid #f59e0b',
+                fontSize: 14,
+                color: '#92400e'
+              }}>
+                <div style={{ fontWeight: 600, marginBottom: 8 }}>
+                  Database Setup Required
+                </div>
+                <div style={{ marginBottom: 12 }}>
+                  The audio recognition system needs database tables to be created. 
+                  Run the provided SQL in your Supabase dashboard to get started.
+                </div>
+                <Link
+                  href="/admin/audio-recognition"
+                  style={{
+                    display: 'inline-block',
+                    padding: '6px 12px',
+                    background: '#d97706',
+                    color: 'white',
+                    borderRadius: 4,
+                    textDecoration: 'none',
+                    fontSize: 12,
+                    fontWeight: 600
+                  }}
+                >
+                  View Setup Instructions
+                </Link>
+              </div>
             </div>
           )}
         </div>
