@@ -1,5 +1,4 @@
 // Browse Queue page ("/browse/browse-queue")
-// Placeholder: Displays the event queue for a given event (demo layout).
 
 import Image from 'next/image';
 import 'styles/internal.css';

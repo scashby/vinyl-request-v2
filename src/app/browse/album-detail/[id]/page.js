@@ -5,8 +5,8 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
-import { supabaseAdmin as supabase } from 'src/lib/supabaseAdmin';
-export const runtime = 'nodejs';
+import { supabase } from 'src/lib/supabaseClient';
+
 import Image from "next/image";
 import 'styles/album-detail.css';
 import 'styles/internal.css';
