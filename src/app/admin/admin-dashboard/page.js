@@ -429,7 +429,10 @@ export default function AdminDashboardPage() {
             color: '#7f1d1d'
           }}>
             <strong>Database Permission Issue:</strong> You&apos;re authenticated but can&apos;t access audio recognition tables. 
-            The RLS policies may need adjustment.
+            The RLS policies may need adjustment. 
+            <Link href="/admin/audio-debug" style={{ color: '#dc2626', marginLeft: 4 }}>
+              Use Debug Tool →
+            </Link>
           </div>
         )}
       </div>
@@ -615,6 +618,22 @@ export default function AdminDashboardPage() {
                     }}
                   >
                     🎧 Audio Recognition Control
+                  </Link>
+                  <Link
+                    href="/admin/audio-debug"
+                    style={{
+                      display: 'block',
+                      padding: '12px 16px',
+                      background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                      color: 'white',
+                      borderRadius: 8,
+                      textDecoration: 'none',
+                      fontWeight: 600,
+                      textAlign: 'center',
+                      fontSize: 14
+                    }}
+                  >
+                    🔧 Audio Recognition Debug
                   </Link>
                   <Link
                     href="/admin/add-album"
@@ -883,6 +902,21 @@ export default function AdminDashboardPage() {
                     }}
                   >
                     View Setup Instructions
+                  </Link>
+                  <Link
+                    href="/admin/audio-debug"
+                    style={{
+                      display: 'inline-block',
+                      padding: '6px 12px',
+                      background: '#dc2626',
+                      color: 'white',
+                      borderRadius: 4,
+                      textDecoration: 'none',
+                      fontSize: 12,
+                      fontWeight: 600
+                    }}
+                  >
+                    🔧 Debug Tool
                   </Link>
                 </div>
               </div>

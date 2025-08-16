@@ -20,6 +20,7 @@ export default function AdminSidebar() {
     
     // Audio Recognition Section
     { label: "Audio Recognition", path: "/admin/audio-recognition", isNew: true },
+    { label: "Audio Debug", path: "/admin/audio-debug", isNew: true },
     
     // Event Management
     { label: "Manage Events", path: "/admin/manage-events" },
@@ -46,7 +47,7 @@ export default function AdminSidebar() {
       <ul className="space-y-2">
         {navItems.map((item) => {
           const isActive = pathname === item.path;
-          const isAudioRecognition = item.path.includes('/audio-recognition');
+          const isAudioRecognition = item.path.includes('/audio-recognition') || item.path.includes('/audio-debug');
           
           return (
             <li key={item.path}>
@@ -83,6 +84,12 @@ export default function AdminSidebar() {
             className="block w-full text-center bg-purple-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-purple-700 transition-colors"
           >
             🎧 Control Panel
+          </Link>
+          <Link 
+            href="/admin/audio-debug"
+            className="block w-full text-center bg-orange-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-orange-700 transition-colors"
+          >
+            🔧 Debug Tool
           </Link>
           <Link 
             href="/admin/audio-recognition/display"
