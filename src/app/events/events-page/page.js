@@ -4,7 +4,8 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { supabase } from 'lib/supabaseClient';
+import { supabaseAdmin as supabase } from 'src/lib/supabaseAdmin';
+export const runtime = 'nodejs';
 import 'styles/internal.css';
 import 'styles/events.css';
 import Link from 'next/link';

@@ -9,7 +9,8 @@ import { useEffect, useState, useMemo } from 'react';
 import AlbumCard from 'components/AlbumCard';
 import 'styles/album-browse.css';
 import 'styles/internal.css';
-import { supabase } from 'lib/supabaseClient';
+import { supabaseAdmin as supabase } from 'src/lib/supabaseAdmin';
+export const runtime = 'nodejs';
 import { useSearchParams } from 'next/navigation';
 //import Footer from 'components/Footer';
 

@@ -3,7 +3,8 @@
 "use client";
 
 import { useState } from 'react';
-import { supabase } from 'lib/supabaseClient';
+import { supabaseAdmin as supabase } from 'src/lib/supabaseAdmin';
+export const runtime = 'nodejs';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 

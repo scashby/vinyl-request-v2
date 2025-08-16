@@ -5,7 +5,8 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { supabase } from 'lib/supabaseClient';
+import { supabaseAdmin as supabase } from 'src/lib/supabaseAdmin';
+export const runtime = 'nodejs';
 import Image from 'next/image';
 
 interface CollectionRow {

@@ -5,7 +5,8 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { supabase } from 'lib/supabaseClient';
+import { supabaseAdmin as supabase } from 'src/lib/supabaseAdmin';
+export const runtime = 'nodejs';
 import 'styles/internal.css';
 import 'styles/events.css';
 import Image from 'next/image';
