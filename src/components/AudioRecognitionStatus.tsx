@@ -83,7 +83,7 @@ export default function AudioRecognitionStatus({ compact = false }: AudioRecogni
         } else if (error.message?.includes('406') || error.message?.includes('Not Acceptable')) {
           // RLS policy issue
           setHasError(true);
-          setErrorMessage('Database permissions issue - check RLS policies');
+          setErrorMessage('HTTP content type mismatch (Accept header).');
           console.error('RLS/406 error loading current track:', error);
         } else {
           // Other error (like table doesn't exist)
@@ -99,7 +99,7 @@ export default function AudioRecognitionStatus({ compact = false }: AudioRecogni
       // Network or other errors
       if (error.message?.includes('406')) {
         setHasError(true);
-        setErrorMessage('Database permissions issue - check RLS policies');
+        setErrorMessage('HTTP content type mismatch (Accept header).');
       } else {
         setHasError(true);
         setErrorMessage('Failed to connect to audio recognition system');
