@@ -2,8 +2,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { supabaseAdmin as supabase } from 'src/lib/supabaseAdmin';
-export const runtime = 'nodejs';
+import { supabase } from 'src/lib/supabaseClient';
 import Image from 'next/image';
 
 interface NowPlayingState {
