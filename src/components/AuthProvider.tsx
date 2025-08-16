@@ -4,8 +4,8 @@
 
 import { ReactNode, createContext, useContext, useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { supabaseAdmin as supabase } from 'src/lib/supabaseAdmin';
-export const runtime = 'nodejs';
+import { supabase } from 'src/lib/supabaseClient';
+
 import type { Session } from "@supabase/supabase-js";
 
 interface AuthContextType {

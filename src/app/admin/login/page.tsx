@@ -5,8 +5,8 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabaseAdmin as supabase } from 'src/lib/supabaseAdmin';
-export const runtime = 'nodejs';
+import { supabase } from 'src/lib/supabaseClient';
+
 
 export default function Page() {
   const [email, setEmail] = useState('');

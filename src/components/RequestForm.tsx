@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { supabaseAdmin as supabase } from 'src/lib/supabaseAdmin';
-export const runtime = 'nodejs';
+import { supabase } from 'src/lib/supabaseClient';
+
 
 interface RequestFormProps {
   eventId: string;

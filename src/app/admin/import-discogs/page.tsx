@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import Papa from 'papaparse';
-import { supabaseAdmin as supabase } from 'src/lib/supabaseAdmin';
-export const runtime = 'nodejs';
+import { supabase } from 'src/lib/supabaseClient';
+
 
 // Updated type to match actual Discogs CSV export structure
 type DiscogsCSVRow = {
