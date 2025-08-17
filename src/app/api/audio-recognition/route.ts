@@ -31,6 +31,37 @@ interface ShazamResponse {
   location?: unknown;
 }
 
+// Convert WebM audio to PCM format for Shazam
+async function convertWebMToPCM(webmBlob: Blob): Promise<ArrayBuffer> {
+  const audioContext = new (globalThis.AudioContext || globalThis.webkitAudioContext)({
+    sampleRate: 44100
+  });
+  
+  try {
+    const arrayBuffer = await webmBlob.arrayBuffer();
+    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+    
+    // Convert to mono if stereo
+    const channelData = audioBuffer.numberOfChannels > 1 
+      ? audioBuffer.getChannelData(0) // Use left channel
+      : audioBuffer.getChannelData(0);
+    
+    // Convert Float32Array to 16-bit PCM
+    const pcmData = new Int16Array(channelData.length);
+    for (let i = 0; i < channelData.length; i++) {
+      // Convert from -1.0 to 1.0 range to -32768 to 32767 range
+      const sample = Math.max(-1, Math.min(1, channelData[i]));
+      pcmData[i] = Math.round(sample * 32767);
+    }
+    
+    await audioContext.close();
+    return pcmData.buffer;
+  } catch (error) {
+    await audioContext.close();
+    throw error;
+  }
+}
+
 // Helper function to check if a track is already playing
 async function checkCurrentContext(artist: string, title: string) {
   const { data: currentTrack } = await supabase
@@ -126,25 +157,30 @@ async function processAudioFile(audioFile: File): Promise<{
   }
 
   try {
-    const arrayBuffer = await audioFile.arrayBuffer();
-    const base64Audio = Buffer.from(arrayBuffer).toString('base64');
+    console.log('🔄 Converting WebM to PCM format for Shazam...');
+    
+    // Convert WebM to PCM format
+    const pcmBuffer = await convertWebMToPCM(audioFile);
+    const base64Audio = Buffer.from(pcmBuffer).toString('base64');
     
     console.log(`✅ Audio conversion successful:`, {
       originalSize: audioFile.size,
+      originalType: audioFile.type,
+      pcmBufferSize: pcmBuffer.byteLength,
       base64Length: base64Audio.length,
       base64Sample: base64Audio.substring(0, 100) + '...'
     });
 
     return {
       isValid: true,
-      audioBuffer: arrayBuffer,
+      audioBuffer: pcmBuffer,
       base64Audio,
-      details: `Converted ${audioFile.size} bytes to ${base64Audio.length} base64 chars`
+      details: `Converted ${audioFile.size} bytes WebM to ${pcmBuffer.byteLength} bytes PCM (${base64Audio.length} base64 chars)`
     };
   } catch (error) {
     return { 
       isValid: false, 
-      details: `Audio processing failed: ${error instanceof Error ? error.message : 'Unknown error'}` 
+      details: `Audio conversion failed: ${error instanceof Error ? error.message : 'Unknown error'}` 
     };
   }
 }
@@ -169,7 +205,7 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Process and validate audio file
+    // Process and validate audio file (now includes PCM conversion)
     const audioProcessResult = await processAudioFile(audioFile);
     
     if (!audioProcessResult.isValid) {
@@ -192,9 +228,9 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('🔑 API Key present:', process.env.SHAZAM_RAPID_API_KEY.substring(0, 10) + '...');
-    console.log('🎵 Calling Shazam API...');
+    console.log('🎵 Calling Shazam API with PCM audio...');
 
-    // Prepare API call with detailed logging - FIXED ENDPOINT
+    // Prepare API call with detailed logging
     const apiUrl = 'https://shazam.p.rapidapi.com/songs/detect';
     const headers = {
       'Content-Type': 'text/plain',
