@@ -31,37 +31,6 @@ interface ShazamResponse {
   location?: unknown;
 }
 
-// Convert WebM audio to PCM format for Shazam
-async function convertWebMToPCM(webmBlob: Blob): Promise<ArrayBuffer> {
-  const audioContext = new (globalThis.AudioContext || globalThis.webkitAudioContext)({
-    sampleRate: 44100
-  });
-  
-  try {
-    const arrayBuffer = await webmBlob.arrayBuffer();
-    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-    
-    // Convert to mono if stereo
-    const channelData = audioBuffer.numberOfChannels > 1 
-      ? audioBuffer.getChannelData(0) // Use left channel
-      : audioBuffer.getChannelData(0);
-    
-    // Convert Float32Array to 16-bit PCM
-    const pcmData = new Int16Array(channelData.length);
-    for (let i = 0; i < channelData.length; i++) {
-      // Convert from -1.0 to 1.0 range to -32768 to 32767 range
-      const sample = Math.max(-1, Math.min(1, channelData[i]));
-      pcmData[i] = Math.round(sample * 32767);
-    }
-    
-    await audioContext.close();
-    return pcmData.buffer;
-  } catch (error) {
-    await audioContext.close();
-    throw error;
-  }
-}
-
 // Helper function to check if a track is already playing
 async function checkCurrentContext(artist: string, title: string) {
   const { data: currentTrack } = await supabase
@@ -129,10 +98,9 @@ async function findCollectionMatch(artist: string, title: string) {
   return null;
 }
 
-// Enhanced audio file validation and processing
+// Enhanced audio file validation - NO SERVER-SIDE PROCESSING
 async function processAudioFile(audioFile: File): Promise<{ 
   isValid: boolean; 
-  audioBuffer?: ArrayBuffer; 
   base64Audio?: string; 
   details: string; 
 }> {
@@ -157,25 +125,23 @@ async function processAudioFile(audioFile: File): Promise<{
   }
 
   try {
-    console.log('🔄 Converting WebM to PCM format for Shazam...');
+    console.log('🔄 Converting audio to base64 for Shazam...');
     
-    // Convert WebM to PCM format
-    const pcmBuffer = await convertWebMToPCM(audioFile);
-    const base64Audio = Buffer.from(pcmBuffer).toString('base64');
+    // Convert the entire audio file to base64 - let Shazam handle the format
+    const arrayBuffer = await audioFile.arrayBuffer();
+    const base64Audio = Buffer.from(arrayBuffer).toString('base64');
     
     console.log(`✅ Audio conversion successful:`, {
       originalSize: audioFile.size,
       originalType: audioFile.type,
-      pcmBufferSize: pcmBuffer.byteLength,
       base64Length: base64Audio.length,
       base64Sample: base64Audio.substring(0, 100) + '...'
     });
 
     return {
       isValid: true,
-      audioBuffer: pcmBuffer,
       base64Audio,
-      details: `Converted ${audioFile.size} bytes WebM to ${pcmBuffer.byteLength} bytes PCM (${base64Audio.length} base64 chars)`
+      details: `Converted ${audioFile.size} bytes ${audioFile.type} to ${base64Audio.length} base64 chars`
     };
   } catch (error) {
     return { 
@@ -205,7 +171,7 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Process and validate audio file (now includes PCM conversion)
+    // Process and validate audio file (NO server-side AudioContext)
     const audioProcessResult = await processAudioFile(audioFile);
     
     if (!audioProcessResult.isValid) {
@@ -228,7 +194,7 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('🔑 API Key present:', process.env.SHAZAM_RAPID_API_KEY.substring(0, 10) + '...');
-    console.log('🎵 Calling Shazam API with PCM audio...');
+    console.log('🎵 Calling Shazam API with raw audio data...');
 
     // Prepare API call with detailed logging
     const apiUrl = 'https://shazam.p.rapidapi.com/songs/detect';
@@ -528,4 +494,18 @@ export async function POST(request: NextRequest) {
       }
     }, { status: 500 });
   }
+}
+
+// Add GET endpoint for health checks
+export async function GET() {
+  return NextResponse.json({
+    success: true,
+    message: 'Audio recognition API is running',
+    environment: {
+      hasShazamKey: !!process.env.SHAZAM_RAPID_API_KEY,
+      keyPrefix: process.env.SHAZAM_RAPID_API_KEY?.substring(0, 8) + '...',
+      nodeEnv: process.env.NODE_ENV,
+      timestamp: new Date().toISOString()
+    }
+  });
 }

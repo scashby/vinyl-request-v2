@@ -3,7 +3,6 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { supabase } from 'src/lib/supabaseClient';
-
 import Image from 'next/image';
 
 interface RecognitionResult {
@@ -93,7 +92,12 @@ export default function AudioRecognitionPage() {
 
     try {
       const formData = new FormData();
-      formData.append('audio', audioBlob, 'sample.webm');
+      formData.append('audio', audioBlob, 'sample.' + (audioBlob.type.includes('webm') ? 'webm' : 'mp4'));
+
+      console.log('🎵 Sending audio for recognition:', {
+        size: audioBlob.size,
+        type: audioBlob.type
+      });
 
       const response = await fetch('/api/audio-recognition', {
         method: 'POST',
@@ -101,7 +105,8 @@ export default function AudioRecognitionPage() {
       });
 
       if (!response.ok) {
-        throw new Error(`Recognition failed: ${response.status}`);
+        const errorText = await response.text();
+        throw new Error(`Recognition failed: ${response.status} - ${errorText}`);
       }
 
       const result = await response.json();
@@ -117,14 +122,14 @@ export default function AudioRecognitionPage() {
         // Refresh history
         loadRecentHistory();
       } else {
-        setStatus('No match found');
+        setStatus(result.error || 'No match found');
         // Try again in 30 seconds if no match
         setNextRecognitionCountdown(30);
       }
 
     } catch (error) {
       console.error('Recognition error:', error);
-      setStatus('Recognition error - retrying in 30 seconds');
+      setStatus(`Recognition error: ${error instanceof Error ? error.message : 'Unknown error'} - retrying in 30 seconds`);
       setNextRecognitionCountdown(30);
     }
   }, [loadRecentHistory]);
@@ -146,10 +151,19 @@ export default function AudioRecognitionPage() {
         }
       });
 
-      const sampleRecorder = new MediaRecorder(stream, {
-        mimeType: 'audio/webm;codecs=opus'
-      });
+      // Try different MIME types for better compatibility
+      let mimeType = 'audio/webm;codecs=opus';
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = 'audio/webm';
+      }
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = 'audio/mp4';
+      }
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = '';
+      }
 
+      const sampleRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
       const sampleChunks: Blob[] = [];
 
       sampleRecorder.ondataavailable = (event) => {
@@ -162,7 +176,9 @@ export default function AudioRecognitionPage() {
         stream.getTracks().forEach(track => track.stop());
         
         if (sampleChunks.length > 0) {
-          const audioBlob = new Blob(sampleChunks, { type: 'audio/webm' });
+          const audioBlob = new Blob(sampleChunks, { 
+            type: sampleChunks[0]?.type || 'audio/webm' 
+          });
           await processAudioSample(audioBlob);
         }
         setIsProcessing(false);
@@ -172,12 +188,14 @@ export default function AudioRecognitionPage() {
       
       // Record for 10 seconds
       setTimeout(() => {
-        sampleRecorder.stop();
+        if (sampleRecorder.state === 'recording') {
+          sampleRecorder.stop();
+        }
       }, 10000);
 
     } catch (error) {
       console.error('Error during recognition:', error);
-      setStatus('Recognition failed');
+      setStatus(`Recognition failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setIsProcessing(false);
     }
   }, [isProcessing, processAudioSample]);
@@ -193,10 +211,22 @@ export default function AudioRecognitionPage() {
         }
       });
 
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'audio/webm;codecs=opus'
-      });
+      // Try different MIME types for better compatibility
+      let mimeType = 'audio/webm;codecs=opus';
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = 'audio/webm';
+        console.log('⚠️ Opus codec not supported, using basic WebM');
+      }
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = 'audio/mp4';
+        console.log('⚠️ WebM not supported, using MP4');
+      }
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = '';
+        console.log('⚠️ Using default audio format');
+      }
 
+      const mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 

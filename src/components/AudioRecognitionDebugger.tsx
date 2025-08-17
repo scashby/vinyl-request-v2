@@ -21,6 +21,8 @@ interface RecognitionResult {
   debugInfo?: {
     processingTime: number;
     matchesCount: number;
+    audioFileSize: number;
+    base64Length: number;
   };
   rawResponse?: unknown;
 }
@@ -61,24 +63,40 @@ export default function AudioRecognitionDebugger() {
       addLog('✅ Microphone access granted', 'success');
       addLog('📊 Audio constraints: sampleRate=44100, no processing', 'info');
 
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'audio/webm;codecs=opus'
-      });
+      // Try different MIME types for better compatibility
+      let mimeType = 'audio/webm;codecs=opus';
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = 'audio/webm';
+        addLog('⚠️ Opus codec not supported, using basic WebM', 'info');
+      }
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = 'audio/mp4';
+        addLog('⚠️ WebM not supported, using MP4', 'info');
+      }
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = '';
+        addLog('⚠️ Using default audio format', 'info');
+      }
 
+      addLog(`🎵 Using MIME type: ${mimeType || 'default'}`, 'info');
+
+      const mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
           audioChunksRef.current.push(event.data);
-          addLog(`📦 Audio chunk received: ${event.data.size} bytes`, 'info');
+          addLog(`📦 Audio chunk received: ${event.data.size} bytes (type: ${event.data.type})`, 'info');
         }
       };
 
       mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const audioBlob = new Blob(audioChunksRef.current, { 
+          type: audioChunksRef.current[0]?.type || 'audio/webm' 
+        });
         setAudioBlob(audioBlob);
-        addLog(`🎵 Recording complete: ${audioBlob.size} bytes total`, 'success');
+        addLog(`🎵 Recording complete: ${audioBlob.size} bytes total (${audioBlob.type})`, 'success');
         
         // Stop all tracks
         stream.getTracks().forEach(track => track.stop());
@@ -123,9 +141,9 @@ export default function AudioRecognitionDebugger() {
 
     try {
       const formData = new FormData();
-      formData.append('audio', audioBlob, 'test-sample.webm');
+      formData.append('audio', audioBlob, 'test-sample.' + (audioBlob.type.includes('webm') ? 'webm' : 'mp4'));
       
-      addLog(`📤 Sending ${audioBlob.size} bytes to API...`, 'info');
+      addLog(`📤 Sending ${audioBlob.size} bytes (${audioBlob.type}) to API...`, 'info');
 
       const response = await fetch('/api/audio-recognition', {
         method: 'POST',
@@ -147,6 +165,8 @@ export default function AudioRecognitionDebugger() {
         if (result.debugInfo) {
           addLog(`⏱️ Processing time: ${result.debugInfo.processingTime}ms`, 'info');
           addLog(`📊 Matches found: ${result.debugInfo.matchesCount}`, 'info');
+          addLog(`📁 Audio file size: ${result.debugInfo.audioFileSize} bytes`, 'info');
+          addLog(`🔤 Base64 length: ${result.debugInfo.base64Length}`, 'info');
         }
       } else {
         addLog(`❌ Recognition failed: ${result.error}`, 'error');
@@ -171,7 +191,7 @@ export default function AudioRecognitionDebugger() {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    addLog(`📁 Testing with uploaded file: ${file.name} (${file.size} bytes)`, 'info');
+    addLog(`📁 Testing with uploaded file: ${file.name} (${file.size} bytes, ${file.type})`, 'info');
     setIsProcessing(true);
 
     try {
@@ -195,6 +215,30 @@ export default function AudioRecognitionDebugger() {
       addLog(`💥 Upload test failed: ${errorMessage}`, 'error');
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const testApiHealth = async () => {
+    try {
+      addLog('🔍 Testing API health...', 'info');
+      const response = await fetch('/api/audio-recognition', {
+        method: 'GET'
+      });
+      
+      const result = await response.json();
+      addLog(`🔍 API Health: ${response.status}`, response.ok ? 'success' : 'error');
+      addLog(JSON.stringify(result, null, 2), 'data');
+      
+      if (result.environment) {
+        if (result.environment.hasShazamKey) {
+          addLog('✅ Shazam API key is configured', 'success');
+        } else {
+          addLog('❌ Shazam API key is missing', 'error');
+        }
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      addLog(`💥 API health check failed: ${errorMessage}`, 'error');
     }
   };
 
@@ -224,6 +268,22 @@ export default function AudioRecognitionDebugger() {
         flexWrap: 'wrap',
         alignItems: 'center'
       }}>
+        <button
+          onClick={testApiHealth}
+          style={{
+            background: '#6366f1',
+            color: 'white',
+            border: 'none',
+            borderRadius: 6,
+            padding: '8px 16px',
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: 'pointer'
+          }}
+        >
+          🔍 Test API Health
+        </button>
+
         <button
           onClick={isRecording ? stopRecording : startRecording}
           disabled={isProcessing}
@@ -329,7 +389,11 @@ export default function AudioRecognitionDebugger() {
               <div><strong>Title:</strong> {result.track.title}</div>
               <div><strong>Confidence:</strong> {Math.round(result.track.confidence * 100)}%</div>
               {result.debugInfo && (
-                <div><strong>Processing:</strong> {result.debugInfo.processingTime}ms</div>
+                <div>
+                  <div><strong>Processing:</strong> {result.debugInfo.processingTime}ms</div>
+                  <div><strong>Audio Size:</strong> {result.debugInfo.audioFileSize} bytes</div>
+                  <div><strong>Base64 Length:</strong> {result.debugInfo.base64Length}</div>
+                </div>
               )}
             </div>
           )}
@@ -363,7 +427,7 @@ export default function AudioRecognitionDebugger() {
         
         {debugLog.length === 0 ? (
           <div style={{ color: '#6b7280', fontStyle: 'italic' }}>
-            Click &quot;Start Recording&quot; to begin debugging...
+            Click &quot;Test API Health&quot; or &quot;Start Recording&quot; to begin debugging...
           </div>
         ) : (
           debugLog.map((log, index) => (
@@ -390,14 +454,14 @@ export default function AudioRecognitionDebugger() {
         borderRadius: 8,
         fontSize: 14
       }}>
-        <div style={{ fontWeight: 600, marginBottom: 8 }}>🔍 Debugging Tips:</div>
-        <ul style={{ margin: 0, paddingLeft: 20 }}>
-          <li>Make sure audio is clear and loud enough</li>
-          <li>Try playing &quot;Dancing Queen&quot; directly to your microphone</li>
-          <li>Check the debug log for API response details</li>
-          <li>Verify your SHAZAM_RAPID_API_KEY is correct</li>
-          <li>Look for processing time - very fast responses might indicate API issues</li>
-        </ul>
+        <div style={{ fontWeight: 600, marginBottom: 8 }}>🔍 Debugging Steps:</div>
+        <ol style={{ margin: 0, paddingLeft: 20 }}>
+          <li><strong>Test API Health first</strong> - Check if Shazam API key is configured</li>
+          <li><strong>Record clear audio</strong> - Try &quot;Dancing Queen&quot; by ABBA (very recognizable)</li>
+          <li><strong>Check debug log</strong> - Look for exact error messages</li>
+          <li><strong>Try uploading a file</strong> - Test with a short MP3 of a popular song</li>
+          <li><strong>Monitor processing time</strong> - Very fast responses might indicate API issues</li>
+        </ol>
       </div>
     </div>
   );
