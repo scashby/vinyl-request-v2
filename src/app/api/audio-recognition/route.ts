@@ -38,7 +38,7 @@ async function checkCurrentContext(artist: string, title: string) {
     .select('*')
     .order('created_at', { ascending: false })
     .limit(1)
-    .single();
+    .maybeSingle();
 
   if (currentTrack) {
     const isSameTrack = 
@@ -194,8 +194,8 @@ export async function POST(request: NextRequest) {
     console.log('🔑 API Key present:', process.env.SHAZAM_RAPID_API_KEY.substring(0, 10) + '...');
     console.log('🎵 Calling Shazam API...');
 
-    // Prepare API call with detailed logging
-    const apiUrl = 'https://shazam.p.rapidapi.com/songs/v2/detect';
+    // Prepare API call with detailed logging - FIXED ENDPOINT
+    const apiUrl = 'https://shazam.p.rapidapi.com/songs/detect';
     const headers = {
       'Content-Type': 'text/plain',
       'X-RapidAPI-Key': process.env.SHAZAM_RAPID_API_KEY,
