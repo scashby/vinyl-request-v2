@@ -1,4 +1,4 @@
-// src/app/api/audio-recognition/route.ts - CORRECT SHAZAM API FORMAT
+// src/app/api/audio-recognition/route.ts - FIXED UNUSED VARIABLES
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from 'src/lib/supabaseClient';
 
@@ -29,133 +29,6 @@ interface ShazamResponse {
   timestamp?: number;
   timezone?: string;
   location?: unknown;
-}
-
-// Convert WebM audio to RAW PCM format that Shazam API expects
-// Based on documentation: RAW PCM, 16-bit little endian, mono, base64 encoded
-async function convertToShazamFormat(audioFile: File): Promise<{ 
-  isValid: boolean; 
-  base64Audio?: string; 
-  details: string; 
-}> {
-  console.log(`📁 Converting audio for Shazam API:`, {
-    name: audioFile.name,
-    size: audioFile.size,
-    type: audioFile.type
-  });
-
-  if (audioFile.size === 0) {
-    return { isValid: false, details: 'File is empty (0 bytes)' };
-  }
-  
-  if (audioFile.size > 10 * 1024 * 1024) {
-    return { isValid: false, details: `File too large: ${audioFile.size} bytes` };
-  }
-
-  if (audioFile.size < 1000) {
-    return { isValid: false, details: `File too small: ${audioFile.size} bytes` };
-  }
-
-  try {
-    console.log('🔄 Converting WebM to RAW PCM format for Shazam...');
-    
-    // We need to convert WebM to RAW PCM format on the client side
-    // Since AudioContext doesn't work on server, we'll send instructions back
-    if (audioFile.type.includes('webm') || audioFile.type.includes('mp4')) {
-      return { 
-        isValid: false, 
-        details: 'WebM/MP4 format detected. Shazam API requires RAW PCM format. Please convert audio client-side first.' 
-      };
-    }
-
-    // If it's already a raw/wav file, process it
-    const arrayBuffer = await audioFile.arrayBuffer();
-    const base64Audio = Buffer.from(arrayBuffer).toString('base64');
-    
-    console.log(`✅ Audio converted to base64:`, {
-      originalSize: audioFile.size,
-      originalType: audioFile.type,
-      base64Length: base64Audio.length
-    });
-
-    return {
-      isValid: true,
-      base64Audio,
-      details: `Converted ${audioFile.size} bytes ${audioFile.type} to ${base64Audio.length} base64 chars`
-    };
-  } catch (error) {
-    return { 
-      isValid: false, 
-      details: `Audio conversion failed: ${error instanceof Error ? error.message : 'Unknown error'}` 
-    };
-  }
-}
-
-// Helper function to check if a track is already playing
-async function checkCurrentContext(artist: string, title: string) {
-  const { data: currentTrack } = await supabase
-    .from('now_playing')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (currentTrack) {
-    const isSameTrack = 
-      currentTrack.artist?.toLowerCase() === artist.toLowerCase() &&
-      currentTrack.title?.toLowerCase() === title.toLowerCase();
-
-    if (isSameTrack) {
-      const timeSinceStart = Date.now() - new Date(currentTrack.started_at).getTime();
-      const timeSinceStartSeconds = Math.floor(timeSinceStart / 1000);
-      
-      if (currentTrack.next_recognition_in && timeSinceStartSeconds < currentTrack.next_recognition_in) {
-        return {
-          isDuplicate: true,
-          currentTrack,
-          remainingTime: currentTrack.next_recognition_in - timeSinceStartSeconds
-        };
-      }
-    }
-  }
-
-  return { isDuplicate: false };
-}
-
-// Helper function to estimate track duration and set next recognition time
-function calculateNextRecognitionTime(artist: string, title: string): number {
-  let estimatedDuration = 180; // Default to 3 minutes
-  
-  const titleLower = title.toLowerCase();
-  
-  if (titleLower.includes('interlude') || titleLower.includes('intro')) {
-    estimatedDuration = 60; // 1 minute
-  } else if (titleLower.includes('extended') || titleLower.includes('long')) {
-    estimatedDuration = 480; // 8 minutes
-  } else if (titleLower.includes('radio edit') || titleLower.includes('single')) {
-    estimatedDuration = 210; // 3.5 minutes
-  }
-  
-  return Math.floor(estimatedDuration * 0.8);
-}
-
-// Helper function to match with collection
-async function findCollectionMatch(artist: string, title: string) {
-  const { data: matches } = await supabase
-    .from('collection')
-    .select('*')
-    .or(`artist.ilike.%${artist}%,title.ilike.%${title}%`)
-    .limit(5);
-
-  if (matches && matches.length > 0) {
-    const exactMatch = matches.find(m => 
-      m.artist?.toLowerCase() === artist.toLowerCase() ||
-      m.title?.toLowerCase().includes(title.toLowerCase())
-    );
-    return exactMatch || matches[0];
-  }
-  
-  return null;
 }
 
 export async function POST(request: NextRequest) {
@@ -208,18 +81,11 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Process uploaded file
-    const audioProcessResult = await convertToShazamFormat(audioFile);
-    
-    if (!audioProcessResult.isValid) {
-      console.error('❌ Audio conversion failed:', audioProcessResult.details);
-      return NextResponse.json({
-        success: false,
-        error: `Audio file invalid: ${audioProcessResult.details}`
-      }, { status: 400 });
-    }
+    // For other audio types, try to process directly
+    const arrayBuffer = await audioFile.arrayBuffer();
+    const base64Audio = Buffer.from(arrayBuffer).toString('base64');
 
-    return await processWithShazam(audioProcessResult.base64Audio!, audioFile.size, startTime);
+    return await processWithShazam(base64Audio, audioFile.size, startTime);
 
   } catch (error) {
     const processingTime = Date.now() - startTime;
@@ -370,9 +236,43 @@ async function processWithShazam(base64Audio: string, originalSize: number, star
     matchesCount: shazamData.matches?.length || 0
   });
 
-  // Continue with the rest of your existing logic...
-  // (checkCurrentContext, calculateNextRecognitionTime, findCollectionMatch, etc.)
-  
+  // Log successful recognition
+  await supabase.from('audio_recognition_logs').insert({
+    artist,
+    title,
+    album: null, // Shazam doesn't reliably provide album info
+    source: 'microphone',
+    service: 'shazam',
+    confidence: shazamData.matches?.length > 0 ? 0.9 : 0.7,
+    confirmed: true,
+    raw_response: shazamData,
+    created_at: new Date().toISOString()
+  });
+
+  // Update now_playing table
+  try {
+    // Clear existing entries
+    await supabase.from('now_playing').delete().neq('id', 0);
+
+    // Insert new entry
+    await supabase.from('now_playing').insert({
+      artist,
+      title,
+      album_title: null,
+      album_id: null,
+      started_at: new Date().toISOString(),
+      recognition_confidence: shazamData.matches?.length > 0 ? 0.9 : 0.7,
+      service_used: 'shazam',
+      recognition_image_url: imageUrl,
+      next_recognition_in: 180, // 3 minutes default
+      created_at: new Date().toISOString()
+    });
+
+    console.log('✅ Updated now_playing table');
+  } catch (dbError) {
+    console.error('⚠️ Database update failed:', dbError);
+  }
+
   const processingTime = Date.now() - startTime;
   console.log(`✅ Recognition complete in ${processingTime}ms: ${artist} - ${title}`);
 
@@ -381,6 +281,7 @@ async function processWithShazam(base64Audio: string, originalSize: number, star
     track: {
       artist,
       title,
+      album: null,
       image_url: imageUrl,
       confidence: shazamData.matches?.length > 0 ? 0.9 : 0.7,
       service: 'shazam',

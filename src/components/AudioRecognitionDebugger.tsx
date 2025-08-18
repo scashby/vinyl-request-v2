@@ -1,4 +1,4 @@
-// src/components/AudioRecognitionDebugger.tsx - WITH RAW PCM CONVERSION
+// src/components/AudioRecognitionDebugger.tsx - FIXED ERRORS
 "use client";
 
 import React, { useState, useRef } from 'react';
@@ -51,7 +51,12 @@ export default function AudioRecognitionDebugger() {
   const convertToRawPCM = async (webmBlob: Blob): Promise<ArrayBuffer> => {
     addLog('🔄 Converting WebM to RAW PCM format for Shazam...', 'info');
     
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)({
+    // FIXED: Proper typing for webkit fallback
+    interface WindowWithWebkit extends Window {
+      webkitAudioContext?: typeof AudioContext;
+    }
+    const AudioContextClass = window.AudioContext || (window as WindowWithWebkit).webkitAudioContext;
+    const audioContext = new AudioContextClass({
       sampleRate: 44100
     });
     
@@ -475,7 +480,7 @@ export default function AudioRecognitionDebugger() {
         
         {debugLog.length === 0 ? (
           <div style={{ color: '#6b7280', fontStyle: 'italic' }}>
-            Click &quot;Test API Health&quot; or &quot;Start Recording&quot; to begin debugging...
+            Click &ldquo;Test API Health&rdquo; or &ldquo;Start Recording&rdquo; to begin debugging...
           </div>
         ) : (
           debugLog.map((log, index) => (
@@ -505,7 +510,7 @@ export default function AudioRecognitionDebugger() {
         <div style={{ fontWeight: 600, marginBottom: 8 }}>🔧 Fixed: RAW PCM Conversion</div>
         <ul style={{ margin: 0, paddingLeft: 20 }}>
           <li><strong>Format Issue Resolved:</strong> Now converts WebM to RAW PCM format that Shazam API requires</li>
-          <li><strong>Test with popular songs:</strong> Try "Bohemian Rhapsody", "Hotel California", or "Dancing Queen"</li>
+          <li><strong>Test with popular songs:</strong> Try &ldquo;Bohemian Rhapsody&rdquo;, &ldquo;Hotel California&rdquo;, or &ldquo;Dancing Queen&rdquo;</li>
           <li><strong>Audio requirements:</strong> RAW PCM 16-bit little endian, mono channel, base64 encoded</li>
           <li><strong>Conversion happens client-side:</strong> Uses AudioContext to convert WebM to proper format</li>
         </ul>
