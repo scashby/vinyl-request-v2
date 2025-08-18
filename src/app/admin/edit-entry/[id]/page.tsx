@@ -12,18 +12,18 @@ type Track = { position: string; title: string; duration: string };
 
 type CollectionEntry = {
   id: string;
-  artist: string;
-  title: string;
-  year: string;
-  folder: string;
-  format: string;
-  image_url: string;
-  media_condition: string;
+  artist: string | null;
+  title: string | null;
+  year: string | null;
+  folder: string | null;
+  format: string | null;
+  image_url: string | null;
+  media_condition: string | null;
   sell_price: string | null;
-  blocked: boolean;
-  blocked_sides: string[];
-  tracklists: string;
-  discogs_release_id: string;
+  blocked: boolean | null;
+  blocked_sides: string[] | null;
+  tracklists: string | null;
+  discogs_release_id: string | null;
   [key: string]: unknown;
 };
 
@@ -69,6 +69,8 @@ export default function EditEntryPage() {
 
   useEffect(() => {
     fetchEntry(id).then((data) => {
+      console.log('Fetched entry data:', data);
+      console.log('sell_price value:', data?.sell_price);
       setEntry(data);
       setBlockedSides(Array.isArray(data?.blocked_sides) ? data.blocked_sides : []);
       let tl: unknown[] = [];
@@ -146,15 +148,27 @@ export default function EditEntryPage() {
     setStatus('Saving...');
     
     const update = {
-      ...entry,
-      blocked_sides: blockedSides,
+      artist: entry.artist || '',
+      title: entry.title || '',
+      year: entry.year || '',
+      folder: entry.folder || '',
+      format: entry.format || '',
+      image_url: entry.image_url || '',
+      media_condition: entry.media_condition || '',
+      sell_price: entry.sell_price || null,
+      blocked_sides: blockedSides || [],
       blocked: !!entry.blocked,
       tracklists: JSON.stringify(tracks),
+      discogs_release_id: entry.discogs_release_id || '',
     };
+    
+    console.log('Saving entry with sell_price:', update.sell_price);
+    console.log('Full update object:', update);
     
     const { error } = await supabase.from('collection').update(update).eq('id', entry.id);
     
     if (error) {
+      console.error('Supabase error:', error);
       setStatus(`Error: ${error.message}`);
       setSaving(false);
     } else {
@@ -297,7 +311,7 @@ export default function EditEntryPage() {
               />
             </div>
 
-            {/* NEW: Sell Price Field */}
+            {/* Sell Price Field */}
             <div>
               <label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>
                 💰 Sell Price
@@ -305,12 +319,20 @@ export default function EditEntryPage() {
               <input 
                 style={inputStyle}
                 value={entry.sell_price || ''} 
-                onChange={e => handleChange('sell_price', e.target.value)}
+                onChange={e => {
+                  console.log('Updating sell_price to:', e.target.value);
+                  handleChange('sell_price', e.target.value);
+                }}
                 placeholder="e.g. $25.00 or NFS"
               />
               <div style={{ fontSize: '12px', color: '#6b7280', marginTop: 4 }}>
                 Enter price like &quot;$25.00&quot; or &quot;NFS&quot; for not for sale. Leave blank if not selling.
               </div>
+              {entry.sell_price && (
+                <div style={{ fontSize: '12px', color: '#059669', marginTop: 4, fontWeight: 'bold' }}>
+                  Current price: {entry.sell_price}
+                </div>
+              )}
             </div>
 
             <div>
