@@ -67,14 +67,17 @@ export default function AudioRecognitionDebugger() {
       const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
       addLog(`🎵 Decoded audio: ${audioBuffer.numberOfChannels} channels, ${audioBuffer.duration.toFixed(2)}s, ${audioBuffer.sampleRate}Hz`, 'info');
       
-      // Convert to mono if stereo
+      // Convert to mono and limit to 3 seconds to reduce size
+      const maxSamples = Math.min(audioBuffer.length, 3 * audioBuffer.sampleRate);
       const channelData = audioBuffer.numberOfChannels > 1 
-        ? audioBuffer.getChannelData(0) // Use left channel
+        ? audioBuffer.getChannelData(0) // Use left channel for mono
         : audioBuffer.getChannelData(0);
       
-      // Convert Float32Array to 16-bit PCM (little endian)
-      const pcmData = new Int16Array(channelData.length);
-      for (let i = 0; i < channelData.length; i++) {
+      addLog(`🔧 Trimming to 3 seconds max: ${maxSamples} samples`, 'info');
+      
+      // Convert Float32Array to 16-bit PCM (little endian) - limited samples
+      const pcmData = new Int16Array(maxSamples);
+      for (let i = 0; i < maxSamples; i++) {
         // Convert from -1.0 to 1.0 range to -32768 to 32767 range
         const sample = Math.max(-1, Math.min(1, channelData[i]));
         pcmData[i] = Math.round(sample * 32767);
@@ -143,16 +146,16 @@ export default function AudioRecognitionDebugger() {
 
       mediaRecorder.start();
       setIsRecording(true);
-      addLog('🔴 Recording started (10 seconds)...', 'info');
+      addLog('🔴 Recording started (5 seconds)...', 'info');
 
-      // Auto-stop after 10 seconds
+      // Auto-stop after 5 seconds (reduced for smaller file size)
       setTimeout(() => {
         if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
           mediaRecorderRef.current.stop();
           setIsRecording(false);
           addLog('⏹️ Recording stopped automatically', 'info');
         }
-      }, 10000);
+      }, 5000);
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -310,7 +313,7 @@ export default function AudioRecognitionDebugger() {
         fontWeight: 'bold',
         color: '#1f2937'
       }}>
-        🔧 Audio Recognition Debugger (RAW PCM Format)
+        🔧 Audio Recognition Debugger (RAW PCM - Size Optimized)
       </h2>
 
       {/* Controls */}
@@ -352,7 +355,7 @@ export default function AudioRecognitionDebugger() {
             opacity: isProcessing ? 0.6 : 1
           }}
         >
-          {isRecording ? '⏹️ Stop Recording' : '🎤 Start Recording (10s)'}
+          {isRecording ? '⏹️ Stop Recording' : '🎤 Start Recording (5s)'}
         </button>
 
         <button
@@ -507,11 +510,12 @@ export default function AudioRecognitionDebugger() {
         borderRadius: 8,
         fontSize: 14
       }}>
-        <div style={{ fontWeight: 600, marginBottom: 8 }}>🔧 Fixed: RAW PCM Conversion</div>
+        <div style={{ fontWeight: 600, marginBottom: 8 }}>🔧 Fixed: RAW PCM Conversion + Size Limits</div>
         <ul style={{ margin: 0, paddingLeft: 20 }}>
           <li><strong>Format Issue Resolved:</strong> Now converts WebM to RAW PCM format that Shazam API requires</li>
+          <li><strong>Size Reduced:</strong> Limited to 3 seconds and mono channel to avoid 413 errors</li>
           <li><strong>Test with popular songs:</strong> Try &ldquo;Bohemian Rhapsody&rdquo;, &ldquo;Hotel California&rdquo;, or &ldquo;Dancing Queen&rdquo;</li>
-          <li><strong>Audio requirements:</strong> RAW PCM 16-bit little endian, mono channel, base64 encoded</li>
+          <li><strong>Audio requirements:</strong> RAW PCM 16-bit little endian, mono channel, ≤3 seconds, base64 encoded</li>
           <li><strong>Conversion happens client-side:</strong> Uses AudioContext to convert WebM to proper format</li>
         </ul>
       </div>
