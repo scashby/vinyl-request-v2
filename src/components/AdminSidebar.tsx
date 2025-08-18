@@ -91,11 +91,15 @@ export default function AdminSidebar() {
           >
             🔧 Debug Tool
           </Link>
-          {/* FIXED: TV Display Link */}
+          {/* FIXED: TV Display Link with debugging */}
           <a 
             href="/admin/audio-recognition/display"
             target="_blank"
             rel="noopener noreferrer"
+            onClick={() => {
+              console.log('Sidebar TV Display clicked, URL:', '/admin/audio-recognition/display');
+              console.log('Current location:', window.location.href);
+            }}
             className="block w-full text-center bg-gray-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-gray-700 transition-colors"
           >
             📺 TV Display

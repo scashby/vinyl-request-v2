@@ -576,11 +576,14 @@ export default function AudioRecognitionPage() {
             </button>
           )}
 
-          {/* TV Display Link */}
+          {/* TV Display Link - Fixed URL */}
           <a
             href="/admin/audio-recognition/display"
             target="_blank"
             rel="noopener noreferrer"
+            onClick={() => {
+              console.log('TV Display link clicked, going to:', '/admin/audio-recognition/display');
+            }}
             style={{
               background: '#2563eb',
               color: 'white',
