@@ -1,4 +1,4 @@
-// src/app/admin/admin-dashboard/page.js
+// src/app/admin/admin-dashboard/page.js - ADD TV DISPLAY OPTION
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -255,6 +255,76 @@ export default function AdminDashboardPage() {
         }}>
           Welcome back! Here&apos;s what&apos;s happening with Dead Wax Dialogues.
         </p>
+      </div>
+
+      {/* ADDED: TV Display Quick Access */}
+      <div style={{
+        background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
+        color: 'white',
+        borderRadius: 16,
+        padding: 24,
+        marginBottom: 24,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between'
+      }}>
+        <div>
+          <h3 style={{
+            margin: 0,
+            fontSize: 20,
+            fontWeight: 600,
+            marginBottom: 8
+          }}>
+            📺 Live Audio Recognition Display
+          </h3>
+          <p style={{
+            margin: 0,
+            opacity: 0.9,
+            fontSize: 14
+          }}>
+            Full-screen display for showing currently recognized tracks on TV/monitor
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 12 }}>
+          <a
+            href="/admin/audio-recognition/display"
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => {
+              console.log('🔗 Dashboard TV Display clicked');
+              console.log('🌐 Target URL:', '/admin/audio-recognition/display');
+              console.log('📍 Current URL:', window.location.href);
+            }}
+            style={{
+              background: '#2563eb',
+              color: 'white',
+              padding: '12px 24px',
+              borderRadius: 8,
+              textDecoration: 'none',
+              fontWeight: 600,
+              fontSize: 16,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8
+            }}
+          >
+            📺 Open TV Display
+          </a>
+          <Link
+            href="/admin/audio-recognition"
+            style={{
+              background: 'rgba(255,255,255,0.2)',
+              color: 'white',
+              padding: '12px 20px',
+              borderRadius: 8,
+              textDecoration: 'none',
+              fontWeight: 600,
+              fontSize: 16
+            }}
+          >
+            🎧 Control Panel
+          </Link>
+        </div>
       </div>
 
       {/* System Health & Authentication Status */}
