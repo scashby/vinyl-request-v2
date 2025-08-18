@@ -1,4 +1,4 @@
-// src/app/admin/audio-recognition/page.tsx - COMPLETE WITH FIXED TIMING
+// src/app/admin/audio-recognition/page.tsx - COMPREHENSIVE FIX
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from 'react';
@@ -56,15 +56,22 @@ export default function AudioRecognitionPage() {
   const [recognitionHistory, setRecognitionHistory] = useState<RecognitionResult[]>([]);
   const [status, setStatus] = useState('Ready to listen');
   const [nextRecognitionCountdown, setNextRecognitionCountdown] = useState(0);
+  const [debugInfo, setDebugInfo] = useState<string[]>([]);
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recognitionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Add debug logging
+  const addDebugInfo = useCallback((message: string) => {
+    console.log(message);
+    setDebugInfo(prev => [`${new Date().toLocaleTimeString()}: ${message}`, ...prev.slice(0, 9)]);
+  }, []);
+
   // RAW PCM Conversion Function
   const convertToRawPCM = useCallback(async (webmBlob: Blob): Promise<ArrayBuffer> => {
-    console.log('🔄 Converting WebM to RAW PCM format for Shazam...');
+    addDebugInfo('🔄 Converting WebM to RAW PCM format for Shazam...');
     
     interface WindowWithWebkit extends Window {
       webkitAudioContext?: typeof AudioContext;
@@ -81,10 +88,10 @@ export default function AudioRecognitionPage() {
     
     try {
       const arrayBuffer = await webmBlob.arrayBuffer();
-      console.log(`📁 WebM file size: ${arrayBuffer.byteLength} bytes`);
+      addDebugInfo(`📁 WebM file size: ${arrayBuffer.byteLength} bytes`);
       
       const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-      console.log(`🎵 Decoded audio: ${audioBuffer.numberOfChannels} channels, ${audioBuffer.duration.toFixed(2)}s, ${audioBuffer.sampleRate}Hz`);
+      addDebugInfo(`🎵 Decoded audio: ${audioBuffer.numberOfChannels} channels, ${audioBuffer.duration.toFixed(2)}s, ${audioBuffer.sampleRate}Hz`);
       
       // Convert to mono and limit to 3 seconds to reduce size
       const maxSamples = Math.min(audioBuffer.length, 3 * audioBuffer.sampleRate);
@@ -92,7 +99,7 @@ export default function AudioRecognitionPage() {
         ? audioBuffer.getChannelData(0) // Use left channel for mono
         : audioBuffer.getChannelData(0);
       
-      console.log(`🔧 Trimming to 3 seconds max: ${maxSamples} samples`);
+      addDebugInfo(`🔧 Trimming to 3 seconds max: ${maxSamples} samples`);
       
       // Convert Float32Array to 16-bit PCM (little endian) - limited samples
       const pcmData = new Int16Array(maxSamples);
@@ -102,20 +109,21 @@ export default function AudioRecognitionPage() {
         pcmData[i] = Math.round(sample * 32767);
       }
       
-      console.log(`✅ Converted to RAW PCM: ${pcmData.buffer.byteLength} bytes (${pcmData.length} samples)`);
+      addDebugInfo(`✅ Converted to RAW PCM: ${pcmData.buffer.byteLength} bytes (${pcmData.length} samples)`);
       
       await audioContext.close();
       return pcmData.buffer;
     } catch (error) {
       await audioContext.close();
-      console.error(`❌ Audio conversion failed:`, error);
+      addDebugInfo(`❌ Audio conversion failed: ${error}`);
       throw error;
     }
-  }, []);
+  }, [addDebugInfo]);
 
   // FIXED: Better error handling for RLS issues
   const loadCurrentTrack = useCallback(async () => {
     try {
+      addDebugInfo('📖 Loading current track from database...');
       const { data, error } = await supabase
         .from('now_playing')
         .select('*')
@@ -126,12 +134,13 @@ export default function AudioRecognitionPage() {
       if (error) {
         if (error.code === 'PGRST116') {
           // No rows - this is fine
+          addDebugInfo('📖 No current track in database');
           setCurrentTrack(null);
         } else {
-          console.warn('Database access issue:', error.message);
-          // Don't crash, just log it
+          addDebugInfo(`❌ Database access issue: ${error.message}`);
         }
       } else if (data) {
+        addDebugInfo(`✅ Loaded current track: ${data.artist} - ${data.title}`);
         setCurrentTrack(data);
         // Calculate remaining time for next recognition
         if (data.next_recognition_in) {
@@ -141,13 +150,14 @@ export default function AudioRecognitionPage() {
         }
       }
     } catch (error) {
-      console.warn('Error loading current track:', error);
+      addDebugInfo(`❌ Error loading current track: ${error}`);
     }
-  }, []);
+  }, [addDebugInfo]);
 
   // FIXED: Better error handling for RLS issues
   const loadRecentHistory = useCallback(async () => {
     try {
+      addDebugInfo('📖 Loading recognition history from database...');
       const { data, error } = await supabase
         .from('audio_recognition_logs')
         .select('*')
@@ -155,41 +165,34 @@ export default function AudioRecognitionPage() {
         .limit(10);
 
       if (error) {
-        console.warn('Cannot load history:', error.message);
-        // Set some placeholder data so UI doesn't break
-        setRecognitionHistory([
-          {
-            artist: 'Recent recognition',
-            title: 'Check browser console for details',
-            confidence: 0,
-            service: 'Note: Database permission issue',
-            created_at: new Date().toISOString()
-          }
-        ]);
+        addDebugInfo(`❌ Cannot load history: ${error.message}`);
+        // Don't set placeholder data, leave it empty
       } else if (data) {
+        addDebugInfo(`✅ Loaded ${data.length} history entries`);
         setRecognitionHistory(data);
       }
     } catch (error) {
-      console.warn('Error loading history:', error);
+      addDebugInfo(`❌ Error loading history: ${error}`);
     }
-  }, []);
+  }, [addDebugInfo]);
 
-  // FIXED: Extract song length from Shazam metadata, then simple math
-  const calculateIntelligentDelay = useCallback((shazamResult: ShazamResult, isNewTrack: boolean) => {
+  // FIXED: Extract song length from Shazam metadata, return INTEGER seconds
+  const calculateIntelligentDelay = useCallback((shazamResult: ShazamResult, isNewTrack: boolean): number => {
     if (!isNewTrack) {
-      // Same track, wait 60 seconds
+      addDebugInfo('🔄 Same track detected, waiting 60 seconds');
       return 60;
     }
 
     const matches = shazamResult.matches || [];
     if (matches.length === 0) {
-      return 120; // fallback
+      addDebugInfo('⚠️ No Shazam matches data, using fallback timing (120s)');
+      return 120;
     }
 
     const offsetInSong = matches[0].offset || 0; // where we are in the song
     
     // Extract actual song duration from Shazam metadata
-    let songDurationSeconds = null;
+    let songDurationSeconds: number | null = null;
     
     if (shazamResult.track?.sections) {
       for (const section of shazamResult.track.sections) {
@@ -201,13 +204,13 @@ export default function AudioRecognitionPage() {
                 meta.title?.toLowerCase().includes('time')) {
               
               const durationText = meta.text;
-              console.log('🔍 Found duration metadata:', meta.title, '=', durationText);
+              addDebugInfo(`🔍 Found duration metadata: ${meta.title} = ${durationText}`);
               
               // Parse formats like "5:16", "316", or "5m 16s"
               const timeMatch = durationText?.match(/(\d+):(\d+)/);
               if (timeMatch) {
                 songDurationSeconds = parseInt(timeMatch[1]) * 60 + parseInt(timeMatch[2]);
-                console.log(`✅ Parsed song duration: ${songDurationSeconds}s (${timeMatch[1]}:${timeMatch[2]})`);
+                addDebugInfo(`✅ Parsed song duration: ${songDurationSeconds}s (${timeMatch[1]}:${timeMatch[2]})`);
                 break;
               }
               
@@ -215,7 +218,7 @@ export default function AudioRecognitionPage() {
               const secondsMatch = durationText?.match(/^\d+$/);
               if (secondsMatch) {
                 songDurationSeconds = parseInt(durationText);
-                console.log(`✅ Parsed song duration: ${songDurationSeconds}s`);
+                addDebugInfo(`✅ Parsed song duration: ${songDurationSeconds}s`);
                 break;
               }
             }
@@ -227,32 +230,108 @@ export default function AudioRecognitionPage() {
     
     // If we couldn't find duration in metadata, fallback to estimation
     if (!songDurationSeconds) {
-      console.log('⚠️ Could not find song duration in Shazam metadata, using fallback');
+      addDebugInfo('⚠️ Could not find song duration in Shazam metadata, using fallback estimation');
       songDurationSeconds = Math.max(240, offsetInSong * 4); // Conservative estimate
     }
     
-    // Simple math: song length - (current position + buffer time)
-    const timeRemaining = Math.max(30, songDurationSeconds - offsetInSong - 30);
+    // FIXED: Simple math returning INTEGER seconds
+    const timeRemaining = Math.max(30, Math.round(songDurationSeconds - offsetInSong - 30));
     
-    console.log(`🎵 TIMING: ${offsetInSong}s into ${Math.floor(songDurationSeconds/60)}:${(songDurationSeconds%60).toString().padStart(2,'0')} song, wait ${Math.floor(timeRemaining/60)}:${(timeRemaining%60).toString().padStart(2,'0')}`);
+    addDebugInfo(`🎵 TIMING CALCULATION:`);
+    addDebugInfo(`   • Current position: ${offsetInSong}s`);
+    addDebugInfo(`   • Song duration: ${Math.floor(songDurationSeconds/60)}:${(songDurationSeconds%60).toString().padStart(2,'0')}`);
+    addDebugInfo(`   • Time remaining: ${Math.floor(timeRemaining/60)}:${(timeRemaining%60).toString().padStart(2,'0')}`);
     
-    return Math.min(480, timeRemaining); // cap at 8 minutes
-  }, []);
+    // Cap at 8 minutes for safety, ensure integer
+    return Math.min(480, timeRemaining);
+  }, [addDebugInfo]);
 
-  // UPDATED: Process audio with FIXED Shazam timing data
+  // Enhanced database update with explicit error handling
+  const updateDatabase = useCallback(async (track: { artist: string; title: string; album?: string; confidence: number; service: string; image_url?: string }) => {
+    addDebugInfo('💾 Updating database...');
+    
+    try {
+      // 1. Clear existing now_playing entries
+      const { error: deleteError } = await supabase
+        .from('now_playing')
+        .delete()
+        .neq('id', 0);
+      
+      if (deleteError) {
+        addDebugInfo(`❌ Failed to clear now_playing: ${deleteError.message}`);
+      } else {
+        addDebugInfo('✅ Cleared existing now_playing entries');
+      }
+
+      // 2. Insert new now_playing entry
+      const nowPlayingData = {
+        artist: track.artist,
+        title: track.title,
+        album_title: track.album || null,
+        album_id: null,
+        started_at: new Date().toISOString(),
+        recognition_confidence: track.confidence || 0.7,
+        service_used: track.service.toLowerCase(),
+        recognition_image_url: track.image_url || null,
+        next_recognition_in: 180, // Default 3 minutes
+        created_at: new Date().toISOString()
+      };
+
+      const { data: nowPlayingResult, error: nowPlayingError } = await supabase
+        .from('now_playing')
+        .insert(nowPlayingData)
+        .select()
+        .single();
+
+      if (nowPlayingError) {
+        addDebugInfo(`❌ Failed to insert now_playing: ${nowPlayingError.message}`);
+      } else {
+        addDebugInfo('✅ Successfully inserted now_playing entry');
+        setCurrentTrack(nowPlayingResult);
+      }
+
+      // 3. Insert recognition log
+      const logData = {
+        artist: track.artist,
+        title: track.title,
+        album: track.album || null,
+        source: 'microphone',
+        service: track.service.toLowerCase(),
+        confidence: track.confidence || 0.7,
+        confirmed: true,
+        match_source: 'shazam',
+        matched_id: null,
+        now_playing: true,
+        raw_response: null,
+        created_at: new Date().toISOString()
+      };
+
+      const { error: logError } = await supabase
+        .from('audio_recognition_logs')
+        .insert(logData);
+
+      if (logError) {
+        addDebugInfo(`❌ Failed to insert recognition log: ${logError.message}`);
+      } else {
+        addDebugInfo('✅ Successfully inserted recognition log');
+        // Reload history
+        setTimeout(() => loadRecentHistory(), 500);
+      }
+
+    } catch (error) {
+      addDebugInfo(`❌ Database update failed: ${error}`);
+    }
+  }, [addDebugInfo, loadRecentHistory]);
+
+  // UPDATED: Process audio with FIXED database updates
   const processAudioSample = useCallback(async (audioBlob: Blob) => {
     setStatus('Converting and processing audio with Shazam...');
 
     try {
-      console.log('🎵 Converting WebM to RAW PCM for recognition:', {
-        size: audioBlob.size,
-        type: audioBlob.type
-      });
-
       // Convert WebM to RAW PCM format
       const rawPCMAudio = await convertToRawPCM(audioBlob);
       
-      console.log(`📤 Sending ${rawPCMAudio.byteLength} bytes of RAW PCM to API...`);
+      addDebugInfo(`📤 Sending ${rawPCMAudio.byteLength} bytes of RAW PCM to API...`);
 
       // Send as raw binary data with proper content type
       const response = await fetch('/api/audio-recognition', {
@@ -272,11 +351,9 @@ export default function AudioRecognitionPage() {
 
       if (result.success && result.track) {
         setStatus(`✅ Recognized: ${result.track.artist} - ${result.track.title}`);
+        addDebugInfo(`🎯 Recognition successful: ${result.track.artist} - ${result.track.title}`);
         
-        // Log the full Shazam response for timing analysis
-        console.log('🔍 Full Shazam response for timing analysis:', result.rawResponse || result);
-        
-        // Add to local history immediately (in case DB has issues)
+        // Add to local history immediately for instant UI update
         const newHistoryEntry: RecognitionResult = {
           id: Date.now(), // Temporary ID
           artist: result.track.artist,
@@ -301,32 +378,25 @@ export default function AudioRecognitionPage() {
         setNextRecognitionCountdown(nextDelay);
 
         if (isNewTrack) {
-          console.log(`🆕 NEW TRACK: ${result.track.artist} - ${result.track.title}`);
+          addDebugInfo(`🆕 NEW TRACK detected`);
+          // Update database for new tracks
+          await updateDatabase(result.track);
         } else {
-          console.log(`🔄 SAME TRACK: ${result.track.artist} - ${result.track.title}`);
+          addDebugInfo(`🔄 SAME TRACK continuing`);
         }
 
-        // Try to load from DB but don't fail if it doesn't work
-        setTimeout(() => {
-          loadCurrentTrack();
-          loadRecentHistory();
-        }, 1000);
-
-        console.log(`🎯 Recognition successful: ${result.track.artist} - ${result.track.title}`);
       } else {
         setStatus(result.error || 'No match found');
-        // On no match, try again in 30 seconds (could be between songs)
+        addDebugInfo('❌ No match found, could be between songs - retrying in 30s');
         setNextRecognitionCountdown(30);
-        console.log('❌ No match, could be between songs - retrying in 30s');
       }
 
     } catch (error) {
-      console.error('Recognition error:', error);
+      addDebugInfo(`❌ Recognition error: ${error}`);
       setStatus(`Recognition error: ${error instanceof Error ? error.message : 'Unknown error'} - retrying in 45 seconds`);
-      // On error, wait 45 seconds before retry
       setNextRecognitionCountdown(45);
     }
-  }, [convertToRawPCM, loadCurrentTrack, loadRecentHistory, currentTrack, calculateIntelligentDelay]);
+  }, [convertToRawPCM, currentTrack, calculateIntelligentDelay, updateDatabase, addDebugInfo]);
 
   const triggerRecognition = useCallback(async () => {
     if (!mediaRecorderRef.current || isProcessing) return;
@@ -388,11 +458,11 @@ export default function AudioRecognitionPage() {
       }, 5000);
 
     } catch (error) {
-      console.error('Error during recognition:', error);
+      addDebugInfo(`❌ Error during recognition: ${error}`);
       setStatus(`Recognition failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setIsProcessing(false);
     }
-  }, [isProcessing, processAudioSample]);
+  }, [isProcessing, processAudioSample, addDebugInfo]);
 
   const startListening = useCallback(async () => {
     try {
@@ -408,15 +478,15 @@ export default function AudioRecognitionPage() {
       let mimeType = 'audio/webm;codecs=opus';
       if (!MediaRecorder.isTypeSupported(mimeType)) {
         mimeType = 'audio/webm';
-        console.log('⚠️ Opus codec not supported, using basic WebM');
+        addDebugInfo('⚠️ Opus codec not supported, using basic WebM');
       }
       if (!MediaRecorder.isTypeSupported(mimeType)) {
         mimeType = 'audio/mp4';
-        console.log('⚠️ WebM not supported, using MP4');
+        addDebugInfo('⚠️ WebM not supported, using MP4');
       }
       if (!MediaRecorder.isTypeSupported(mimeType)) {
         mimeType = '';
-        console.log('⚠️ Using default audio format');
+        addDebugInfo('⚠️ Using default audio format');
       }
 
       const mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
@@ -432,6 +502,7 @@ export default function AudioRecognitionPage() {
       mediaRecorder.start();
       setIsListening(true);
       setStatus('🎧 Listening for audio...');
+      addDebugInfo('🎧 Started listening for audio');
 
       // Start first recognition immediately
       setTimeout(() => {
@@ -439,10 +510,10 @@ export default function AudioRecognitionPage() {
       }, 2000); // Start after 2 seconds
 
     } catch (error) {
-      console.error('Error accessing microphone:', error);
+      addDebugInfo(`❌ Error accessing microphone: ${error}`);
       setStatus('Error: Could not access microphone');
     }
-  }, [triggerRecognition]);
+  }, [triggerRecognition, addDebugInfo]);
 
   const stopListening = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
@@ -458,21 +529,26 @@ export default function AudioRecognitionPage() {
     setIsProcessing(false);
     setStatus('Stopped listening');
     setNextRecognitionCountdown(0);
-  }, []);
+    addDebugInfo('🛑 Stopped listening');
+  }, [addDebugInfo]);
 
   const clearCurrentTrack = useCallback(async () => {
     try {
       await supabase.from('now_playing').delete().neq('id', 0);
       setCurrentTrack(null);
       setStatus('Cleared current track');
+      addDebugInfo('🗑️ Cleared current track');
     } catch (error) {
-      console.error('Error clearing track:', error);
+      addDebugInfo(`❌ Error clearing track: ${error}`);
     }
-  }, []);
+  }, [addDebugInfo]);
 
+  // FIXED: Format time properly, handle bad input
   const formatTime = useCallback((seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
+    // Ensure we have a valid integer
+    const validSeconds = Math.max(0, Math.floor(Number(seconds) || 0));
+    const mins = Math.floor(validSeconds / 60);
+    const secs = validSeconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   }, []);
 
@@ -482,7 +558,7 @@ export default function AudioRecognitionPage() {
     loadRecentHistory();
   }, [loadCurrentTrack, loadRecentHistory]);
 
-  // FIXED: Countdown timer with intelligent timing
+  // FIXED: Countdown timer with better validation
   useEffect(() => {
     if (nextRecognitionCountdown > 0 && isListening) {
       countdownIntervalRef.current = setInterval(() => {
@@ -524,7 +600,7 @@ export default function AudioRecognitionPage() {
           Audio Recognition Control
         </h1>
         <p style={{ color: '#666', fontSize: 16 }}>
-          Listen for vinyl and cassette audio, identify tracks with Shazam (uses song duration from metadata)
+          Listen for vinyl and cassette audio, identify tracks with Shazam (Fixed timing + database updates)
         </p>
       </div>
 
@@ -572,14 +648,10 @@ export default function AudioRecognitionPage() {
             </button>
           )}
 
-          {/* TV Display Link */}
           <a
             href="/tv-display"
             target="_blank"
             rel="noopener noreferrer"
-            onClick={() => {
-              console.log('TV Display link clicked, going to:', '/tv-display');
-            }}
             style={{
               background: '#2563eb',
               color: 'white',
@@ -617,8 +689,30 @@ export default function AudioRecognitionPage() {
           fontSize: 12,
           color: '#15803d'
         }}>
-          ✅ <strong>Fixed Timing:</strong> Now extracts actual song duration from Shazam metadata and calculates: Song Length - (Current Position + Buffer) = Next Sample Time
+          ✅ <strong>Fixed:</strong> Integer timing calculations, explicit database updates, improved error handling
         </div>
+      </div>
+
+      {/* Debug Info Panel */}
+      <div style={{
+        background: '#f3f4f6',
+        border: '1px solid #d1d5db',
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 32,
+        maxHeight: 200,
+        overflowY: 'auto'
+      }}>
+        <h3 style={{ margin: '0 0 12px 0', fontSize: 16, fontWeight: 600 }}>Debug Log</h3>
+        {debugInfo.length === 0 ? (
+          <div style={{ color: '#6b7280', fontStyle: 'italic' }}>No debug info yet</div>
+        ) : (
+          debugInfo.map((info, index) => (
+            <div key={index} style={{ fontSize: 12, marginBottom: 4, fontFamily: 'monospace' }}>
+              {info}
+            </div>
+          ))
+        )}
       </div>
 
       {/* Current Track Display */}
@@ -683,7 +777,7 @@ export default function AudioRecognitionPage() {
         <div style={{ maxHeight: 400, overflowY: 'auto' }}>
           {recognitionHistory.length === 0 ? (
             <div style={{ padding: 24, textAlign: 'center', color: '#6b7280' }}>
-              No recognition history yet. Database connection may need setup.
+              No recognition history yet. Check debug log for database issues.
             </div>
           ) : (
             recognitionHistory.map((track, index) => (
