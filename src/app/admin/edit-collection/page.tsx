@@ -513,24 +513,22 @@ export default function EditCollectionPage() {
                     >
                       Edit
                     </Link>
-                    {row.sell_price && (
-                      <button
-                        onClick={() => deleteRow(row)}
-                        disabled={updatingRow === row.id}
-                        style={{ 
-                          color: '#dc2626', 
-                          background: 'none', 
-                          border: 'none', 
-                          cursor: 'pointer', 
-                          fontSize: 12,
-                          padding: '2px 4px',
-                          borderRadius: 2
-                        }}
-                        title="Delete sold item"
-                      >
-                        🗑️
-                      </button>
-                    )}
+                    <button
+                      onClick={() => deleteRow(row)}
+                      disabled={updatingRow === row.id}
+                      style={{ 
+                        color: '#dc2626', 
+                        background: 'none', 
+                        border: 'none', 
+                        cursor: 'pointer', 
+                        fontSize: 12,
+                        padding: '2px 4px',
+                        borderRadius: 2
+                      }}
+                      title="Delete item"
+                    >
+                      🗑️
+                    </button>
                   </div>
                 </td>
               </tr>
