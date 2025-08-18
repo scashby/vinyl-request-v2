@@ -1,4 +1,4 @@
-// src/app/admin/audio-recognition/page.tsx - FIXED WITH RAW PCM CONVERSION
+// src/app/admin/audio-recognition/page.tsx - COMPLETE FIXED VERSION
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from 'react';
@@ -47,7 +47,7 @@ export default function AudioRecognitionPage() {
   const recognitionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // ADDED: RAW PCM Conversion Function (from working debugger)
+  // RAW PCM Conversion Function
   const convertToRawPCM = useCallback(async (webmBlob: Blob): Promise<ArrayBuffer> => {
     console.log('🔄 Converting WebM to RAW PCM format for Shazam...');
     
@@ -98,6 +98,7 @@ export default function AudioRecognitionPage() {
     }
   }, []);
 
+  // FIXED: Better error handling for RLS issues
   const loadCurrentTrack = useCallback(async () => {
     try {
       const { data, error } = await supabase
@@ -107,7 +108,15 @@ export default function AudioRecognitionPage() {
         .limit(1)
         .single();
 
-      if (!error && data) {
+      if (error) {
+        if (error.code === 'PGRST116') {
+          // No rows - this is fine
+          setCurrentTrack(null);
+        } else {
+          console.warn('Database access issue:', error.message);
+          // Don't crash, just log it
+        }
+      } else if (data) {
         setCurrentTrack(data);
         // Calculate remaining time for next recognition
         if (data.next_recognition_in) {
@@ -116,11 +125,12 @@ export default function AudioRecognitionPage() {
           setNextRecognitionCountdown(remaining);
         }
       }
-    } catch {
-      console.log('No current track playing');
+    } catch (error) {
+      console.warn('Error loading current track:', error);
     }
   }, []);
 
+  // FIXED: Better error handling for RLS issues
   const loadRecentHistory = useCallback(async () => {
     try {
       const { data, error } = await supabase
@@ -129,15 +139,111 @@ export default function AudioRecognitionPage() {
         .order('created_at', { ascending: false })
         .limit(10);
 
-      if (!error && data) {
+      if (error) {
+        console.warn('Cannot load history:', error.message);
+        // Set some placeholder data so UI doesn't break
+        setRecognitionHistory([
+          {
+            artist: 'Recent recognition',
+            title: 'Check browser console for details',
+            confidence: 0,
+            service: 'Note: Database permission issue',
+            created_at: new Date().toISOString()
+          }
+        ]);
+      } else if (data) {
         setRecognitionHistory(data);
       }
     } catch (error) {
-      console.error('Error loading history:', error);
+      console.warn('Error loading history:', error);
     }
   }, []);
 
-  // UPDATED: Process audio with RAW PCM conversion
+  // INTELLIGENT: Use actual Shazam timing data instead of guessing
+  const calculateIntelligentDelay = useCallback((shazamResult: { matches?: Array<{ offset?: number }>; track?: { sections?: Array<{ type: string; metadata?: Array<{ title?: string; text?: string }> }> } }, isNewTrack: boolean) => {
+    if (!isNewTrack) {
+      // Same track still playing, wait longer
+      return 60; // 1 minute for same track
+    }
+
+    // Extract timing data from Shazam response
+    const matches = shazamResult.matches || [];
+    const track = shazamResult.track;
+    
+    if (matches.length === 0) {
+      console.log('⚠️ No Shazam matches data, using fallback timing');
+      return 120; // 2 minute fallback
+    }
+
+    // Get the offset (where in the song our sample was from)
+    const primaryMatch = matches[0];
+    const offsetInSong = primaryMatch.offset || 0; // seconds into the song
+    
+    console.log(`🎯 Shazam match: offset=${offsetInSong}s into song`);
+
+    // Try to get total song duration from Shazam metadata
+    let songDuration = null;
+    
+    // Check track sections for duration metadata
+    if (track?.sections) {
+      for (const section of track.sections) {
+        if (section.type === 'SONG' && section.metadata) {
+          for (const meta of section.metadata) {
+            if (meta.title?.toLowerCase().includes('duration') || 
+                meta.title?.toLowerCase().includes('length')) {
+              // Parse duration from metadata (could be "3:45" format)
+              const durationStr = meta.text;
+              const timeMatch = durationStr?.match(/(\d+):(\d+)/);
+              if (timeMatch) {
+                songDuration = parseInt(timeMatch[1]) * 60 + parseInt(timeMatch[2]);
+                console.log(`🎵 Found song duration in Shazam metadata: ${songDuration}s`);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // If we have both offset and duration, calculate precisely when song ends
+    if (songDuration && offsetInSong < songDuration) {
+      const remainingTime = songDuration - offsetInSong;
+      const nextRecognitionDelay = Math.max(30, remainingTime - 10); // Wait until 10s before song ends
+      
+      console.log(`🎵 PRECISE TIMING: Song is ${songDuration}s long, we're ${offsetInSong}s in, ${remainingTime}s remaining`);
+      console.log(`⏰ Next recognition in ${nextRecognitionDelay}s (10s before song ends)`);
+      
+      return Math.min(480, nextRecognitionDelay); // Cap at 8 minutes for safety
+    }
+
+    // Fallback: Use offset to estimate when to check again
+    if (offsetInSong > 0) {
+      // If we're early in the song (first 30s), assume it's a 3-4 minute song
+      if (offsetInSong < 30) {
+        const estimatedRemaining = 210 - offsetInSong; // Assume 3.5 min song
+        const nextCheck = Math.max(60, estimatedRemaining - 15);
+        console.log(`📊 Early in song (${offsetInSong}s), estimated ${estimatedRemaining}s remaining, next check in ${nextCheck}s`);
+        return Math.min(300, nextCheck);
+      }
+      
+      // If we're mid-song (30s-120s), assume it ends in 60-90s
+      if (offsetInSong < 120) {
+        const estimatedRemaining = 90;
+        console.log(`📊 Mid-song (${offsetInSong}s), checking again in ${estimatedRemaining}s`);
+        return estimatedRemaining;
+      }
+      
+      // If we're late in song (>2min), check sooner
+      const quickCheck = 45;
+      console.log(`📊 Late in song (${offsetInSong}s), quick check in ${quickCheck}s`);
+      return quickCheck;
+    }
+
+    // Final fallback
+    console.log('⚠️ No useful timing data from Shazam, using 2-minute fallback');
+    return 120;
+  }, []);
+
+  // UPDATED: Process audio with Shazam timing data
   const processAudioSample = useCallback(async (audioBlob: Blob) => {
     setStatus('Converting and processing audio with Shazam...');
 
@@ -169,35 +275,68 @@ export default function AudioRecognitionPage() {
       const result = await response.json();
 
       if (result.success && result.track) {
-        setStatus(`Recognized: ${result.track.artist} - ${result.track.title}`);
+        setStatus(`✅ Recognized: ${result.track.artist} - ${result.track.title}`);
         
-        // Load updated track and history
-        loadCurrentTrack();
-        loadRecentHistory();
+        // Log the full Shazam response for timing analysis
+        console.log('🔍 Full Shazam response for timing analysis:', result.rawResponse || result);
         
-        // Set countdown for next recognition based on track duration
-        const nextRecognitionDelay = result.nextRecognitionIn || 180; // Default 3 minutes
-        setNextRecognitionCountdown(nextRecognitionDelay);
+        // Add to local history immediately (in case DB has issues)
+        const newHistoryEntry: RecognitionResult = {
+          id: Date.now(), // Temporary ID
+          artist: result.track.artist,
+          title: result.track.title,
+          album: result.track.album,
+          confidence: result.track.confidence,
+          service: result.track.service,
+          created_at: new Date().toISOString(),
+          source: 'microphone',
+          confirmed: true
+        };
+        
+        setRecognitionHistory(prev => [newHistoryEntry, ...prev.slice(0, 9)]);
+        
+        // Try to load from DB but don't fail if it doesn't work
+        setTimeout(() => {
+          loadCurrentTrack();
+          loadRecentHistory();
+        }, 1000);
+        
+        // Check if this is a new track
+        const isNewTrack = !currentTrack || 
+          currentTrack.artist?.toLowerCase() !== result.track.artist?.toLowerCase() || 
+          currentTrack.title?.toLowerCase() !== result.track.title?.toLowerCase();
+        
+        // Use actual Shazam timing data to calculate next recognition
+        const nextDelay = calculateIntelligentDelay(result.rawResponse || result, isNewTrack);
+        setNextRecognitionCountdown(nextDelay);
+
+        if (isNewTrack) {
+          console.log(`🆕 NEW TRACK: ${result.track.artist} - ${result.track.title}`);
+        } else {
+          console.log(`🔄 SAME TRACK: ${result.track.artist} - ${result.track.title}`);
+        }
 
         console.log(`🎯 Recognition successful: ${result.track.artist} - ${result.track.title}`);
       } else {
         setStatus(result.error || 'No match found');
-        // Try again in 30 seconds if no match
+        // On no match, try again in 30 seconds (could be between songs)
         setNextRecognitionCountdown(30);
+        console.log('❌ No match, could be between songs - retrying in 30s');
       }
 
     } catch (error) {
       console.error('Recognition error:', error);
-      setStatus(`Recognition error: ${error instanceof Error ? error.message : 'Unknown error'} - retrying in 30 seconds`);
-      setNextRecognitionCountdown(30);
+      setStatus(`Recognition error: ${error instanceof Error ? error.message : 'Unknown error'} - retrying in 45 seconds`);
+      // On error, wait 45 seconds before retry
+      setNextRecognitionCountdown(45);
     }
-  }, [convertToRawPCM, loadCurrentTrack, loadRecentHistory]);
+  }, [convertToRawPCM, loadCurrentTrack, loadRecentHistory, currentTrack, calculateIntelligentDelay]);
 
   const triggerRecognition = useCallback(async () => {
     if (!mediaRecorderRef.current || isProcessing) return;
 
     setIsProcessing(true);
-    setStatus('Capturing audio for recognition...');
+    setStatus('🎤 Capturing audio for recognition...');
 
     try {
       // Create a short recording just for recognition
@@ -270,7 +409,6 @@ export default function AudioRecognitionPage() {
         }
       });
 
-      // Try different MIME types for better compatibility
       let mimeType = 'audio/webm;codecs=opus';
       if (!MediaRecorder.isTypeSupported(mimeType)) {
         mimeType = 'audio/webm';
@@ -297,12 +435,12 @@ export default function AudioRecognitionPage() {
 
       mediaRecorder.start();
       setIsListening(true);
-      setStatus('Listening for audio...');
+      setStatus('🎧 Listening for audio...');
 
       // Start first recognition immediately
       setTimeout(() => {
         triggerRecognition();
-      }, 2000);
+      }, 2000); // Start after 2 seconds
 
     } catch (error) {
       console.error('Error accessing microphone:', error);
@@ -348,13 +486,16 @@ export default function AudioRecognitionPage() {
     loadRecentHistory();
   }, [loadCurrentTrack, loadRecentHistory]);
 
-  // Countdown timer for next recognition
+  // FIXED: Countdown timer with intelligent timing
   useEffect(() => {
     if (nextRecognitionCountdown > 0 && isListening) {
       countdownIntervalRef.current = setInterval(() => {
         setNextRecognitionCountdown(prev => {
           if (prev <= 1) {
-            triggerRecognition();
+            // Don't trigger if already processing
+            if (!isProcessing) {
+              triggerRecognition();
+            }
             return 0;
           }
           return prev - 1;
@@ -371,7 +512,7 @@ export default function AudioRecognitionPage() {
         clearInterval(countdownIntervalRef.current);
       }
     };
-  }, [nextRecognitionCountdown, isListening, triggerRecognition]);
+  }, [nextRecognitionCountdown, isListening, triggerRecognition, isProcessing]);
 
   return (
     <div style={{ 
@@ -434,6 +575,24 @@ export default function AudioRecognitionPage() {
               Clear Current Track
             </button>
           )}
+
+          {/* TV Display Link */}
+          <a
+            href="/admin/audio-recognition/display"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              background: '#2563eb',
+              color: 'white',
+              padding: '8px 16px',
+              borderRadius: 8,
+              textDecoration: 'none',
+              fontSize: 14,
+              fontWeight: 600
+            }}
+          >
+            📺 Open TV Display
+          </a>
         </div>
 
         <div style={{ 
@@ -459,7 +618,7 @@ export default function AudioRecognitionPage() {
           fontSize: 12,
           color: '#15803d'
         }}>
-          ✅ <strong>Fixed:</strong> Now using RAW PCM format for reliable Shazam recognition (5-second samples, 3-second processing limit)
+          ✅ <strong>Intelligent Timing:</strong> Uses Shazam&apos;s offset data to know where in each song we are, then waits until near the end before next recognition
         </div>
       </div>
 
@@ -503,24 +662,6 @@ export default function AudioRecognitionPage() {
               Started: {new Date(currentTrack.started_at).toLocaleTimeString()}
             </div>
           </div>
-          <div style={{ textAlign: 'center' }}>
-            <a
-              href="/admin/audio-recognition/display"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                background: '#2563eb',
-                color: 'white',
-                padding: '12px 20px',
-                borderRadius: 8,
-                textDecoration: 'none',
-                fontWeight: 600,
-                display: 'inline-block'
-              }}
-            >
-              📺 Open TV Display
-            </a>
-          </div>
         </div>
       )}
 
@@ -543,7 +684,7 @@ export default function AudioRecognitionPage() {
         <div style={{ maxHeight: 400, overflowY: 'auto' }}>
           {recognitionHistory.length === 0 ? (
             <div style={{ padding: 24, textAlign: 'center', color: '#6b7280' }}>
-              No recognition history yet
+              No recognition history yet. Database connection may need setup.
             </div>
           ) : (
             recognitionHistory.map((track, index) => (

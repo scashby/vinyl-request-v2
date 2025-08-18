@@ -1,4 +1,4 @@
-// src/components/AdminSidebar.tsx
+// src/components/AdminSidebar.tsx - FIXED TV DISPLAY LINK
 "use client";
 
 import Link from "next/link";
@@ -91,14 +91,15 @@ export default function AdminSidebar() {
           >
             🔧 Debug Tool
           </Link>
-          <Link 
+          {/* FIXED: TV Display Link */}
+          <a 
             href="/admin/audio-recognition/display"
             target="_blank"
             rel="noopener noreferrer"
             className="block w-full text-center bg-gray-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-gray-700 transition-colors"
           >
             📺 TV Display
-          </Link>
+          </a>
         </div>
       </div>
 

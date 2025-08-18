@@ -287,11 +287,19 @@ async function processWithShazam(base64Audio: string, originalSize: number, star
       service: 'shazam',
       shazam_key: track.key
     },
+    // ADDED: Include full Shazam response for timing analysis
+    rawResponse: shazamData,
     debugInfo: {
       processingTime,
       audioFileSize: originalSize,
       base64Length: base64Audio.length,
-      matchesCount: shazamData.matches?.length || 0
+      matchesCount: shazamData.matches?.length || 0,
+      // ADDED: Extract timing data for easier access
+      timingData: {
+        offset: shazamData.matches?.[0]?.offset || null,
+        hasMatches: shazamData.matches?.length > 0,
+        sections: shazamData.track?.sections?.map(s => s.type) || []
+      }
     }
   });
 }
