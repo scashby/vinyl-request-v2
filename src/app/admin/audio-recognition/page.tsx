@@ -1,4 +1,4 @@
-// src/app/admin/audio-recognition/page.tsx
+// src/app/admin/audio-recognition/page.tsx - FIXED WITH RAW PCM CONVERSION
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from 'react';
@@ -47,7 +47,57 @@ export default function AudioRecognitionPage() {
   const recognitionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // ALL FUNCTION DECLARATIONS FIRST
+  // ADDED: RAW PCM Conversion Function (from working debugger)
+  const convertToRawPCM = useCallback(async (webmBlob: Blob): Promise<ArrayBuffer> => {
+    console.log('🔄 Converting WebM to RAW PCM format for Shazam...');
+    
+    interface WindowWithWebkit extends Window {
+      webkitAudioContext?: typeof AudioContext;
+    }
+    const AudioContextClass = window.AudioContext || (window as WindowWithWebkit).webkitAudioContext;
+    
+    if (!AudioContextClass) {
+      throw new Error('AudioContext not supported in this browser');
+    }
+    
+    const audioContext = new AudioContextClass({
+      sampleRate: 44100
+    });
+    
+    try {
+      const arrayBuffer = await webmBlob.arrayBuffer();
+      console.log(`📁 WebM file size: ${arrayBuffer.byteLength} bytes`);
+      
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+      console.log(`🎵 Decoded audio: ${audioBuffer.numberOfChannels} channels, ${audioBuffer.duration.toFixed(2)}s, ${audioBuffer.sampleRate}Hz`);
+      
+      // Convert to mono and limit to 3 seconds to reduce size
+      const maxSamples = Math.min(audioBuffer.length, 3 * audioBuffer.sampleRate);
+      const channelData = audioBuffer.numberOfChannels > 1 
+        ? audioBuffer.getChannelData(0) // Use left channel for mono
+        : audioBuffer.getChannelData(0);
+      
+      console.log(`🔧 Trimming to 3 seconds max: ${maxSamples} samples`);
+      
+      // Convert Float32Array to 16-bit PCM (little endian) - limited samples
+      const pcmData = new Int16Array(maxSamples);
+      for (let i = 0; i < maxSamples; i++) {
+        // Convert from -1.0 to 1.0 range to -32768 to 32767 range
+        const sample = Math.max(-1, Math.min(1, channelData[i]));
+        pcmData[i] = Math.round(sample * 32767);
+      }
+      
+      console.log(`✅ Converted to RAW PCM: ${pcmData.buffer.byteLength} bytes (${pcmData.length} samples)`);
+      
+      await audioContext.close();
+      return pcmData.buffer;
+    } catch (error) {
+      await audioContext.close();
+      console.error(`❌ Audio conversion failed:`, error);
+      throw error;
+    }
+  }, []);
+
   const loadCurrentTrack = useCallback(async () => {
     try {
       const { data, error } = await supabase
@@ -87,21 +137,28 @@ export default function AudioRecognitionPage() {
     }
   }, []);
 
+  // UPDATED: Process audio with RAW PCM conversion
   const processAudioSample = useCallback(async (audioBlob: Blob) => {
-    setStatus('Processing audio with Shazam...');
+    setStatus('Converting and processing audio with Shazam...');
 
     try {
-      const formData = new FormData();
-      formData.append('audio', audioBlob, 'sample.' + (audioBlob.type.includes('webm') ? 'webm' : 'mp4'));
-
-      console.log('🎵 Sending audio for recognition:', {
+      console.log('🎵 Converting WebM to RAW PCM for recognition:', {
         size: audioBlob.size,
         type: audioBlob.type
       });
 
+      // Convert WebM to RAW PCM format
+      const rawPCMAudio = await convertToRawPCM(audioBlob);
+      
+      console.log(`📤 Sending ${rawPCMAudio.byteLength} bytes of RAW PCM to API...`);
+
+      // Send as raw binary data with proper content type
       const response = await fetch('/api/audio-recognition', {
         method: 'POST',
-        body: formData
+        headers: {
+          'Content-Type': 'application/octet-stream'
+        },
+        body: rawPCMAudio
       });
 
       if (!response.ok) {
@@ -113,14 +170,16 @@ export default function AudioRecognitionPage() {
 
       if (result.success && result.track) {
         setStatus(`Recognized: ${result.track.artist} - ${result.track.title}`);
-        setCurrentTrack(result.nowPlaying);
+        
+        // Load updated track and history
+        loadCurrentTrack();
+        loadRecentHistory();
         
         // Set countdown for next recognition based on track duration
         const nextRecognitionDelay = result.nextRecognitionIn || 180; // Default 3 minutes
         setNextRecognitionCountdown(nextRecognitionDelay);
 
-        // Refresh history
-        loadRecentHistory();
+        console.log(`🎯 Recognition successful: ${result.track.artist} - ${result.track.title}`);
       } else {
         setStatus(result.error || 'No match found');
         // Try again in 30 seconds if no match
@@ -132,7 +191,7 @@ export default function AudioRecognitionPage() {
       setStatus(`Recognition error: ${error instanceof Error ? error.message : 'Unknown error'} - retrying in 30 seconds`);
       setNextRecognitionCountdown(30);
     }
-  }, [loadRecentHistory]);
+  }, [convertToRawPCM, loadCurrentTrack, loadRecentHistory]);
 
   const triggerRecognition = useCallback(async () => {
     if (!mediaRecorderRef.current || isProcessing) return;
@@ -186,12 +245,12 @@ export default function AudioRecognitionPage() {
 
       sampleRecorder.start();
       
-      // Record for 10 seconds
+      // Record for 5 seconds (reduced for smaller file size)
       setTimeout(() => {
         if (sampleRecorder.state === 'recording') {
           sampleRecorder.stop();
         }
-      }, 10000);
+      }, 5000);
 
     } catch (error) {
       console.error('Error during recognition:', error);
@@ -283,7 +342,6 @@ export default function AudioRecognitionPage() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   }, []);
 
-  // ALL USEEFFECT HOOKS AFTER ALL FUNCTIONS
   // Load current state on mount
   useEffect(() => {
     loadCurrentTrack();
@@ -329,7 +387,7 @@ export default function AudioRecognitionPage() {
           Audio Recognition Control
         </h1>
         <p style={{ color: '#666', fontSize: 16 }}>
-          Listen for vinyl and cassette audio, identify tracks with Shazam
+          Listen for vinyl and cassette audio, identify tracks with Shazam (RAW PCM format)
         </p>
       </div>
 
@@ -391,6 +449,18 @@ export default function AudioRecognitionPage() {
             Next recognition in: {formatTime(nextRecognitionCountdown)}
           </div>
         )}
+
+        <div style={{
+          marginTop: 12,
+          padding: 12,
+          background: '#f0fdf4',
+          border: '1px solid #22c55e',
+          borderRadius: 8,
+          fontSize: 12,
+          color: '#15803d'
+        }}>
+          ✅ <strong>Fixed:</strong> Now using RAW PCM format for reliable Shazam recognition (5-second samples, 3-second processing limit)
+        </div>
       </div>
 
       {/* Current Track Display */}
