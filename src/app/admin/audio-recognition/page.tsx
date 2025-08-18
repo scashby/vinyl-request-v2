@@ -179,8 +179,10 @@ export default function AudioRecognitionPage() {
   // FIXED: Extract song length from Shazam metadata, return INTEGER seconds
   const calculateIntelligentDelay = useCallback((shazamResult: ShazamResult, isNewTrack: boolean): number => {
     if (!isNewTrack) {
-      addDebugInfo('🔄 Same track detected, waiting 60 seconds');
-      return 60;
+      // Same track detected - we may have sampled too early
+      // Try again in 30 seconds to catch the transition
+      addDebugInfo('🔄 Same track detected - sampling too early, retry in 30s');
+      return 30;
     }
 
     const matches = shazamResult.matches || [];
@@ -234,16 +236,21 @@ export default function AudioRecognitionPage() {
       songDurationSeconds = Math.max(240, offsetInSong * 4); // Conservative estimate
     }
     
-    // FIXED: Simple math returning INTEGER seconds
-    const timeRemaining = Math.max(30, Math.round(songDurationSeconds - offsetInSong - 30));
+    // AGGRESSIVE TIMING: Sample much closer to song end to catch next song
+    // Wait until 5-10 seconds AFTER the song should end to catch the new song
+    const estimatedTimeToEnd = songDurationSeconds - offsetInSong;
+    const waitTimeAfterEnd = 10; // Wait 10 seconds after song ends
+    const totalWaitTime = Math.max(15, Math.round(estimatedTimeToEnd + waitTimeAfterEnd));
     
-    addDebugInfo(`🎵 TIMING CALCULATION:`);
+    addDebugInfo(`🎵 AGGRESSIVE TIMING CALCULATION:`);
     addDebugInfo(`   • Current position: ${offsetInSong}s`);
     addDebugInfo(`   • Song duration: ${Math.floor(songDurationSeconds/60)}:${(songDurationSeconds%60).toString().padStart(2,'0')}`);
-    addDebugInfo(`   • Time remaining: ${Math.floor(timeRemaining/60)}:${(timeRemaining%60).toString().padStart(2,'0')}`);
+    addDebugInfo(`   • Time until song ends: ${Math.floor(estimatedTimeToEnd/60)}:${(estimatedTimeToEnd%60).toString().padStart(2,'0')}`);
+    addDebugInfo(`   • Wait ${waitTimeAfterEnd}s after song ends to catch next song`);
+    addDebugInfo(`   • Total wait time: ${Math.floor(totalWaitTime/60)}:${(totalWaitTime%60).toString().padStart(2,'0')}`);
     
     // Cap at 8 minutes for safety, ensure integer
-    return Math.min(480, timeRemaining);
+    return Math.min(480, totalWaitTime);
   }, [addDebugInfo]);
 
   // Enhanced database update with explicit error handling
@@ -689,7 +696,7 @@ export default function AudioRecognitionPage() {
           fontSize: 12,
           color: '#15803d'
         }}>
-          ✅ <strong>Fixed:</strong> Integer timing calculations, explicit database updates, improved error handling
+          ✅ <strong>Aggressive Timing:</strong> Waits until 10s AFTER song ends to catch next song. If same song detected, retries in 30s.
         </div>
       </div>
 

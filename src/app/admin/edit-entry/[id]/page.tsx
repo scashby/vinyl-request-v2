@@ -1,5 +1,5 @@
-// Admin Edit Entry page ("/admin/edit-entry/[id]")
-// Allows admin to edit all fields of a collection entry by ID; supports Discogs lookup and blocked sides.
+// Enhanced Admin Edit Entry page with sell price support
+// Update for: src/app/admin/edit-entry/[id]/page.tsx
 
 "use client";
 
@@ -19,6 +19,7 @@ type CollectionEntry = {
   format: string;
   image_url: string;
   media_condition: string;
+  sell_price: string | null;
   blocked: boolean;
   blocked_sides: string[];
   tracklists: string;
@@ -56,7 +57,7 @@ function cleanTrack(track: Partial<Track>): Track {
   };
 }
 
-export default function Page() {
+export default function EditEntryPage() {
   const params = useParams();
   const id = params.id as string;
   const router = useRouter();
@@ -294,6 +295,22 @@ export default function Page() {
                 onChange={e => handleChange('media_condition', e.target.value)}
                 placeholder="e.g. VG+, NM, M" 
               />
+            </div>
+
+            {/* NEW: Sell Price Field */}
+            <div>
+              <label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>
+                💰 Sell Price
+              </label>
+              <input 
+                style={inputStyle}
+                value={entry.sell_price || ''} 
+                onChange={e => handleChange('sell_price', e.target.value)}
+                placeholder="e.g. $25.00 or NFS"
+              />
+              <div style={{ fontSize: '12px', color: '#6b7280', marginTop: 4 }}>
+                Enter price like &quot;$25.00&quot; or &quot;NFS&quot; for not for sale. Leave blank if not selling.
+              </div>
             </div>
 
             <div>
