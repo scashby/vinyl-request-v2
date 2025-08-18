@@ -1,4 +1,4 @@
-// src/components/AdminSidebar.tsx - FIXED TV DISPLAY LINK
+// src/components/AdminSidebar.tsx - UPDATED TV DISPLAY LINK
 "use client";
 
 import Link from "next/link";
@@ -91,13 +91,13 @@ export default function AdminSidebar() {
           >
             🔧 Debug Tool
           </Link>
-          {/* FIXED: TV Display Link with debugging */}
+          {/* UPDATED: TV Display Link to public route */}
           <a 
-            href="/admin/audio-recognition/display"
+            href="/tv-display"
             target="_blank"
             rel="noopener noreferrer"
             onClick={() => {
-              console.log('Sidebar TV Display clicked, URL:', '/admin/audio-recognition/display');
+              console.log('Sidebar TV Display clicked, URL:', '/tv-display');
               console.log('Current location:', window.location.href);
             }}
             className="block w-full text-center bg-gray-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-gray-700 transition-colors"

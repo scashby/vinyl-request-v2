@@ -1,4 +1,4 @@
-// src/app/admin/audio-recognition/page.tsx - COMPLETE FIXED VERSION
+// src/app/admin/audio-recognition/page.tsx - UPDATED TV DISPLAY LINK
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from 'react';
@@ -576,13 +576,13 @@ export default function AudioRecognitionPage() {
             </button>
           )}
 
-          {/* TV Display Link - Fixed URL */}
+          {/* UPDATED: TV Display Link */}
           <a
-            href="/admin/audio-recognition/display"
+            href="/tv-display"
             target="_blank"
             rel="noopener noreferrer"
             onClick={() => {
-              console.log('TV Display link clicked, going to:', '/admin/audio-recognition/display');
+              console.log('TV Display link clicked, going to:', '/tv-display');
             }}
             style={{
               background: '#2563eb',

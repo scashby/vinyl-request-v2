@@ -1,4 +1,4 @@
-// src/app/admin/admin-dashboard/page.js - ADD TV DISPLAY OPTION
+// src/app/admin/admin-dashboard/page.js - UPDATED TV DISPLAY LINK
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -257,7 +257,7 @@ export default function AdminDashboardPage() {
         </p>
       </div>
 
-      {/* ADDED: TV Display Quick Access */}
+      {/* UPDATED: TV Display Quick Access */}
       <div style={{
         background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
         color: 'white',
@@ -287,12 +287,12 @@ export default function AdminDashboardPage() {
         </div>
         <div style={{ display: 'flex', gap: 12 }}>
           <a
-            href="/admin/audio-recognition/display"
+            href="/tv-display"
             target="_blank"
             rel="noopener noreferrer"
             onClick={() => {
               console.log('🔗 Dashboard TV Display clicked');
-              console.log('🌐 Target URL:', '/admin/audio-recognition/display');
+              console.log('🌐 Target URL:', '/tv-display');
               console.log('📍 Current URL:', window.location.href);
             }}
             style={{

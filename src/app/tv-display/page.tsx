@@ -1,4 +1,4 @@
-// src/app/admin/audio-recognition/display/page.tsx
+// src/app/tv-display/page.tsx - PUBLIC TV DISPLAY ROUTE
 "use client";
 
 import { useState, useEffect } from 'react';
