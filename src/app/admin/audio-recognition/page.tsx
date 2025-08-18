@@ -171,18 +171,18 @@ export default function AudioRecognitionPage() {
     
     if (!actualSongDuration) {
       console.log('⚠️ No song duration found, using estimation');
-      return Math.max(60, 240 - offsetInSong - 30); // 4min estimate
+      return Math.max(60, 240 - offsetInSong - 5); // 4min estimate with 5s buffer
     }
 
-    // PRECISE CALCULATION: Song Duration - Current Position - Buffer
-    const timeRemaining = actualSongDuration - offsetInSong - 30; // 30s buffer
-    const waitTime = Math.max(30, timeRemaining);
+    // PRECISE CALCULATION: Sample right at song end to catch next song start
+    const timeRemaining = actualSongDuration - offsetInSong - 5; // 5s buffer to catch transition
+    const waitTime = Math.max(10, timeRemaining); // Minimum 10s wait
     
     console.log(`🎵 PRECISE TIMING:`);
     console.log(`   • Song duration: ${actualSongDuration}s`);
     console.log(`   • Current position: ${offsetInSong}s`);
-    console.log(`   • Time remaining: ${timeRemaining}s`);
-    console.log(`   • Wait time: ${waitTime}s`);
+    console.log(`   • Time until song ends: ${actualSongDuration - offsetInSong}s`);
+    console.log(`   • Sample in: ${waitTime}s (5s before song ends)`);
     
     return Math.round(waitTime);
   }, [extractSongDuration]);
@@ -550,7 +550,7 @@ export default function AudioRecognitionPage() {
           Audio Recognition Control
         </h1>
         <p style={{ color: '#666', fontSize: 16 }}>
-          Listen for vinyl and cassette audio, identify tracks with Shazam (PRECISE timing using actual song duration)
+          Listen for vinyl and cassette audio, identify tracks with Shazam (Samples right before song ends to catch next track)
         </p>
       </div>
 
@@ -658,7 +658,7 @@ export default function AudioRecognitionPage() {
           fontSize: 12,
           color: '#15803d'
         }}>
-          ✅ <strong>PRECISE TIMING:</strong> Now uses actual song duration from Shazam metadata. Formula: Song Duration - (Current Position + 30s buffer) = Next Sample Time
+          ✅ <strong>PRECISE TIMING:</strong> Samples 5 seconds before song ends to catch next song start. Formula: Song Duration - Current Position - 5s = Next Sample Time
         </div>
       </div>
 
