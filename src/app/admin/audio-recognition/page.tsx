@@ -1,4 +1,4 @@
-// src/app/admin/audio-recognition/page.tsx - UPDATED TV DISPLAY LINK
+// src/app/admin/audio-recognition/page.tsx - COMPLETE WITH FIXED TIMING
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from 'react';
@@ -32,6 +32,21 @@ interface NowPlayingState {
   service_used: string;
   recognition_image_url?: string;
   next_recognition_in?: number;
+}
+
+interface ShazamTrackSection {
+  type?: string;
+  metadata?: Array<{
+    title?: string;
+    text?: string;
+  }>;
+}
+
+interface ShazamResult {
+  matches?: Array<{ offset?: number }>;
+  track?: {
+    sections?: ShazamTrackSection[];
+  };
 }
 
 export default function AudioRecognitionPage() {
@@ -159,91 +174,72 @@ export default function AudioRecognitionPage() {
     }
   }, []);
 
-  // INTELLIGENT: Use actual Shazam timing data instead of guessing
-  const calculateIntelligentDelay = useCallback((shazamResult: { matches?: Array<{ offset?: number }>; track?: { sections?: Array<{ type: string; metadata?: Array<{ title?: string; text?: string }> }> } }, isNewTrack: boolean) => {
+  // FIXED: Extract song length from Shazam metadata, then simple math
+  const calculateIntelligentDelay = useCallback((shazamResult: ShazamResult, isNewTrack: boolean) => {
     if (!isNewTrack) {
-      // Same track still playing, wait longer
-      return 60; // 1 minute for same track
+      // Same track, wait 60 seconds
+      return 60;
     }
 
-    // Extract timing data from Shazam response
     const matches = shazamResult.matches || [];
-    const track = shazamResult.track;
-    
     if (matches.length === 0) {
-      console.log('⚠️ No Shazam matches data, using fallback timing');
-      return 120; // 2 minute fallback
+      return 120; // fallback
     }
 
-    // Get the offset (where in the song our sample was from)
-    const primaryMatch = matches[0];
-    const offsetInSong = primaryMatch.offset || 0; // seconds into the song
+    const offsetInSong = matches[0].offset || 0; // where we are in the song
     
-    console.log(`🎯 Shazam match: offset=${offsetInSong}s into song`);
-
-    // Try to get total song duration from Shazam metadata
-    let songDuration = null;
+    // Extract actual song duration from Shazam metadata
+    let songDurationSeconds = null;
     
-    // Check track sections for duration metadata
-    if (track?.sections) {
-      for (const section of track.sections) {
-        if (section.type === 'SONG' && section.metadata) {
+    if (shazamResult.track?.sections) {
+      for (const section of shazamResult.track.sections) {
+        if (section.metadata) {
           for (const meta of section.metadata) {
+            // Look for duration in various possible fields
             if (meta.title?.toLowerCase().includes('duration') || 
-                meta.title?.toLowerCase().includes('length')) {
-              // Parse duration from metadata (could be "3:45" format)
-              const durationStr = meta.text;
-              const timeMatch = durationStr?.match(/(\d+):(\d+)/);
+                meta.title?.toLowerCase().includes('length') ||
+                meta.title?.toLowerCase().includes('time')) {
+              
+              const durationText = meta.text;
+              console.log('🔍 Found duration metadata:', meta.title, '=', durationText);
+              
+              // Parse formats like "5:16", "316", or "5m 16s"
+              const timeMatch = durationText?.match(/(\d+):(\d+)/);
               if (timeMatch) {
-                songDuration = parseInt(timeMatch[1]) * 60 + parseInt(timeMatch[2]);
-                console.log(`🎵 Found song duration in Shazam metadata: ${songDuration}s`);
+                songDurationSeconds = parseInt(timeMatch[1]) * 60 + parseInt(timeMatch[2]);
+                console.log(`✅ Parsed song duration: ${songDurationSeconds}s (${timeMatch[1]}:${timeMatch[2]})`);
+                break;
+              }
+              
+              // Try parsing just seconds
+              const secondsMatch = durationText?.match(/^\d+$/);
+              if (secondsMatch) {
+                songDurationSeconds = parseInt(durationText);
+                console.log(`✅ Parsed song duration: ${songDurationSeconds}s`);
+                break;
               }
             }
           }
+          if (songDurationSeconds) break;
         }
       }
     }
-
-    // If we have both offset and duration, calculate precisely when song ends
-    if (songDuration && offsetInSong < songDuration) {
-      const remainingTime = songDuration - offsetInSong;
-      const nextRecognitionDelay = Math.max(30, remainingTime - 10); // Wait until 10s before song ends
-      
-      console.log(`🎵 PRECISE TIMING: Song is ${songDuration}s long, we're ${offsetInSong}s in, ${remainingTime}s remaining`);
-      console.log(`⏰ Next recognition in ${nextRecognitionDelay}s (10s before song ends)`);
-      
-      return Math.min(480, nextRecognitionDelay); // Cap at 8 minutes for safety
+    
+    // If we couldn't find duration in metadata, fallback to estimation
+    if (!songDurationSeconds) {
+      console.log('⚠️ Could not find song duration in Shazam metadata, using fallback');
+      songDurationSeconds = Math.max(240, offsetInSong * 4); // Conservative estimate
     }
-
-    // Fallback: Use offset to estimate when to check again
-    if (offsetInSong > 0) {
-      // If we're early in the song (first 30s), assume it's a 3-4 minute song
-      if (offsetInSong < 30) {
-        const estimatedRemaining = 210 - offsetInSong; // Assume 3.5 min song
-        const nextCheck = Math.max(60, estimatedRemaining - 15);
-        console.log(`📊 Early in song (${offsetInSong}s), estimated ${estimatedRemaining}s remaining, next check in ${nextCheck}s`);
-        return Math.min(300, nextCheck);
-      }
-      
-      // If we're mid-song (30s-120s), assume it ends in 60-90s
-      if (offsetInSong < 120) {
-        const estimatedRemaining = 90;
-        console.log(`📊 Mid-song (${offsetInSong}s), checking again in ${estimatedRemaining}s`);
-        return estimatedRemaining;
-      }
-      
-      // If we're late in song (>2min), check sooner
-      const quickCheck = 45;
-      console.log(`📊 Late in song (${offsetInSong}s), quick check in ${quickCheck}s`);
-      return quickCheck;
-    }
-
-    // Final fallback
-    console.log('⚠️ No useful timing data from Shazam, using 2-minute fallback');
-    return 120;
+    
+    // Simple math: song length - (current position + buffer time)
+    const timeRemaining = Math.max(30, songDurationSeconds - offsetInSong - 30);
+    
+    console.log(`🎵 TIMING: ${offsetInSong}s into ${Math.floor(songDurationSeconds/60)}:${(songDurationSeconds%60).toString().padStart(2,'0')} song, wait ${Math.floor(timeRemaining/60)}:${(timeRemaining%60).toString().padStart(2,'0')}`);
+    
+    return Math.min(480, timeRemaining); // cap at 8 minutes
   }, []);
 
-  // UPDATED: Process audio with Shazam timing data
+  // UPDATED: Process audio with FIXED Shazam timing data
   const processAudioSample = useCallback(async (audioBlob: Blob) => {
     setStatus('Converting and processing audio with Shazam...');
 
@@ -295,18 +291,12 @@ export default function AudioRecognitionPage() {
         
         setRecognitionHistory(prev => [newHistoryEntry, ...prev.slice(0, 9)]);
         
-        // Try to load from DB but don't fail if it doesn't work
-        setTimeout(() => {
-          loadCurrentTrack();
-          loadRecentHistory();
-        }, 1000);
-        
-        // Check if this is a new track
+        // Check if this is a new track BEFORE updating database
         const isNewTrack = !currentTrack || 
           currentTrack.artist?.toLowerCase() !== result.track.artist?.toLowerCase() || 
           currentTrack.title?.toLowerCase() !== result.track.title?.toLowerCase();
         
-        // Use actual Shazam timing data to calculate next recognition
+        // Use FIXED Shazam timing data to calculate next recognition
         const nextDelay = calculateIntelligentDelay(result.rawResponse || result, isNewTrack);
         setNextRecognitionCountdown(nextDelay);
 
@@ -315,6 +305,12 @@ export default function AudioRecognitionPage() {
         } else {
           console.log(`🔄 SAME TRACK: ${result.track.artist} - ${result.track.title}`);
         }
+
+        // Try to load from DB but don't fail if it doesn't work
+        setTimeout(() => {
+          loadCurrentTrack();
+          loadRecentHistory();
+        }, 1000);
 
         console.log(`🎯 Recognition successful: ${result.track.artist} - ${result.track.title}`);
       } else {
@@ -528,7 +524,7 @@ export default function AudioRecognitionPage() {
           Audio Recognition Control
         </h1>
         <p style={{ color: '#666', fontSize: 16 }}>
-          Listen for vinyl and cassette audio, identify tracks with Shazam (RAW PCM format)
+          Listen for vinyl and cassette audio, identify tracks with Shazam (uses song duration from metadata)
         </p>
       </div>
 
@@ -576,7 +572,7 @@ export default function AudioRecognitionPage() {
             </button>
           )}
 
-          {/* UPDATED: TV Display Link */}
+          {/* TV Display Link */}
           <a
             href="/tv-display"
             target="_blank"
@@ -621,7 +617,7 @@ export default function AudioRecognitionPage() {
           fontSize: 12,
           color: '#15803d'
         }}>
-          ✅ <strong>Intelligent Timing:</strong> Uses Shazam&apos;s offset data to know where in each song we are, then waits until near the end before next recognition
+          ✅ <strong>Fixed Timing:</strong> Now extracts actual song duration from Shazam metadata and calculates: Song Length - (Current Position + Buffer) = Next Sample Time
         </div>
       </div>
 
