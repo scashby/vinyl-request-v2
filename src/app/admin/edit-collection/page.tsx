@@ -35,7 +35,9 @@ interface PageState {
   showMissingImages: boolean;
   showMissingTracklists: boolean;
   showForSale: boolean;
-  showBadgedOnly: boolean;
+  showTop200Only: boolean;
+  showTop10Only: boolean;
+  showInnerCircleOnly: boolean;
   scrollPosition: number;
 }
 
@@ -48,7 +50,9 @@ export default function EditCollectionPage() {
   const [showMissingImages, setShowMissingImages] = useState<boolean>(false);
   const [showMissingTracklists, setShowMissingTracklists] = useState<boolean>(false);
   const [showForSale, setShowForSale] = useState<boolean>(false);
-  const [showBadgedOnly, setShowBadgedOnly] = useState<boolean>(false);
+  const [showTop200Only, setShowTop200Only] = useState<boolean>(false);
+  const [showTop10Only, setShowTop10Only] = useState<boolean>(false);
+  const [showInnerCircleOnly, setShowInnerCircleOnly] = useState<boolean>(false);
   const [editingPrice, setEditingPrice] = useState<number | null>(null);
   const [tempPrice, setTempPrice] = useState<string>('');
   const [updatingRow, setUpdatingRow] = useState<number | null>(null);
@@ -62,11 +66,13 @@ export default function EditCollectionPage() {
       showMissingImages,
       showMissingTracklists,
       showForSale,
-      showBadgedOnly,
+      showTop200Only,
+      showTop10Only,
+      showInnerCircleOnly,
       scrollPosition: window.scrollY
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  }, [sortColumn, sortDirection, query, showMissingImages, showMissingTracklists, showForSale, showBadgedOnly]);
+  }, [sortColumn, sortDirection, query, showMissingImages, showMissingTracklists, showForSale, showTop200Only, showTop10Only, showInnerCircleOnly]);
 
   // Load state from localStorage
   const loadState = useCallback(() => {
@@ -80,7 +86,9 @@ export default function EditCollectionPage() {
         setShowMissingImages(state.showMissingImages || false);
         setShowMissingTracklists(state.showMissingTracklists || false);
         setShowForSale(state.showForSale || false);
-        setShowBadgedOnly(state.showBadgedOnly || false);
+        setShowTop200Only(state.showTop200Only || false);
+        setShowTop10Only(state.showTop10Only || false);
+        setShowInnerCircleOnly(state.showInnerCircleOnly || false);
         
         // Restore scroll position after data loads
         setTimeout(() => {
@@ -243,11 +251,13 @@ export default function EditCollectionPage() {
     // For sale filter
     const matchesForSaleFilter = !showForSale || (row.sell_price && row.sell_price !== '');
 
-    // Badge filter
-    const matchesBadgeFilter = !showBadgedOnly || 
-      (row.steves_top_200 || row.this_weeks_top_10 || row.inner_circle_preferred);
+    // Individual badge filters
+    const matchesTop200Filter = !showTop200Only || !!row.steves_top_200;
+    const matchesTop10Filter = !showTop10Only || !!row.this_weeks_top_10;
+    const matchesInnerCircleFilter = !showInnerCircleOnly || !!row.inner_circle_preferred;
 
-    return matchesQuery && matchesImageFilter && matchesTracklistFilter && matchesForSaleFilter && matchesBadgeFilter;
+    return matchesQuery && matchesImageFilter && matchesTracklistFilter && matchesForSaleFilter && 
+           matchesTop200Filter && matchesTop10Filter && matchesInnerCircleFilter;
   });
 
   const sortedAndFiltered = sortData(filtered);
@@ -380,11 +390,97 @@ export default function EditCollectionPage() {
     updateSellPrice(rowId, tempPrice);
   };
 
+  // Print/Export function
+  const exportToPrint = () => {
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Collection Export - ${new Date().toLocaleDateString()}</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            h1 { color: #333; margin-bottom: 20px; }
+            .filters { margin-bottom: 20px; padding: 10px; background: #f5f5f5; border-radius: 5px; font-size: 12px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 11px; }
+            th { background-color: #f2f2f2; font-weight: bold; }
+            tr:nth-child(even) { background-color: #f9f9f9; }
+            .badge { font-size: 9px; padding: 1px 3px; border-radius: 2px; margin-right: 2px; }
+            .top200 { background: #fee2e2; color: #dc2626; }
+            .top10 { background: #fed7aa; color: #ea580c; }
+            .inner { background: #e9d5ff; color: #7c3aed; }
+            @media print {
+              body { margin: 10px; }
+              .no-print { display: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <h1>Dead Wax Dialogues Collection</h1>
+          <div class="filters">
+            <strong>Export Date:</strong> ${new Date().toLocaleString()}<br/>
+            <strong>Total Items:</strong> ${sortedAndFiltered.length} of ${data.length}<br/>
+            <strong>Filters Applied:</strong> 
+            ${query ? `Search: "${query}" • ` : ''}
+            ${showMissingImages ? 'Missing Images • ' : ''}
+            ${showMissingTracklists ? 'Missing Tracklists • ' : ''}
+            ${showForSale ? 'For Sale Only • ' : ''}
+            ${showTop200Only ? 'Steve\'s Top 200 Only • ' : ''}
+            ${showTop10Only ? 'This Week\'s Top 10 Only • ' : ''}
+            ${showInnerCircleOnly ? 'Inner Circle Preferred Only • ' : ''}
+            ${!query && !showMissingImages && !showMissingTracklists && !showForSale && !showTop200Only && !showTop10Only && !showInnerCircleOnly ? 'None' : ''}
+          </div>
+          
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 30%">Title</th>
+                <th style="width: 25%">Artist</th>
+                <th style="width: 20%">Format / Folder</th>
+                <th style="width: 15%">Price</th>
+                <th style="width: 10%">Badges</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${sortedAndFiltered.map(row => `
+                <tr>
+                  <td>${row.title || ''}</td>
+                  <td>${row.artist || ''}</td>
+                  <td>${[row.format, row.folder].filter(Boolean).join(' / ')}</td>
+                  <td>${row.sell_price || ''}</td>
+                  <td>
+                    ${row.steves_top_200 ? '<span class="badge top200">⭐T200</span>' : ''}
+                    ${row.this_weeks_top_10 ? '<span class="badge top10">🔥T10</span>' : ''}
+                    ${row.inner_circle_preferred ? '<span class="badge inner">💎IC</span>' : ''}
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          
+          <div style="margin-top: 20px; font-size: 10px; color: #666;">
+            Generated from Dead Wax Dialogues collection management system
+          </div>
+        </body>
+      </html>
+    `;
+
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.focus();
+      setTimeout(() => {
+        printWindow.print();
+      }, 250);
+    }
+  };
+
   const forSaleCount = data.filter(row => row.sell_price && row.sell_price !== '').length;
-  const badgedCount = data.filter(row => row.steves_top_200 || row.this_weeks_top_10 || row.inner_circle_preferred).length;
   const top200Count = data.filter(row => row.steves_top_200).length;
   const top10Count = data.filter(row => row.this_weeks_top_10).length; 
   const innerCircleCount = data.filter(row => row.inner_circle_preferred).length;
+  const badgedCount = top200Count + top10Count + innerCircleCount;
 
   return (
     <div style={{ padding: 24, background: "#fff", color: "#222", minHeight: "100vh" }}>
@@ -408,6 +504,13 @@ export default function EditCollectionPage() {
             style={{ padding: '4px 8px', background: '#2563eb', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}
           >
             Reload
+          </button>
+          <button 
+            onClick={exportToPrint}
+            style={{ padding: '4px 12px', background: '#059669', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontWeight: 'bold' }}
+            title="Export current view to PDF/Print"
+          >
+            📄 Export PDF
           </button>
           <span style={{ color: "#222" }}>{status}</span>
         </div>
@@ -439,14 +542,34 @@ export default function EditCollectionPage() {
             />
             For sale only ({forSaleCount})
           </label>
+        </div>
+
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 4, color: "#222", fontSize: 14 }}>
+            <input
+              type="checkbox"
+              checked={showTop200Only}
+              onChange={e => setShowTop200Only(e.target.checked)}
+            />
+            <span style={{ color: '#dc2626', fontWeight: 'bold' }}>⭐ Top 200 only ({top200Count})</span>
+          </label>
 
           <label style={{ display: 'flex', alignItems: 'center', gap: 4, color: "#222", fontSize: 14 }}>
             <input
               type="checkbox"
-              checked={showBadgedOnly}
-              onChange={e => setShowBadgedOnly(e.target.checked)}
+              checked={showTop10Only}
+              onChange={e => setShowTop10Only(e.target.checked)}
             />
-            Badged only ({badgedCount})
+            <span style={{ color: '#ea580c', fontWeight: 'bold' }}>🔥 Top 10 only ({top10Count})</span>
+          </label>
+
+          <label style={{ display: 'flex', alignItems: 'center', gap: 4, color: "#222", fontSize: 14 }}>
+            <input
+              type="checkbox"
+              checked={showInnerCircleOnly}
+              onChange={e => setShowInnerCircleOnly(e.target.checked)}
+            />
+            <span style={{ color: '#7c3aed', fontWeight: 'bold' }}>💎 Inner Circle only ({innerCircleCount})</span>
           </label>
         </div>
       </div>
@@ -652,11 +775,14 @@ export default function EditCollectionPage() {
           {showMissingImages && ` (${data.filter(row => !hasValidImage(row)).length} missing images)`}
           {showMissingTracklists && ` (${data.filter(row => !hasValidTracklist(row)).length} missing tracklists)`}
           {showForSale && ` (${forSaleCount} for sale)`}
-          {showBadgedOnly && ` (${badgedCount} badged)`}
+          {showTop200Only && ` (${top200Count} top 200)`}
+          {showTop10Only && ` (${top10Count} top 10)`}
+          {showInnerCircleOnly && ` (${innerCircleCount} inner circle)`}
         </div>
         <div style={{ fontSize: 12, color: '#666' }}>
           💡 Click price field to edit • Check boxes to toggle badges • Delete button available for all items<br/>
-          📊 Badges: ⭐{top200Count} • 🔥{top10Count} • 💎{innerCircleCount} • Total: {badgedCount}
+          📊 Badges: ⭐{top200Count} • 🔥{top10Count} • 💎{innerCircleCount} • Total: {badgedCount}<br/>
+          📄 Export current filtered view to PDF/Print with title, artist, format/folder, and price
         </div>
       </div>
     </div>
