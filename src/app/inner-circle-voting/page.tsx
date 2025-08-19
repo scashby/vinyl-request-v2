@@ -493,7 +493,7 @@ export default function InnerCircleVotingPage() {
               background: 'linear-gradient(135deg, #fbbf24, #f59e0b)',
               color: '#000',
               border: 'none',
-              borderRadius: 50,
+              borderRadius: '50%',
               width: 70,
               height: 70,
               fontSize: 12,
@@ -506,15 +506,7 @@ export default function InnerCircleVotingPage() {
               justifyContent: 'center',
               gap: 2,
               transition: 'all 0.3s ease',
-              zIndex: 1000
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'scale(1.1)';
-              e.currentTarget.style.boxShadow = '0 12px 30px rgba(251, 191, 36, 0.6)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'scale(1)';
-              e.currentTarget.style.boxShadow = '0 8px 25px rgba(251, 191, 36, 0.4)';
+              zIndex: 9999
             }}
           >
             <div style={{ fontSize: 16 }}>🗳️</div>
