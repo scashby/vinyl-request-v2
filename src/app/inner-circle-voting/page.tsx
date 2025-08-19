@@ -33,7 +33,7 @@ export default function InnerCircleVotingPage() {
   const [error, setError] = useState('');
   const [voteCounts, setVoteCounts] = useState<Record<number, number>>({});
   
-  const MAX_VOTES = 15; // Limit votes per person
+  const MAX_VOTES = 20; // Limit votes per person
 
   useEffect(() => {
     loadCollection();
@@ -42,20 +42,18 @@ export default function InnerCircleVotingPage() {
 
   const loadCollection = async () => {
     try {
-      // Load all non-blocked albums - let Inner Circle vote on the full collection
       const { data, error } = await supabase
         .from('collection')
         .select('id, artist, title, year, image_url, folder')
-        .or('blocked.is.null,blocked.eq.false') // Exclude blocked albums only
+        .ilike('format', '%vinyl%')
+        .or('blocked.is.null,blocked.eq.false')
         .order('artist', { ascending: true })
         .order('title', { ascending: true });
 
       if (error) throw error;
-      
-      console.log(`Loaded ${data?.length || 0} albums for Inner Circle voting`);
       setAlbums(data || []);
     } catch (error) {
-      console.error('Error loading collection:', error);
+      console.error('Error loading vinyl collection:', error);
       setError('Failed to load collection. Please refresh the page.');
     } finally {
       setLoading(false);
