@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from 'src/lib/supabaseClient';
 import Image from 'next/image';
 
-interface VinylAlbum {
+interface Album {
   id: number;
   artist: string;
   title: string;
@@ -24,7 +24,7 @@ interface VoterInfo {
 }
 
 export default function InnerCircleVotingPage() {
-  const [albums, setAlbums] = useState<VinylAlbum[]>([]);
+  const [albums, setAlbums] = useState<Album[]>([]);
   const [selectedAlbums, setSelectedAlbums] = useState<Set<number>>(new Set());
   const [voterInfo, setVoterInfo] = useState<VoterInfo>({ name: '', email: '' });
   const [loading, setLoading] = useState(true);
@@ -36,26 +36,26 @@ export default function InnerCircleVotingPage() {
   const MAX_VOTES = 15; // Limit votes per person
 
   useEffect(() => {
-    loadVinylCollection();
+    loadCollection();
     loadVoteCounts();
   }, []);
 
-  const loadVinylCollection = async () => {
+  const loadCollection = async () => {
     try {
+      // Load all non-blocked albums - let Inner Circle vote on the full collection
       const { data, error } = await supabase
         .from('collection')
         .select('id, artist, title, year, image_url, folder')
-        .ilike('format', '%vinyl%') // Only vinyl records
-        .or('blocked.is.null,blocked.eq.false') // Exclude blocked albums (null or false are OK)
+        .or('blocked.is.null,blocked.eq.false') // Exclude blocked albums only
         .order('artist', { ascending: true })
         .order('title', { ascending: true });
 
       if (error) throw error;
       
-      console.log(`Loaded ${data?.length || 0} vinyl albums for voting (blocked albums excluded)`);
+      console.log(`Loaded ${data?.length || 0} albums for Inner Circle voting`);
       setAlbums(data || []);
     } catch (error) {
-      console.error('Error loading vinyl collection:', error);
+      console.error('Error loading collection:', error);
       setError('Failed to load collection. Please refresh the page.');
     } finally {
       setLoading(false);
@@ -161,7 +161,7 @@ export default function InnerCircleVotingPage() {
         color: 'white'
       }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 24, marginBottom: 16 }}>🎵 Loading Vinyl Collection...</div>
+          <div style={{ fontSize: 24, marginBottom: 16 }}>🎵 Loading Collection...</div>
           <div style={{ fontSize: 16, opacity: 0.8 }}>Preparing your voting experience</div>
         </div>
       </div>
@@ -223,10 +223,10 @@ export default function InnerCircleVotingPage() {
             💎 Inner Circle Voting
           </h1>
           <p style={{ fontSize: 18, margin: '0 0 20px 0', opacity: 0.9 }}>
-            Vote for your favorite vinyl albums from the Dead Wax Dialogues collection
+            Vote for your favorite albums from the Dead Wax Dialogues collection
           </p>
           <p style={{ fontSize: 16, opacity: 0.8 }}>
-            Select up to <strong>{MAX_VOTES} albums</strong> • {albums.length} vinyl records available
+            Select up to <strong>{MAX_VOTES} albums</strong> • {albums.length} records available
           </p>
           
           {/* Vote Counter */}
