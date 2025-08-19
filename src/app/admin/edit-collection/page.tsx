@@ -486,8 +486,28 @@ export default function EditCollectionPage() {
     <div style={{ padding: 24, background: "#fff", color: "#222", minHeight: "100vh" }}>
       <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h2 style={{ color: "#222", margin: 0 }}>Edit Collection</h2>
-        <div style={{ fontSize: 14, color: '#666' }}>
-          💾 Sort & filter state automatically saved
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <Link
+            href="/admin/inner-circle-results"
+            style={{
+              background: 'linear-gradient(135deg, #7c3aed, #a855f7)',
+              color: 'white',
+              padding: '8px 16px',
+              borderRadius: 8,
+              textDecoration: 'none',
+              fontSize: 14,
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              boxShadow: '0 2px 4px rgba(124, 58, 237, 0.2)'
+            }}
+          >
+            💎 Inner Circle Results
+          </Link>
+          <div style={{ fontSize: 14, color: '#666' }}>
+            💾 Sort & filter state automatically saved
+          </div>
         </div>
       </div>
       
