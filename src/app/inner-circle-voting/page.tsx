@@ -33,7 +33,7 @@ export default function InnerCircleVotingPage() {
   const [error, setError] = useState('');
   const [voteCounts, setVoteCounts] = useState<Record<number, number>>({});
   
-  const MAX_VOTES = 20; // Limit votes per person
+  const MAX_VOTES = 15; // Limit votes per person
 
   useEffect(() => {
     loadCollection();
@@ -45,7 +45,7 @@ export default function InnerCircleVotingPage() {
       const { data, error } = await supabase
         .from('collection')
         .select('id, artist, title, year, image_url, folder')
-        .ilike('format', '%vinyl%')
+        .eq('folder', 'Vinyl') // Filter by vinyl folder
         .or('blocked.is.null,blocked.eq.false')
         .order('artist', { ascending: true })
         .order('title', { ascending: true });
