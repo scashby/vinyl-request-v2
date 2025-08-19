@@ -20,6 +20,9 @@ type CollectionEntry = {
   image_url: string | null;
   media_condition: string | null;
   sell_price: string | null;
+  steves_top_200: boolean | null;
+  this_weeks_top_10: boolean | null;
+  inner_circle_preferred: boolean | null;
   blocked: boolean | null;
   blocked_sides: string[] | null;
   tracklists: string | null;
@@ -156,14 +159,20 @@ export default function EditEntryPage() {
       image_url: entry.image_url || '',
       media_condition: entry.media_condition || '',
       sell_price: entry.sell_price || null,
+      steves_top_200: !!entry.steves_top_200,
+      this_weeks_top_10: !!entry.this_weeks_top_10,
+      inner_circle_preferred: !!entry.inner_circle_preferred,
       blocked_sides: blockedSides || [],
       blocked: !!entry.blocked,
       tracklists: JSON.stringify(tracks),
       discogs_release_id: entry.discogs_release_id || '',
     };
     
-    console.log('Saving entry with sell_price:', update.sell_price);
-    console.log('Full update object:', update);
+    console.log('Saving entry with badges:', {
+      steves_top_200: update.steves_top_200,
+      this_weeks_top_10: update.this_weeks_top_10,
+      inner_circle_preferred: update.inner_circle_preferred
+    });
     
     const { error } = await supabase.from('collection').update(update).eq('id', entry.id);
     
@@ -333,6 +342,54 @@ export default function EditEntryPage() {
                   Current price: {entry.sell_price}
                 </div>
               )}
+            </div>
+
+            {/* Badge Options */}
+            <div style={{ 
+              padding: 16, 
+              background: '#f0f9ff', 
+              borderRadius: 8, 
+              border: '1px solid #0369a1' 
+            }}>
+              <h4 style={{ fontSize: '16px', fontWeight: '600', margin: '0 0 12px 0', color: '#0c4a6e' }}>
+                🏆 Special Badges
+              </h4>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <label style={{ display: 'flex', alignItems: 'center', color: "#374151", cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={!!entry.steves_top_200}
+                    onChange={e => handleChange('steves_top_200', e.target.checked)}
+                    style={{ marginRight: 8, transform: 'scale(1.1)' }}
+                  />
+                  <span style={{ fontWeight: '600', color: '#dc2626' }}>⭐ Steve&apos;s Top 200</span>
+                </label>
+                
+                <label style={{ display: 'flex', alignItems: 'center', color: "#374151", cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={!!entry.this_weeks_top_10}
+                    onChange={e => handleChange('this_weeks_top_10', e.target.checked)}
+                    style={{ marginRight: 8, transform: 'scale(1.1)' }}
+                  />
+                  <span style={{ fontWeight: '600', color: '#ea580c' }}>🔥 This Week&apos;s Top 10</span>
+                </label>
+                
+                <label style={{ display: 'flex', alignItems: 'center', color: "#374151", cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={!!entry.inner_circle_preferred}
+                    onChange={e => handleChange('inner_circle_preferred', e.target.checked)}
+                    style={{ marginRight: 8, transform: 'scale(1.1)' }}
+                  />
+                  <span style={{ fontWeight: '600', color: '#7c3aed' }}>💎 Inner Circle Preferred</span>
+                </label>
+              </div>
+              
+              <div style={{ fontSize: '12px', color: '#0369a1', marginTop: 8 }}>
+                These badges will appear on the browse page and TV display
+              </div>
             </div>
 
             <div>

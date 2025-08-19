@@ -16,6 +16,9 @@ interface CollectionRow {
   format?: string;
   media_condition?: string;
   sell_price?: string | null;
+  steves_top_200?: boolean | null;
+  this_weeks_top_10?: boolean | null;
+  inner_circle_preferred?: boolean | null;
   tracklists?: string | { position?: string; title?: string }[];
   blocked?: boolean;
 }
@@ -32,6 +35,7 @@ interface PageState {
   showMissingImages: boolean;
   showMissingTracklists: boolean;
   showForSale: boolean;
+  showBadgedOnly: boolean;
   scrollPosition: number;
 }
 
@@ -44,6 +48,7 @@ export default function EditCollectionPage() {
   const [showMissingImages, setShowMissingImages] = useState<boolean>(false);
   const [showMissingTracklists, setShowMissingTracklists] = useState<boolean>(false);
   const [showForSale, setShowForSale] = useState<boolean>(false);
+  const [showBadgedOnly, setShowBadgedOnly] = useState<boolean>(false);
   const [editingPrice, setEditingPrice] = useState<number | null>(null);
   const [tempPrice, setTempPrice] = useState<string>('');
   const [updatingRow, setUpdatingRow] = useState<number | null>(null);
@@ -57,10 +62,11 @@ export default function EditCollectionPage() {
       showMissingImages,
       showMissingTracklists,
       showForSale,
+      showBadgedOnly,
       scrollPosition: window.scrollY
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  }, [sortColumn, sortDirection, query, showMissingImages, showMissingTracklists, showForSale]);
+  }, [sortColumn, sortDirection, query, showMissingImages, showMissingTracklists, showForSale, showBadgedOnly]);
 
   // Load state from localStorage
   const loadState = useCallback(() => {
@@ -74,6 +80,7 @@ export default function EditCollectionPage() {
         setShowMissingImages(state.showMissingImages || false);
         setShowMissingTracklists(state.showMissingTracklists || false);
         setShowForSale(state.showForSale || false);
+        setShowBadgedOnly(state.showBadgedOnly || false);
         
         // Restore scroll position after data loads
         setTimeout(() => {
@@ -236,7 +243,11 @@ export default function EditCollectionPage() {
     // For sale filter
     const matchesForSaleFilter = !showForSale || (row.sell_price && row.sell_price !== '');
 
-    return matchesQuery && matchesImageFilter && matchesTracklistFilter && matchesForSaleFilter;
+    // Badge filter
+    const matchesBadgeFilter = !showBadgedOnly || 
+      (row.steves_top_200 || row.this_weeks_top_10 || row.inner_circle_preferred);
+
+    return matchesQuery && matchesImageFilter && matchesTracklistFilter && matchesForSaleFilter && matchesBadgeFilter;
   });
 
   const sortedAndFiltered = sortData(filtered);
@@ -336,6 +347,7 @@ export default function EditCollectionPage() {
   };
 
   const forSaleCount = data.filter(row => row.sell_price && row.sell_price !== '').length;
+  const badgedCount = data.filter(row => row.steves_top_200 || row.this_weeks_top_10 || row.inner_circle_preferred).length;
 
   return (
     <div style={{ padding: 24, background: "#fff", color: "#222", minHeight: "100vh" }}>
@@ -390,6 +402,15 @@ export default function EditCollectionPage() {
             />
             For sale only ({forSaleCount})
           </label>
+
+          <label style={{ display: 'flex', alignItems: 'center', gap: 4, color: "#222", fontSize: 14 }}>
+            <input
+              type="checkbox"
+              checked={showBadgedOnly}
+              onChange={e => setShowBadgedOnly(e.target.checked)}
+            />
+            Badged only ({badgedCount})
+          </label>
         </div>
       </div>
 
@@ -426,6 +447,7 @@ export default function EditCollectionPage() {
                   onClick={() => handleSort('sell_price')}>
                 💰 Sell Price{getSortIcon('sell_price')}
               </th>
+              <th style={{ padding: '8px 4px', borderBottom: '1px solid #ddd' }}>🏆 Badges</th>
               <th style={{ padding: '8px 4px', borderBottom: '1px solid #ddd' }}>Tracklist</th>
               <th style={{ padding: '8px 4px', borderBottom: '1px solid #ddd' }}>Actions</th>
             </tr>
@@ -502,6 +524,52 @@ export default function EditCollectionPage() {
                     </div>
                   )}
                 </td>
+                <td style={{ padding: '4px', minWidth: 80 }}>
+                  <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+                    {row.steves_top_200 && (
+                      <span style={{ 
+                        fontSize: '10px', 
+                        background: '#fee2e2', 
+                        color: '#dc2626', 
+                        padding: '2px 4px', 
+                        borderRadius: 3, 
+                        fontWeight: 'bold',
+                        border: '1px solid #dc2626'
+                      }}>
+                        ⭐ TOP200
+                      </span>
+                    )}
+                    {row.this_weeks_top_10 && (
+                      <span style={{ 
+                        fontSize: '10px', 
+                        background: '#fed7aa', 
+                        color: '#ea580c', 
+                        padding: '2px 4px', 
+                        borderRadius: 3, 
+                        fontWeight: 'bold',
+                        border: '1px solid #ea580c'
+                      }}>
+                        🔥 TOP10
+                      </span>
+                    )}
+                    {row.inner_circle_preferred && (
+                      <span style={{ 
+                        fontSize: '10px', 
+                        background: '#e9d5ff', 
+                        color: '#7c3aed', 
+                        padding: '2px 4px', 
+                        borderRadius: 3, 
+                        fontWeight: 'bold',
+                        border: '1px solid #7c3aed'
+                      }}>
+                        💎 INNER
+                      </span>
+                    )}
+                    {!row.steves_top_200 && !row.this_weeks_top_10 && !row.inner_circle_preferred && (
+                      <span style={{ fontSize: '10px', color: '#9ca3af' }}>—</span>
+                    )}
+                  </div>
+                </td>
                 <td style={{ color: hasValidTracklist(row) ? '#222' : '#999', fontStyle: hasValidTracklist(row) ? 'normal' : 'italic', padding: '4px', maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {hasValidTracklist(row) ? parseTracklistShort(row.tracklists) : 'No tracklist'}
                 </td>
@@ -543,6 +611,7 @@ export default function EditCollectionPage() {
           {showMissingImages && ` (${data.filter(row => !hasValidImage(row)).length} missing images)`}
           {showMissingTracklists && ` (${data.filter(row => !hasValidTracklist(row)).length} missing tracklists)`}
           {showForSale && ` (${forSaleCount} for sale)`}
+          {showBadgedOnly && ` (${badgedCount} badged)`}
         </div>
         <div style={{ fontSize: 12, color: '#666' }}>
           💡 Click price field to edit • Delete button appears for items with prices
