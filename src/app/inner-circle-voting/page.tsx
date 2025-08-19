@@ -4,7 +4,7 @@
 
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from 'src/lib/supabaseClient';
 import Image from 'next/image';
 
@@ -34,6 +34,14 @@ export default function InnerCircleVotingPage() {
   const [voteCounts, setVoteCounts] = useState<Record<number, number>>({});
   
   const MAX_VOTES = 15; // Limit votes per person
+  const submitFormRef = useRef<HTMLDivElement>(null);
+
+  const scrollToSubmit = () => {
+    submitFormRef.current?.scrollIntoView({ 
+      behavior: 'smooth',
+      block: 'start'
+    });
+  };
 
   useEffect(() => {
     loadCollection();
@@ -370,13 +378,16 @@ export default function InnerCircleVotingPage() {
         </div>
 
         {/* Voter Information Form */}
-        <div style={{
-          background: 'rgba(255, 255, 255, 0.1)',
-          borderRadius: 16,
-          padding: 30,
-          backdropFilter: 'blur(10px)',
-          marginBottom: 20
-        }}>
+        <div 
+          ref={submitFormRef}
+          style={{
+            background: 'rgba(255, 255, 255, 0.1)',
+            borderRadius: 16,
+            padding: 30,
+            backdropFilter: 'blur(10px)',
+            marginBottom: 20
+          }}
+        >
           <h3 style={{ fontSize: 24, margin: '0 0 20px 0', textAlign: 'center' }}>
             Submit Your Votes
           </h3>
@@ -470,6 +481,48 @@ export default function InnerCircleVotingPage() {
             Each email address can only vote once. Your votes will be used to select Inner Circle favorites.
           </div>
         </div>
+
+        {/* Floating Submit Button */}
+        {selectedAlbums.size > 0 && (
+          <button
+            onClick={scrollToSubmit}
+            style={{
+              position: 'fixed',
+              bottom: 30,
+              right: 30,
+              background: 'linear-gradient(135deg, #fbbf24, #f59e0b)',
+              color: '#000',
+              border: 'none',
+              borderRadius: 50,
+              width: 70,
+              height: 70,
+              fontSize: 12,
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              boxShadow: '0 8px 25px rgba(251, 191, 36, 0.4)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 2,
+              transition: 'all 0.3s ease',
+              zIndex: 1000
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'scale(1.1)';
+              e.currentTarget.style.boxShadow = '0 12px 30px rgba(251, 191, 36, 0.6)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'scale(1)';
+              e.currentTarget.style.boxShadow = '0 8px 25px rgba(251, 191, 36, 0.4)';
+            }}
+          >
+            <div style={{ fontSize: 16 }}>🗳️</div>
+            <div style={{ fontSize: 10, lineHeight: 1 }}>
+              SUBMIT<br/>{selectedAlbums.size}
+            </div>
+          </button>
+        )}
       </div>
     </div>
   );
