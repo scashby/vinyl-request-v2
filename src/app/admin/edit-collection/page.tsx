@@ -274,6 +274,40 @@ export default function EditCollectionPage() {
     return sortDirection === 'asc' ? ' ↑' : ' ↓';
   }
 
+  async function updateBadge(rowId: number, badgeType: 'steves_top_200' | 'this_weeks_top_10' | 'inner_circle_preferred', newValue: boolean) {
+    setUpdatingRow(rowId);
+    try {
+      const { error } = await supabase
+        .from('collection')
+        .update({ [badgeType]: newValue })
+        .eq('id', rowId);
+
+      if (error) throw error;
+
+      // Update local data
+      setData(prevData => 
+        prevData.map(row => 
+          row.id === rowId 
+            ? { ...row, [badgeType]: newValue }
+            : row
+        )
+      );
+
+      const badgeNames = {
+        steves_top_200: "Steve's Top 200",
+        this_weeks_top_10: "This Week's Top 10", 
+        inner_circle_preferred: "Inner Circle Preferred"
+      };
+
+      setStatus(`${newValue ? 'Added' : 'Removed'} ${badgeNames[badgeType]} for ID ${rowId}`);
+      setTimeout(() => setStatus(''), 3000);
+    } catch (error) {
+      console.error('Error updating badge:', error);
+      setStatus(`Error updating badge: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setUpdatingRow(null);
+    }
+  }
   async function updateSellPrice(rowId: number, newPrice: string) {
     setUpdatingRow(rowId);
     try {
@@ -348,6 +382,9 @@ export default function EditCollectionPage() {
 
   const forSaleCount = data.filter(row => row.sell_price && row.sell_price !== '').length;
   const badgedCount = data.filter(row => row.steves_top_200 || row.this_weeks_top_10 || row.inner_circle_preferred).length;
+  const top200Count = data.filter(row => row.steves_top_200).length;
+  const top10Count = data.filter(row => row.this_weeks_top_10).length; 
+  const innerCircleCount = data.filter(row => row.inner_circle_preferred).length;
 
   return (
     <div style={{ padding: 24, background: "#fff", color: "#222", minHeight: "100vh" }}>
@@ -447,7 +484,18 @@ export default function EditCollectionPage() {
                   onClick={() => handleSort('sell_price')}>
                 💰 Sell Price{getSortIcon('sell_price')}
               </th>
-              <th style={{ padding: '8px 4px', borderBottom: '1px solid #ddd' }}>🏆 Badges</th>
+              <th style={{ padding: '8px 4px', borderBottom: '1px solid #ddd', fontSize: 11, textAlign: 'center' }}
+                  title="Steve's Top 200">
+                ⭐<br/>T200
+              </th>
+              <th style={{ padding: '8px 4px', borderBottom: '1px solid #ddd', fontSize: 11, textAlign: 'center' }}
+                  title="This Week's Top 10">
+                🔥<br/>T10
+              </th>
+              <th style={{ padding: '8px 4px', borderBottom: '1px solid #ddd', fontSize: 11, textAlign: 'center' }}
+                  title="Inner Circle Preferred">
+                💎<br/>IC
+              </th>
               <th style={{ padding: '8px 4px', borderBottom: '1px solid #ddd' }}>Tracklist</th>
               <th style={{ padding: '8px 4px', borderBottom: '1px solid #ddd' }}>Actions</th>
             </tr>
@@ -524,51 +572,44 @@ export default function EditCollectionPage() {
                     </div>
                   )}
                 </td>
-                <td style={{ padding: '4px', minWidth: 80 }}>
-                  <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
-                    {row.steves_top_200 && (
-                      <span style={{ 
-                        fontSize: '10px', 
-                        background: '#fee2e2', 
-                        color: '#dc2626', 
-                        padding: '2px 4px', 
-                        borderRadius: 3, 
-                        fontWeight: 'bold',
-                        border: '1px solid #dc2626'
-                      }}>
-                        ⭐ TOP200
-                      </span>
-                    )}
-                    {row.this_weeks_top_10 && (
-                      <span style={{ 
-                        fontSize: '10px', 
-                        background: '#fed7aa', 
-                        color: '#ea580c', 
-                        padding: '2px 4px', 
-                        borderRadius: 3, 
-                        fontWeight: 'bold',
-                        border: '1px solid #ea580c'
-                      }}>
-                        🔥 TOP10
-                      </span>
-                    )}
-                    {row.inner_circle_preferred && (
-                      <span style={{ 
-                        fontSize: '10px', 
-                        background: '#e9d5ff', 
-                        color: '#7c3aed', 
-                        padding: '2px 4px', 
-                        borderRadius: 3, 
-                        fontWeight: 'bold',
-                        border: '1px solid #7c3aed'
-                      }}>
-                        💎 INNER
-                      </span>
-                    )}
-                    {!row.steves_top_200 && !row.this_weeks_top_10 && !row.inner_circle_preferred && (
-                      <span style={{ fontSize: '10px', color: '#9ca3af' }}>—</span>
-                    )}
-                  </div>
+                <td style={{ padding: '4px', textAlign: 'center' }}>
+                  <input
+                    type="checkbox"
+                    checked={!!row.steves_top_200}
+                    onChange={e => updateBadge(row.id, 'steves_top_200', e.target.checked)}
+                    disabled={updatingRow === row.id}
+                    style={{ 
+                      transform: 'scale(1.2)',
+                      cursor: updatingRow === row.id ? 'not-allowed' : 'pointer'
+                    }}
+                    title="Steve's Top 200"
+                  />
+                </td>
+                <td style={{ padding: '4px', textAlign: 'center' }}>
+                  <input
+                    type="checkbox"
+                    checked={!!row.this_weeks_top_10}
+                    onChange={e => updateBadge(row.id, 'this_weeks_top_10', e.target.checked)}
+                    disabled={updatingRow === row.id}
+                    style={{ 
+                      transform: 'scale(1.2)',
+                      cursor: updatingRow === row.id ? 'not-allowed' : 'pointer'
+                    }}
+                    title="This Week's Top 10"
+                  />
+                </td>
+                <td style={{ padding: '4px', textAlign: 'center' }}>
+                  <input
+                    type="checkbox"
+                    checked={!!row.inner_circle_preferred}
+                    onChange={e => updateBadge(row.id, 'inner_circle_preferred', e.target.checked)}
+                    disabled={updatingRow === row.id}
+                    style={{ 
+                      transform: 'scale(1.2)',
+                      cursor: updatingRow === row.id ? 'not-allowed' : 'pointer'
+                    }}
+                    title="Inner Circle Preferred"
+                  />
                 </td>
                 <td style={{ color: hasValidTracklist(row) ? '#222' : '#999', fontStyle: hasValidTracklist(row) ? 'normal' : 'italic', padding: '4px', maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {hasValidTracklist(row) ? parseTracklistShort(row.tracklists) : 'No tracklist'}
@@ -614,7 +655,8 @@ export default function EditCollectionPage() {
           {showBadgedOnly && ` (${badgedCount} badged)`}
         </div>
         <div style={{ fontSize: 12, color: '#666' }}>
-          💡 Click price field to edit • Delete button appears for items with prices
+          💡 Click price field to edit • Check boxes to toggle badges • Delete button available for all items<br/>
+          📊 Badges: ⭐{top200Count} • 🔥{top10Count} • 💎{innerCircleCount} • Total: {badgedCount}
         </div>
       </div>
     </div>
