@@ -33,7 +33,7 @@ export default function InnerCircleVotingPage() {
   const [error, setError] = useState('');
   const [voteCounts, setVoteCounts] = useState<Record<number, number>>({});
   
-  const MAX_VOTES = 15; // Limit votes per person
+  const MAX_VOTES = 20; // Limit votes per person
   const submitFormRef = useRef<HTMLDivElement>(null);
 
   const scrollToSubmit = () => {
