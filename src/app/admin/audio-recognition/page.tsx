@@ -1,4 +1,4 @@
-// src/app/admin/audio-recognition/page.tsx - FINAL PRECISE TIMING
+// src/app/admin/audio-recognition/page.tsx - SILENCE DETECTION APPROACH
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from 'react';
@@ -31,72 +31,62 @@ interface NowPlayingState {
   recognition_confidence: number;
   service_used: string;
   recognition_image_url?: string;
-  next_recognition_in?: number;
-  song_duration?: number;
-  song_offset?: number;
 }
 
-interface ShazamMetadata {
-  title?: string;
-  text?: string;
+interface SilenceDetectorConfig {
+  silenceThreshold: number;      // Audio level below which is considered silence
+  silenceDuration: number;       // How long silence must persist (ms)
+  initialRecognitionDelay: number; // Wait after starting before first recognition
+  postRecognitionCooldown: number; // Wait after recognition before listening for silence
 }
 
-interface ShazamSection {
-  type?: string;
-  metadata?: ShazamMetadata[];
+interface WindowWithWebkitAudioContext extends Window {
+  webkitAudioContext?: typeof AudioContext;
 }
 
-interface ShazamTrack {
-  sections?: ShazamSection[];
-}
-
-interface ShazamResult {
-  matches?: Array<{ offset?: number }>;
-  track?: ShazamTrack;
-}
-
-export default function AudioRecognitionPage() {
+export default function SilenceDetectionAudioRecognition() {
   const [isListening, setIsListening] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentTrack, setCurrentTrack] = useState<NowPlayingState | null>(null);
   const [recognitionHistory, setRecognitionHistory] = useState<RecognitionResult[]>([]);
   const [status, setStatus] = useState('Ready to listen');
-  const [nextRecognitionCountdown, setNextRecognitionCountdown] = useState(0);
-  const [currentSongPosition, setCurrentSongPosition] = useState(0);
+  const [silenceLevel, setSilenceLevel] = useState(0);
+  const [isInSilence, setIsInSilence] = useState(false);
+  const [silenceDuration, setSilenceDuration] = useState(0);
   
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
-  const recognitionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  // Silence detection configuration
+  const [config, setConfig] = useState<SilenceDetectorConfig>({
+    silenceThreshold: 0.01,        // Very low audio level
+    silenceDuration: 3000,         // 3 seconds of silence
+    initialRecognitionDelay: 3000, // Wait 3 seconds before first recognition
+    postRecognitionCooldown: 10000 // Wait 10 seconds after recognition
+  });
 
-  // RAW PCM Conversion Function
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const silenceStartTimeRef = useRef<number | null>(null);
+  const lastRecognitionTimeRef = useRef<number>(0);
+  const animationFrameRef = useRef<number | null>(null);
+
+  // Convert audio to RAW PCM format for Shazam
   const convertToRawPCM = useCallback(async (webmBlob: Blob): Promise<ArrayBuffer> => {
     console.log('🔄 Converting WebM to RAW PCM format for Shazam...');
     
-    interface WindowWithWebkit extends Window {
-      webkitAudioContext?: typeof AudioContext;
-    }
-    const AudioContextClass = window.AudioContext || (window as WindowWithWebkit).webkitAudioContext;
-    
-    if (!AudioContextClass) {
-      throw new Error('AudioContext not supported in this browser');
-    }
-    
-    const audioContext = new AudioContextClass({
-      sampleRate: 44100
-    });
+    const AudioContextClass = window.AudioContext || (window as WindowWithWebkitAudioContext).webkitAudioContext;
+    const audioContext = new AudioContextClass({ sampleRate: 44100 });
     
     try {
       const arrayBuffer = await webmBlob.arrayBuffer();
       const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
       
-      // Convert to mono and limit to 3 seconds to reduce size
+      // Convert to mono and limit to 3 seconds
       const maxSamples = Math.min(audioBuffer.length, 3 * audioBuffer.sampleRate);
       const channelData = audioBuffer.numberOfChannels > 1 
         ? audioBuffer.getChannelData(0) 
         : audioBuffer.getChannelData(0);
       
-      // Convert Float32Array to 16-bit PCM (little endian)
+      // Convert Float32Array to 16-bit PCM
       const pcmData = new Int16Array(maxSamples);
       for (let i = 0; i < maxSamples; i++) {
         const sample = Math.max(-1, Math.min(1, channelData[i]));
@@ -111,131 +101,9 @@ export default function AudioRecognitionPage() {
     }
   }, []);
 
-  // FIXED: Extract ACTUAL song duration from Shazam metadata
-  const extractSongDuration = useCallback((shazamResult: ShazamResult): number | null => {
-    if (!shazamResult.track?.sections) {
-      console.log('❌ No track sections in Shazam response');
-      return null;
-    }
-
-    for (const section of shazamResult.track.sections) {
-      if (section.metadata) {
-        for (const meta of section.metadata) {
-          // Look for duration in metadata
-          if (meta.title?.toLowerCase().includes('duration') || 
-              meta.title?.toLowerCase().includes('length')) {
-            
-            const durationText = meta.text;
-            console.log(`🔍 Found duration metadata: ${meta.title} = ${durationText}`);
-            
-            // Parse "MM:SS" format
-            const timeMatch = durationText?.match(/(\d+):(\d+)/);
-            if (timeMatch) {
-              const minutes = parseInt(timeMatch[1]);
-              const seconds = parseInt(timeMatch[2]);
-              const totalSeconds = minutes * 60 + seconds;
-              console.log(`✅ Extracted song duration: ${totalSeconds}s (${minutes}:${seconds.toString().padStart(2, '0')})`);
-              return totalSeconds;
-            }
-            
-            // Parse seconds only
-            const secondsMatch = durationText?.match(/^\d+$/);
-            if (secondsMatch) {
-              const totalSeconds = parseInt(durationText);
-              console.log(`✅ Extracted song duration: ${totalSeconds}s`);
-              return totalSeconds;
-            }
-          }
-        }
-      }
-    }
-    
-    console.log('❌ Could not find song duration in Shazam metadata');
-    return null;
-  }, []);
-
-  // PRECISE timing calculation using actual Shazam data
-  const calculatePreciseTiming = useCallback((shazamResult: ShazamResult, isNewTrack: boolean): number => {
-    if (!isNewTrack) {
-      return 60; // Same track, wait 1 minute
-    }
-
-    const matches = shazamResult.matches || [];
-    if (matches.length === 0) {
-      console.log('⚠️ No Shazam matches, using 120s fallback');
-      return 120;
-    }
-
-    const offsetInSong = matches[0].offset || 0;
-    const actualSongDuration = extractSongDuration(shazamResult);
-    
-    if (!actualSongDuration) {
-      console.log('⚠️ No song duration found, using estimation');
-      return Math.max(60, 240 - offsetInSong - 5); // 4min estimate with 5s buffer
-    }
-
-    // PRECISE CALCULATION: Sample right at song end to catch next song start
-    const timeRemaining = actualSongDuration - offsetInSong - 5; // 5s buffer to catch transition
-    const waitTime = Math.max(10, timeRemaining); // Minimum 10s wait
-    
-    console.log(`🎵 PRECISE TIMING:`);
-    console.log(`   • Song duration: ${actualSongDuration}s`);
-    console.log(`   • Current position: ${offsetInSong}s`);
-    console.log(`   • Time until song ends: ${actualSongDuration - offsetInSong}s`);
-    console.log(`   • Sample in: ${waitTime}s (5s before song ends)`);
-    
-    return Math.round(waitTime);
-  }, [extractSongDuration]);
-
-  // Load current track
-  const loadCurrentTrack = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from('now_playing')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-
-      if (error && error.code !== 'PGRST116') {
-        console.warn('Database access issue:', error.message);
-      } else if (data) {
-        setCurrentTrack(data);
-        if (data.next_recognition_in) {
-          const elapsed = Math.floor((Date.now() - new Date(data.started_at).getTime()) / 1000);
-          const remaining = Math.max(0, data.next_recognition_in - elapsed);
-          setNextRecognitionCountdown(remaining);
-        }
-      } else {
-        setCurrentTrack(null);
-      }
-    } catch (error) {
-      console.warn('Error loading current track:', error);
-    }
-  }, []);
-
-  // Load recognition history
-  const loadRecentHistory = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from('audio_recognition_logs')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(10);
-
-      if (error) {
-        console.warn('Cannot load history:', error.message);
-      } else if (data) {
-        setRecognitionHistory(data);
-      }
-    } catch (error) {
-      console.warn('Error loading history:', error);
-    }
-  }, []);
-
-  // Process audio sample
-  const processAudioSample = useCallback(async (audioBlob: Blob) => {
-    setStatus('Converting and processing audio with Shazam...');
+  // Process audio sample with Shazam
+  const processAudioSample = useCallback(async (audioBlob: Blob, reason: string) => {
+    setStatus('🔍 Processing with Shazam...');
 
     try {
       const rawPCMAudio = await convertToRawPCM(audioBlob);
@@ -256,9 +124,9 @@ export default function AudioRecognitionPage() {
       const result = await response.json();
 
       if (result.success && result.track) {
-        setStatus(`✅ Recognized: ${result.track.artist} - ${result.track.title}`);
+        setStatus(`✅ Recognized (${reason}): ${result.track.artist} - ${result.track.title}`);
         
-        // Add to history immediately
+        // Add to history
         const newHistoryEntry: RecognitionResult = {
           id: Date.now(),
           artist: result.track.artist,
@@ -272,25 +140,16 @@ export default function AudioRecognitionPage() {
         };
         
         setRecognitionHistory(prev => [newHistoryEntry, ...prev.slice(0, 9)]);
-        
-        // Check if new track
+
+        // Check if it's a new track
         const isNewTrack = !currentTrack || 
           currentTrack.artist?.toLowerCase() !== result.track.artist?.toLowerCase() || 
           currentTrack.title?.toLowerCase() !== result.track.title?.toLowerCase();
         
-        // Calculate precise timing
-        const nextDelay = calculatePreciseTiming(result.rawResponse || result, isNewTrack);
-        setNextRecognitionCountdown(nextDelay);
-
-        // Extract song info for display
-        const shazamResult = result.rawResponse || result;
-        const offsetInSong = shazamResult.matches?.[0]?.offset || 0;
-        const songDuration = extractSongDuration(shazamResult);
-        
         if (isNewTrack) {
           console.log(`🆕 NEW TRACK: ${result.track.artist} - ${result.track.title}`);
           
-          // Update database with song info
+          // Update database
           try {
             await supabase.from('now_playing').delete().neq('id', 0);
             
@@ -304,9 +163,6 @@ export default function AudioRecognitionPage() {
                 recognition_confidence: result.track.confidence || 0.7,
                 service_used: result.track.service.toLowerCase(),
                 recognition_image_url: result.track.image_url || null,
-                next_recognition_in: nextDelay,
-                song_duration: songDuration,
-                song_offset: offsetInSong,
                 created_at: new Date().toISOString()
               })
               .select()
@@ -336,23 +192,24 @@ export default function AudioRecognitionPage() {
 
       } else {
         setStatus(result.error || 'No match found');
-        setNextRecognitionCountdown(30);
       }
 
     } catch (error) {
       console.error('Recognition error:', error);
       setStatus(`Recognition error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      setNextRecognitionCountdown(45);
     }
-  }, [convertToRawPCM, currentTrack, calculatePreciseTiming, extractSongDuration]);
+  }, [convertToRawPCM, currentTrack]);
 
-  const triggerRecognition = useCallback(async () => {
-    if (!mediaRecorderRef.current || isProcessing) return;
+  // Trigger audio recognition - now defined before it's used
+  const triggerRecognition = useCallback(async (reason: string) => {
+    if (isProcessing) return;
 
     setIsProcessing(true);
-    setStatus('🎤 Capturing audio for recognition...');
+    setStatus(`🎤 ${reason} - Capturing audio...`);
+    lastRecognitionTimeRef.current = Date.now();
 
     try {
+      // Create a temporary recorder to capture a sample
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
           echoCancellation: false,
@@ -365,12 +222,6 @@ export default function AudioRecognitionPage() {
       let mimeType = 'audio/webm;codecs=opus';
       if (!MediaRecorder.isTypeSupported(mimeType)) {
         mimeType = 'audio/webm';
-      }
-      if (!MediaRecorder.isTypeSupported(mimeType)) {
-        mimeType = 'audio/mp4';
-      }
-      if (!MediaRecorder.isTypeSupported(mimeType)) {
-        mimeType = '';
       }
 
       const sampleRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
@@ -389,7 +240,7 @@ export default function AudioRecognitionPage() {
           const audioBlob = new Blob(sampleChunks, { 
             type: sampleChunks[0]?.type || 'audio/webm' 
           });
-          await processAudioSample(audioBlob);
+          await processAudioSample(audioBlob, reason);
         }
         setIsProcessing(false);
       };
@@ -409,7 +260,72 @@ export default function AudioRecognitionPage() {
     }
   }, [isProcessing, processAudioSample]);
 
-  const startListening = useCallback(async () => {
+  // Monitor audio levels continuously for silence detection
+  const monitorAudioLevels = useCallback(() => {
+    if (!analyserRef.current) return;
+
+    const analyser = analyserRef.current;
+    const dataArray = new Uint8Array(analyser.frequencyBinCount);
+    
+    const checkAudioLevel = () => {
+      analyser.getByteFrequencyData(dataArray);
+      
+      // Calculate RMS (Root Mean Square) for audio level
+      let sum = 0;
+      for (let i = 0; i < dataArray.length; i++) {
+        sum += (dataArray[i] / 255) * (dataArray[i] / 255);
+      }
+      const rms = Math.sqrt(sum / dataArray.length);
+      setSilenceLevel(rms);
+
+      const now = Date.now();
+      const timeSinceLastRecognition = now - lastRecognitionTimeRef.current;
+      
+      // Only detect silence if we're past the cooldown period
+      if (timeSinceLastRecognition > config.postRecognitionCooldown) {
+        if (rms < config.silenceThreshold) {
+          // We're in silence
+          if (!isInSilence) {
+            setIsInSilence(true);
+            silenceStartTimeRef.current = now;
+            setStatus('🔇 Silence detected, monitoring...');
+          } else if (silenceStartTimeRef.current) {
+            const silenceDuration = now - silenceStartTimeRef.current;
+            setSilenceDuration(silenceDuration);
+            
+            // If silence has lasted long enough, trigger recognition
+            if (silenceDuration >= config.silenceDuration && !isProcessing) {
+              setIsInSilence(false);
+              silenceStartTimeRef.current = null;
+              setSilenceDuration(0);
+              triggerRecognition('Silence detection triggered');
+            }
+          }
+        } else {
+          // Audio detected, reset silence tracking
+          if (isInSilence) {
+            setIsInSilence(false);
+            silenceStartTimeRef.current = null;
+            setSilenceDuration(0);
+            setStatus('🎵 Audio detected, listening...');
+          }
+        }
+      } else {
+        // During cooldown period
+        const cooldownRemaining = Math.ceil((config.postRecognitionCooldown - timeSinceLastRecognition) / 1000);
+        setStatus(`⏳ Cooldown: ${cooldownRemaining}s remaining`);
+      }
+
+      if (isListening) {
+        animationFrameRef.current = requestAnimationFrame(checkAudioLevel);
+      }
+    };
+
+    checkAudioLevel();
+  }, [config.silenceThreshold, config.silenceDuration, config.postRecognitionCooldown, isInSilence, isProcessing, isListening, triggerRecognition]);
+
+  // Initialize audio analysis for silence detection
+  const initializeAudioAnalysis = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
@@ -420,6 +336,20 @@ export default function AudioRecognitionPage() {
         }
       });
 
+      // Create audio context for analysis
+      const AudioContextClass = window.AudioContext || (window as WindowWithWebkitAudioContext).webkitAudioContext;
+      const audioContext = new AudioContextClass();
+      const analyser = audioContext.createAnalyser();
+      const source = audioContext.createMediaStreamSource(stream);
+      
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.3;
+      source.connect(analyser);
+
+      audioContextRef.current = audioContext;
+      analyserRef.current = analyser;
+
+      // Start MediaRecorder for when we need to capture samples
       let mimeType = 'audio/webm;codecs=opus';
       if (!MediaRecorder.isTypeSupported(mimeType)) {
         mimeType = 'audio/webm';
@@ -427,114 +357,77 @@ export default function AudioRecognitionPage() {
       if (!MediaRecorder.isTypeSupported(mimeType)) {
         mimeType = 'audio/mp4';
       }
-      if (!MediaRecorder.isTypeSupported(mimeType)) {
-        mimeType = '';
-      }
 
       const mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
       mediaRecorderRef.current = mediaRecorder;
-      audioChunksRef.current = [];
 
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
-        }
-      };
+      // Start continuous audio level monitoring
+      monitorAudioLevels();
 
-      mediaRecorder.start();
       setIsListening(true);
-      setStatus('🎧 Listening for audio...');
+      setStatus('🎧 Listening for audio and silence...');
 
+      // Initial recognition after delay
       setTimeout(() => {
-        triggerRecognition();
-      }, 2000);
+        if (isListening) {
+          triggerRecognition('Initial recognition');
+        }
+      }, config.initialRecognitionDelay);
 
     } catch (error) {
-      console.error('Error accessing microphone:', error);
+      console.error('Error initializing audio analysis:', error);
       setStatus('Error: Could not access microphone');
     }
-  }, [triggerRecognition]);
+  }, [config.initialRecognitionDelay, isListening, monitorAudioLevels, triggerRecognition]);
 
+  // Stop listening and cleanup
   const stopListening = useCallback(() => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
+    setIsListening(false);
+    setIsProcessing(false);
+    setIsInSilence(false);
+    setSilenceDuration(0);
+    
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+    }
+    
+    if (mediaRecorderRef.current?.stream) {
       mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
     }
     
-    if (recognitionTimeoutRef.current) {
-      clearTimeout(recognitionTimeoutRef.current);
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
     }
-
-    setIsListening(false);
-    setIsProcessing(false);
+    
     setStatus('Stopped listening');
-    setNextRecognitionCountdown(0);
-    setCurrentSongPosition(0);
   }, []);
 
-  const clearCurrentTrack = useCallback(async () => {
-    try {
-      await supabase.from('now_playing').delete().neq('id', 0);
-      setCurrentTrack(null);
-      setCurrentSongPosition(0);
-      setStatus('Cleared current track');
-    } catch (error) {
-      console.error('Error clearing track:', error);
-    }
-  }, []);
-
-  const formatTime = useCallback((seconds: number) => {
-    const validSeconds = Math.max(0, Math.floor(Number(seconds) || 0));
-    const mins = Math.floor(validSeconds / 60);
-    const secs = validSeconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  }, []);
-
-  // Update current song position every second
+  // Load current track on mount
   useEffect(() => {
-    if (currentTrack && currentTrack.started_at && currentTrack.song_offset !== undefined) {
-      const interval = setInterval(() => {
-        const elapsedSinceRecognition = Math.floor((Date.now() - new Date(currentTrack.started_at).getTime()) / 1000);
-        const currentPosition = (currentTrack.song_offset || 0) + elapsedSinceRecognition;
-        setCurrentSongPosition(currentPosition);
-      }, 1000);
+    const loadCurrentTrack = async () => {
+      try {
+        const { data } = await supabase
+          .from('now_playing')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
 
-      return () => clearInterval(interval);
-    }
-  }, [currentTrack]);
-
-  // Load current state on mount
-  useEffect(() => {
-    loadCurrentTrack();
-    loadRecentHistory();
-  }, [loadCurrentTrack, loadRecentHistory]);
-
-  // Countdown timer
-  useEffect(() => {
-    if (nextRecognitionCountdown > 0 && isListening) {
-      countdownIntervalRef.current = setInterval(() => {
-        setNextRecognitionCountdown(prev => {
-          if (prev <= 1) {
-            if (!isProcessing) {
-              triggerRecognition();
-            }
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    } else {
-      if (countdownIntervalRef.current) {
-        clearInterval(countdownIntervalRef.current);
-      }
-    }
-
-    return () => {
-      if (countdownIntervalRef.current) {
-        clearInterval(countdownIntervalRef.current);
+        if (data) {
+          setCurrentTrack(data);
+        }
+      } catch (error) {
+        console.warn('Error loading current track:', error);
       }
     };
-  }, [nextRecognitionCountdown, isListening, triggerRecognition, isProcessing]);
+
+    loadCurrentTrack();
+  }, []);
+
+  const formatTime = (ms: number) => {
+    const seconds = Math.floor(ms / 1000);
+    return `${seconds}s`;
+  };
 
   return (
     <div style={{ 
@@ -545,14 +438,12 @@ export default function AudioRecognitionPage() {
       maxWidth: 1200,
       margin: '0 auto'
     }}>
-      <div style={{ marginBottom: 32 }}>
-        <h1 style={{ fontSize: 32, fontWeight: 'bold', marginBottom: 8 }}>
-          Audio Recognition Control
-        </h1>
-        <p style={{ color: '#666', fontSize: 16 }}>
-          Listen for vinyl and cassette audio, identify tracks with Shazam (Samples right before song ends to catch next track)
-        </p>
-      </div>
+      <h1 style={{ fontSize: 32, fontWeight: 'bold', marginBottom: 8 }}>
+        🔇 Silence Detection Audio Recognition
+      </h1>
+      <p style={{ color: '#666', fontSize: 16, marginBottom: 32 }}>
+        Automatically detects track changes by monitoring silence between songs
+      </p>
 
       {/* Control Panel */}
       <div style={{
@@ -564,7 +455,7 @@ export default function AudioRecognitionPage() {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
           <button
-            onClick={isListening ? stopListening : startListening}
+            onClick={isListening ? stopListening : initializeAudioAnalysis}
             disabled={isProcessing}
             style={{
               background: isListening ? '#dc2626' : '#16a34a',
@@ -578,88 +469,135 @@ export default function AudioRecognitionPage() {
               opacity: isProcessing ? 0.6 : 1
             }}
           >
-            {isListening ? '🛑 Stop Listening' : '🎧 Start Listening'}
+            {isListening ? '🛑 Stop Listening' : '🎧 Start Silence Detection'}
           </button>
 
-          {currentTrack && (
-            <button
-              onClick={clearCurrentTrack}
-              style={{
-                background: '#6b7280',
-                color: 'white',
-                border: 'none',
-                borderRadius: 8,
-                padding: '8px 16px',
-                fontSize: 14,
-                cursor: 'pointer'
-              }}
-            >
-              Clear Current Track
-            </button>
-          )}
-
-          <a
-            href="/tv-display"
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            onClick={() => triggerRecognition('Manual trigger')}
+            disabled={!isListening || isProcessing}
             style={{
               background: '#2563eb',
               color: 'white',
-              padding: '8px 16px',
+              border: 'none',
               borderRadius: 8,
-              textDecoration: 'none',
+              padding: '8px 16px',
               fontSize: 14,
-              fontWeight: 600
+              cursor: (!isListening || isProcessing) ? 'not-allowed' : 'pointer',
+              opacity: (!isListening || isProcessing) ? 0.6 : 1
             }}
           >
-            📺 Open TV Display
-          </a>
+            🎯 Manual Recognition
+          </button>
         </div>
 
+        {/* Status */}
         <div style={{ 
           fontSize: 14, 
-          color: isProcessing ? '#ea580c' : '#16a34a',
-          marginBottom: 12 
+          color: isProcessing ? '#ea580c' : isInSilence ? '#7c3aed' : '#16a34a',
+          marginBottom: 12,
+          fontWeight: 600
         }}>
           Status: {status}
         </div>
 
-        {nextRecognitionCountdown > 0 && isListening && (
-          <div style={{ fontSize: 14, color: '#2563eb', marginBottom: 8 }}>
-            Next recognition in: {formatTime(nextRecognitionCountdown)}
-          </div>
-        )}
-
-        {/* ADDED: Current song position countdown */}
-        {currentTrack && currentTrack.song_duration && (
-          <div style={{ 
-            fontSize: 14, 
-            color: '#7c3aed',
-            background: '#f3f4f6',
-            padding: '8px 12px',
-            borderRadius: 6,
-            marginBottom: 8
-          }}>
-            Song position: {formatTime(currentSongPosition)} / {formatTime(currentTrack.song_duration)}
-            {currentTrack.song_duration - currentSongPosition > 0 && (
-              <span style={{ marginLeft: 8, color: '#059669' }}>
-                ({formatTime(currentTrack.song_duration - currentSongPosition)} remaining)
+        {/* Audio Level Indicators */}
+        {isListening && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ marginBottom: 8 }}>
+              <span style={{ fontSize: 12, color: '#6b7280' }}>Audio Level: </span>
+              <div style={{
+                display: 'inline-block',
+                width: 200,
+                height: 8,
+                background: '#e5e7eb',
+                borderRadius: 4,
+                overflow: 'hidden',
+                verticalAlign: 'middle',
+                marginLeft: 8
+              }}>
+                <div style={{
+                  width: `${Math.min(silenceLevel * 1000, 100)}%`,
+                  height: '100%',
+                  background: silenceLevel < config.silenceThreshold ? '#ef4444' : '#22c55e',
+                  transition: 'width 0.1s'
+                }}></div>
+              </div>
+              <span style={{ 
+                fontSize: 12, 
+                color: silenceLevel < config.silenceThreshold ? '#ef4444' : '#22c55e',
+                marginLeft: 8,
+                fontWeight: 600
+              }}>
+                {silenceLevel < config.silenceThreshold ? 'SILENCE' : 'AUDIO'}
               </span>
+            </div>
+            
+            {isInSilence && (
+              <div style={{ fontSize: 12, color: '#7c3aed' }}>
+                Silence Duration: {formatTime(silenceDuration)} / {formatTime(config.silenceDuration)}
+              </div>
             )}
           </div>
         )}
 
-        <div style={{
-          marginTop: 12,
-          padding: 12,
-          background: '#f0fdf4',
-          border: '1px solid #22c55e',
-          borderRadius: 8,
-          fontSize: 12,
-          color: '#15803d'
-        }}>
-          ✅ <strong>PRECISE TIMING:</strong> Samples 5 seconds before song ends to catch next song start. Formula: Song Duration - Current Position - 5s = Next Sample Time
-        </div>
+        {/* Configuration Controls */}
+        <details style={{ marginTop: 16 }}>
+          <summary style={{ cursor: 'pointer', fontWeight: 600, fontSize: 14 }}>
+            ⚙️ Silence Detection Settings
+          </summary>
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', 
+            gap: 16, 
+            marginTop: 16,
+            padding: 16,
+            background: '#f3f4f6',
+            borderRadius: 8
+          }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
+                Silence Threshold: {config.silenceThreshold.toFixed(3)}
+              </label>
+              <input
+                type="range"
+                min="0.001"
+                max="0.1"
+                step="0.001"
+                value={config.silenceThreshold}
+                onChange={(e) => setConfig(prev => ({ ...prev, silenceThreshold: parseFloat(e.target.value) }))}
+                style={{ width: '100%' }}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
+                Silence Duration: {formatTime(config.silenceDuration)}
+              </label>
+              <input
+                type="range"
+                min="1000"
+                max="10000"
+                step="500"
+                value={config.silenceDuration}
+                onChange={(e) => setConfig(prev => ({ ...prev, silenceDuration: parseInt(e.target.value) }))}
+                style={{ width: '100%' }}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
+                Post-Recognition Cooldown: {formatTime(config.postRecognitionCooldown)}
+              </label>
+              <input
+                type="range"
+                min="5000"
+                max="30000"
+                step="1000"
+                value={config.postRecognitionCooldown}
+                onChange={(e) => setConfig(prev => ({ ...prev, postRecognitionCooldown: parseInt(e.target.value) }))}
+                style={{ width: '100%' }}
+              />
+            </div>
+          </div>
+        </details>
       </div>
 
       {/* Current Track Display */}
@@ -700,13 +638,6 @@ export default function AudioRecognitionPage() {
               Confidence: {Math.round(currentTrack.recognition_confidence * 100)}% • 
               Source: {currentTrack.service_used} • 
               Started: {new Date(currentTrack.started_at).toLocaleTimeString()}
-              {currentTrack.song_duration && (
-                <>
-                  <br />
-                  Song: {formatTime(currentTrack.song_duration)} • 
-                  Offset: {formatTime(currentTrack.song_offset || 0)}
-                </>
-              )}
             </div>
           </div>
         </div>
@@ -726,12 +657,12 @@ export default function AudioRecognitionPage() {
           fontWeight: 600,
           fontSize: 16
         }}>
-          Recent Recognition History
+          🎵 Recognition History
         </div>
         <div style={{ maxHeight: 400, overflowY: 'auto' }}>
           {recognitionHistory.length === 0 ? (
             <div style={{ padding: 24, textAlign: 'center', color: '#6b7280' }}>
-              No recognition history yet. Check database permissions.
+              No recognitions yet. Start listening to see track history.
             </div>
           ) : (
             recognitionHistory.map((track, index) => (
