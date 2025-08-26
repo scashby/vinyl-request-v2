@@ -266,12 +266,33 @@ export default function SilenceDetectionAudioRecognition() {
       // Create audio context for real-time analysis
       const AudioContextClass = window.AudioContext || (window as WindowWithWebkitAudioContext).webkitAudioContext;
       const audioContext = new AudioContextClass();
+      
+      // CRITICAL: Ensure audio context is activated
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume();
+        console.log('Audio context resumed');
+      }
+      
       const analyser = audioContext.createAnalyser();
       const source = audioContext.createMediaStreamSource(stream);
       
+      // CRITICAL: Set proper analyser settings for audio detection
       analyser.fftSize = 256;
       analyser.smoothingTimeConstant = 0.3;
+      analyser.minDecibels = -90;  // Lower threshold for better sensitivity
+      analyser.maxDecibels = -10;  // Higher max for better range
       source.connect(analyser);
+
+      console.log('Audio setup:', {
+        contextState: audioContext.state,
+        analyserSettings: {
+          fftSize: analyser.fftSize,
+          frequencyBinCount: analyser.frequencyBinCount,
+          minDecibels: analyser.minDecibels,
+          maxDecibels: analyser.maxDecibels,
+          smoothingTimeConstant: analyser.smoothingTimeConstant
+        }
+      });
 
       audioContextRef.current = audioContext;
       analyserRef.current = analyser;
@@ -298,20 +319,46 @@ export default function SilenceDetectionAudioRecognition() {
         
         analyser.getByteFrequencyData(dataArray);
         
-        // Calculate RMS for audio level
+        // DEBUG: Log raw data periodically
+        const debugCount = Math.floor(Date.now() / 5000); // Every 5 seconds
+        if (debugCount % 1 === 0 && Date.now() % 5000 < 100) {
+          console.log('Raw frequency data sample:', {
+            firstFewBins: Array.from(dataArray.slice(0, 10)),
+            maxValue: Math.max(...dataArray),
+            nonZeroCount: Array.from(dataArray).filter(v => v > 0).length,
+            audioContextState: audioContext.state
+          });
+        }
+        
+        // Calculate RMS for audio level - IMPROVED CALCULATION
         let sum = 0;
         for (let i = 0; i < dataArray.length; i++) {
-          sum += (dataArray[i] / 255) * (dataArray[i] / 255);
+          const normalizedValue = dataArray[i] / 255;
+          sum += normalizedValue * normalizedValue;
         }
         const rms = Math.sqrt(sum / dataArray.length);
-        setSilenceLevel(rms);
+        
+        // Also try time domain data as alternative
+        const timeDomainArray = new Uint8Array(analyser.frequencyBinCount);
+        analyser.getByteTimeDomainData(timeDomainArray);
+        
+        let timeDomainRms = 0;
+        for (let i = 0; i < timeDomainArray.length; i++) {
+          const sample = (timeDomainArray[i] - 128) / 128;
+          timeDomainRms += sample * sample;
+        }
+        timeDomainRms = Math.sqrt(timeDomainRms / timeDomainArray.length);
+        
+        // Use the higher of frequency or time domain RMS
+        const effectiveRms = Math.max(rms, timeDomainRms);
+        setSilenceLevel(effectiveRms);
 
         const now = Date.now();
         const timeSinceLastRecognition = now - lastRecognitionTimeRef.current;
         
         // Only detect silence if we're past the cooldown period
         if (timeSinceLastRecognition > config.postRecognitionCooldown) {
-          if (rms < config.silenceThreshold) {
+          if (effectiveRms < config.silenceThreshold) {
             // We're in silence
             if (!isInSilence) {
               setIsInSilence(true);
@@ -446,7 +493,8 @@ export default function SilenceDetectionAudioRecognition() {
         🔇 Silence Detection Audio Recognition
       </h1>
       <p style={{ color: '#666', fontSize: 16, marginBottom: 32 }}>
-        Automatically detects track changes by monitoring silence between songs
+        <strong>Setup Required:</strong> Position your microphone near your speakers/turntable so it can hear the vinyl/cassette audio. 
+        Web browsers cannot capture system audio directly - only microphone input.
       </p>
 
       {/* Control Panel */}
@@ -648,18 +696,55 @@ export default function SilenceDetectionAudioRecognition() {
           <div style={{
             marginTop: 16,
             padding: 12,
-            background: '#f0fdf4',
-            border: '1px solid #22c55e',
+            background: silenceLevel < 0.001 ? '#fef2f2' : '#f0fdf4',
+            border: `1px solid ${silenceLevel < 0.001 ? '#ef4444' : '#22c55e'}`,
             borderRadius: 8,
             fontSize: 12,
-            color: '#15803d'
+            color: silenceLevel < 0.001 ? '#dc2626' : '#15803d'
           }}>
-            🔧 <strong>Debug:</strong> Monitoring={monitoringRef.current ? 'YES' : 'NO'} | 
+            <strong>Debug:</strong> Monitoring={monitoringRef.current ? 'YES' : 'NO'} | 
             AudioContext={audioContextRef.current ? 'ACTIVE' : 'NONE'} | 
             Analyser={analyserRef.current ? 'CONNECTED' : 'NONE'} |
             Stream={streamRef.current ? 'ACTIVE' : 'NONE'}
+            <br />
+            {silenceLevel < 0.001 ? (
+              <>
+                ⚠️ <strong>No Audio Detected:</strong> Your microphone may not be hearing your speakers. 
+                Try positioning it closer to your audio source or increasing volume.
+              </>
+            ) : (
+              <>
+                ✅ <strong>Audio Input Working:</strong> Microphone is receiving audio signal properly.
+              </>
+            )}
           </div>
         )}
+
+        {/* Microphone Test Section */}
+        <div style={{
+          marginTop: 16,
+          padding: 16,
+          background: '#fffbeb',
+          border: '1px solid #f59e0b',
+          borderRadius: 8,
+          fontSize: 14
+        }}>
+          <div style={{ fontWeight: 600, marginBottom: 8, color: '#92400e' }}>
+            🎤 Microphone Setup Instructions:
+          </div>
+          <ol style={{ margin: 0, paddingLeft: 20, color: '#92400e' }}>
+            <li><strong>Position microphone near speakers:</strong> Place your microphone where it can clearly hear your turntable/cassette player audio</li>
+            <li><strong>Test audio levels:</strong> Play music and watch the audio level bar above - it should show green &ldquo;AUDIO&rdquo; when music is playing</li>
+            <li><strong>Adjust sensitivity:</strong> If needed, adjust the silence threshold in settings below</li>
+            <li><strong>Avoid background noise:</strong> Minimize room noise for better recognition accuracy</li>
+          </ol>
+          {!isListening && (
+            <div style={{ marginTop: 12, fontSize: 12, fontStyle: 'italic', color: '#78716c' }}>
+              Note: Web browsers can only access microphone input, not system audio directly. 
+              The microphone must physically hear your vinyl/cassette audio.
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Current Track Display */}
