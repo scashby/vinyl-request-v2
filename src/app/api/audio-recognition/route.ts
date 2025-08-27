@@ -116,7 +116,7 @@ async function processWithShazam(base64Audio: string, originalSize: number, star
   console.log('🎵 Calling Shazam Song Recognizer API with RAW PCM data...');
 
   // FIXED: Use correct API endpoint from RapidAPI subscription
-  const apiUrl = 'https://shazam-song-recognizer.p.rapidapi.com/songs/recognize-track';
+  const apiUrl = 'https://shazam-song-recognizer.p.rapidapi.com/recognize';
   const headers = {
     'content-type': 'text/plain',
     'x-rapidapi-key': process.env.SHAZAM_RAPID_API_KEY,
