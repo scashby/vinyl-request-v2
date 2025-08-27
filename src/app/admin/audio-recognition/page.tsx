@@ -1,4 +1,4 @@
-// src/app/admin/audio-recognition/page.tsx - SILENCE DETECTION APPROACH
+// src/app/admin/audio-recognition/page.tsx - FIXED VERSION
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from 'react';
@@ -44,7 +44,7 @@ interface WindowWithWebkitAudioContext extends Window {
   webkitAudioContext?: typeof AudioContext;
 }
 
-export default function SilenceDetectionAudioRecognition() {
+export default function AudioRecognitionPage() {
   const [isListening, setIsListening] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentTrack, setCurrentTrack] = useState<NowPlayingState | null>(null);
@@ -190,7 +190,7 @@ export default function SilenceDetectionAudioRecognition() {
     }
   }, [convertToRawPCM, currentTrack]);
 
-  // Trigger manual recognition
+  // Trigger recognition (main function)
   const triggerRecognition = useCallback(async (reason: string) => {
     if (isProcessing) return;
 
@@ -249,7 +249,67 @@ export default function SilenceDetectionAudioRecognition() {
     }
   }, [isProcessing, processAudioSample]);
 
-  // Start listening with integrated audio monitoring - NO CIRCULAR DEPENDENCIES
+  // Audio level monitoring function
+  const checkAudioLevel = useCallback(() => {
+    const analyser = analyserRef.current;
+    if (!monitoringRef.current || !analyser) return;
+    
+    const dataArray = new Uint8Array(analyser.frequencyBinCount);
+    analyser.getByteFrequencyData(dataArray);
+    
+    // Calculate RMS for audio level
+    let sum = 0;
+    for (let i = 0; i < dataArray.length; i++) {
+      sum += (dataArray[i] / 255) * (dataArray[i] / 255);
+    }
+    const rms = Math.sqrt(sum / dataArray.length);
+    setSilenceLevel(rms);
+
+    const now = Date.now();
+    const timeSinceLastRecognition = now - lastRecognitionTimeRef.current;
+    
+    // Only detect silence if we're past the cooldown period
+    if (timeSinceLastRecognition > config.postRecognitionCooldown) {
+      if (rms < config.silenceThreshold) {
+        // We're in silence
+        if (!isInSilence) {
+          setIsInSilence(true);
+          silenceStartTimeRef.current = now;
+          setStatus('🔇 Silence detected, monitoring...');
+        } else if (silenceStartTimeRef.current) {
+          const currentSilenceDuration = now - silenceStartTimeRef.current;
+          setSilenceDuration(currentSilenceDuration);
+          
+          // If silence has lasted long enough, trigger recognition
+          if (currentSilenceDuration >= config.silenceDuration && !isProcessing) {
+            setIsInSilence(false);
+            silenceStartTimeRef.current = null;
+            setSilenceDuration(0);
+            triggerRecognition('Silence detection triggered');
+          }
+        }
+      } else {
+        // Audio detected, reset silence tracking
+        if (isInSilence) {
+          setIsInSilence(false);
+          silenceStartTimeRef.current = null;
+          setSilenceDuration(0);
+          setStatus('🎵 Audio detected, listening...');
+        }
+      }
+    } else {
+      // During cooldown period
+      const cooldownRemaining = Math.ceil((config.postRecognitionCooldown - timeSinceLastRecognition) / 1000);
+      setStatus(`⏳ Cooldown: ${cooldownRemaining}s remaining`);
+    }
+
+    // Continue monitoring
+    if (monitoringRef.current) {
+      animationFrameRef.current = requestAnimationFrame(checkAudioLevel);
+    }
+  }, [config.postRecognitionCooldown, config.silenceThreshold, config.silenceDuration, isInSilence, isProcessing, triggerRecognition]);
+
+  // Start listening (MAIN FUNCTION)
   const startListening = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -266,33 +326,12 @@ export default function SilenceDetectionAudioRecognition() {
       // Create audio context for real-time analysis
       const AudioContextClass = window.AudioContext || (window as WindowWithWebkitAudioContext).webkitAudioContext;
       const audioContext = new AudioContextClass();
-      
-      // CRITICAL: Ensure audio context is activated
-      if (audioContext.state === 'suspended') {
-        await audioContext.resume();
-        console.log('Audio context resumed');
-      }
-      
       const analyser = audioContext.createAnalyser();
       const source = audioContext.createMediaStreamSource(stream);
       
-      // CRITICAL: Set proper analyser settings for audio detection
       analyser.fftSize = 256;
       analyser.smoothingTimeConstant = 0.3;
-      analyser.minDecibels = -90;  // Lower threshold for better sensitivity
-      analyser.maxDecibels = -10;  // Higher max for better range
       source.connect(analyser);
-
-      console.log('Audio setup:', {
-        contextState: audioContext.state,
-        analyserSettings: {
-          fftSize: analyser.fftSize,
-          frequencyBinCount: analyser.frequencyBinCount,
-          minDecibels: analyser.minDecibels,
-          maxDecibels: analyser.maxDecibels,
-          smoothingTimeConstant: analyser.smoothingTimeConstant
-        }
-      });
 
       audioContextRef.current = audioContext;
       analyserRef.current = analyser;
@@ -311,96 +350,10 @@ export default function SilenceDetectionAudioRecognition() {
       setStatus('🎧 Listening for audio and silence...');
       monitoringRef.current = true;
 
-      // INLINE audio monitoring logic to avoid circular dependencies
-      const dataArray = new Uint8Array(analyser.frequencyBinCount);
-      
-      const checkAudioLevel = () => {
-        if (!monitoringRef.current || !analyser) return;
-        
-        analyser.getByteFrequencyData(dataArray);
-        
-        // DEBUG: Log raw data periodically
-        const debugCount = Math.floor(Date.now() / 5000); // Every 5 seconds
-        if (debugCount % 1 === 0 && Date.now() % 5000 < 100) {
-          console.log('Raw frequency data sample:', {
-            firstFewBins: Array.from(dataArray.slice(0, 10)),
-            maxValue: Math.max(...dataArray),
-            nonZeroCount: Array.from(dataArray).filter(v => v > 0).length,
-            audioContextState: audioContext.state
-          });
-        }
-        
-        // Calculate RMS for audio level - IMPROVED CALCULATION
-        let sum = 0;
-        for (let i = 0; i < dataArray.length; i++) {
-          const normalizedValue = dataArray[i] / 255;
-          sum += normalizedValue * normalizedValue;
-        }
-        const rms = Math.sqrt(sum / dataArray.length);
-        
-        // Also try time domain data as alternative
-        const timeDomainArray = new Uint8Array(analyser.frequencyBinCount);
-        analyser.getByteTimeDomainData(timeDomainArray);
-        
-        let timeDomainRms = 0;
-        for (let i = 0; i < timeDomainArray.length; i++) {
-          const sample = (timeDomainArray[i] - 128) / 128;
-          timeDomainRms += sample * sample;
-        }
-        timeDomainRms = Math.sqrt(timeDomainRms / timeDomainArray.length);
-        
-        // Use the higher of frequency or time domain RMS
-        const effectiveRms = Math.max(rms, timeDomainRms);
-        setSilenceLevel(effectiveRms);
-
-        const now = Date.now();
-        const timeSinceLastRecognition = now - lastRecognitionTimeRef.current;
-        
-        // Only detect silence if we're past the cooldown period
-        if (timeSinceLastRecognition > config.postRecognitionCooldown) {
-          if (effectiveRms < config.silenceThreshold) {
-            // We're in silence
-            if (!isInSilence) {
-              setIsInSilence(true);
-              silenceStartTimeRef.current = now;
-              setStatus('🔇 Silence detected, monitoring...');
-            } else if (silenceStartTimeRef.current) {
-              const currentSilenceDuration = now - silenceStartTimeRef.current;
-              setSilenceDuration(currentSilenceDuration);
-              
-              // If silence has lasted long enough, trigger recognition
-              if (currentSilenceDuration >= config.silenceDuration && !isProcessing) {
-                setIsInSilence(false);
-                silenceStartTimeRef.current = null;
-                setSilenceDuration(0);
-                triggerRecognition('Silence detection triggered');
-              }
-            }
-          } else {
-            // Audio detected, reset silence tracking
-            if (isInSilence) {
-              setIsInSilence(false);
-              silenceStartTimeRef.current = null;
-              setSilenceDuration(0);
-              setStatus('🎵 Audio detected, listening...');
-            }
-          }
-        } else {
-          // During cooldown period
-          const cooldownRemaining = Math.ceil((config.postRecognitionCooldown - timeSinceLastRecognition) / 1000);
-          setStatus(`⏳ Cooldown: ${cooldownRemaining}s remaining`);
-        }
-
-        // Continue monitoring
-        if (monitoringRef.current) {
-          animationFrameRef.current = requestAnimationFrame(checkAudioLevel);
-        }
-      };
-
-      // Start monitoring
+      // Start audio level monitoring
       checkAudioLevel();
 
-      // Initial recognition after delay
+      // MAIN APPROACH: Do initial recognition first, then use silence detection
       setTimeout(() => {
         triggerRecognition('Initial recognition');
       }, config.initialRecognitionDelay);
@@ -409,7 +362,7 @@ export default function SilenceDetectionAudioRecognition() {
       console.error('Error starting audio monitoring:', error);
       setStatus('Error: Could not access microphone');
     }
-  }, [config.initialRecognitionDelay, config.postRecognitionCooldown, config.silenceThreshold, config.silenceDuration, isInSilence, isProcessing, triggerRecognition]);
+  }, [config.initialRecognitionDelay, checkAudioLevel, triggerRecognition]);
 
   // Stop listening and cleanup
   const stopListening = useCallback(() => {
@@ -469,11 +422,14 @@ export default function SilenceDetectionAudioRecognition() {
     }
   }, []);
 
-  // Load data on mount
+  // Load data on mount - FIXED: Added dependency arrays
   useEffect(() => {
     loadCurrentTrack();
+  }, [loadCurrentTrack]);
+
+  useEffect(() => {
     loadRecentHistory();
-  }, [loadCurrentTrack, loadRecentHistory]);
+  }, [loadRecentHistory]);
 
   const formatTime = (ms: number) => {
     const seconds = Math.floor(ms / 1000);
@@ -490,11 +446,10 @@ export default function SilenceDetectionAudioRecognition() {
       margin: '0 auto'
     }}>
       <h1 style={{ fontSize: 32, fontWeight: 'bold', marginBottom: 8 }}>
-        🔇 Silence Detection Audio Recognition
+        🎵 Audio Recognition with Silence Detection
       </h1>
       <p style={{ color: '#666', fontSize: 16, marginBottom: 32 }}>
-        <strong>Setup Required:</strong> Position your microphone near your speakers/turntable so it can hear the vinyl/cassette audio. 
-        Web browsers cannot capture system audio directly - only microphone input.
+        Recognizes tracks immediately, then monitors silence for automatic re-recognition
       </p>
 
       {/* Control Panel */}
@@ -521,7 +476,7 @@ export default function SilenceDetectionAudioRecognition() {
               opacity: isProcessing ? 0.6 : 1
             }}
           >
-            {isListening ? '🛑 Stop Listening' : '🎧 Start Silence Detection'}
+            {isListening ? '🛑 Stop Listening' : '🎧 Start Recognition'}
           </button>
 
           <button
@@ -696,55 +651,18 @@ export default function SilenceDetectionAudioRecognition() {
           <div style={{
             marginTop: 16,
             padding: 12,
-            background: silenceLevel < 0.001 ? '#fef2f2' : '#f0fdf4',
-            border: `1px solid ${silenceLevel < 0.001 ? '#ef4444' : '#22c55e'}`,
+            background: '#f0fdf4',
+            border: '1px solid #22c55e',
             borderRadius: 8,
             fontSize: 12,
-            color: silenceLevel < 0.001 ? '#dc2626' : '#15803d'
+            color: '#15803d'
           }}>
-            <strong>Debug:</strong> Monitoring={monitoringRef.current ? 'YES' : 'NO'} | 
+            🔧 <strong>Debug:</strong> Monitoring={monitoringRef.current ? 'YES' : 'NO'} | 
             AudioContext={audioContextRef.current ? 'ACTIVE' : 'NONE'} | 
             Analyser={analyserRef.current ? 'CONNECTED' : 'NONE'} |
             Stream={streamRef.current ? 'ACTIVE' : 'NONE'}
-            <br />
-            {silenceLevel < 0.001 ? (
-              <>
-                ⚠️ <strong>No Audio Detected:</strong> Your microphone may not be hearing your speakers. 
-                Try positioning it closer to your audio source or increasing volume.
-              </>
-            ) : (
-              <>
-                ✅ <strong>Audio Input Working:</strong> Microphone is receiving audio signal properly.
-              </>
-            )}
           </div>
         )}
-
-        {/* Microphone Test Section */}
-        <div style={{
-          marginTop: 16,
-          padding: 16,
-          background: '#fffbeb',
-          border: '1px solid #f59e0b',
-          borderRadius: 8,
-          fontSize: 14
-        }}>
-          <div style={{ fontWeight: 600, marginBottom: 8, color: '#92400e' }}>
-            🎤 Microphone Setup Instructions:
-          </div>
-          <ol style={{ margin: 0, paddingLeft: 20, color: '#92400e' }}>
-            <li><strong>Position microphone near speakers:</strong> Place your microphone where it can clearly hear your turntable/cassette player audio</li>
-            <li><strong>Test audio levels:</strong> Play music and watch the audio level bar above - it should show green &ldquo;AUDIO&rdquo; when music is playing</li>
-            <li><strong>Adjust sensitivity:</strong> If needed, adjust the silence threshold in settings below</li>
-            <li><strong>Avoid background noise:</strong> Minimize room noise for better recognition accuracy</li>
-          </ol>
-          {!isListening && (
-            <div style={{ marginTop: 12, fontSize: 12, fontStyle: 'italic', color: '#78716c' }}>
-              Note: Web browsers can only access microphone input, not system audio directly. 
-              The microphone must physically hear your vinyl/cassette audio.
-            </div>
-          )}
-        </div>
       </div>
 
       {/* Current Track Display */}
