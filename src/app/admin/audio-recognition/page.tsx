@@ -282,7 +282,7 @@ export default function AudioRecognitionPage() {
     }
   }, [isProcessing, processAudioSample]);
 
-  // Silence monitoring function
+  // Silence monitoring function - FIXED: Added triggerRecognition to dependency array
   const checkAudioLevel = useCallback(() => {
     const analyser = analyserRef.current;
     if (!monitoringRef.current || !analyser || !silenceMonitoringActive) return;
