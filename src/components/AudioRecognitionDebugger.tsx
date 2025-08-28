@@ -1,4 +1,4 @@
-// src/components/AudioRecognitionDebugger.tsx - FIXED ERRORS
+// src/components/AudioRecognitionDebugger.tsx - FIXED WITH AUDIO VERIFICATION
 "use client";
 
 import React, { useState, useRef } from 'react';
@@ -33,8 +33,12 @@ export default function AudioRecognitionDebugger() {
   const [debugLog, setDebugLog] = useState<LogEntry[]>([]);
   const [result, setResult] = useState<RecognitionResult | null>(null);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [audioLevel, setAudioLevel] = useState(0);
+  const [maxAudioLevel, setMaxAudioLevel] = useState(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const levelCheckRef = useRef<number | null>(null);
 
   const addLog = (message: string, type: LogEntry['type'] = 'info') => {
     const timestamp = new Date().toLocaleTimeString();
@@ -45,13 +49,14 @@ export default function AudioRecognitionDebugger() {
     setDebugLog([]);
     setResult(null);
     setAudioBlob(null);
+    setAudioLevel(0);
+    setMaxAudioLevel(0);
   };
 
   // Convert WebM audio to RAW PCM format that Shazam expects
   const convertToRawPCM = async (webmBlob: Blob): Promise<ArrayBuffer> => {
-    addLog('🔄 Converting WebM to RAW PCM format for Shazam...', 'info');
+    addLog('Converting WebM to RAW PCM format for Shazam...', 'info');
     
-    // FIXED: Proper typing for webkit fallback
     interface WindowWithWebkit extends Window {
       webkitAudioContext?: typeof AudioContext;
     }
@@ -62,41 +67,40 @@ export default function AudioRecognitionDebugger() {
     
     try {
       const arrayBuffer = await webmBlob.arrayBuffer();
-      addLog(`📁 WebM file size: ${arrayBuffer.byteLength} bytes`, 'info');
+      addLog(`WebM file size: ${arrayBuffer.byteLength} bytes`, 'info');
       
       const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-      addLog(`🎵 Decoded audio: ${audioBuffer.numberOfChannels} channels, ${audioBuffer.duration.toFixed(2)}s, ${audioBuffer.sampleRate}Hz`, 'info');
+      addLog(`Decoded audio: ${audioBuffer.numberOfChannels} channels, ${audioBuffer.duration.toFixed(2)}s, ${audioBuffer.sampleRate}Hz`, 'info');
       
       // Convert to mono and limit to 3 seconds to reduce size
       const maxSamples = Math.min(audioBuffer.length, 3 * audioBuffer.sampleRate);
       const channelData = audioBuffer.numberOfChannels > 1 
-        ? audioBuffer.getChannelData(0) // Use left channel for mono
+        ? audioBuffer.getChannelData(0) 
         : audioBuffer.getChannelData(0);
       
-      addLog(`🔧 Trimming to 3 seconds max: ${maxSamples} samples`, 'info');
+      addLog(`Trimming to 3 seconds max: ${maxSamples} samples`, 'info');
       
-      // Convert Float32Array to 16-bit PCM (little endian) - limited samples
+      // Convert Float32Array to 16-bit PCM (little endian)
       const pcmData = new Int16Array(maxSamples);
       for (let i = 0; i < maxSamples; i++) {
-        // Convert from -1.0 to 1.0 range to -32768 to 32767 range
         const sample = Math.max(-1, Math.min(1, channelData[i]));
         pcmData[i] = Math.round(sample * 32767);
       }
       
-      addLog(`✅ Converted to RAW PCM: ${pcmData.buffer.byteLength} bytes (${pcmData.length} samples)`, 'success');
+      addLog(`Converted to RAW PCM: ${pcmData.buffer.byteLength} bytes (${pcmData.length} samples)`, 'success');
       
       await audioContext.close();
       return pcmData.buffer;
     } catch (error) {
       await audioContext.close();
-      addLog(`❌ Audio conversion failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+      addLog(`Audio conversion failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
       throw error;
     }
   };
 
   const startRecording = async () => {
     try {
-      addLog('🎤 Requesting microphone access...', 'info');
+      addLog('Requesting microphone access...', 'info');
       
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
@@ -107,20 +111,45 @@ export default function AudioRecognitionDebugger() {
         }
       });
 
-      addLog('✅ Microphone access granted', 'success');
+      addLog('Microphone access granted', 'success');
 
-      // Try different MIME types for better compatibility
+      // Set up real-time audio level monitoring
+      interface WindowWithWebkit extends Window {
+        webkitAudioContext?: typeof AudioContext;
+      }
+      const AudioContextClass = window.AudioContext || (window as WindowWithWebkit).webkitAudioContext;
+      const audioContext = new AudioContextClass();
+      const analyser = audioContext.createAnalyser();
+      const source = audioContext.createMediaStreamSource(stream);
+      source.connect(analyser);
+      
+      analyser.fftSize = 256;
+      analyserRef.current = analyser;
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+      
+      setMaxAudioLevel(0);
+      
+      const checkAudioLevel = () => {
+        if (!analyserRef.current) return;
+        analyserRef.current.getByteFrequencyData(dataArray);
+        const level = Math.max(...dataArray);
+        setAudioLevel(level);
+        setMaxAudioLevel(prev => Math.max(prev, level));
+      };
+      
+      levelCheckRef.current = window.setInterval(checkAudioLevel, 50);
+
       let mimeType = 'audio/webm;codecs=opus';
       if (!MediaRecorder.isTypeSupported(mimeType)) {
         mimeType = 'audio/webm';
-        addLog('⚠️ Opus codec not supported, using basic WebM', 'info');
+        addLog('Opus codec not supported, using basic WebM', 'info');
       }
       if (!MediaRecorder.isTypeSupported(mimeType)) {
         mimeType = 'audio/mp4';
-        addLog('⚠️ WebM not supported, using MP4', 'info');
+        addLog('WebM not supported, using MP4', 'info');
       }
 
-      addLog(`🎵 Using MIME type: ${mimeType || 'default'}`, 'info');
+      addLog(`Using MIME type: ${mimeType || 'default'}`, 'info');
 
       const mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
       mediaRecorderRef.current = mediaRecorder;
@@ -129,37 +158,55 @@ export default function AudioRecognitionDebugger() {
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
           audioChunksRef.current.push(event.data);
-          addLog(`📦 Audio chunk received: ${event.data.size} bytes`, 'info');
+          addLog(`Audio chunk received: ${event.data.size} bytes`, 'info');
         }
       };
 
       mediaRecorder.onstop = () => {
+        // Stop level monitoring
+        if (levelCheckRef.current) {
+          clearInterval(levelCheckRef.current);
+          levelCheckRef.current = null;
+        }
+        audioContext.close();
+        
         const audioBlob = new Blob(audioChunksRef.current, { 
           type: audioChunksRef.current[0]?.type || 'audio/webm' 
         });
         setAudioBlob(audioBlob);
-        addLog(`🎵 Recording complete: ${audioBlob.size} bytes (${audioBlob.type})`, 'success');
         
-        // Stop all tracks
+        // Audio verification
+        addLog(`Recording complete: ${audioBlob.size} bytes (${audioBlob.type})`, 'success');
+        addLog(`Max audio level: ${maxAudioLevel}/255`, maxAudioLevel < 10 ? 'error' : 'success');
+        
+        if (audioBlob.size < 5000) {
+          addLog(`PROBLEM: File only ${audioBlob.size} bytes - likely silence`, 'error');
+          addLog(`Fix: Increase speaker volume or move closer to speakers`, 'info');
+        }
+        
+        if (maxAudioLevel < 10) {
+          addLog(`PROBLEM: Max audio level ${maxAudioLevel}/255 - microphone not picking up speakers`, 'error');
+          addLog(`Fix: Check microphone permissions, increase system input gain, or use external mic`, 'info');
+        }
+        
         stream.getTracks().forEach(track => track.stop());
       };
 
       mediaRecorder.start();
       setIsRecording(true);
-      addLog('🔴 Recording started (5 seconds)...', 'info');
+      addLog('Recording started (5 seconds)...', 'info');
 
-      // Auto-stop after 5 seconds (reduced for smaller file size)
       setTimeout(() => {
         if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
           mediaRecorderRef.current.stop();
           setIsRecording(false);
-          addLog('⏹️ Recording stopped automatically', 'info');
+          addLog('Recording stopped automatically', 'info');
         }
       }, 5000);
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      addLog(`❌ Microphone error: ${errorMessage}`, 'error');
+      addLog(`Microphone error: ${errorMessage}`, 'error');
       setIsRecording(false);
     }
   };
@@ -168,26 +215,24 @@ export default function AudioRecognitionDebugger() {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
-      addLog('⏹️ Recording stopped manually', 'info');
+      addLog('Recording stopped manually', 'info');
     }
   };
 
   const testRecognition = async () => {
     if (!audioBlob) {
-      addLog('❌ No audio recorded yet', 'error');
+      addLog('No audio recorded yet', 'error');
       return;
     }
 
     setIsProcessing(true);
-    addLog('🚀 Starting audio recognition test...', 'info');
+    addLog('Starting audio recognition test...', 'info');
 
     try {
-      // Convert WebM to RAW PCM format first
       const rawPCMAudio = await convertToRawPCM(audioBlob);
       
-      addLog(`📤 Sending ${rawPCMAudio.byteLength} bytes of RAW PCM to API...`, 'info');
+      addLog(`Sending ${rawPCMAudio.byteLength} bytes of RAW PCM to API...`, 'info');
 
-      // Send as raw binary data with proper content type
       const response = await fetch('/api/audio-recognition', {
         method: 'POST',
         headers: {
@@ -196,38 +241,38 @@ export default function AudioRecognitionDebugger() {
         body: rawPCMAudio
       });
 
-      addLog(`📡 API Response: ${response.status} ${response.statusText}`, 
+      addLog(`API Response: ${response.status} ${response.statusText}`, 
         response.ok ? 'success' : 'error');
 
       const result: RecognitionResult = await response.json();
       
-      addLog('📄 Full API response:', 'info');
+      addLog('Full API response:', 'info');
       addLog(JSON.stringify(result, null, 2), 'data');
 
       setResult(result);
 
       if (result.success) {
-        addLog(`🎯 Recognition successful: ${result.track?.artist} - ${result.track?.title}`, 'success');
+        addLog(`Recognition successful: ${result.track?.artist} - ${result.track?.title}`, 'success');
         if (result.debugInfo) {
-          addLog(`⏱️ Processing time: ${result.debugInfo.processingTime}ms`, 'info');
-          addLog(`📊 Matches found: ${result.debugInfo.matchesCount}`, 'info');
-          addLog(`📁 RAW PCM size: ${result.debugInfo.audioFileSize} bytes`, 'info');
-          addLog(`🔤 Base64 length: ${result.debugInfo.base64Length}`, 'info');
+          addLog(`Processing time: ${result.debugInfo.processingTime}ms`, 'info');
+          addLog(`Matches found: ${result.debugInfo.matchesCount}`, 'info');
+          addLog(`RAW PCM size: ${result.debugInfo.audioFileSize} bytes`, 'info');
+          addLog(`Base64 length: ${result.debugInfo.base64Length}`, 'info');
         }
       } else {
-        addLog(`❌ Recognition failed: ${result.error}`, 'error');
+        addLog(`Recognition failed: ${result.error}`, 'error');
         if (result.debugInfo) {
-          addLog(`📊 Debug info: ${JSON.stringify(result.debugInfo, null, 2)}`, 'data');
+          addLog(`Debug info: ${JSON.stringify(result.debugInfo, null, 2)}`, 'data');
         }
         if (result.rawResponse) {
-          addLog('🔍 Raw Shazam response for analysis:', 'info');
+          addLog('Raw Shazam response for analysis:', 'info');
           addLog(JSON.stringify(result.rawResponse, null, 2), 'data');
         }
       }
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      addLog(`💥 Request failed: ${errorMessage}`, 'error');
+      addLog(`Request failed: ${errorMessage}`, 'error');
     } finally {
       setIsProcessing(false);
     }
@@ -237,13 +282,12 @@ export default function AudioRecognitionDebugger() {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    addLog(`📁 Testing with uploaded file: ${file.name} (${file.size} bytes, ${file.type})`, 'info');
+    addLog(`Testing with uploaded file: ${file.name} (${file.size} bytes, ${file.type})`, 'info');
     setIsProcessing(true);
 
     try {
-      // For uploaded files, try to convert them to RAW PCM too
       if (file.type.startsWith('audio/')) {
-        addLog('🔄 Converting uploaded audio to RAW PCM...', 'info');
+        addLog('Converting uploaded audio to RAW PCM...', 'info');
         const rawPCMAudio = await convertToRawPCM(file);
         
         const response = await fetch('/api/audio-recognition', {
@@ -256,17 +300,17 @@ export default function AudioRecognitionDebugger() {
 
         const result: RecognitionResult = await response.json();
         
-        addLog(`📡 Upload test result: ${response.status}`, response.ok ? 'success' : 'error');
+        addLog(`Upload test result: ${response.status}`, response.ok ? 'success' : 'error');
         addLog(JSON.stringify(result, null, 2), 'data');
         
         setResult(result);
       } else {
-        addLog('❌ Uploaded file is not an audio file', 'error');
+        addLog('Uploaded file is not an audio file', 'error');
       }
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      addLog(`💥 Upload test failed: ${errorMessage}`, 'error');
+      addLog(`Upload test failed: ${errorMessage}`, 'error');
     } finally {
       setIsProcessing(false);
     }
@@ -274,27 +318,27 @@ export default function AudioRecognitionDebugger() {
 
   const testApiHealth = async () => {
     try {
-      addLog('🔍 Testing API health...', 'info');
+      addLog('Testing API health...', 'info');
       const response = await fetch('/api/audio-recognition', {
         method: 'GET'
       });
       
       const result = await response.json();
-      addLog(`🔍 API Health: ${response.status}`, response.ok ? 'success' : 'error');
+      addLog(`API Health: ${response.status}`, response.ok ? 'success' : 'error');
       addLog(JSON.stringify(result, null, 2), 'data');
       
       if (result.environment?.hasShazamKey) {
-        addLog('✅ Shazam API key is configured', 'success');
+        addLog('Shazam API key is configured', 'success');
       } else {
-        addLog('❌ Shazam API key is missing', 'error');
+        addLog('Shazam API key is missing', 'error');
       }
       
       if (result.requirements) {
-        addLog(`📋 Audio requirements: ${result.requirements.audioFormat}, ${result.requirements.channels}`, 'info');
+        addLog(`Audio requirements: ${result.requirements.audioFormat}, ${result.requirements.channels}`, 'info');
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      addLog(`💥 API health check failed: ${errorMessage}`, 'error');
+      addLog(`API health check failed: ${errorMessage}`, 'error');
     }
   };
 
@@ -313,7 +357,7 @@ export default function AudioRecognitionDebugger() {
         fontWeight: 'bold',
         color: '#1f2937'
       }}>
-        🔧 Audio Recognition Debugger (RAW PCM - Size Optimized)
+        Audio Recognition Debugger (RAW PCM - Size Optimized)
       </h2>
 
       {/* Controls */}
@@ -337,7 +381,7 @@ export default function AudioRecognitionDebugger() {
             cursor: 'pointer'
           }}
         >
-          🔍 Test API Health
+          Test API Health
         </button>
 
         <button
@@ -355,7 +399,7 @@ export default function AudioRecognitionDebugger() {
             opacity: isProcessing ? 0.6 : 1
           }}
         >
-          {isRecording ? '⏹️ Stop Recording' : '🎤 Start Recording (5s)'}
+          {isRecording ? 'Stop Recording' : 'Start Recording (5s)'}
         </button>
 
         <button
@@ -373,7 +417,7 @@ export default function AudioRecognitionDebugger() {
             opacity: (!audioBlob || isProcessing || isRecording) ? 0.6 : 1
           }}
         >
-          {isProcessing ? '⏳ Testing...' : '🔍 Test Recognition'}
+          {isProcessing ? 'Testing...' : 'Test Recognition'}
         </button>
 
         <label style={{
@@ -386,7 +430,7 @@ export default function AudioRecognitionDebugger() {
           fontWeight: 600,
           cursor: 'pointer'
         }}>
-          📁 Upload Audio File
+          Upload Audio File
           <input
             type="file"
             accept="audio/*"
@@ -409,9 +453,40 @@ export default function AudioRecognitionDebugger() {
             cursor: 'pointer'
           }}
         >
-          🗑️ Clear Log
+          Clear Log
         </button>
       </div>
+
+      {/* Real-time audio level display */}
+      {isRecording && (
+        <div style={{
+          background: '#f3f4f6',
+          border: '1px solid #d1d5db',
+          borderRadius: 6,
+          padding: 12,
+          marginBottom: 16,
+          fontSize: 14
+        }}>
+          <div style={{ marginBottom: 8 }}>Audio Level: {audioLevel}/255 (Max: {maxAudioLevel}/255)</div>
+          <div style={{
+            width: '100%',
+            height: 20,
+            background: '#e5e7eb',
+            borderRadius: 4,
+            overflow: 'hidden'
+          }}>
+            <div style={{
+              width: `${(audioLevel / 255) * 100}%`,
+              height: '100%',
+              background: audioLevel < 10 ? '#ef4444' : '#22c55e',
+              transition: 'width 0.1s ease'
+            }}></div>
+          </div>
+          <div style={{ fontSize: 12, marginTop: 4, color: '#6b7280' }}>
+            {audioLevel < 10 ? 'Too quiet - increase speaker volume' : 'Good audio level'}
+          </div>
+        </div>
+      )}
 
       {/* Status */}
       {audioBlob && (
@@ -421,9 +496,32 @@ export default function AudioRecognitionDebugger() {
           borderRadius: 6,
           padding: 12,
           marginBottom: 16,
-          fontSize: 14
+          fontSize: 14,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between'
         }}>
-          ✅ Audio ready: {audioBlob.size} bytes ({audioBlob.type}) - will be converted to RAW PCM
+          <div>
+            Audio ready: {audioBlob.size} bytes ({audioBlob.type}) - Max level: {maxAudioLevel}/255
+          </div>
+          <button
+            onClick={() => {
+              const audioUrl = URL.createObjectURL(audioBlob);
+              const audio = new Audio(audioUrl);
+              audio.play();
+            }}
+            style={{
+              background: '#16a34a',
+              color: 'white',
+              border: 'none',
+              borderRadius: 4,
+              padding: '4px 8px',
+              fontSize: 12,
+              cursor: 'pointer'
+            }}
+          >
+            Play Recording
+          </button>
         </div>
       )}
 
@@ -437,7 +535,7 @@ export default function AudioRecognitionDebugger() {
           marginBottom: 16
         }}>
           <div style={{ fontWeight: 600, marginBottom: 8 }}>
-            {result.success ? '✅ Recognition Result' : '❌ Recognition Failed'}
+            {result.success ? 'Recognition Result' : 'Recognition Failed'}
           </div>
           {result.success && result.track && (
             <div>
@@ -478,12 +576,12 @@ export default function AudioRecognitionDebugger() {
           borderBottom: '1px solid #333',
           paddingBottom: 8
         }}>
-          📋 Debug Log ({debugLog.length} entries)
+          Debug Log ({debugLog.length} entries)
         </div>
         
         {debugLog.length === 0 ? (
           <div style={{ color: '#6b7280', fontStyle: 'italic' }}>
-            Click &ldquo;Test API Health&rdquo; or &ldquo;Start Recording&rdquo; to begin debugging...
+            Click &quot;Test API Health&quot; or &quot;Start Recording&quot; to begin debugging...
           </div>
         ) : (
           debugLog.map((log, index) => (
@@ -499,25 +597,6 @@ export default function AudioRecognitionDebugger() {
             </div>
           ))
         )}
-      </div>
-
-      {/* Instructions */}
-      <div style={{
-        marginTop: 16,
-        padding: 16,
-        background: '#fef3c7',
-        border: '1px solid #f59e0b',
-        borderRadius: 8,
-        fontSize: 14
-      }}>
-        <div style={{ fontWeight: 600, marginBottom: 8 }}>🔧 Fixed: RAW PCM Conversion + Size Limits</div>
-        <ul style={{ margin: 0, paddingLeft: 20 }}>
-          <li><strong>Format Issue Resolved:</strong> Now converts WebM to RAW PCM format that Shazam API requires</li>
-          <li><strong>Size Reduced:</strong> Limited to 3 seconds and mono channel to avoid 413 errors</li>
-          <li><strong>Test with popular songs:</strong> Try &ldquo;Bohemian Rhapsody&rdquo;, &ldquo;Hotel California&rdquo;, or &ldquo;Dancing Queen&rdquo;</li>
-          <li><strong>Audio requirements:</strong> RAW PCM 16-bit little endian, mono channel, ≤3 seconds, base64 encoded</li>
-          <li><strong>Conversion happens client-side:</strong> Uses AudioContext to convert WebM to proper format</li>
-        </ul>
       </div>
     </div>
   );

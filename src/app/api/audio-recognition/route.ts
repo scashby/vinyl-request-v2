@@ -115,12 +115,12 @@ async function processWithShazam(base64Audio: string, originalSize: number, star
   console.log('🔑 API Key present:', process.env.SHAZAM_RAPID_API_KEY.substring(0, 10) + '...');
   console.log('🎵 Calling Shazam Song Recognizer API with RAW PCM data...');
 
-  // FIXED: Use correct API endpoint from RapidAPI subscription
-  const apiUrl = 'https://shazam-song-recognizer.p.rapidapi.com/recognize';
+  // Revert to original working API endpoint  
+  const apiUrl = 'https://shazam.p.rapidapi.com/songs/detect';
   const headers = {
     'content-type': 'text/plain',
     'x-rapidapi-key': process.env.SHAZAM_RAPID_API_KEY,
-    'x-rapidapi-host': 'shazam-song-recognizer.p.rapidapi.com'
+    'x-rapidapi-host': 'shazam.p.rapidapi.com'
   };
 
   console.log('🌐 API Request details:', {
@@ -202,7 +202,7 @@ async function processWithShazam(base64Audio: string, originalSize: number, star
       title: null,
       album: null,
       source: 'microphone',
-      service: 'shazam-song-recognizer',
+      service: 'shazam',
       confidence: 0,
       confirmed: false,
       raw_response: shazamData,
@@ -242,7 +242,7 @@ async function processWithShazam(base64Audio: string, originalSize: number, star
     title,
     album: null, // Shazam doesn't reliably provide album info
     source: 'microphone',
-    service: 'shazam-song-recognizer',
+    service: 'shazam',
     confidence: shazamData.matches?.length > 0 ? 0.9 : 0.7,
     confirmed: true,
     raw_response: shazamData,
@@ -262,7 +262,7 @@ async function processWithShazam(base64Audio: string, originalSize: number, star
       album_id: null,
       started_at: new Date().toISOString(),
       recognition_confidence: shazamData.matches?.length > 0 ? 0.9 : 0.7,
-      service_used: 'shazam-song-recognizer',
+      service_used: 'shazam',
       recognition_image_url: imageUrl,
       next_recognition_in: 180, // 3 minutes default
       created_at: new Date().toISOString()
