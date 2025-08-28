@@ -418,7 +418,7 @@ export default function InnerCircleVotingPage() {
                 background: 'rgba(255, 255, 255, 0.95)',
                 borderRadius: '0 0 12px 12px',
                 backdropFilter: 'blur(10px)',
-                zIndex: 10,
+                zIndex: 1000,
                 maxHeight: 200,
                 overflowY: 'auto',
                 border: '1px solid rgba(255, 255, 255, 0.2)',
