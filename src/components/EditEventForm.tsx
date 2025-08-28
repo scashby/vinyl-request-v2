@@ -1,11 +1,10 @@
-// EditEventForm.tsx — Updated with recurring events functionality
+// EditEventForm.tsx — Fixed date handling for recurring events
 
 "use client";
 
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { supabase } from 'src/lib/supabaseClient';
-
 
 const formatList = ['Vinyl', 'Cassettes', 'CD', '45s', '8-Track'];
 
@@ -167,6 +166,8 @@ export default function EditEventForm() {
     setEventData((prev) => ({
       ...prev,
       [name]: checked,
+      // FIXED: Clear recurrence_end_date when is_recurring is unchecked
+      ...(name === 'is_recurring' && !checked ? { recurrence_end_date: '' } : {})
     }));
   };
 
@@ -202,9 +203,30 @@ export default function EditEventForm() {
         }
       }
 
+      // FIXED: Prepare payload with proper null handling for date fields
       const payload = {
-        ...eventData,
+        title: eventData.title,
+        date: eventData.date,
+        time: eventData.time,
+        location: eventData.location,
+        image_url: eventData.image_url,
+        info: eventData.info,
+        info_url: eventData.info_url,
+        has_queue: eventData.has_queue,
         allowed_formats: `{${eventData.allowed_formats.map(f => f.trim()).join(',')}}`,
+        is_recurring: eventData.is_recurring,
+        // FIXED: Only include recurrence fields if the event is recurring
+        ...(eventData.is_recurring ? {
+          recurrence_pattern: eventData.recurrence_pattern,
+          recurrence_interval: eventData.recurrence_interval,
+          recurrence_end_date: eventData.recurrence_end_date || null, // Convert empty string to null
+        } : {
+          recurrence_pattern: null,
+          recurrence_interval: null,
+          recurrence_end_date: null, // Explicitly set to null for non-recurring events
+        }),
+        // Only include parent_event_id if it exists
+        ...(eventData.parent_event_id ? { parent_event_id: eventData.parent_event_id } : {})
       };
 
       console.log('Submitting payload:', payload);
@@ -237,7 +259,11 @@ export default function EditEventForm() {
         const eventsToInsert = recurringEvents.slice(1).map(e => ({
           ...e,
           allowed_formats: `{${e.allowed_formats.map(f => f.trim()).join(',')}}`,
-          parent_event_id: savedEvent.id
+          parent_event_id: savedEvent.id,
+          // FIXED: Ensure null values for non-recurring child events
+          recurrence_pattern: null,
+          recurrence_interval: null,
+          recurrence_end_date: null,
         }));
 
         console.log('Events to insert:', eventsToInsert);
