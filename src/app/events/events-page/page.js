@@ -371,8 +371,9 @@ export default function Page() {
             })}
           </section>
         )}
-        {renderBookingSection()}
       </main>
+      {/* Booking section completely separate from event content */}
+      {events.length > 0 && renderBookingSection()}
     </div>
   );
 }
