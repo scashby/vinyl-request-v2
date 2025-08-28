@@ -1,8 +1,10 @@
-import { supabaseAdmin as supabase } from 'src/lib/supabaseAdmin';
+// src/app/api/most-wanted/route.js
+import { supabaseAdmin } from 'src/lib/supabaseAdmin';
 export const runtime = 'nodejs';
 
 
 export async function GET() {
+  const supabase = supabaseAdmin();
   const { data, error } = await supabase
     .from('most_wanted')
     .select('id, title, url, rank')
@@ -21,6 +23,7 @@ export async function GET() {
 export async function PUT(request) {
   const body = await request.json();
   const { id, title, url, rank } = body;
+  const supabase = supabaseAdmin();
 
   const { error } = await supabase
     .from("most_wanted")

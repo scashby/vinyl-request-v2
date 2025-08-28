@@ -1,8 +1,10 @@
-import { supabaseAdmin as supabase } from 'src/lib/supabaseAdmin';
+// src/app/api/playlists/route.js
+import { supabaseAdmin } from 'src/lib/supabaseAdmin';
 export const runtime = 'nodejs';
 
 
 export async function GET() {
+  const supabase = supabaseAdmin();
   const { data, error } = await supabase
     .from('playlists')
     .select('id, platform, embed_url')
@@ -21,6 +23,7 @@ export async function GET() {
 export async function PUT(request) {
   const body = await request.json();
   const { id, platform, embed_url } = body;
+  const supabase = supabaseAdmin();
 
   const { error } = await supabase
     .from("playlists")
