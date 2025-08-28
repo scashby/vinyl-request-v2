@@ -1,10 +1,10 @@
-// Inner Circle Voting Page
-// Create as: src/app/inner-circle-voting/page.tsx
-// Secret URL for Inner Circle members to vote on their favorite vinyl
+// Inner Circle Voting Page with Enhanced Search
+// Enhanced version of: src/app/inner-circle-voting/page.tsx
+// Adds search functionality, similar artist suggestions, and better filtering
 
 "use client";
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { supabase } from 'src/lib/supabaseClient';
 import Image from 'next/image';
 
@@ -32,9 +32,12 @@ export default function InnerCircleVotingPage() {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
   const [voteCounts, setVoteCounts] = useState<Record<number, number>>({});
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
   
   const MAX_VOTES = 20; // Limit votes per person
   const submitFormRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const scrollToSubmit = () => {
     submitFormRef.current?.scrollIntoView({ 
@@ -87,6 +90,87 @@ export default function InnerCircleVotingPage() {
     } catch (error) {
       console.error('Error loading vote counts:', error);
     }
+  };
+
+  // Enhanced search functionality with fuzzy matching
+  const filteredAlbums = useMemo(() => {
+    if (!searchQuery.trim()) return albums;
+    
+    const query = searchQuery.toLowerCase().trim();
+    const queryWords = query.split(/\s+/);
+    
+    return albums.filter(album => {
+      const artistLower = album.artist.toLowerCase();
+      const titleLower = album.title.toLowerCase();
+      const yearStr = album.year.toString();
+      
+      // Exact phrase matching
+      if (artistLower.includes(query) || titleLower.includes(query)) {
+        return true;
+      }
+      
+      // Word-based matching (all words must be found)
+      const allWords = queryWords.every(word => 
+        artistLower.includes(word) || 
+        titleLower.includes(word) || 
+        yearStr.includes(word)
+      );
+      
+      if (allWords) return true;
+      
+      // Partial matching for shorter queries
+      if (query.length >= 3) {
+        return artistLower.startsWith(query) || 
+               titleLower.startsWith(query) ||
+               artistLower.includes(query.substring(0, -1)) ||
+               titleLower.includes(query.substring(0, -1));
+      }
+      
+      return false;
+    });
+  }, [albums, searchQuery]);
+
+  // Get unique artists for suggestions
+  const uniqueArtists = useMemo(() => {
+    const artists = new Set(albums.map(album => album.artist));
+    return Array.from(artists).sort();
+  }, [albums]);
+
+  // Get search suggestions based on current query
+  const searchSuggestions = useMemo(() => {
+    if (!searchQuery.trim() || searchQuery.length < 2) return [];
+    
+    const query = searchQuery.toLowerCase();
+    const suggestions = new Set<string>();
+    
+    // Artist suggestions
+    uniqueArtists.forEach(artist => {
+      if (artist.toLowerCase().includes(query) && artist.toLowerCase() !== query) {
+        suggestions.add(artist);
+      }
+    });
+    
+    // Album title suggestions
+    albums.forEach(album => {
+      if (album.title.toLowerCase().includes(query) && 
+          album.title.toLowerCase() !== query &&
+          suggestions.size < 10) {
+        suggestions.add(`${album.artist} - ${album.title}`);
+      }
+    });
+    
+    return Array.from(suggestions).slice(0, 8);
+  }, [searchQuery, uniqueArtists, albums]);
+
+  const clearSearch = () => {
+    setSearchQuery('');
+    setShowSuggestions(false);
+    searchInputRef.current?.focus();
+  };
+
+  const selectSuggestion = (suggestion: string) => {
+    setSearchQuery(suggestion.includes(' - ') ? suggestion.split(' - ')[0] : suggestion);
+    setShowSuggestions(false);
   };
 
   const toggleVote = (albumId: number) => {
@@ -253,6 +337,161 @@ export default function InnerCircleVotingPage() {
           </div>
         </div>
 
+        {/* Enhanced Search Section */}
+        <div style={{
+          background: 'rgba(255, 255, 255, 0.1)',
+          borderRadius: 16,
+          padding: 24,
+          marginBottom: 32,
+          backdropFilter: 'blur(10px)',
+          position: 'relative'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+            <div style={{ fontSize: 20 }}>🔍</div>
+            <h3 style={{ fontSize: 20, margin: 0, fontWeight: 'bold' }}>
+              Search Albums
+            </h3>
+            {searchQuery && (
+              <div style={{
+                background: 'rgba(34, 197, 94, 0.2)',
+                color: '#22c55e',
+                padding: '4px 12px',
+                borderRadius: 12,
+                fontSize: 12,
+                fontWeight: 'bold'
+              }}>
+                {filteredAlbums.length} found
+              </div>
+            )}
+          </div>
+
+          <div style={{ position: 'relative' }}>
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={searchQuery}
+              onChange={e => {
+                setSearchQuery(e.target.value);
+                setShowSuggestions(e.target.value.length > 1);
+              }}
+              onFocus={() => setShowSuggestions(searchQuery.length > 1)}
+              style={{
+                width: '100%',
+                padding: '16px 50px 16px 20px',
+                borderRadius: 12,
+                border: 'none',
+                fontSize: 16,
+                background: 'rgba(255, 255, 255, 0.9)',
+                color: '#333',
+                outline: 'none'
+              }}
+              placeholder="Search by artist name, album title, or year..."
+            />
+            
+            {searchQuery && (
+              <button
+                onClick={clearSearch}
+                style={{
+                  position: 'absolute',
+                  right: 15,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'transparent',
+                  border: 'none',
+                  fontSize: 18,
+                  cursor: 'pointer',
+                  color: '#666',
+                  padding: 5
+                }}
+              >
+                ✕
+              </button>
+            )}
+
+            {/* Search Suggestions Dropdown */}
+            {showSuggestions && searchSuggestions.length > 0 && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                right: 0,
+                background: 'rgba(255, 255, 255, 0.95)',
+                borderRadius: '0 0 12px 12px',
+                backdropFilter: 'blur(10px)',
+                zIndex: 10,
+                maxHeight: 200,
+                overflowY: 'auto',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                marginTop: 2
+              }}>
+                <div style={{
+                  padding: '8px 16px',
+                  fontSize: 12,
+                  fontWeight: 'bold',
+                  color: '#666',
+                  borderBottom: '1px solid rgba(0,0,0,0.1)'
+                }}>
+                  Suggestions
+                </div>
+                {searchSuggestions.map((suggestion, index) => (
+                  <button
+                    key={index}
+                    onClick={() => selectSuggestion(suggestion)}
+                    style={{
+                      width: '100%',
+                      padding: '12px 16px',
+                      border: 'none',
+                      background: 'transparent',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      fontSize: 14,
+                      color: '#333',
+                      borderBottom: index < searchSuggestions.length - 1 ? '1px solid rgba(0,0,0,0.05)' : 'none',
+                      transition: 'background 0.2s'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.05)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    {suggestion.includes(' - ') ? (
+                      <>
+                        <span style={{ fontWeight: 'bold' }}>
+                          {suggestion.split(' - ')[0]}
+                        </span>
+                        <span style={{ color: '#666' }}>
+                          {' - ' + suggestion.split(' - ')[1]}
+                        </span>
+                      </>
+                    ) : (
+                      <span style={{ fontWeight: 'bold' }}>{suggestion}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Search Stats */}
+          <div style={{
+            marginTop: 16,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            fontSize: 14,
+            opacity: 0.8
+          }}>
+            <div>
+              {searchQuery ? (
+                <>Showing {filteredAlbums.length} of {albums.length} albums</>
+              ) : (
+                <>Showing all {albums.length} albums</>
+              )}
+            </div>
+            <div>
+              Try searching for artist names like &ldquo;Beatles&rdquo; or &ldquo;Miles Davis&rdquo;
+            </div>
+          </div>
+        </div>
+
         {/* Album Grid */}
         <div style={{
           display: 'grid',
@@ -260,7 +499,7 @@ export default function InnerCircleVotingPage() {
           gap: 20,
           marginBottom: 40
         }}>
-          {albums.map(album => {
+          {filteredAlbums.map(album => {
             const isSelected = selectedAlbums.has(album.id);
             const voteCount = voteCounts[album.id] || 0;
             
@@ -376,6 +615,41 @@ export default function InnerCircleVotingPage() {
             );
           })}
         </div>
+
+        {/* No Results Message */}
+        {searchQuery && filteredAlbums.length === 0 && (
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.1)',
+            borderRadius: 16,
+            padding: 40,
+            textAlign: 'center',
+            marginBottom: 40,
+            backdropFilter: 'blur(10px)'
+          }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>🔍</div>
+            <h3 style={{ fontSize: 24, marginBottom: 12, margin: 0 }}>
+              No albums found
+            </h3>
+            <p style={{ fontSize: 16, opacity: 0.8, marginBottom: 20 }}>
+              No albums match your search for &ldquo;<strong>{searchQuery}</strong>&rdquo;
+            </p>
+            <button
+              onClick={clearSearch}
+              style={{
+                background: '#fbbf24',
+                color: '#000',
+                border: 'none',
+                borderRadius: 8,
+                padding: '12px 24px',
+                fontSize: 16,
+                fontWeight: 'bold',
+                cursor: 'pointer'
+              }}
+            >
+              Clear Search
+            </button>
+          </div>
+        )}
 
         {/* Voter Information Form */}
         <div 
