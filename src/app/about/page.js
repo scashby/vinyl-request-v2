@@ -291,24 +291,6 @@ export default function AboutPage() {
                   )}
                 </div>
               </div>
-
-              {/* Social Feed */}
-              <div className="about-social-feed">
-                <div className="about-sidebar-title">Recent Social Posts</div>
-                <div className="social-widgets">
-                  <SocialEmbeds />
-                  <div className="social-embed">
-                    <a
-                      href={aboutContent.linktree_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="linktree-button"
-                    >
-                      Visit Our Linktree
-                    </a>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
 
@@ -321,6 +303,7 @@ export default function AboutPage() {
                 </li>
               ))}
             </ol>
+            
             <div className="about-wishlist">
               <div className="about-sidebar-title">Wish List</div>
               <a href={aboutContent.amazon_wishlist_url} target="_blank" rel="noopener noreferrer">
@@ -329,6 +312,24 @@ export default function AboutPage() {
               <a href={aboutContent.discogs_wantlist_url} target="_blank" rel="noopener noreferrer">
                 Full Discogs Wantlist
               </a>
+            </div>
+
+            {/* Social Feed - MOVED HERE */}
+            <div className="about-social-feed">
+              <div className="about-sidebar-title">Recent Social Posts</div>
+              <div className="social-widgets">
+                <SocialEmbeds />
+                <div className="social-embed">
+                  <a
+                    href={aboutContent.linktree_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="linktree-button"
+                  >
+                    Visit Our Linktree
+                  </a>
+                </div>
+              </div>
             </div>
           </aside>
         </div>
