@@ -1,4 +1,4 @@
-// EditEventForm.tsx — Fixed date handling for recurring events
+// EditEventForm.tsx — Enhanced with TBA support and fixed date handling for recurring events
 
 "use client";
 
@@ -23,14 +23,15 @@ interface EventData {
   recurrence_interval: number;
   recurrence_end_date: string;
   parent_event_id?: number;
+  is_tba: boolean; // New field for TBA events
 }
 
 // Utility function to generate recurring events
 function generateRecurringEvents(baseEvent: EventData & { id?: number }): Omit<EventData, 'id'>[] {
   const events: Omit<EventData, 'id'>[] = [];
   
-  if (!baseEvent.is_recurring || !baseEvent.recurrence_end_date) {
-    // Return without ID for non-recurring events
+  if (!baseEvent.is_recurring || !baseEvent.recurrence_end_date || baseEvent.is_tba) {
+    // Return without ID for non-recurring events or TBA events
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { id: _id, ...eventWithoutId } = baseEvent;
     return [eventWithoutId];
@@ -92,6 +93,7 @@ export default function EditEventForm() {
     recurrence_pattern: 'weekly',
     recurrence_interval: 1,
     recurrence_end_date: '',
+    is_tba: false,
   });
 
   useEffect(() => {
@@ -105,6 +107,7 @@ export default function EditEventForm() {
         }
       }
       if (copiedEvent) {
+        const isTBA = !copiedEvent.date || copiedEvent.date === '' || copiedEvent.date === '9999-12-31';
         setEventData({
           ...eventData,
           ...copiedEvent,
@@ -114,6 +117,8 @@ export default function EditEventForm() {
               ? copiedEvent.allowed_formats.replace(/[{}]/g, '').split(',').map((f: string) => f.trim()).filter(Boolean)
               : [],
           title: copiedEvent.title ? `${copiedEvent.title} (Copy)` : '',
+          is_tba: isTBA,
+          date: isTBA ? '' : copiedEvent.date,
           // Reset recurring settings for copied events
           is_recurring: false,
           recurrence_end_date: '',
@@ -129,6 +134,7 @@ export default function EditEventForm() {
         if (error) {
           console.error('Error fetching event:', error);
         } else if (data) {
+          const isTBA = !data.date || data.date === '' || data.date === '9999-12-31';
           setEventData({
             ...eventData,
             ...data,
@@ -141,6 +147,8 @@ export default function EditEventForm() {
             recurrence_pattern: data.recurrence_pattern || 'weekly',
             recurrence_interval: data.recurrence_interval || 1,
             recurrence_end_date: data.recurrence_end_date || '',
+            is_tba: isTBA,
+            date: isTBA ? '' : data.date,
           });
         }
       }
@@ -160,13 +168,19 @@ export default function EditEventForm() {
     }));
   };
 
-  // For has_queue and is_recurring checkboxes
+  // For has_queue, is_recurring, and is_tba checkboxes
   const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, checked } = e.target;
     setEventData((prev) => ({
       ...prev,
       [name]: checked,
-      // FIXED: Clear recurrence_end_date when is_recurring is unchecked
+      // Clear date when TBA is checked, restore a default date when unchecked
+      ...(name === 'is_tba' && checked ? { 
+        date: '', 
+        is_recurring: false, // Can't have recurring TBA events
+        recurrence_end_date: '' 
+      } : {}),
+      // Clear recurrence_end_date when is_recurring is unchecked
       ...(name === 'is_recurring' && !checked ? { recurrence_end_date: '' } : {})
     }));
   };
@@ -187,8 +201,8 @@ export default function EditEventForm() {
     e.preventDefault();
     
     try {
-      // Basic validation for recurring events
-      if (eventData.is_recurring) {
+      // Basic validation
+      if (!eventData.is_tba && eventData.is_recurring) {
         if (!eventData.date) {
           alert('Please set a start date for the recurring event');
           return;
@@ -203,10 +217,10 @@ export default function EditEventForm() {
         }
       }
 
-      // FIXED: Prepare payload with proper null handling for date fields
+      // Prepare payload with proper null handling for date fields
       const payload = {
         title: eventData.title,
-        date: eventData.date,
+        date: eventData.is_tba ? '9999-12-31' : eventData.date, // Use special date for TBA events
         time: eventData.time,
         location: eventData.location,
         image_url: eventData.image_url,
@@ -214,16 +228,16 @@ export default function EditEventForm() {
         info_url: eventData.info_url,
         has_queue: eventData.has_queue,
         allowed_formats: `{${eventData.allowed_formats.map(f => f.trim()).join(',')}}`,
-        is_recurring: eventData.is_recurring,
-        // FIXED: Only include recurrence fields if the event is recurring
-        ...(eventData.is_recurring ? {
+        is_recurring: eventData.is_tba ? false : eventData.is_recurring, // TBA events can't be recurring
+        // Only include recurrence fields if the event is recurring and not TBA
+        ...(!eventData.is_tba && eventData.is_recurring ? {
           recurrence_pattern: eventData.recurrence_pattern,
           recurrence_interval: eventData.recurrence_interval,
-          recurrence_end_date: eventData.recurrence_end_date || null, // Convert empty string to null
+          recurrence_end_date: eventData.recurrence_end_date || null,
         } : {
           recurrence_pattern: null,
           recurrence_interval: null,
-          recurrence_end_date: null, // Explicitly set to null for non-recurring events
+          recurrence_end_date: null,
         }),
         // Only include parent_event_id if it exists
         ...(eventData.parent_event_id ? { parent_event_id: eventData.parent_event_id } : {})
@@ -231,8 +245,8 @@ export default function EditEventForm() {
 
       console.log('Submitting payload:', payload);
 
-      if (eventData.is_recurring && !id) {
-        // Creating a new recurring event
+      if (!eventData.is_tba && eventData.is_recurring && !id) {
+        // Creating a new recurring event (not TBA)
         console.log('Creating recurring event...');
         const { data: savedEvent, error: saveError } = await supabase
           .from('events')
@@ -249,7 +263,7 @@ export default function EditEventForm() {
 
         // Generate and save recurring instances
         const recurringEvents = generateRecurringEvents({
-          ...savedEvent,
+          ...eventData,
           id: savedEvent.id
         });
 
@@ -258,9 +272,9 @@ export default function EditEventForm() {
         // Remove the first event (it's already saved) and save the rest
         const eventsToInsert = recurringEvents.slice(1).map(e => ({
           ...e,
+          date: e.date, // Keep the calculated date
           allowed_formats: `{${e.allowed_formats.map(f => f.trim()).join(',')}}`,
           parent_event_id: savedEvent.id,
-          // FIXED: Ensure null values for non-recurring child events
           recurrence_pattern: null,
           recurrence_interval: null,
           recurrence_end_date: null,
@@ -281,7 +295,7 @@ export default function EditEventForm() {
 
         alert(`Successfully created ${recurringEvents.length} recurring events!`);
       } else {
-        // Single event or updating existing event
+        // Single event (including TBA) or updating existing event
         console.log('Saving single event...');
         let result;
         if (id) {
@@ -341,15 +355,29 @@ export default function EditEventForm() {
           required
           style={{ display: 'block', width: '100%', marginBottom: '1rem', padding: '0.5rem' }}
         />
-        <input
-          name="date"
-          type="date"
-          value={eventData.date}
-          onChange={handleChange}
-          placeholder="Date"
-          required
-          style={{ display: 'block', width: '100%', marginBottom: '1rem', padding: '0.5rem' }}
-        />
+
+        <label style={{ display: 'block', marginBottom: '1rem' }}>
+          <input
+            type="checkbox"
+            name="is_tba"
+            checked={eventData.is_tba}
+            onChange={handleCheckboxChange}
+          />
+          {' '}Date To Be Announced (TBA)
+        </label>
+
+        {!eventData.is_tba && (
+          <input
+            name="date"
+            type="date"
+            value={eventData.date}
+            onChange={handleChange}
+            placeholder="Date"
+            required
+            style={{ display: 'block', width: '100%', marginBottom: '1rem', padding: '0.5rem' }}
+          />
+        )}
+
         <input
           name="time"
           value={eventData.time}
@@ -403,17 +431,32 @@ export default function EditEventForm() {
           {' '}Has Queue
         </label>
 
-        <label style={{ display: 'block', marginBottom: '1rem' }}>
-          <input
-            type="checkbox"
-            name="is_recurring"
-            checked={eventData.is_recurring}
-            onChange={handleCheckboxChange}
-          />
-          {' '}Recurring Event
-        </label>
+        {!eventData.is_tba && (
+          <label style={{ display: 'block', marginBottom: '1rem' }}>
+            <input
+              type="checkbox"
+              name="is_recurring"
+              checked={eventData.is_recurring}
+              onChange={handleCheckboxChange}
+            />
+            {' '}Recurring Event
+          </label>
+        )}
 
-        {eventData.is_recurring && (
+        {eventData.is_tba && (
+          <div style={{
+            backgroundColor: '#fff3cd',
+            border: '1px solid #ffeaa7',
+            borderRadius: '4px',
+            padding: '1rem',
+            marginBottom: '1rem',
+            color: '#856404'
+          }}>
+            <strong>Note:</strong> TBA events cannot be set as recurring. Please set a specific date to enable recurring options.
+          </div>
+        )}
+
+        {!eventData.is_tba && eventData.is_recurring && (
           <div style={{ 
             border: '1px solid #ddd', 
             padding: '1rem', 
@@ -495,7 +538,7 @@ export default function EditEventForm() {
             cursor: 'pointer'
           }}
         >
-          {eventData.is_recurring && !id ? 'Create Recurring Events' : 'Save Event'}
+          {!eventData.is_tba && eventData.is_recurring && !id ? 'Create Recurring Events' : 'Save Event'}
         </button>
       </form>
     </div>
