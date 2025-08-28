@@ -101,7 +101,7 @@ export default function Page() {
         borderRadius: '8px',
         padding: '1.5rem',
         display: 'inline-block',
-        textAlign: 'left',
+        textAlign: 'center',
         maxWidth: '400px'
       }}>
         <h4 style={{ 
@@ -111,6 +111,45 @@ export default function Page() {
         }}>
           Want to book an event?
         </h4>
+        
+        {/* Book Online Button for empty state */}
+        <div style={{ marginBottom: '1rem' }}>
+          <a 
+            href="https://calendly.com/deadwaxdialogues" // Replace with your actual booking URL
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'inline-block',
+              backgroundColor: '#007bff',
+              color: '#ffffff',
+              padding: '0.6rem 1.2rem',
+              borderRadius: '6px',
+              textDecoration: 'none',
+              fontSize: '1rem',
+              fontWeight: '600',
+              boxShadow: '0 2px 4px rgba(0, 123, 255, 0.2)',
+              transition: 'all 0.2s ease',
+              cursor: 'pointer'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.backgroundColor = '#0056b3';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.backgroundColor = '#007bff';
+            }}
+          >
+            📅 Book Online
+          </a>
+        </div>
+
+        <div style={{ 
+          color: '#666', 
+          marginBottom: '1rem',
+          fontSize: '0.9rem'
+        }}>
+          or contact directly:
+        </div>
+
         <p style={{ margin: '0.5rem 0', color: '#495057' }}>
           <strong>Steve Ashby</strong><br />
           Dead Wax Dialogues
@@ -174,8 +213,50 @@ export default function Page() {
             fontSize: '1.3rem',
             textAlign: 'center'
           }}>
-            Contact Information
+            Get In Touch
           </h4>
+          
+          {/* Book Online Button */}
+          <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+            <a 
+              href="https://calendly.com/deadwaxdialogues" // Replace with your actual booking URL
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'inline-block',
+                backgroundColor: '#007bff',
+                color: '#ffffff',
+                padding: '0.75rem 1.5rem',
+                borderRadius: '6px',
+                textDecoration: 'none',
+                fontSize: '1.1rem',
+                fontWeight: '600',
+                boxShadow: '0 2px 4px rgba(0, 123, 255, 0.2)',
+                transition: 'all 0.2s ease',
+                cursor: 'pointer'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.backgroundColor = '#0056b3';
+                e.currentTarget.style.transform = 'translateY(-1px)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.backgroundColor = '#007bff';
+                e.currentTarget.style.transform = 'translateY(0)';
+              }}
+            >
+              📅 Book Online
+            </a>
+          </div>
+
+          <div style={{ 
+            textAlign: 'center', 
+            color: '#666', 
+            marginBottom: '1.5rem',
+            fontSize: '0.9rem'
+          }}>
+            or contact directly:
+          </div>
+
           <p style={{ margin: '0.75rem 0', fontSize: '1.1rem' }}>
             <strong>Steve Ashby</strong><br />
             <span style={{ color: '#666' }}>Dead Wax Dialogues</span>
