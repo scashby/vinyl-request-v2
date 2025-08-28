@@ -1,4 +1,4 @@
-// About page ("/about") — Enhanced with booking information and rates
+// About page ("/about") — Database-driven content
 
 'use client'
 
@@ -8,46 +8,7 @@ import 'styles/about.css'
 
 export default function AboutPage() {
   const [mostWanted, setMostWanted] = useState([]);
-  const [aboutContent, setAboutContent] = useState({
-    main_description: "Hi, I'm Stephen. If you ever wanted to know why anyone still loves vinyl, cassettes, or tangling with Discogs, you're in the right place.\n\nThis site is a home for vinyl drop nights, weird collection habits, top 10 wishlists, and the best and worst audio formats ever invented.\n\nThere will be occasional silly interviews, commentary, and projects from the road (and the turntable).",
-    booking_description: "Looking to bring vinyl culture to your venue or event? Dead Wax Dialogues offers unique vinyl experiences that connect people through music discovery and storytelling.",
-    contact_name: "Steve Ashby",
-    contact_company: "Dead Wax Dialogues",
-    contact_email: "steve@deadwaxdialogues.com",
-    contact_phone: "443-235-6608",
-    calendly_url: "https://calendly.com/deadwaxdialogues",
-    services: [
-      {
-        title: "Vinyl Drop Nights",
-        description: "Interactive vinyl listening experiences where attendees discover new music and share stories",
-        price: "Contact for pricing"
-      },
-      {
-        title: "Private Events",
-        description: "Custom vinyl experiences for parties, corporate events, and special occasions",
-        price: "Starting at $500"
-      },
-      {
-        title: "Educational Workshops",
-        description: "Learn about vinyl history, collecting, and the culture surrounding physical media",
-        price: "Starting at $300"
-      }
-    ],
-    testimonials: [
-      {
-        text: "Steve brought such a unique energy to our event. The vinyl experience was unforgettable!",
-        author: "Sarah M., Event Coordinator"
-      },
-      {
-        text: "Dead Wax Dialogues turned our corporate gathering into something truly special.",
-        author: "Mike R., Corporate Events"
-      }
-    ],
-    booking_notes: "All events include professional setup, curated vinyl selection, and engaging facilitation. Travel fees may apply for events outside the Baltimore/DC area.",
-    amazon_wishlist_url: "https://www.amazon.com/hz/wishlist/ls/D5MXYF471325?ref_=wl_share",
-    discogs_wantlist_url: "https://www.discogs.com/wantlist?user=socialblunders",
-    linktree_url: "https://linktr.ee/deadwaxdialogues"
-  });
+  const [aboutContent, setAboutContent] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -57,24 +18,19 @@ export default function AboutPage() {
         const mostWantedResponse = await fetch("/api/most-wanted");
         const mostWantedData = await mostWantedResponse.json();
         setMostWanted(mostWantedData);
-      } catch (_err) {
-        console.error("Error fetching most wanted:", _err);
+      } catch (error) {
+        console.error("Error fetching most wanted:", error);
       }
 
-      // Try to fetch about content from database
+      // Fetch about content from database
       try {
         const aboutResponse = await fetch("/api/about-content");
         if (aboutResponse.ok) {
           const aboutData = await aboutResponse.json();
-          if (aboutData) {
-            setAboutContent(prevContent => ({
-              ...prevContent,
-              ...aboutData
-            }));
-          }
+          setAboutContent(aboutData);
         }
-      } catch {
-        console.log("Using default about content (no database content found)");
+      } catch (error) {
+        console.error("Error fetching about content:", error);
       }
       
       setLoading(false);
@@ -100,6 +56,23 @@ export default function AboutPage() {
     );
   }
 
+  if (!aboutContent) {
+    return (
+      <div className="page-wrapper">
+        <header className="about-hero">
+          <div className="overlay">
+            <h1>About</h1>
+          </div>
+        </header>
+        <main className="event-body">
+          <div style={{ textAlign: 'center', padding: '3rem', fontSize: '1.2rem' }}>
+            Content not available. Please contact the administrator.
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="page-wrapper">
       <header className="about-hero">
@@ -112,7 +85,7 @@ export default function AboutPage() {
           <div className="about-main-col">
             <div className="about-body-container">
               <h2 className="about-title">About Dead Wax Dialogues</h2>
-              {aboutContent.main_description.split('\n\n').map((paragraph, index) => (
+              {aboutContent.main_description && aboutContent.main_description.split('\n\n').map((paragraph, index) => (
                 <p key={index}>{paragraph}</p>
               ))}
 
@@ -178,44 +151,46 @@ export default function AboutPage() {
                 </div>
 
                 {/* Services Grid */}
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-                  gap: '1.5rem',
-                  marginBottom: '2rem'
-                }}>
-                  {aboutContent.services.map((service, index) => (
-                    <div key={index} style={{
-                      backgroundColor: '#ffffff',
-                      border: '1px solid #dee2e6',
-                      borderRadius: '8px',
-                      padding: '1.5rem'
-                    }}>
-                      <h4 style={{
-                        fontSize: '1.2rem',
-                        fontWeight: 'bold',
-                        color: '#333',
-                        marginBottom: '0.5rem'
+                {aboutContent.services && aboutContent.services.length > 0 && (
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+                    gap: '1.5rem',
+                    marginBottom: '2rem'
+                  }}>
+                    {aboutContent.services.map((service, index) => (
+                      <div key={index} style={{
+                        backgroundColor: '#ffffff',
+                        border: '1px solid #dee2e6',
+                        borderRadius: '8px',
+                        padding: '1.5rem'
                       }}>
-                        {service.title}
-                      </h4>
-                      <p style={{
-                        color: '#666',
-                        marginBottom: '1rem',
-                        lineHeight: '1.5'
-                      }}>
-                        {service.description}
-                      </p>
-                      <div style={{
-                        fontSize: '1.1rem',
-                        fontWeight: 'bold',
-                        color: '#007bff'
-                      }}>
-                        {service.price}
+                        <h4 style={{
+                          fontSize: '1.2rem',
+                          fontWeight: 'bold',
+                          color: '#333',
+                          marginBottom: '0.5rem'
+                        }}>
+                          {service.title}
+                        </h4>
+                        <p style={{
+                          color: '#666',
+                          marginBottom: '1rem',
+                          lineHeight: '1.5'
+                        }}>
+                          {service.description}
+                        </p>
+                        <div style={{
+                          fontSize: '1.1rem',
+                          fontWeight: 'bold',
+                          color: '#007bff'
+                        }}>
+                          {service.price}
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
 
                 {/* Testimonials */}
                 {aboutContent.testimonials && aboutContent.testimonials.length > 0 && (
@@ -287,19 +262,19 @@ export default function AboutPage() {
                     marginBottom: '1rem'
                   }}>
                     <div>
-                      <strong>Steve Ashby</strong><br />
-                      <span style={{ color: '#666' }}>Dead Wax Dialogues</span>
+                      <strong>{aboutContent.contact_name}</strong><br />
+                      <span style={{ color: '#666' }}>{aboutContent.contact_company}</span>
                     </div>
                     <div>
-                      <a href="mailto:steve@deadwaxdialogues.com" 
+                      <a href={`mailto:${aboutContent.contact_email}`} 
                          style={{ color: '#007bff', textDecoration: 'none' }}>
-                        steve@deadwaxdialogues.com
+                        {aboutContent.contact_email}
                       </a>
                     </div>
                     <div>
-                      <a href="tel:443-235-6608" 
+                      <a href={`tel:${aboutContent.contact_phone}`} 
                          style={{ color: '#007bff', textDecoration: 'none' }}>
-                        443-235-6608
+                        {aboutContent.contact_phone}
                       </a>
                     </div>
                   </div>
