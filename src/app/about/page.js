@@ -11,6 +11,11 @@ export default function AboutPage() {
   const [aboutContent, setAboutContent] = useState({
     main_description: "Hi, I'm Stephen. If you ever wanted to know why anyone still loves vinyl, cassettes, or tangling with Discogs, you're in the right place.\n\nThis site is a home for vinyl drop nights, weird collection habits, top 10 wishlists, and the best and worst audio formats ever invented.\n\nThere will be occasional silly interviews, commentary, and projects from the road (and the turntable).",
     booking_description: "Looking to bring vinyl culture to your venue or event? Dead Wax Dialogues offers unique vinyl experiences that connect people through music discovery and storytelling.",
+    contact_name: "Steve Ashby",
+    contact_company: "Dead Wax Dialogues",
+    contact_email: "steve@deadwaxdialogues.com",
+    contact_phone: "443-235-6608",
+    calendly_url: "https://calendly.com/deadwaxdialogues",
     services: [
       {
         title: "Vinyl Drop Nights",
@@ -38,7 +43,10 @@ export default function AboutPage() {
         author: "Mike R., Corporate Events"
       }
     ],
-    booking_notes: "All events include professional setup, curated vinyl selection, and engaging facilitation. Travel fees may apply for events outside the Baltimore/DC area."
+    booking_notes: "All events include professional setup, curated vinyl selection, and engaging facilitation. Travel fees may apply for events outside the Baltimore/DC area.",
+    amazon_wishlist_url: "https://www.amazon.com/hz/wishlist/ls/D5MXYF471325?ref_=wl_share",
+    discogs_wantlist_url: "https://www.discogs.com/wantlist?user=socialblunders",
+    linktree_url: "https://linktr.ee/deadwaxdialogues"
   });
   const [loading, setLoading] = useState(true);
 
@@ -140,7 +148,7 @@ export default function AboutPage() {
                 {/* Book Online Button */}
                 <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
                   <a 
-                    href="https://calendly.com/deadwaxdialogues"
+                    href={aboutContent.calendly_url}
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{
@@ -316,7 +324,7 @@ export default function AboutPage() {
                   <SocialEmbeds />
                   <div className="social-embed">
                     <a
-                      href="https://linktr.ee/deadwaxdialogues"
+                      href={aboutContent.linktree_url}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="linktree-button"
@@ -340,10 +348,10 @@ export default function AboutPage() {
             </ol>
             <div className="about-wishlist">
               <div className="about-sidebar-title">Wish List</div>
-              <a href="https://www.amazon.com/hz/wishlist/ls/D5MXYF471325?ref_=wl_share" target="_blank" rel="noopener noreferrer">
+              <a href={aboutContent.amazon_wishlist_url} target="_blank" rel="noopener noreferrer">
                 Full Amazon Wish List
               </a>
-              <a href="https://www.discogs.com/wantlist?user=socialblunders" target="_blank" rel="noopener noreferrer">
+              <a href={aboutContent.discogs_wantlist_url} target="_blank" rel="noopener noreferrer">
                 Full Discogs Wantlist
               </a>
             </div>

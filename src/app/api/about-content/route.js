@@ -46,7 +46,7 @@ export async function POST(request) {
     const body = await request.json();
     
     // Validate required fields
-    if (!body.main_description && !body.booking_description) {
+    if (!body.main_description && !body.booking_description && !body.contact_name) {
       return new Response(
         JSON.stringify({ error: 'At least one content field is required' }),
         { 
@@ -71,9 +71,17 @@ export async function POST(request) {
         .update({
           main_description: body.main_description || null,
           booking_description: body.booking_description || null,
+          contact_name: body.contact_name || null,
+          contact_company: body.contact_company || null,
+          contact_email: body.contact_email || null,
+          contact_phone: body.contact_phone || null,
+          calendly_url: body.calendly_url || null,
           services: body.services || [],
           testimonials: body.testimonials || [],
           booking_notes: body.booking_notes || null,
+          amazon_wishlist_url: body.amazon_wishlist_url || null,
+          discogs_wantlist_url: body.discogs_wantlist_url || null,
+          linktree_url: body.linktree_url || null,
           updated_at: new Date().toISOString()
         })
         .eq('id', existingData.id)
@@ -86,9 +94,17 @@ export async function POST(request) {
         .insert([{
           main_description: body.main_description || null,
           booking_description: body.booking_description || null,
+          contact_name: body.contact_name || null,
+          contact_company: body.contact_company || null,
+          contact_email: body.contact_email || null,
+          contact_phone: body.contact_phone || null,
+          calendly_url: body.calendly_url || null,
           services: body.services || [],
           testimonials: body.testimonials || [],
-          booking_notes: body.booking_notes || null
+          booking_notes: body.booking_notes || null,
+          amazon_wishlist_url: body.amazon_wishlist_url || null,
+          discogs_wantlist_url: body.discogs_wantlist_url || null,
+          linktree_url: body.linktree_url || null
         }])
         .select()
         .single();
