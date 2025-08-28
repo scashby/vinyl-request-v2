@@ -344,7 +344,8 @@ export default function InnerCircleVotingPage() {
           padding: 24,
           marginBottom: 32,
           backdropFilter: 'blur(10px)',
-          position: 'relative'
+          position: 'relative',
+          zIndex: 1000
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
             <div style={{ fontSize: 20 }}>🔍</div>
@@ -418,7 +419,7 @@ export default function InnerCircleVotingPage() {
                 background: 'rgba(255, 255, 255, 0.95)',
                 borderRadius: '0 0 12px 12px',
                 backdropFilter: 'blur(10px)',
-                zIndex: 1000,
+                zIndex: 9999,
                 maxHeight: 200,
                 overflowY: 'auto',
                 border: '1px solid rgba(255, 255, 255, 0.2)',
