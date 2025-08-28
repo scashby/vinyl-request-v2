@@ -285,23 +285,28 @@ export default function AudioRecognitionPage() {
   // Silence monitoring function - FIXED: Added triggerRecognition to dependency array
   const checkAudioLevel = useCallback(() => {
     const analyser = analyserRef.current;
-    if (!monitoringRef.current || !analyser || !silenceMonitoringActive) return;
-    
-    const dataArray = new Uint8Array(analyser.frequencyBinCount);
-    analyser.getByteFrequencyData(dataArray);
-    
-    // Calculate RMS for audio level
-    let sum = 0;
-    let validSamples = 0;
-    for (let i = 0; i < dataArray.length; i++) {
-      const value = dataArray[i];
-      if (value > 0) {
-        sum += (value / 255) * (value / 255);
-        validSamples++;
-      }
+    if (!monitoringRef.current || !analyser || !silenceMonitoringActive) {
+      console.log('Silence monitoring stopped:', { monitoring: monitoringRef.current, hasAnalyser: !!analyser, active: silenceMonitoringActive });
+      return;
     }
-    const rms = validSamples > 0 ? Math.sqrt(sum / validSamples) : 0;
+    
+    // Use time domain data instead of frequency data for better silence detection
+    const dataArray = new Uint8Array(analyser.fftSize);
+    analyser.getByteTimeDomainData(dataArray);
+    
+    // Calculate RMS for audio level using time domain data
+    let sum = 0;
+    for (let i = 0; i < dataArray.length; i++) {
+      const value = (dataArray[i] - 128) / 128; // Convert to -1 to 1 range
+      sum += value * value;
+    }
+    const rms = Math.sqrt(sum / dataArray.length);
     setSilenceLevel(rms);
+
+    // Debug logging every few seconds
+    if (Date.now() % 3000 < 100) {
+      console.log('Audio level check:', { rms: rms.toFixed(4), threshold: config.silenceThreshold, isQuiet: rms < config.silenceThreshold });
+    }
 
     const now = Date.now();
     const timeSinceLastRecognition = now - lastRecognitionTimeRef.current;
@@ -311,7 +316,7 @@ export default function AudioRecognitionPage() {
       if (rms < config.silenceThreshold) {
         // We're in silence
         if (!isInSilence) {
-          console.log('Silence started');
+          console.log('Silence started - RMS:', rms, 'Threshold:', config.silenceThreshold);
           setIsInSilence(true);
           silenceStartTimeRef.current = now;
           setStatus('Silence detected, monitoring...');
@@ -321,7 +326,7 @@ export default function AudioRecognitionPage() {
           
           // If silence has lasted long enough, trigger recognition
           if (currentSilenceDuration >= config.silenceDuration && !isProcessing) {
-            console.log('Silence duration reached, triggering recognition');
+            console.log('Silence duration reached, triggering recognition. Duration:', currentSilenceDuration, 'Required:', config.silenceDuration);
             setIsInSilence(false);
             silenceStartTimeRef.current = null;
             setSilenceDuration(0);
@@ -331,7 +336,7 @@ export default function AudioRecognitionPage() {
       } else {
         // Audio detected, reset silence tracking
         if (isInSilence) {
-          console.log('Audio detected, stopping silence tracking');
+          console.log('Audio detected, stopping silence tracking. RMS:', rms);
           setIsInSilence(false);
           silenceStartTimeRef.current = null;
           setSilenceDuration(0);
@@ -344,9 +349,11 @@ export default function AudioRecognitionPage() {
       setStatus(`Cooldown: ${cooldownRemaining}s remaining`);
     }
 
-    // Continue monitoring
+    // Continue monitoring - CRITICAL: This must happen every frame
     if (monitoringRef.current && silenceMonitoringActive) {
       animationFrameRef.current = requestAnimationFrame(checkAudioLevel);
+    } else {
+      console.log('Stopping silence monitoring loop');
     }
   }, [config.postRecognitionCooldown, config.silenceThreshold, config.silenceDuration, isInSilence, isProcessing, silenceMonitoringActive, triggerRecognition]);
 
