@@ -1,4 +1,4 @@
-// src/components/AdminSidebar.tsx - UPDATED TV DISPLAY LINK
+// src/components/AdminSidebar.tsx - UPDATED with Edit About page
 "use client";
 
 import Link from "next/link";
@@ -33,6 +33,7 @@ export default function AdminSidebar() {
     { label: "Add Customer Vinyl", path: "/admin/add-customer-vinyl" },
     
     // Content Management
+    { label: "Edit About Page", path: "/admin/edit-about", isNew: true },
     { label: "Most Wanted", path: "/admin/most-wanted" },
     { label: "Social Embeds", path: "/admin/socials" },
     
@@ -48,6 +49,7 @@ export default function AdminSidebar() {
         {navItems.map((item) => {
           const isActive = pathname === item.path;
           const isAudioRecognition = item.path.includes('/audio-recognition') || item.path.includes('/audio-debug');
+          const isContentManagement = item.path.includes('/edit-about') || item.path.includes('/most-wanted') || item.path.includes('/socials');
           
           return (
             <li key={item.path}>
@@ -59,6 +61,8 @@ export default function AdminSidebar() {
                     ? "bg-blue-100 text-blue-700 font-semibold border-l-4 border-blue-500" 
                     : isAudioRecognition
                     ? "text-purple-700 hover:bg-purple-50 hover:text-purple-800 pl-4"
+                    : isContentManagement
+                    ? "text-green-700 hover:bg-green-50 hover:text-green-800 pl-4"
                     : "text-gray-700 hover:bg-gray-200 hover:text-blue-600"
                   }
                 `}
@@ -91,7 +95,7 @@ export default function AdminSidebar() {
           >
             🔧 Debug Tool
           </Link>
-          {/* UPDATED: TV Display Link to public route */}
+          {/* TV Display Link to public route */}
           <a 
             href="/tv-display"
             target="_blank"
@@ -107,19 +111,38 @@ export default function AdminSidebar() {
         </div>
       </div>
 
-      {/* Quick Actions */}
+      {/* Content Management Quick Actions */}
       <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-        <h4 className="text-sm font-semibold text-green-800 mb-2">Quick Actions</h4>
+        <h4 className="text-sm font-semibold text-green-800 mb-2">📝 Content Management</h4>
+        <div className="space-y-2">
+          <Link 
+            href="/admin/edit-about"
+            className="block w-full text-center bg-green-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-green-700 transition-colors"
+          >
+            📄 Edit About Page
+          </Link>
+          <Link 
+            href="/admin/most-wanted"
+            className="block w-full text-center bg-blue-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-blue-700 transition-colors"
+          >
+            ⭐ Most Wanted List
+          </Link>
+        </div>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+        <h4 className="text-sm font-semibold text-blue-800 mb-2">⚡ Quick Actions</h4>
         <div className="space-y-2">
           <Link 
             href="/admin/edit-collection"
-            className="block w-full text-center bg-green-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-green-700 transition-colors"
+            className="block w-full text-center bg-blue-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-blue-700 transition-colors"
           >
             📚 Edit Collection
           </Link>
           <Link 
             href="/admin/add-album"
-            className="block w-full text-center bg-blue-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-blue-700 transition-colors"
+            className="block w-full text-center bg-indigo-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-indigo-700 transition-colors"
           >
             ➕ Add Album
           </Link>
