@@ -395,11 +395,40 @@ export default function AudioRecognitionPage() {
         triggerRecognition('Initial recognition');
       }, 2000);
 
+      // SETUP SILENCE MONITORING after initial recognition
+      setTimeout(() => {
+        if (streamRef.current) {
+          console.log('Setting up silence monitoring...');
+          
+          // Set up audio analysis for silence detection
+          const AudioContextClass = window.AudioContext || (window as WindowWithWebkitAudioContext).webkitAudioContext;
+          const audioContext = new AudioContextClass();
+          const analyser = audioContext.createAnalyser();
+          const source = audioContext.createMediaStreamSource(streamRef.current);
+          
+          source.connect(analyser);
+          analyser.fftSize = 256;
+          
+          audioContextRef.current = audioContext;
+          analyserRef.current = analyser;
+          
+          // Start silence monitoring
+          monitoringRef.current = true;
+          setSilenceMonitoringActive(true);
+          
+          // Start the silence check loop
+          animationFrameRef.current = requestAnimationFrame(checkAudioLevel);
+          
+          console.log('Silence monitoring active');
+          setStatus('Silence monitoring started - listening for track changes...');
+        }
+      }, 8000); // Start silence monitoring 8 seconds after starting (after initial recognition completes)
+
     } catch (error) {
       console.error('Error accessing microphone:', error);
       setStatus('Error: Could not access microphone');
     }
-  }, [triggerRecognition]);
+  }, [triggerRecognition, checkAudioLevel]);
 
   // Stop everything
   const stopListening = useCallback(() => {
