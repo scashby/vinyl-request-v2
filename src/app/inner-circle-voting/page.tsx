@@ -92,41 +92,23 @@ export default function InnerCircleVotingPage() {
     }
   };
 
-  // Enhanced search functionality with fuzzy matching
+  // Enhanced search functionality with more reliable filtering
   const filteredAlbums = useMemo(() => {
     if (!searchQuery.trim()) return albums;
     
     const query = searchQuery.toLowerCase().trim();
-    const queryWords = query.split(/\s+/);
     
     return albums.filter(album => {
-      const artistLower = album.artist.toLowerCase();
-      const titleLower = album.title.toLowerCase();
-      const yearStr = album.year.toString();
+      const artistLower = (album.artist || '').toLowerCase();
+      const titleLower = (album.title || '').toLowerCase();
+      const yearStr = (album.year || '').toString();
+      const searchText = `${artistLower} ${titleLower} ${yearStr}`.toLowerCase();
       
-      // Exact phrase matching
-      if (artistLower.includes(query) || titleLower.includes(query)) {
-        return true;
-      }
-      
-      // Word-based matching (all words must be found)
-      const allWords = queryWords.every(word => 
-        artistLower.includes(word) || 
-        titleLower.includes(word) || 
-        yearStr.includes(word)
-      );
-      
-      if (allWords) return true;
-      
-      // Partial matching for shorter queries
-      if (query.length >= 3) {
-        return artistLower.startsWith(query) || 
-               titleLower.startsWith(query) ||
-               artistLower.includes(query.substring(0, -1)) ||
-               titleLower.includes(query.substring(0, -1));
-      }
-      
-      return false;
+      // Simple includes matching - if any part of the search query matches
+      return searchText.includes(query) || 
+             artistLower.includes(query) || 
+             titleLower.includes(query) ||
+             yearStr.includes(query);
     });
   }, [albums, searchQuery]);
 
