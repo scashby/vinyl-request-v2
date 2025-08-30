@@ -1,12 +1,12 @@
-// Browse Albums page ("/browse/browse-albums")
-// Lists and filters all albums in the collection with search, sort, and filter by media type.
-// Supports event context via query parameters (?eventId=...).
+// Updated Browse Albums page with Album Suggestion Component
+// Replace: src/app/browse/browse-albums/page.js
 
 "use client";
 
 import { Suspense } from 'react';
 import { useEffect, useState, useMemo } from 'react';
 import AlbumCard from 'components/AlbumCard';
+import AlbumSuggestionBox from 'components/AlbumSuggestionBox';
 import 'styles/album-browse.css';
 import 'styles/internal.css';
 import { supabase } from 'src/lib/supabaseClient';
@@ -27,6 +27,7 @@ function BrowseAlbumsContent() {
   const [mediaFilter, setMediaFilter] = useState('');
   const [sortField, setSortField] = useState('title');
   const [sortAsc, setSortAsc] = useState(true);
+  const [showSuggestionBox, setShowSuggestionBox] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -140,6 +141,9 @@ function BrowseAlbumsContent() {
     return fa;
   }, [albums, searchTerm, mediaFilter, allowedFormats, normalizedFormats, sortField, sortAsc]);
 
+  const hasSearchQuery = searchTerm.trim().length > 0;
+  const hasNoResults = hasSearchQuery && filteredAlbums.length === 0;
+
   return (
     <div className="page-wrapper">
       <header className="event-hero">
@@ -182,6 +186,73 @@ function BrowseAlbumsContent() {
           </button>
         </div>
 
+        {/* Show suggestion box when no search results */}
+        {hasNoResults && (
+          <div style={{ marginBottom: 32 }}>
+            <AlbumSuggestionBox 
+              context="search" 
+              searchQuery={searchTerm}
+            />
+          </div>
+        )}
+
+        {/* General suggestion box when not searching and not in event context */}
+        {!hasSearchQuery && !eventId && !showSuggestionBox && (
+          <div style={{ marginBottom: 24 }}>
+            <AlbumSuggestionBox 
+              compact={true}
+              onClose={() => setShowSuggestionBox(true)}
+            />
+          </div>
+        )}
+
+        {/* Results count and suggestion toggle */}
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          marginBottom: 20,
+          padding: '0 8px'
+        }}>
+          <div style={{ fontSize: '14px', color: '#666' }}>
+            {hasSearchQuery ? (
+              <>Showing {filteredAlbums.length} results for &quot;{searchTerm}&quot;</>
+            ) : (
+              <>Showing {filteredAlbums.length} albums</>
+            )}
+          </div>
+          
+          {/* Suggestion toggle button */}
+          {!hasNoResults && (
+            <button
+              onClick={() => setShowSuggestionBox(!showSuggestionBox)}
+              style={{
+                background: 'rgba(59, 130, 246, 0.1)',
+                border: '1px solid #3b82f6',
+                borderRadius: 6,
+                padding: '8px 16px',
+                fontSize: 13,
+                fontWeight: 600,
+                color: '#3b82f6',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              💡 Suggest an Album
+            </button>
+          )}
+        </div>
+
+        {/* Expandable suggestion box */}
+        {showSuggestionBox && !hasNoResults && (
+          <div style={{ marginBottom: 32 }}>
+            <AlbumSuggestionBox 
+              context={eventId ? "general" : "general"}
+              onClose={() => setShowSuggestionBox(false)}
+            />
+          </div>
+        )}
+
         <section className="album-grid">
           {filteredAlbums.map((album) => (
             <AlbumCard
@@ -193,6 +264,22 @@ function BrowseAlbumsContent() {
             />
           ))}
         </section>
+
+        {/* Additional help text for empty states */}
+        {filteredAlbums.length === 0 && !hasSearchQuery && (
+          <div style={{
+            textAlign: 'center',
+            padding: 40,
+            color: '#6b7280',
+            fontSize: 16
+          }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>🎵</div>
+            <p>The collection is loading or no albums match your filters.</p>
+            <p style={{ fontSize: 14 }}>
+              Try adjusting your media type filter or suggest new albums above!
+            </p>
+          </div>
+        )}
       </main>
     </div>
   );

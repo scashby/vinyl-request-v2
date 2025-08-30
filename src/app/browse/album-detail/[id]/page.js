@@ -1,16 +1,18 @@
+// src/app/browse/album-detail/[id]/page.js
 // Album Detail page ("/browse/album-detail/[id]")
 // Displays album details, tracks, and allows adding a side to an event queue.
+// Updated with SuggestAlbum component integration
 
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { supabase } from 'src/lib/supabaseClient';
+import SuggestAlbum from 'components/SuggestAlbum';
 
 import Image from "next/image";
 import 'styles/album-detail.css';
 import 'styles/internal.css';
-
 
 export default function Page() {
   const params = useParams();
@@ -342,6 +344,19 @@ export default function Page() {
             <span>{time}</span>
           </div>
         ))}
+      </div>
+
+      {/* Album Suggestion Component */}
+      <div style={{ marginTop: 40, maxWidth: 600, margin: '40px auto 20px auto' }}>
+        <SuggestAlbum 
+          context={eventId ? `event_${eventId}_album_detail` : 'album_detail'} 
+          compact={true}
+          style={{ 
+            background: 'rgba(255, 255, 255, 0.1)',
+            color: 'white',
+            borderColor: 'rgba(255, 255, 255, 0.3)'
+          }}
+        />
       </div>
     </div>
   );

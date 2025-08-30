@@ -216,7 +216,7 @@ export default function AudioRecognitionPage() {
     }
   }, [convertToRawPCM, currentTrack]);
 
-  // MAIN RECOGNITION FUNCTION - Does immediate recognition (from working code)
+  // MAIN RECOGNITION FUNCTION - Does immediate recognition
   const triggerRecognition = useCallback(async (reason: string) => {
     if (isProcessing) return;
 
@@ -282,82 +282,7 @@ export default function AudioRecognitionPage() {
     }
   }, [isProcessing, processAudioSample]);
 
-  // Silence monitoring function - FIXED: Added triggerRecognition to dependency array
-  const checkAudioLevel = useCallback(() => {
-    const analyser = analyserRef.current;
-    if (!monitoringRef.current || !analyser || !silenceMonitoringActive) {
-      console.log('Silence monitoring stopped:', { monitoring: monitoringRef.current, hasAnalyser: !!analyser, active: silenceMonitoringActive });
-      return;
-    }
-    
-    // Use time domain data instead of frequency data for better silence detection
-    const dataArray = new Uint8Array(analyser.fftSize);
-    analyser.getByteTimeDomainData(dataArray);
-    
-    // Calculate RMS for audio level using time domain data
-    let sum = 0;
-    for (let i = 0; i < dataArray.length; i++) {
-      const value = (dataArray[i] - 128) / 128; // Convert to -1 to 1 range
-      sum += value * value;
-    }
-    const rms = Math.sqrt(sum / dataArray.length);
-    setSilenceLevel(rms);
-
-    // Debug logging every few seconds
-    if (Date.now() % 3000 < 100) {
-      console.log('Audio level check:', { rms: rms.toFixed(4), threshold: config.silenceThreshold, isQuiet: rms < config.silenceThreshold });
-    }
-
-    const now = Date.now();
-    const timeSinceLastRecognition = now - lastRecognitionTimeRef.current;
-    
-    // Only detect silence if we're past the cooldown period
-    if (timeSinceLastRecognition > config.postRecognitionCooldown) {
-      if (rms < config.silenceThreshold) {
-        // We're in silence
-        if (!isInSilence) {
-          console.log('Silence started - RMS:', rms, 'Threshold:', config.silenceThreshold);
-          setIsInSilence(true);
-          silenceStartTimeRef.current = now;
-          setStatus('Silence detected, monitoring...');
-        } else if (silenceStartTimeRef.current) {
-          const currentSilenceDuration = now - silenceStartTimeRef.current;
-          setSilenceDuration(currentSilenceDuration);
-          
-          // If silence has lasted long enough, trigger recognition
-          if (currentSilenceDuration >= config.silenceDuration && !isProcessing) {
-            console.log('Silence duration reached, triggering recognition. Duration:', currentSilenceDuration, 'Required:', config.silenceDuration);
-            setIsInSilence(false);
-            silenceStartTimeRef.current = null;
-            setSilenceDuration(0);
-            triggerRecognition('Silence detection triggered');
-          }
-        }
-      } else {
-        // Audio detected, reset silence tracking
-        if (isInSilence) {
-          console.log('Audio detected, stopping silence tracking. RMS:', rms);
-          setIsInSilence(false);
-          silenceStartTimeRef.current = null;
-          setSilenceDuration(0);
-          setStatus('Audio detected, listening...');
-        }
-      }
-    } else {
-      // During cooldown period
-      const cooldownRemaining = Math.ceil((config.postRecognitionCooldown - timeSinceLastRecognition) / 1000);
-      setStatus(`Cooldown: ${cooldownRemaining}s remaining`);
-    }
-
-    // Continue monitoring - CRITICAL: This must happen every frame
-    if (monitoringRef.current && silenceMonitoringActive) {
-      animationFrameRef.current = requestAnimationFrame(checkAudioLevel);
-    } else {
-      console.log('Stopping silence monitoring loop');
-    }
-  }, [config.postRecognitionCooldown, config.silenceThreshold, config.silenceDuration, isInSilence, isProcessing, silenceMonitoringActive, triggerRecognition]);
-
-  // MAIN START FUNCTION - Immediate recognition first (from working code)
+  // MAIN START FUNCTION - Immediate recognition first
   const startListening = useCallback(async () => {
     console.log('Starting audio recognition system...');
     
@@ -384,7 +309,7 @@ export default function AudioRecognitionPage() {
 
       const mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
       mediaRecorderRef.current = mediaRecorder;
-      streamRef.current = stream; // Store stream for silence monitoring
+      streamRef.current = stream;
       audioChunksRef.current = [];
 
       mediaRecorder.ondataavailable = (event) => {
@@ -397,7 +322,7 @@ export default function AudioRecognitionPage() {
       setIsListening(true);
       setStatus('Listening for audio...');
 
-      // IMMEDIATE RECOGNITION (from working code)
+      // IMMEDIATE RECOGNITION
       setTimeout(() => {
         triggerRecognition('Initial recognition');
       }, 2000);
@@ -407,7 +332,6 @@ export default function AudioRecognitionPage() {
         if (streamRef.current) {
           console.log('Setting up silence monitoring...');
           
-          // Set up audio analysis for silence detection
           const AudioContextClass = window.AudioContext || (window as WindowWithWebkitAudioContext).webkitAudioContext;
           const audioContext = new AudioContextClass();
           const analyser = audioContext.createAnalyser();
@@ -419,23 +343,74 @@ export default function AudioRecognitionPage() {
           audioContextRef.current = audioContext;
           analyserRef.current = analyser;
           
-          // Start silence monitoring
           monitoringRef.current = true;
           setSilenceMonitoringActive(true);
           
-          // Start the silence check loop
-          animationFrameRef.current = requestAnimationFrame(checkAudioLevel);
-          
           console.log('Silence monitoring active');
           setStatus('Silence monitoring started - listening for track changes...');
+          
+          // Start monitoring loop directly with refs
+          const monitorLoop = () => {
+            if (!monitoringRef.current || !analyserRef.current) return;
+            
+            const dataArray = new Uint8Array(analyserRef.current.fftSize);
+            analyserRef.current.getByteTimeDomainData(dataArray);
+            
+            let sum = 0;
+            for (let i = 0; i < dataArray.length; i++) {
+              const value = (dataArray[i] - 128) / 128;
+              sum += value * value;
+            }
+            const rms = Math.sqrt(sum / dataArray.length);
+            setSilenceLevel(rms);
+
+            const now = Date.now();
+            const timeSinceLastRecognition = now - lastRecognitionTimeRef.current;
+            
+            if (timeSinceLastRecognition > config.postRecognitionCooldown) {
+              if (rms < config.silenceThreshold) {
+                if (!isInSilence) {
+                  setIsInSilence(true);
+                  silenceStartTimeRef.current = now;
+                  setStatus('Silence detected, monitoring...');
+                } else if (silenceStartTimeRef.current) {
+                  const currentSilenceDuration = now - silenceStartTimeRef.current;
+                  setSilenceDuration(currentSilenceDuration);
+                  
+                  if (currentSilenceDuration >= config.silenceDuration && !isProcessing) {
+                    setIsInSilence(false);
+                    silenceStartTimeRef.current = null;
+                    setSilenceDuration(0);
+                    triggerRecognition('Silence detection triggered');
+                  }
+                }
+              } else {
+                if (isInSilence) {
+                  setIsInSilence(false);
+                  silenceStartTimeRef.current = null;
+                  setSilenceDuration(0);
+                  setStatus('Audio detected, listening...');
+                }
+              }
+            } else {
+              const cooldownRemaining = Math.ceil((config.postRecognitionCooldown - timeSinceLastRecognition) / 1000);
+              setStatus(`Cooldown: ${cooldownRemaining}s remaining`);
+            }
+
+            if (monitoringRef.current) {
+              animationFrameRef.current = requestAnimationFrame(monitorLoop);
+            }
+          };
+          
+          monitorLoop();
         }
-      }, 8000); // Start silence monitoring 8 seconds after starting (after initial recognition completes)
+      }, 8000);
 
     } catch (error) {
       console.error('Error accessing microphone:', error);
       setStatus('Error: Could not access microphone');
     }
-  }, [triggerRecognition, checkAudioLevel]);
+  }, [triggerRecognition, config.postRecognitionCooldown, config.silenceDuration, config.silenceThreshold, isInSilence, isProcessing]);
 
   // Stop everything
   const stopListening = useCallback(() => {
@@ -485,7 +460,7 @@ export default function AudioRecognitionPage() {
     }
   }, []);
 
-  // Load current track and history (from working code)
+  // Load current track and history
   const loadCurrentTrack = useCallback(async () => {
     try {
       const { data, error } = await supabase

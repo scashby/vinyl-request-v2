@@ -1,12 +1,12 @@
-// Inner Circle Voting Page with Enhanced Search
-// Enhanced version of: src/app/inner-circle-voting/page.tsx
-// Adds search functionality, similar artist suggestions, and better filtering
+// Updated Inner Circle Voting Page with Album Suggestion Integration
+// Replace: src/app/inner-circle-voting/page.tsx
 
 "use client";
 
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { supabase } from 'src/lib/supabaseClient';
 import Image from 'next/image';
+import AlbumSuggestionBox from 'components/AlbumSuggestionBox';
 
 interface Album {
   id: number;
@@ -34,6 +34,7 @@ export default function InnerCircleVotingPage() {
   const [voteCounts, setVoteCounts] = useState<Record<number, number>>({});
   const [searchQuery, setSearchQuery] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [showSuggestionBox, setShowSuggestionBox] = useState(false);
   
   const MAX_VOTES = 20; // Limit votes per person
   const submitFormRef = useRef<HTMLDivElement>(null);
@@ -92,23 +93,41 @@ export default function InnerCircleVotingPage() {
     }
   };
 
-  // Enhanced search functionality with more reliable filtering
+  // Enhanced search functionality with fuzzy matching
   const filteredAlbums = useMemo(() => {
     if (!searchQuery.trim()) return albums;
     
     const query = searchQuery.toLowerCase().trim();
+    const queryWords = query.split(/\s+/);
     
     return albums.filter(album => {
-      const artistLower = (album.artist || '').toLowerCase();
-      const titleLower = (album.title || '').toLowerCase();
-      const yearStr = (album.year || '').toString();
-      const searchText = `${artistLower} ${titleLower} ${yearStr}`.toLowerCase();
+      const artistLower = album.artist.toLowerCase();
+      const titleLower = album.title.toLowerCase();
+      const yearStr = album.year.toString();
       
-      // Simple includes matching - if any part of the search query matches
-      return searchText.includes(query) || 
-             artistLower.includes(query) || 
-             titleLower.includes(query) ||
-             yearStr.includes(query);
+      // Exact phrase matching
+      if (artistLower.includes(query) || titleLower.includes(query)) {
+        return true;
+      }
+      
+      // Word-based matching (all words must be found)
+      const allWords = queryWords.every(word => 
+        artistLower.includes(word) || 
+        titleLower.includes(word) || 
+        yearStr.includes(word)
+      );
+      
+      if (allWords) return true;
+      
+      // Partial matching for shorter queries
+      if (query.length >= 3) {
+        return artistLower.startsWith(query) || 
+               titleLower.startsWith(query) ||
+               artistLower.includes(query.slice(0, -1)) ||
+               titleLower.includes(query.slice(0, -1));
+      }
+      
+      return false;
     });
   }, [albums, searchQuery]);
 
@@ -222,6 +241,9 @@ export default function InnerCircleVotingPage() {
     }
   };
 
+  const hasSearchQuery = searchQuery.trim().length > 0;
+  const hasNoResults = hasSearchQuery && filteredAlbums.length === 0;
+
   if (loading) {
     return (
       <div style={{
@@ -256,7 +278,7 @@ export default function InnerCircleVotingPage() {
           borderRadius: 16,
           padding: 40,
           textAlign: 'center',
-          maxWidth: 500,
+          maxWidth: 600,
           backdropFilter: 'blur(10px)'
         }}>
           <div style={{ fontSize: 48, marginBottom: 20 }}>🎉</div>
@@ -264,9 +286,32 @@ export default function InnerCircleVotingPage() {
           <p style={{ fontSize: 18, marginBottom: 20, opacity: 0.9 }}>
             Your votes have been submitted successfully. We appreciate your participation in choosing the Inner Circle favorites!
           </p>
-          <p style={{ fontSize: 16, opacity: 0.7 }}>
+          <p style={{ fontSize: 16, opacity: 0.7, marginBottom: 30 }}>
             You voted for {selectedAlbums.size} album{selectedAlbums.size !== 1 ? 's' : ''}.
           </p>
+          
+          {/* Post-voting suggestion section */}
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.1)',
+            borderRadius: 12,
+            padding: 24,
+            marginBottom: 20,
+            backdropFilter: 'blur(10px)'
+          }}>
+            <h3 style={{ fontSize: 20, margin: '0 0 12px 0' }}>
+              💡 One More Thing...
+            </h3>
+            <p style={{ fontSize: 14, opacity: 0.9, marginBottom: 16 }}>
+              Didn&rsquo;t see your favorite album in the collection?
+ Suggest it for future additions!
+            </p>
+            
+            <AlbumSuggestionBox 
+              context="voting"
+              compact={false}
+            />
+          </div>
+          
           <div style={{ marginTop: 30, fontSize: 14, opacity: 0.6 }}>
             Results will be announced soon and winners will be marked with the 💎 Inner Circle badge.
           </div>
@@ -326,26 +371,45 @@ export default function InnerCircleVotingPage() {
           padding: 24,
           marginBottom: 32,
           backdropFilter: 'blur(10px)',
-          position: 'relative',
-          zIndex: 1000
+          position: 'relative'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-            <div style={{ fontSize: 20 }}>🔍</div>
-            <h3 style={{ fontSize: 20, margin: 0, fontWeight: 'bold' }}>
-              Search Albums
-            </h3>
-            {searchQuery && (
-              <div style={{
-                background: 'rgba(34, 197, 94, 0.2)',
-                color: '#22c55e',
-                padding: '4px 12px',
-                borderRadius: 12,
-                fontSize: 12,
-                fontWeight: 'bold'
-              }}>
-                {filteredAlbums.length} found
-              </div>
-            )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ fontSize: 20 }}>🔍</div>
+              <h3 style={{ fontSize: 20, margin: 0, fontWeight: 'bold' }}>
+                Search Albums
+              </h3>
+              {searchQuery && (
+                <div style={{
+                  background: 'rgba(34, 197, 94, 0.2)',
+                  color: '#22c55e',
+                  padding: '4px 12px',
+                  borderRadius: 12,
+                  fontSize: 12,
+                  fontWeight: 'bold'
+                }}>
+                  {filteredAlbums.length} found
+                </div>
+              )}
+            </div>
+            
+            {/* Suggestion toggle button */}
+            <button
+              onClick={() => setShowSuggestionBox(!showSuggestionBox)}
+              style={{
+                background: 'rgba(251, 191, 36, 0.2)',
+                border: '2px solid #fbbf24',
+                borderRadius: 8,
+                padding: '8px 16px',
+                fontSize: 13,
+                fontWeight: 600,
+                color: '#fbbf24',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              💡 Suggest an Album
+            </button>
           </div>
 
           <div style={{ position: 'relative' }}>
@@ -401,7 +465,7 @@ export default function InnerCircleVotingPage() {
                 background: 'rgba(255, 255, 255, 0.95)',
                 borderRadius: '0 0 12px 12px',
                 backdropFilter: 'blur(10px)',
-                zIndex: 9999,
+                zIndex: 10,
                 maxHeight: 200,
                 overflowY: 'auto',
                 border: '1px solid rgba(255, 255, 255, 0.2)',
@@ -470,10 +534,31 @@ export default function InnerCircleVotingPage() {
               )}
             </div>
             <div>
-              Try searching for artist names like &ldquo;Beatles&rdquo; or &ldquo;Miles Davis&rdquo;
+              Try searching for artist names like &quot;Beatles&quot; or &quot;Miles Davis&quot;
             </div>
           </div>
         </div>
+
+        {/* Album Suggestion Box */}
+        {showSuggestionBox && (
+          <div style={{ marginBottom: 32 }}>
+            <AlbumSuggestionBox 
+              context="voting"
+              searchQuery={hasNoResults ? searchQuery : ''}
+              onClose={() => setShowSuggestionBox(false)}
+            />
+          </div>
+        )}
+
+        {/* Show suggestion for no search results */}
+        {hasNoResults && (
+          <div style={{ marginBottom: 32 }}>
+            <AlbumSuggestionBox 
+              context="search" 
+              searchQuery={searchQuery}
+            />
+          </div>
+        )}
 
         {/* Album Grid */}
         <div style={{
@@ -600,7 +685,7 @@ export default function InnerCircleVotingPage() {
         </div>
 
         {/* No Results Message */}
-        {searchQuery && filteredAlbums.length === 0 && (
+        {searchQuery && filteredAlbums.length === 0 && !hasNoResults && (
           <div style={{
             background: 'rgba(255, 255, 255, 0.1)',
             borderRadius: 16,
@@ -614,7 +699,7 @@ export default function InnerCircleVotingPage() {
               No albums found
             </h3>
             <p style={{ fontSize: 16, opacity: 0.8, marginBottom: 20 }}>
-              No albums match your search for &ldquo;<strong>{searchQuery}</strong>&rdquo;
+              No albums match your search for &quot;<strong>{searchQuery}</strong>&quot;
             </p>
             <button
               onClick={clearSearch}
@@ -626,10 +711,26 @@ export default function InnerCircleVotingPage() {
                 padding: '12px 24px',
                 fontSize: 16,
                 fontWeight: 'bold',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                marginRight: 12
               }}
             >
               Clear Search
+            </button>
+            <button
+              onClick={() => setShowSuggestionBox(true)}
+              style={{
+                background: 'rgba(255, 255, 255, 0.2)',
+                color: 'white',
+                border: '2px solid white',
+                borderRadius: 8,
+                padding: '12px 24px',
+                fontSize: 16,
+                fontWeight: 'bold',
+                cursor: 'pointer'
+              }}
+            >
+              💡 Suggest This Album
             </button>
           </div>
         )}
