@@ -217,7 +217,7 @@ function BrowseAlbumsContent() {
           display: 'flex', 
           justifyContent: 'space-between', 
           alignItems: 'center',
-          marginBottom: 24,
+          marginBottom: 32,
           padding: '0 8px'
         }}>
           <div style={{ fontSize: '14px', color: '#666' }}>
@@ -228,7 +228,7 @@ function BrowseAlbumsContent() {
             )}
           </div>
           
-          {/* Only show suggest button if suggestion box is not already open */}
+          {/* Hide button when suggestion box is open or when no results (auto-shows form) */}
           {!hasNoResults && !showSuggestionBox && (
             <button
               onClick={() => setShowSuggestionBox(true)}
@@ -237,12 +237,12 @@ function BrowseAlbumsContent() {
                 color: 'white',
                 border: 'none',
                 borderRadius: 8,
-                padding: '10px 20px',
+                padding: '12px 24px',
                 fontSize: 14,
                 fontWeight: 600,
                 cursor: 'pointer',
                 transition: 'all 0.2s ease',
-                boxShadow: '0 2px 6px rgba(59, 130, 246, 0.3)'
+                boxShadow: '0 4px 12px rgba(59, 130, 246, 0.4)'
               }}
             >
               💡 Suggest an Album

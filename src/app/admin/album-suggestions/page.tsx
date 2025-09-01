@@ -1,4 +1,4 @@
-// Admin Album Suggestions Management Page - ESLint Fixed
+// Complete Admin Album Suggestions Management Page - ESLint Fixed
 // Create as: src/app/admin/album-suggestions/page.tsx
 
 "use client";
@@ -10,25 +10,24 @@ interface AlbumSuggestion {
   id: number;
   artist: string;
   album: string;
-  notes: string | null;
-  contribution_amount: number | null;
-  total_contributions: number | null;
-  suggestor_name: string;
-  suggestor_email: string | null;
+  reason: string | null;
+  contribution_amount: string | null;
+  contributor_name: string;
+  contributor_email: string | null;
   context: string;
-  search_query: string | null;
-  suggestion_count: number;
-  status: 'pending' | 'approved' | 'purchased' | 'rejected' | 'duplicate';
+  status: 'pending' | 'approved' | 'purchased' | 'declined';
   admin_notes: string | null;
   created_at: string;
-  last_suggested_at: string;
+  updated_at: string;
+  estimated_cost: number | null;
+  priority_score: number;
 }
 
 export default function AdminAlbumSuggestionsPage() {
   const [suggestions, setSuggestions] = useState<AlbumSuggestion[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'purchased' | 'rejected'>('all');
-  const [sortBy, setSortBy] = useState<'suggestion_count' | 'created_at' | 'total_contributions'>('suggestion_count');
+  const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'purchased' | 'declined'>('all');
+  const [sortBy, setSortBy] = useState<'priority_score' | 'created_at' | 'contribution_amount'>('created_at');
   const [updatingId, setUpdatingId] = useState<number | null>(null);
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
@@ -85,10 +84,12 @@ export default function AdminAlbumSuggestionsPage() {
 
   const sortedSuggestions = [...suggestions].sort((a, b) => {
     switch (sortBy) {
-      case 'suggestion_count':
-        return b.suggestion_count - a.suggestion_count;
-      case 'total_contributions':
-        return (b.total_contributions || 0) - (a.total_contributions || 0);
+      case 'priority_score':
+        return (b.priority_score || 0) - (a.priority_score || 0);
+      case 'contribution_amount':
+        const aAmount = parseFloat(a.contribution_amount || '0');
+        const bAmount = parseFloat(b.contribution_amount || '0');
+        return bAmount - aAmount;
       case 'created_at':
       default:
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
@@ -100,8 +101,7 @@ export default function AdminAlbumSuggestionsPage() {
       pending: { bg: '#fef3c7', color: '#d97706', border: '#f59e0b' },
       approved: { bg: '#dcfce7', color: '#16a34a', border: '#22c55e' },
       purchased: { bg: '#dbeafe', color: '#2563eb', border: '#3b82f6' },
-      rejected: { bg: '#fee2e2', color: '#dc2626', border: '#ef4444' },
-      duplicate: { bg: '#f3f4f6', color: '#6b7280', border: '#9ca3af' }
+      declined: { bg: '#fee2e2', color: '#dc2626', border: '#ef4444' }
     };
     
     const style = styles[status as keyof typeof styles] || styles.pending;
@@ -191,7 +191,7 @@ export default function AdminAlbumSuggestionsPage() {
         </div>
         <div style={{ background: '#f0fdf4', padding: 16, borderRadius: 8, border: '1px solid #10b981' }}>
           <div style={{ fontSize: 20, fontWeight: 'bold', color: '#047857' }}>
-            ${suggestions.reduce((sum, s) => sum + (s.total_contributions || 0), 0).toFixed(2)}
+            ${suggestions.reduce((sum, s) => sum + parseFloat(s.contribution_amount || '0'), 0).toFixed(2)}
           </div>
           <div style={{ fontSize: 12, color: '#059669' }}>Total Contributions</div>
         </div>
@@ -212,7 +212,7 @@ export default function AdminAlbumSuggestionsPage() {
           <label style={{ fontSize: 14, fontWeight: 600 }}>Filter:</label>
           <select
             value={filter}
-            onChange={e => setFilter(e.target.value as 'all' | 'pending' | 'approved' | 'purchased' | 'rejected')}
+            onChange={e => setFilter(e.target.value as 'all' | 'pending' | 'approved' | 'purchased' | 'declined')}
             style={{
               padding: '6px 10px',
               border: '1px solid #d1d5db',
@@ -224,7 +224,7 @@ export default function AdminAlbumSuggestionsPage() {
             <option value="pending">Pending</option>
             <option value="approved">Approved</option>
             <option value="purchased">Purchased</option>
-            <option value="rejected">Rejected</option>
+            <option value="declined">Declined</option>
           </select>
         </div>
 
@@ -232,7 +232,7 @@ export default function AdminAlbumSuggestionsPage() {
           <label style={{ fontSize: 14, fontWeight: 600 }}>Sort by:</label>
           <select
             value={sortBy}
-            onChange={e => setSortBy(e.target.value as 'suggestion_count' | 'created_at' | 'total_contributions')}
+            onChange={e => setSortBy(e.target.value as 'priority_score' | 'created_at' | 'contribution_amount')}
             style={{
               padding: '6px 10px',
               border: '1px solid #d1d5db',
@@ -240,9 +240,9 @@ export default function AdminAlbumSuggestionsPage() {
               fontSize: 14
             }}
           >
-            <option value="suggestion_count">Most Requested</option>
-            <option value="total_contributions">Highest Contribution</option>
             <option value="created_at">Newest First</option>
+            <option value="priority_score">Highest Priority</option>
+            <option value="contribution_amount">Highest Contribution</option>
           </select>
         </div>
 
@@ -276,12 +276,12 @@ export default function AdminAlbumSuggestionsPage() {
           fontWeight: 600,
           fontSize: 14,
           display: 'grid',
-          gridTemplateColumns: '2fr 1fr 100px 120px 100px 150px',
+          gridTemplateColumns: '2fr 1fr 80px 120px 100px 150px',
           gap: 16
         }}>
           <div>Album</div>
-          <div>Suggestor</div>
-          <div>Requests</div>
+          <div>Contributor</div>
+          <div>Priority</div>
           <div>Contribution</div>
           <div>Status</div>
           <div>Actions</div>
@@ -294,7 +294,7 @@ export default function AdminAlbumSuggestionsPage() {
                 padding: '16px',
                 borderBottom: index < sortedSuggestions.length - 1 ? '1px solid #f3f4f6' : 'none',
                 display: 'grid',
-                gridTemplateColumns: '2fr 1fr 100px 120px 100px 150px',
+                gridTemplateColumns: '2fr 1fr 80px 120px 100px 150px',
                 gap: 16,
                 alignItems: 'center',
                 fontSize: 14
@@ -305,35 +305,34 @@ export default function AdminAlbumSuggestionsPage() {
                   </div>
                   <div style={{ fontSize: 12, color: '#6b7280' }}>
                     {suggestion.context} • {new Date(suggestion.created_at).toLocaleDateString()}
-                    {suggestion.search_query && ` • Search: "${suggestion.search_query}"`}
                   </div>
                 </div>
 
                 <div>
-                  <div style={{ fontWeight: 500 }}>{suggestion.suggestor_name}</div>
-                  {suggestion.suggestor_email && (
+                  <div style={{ fontWeight: 500 }}>{suggestion.contributor_name}</div>
+                  {suggestion.contributor_email && (
                     <div style={{ fontSize: 12, color: '#6b7280' }}>
-                      {suggestion.suggestor_email}
+                      {suggestion.contributor_email}
                     </div>
                   )}
                 </div>
 
                 <div style={{
                   textAlign: 'center',
-                  background: suggestion.suggestion_count > 1 ? '#dcfce7' : '#f3f4f6',
+                  background: (suggestion.priority_score || 0) > 0 ? '#dcfce7' : '#f3f4f6',
                   padding: '4px 8px',
                   borderRadius: 12,
                   fontWeight: 600,
                   fontSize: 12
                 }}>
-                  {suggestion.suggestion_count}
+                  {suggestion.priority_score || 0}
                 </div>
 
                 <div style={{ textAlign: 'center' }}>
-                  {suggestion.total_contributions ? (
+                  {suggestion.contribution_amount ? (
                     <div>
                       <div style={{ fontWeight: 600, color: '#059669' }}>
-                        ${suggestion.total_contributions}
+                        ${suggestion.contribution_amount}
                       </div>
                       <a
                         href={getVenmoUrl(suggestion)}
@@ -376,7 +375,7 @@ export default function AdminAlbumSuggestionsPage() {
                         ✓ Approve
                       </button>
                       <button
-                        onClick={() => updateSuggestionStatus(suggestion.id, 'rejected')}
+                        onClick={() => updateSuggestionStatus(suggestion.id, 'declined')}
                         disabled={updatingId === suggestion.id}
                         style={{
                           background: '#ef4444',
@@ -388,7 +387,7 @@ export default function AdminAlbumSuggestionsPage() {
                           fontSize: 11
                         }}
                       >
-                        ✕ Reject
+                        ✕ Decline
                       </button>
                     </>
                   )}
@@ -436,9 +435,9 @@ export default function AdminAlbumSuggestionsPage() {
                 }}>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                     <div>
-                      <strong>Notes:</strong>
+                      <strong>Reason:</strong>
                       <div style={{ marginTop: 4, color: '#6b7280' }}>
-                        {suggestion.notes || 'No additional notes'}
+                        {suggestion.reason || 'No reason provided'}
                       </div>
                     </div>
                     <div>
@@ -450,7 +449,7 @@ export default function AdminAlbumSuggestionsPage() {
                   </div>
                   <div style={{ marginTop: 12, fontSize: 12, color: '#9ca3af' }}>
                     Created: {new Date(suggestion.created_at).toLocaleString()} • 
-                    Last suggested: {new Date(suggestion.last_suggested_at).toLocaleString()}
+                    Last updated: {new Date(suggestion.updated_at).toLocaleString()}
                   </div>
                 </div>
               )}
@@ -506,31 +505,6 @@ export default function AdminAlbumSuggestionsPage() {
               }}
             >
               ✓ Approve All Pending
-            </button>
-            <button
-              onClick={() => {
-                const duplicateSuggestions = suggestions.filter(s => 
-                  s.status === 'pending' && 
-                  suggestions.some(other => 
-                    other.id !== s.id && 
-                    other.artist.toLowerCase() === s.artist.toLowerCase() && 
-                    other.album.toLowerCase() === s.album.toLowerCase()
-                  )
-                );
-                duplicateSuggestions.forEach(s => updateSuggestionStatus(s.id, 'duplicate', 'Marked as duplicate'));
-              }}
-              style={{
-                background: '#9ca3af',
-                color: 'white',
-                border: 'none',
-                borderRadius: 6,
-                padding: '8px 16px',
-                cursor: 'pointer',
-                fontSize: 14,
-                fontWeight: 600
-              }}
-            >
-              🔄 Mark Duplicates
             </button>
           </div>
         </div>

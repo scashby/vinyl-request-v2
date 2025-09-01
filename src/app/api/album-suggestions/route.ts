@@ -1,4 +1,4 @@
-// Improved Album Suggestions API Route with better error handling and debugging
+// Fixed Album Suggestions API Route with TypeScript error resolution
 // Replace: src/app/api/album-suggestions/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -75,7 +75,27 @@ export async function POST(request: NextRequest) {
       }, { status: 500 });
     }
 
-    let result;
+    // Define proper types for album suggestion
+    interface AlbumSuggestion {
+      id: number;
+      artist: string;
+      album: string;
+      notes: string | null;
+      contribution_amount: number | null;
+      total_contributions: number | null;
+      suggestor_name: string;
+      suggestor_email: string | null;
+      context: string;
+      search_query: string | null;
+      status: string;
+      created_at: string;
+      last_suggested_at: string;
+      updated_at?: string | null;
+      admin_notes?: string | null;
+    }
+
+    // Declare result variable with proper type
+    let result: { data: AlbumSuggestion | null; error: Error | null };
     
     if (existing) {
       debugLog('Found existing suggestion, updating:', existing.id);
@@ -86,7 +106,7 @@ export async function POST(request: NextRequest) {
       const newTotal = currentContributions + newContribution;
 
       // Increment suggestion count for existing suggestion
-      const { data, error } = await supabase
+      const { data: updateData, error } = await supabase
         .from('album_suggestions')
         .update({
           last_suggested_at: new Date().toISOString(),
@@ -106,7 +126,7 @@ export async function POST(request: NextRequest) {
         throw new Error(`Failed to update existing suggestion: ${error.message}`);
       }
 
-      result = { data, error: null };
+      result = { data: updateData, error: null };
       debugLog('Successfully updated existing suggestion');
     } else {
       debugLog('Creating new suggestion');
@@ -129,7 +149,7 @@ export async function POST(request: NextRequest) {
 
       debugLog('Insert data prepared:', insertData);
 
-      const { data, error } = await supabase
+      const { data: insertedData, error } = await supabase
         .from('album_suggestions')
         .insert(insertData)
         .select()
@@ -140,7 +160,7 @@ export async function POST(request: NextRequest) {
         throw new Error(`Failed to create suggestion: ${error.message}`);
       }
 
-      result = { data, error: null };
+      result = { data: insertedData, error: null };
       debugLog('Successfully created new suggestion');
     }
 

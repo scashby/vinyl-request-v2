@@ -45,10 +45,10 @@ export default function AdminTestAlbumSuggestionsPage() {
         body: JSON.stringify({
           artist: 'Test Artist',
           album: 'Test Album',
-          notes: 'Test submission from admin debug page',
-          suggestor_name: 'Admin Test',
-          context: 'debug',
-          search_query: 'test'
+          reason: 'Test submission from admin debug page',
+          contributor_name: 'Admin Test User',
+          contributor_email: 'admin@test.com',
+          context: 'general'
         })
       });
 
