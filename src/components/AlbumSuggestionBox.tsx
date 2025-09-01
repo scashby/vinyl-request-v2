@@ -1,4 +1,4 @@
-// Correct Album Suggestion Component matching your database schema
+// Fixed Album Suggestion Component with correct database field mapping
 // Replace: src/components/AlbumSuggestionBox.tsx
 
 import { useState } from 'react';
@@ -20,10 +20,10 @@ export default function AlbumSuggestionBox({
   const [suggestion, setSuggestion] = useState({
     artist: '',
     album: '',
-    reason: '',
+    reason: '', // Updated to match database schema
     contributionAmount: '',
-    contributorName: '',
-    contributorEmail: ''
+    contributorName: '', // Updated to match database schema
+    contributorEmail: '' // Updated to match database schema
   });
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -77,11 +77,12 @@ export default function AlbumSuggestionBox({
         body: JSON.stringify({
           artist: suggestion.artist.trim(),
           album: suggestion.album.trim(),
-          reason: suggestion.reason.trim(),
-          contribution_amount: suggestion.contributionAmount ? suggestion.contributionAmount : null,
-          contributor_name: suggestion.contributorName.trim(),
-          contributor_email: suggestion.contributorEmail.trim(),
-          context
+          notes: suggestion.reason.trim(), // Maps to 'reason' field in database
+          contribution_amount: suggestion.contributionAmount || null,
+          suggestor_name: suggestion.contributorName.trim(), // Maps to 'contributor_name' in database  
+          suggestor_email: suggestion.contributorEmail.trim(), // Maps to 'contributor_email' in database
+          context,
+          search_query: searchQuery
         })
       });
 
@@ -90,11 +91,8 @@ export default function AlbumSuggestionBox({
         throw new Error(errorData.error || 'Failed to submit suggestion');
       }
 
-      const result = await response.json();
-      console.log('Suggestion submitted successfully:', result);
       setSubmitted(true);
     } catch (error) {
-      console.error('Error submitting suggestion:', error);
       setError(error instanceof Error ? error.message : 'Failed to submit suggestion');
     } finally {
       setSubmitting(false);
@@ -131,7 +129,7 @@ export default function AlbumSuggestionBox({
           transition: 'all 0.3s ease',
           fontSize: 14,
           fontWeight: 600,
-          boxShadow: '0 4px 12px rgba(59, 130, 246, 0.4)'
+          boxShadow: '0 2px 4px rgba(59, 130, 246, 0.2)'
         }}
         onClick={handleOpen}
       >
@@ -180,9 +178,6 @@ export default function AlbumSuggestionBox({
         </h3>
         <p style={{ fontSize: 14, margin: '0 0 16px 0', opacity: 0.9 }}>
           Thanks for suggesting &ldquo;{suggestion.artist} - {suggestion.album}&rdquo;
-        </p>
-        <p style={{ fontSize: 12, margin: '0 0 16px 0', opacity: 0.8 }}>
-          We&apos;ll let you know at {suggestion.contributorEmail} when we get it!
         </p>
         
         {suggestion.contributionAmount && (
@@ -291,7 +286,7 @@ export default function AlbumSuggestionBox({
       <textarea
         value={suggestion.reason}
         onChange={e => setSuggestion(prev => ({ ...prev, reason: e.target.value }))}
-        placeholder="Why should we get this album? (optional)"
+        placeholder="Why should we add this album? (optional)"
         rows={2}
         style={{
           width: '100%',
@@ -341,19 +336,19 @@ export default function AlbumSuggestionBox({
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 8 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
         <div>
           <input
             type="text"
             value={suggestion.contributorName}
             onChange={e => setSuggestion(prev => ({ ...prev, contributorName: e.target.value }))}
-            placeholder="Your Name *"
+            placeholder="Your Name (required) *"
             required
             style={{
-              padding: '10px 12px',
-              border: `2px solid ${suggestion.contributorName ? '#22c55e' : '#ef4444'}`,
-              borderRadius: 6,
-              fontSize: 14,
+              padding: '8px 10px',
+              border: '2px solid #d1d5db',
+              borderRadius: 4,
+              fontSize: 12,
               outline: 'none',
               width: '100%'
             }}
@@ -364,13 +359,13 @@ export default function AlbumSuggestionBox({
             type="email"
             value={suggestion.contributorEmail}
             onChange={e => setSuggestion(prev => ({ ...prev, contributorEmail: e.target.value }))}
-            placeholder="Your Email *"
+            placeholder="Your Email (required) *"
             required
             style={{
-              padding: '10px 12px',
-              border: `2px solid ${suggestion.contributorEmail ? '#22c55e' : '#ef4444'}`,
-              borderRadius: 6,
-              fontSize: 14,
+              padding: '8px 10px',
+              border: '2px solid #d1d5db',
+              borderRadius: 4,
+              fontSize: 12,
               outline: 'none',
               width: '100%'
             }}
@@ -379,7 +374,7 @@ export default function AlbumSuggestionBox({
       </div>
 
       <div style={{ 
-        fontSize: 12, 
+        fontSize: 11, 
         color: '#6b7280', 
         marginBottom: 16,
         fontStyle: 'italic'
@@ -393,10 +388,9 @@ export default function AlbumSuggestionBox({
           border: '1px solid #fca5a5',
           color: '#dc2626',
           borderRadius: 6,
-          padding: 12,
-          fontSize: 14,
-          marginBottom: 16,
-          fontWeight: 'bold'
+          padding: 8,
+          fontSize: 12,
+          marginBottom: 12
         }}>
           {error}
         </div>
@@ -410,7 +404,7 @@ export default function AlbumSuggestionBox({
             color: '#374151',
             border: '1px solid #d1d5db',
             borderRadius: 6,
-            padding: '10px 16px',
+            padding: '8px 16px',
             cursor: 'pointer',
             fontSize: 14
           }}
@@ -419,18 +413,14 @@ export default function AlbumSuggestionBox({
         </button>
         <button
           onClick={handleSubmit}
-          disabled={submitting || !suggestion.artist.trim() || !suggestion.album.trim() || !suggestion.contributorName.trim() || !suggestion.contributorEmail.trim()}
+          disabled={submitting}
           style={{
-            background: (submitting || !suggestion.artist.trim() || !suggestion.album.trim() || !suggestion.contributorName.trim() || !suggestion.contributorEmail.trim()) 
-              ? '#9ca3af' 
-              : '#3b82f6',
+            background: submitting ? '#9ca3af' : '#3b82f6',
             color: 'white',
             border: 'none',
             borderRadius: 6,
-            padding: '10px 16px',
-            cursor: (submitting || !suggestion.artist.trim() || !suggestion.album.trim() || !suggestion.contributorName.trim() || !suggestion.contributorEmail.trim()) 
-              ? 'not-allowed' 
-              : 'pointer',
+            padding: '8px 16px',
+            cursor: submitting ? 'not-allowed' : 'pointer',
             fontSize: 14,
             fontWeight: 'bold'
           }}

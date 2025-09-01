@@ -1,4 +1,4 @@
-// Clean Browse Albums page (ESLint compliant)
+// Fixed Browse Albums page with proper button spacing
 // Replace: src/app/browse/browse-albums/page.js
 
 "use client";
@@ -213,14 +213,21 @@ function BrowseAlbumsContent() {
           </button>
         </div>
 
+        {/* FIXED: Results and Actions Section with proper spacing */}
         <div style={{ 
           display: 'flex', 
           justifyContent: 'space-between', 
-          alignItems: 'center',
-          marginBottom: 32,
-          padding: '0 8px'
+          alignItems: 'flex-start',
+          marginBottom: 24,
+          padding: '0 8px',
+          gap: '20px' // Add gap between items
         }}>
-          <div style={{ fontSize: '14px', color: '#666' }}>
+          <div style={{ 
+            fontSize: '14px', 
+            color: '#666',
+            flex: '1', // Allow to grow but not too much
+            minWidth: '200px'
+          }}>
             {hasSearchQuery ? (
               <>Showing {filteredAlbums.length} results for &ldquo;{searchTerm}&rdquo;</>
             ) : (
@@ -228,25 +235,31 @@ function BrowseAlbumsContent() {
             )}
           </div>
           
-          {/* Hide button when suggestion box is open or when no results (auto-shows form) */}
+          {/* FIXED: Suggestion button with proper spacing and sizing */}
           {!hasNoResults && !showSuggestionBox && (
-            <button
-              onClick={() => setShowSuggestionBox(true)}
-              style={{
-                background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
-                color: 'white',
-                border: 'none',
-                borderRadius: 8,
-                padding: '12px 24px',
-                fontSize: 14,
-                fontWeight: 600,
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                boxShadow: '0 4px 12px rgba(59, 130, 246, 0.4)'
-              }}
-            >
-              💡 Suggest an Album
-            </button>
+            <div style={{ 
+              flexShrink: 0, // Don't shrink
+              marginLeft: 'auto' // Push to right side
+            }}>
+              <button
+                onClick={() => setShowSuggestionBox(true)}
+                style={{
+                  background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 8,
+                  padding: '10px 20px',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 2px 6px rgba(59, 130, 246, 0.3)',
+                  whiteSpace: 'nowrap' // Prevent text wrapping
+                }}
+              >
+                💡 Suggest an Album
+              </button>
+            </div>
           )}
         </div>
 

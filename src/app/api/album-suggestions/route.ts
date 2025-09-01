@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
     // Check if suggestion already exists (to avoid duplicates)
     const { data: existing, error: existingError } = await supabase
       .from('album_suggestions')
-      .select('id, total_contributions')
+      .select('id, contribution_amount')
       .eq('artist', artist.trim())
       .eq('album', album.trim())
       .single();
@@ -75,23 +75,23 @@ export async function POST(request: NextRequest) {
       }, { status: 500 });
     }
 
-    // Define proper types for album suggestion
+    // Define proper types for album suggestion (matching actual database schema)
     interface AlbumSuggestion {
       id: number;
       artist: string;
       album: string;
-      notes: string | null;
-      contribution_amount: number | null;
-      total_contributions: number | null;
-      suggestor_name: string;
-      suggestor_email: string | null;
+      reason: string | null;
+      contributor_name: string | null;
+      contributor_email: string | null;
+      contribution_amount: string | null;
       context: string;
-      search_query: string | null;
       status: string;
       created_at: string;
-      last_suggested_at: string;
       updated_at?: string | null;
       admin_notes?: string | null;
+      estimated_cost?: number | null;
+      venmo_transaction_id?: string | null;
+      priority_score?: number | null;
     }
 
     // Declare result variable with proper type
@@ -100,21 +100,17 @@ export async function POST(request: NextRequest) {
     if (existing) {
       debugLog('Found existing suggestion, updating:', existing.id);
       
-      // Calculate new total contributions
-      const currentContributions = existing.total_contributions || 0;
-      const newContribution = contribution_amount ? parseFloat(contribution_amount.toString()) : 0;
-      const newTotal = currentContributions + newContribution;
-
-      // Increment suggestion count for existing suggestion
+      // Just update the record with new notes if provided - don't try to sum contributions
+      // since contribution_amount in the schema is text, not numeric
       const { data: updateData, error } = await supabase
         .from('album_suggestions')
         .update({
-          last_suggested_at: new Date().toISOString(),
-          // Update notes if provided
-          ...(notes?.trim() && { notes: notes.trim() }),
-          // Add contribution amount if provided
-          ...(newContribution > 0 && {
-            total_contributions: newTotal
+          updated_at: new Date().toISOString(),
+          // Update reason if provided
+          ...(notes?.trim() && { reason: notes.trim() }),
+          // Update contribution amount if provided
+          ...(contribution_amount && {
+            contribution_amount: contribution_amount.toString()
           })
         })
         .eq('id', existing.id)
@@ -135,16 +131,14 @@ export async function POST(request: NextRequest) {
       const insertData = {
         artist: artist.trim(),
         album: album.trim(),
-        notes: notes?.trim() || null,
-        contribution_amount: contribution_amount ? parseFloat(contribution_amount.toString()) : null,
-        total_contributions: contribution_amount ? parseFloat(contribution_amount.toString()) : null,
-        suggestor_name: suggestor_name?.trim() || 'Anonymous',
-        suggestor_email: suggestor_email?.trim() || null,
+        reason: notes?.trim() || null,
+        contribution_amount: contribution_amount ? contribution_amount.toString() : null,
+        contributor_name: suggestor_name?.trim() || 'Anonymous',
+        contributor_email: suggestor_email?.trim() || null,
         context: context || 'general',
-        search_query: search_query || null,
         status: 'pending',
         created_at: new Date().toISOString(),
-        last_suggested_at: new Date().toISOString()
+        updated_at: new Date().toISOString()
       };
 
       debugLog('Insert data prepared:', insertData);

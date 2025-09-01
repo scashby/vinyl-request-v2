@@ -1,5 +1,5 @@
-// Complete Admin Album Suggestions Management Page - ESLint Fixed
-// Create as: src/app/admin/album-suggestions/page.tsx
+// Fixed Admin Album Suggestions Management Page - Updated for correct database schema
+// Replace: src/app/admin/album-suggestions/page.tsx
 
 "use client";
 
@@ -12,22 +12,23 @@ interface AlbumSuggestion {
   album: string;
   reason: string | null;
   contribution_amount: string | null;
-  contributor_name: string;
+  contributor_name: string | null;
   contributor_email: string | null;
   context: string;
   status: 'pending' | 'approved' | 'purchased' | 'declined';
   admin_notes: string | null;
   created_at: string;
-  updated_at: string;
+  updated_at: string | null;
   estimated_cost: number | null;
-  priority_score: number;
+  venmo_transaction_id: string | null;
+  priority_score: number | null;
 }
 
 export default function AdminAlbumSuggestionsPage() {
   const [suggestions, setSuggestions] = useState<AlbumSuggestion[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'purchased' | 'declined'>('all');
-  const [sortBy, setSortBy] = useState<'priority_score' | 'created_at' | 'contribution_amount'>('created_at');
+  const [sortBy, setSortBy] = useState<'created_at' | 'priority_score' | 'contribution_amount'>('created_at');
   const [updatingId, setUpdatingId] = useState<number | null>(null);
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
@@ -87,8 +88,8 @@ export default function AdminAlbumSuggestionsPage() {
       case 'priority_score':
         return (b.priority_score || 0) - (a.priority_score || 0);
       case 'contribution_amount':
-        const aAmount = parseFloat(a.contribution_amount || '0');
-        const bAmount = parseFloat(b.contribution_amount || '0');
+        const aAmount = a.contribution_amount ? parseFloat(a.contribution_amount) : 0;
+        const bAmount = b.contribution_amount ? parseFloat(b.contribution_amount) : 0;
         return bAmount - aAmount;
       case 'created_at':
       default:
@@ -191,7 +192,10 @@ export default function AdminAlbumSuggestionsPage() {
         </div>
         <div style={{ background: '#f0fdf4', padding: 16, borderRadius: 8, border: '1px solid #10b981' }}>
           <div style={{ fontSize: 20, fontWeight: 'bold', color: '#047857' }}>
-            ${suggestions.reduce((sum, s) => sum + parseFloat(s.contribution_amount || '0'), 0).toFixed(2)}
+            ${suggestions.reduce((sum, s) => {
+              const amount = s.contribution_amount ? parseFloat(s.contribution_amount) : 0;
+              return sum + amount;
+            }, 0).toFixed(2)}
           </div>
           <div style={{ fontSize: 12, color: '#059669' }}>Total Contributions</div>
         </div>
@@ -212,7 +216,7 @@ export default function AdminAlbumSuggestionsPage() {
           <label style={{ fontSize: 14, fontWeight: 600 }}>Filter:</label>
           <select
             value={filter}
-            onChange={e => setFilter(e.target.value as 'all' | 'pending' | 'approved' | 'purchased' | 'declined')}
+            onChange={e => setFilter(e.target.value as typeof filter)}
             style={{
               padding: '6px 10px',
               border: '1px solid #d1d5db',
@@ -232,7 +236,7 @@ export default function AdminAlbumSuggestionsPage() {
           <label style={{ fontSize: 14, fontWeight: 600 }}>Sort by:</label>
           <select
             value={sortBy}
-            onChange={e => setSortBy(e.target.value as 'priority_score' | 'created_at' | 'contribution_amount')}
+            onChange={e => setSortBy(e.target.value as typeof sortBy)}
             style={{
               padding: '6px 10px',
               border: '1px solid #d1d5db',
@@ -241,8 +245,8 @@ export default function AdminAlbumSuggestionsPage() {
             }}
           >
             <option value="created_at">Newest First</option>
-            <option value="priority_score">Highest Priority</option>
-            <option value="contribution_amount">Highest Contribution</option>
+            <option value="priority_score">Priority Score</option>
+            <option value="contribution_amount">Contribution Amount</option>
           </select>
         </div>
 
@@ -276,12 +280,11 @@ export default function AdminAlbumSuggestionsPage() {
           fontWeight: 600,
           fontSize: 14,
           display: 'grid',
-          gridTemplateColumns: '2fr 1fr 80px 120px 100px 150px',
+          gridTemplateColumns: '2fr 1fr 120px 100px 150px',
           gap: 16
         }}>
           <div>Album</div>
           <div>Contributor</div>
-          <div>Priority</div>
           <div>Contribution</div>
           <div>Status</div>
           <div>Actions</div>
@@ -294,7 +297,7 @@ export default function AdminAlbumSuggestionsPage() {
                 padding: '16px',
                 borderBottom: index < sortedSuggestions.length - 1 ? '1px solid #f3f4f6' : 'none',
                 display: 'grid',
-                gridTemplateColumns: '2fr 1fr 80px 120px 100px 150px',
+                gridTemplateColumns: '2fr 1fr 120px 100px 150px',
                 gap: 16,
                 alignItems: 'center',
                 fontSize: 14
@@ -306,26 +309,20 @@ export default function AdminAlbumSuggestionsPage() {
                   <div style={{ fontSize: 12, color: '#6b7280' }}>
                     {suggestion.context} • {new Date(suggestion.created_at).toLocaleDateString()}
                   </div>
+                  {suggestion.reason && (
+                    <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 4 }}>
+                      {suggestion.reason.substring(0, 100)}{suggestion.reason.length > 100 ? '...' : ''}
+                    </div>
+                  )}
                 </div>
 
                 <div>
-                  <div style={{ fontWeight: 500 }}>{suggestion.contributor_name}</div>
+                  <div style={{ fontWeight: 500 }}>{suggestion.contributor_name || 'Anonymous'}</div>
                   {suggestion.contributor_email && (
                     <div style={{ fontSize: 12, color: '#6b7280' }}>
                       {suggestion.contributor_email}
                     </div>
                   )}
-                </div>
-
-                <div style={{
-                  textAlign: 'center',
-                  background: (suggestion.priority_score || 0) > 0 ? '#dcfce7' : '#f3f4f6',
-                  padding: '4px 8px',
-                  borderRadius: 12,
-                  fontWeight: 600,
-                  fontSize: 12
-                }}>
-                  {suggestion.priority_score || 0}
                 </div>
 
                 <div style={{ textAlign: 'center' }}>
@@ -435,9 +432,9 @@ export default function AdminAlbumSuggestionsPage() {
                 }}>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                     <div>
-                      <strong>Reason:</strong>
+                      <strong>Full Reason:</strong>
                       <div style={{ marginTop: 4, color: '#6b7280' }}>
-                        {suggestion.reason || 'No reason provided'}
+                        {suggestion.reason || 'No additional reason provided'}
                       </div>
                     </div>
                     <div>
@@ -448,8 +445,8 @@ export default function AdminAlbumSuggestionsPage() {
                     </div>
                   </div>
                   <div style={{ marginTop: 12, fontSize: 12, color: '#9ca3af' }}>
-                    Created: {new Date(suggestion.created_at).toLocaleString()} • 
-                    Last updated: {new Date(suggestion.updated_at).toLocaleString()}
+                    Created: {new Date(suggestion.created_at).toLocaleString()}
+                    {suggestion.updated_at && ` • Updated: ${new Date(suggestion.updated_at).toLocaleString()}`}
                   </div>
                 </div>
               )}
