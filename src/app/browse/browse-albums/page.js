@@ -1,4 +1,4 @@
-// Updated Browse Albums page with Album Suggestion Component
+// Clean Browse Albums page (ESLint compliant)
 // Replace: src/app/browse/browse-albums/page.js
 
 "use client";
@@ -12,7 +12,6 @@ import 'styles/internal.css';
 import { supabase } from 'src/lib/supabaseClient';
 
 import { useSearchParams } from 'next/navigation';
-//import Footer from 'components/Footer';
 
 function BrowseAlbumsContent() {
   const searchParams = useSearchParams();
@@ -28,6 +27,7 @@ function BrowseAlbumsContent() {
   const [sortField, setSortField] = useState('title');
   const [sortAsc, setSortAsc] = useState(true);
   const [showSuggestionBox, setShowSuggestionBox] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
@@ -38,16 +38,12 @@ function BrowseAlbumsContent() {
           .select('id, title, allowed_formats')
           .eq('id', eventId)
           .single();
-        if (!error && data) {
-          if (isMounted) {
-            setAllowedFormats(data.allowed_formats || []);
-            setEventTitle(data.title || '');
-          }
-        } else {
-          if (isMounted) {
-            setAllowedFormats(null);
-            setEventTitle('');
-          }
+        if (!error && data && isMounted) {
+          setAllowedFormats(data.allowed_formats || []);
+          setEventTitle(data.title || '');
+        } else if (isMounted) {
+          setAllowedFormats(null);
+          setEventTitle('');
         }
       } else if (allowedFormatsParam && eventTitleParam) {
         setAllowedFormats(allowedFormatsParam.split(',').map(f => f.trim()));
@@ -62,42 +58,50 @@ function BrowseAlbumsContent() {
   }, [eventId, allowedFormatsParam, eventTitleParam]);
 
   useEffect(() => {
-  async function fetchAllAlbums() {
-    let allRows = [];
-    let from = 0;
-    const batchSize = 1000;
-    let keepGoing = true;
-    while (keepGoing) {
-      let { data: batch, error } = await supabase
-        .from('collection')
-        .select('*')
-        .or('blocked.is.null,blocked.eq.false') // Exclude blocked items (handles NULL as not blocked)
-        .range(from, from + batchSize - 1);
-      if (error) {
-        console.error('Error fetching albums:', error);
-        break;
+    async function fetchAllAlbums() {
+      setLoading(true);
+      let allRows = [];
+      let from = 0;
+      const batchSize = 1000;
+      let keepGoing = true;
+      
+      while (keepGoing) {
+        let { data: batch, error } = await supabase
+          .from('collection')
+          .select('*')
+          .or('blocked.is.null,blocked.eq.false')
+          .range(from, from + batchSize - 1);
+          
+        if (error) {
+          console.error('Error fetching albums:', error);
+          break;
+        }
+        if (!batch || batch.length === 0) break;
+        
+        allRows = allRows.concat(batch);
+        keepGoing = batch.length === batchSize;
+        from += batchSize;
       }
-      if (!batch || batch.length === 0) break;
-      allRows = allRows.concat(batch);
-      keepGoing = batch.length === batchSize;
-      from += batchSize;
+      
+      const parsed = allRows.map(album => ({
+        id: album.id,
+        title: album.title,
+        artist: album.artist,
+        year: album.year,
+        folder: album.folder,
+        mediaType: album.folder,
+        image:
+          album.image_url && album.image_url.trim().toLowerCase() !== 'no'
+            ? album.image_url.trim()
+            : '/images/coverplaceholder.png'
+      }));
+      
+      setAlbums(parsed);
+      setLoading(false);
     }
-    const parsed = allRows.map(album => ({
-      id: album.id,
-      title: album.title,
-      artist: album.artist,
-      year: album.year,
-      folder: album.folder,
-      mediaType: album.folder,
-      image:
-        album.image_url && album.image_url.trim().toLowerCase() !== 'no'
-          ? album.image_url.trim()
-          : '/images/coverplaceholder.png'
-    }));
-    setAlbums(parsed);
-  }
-  fetchAllAlbums();
-}, []);
+    
+    fetchAllAlbums();
+  }, []);
 
   const formatVariants = (format) => {
     const f = format.trim().toLowerCase();
@@ -131,6 +135,7 @@ function BrowseAlbumsContent() {
         formatVariants(mediaFilter).includes(folder);
       return matchesSearch && isAllowed && matchesFilter;
     });
+    
     fa = [...fa].sort((a, b) => {
       let va = (a[sortField] || '').toString().toLowerCase();
       let vb = (b[sortField] || '').toString().toLowerCase();
@@ -143,6 +148,28 @@ function BrowseAlbumsContent() {
 
   const hasSearchQuery = searchTerm.trim().length > 0;
   const hasNoResults = hasSearchQuery && filteredAlbums.length === 0;
+
+  if (loading) {
+    return (
+      <div className="page-wrapper">
+        <header className="event-hero">
+          <div className="overlay">
+            <h1>Loading Collection...</h1>
+          </div>
+        </header>
+        <main className="browse-collection-body" style={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          minHeight: '400px',
+          fontSize: '18px',
+          color: '#666'
+        }}>
+          Loading albums...
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="page-wrapper">
@@ -186,27 +213,6 @@ function BrowseAlbumsContent() {
           </button>
         </div>
 
-        {/* Show suggestion box when no search results */}
-        {hasNoResults && (
-          <div style={{ marginBottom: 32 }}>
-            <AlbumSuggestionBox 
-              context="search" 
-              searchQuery={searchTerm}
-            />
-          </div>
-        )}
-
-        {/* General suggestion box when not searching and not in event context */}
-        {!hasSearchQuery && !eventId && !showSuggestionBox && (
-          <div style={{ marginBottom: 24 }}>
-            <AlbumSuggestionBox 
-              compact={true}
-              onClose={() => setShowSuggestionBox(true)}
-            />
-          </div>
-        )}
-
-        {/* Results count and suggestion toggle */}
         <div style={{ 
           display: 'flex', 
           justifyContent: 'space-between', 
@@ -216,38 +222,35 @@ function BrowseAlbumsContent() {
         }}>
           <div style={{ fontSize: '14px', color: '#666' }}>
             {hasSearchQuery ? (
-              <>Showing {filteredAlbums.length} results for &quot;{searchTerm}&quot;</>
+              <>Showing {filteredAlbums.length} results for &ldquo;{searchTerm}&rdquo;</>
             ) : (
               <>Showing {filteredAlbums.length} albums</>
             )}
           </div>
           
-          {/* Suggestion toggle button */}
-          {!hasNoResults && (
-            <button
-              onClick={() => setShowSuggestionBox(!showSuggestionBox)}
-              style={{
-                background: 'rgba(59, 130, 246, 0.1)',
-                border: '1px solid #3b82f6',
-                borderRadius: 6,
-                padding: '8px 16px',
-                fontSize: 13,
-                fontWeight: 600,
-                color: '#3b82f6',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              💡 Suggest an Album
-            </button>
-          )}
+          <button
+            onClick={() => setShowSuggestionBox(!showSuggestionBox)}
+            style={{
+              background: 'rgba(59, 130, 246, 0.1)',
+              border: '1px solid #3b82f6',
+              borderRadius: 6,
+              padding: '8px 16px',
+              fontSize: 13,
+              fontWeight: 600,
+              color: '#3b82f6',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            💡 {showSuggestionBox ? 'Hide Suggestions' : 'Suggest an Album'}
+          </button>
         </div>
 
-        {/* Expandable suggestion box */}
-        {showSuggestionBox && !hasNoResults && (
+        {(hasNoResults || showSuggestionBox) && (
           <div style={{ marginBottom: 32 }}>
             <AlbumSuggestionBox 
-              context={eventId ? "general" : "general"}
+              context={hasNoResults ? "search" : "general"}
+              searchQuery={hasNoResults ? searchTerm : ''}
               onClose={() => setShowSuggestionBox(false)}
             />
           </div>
@@ -265,7 +268,6 @@ function BrowseAlbumsContent() {
           ))}
         </section>
 
-        {/* Additional help text for empty states */}
         {filteredAlbums.length === 0 && !hasSearchQuery && (
           <div style={{
             textAlign: 'center',
@@ -277,6 +279,30 @@ function BrowseAlbumsContent() {
             <p>The collection is loading or no albums match your filters.</p>
             <p style={{ fontSize: 14 }}>
               Try adjusting your media type filter or suggest new albums above!
+            </p>
+          </div>
+        )}
+
+        {hasNoResults && (
+          <div style={{
+            textAlign: 'center',
+            padding: 40,
+            color: '#6b7280',
+            fontSize: 16,
+            background: '#f9fafb',
+            borderRadius: 12,
+            border: '2px dashed #d1d5db',
+            margin: '20px 0'
+          }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>🔍</div>
+            <h3 style={{ fontSize: 24, marginBottom: 12, color: '#374151' }}>
+              No albums found
+            </h3>
+            <p style={{ marginBottom: 16 }}>
+              No albums match your search for &ldquo;<strong>{searchTerm}</strong>&rdquo;
+            </p>
+            <p style={{ fontSize: 14 }}>
+              The album suggestion form above can help you request this album for the collection.
             </p>
           </div>
         )}

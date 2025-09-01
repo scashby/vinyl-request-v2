@@ -1,5 +1,5 @@
-// Album Suggestion Component - Reusable across pages
-// Create as: src/components/AlbumSuggestionBox.tsx
+// Clean Album Suggestion Component (ESLint compliant)
+// Replace: src/components/AlbumSuggestionBox.tsx
 
 import { useState } from 'react';
 
@@ -16,7 +16,7 @@ export default function AlbumSuggestionBox({
   onClose,
   compact = false 
 }: AlbumSuggestionBoxProps) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(!compact);
   const [suggestion, setSuggestion] = useState({
     artist: '',
     album: '',
@@ -29,10 +29,8 @@ export default function AlbumSuggestionBox({
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
 
-  // Pre-fill from search query if available
   const handleOpen = () => {
     if (searchQuery) {
-      // Try to parse "Artist - Album" format
       const parts = searchQuery.split(' - ');
       if (parts.length === 2) {
         setSuggestion(prev => ({
@@ -84,7 +82,8 @@ export default function AlbumSuggestionBox({
       });
 
       if (!response.ok) {
-        throw new Error('Failed to submit suggestion');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to submit suggestion');
       }
 
       setSubmitted(true);
@@ -95,12 +94,12 @@ export default function AlbumSuggestionBox({
     }
   };
 
-      const getContextMessage = () => {
+  const getContextMessage = () => {
     switch (context) {
       case 'search':
-        return `Couldn&apos;t find &ldquo;${searchQuery}&rdquo;? Suggest it for the collection!`;
+        return `Couldn't find "${searchQuery}"? Suggest it for the collection!`;
       case 'voting':
-        return "Don&apos;t see your favorite album? Suggest it for future additions!";
+        return "Don't see your favorite album? Suggest it for future additions!";
       default:
         return "Suggest an album for the Dead Wax Dialogues collection";
     }
@@ -114,18 +113,21 @@ export default function AlbumSuggestionBox({
 
   if (compact && !isOpen) {
     return (
-      <div style={{
-        background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
-        color: 'white',
-        padding: '12px 20px',
-        borderRadius: 8,
-        textAlign: 'center',
-        cursor: 'pointer',
-        transition: 'all 0.3s ease',
-        fontSize: 14,
-        fontWeight: 600
-      }}
-      onClick={handleOpen}>
+      <div 
+        style={{
+          background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+          color: 'white',
+          padding: '12px 20px',
+          borderRadius: 8,
+          textAlign: 'center',
+          cursor: 'pointer',
+          transition: 'all 0.3s ease',
+          fontSize: 14,
+          fontWeight: 600,
+          boxShadow: '0 2px 4px rgba(59, 130, 246, 0.2)'
+        }}
+        onClick={handleOpen}
+      >
         💡 Suggest an Album
       </div>
     );
@@ -133,16 +135,18 @@ export default function AlbumSuggestionBox({
 
   if (!isOpen) {
     return (
-      <div style={{
-        background: 'rgba(59, 130, 246, 0.1)',
-        border: '2px dashed #3b82f6',
-        borderRadius: 12,
-        padding: 20,
-        textAlign: 'center',
-        cursor: 'pointer',
-        transition: 'all 0.3s ease'
-      }}
-      onClick={handleOpen}>
+      <div 
+        style={{
+          background: 'rgba(59, 130, 246, 0.1)',
+          border: '2px dashed #3b82f6',
+          borderRadius: 12,
+          padding: 20,
+          textAlign: 'center',
+          cursor: 'pointer',
+          transition: 'all 0.3s ease'
+        }}
+        onClick={handleOpen}
+      >
         <div style={{ fontSize: 24, marginBottom: 8 }}>💡</div>
         <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4, color: '#3b82f6' }}>
           {getContextMessage()}
@@ -168,7 +172,7 @@ export default function AlbumSuggestionBox({
           Suggestion Submitted!
         </h3>
         <p style={{ fontSize: 14, margin: '0 0 16px 0', opacity: 0.9 }}>
-                      Thanks for suggesting &ldquo;{suggestion.artist} - {suggestion.album}&rdquo;
+          Thanks for suggesting &ldquo;{suggestion.artist} - {suggestion.album}&rdquo;
         </p>
         
         {suggestion.contributionAmount && (
@@ -218,7 +222,8 @@ export default function AlbumSuggestionBox({
       borderRadius: 12,
       padding: 24,
       boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
-      color: '#222'
+      color: '#222',
+      marginBottom: 16
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <h3 style={{ fontSize: 18, margin: 0, fontWeight: 'bold' }}>
@@ -252,7 +257,9 @@ export default function AlbumSuggestionBox({
             padding: '10px 12px',
             border: '1px solid #d1d5db',
             borderRadius: 6,
-            fontSize: 14
+            fontSize: 14,
+            outline: 'none',
+            width: '100%'
           }}
         />
         <input
@@ -264,7 +271,9 @@ export default function AlbumSuggestionBox({
             padding: '10px 12px',
             border: '1px solid #d1d5db',
             borderRadius: 6,
-            fontSize: 14
+            fontSize: 14,
+            outline: 'none',
+            width: '100%'
           }}
         />
       </div>
@@ -281,7 +290,8 @@ export default function AlbumSuggestionBox({
           borderRadius: 6,
           fontSize: 14,
           marginBottom: 16,
-          resize: 'none'
+          resize: 'none',
+          outline: 'none'
         }}
       />
 
@@ -311,11 +321,12 @@ export default function AlbumSuggestionBox({
               padding: '8px 10px',
               border: '1px solid #bfdbfe',
               borderRadius: 4,
-              fontSize: 14
+              fontSize: 14,
+              outline: 'none'
             }}
           />
           <div style={{ fontSize: 12, color: '#0369a1' }}>
-            Enter amount (optional) - you&apos;ll get a Venmo link after submitting
+            Enter amount (optional) - you&rsquo;ll get a Venmo link after submitting
           </div>
         </div>
       </div>
@@ -330,7 +341,8 @@ export default function AlbumSuggestionBox({
             padding: '8px 10px',
             border: '1px solid #d1d5db',
             borderRadius: 4,
-            fontSize: 12
+            fontSize: 12,
+            outline: 'none'
           }}
         />
         <input
@@ -342,7 +354,8 @@ export default function AlbumSuggestionBox({
             padding: '8px 10px',
             border: '1px solid #d1d5db',
             borderRadius: 4,
-            fontSize: 12
+            fontSize: 12,
+            outline: 'none'
           }}
         />
       </div>

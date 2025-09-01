@@ -1,4 +1,4 @@
-// src/app/admin/audio-recognition/page.tsx - IMMEDIATE RECOGNITION + SILENCE TRIGGERS
+// src/app/admin/audio-recognition/page.tsx - FIXED DEPENDENCIES & DECLARATION ORDER
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from 'react';
@@ -282,6 +282,85 @@ export default function AudioRecognitionPage() {
     }
   }, [isProcessing, processAudioSample]);
 
+  // Start silence monitoring - separate function to avoid dependency issues
+  const startSilenceMonitoring = useCallback(() => {
+    if (!streamRef.current) return;
+    
+    console.log('Setting up silence monitoring...');
+    
+    const AudioContextClass = window.AudioContext || (window as WindowWithWebkitAudioContext).webkitAudioContext;
+    const audioContext = new AudioContextClass();
+    const analyser = audioContext.createAnalyser();
+    const source = audioContext.createMediaStreamSource(streamRef.current);
+    
+    source.connect(analyser);
+    analyser.fftSize = 256;
+    
+    audioContextRef.current = audioContext;
+    analyserRef.current = analyser;
+    
+    monitoringRef.current = true;
+    setSilenceMonitoringActive(true);
+    
+    console.log('Silence monitoring active');
+    setStatus('Silence monitoring started - listening for track changes...');
+    
+    // Start monitoring loop directly with refs
+    const monitorLoop = () => {
+      if (!monitoringRef.current || !analyserRef.current) return;
+      
+      const dataArray = new Uint8Array(analyserRef.current.fftSize);
+      analyserRef.current.getByteTimeDomainData(dataArray);
+      
+      let sum = 0;
+      for (let i = 0; i < dataArray.length; i++) {
+        const value = (dataArray[i] - 128) / 128;
+        sum += value * value;
+      }
+      const rms = Math.sqrt(sum / dataArray.length);
+      setSilenceLevel(rms);
+
+      const now = Date.now();
+      const timeSinceLastRecognition = now - lastRecognitionTimeRef.current;
+      
+      if (timeSinceLastRecognition > config.postRecognitionCooldown) {
+        if (rms < config.silenceThreshold) {
+          if (!isInSilence) {
+            setIsInSilence(true);
+            silenceStartTimeRef.current = now;
+            setStatus('Silence detected, monitoring...');
+          } else if (silenceStartTimeRef.current) {
+            const currentSilenceDuration = now - silenceStartTimeRef.current;
+            setSilenceDuration(currentSilenceDuration);
+            
+            if (currentSilenceDuration >= config.silenceDuration && !isProcessing) {
+              setIsInSilence(false);
+              silenceStartTimeRef.current = null;
+              setSilenceDuration(0);
+              triggerRecognition('Silence detection triggered');
+            }
+          }
+        } else {
+          if (isInSilence) {
+            setIsInSilence(false);
+            silenceStartTimeRef.current = null;
+            setSilenceDuration(0);
+            setStatus('Audio detected, listening...');
+          }
+        }
+      } else {
+        const cooldownRemaining = Math.ceil((config.postRecognitionCooldown - timeSinceLastRecognition) / 1000);
+        setStatus(`Cooldown: ${cooldownRemaining}s remaining`);
+      }
+
+      if (monitoringRef.current) {
+        animationFrameRef.current = requestAnimationFrame(monitorLoop);
+      }
+    };
+    
+    monitorLoop();
+  }, [config.postRecognitionCooldown, config.silenceDuration, config.silenceThreshold, isInSilence, isProcessing, triggerRecognition]);
+
   // MAIN START FUNCTION - Immediate recognition first
   const startListening = useCallback(async () => {
     console.log('Starting audio recognition system...');
@@ -329,88 +408,14 @@ export default function AudioRecognitionPage() {
 
       // SETUP SILENCE MONITORING after initial recognition
       setTimeout(() => {
-        if (streamRef.current) {
-          console.log('Setting up silence monitoring...');
-          
-          const AudioContextClass = window.AudioContext || (window as WindowWithWebkitAudioContext).webkitAudioContext;
-          const audioContext = new AudioContextClass();
-          const analyser = audioContext.createAnalyser();
-          const source = audioContext.createMediaStreamSource(streamRef.current);
-          
-          source.connect(analyser);
-          analyser.fftSize = 256;
-          
-          audioContextRef.current = audioContext;
-          analyserRef.current = analyser;
-          
-          monitoringRef.current = true;
-          setSilenceMonitoringActive(true);
-          
-          console.log('Silence monitoring active');
-          setStatus('Silence monitoring started - listening for track changes...');
-          
-          // Start monitoring loop directly with refs
-          const monitorLoop = () => {
-            if (!monitoringRef.current || !analyserRef.current) return;
-            
-            const dataArray = new Uint8Array(analyserRef.current.fftSize);
-            analyserRef.current.getByteTimeDomainData(dataArray);
-            
-            let sum = 0;
-            for (let i = 0; i < dataArray.length; i++) {
-              const value = (dataArray[i] - 128) / 128;
-              sum += value * value;
-            }
-            const rms = Math.sqrt(sum / dataArray.length);
-            setSilenceLevel(rms);
-
-            const now = Date.now();
-            const timeSinceLastRecognition = now - lastRecognitionTimeRef.current;
-            
-            if (timeSinceLastRecognition > config.postRecognitionCooldown) {
-              if (rms < config.silenceThreshold) {
-                if (!isInSilence) {
-                  setIsInSilence(true);
-                  silenceStartTimeRef.current = now;
-                  setStatus('Silence detected, monitoring...');
-                } else if (silenceStartTimeRef.current) {
-                  const currentSilenceDuration = now - silenceStartTimeRef.current;
-                  setSilenceDuration(currentSilenceDuration);
-                  
-                  if (currentSilenceDuration >= config.silenceDuration && !isProcessing) {
-                    setIsInSilence(false);
-                    silenceStartTimeRef.current = null;
-                    setSilenceDuration(0);
-                    triggerRecognition('Silence detection triggered');
-                  }
-                }
-              } else {
-                if (isInSilence) {
-                  setIsInSilence(false);
-                  silenceStartTimeRef.current = null;
-                  setSilenceDuration(0);
-                  setStatus('Audio detected, listening...');
-                }
-              }
-            } else {
-              const cooldownRemaining = Math.ceil((config.postRecognitionCooldown - timeSinceLastRecognition) / 1000);
-              setStatus(`Cooldown: ${cooldownRemaining}s remaining`);
-            }
-
-            if (monitoringRef.current) {
-              animationFrameRef.current = requestAnimationFrame(monitorLoop);
-            }
-          };
-          
-          monitorLoop();
-        }
+        startSilenceMonitoring();
       }, 8000);
 
     } catch (error) {
       console.error('Error accessing microphone:', error);
       setStatus('Error: Could not access microphone');
     }
-  }, [triggerRecognition, config.postRecognitionCooldown, config.silenceDuration, config.silenceThreshold, isInSilence, isProcessing]);
+  }, [triggerRecognition, startSilenceMonitoring]);
 
   // Stop everything
   const stopListening = useCallback(() => {
