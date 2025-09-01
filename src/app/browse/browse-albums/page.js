@@ -217,7 +217,7 @@ function BrowseAlbumsContent() {
           display: 'flex', 
           justifyContent: 'space-between', 
           alignItems: 'center',
-          marginBottom: 20,
+          marginBottom: 24,
           padding: '0 8px'
         }}>
           <div style={{ fontSize: '14px', color: '#666' }}>
@@ -228,26 +228,30 @@ function BrowseAlbumsContent() {
             )}
           </div>
           
-          <button
-            onClick={() => setShowSuggestionBox(!showSuggestionBox)}
-            style={{
-              background: 'rgba(59, 130, 246, 0.1)',
-              border: '1px solid #3b82f6',
-              borderRadius: 6,
-              padding: '8px 16px',
-              fontSize: 13,
-              fontWeight: 600,
-              color: '#3b82f6',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease'
-            }}
-          >
-            💡 {showSuggestionBox ? 'Hide Suggestions' : 'Suggest an Album'}
-          </button>
+          {/* Only show suggest button if suggestion box is not already open */}
+          {!hasNoResults && !showSuggestionBox && (
+            <button
+              onClick={() => setShowSuggestionBox(true)}
+              style={{
+                background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                color: 'white',
+                border: 'none',
+                borderRadius: 8,
+                padding: '10px 20px',
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                boxShadow: '0 2px 6px rgba(59, 130, 246, 0.3)'
+              }}
+            >
+              💡 Suggest an Album
+            </button>
+          )}
         </div>
 
         {(hasNoResults || showSuggestionBox) && (
-          <div style={{ marginBottom: 32 }}>
+          <div style={{ marginBottom: 40 }}>
             <AlbumSuggestionBox 
               context={hasNoResults ? "search" : "general"}
               searchQuery={hasNoResults ? searchTerm : ''}

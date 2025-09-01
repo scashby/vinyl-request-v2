@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
     // Check if suggestion already exists (to avoid duplicates)
     const { data: existing, error: existingError } = await supabase
       .from('album_suggestions')
-      .select('id, suggestion_count, total_contributions')
+      .select('id, total_contributions')
       .eq('artist', artist.trim())
       .eq('album', album.trim())
       .single();
@@ -89,7 +89,6 @@ export async function POST(request: NextRequest) {
       const { data, error } = await supabase
         .from('album_suggestions')
         .update({
-          suggestion_count: existing.suggestion_count + 1,
           last_suggested_at: new Date().toISOString(),
           // Update notes if provided
           ...(notes?.trim() && { notes: notes.trim() }),
@@ -123,7 +122,6 @@ export async function POST(request: NextRequest) {
         suggestor_email: suggestor_email?.trim() || null,
         context: context || 'general',
         search_query: search_query || null,
-        suggestion_count: 1,
         status: 'pending',
         created_at: new Date().toISOString(),
         last_suggested_at: new Date().toISOString()
@@ -195,7 +193,6 @@ export async function GET(request: NextRequest) {
     let query = supabase
       .from('album_suggestions')
       .select('*')
-      .order('suggestion_count', { ascending: false })
       .order('created_at', { ascending: false })
       .limit(limit);
 

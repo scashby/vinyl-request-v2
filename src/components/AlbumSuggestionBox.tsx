@@ -62,6 +62,11 @@ export default function AlbumSuggestionBox({
       return;
     }
 
+    if (!suggestion.suggestorName.trim() || !suggestion.suggestorEmail.trim()) {
+      setError('Please enter your name and email address so we can let you know when we get the album.');
+      return;
+    }
+
     setSubmitting(true);
     setError('');
 
@@ -74,7 +79,7 @@ export default function AlbumSuggestionBox({
           album: suggestion.album.trim(),
           notes: suggestion.notes.trim(),
           contribution_amount: suggestion.contributionAmount ? parseFloat(suggestion.contributionAmount) : null,
-          suggestor_name: suggestion.suggestorName.trim() || 'Anonymous',
+          suggestor_name: suggestion.suggestorName.trim(),
           suggestor_email: suggestion.suggestorEmail.trim(),
           context,
           search_query: searchQuery
@@ -332,32 +337,49 @@ export default function AlbumSuggestionBox({
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
-        <input
-          type="text"
-          value={suggestion.suggestorName}
-          onChange={e => setSuggestion(prev => ({ ...prev, suggestorName: e.target.value }))}
-          placeholder="Your Name (optional)"
-          style={{
-            padding: '8px 10px',
-            border: '1px solid #d1d5db',
-            borderRadius: 4,
-            fontSize: 12,
-            outline: 'none'
-          }}
-        />
-        <input
-          type="email"
-          value={suggestion.suggestorEmail}
-          onChange={e => setSuggestion(prev => ({ ...prev, suggestorEmail: e.target.value }))}
-          placeholder="Your Email (optional)"
-          style={{
-            padding: '8px 10px',
-            border: '1px solid #d1d5db',
-            borderRadius: 4,
-            fontSize: 12,
-            outline: 'none'
-          }}
-        />
+        <div>
+          <input
+            type="text"
+            value={suggestion.suggestorName}
+            onChange={e => setSuggestion(prev => ({ ...prev, suggestorName: e.target.value }))}
+            placeholder="Your Name (required) *"
+            required
+            style={{
+              padding: '8px 10px',
+              border: '2px solid #d1d5db',
+              borderRadius: 4,
+              fontSize: 12,
+              outline: 'none',
+              width: '100%'
+            }}
+          />
+        </div>
+        <div>
+          <input
+            type="email"
+            value={suggestion.suggestorEmail}
+            onChange={e => setSuggestion(prev => ({ ...prev, suggestorEmail: e.target.value }))}
+            placeholder="Your Email (required) *"
+            required
+            style={{
+              padding: '8px 10px',
+              border: '2px solid #d1d5db',
+              borderRadius: 4,
+              fontSize: 12,
+              outline: 'none',
+              width: '100%'
+            }}
+          />
+        </div>
+      </div>
+
+      <div style={{ 
+        fontSize: 11, 
+        color: '#6b7280', 
+        marginBottom: 16,
+        fontStyle: 'italic'
+      }}>
+        * Required so we can let you know when we get the album!
       </div>
 
       {error && (
