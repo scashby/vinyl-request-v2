@@ -1,9 +1,9 @@
-// Updated Browse Queue page with Album Suggestion Component
+// Fixed Browse Queue page with Suspense boundary
 // Replace: src/app/browse/browse-queue/page.js
 
 "use client";
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import AlbumSuggestionBox from 'components/AlbumSuggestionBox';
@@ -11,7 +11,7 @@ import { supabase } from 'src/lib/supabaseClient';
 import 'styles/internal.css';
 import 'styles/browse-queue.css';
 
-export default function BrowseQueuePage() {
+function BrowseQueueContent() {
   const searchParams = useSearchParams();
   const eventId = searchParams.get('eventId');
   
@@ -19,10 +19,6 @@ export default function BrowseQueuePage() {
   const [eventData, setEventData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showSuggestionBox, setShowSuggestionBox] = useState(false);
-
-  useEffect(() => {
-    loadEventAndQueue();
-  }, [loadEventAndQueue]);
 
   const loadEventAndQueue = useCallback(async () => {
     if (!eventId) {
@@ -114,6 +110,10 @@ export default function BrowseQueuePage() {
       setLoading(false);
     }
   }, [eventId]);
+
+  useEffect(() => {
+    loadEventAndQueue();
+  }, [loadEventAndQueue]);
 
   const voteForItem = async (itemId) => {
     try {
@@ -492,5 +492,13 @@ export default function BrowseQueuePage() {
         </section>
       </main>
     </div>
+  );
+}
+
+export default function BrowseQueuePage() {
+  return (
+    <Suspense fallback={<div>Loading queue...</div>}>
+      <BrowseQueueContent />
+    </Suspense>
   );
 }
