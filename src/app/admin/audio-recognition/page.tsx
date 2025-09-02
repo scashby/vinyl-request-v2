@@ -57,28 +57,37 @@ export default function AudioRecognitionPage() {
   const monitoringIntervalRef = useRef<number | null>(null);
   const silenceStartRef = useRef<number>(0);
 
-  // SIMPLE amplitude detection - no fancy math
+  // PROPER amplitude detection using time domain data
   const getCurrentAudioLevel = useCallback((): number => {
     if (!analyserRef.current) return 0;
     
     const analyser = analyserRef.current;
     const bufferLength = analyser.fftSize;
     const dataArray = new Uint8Array(bufferLength);
-    analyser.getByteFrequencyData(dataArray); // Use frequency data for more stable readings
+    analyser.getByteTimeDomainData(dataArray); // Use TIME DOMAIN data for amplitude
     
-    // Get average amplitude across all frequencies
-    let sum = 0;
+    // Calculate RMS (Root Mean Square) for proper amplitude measurement
+    let sumSquares = 0;
     for (let i = 0; i < bufferLength; i++) {
-      sum += dataArray[i];
+      const sample = (dataArray[i] - 128) / 128; // Convert to -1 to 1 range
+      sumSquares += sample * sample;
     }
-    const average = sum / bufferLength;
+    const rms = Math.sqrt(sumSquares / bufferLength);
     
-    // Scale to 0-100 for display
-    const level = Math.round((average / 255) * 100);
+    // Convert to decibels (logarithmic scale)
+    const decibels = 20 * Math.log10(rms + 0.0001); // Add small value to avoid log(0)
+    
+    // Map decibels to 0-100 scale
+    // Typical range: -60dB (quiet) to -10dB (loud)
+    // Map -60dB = 0, -10dB = 100
+    const minDB = -60;
+    const maxDB = -10;
+    const level = Math.max(0, Math.min(100, ((decibels - minDB) / (maxDB - minDB)) * 100));
     
     console.log('=== AUDIO LEVEL ===');
-    console.log('Raw average:', average);
-    console.log('Scaled level (0-100):', level);
+    console.log('RMS:', rms.toFixed(4));
+    console.log('Decibels:', decibels.toFixed(1), 'dB');
+    console.log('Scaled level (0-100):', Math.round(level));
     console.log('Music threshold:', musicLevel);
     console.log('Silence threshold:', silenceLevel);
     console.log('Currently above music level?', level > musicLevel);
@@ -87,8 +96,9 @@ export default function AudioRecognitionPage() {
     
     // Update debug info for on-page console
     setDebugInfo([
-      `Raw average: ${average.toFixed(1)}`,
-      `Scaled level: ${level}`,
+      `RMS: ${rms.toFixed(4)}`,
+      `Decibels: ${decibels.toFixed(1)} dB`,
+      `Scaled level: ${Math.round(level)}`,
       `Music threshold: ${musicLevel}`,
       `Silence threshold: ${silenceLevel}`,
       `Above music? ${level > musicLevel}`,
@@ -97,7 +107,7 @@ export default function AudioRecognitionPage() {
       `Silence counter: ${silenceCounter}s`
     ]);
     
-    return level;
+    return Math.round(level);
   }, [musicLevel, silenceLevel, isInSilence, silenceCounter]);
 
   // Convert audio buffer for recognition API
