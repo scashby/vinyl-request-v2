@@ -291,3 +291,48 @@ export async function PUT(request: NextRequest) {
     }, { status: 500 });
   }
 }
+
+// DELETE - Remove suggestion (for admin)
+export async function DELETE(request: NextRequest) {
+  debugLog('DELETE request received');
+  
+  try {
+    const body = await request.json();
+    const { id } = body;
+
+    debugLog('DELETE body:', { id });
+
+    if (!id) {
+      return NextResponse.json({
+        success: false,
+        error: 'Suggestion ID is required'
+      }, { status: 400 });
+    }
+
+    const { error } = await supabase
+      .from('album_suggestions')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      debugLog('DELETE error:', error);
+      throw error;
+    }
+
+    debugLog('Successfully deleted suggestion');
+
+    return NextResponse.json({
+      success: true,
+      message: 'Suggestion deleted successfully'
+    });
+
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to delete suggestion';
+    debugLog('DELETE error:', error);
+    
+    return NextResponse.json({
+      success: false,
+      error: errorMessage
+    }, { status: 500 });
+  }
+}

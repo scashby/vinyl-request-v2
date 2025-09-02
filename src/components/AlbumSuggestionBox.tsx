@@ -113,7 +113,7 @@ export default function AlbumSuggestionBox({
   const getVenmoUrl = () => {
     const amount = suggestion.contributionAmount || '10';
     const note = `Album suggestion: ${suggestion.artist} - ${suggestion.album}`;
-    return `https://venmo.com/deadwaxdialogues?txn=pay&amount=${amount}&note=${encodeURIComponent(note)}`;
+    return `https://venmo.com/u/deadwaxdialogues?txn=pay&amount=${amount}&note=${encodeURIComponent(note)}`;
   };
 
   if (compact && !isOpen) {

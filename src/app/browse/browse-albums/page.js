@@ -211,55 +211,42 @@ function BrowseAlbumsContent() {
           >
             Sort: {sortAsc ? 'Ascending' : 'Descending'}
           </button>
+          
+          {/* Add suggest button inline with other controls */}
+          {!hasNoResults && !showSuggestionBox && (
+            <button
+              onClick={() => setShowSuggestionBox(true)}
+              style={{
+                background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                color: 'white',
+                border: 'none',
+                borderRadius: 8,
+                padding: '10px 20px',
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                boxShadow: '0 2px 6px rgba(59, 130, 246, 0.3)',
+                whiteSpace: 'nowrap',
+                marginLeft: 'auto' // Push to the right
+              }}
+            >
+              💡 Suggest an Album
+            </button>
+          )}
         </div>
 
-        {/* FIXED: Results and Actions Section with proper spacing */}
+        {/* Simplified results display without separate button */}
         <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'flex-start',
+          fontSize: '14px', 
+          color: '#666',
           marginBottom: 24,
-          padding: '0 8px',
-          gap: '20px' // Add gap between items
+          padding: '0 8px'
         }}>
-          <div style={{ 
-            fontSize: '14px', 
-            color: '#666',
-            flex: '1', // Allow to grow but not too much
-            minWidth: '200px'
-          }}>
-            {hasSearchQuery ? (
-              <>Showing {filteredAlbums.length} results for &ldquo;{searchTerm}&rdquo;</>
-            ) : (
-              <>Showing {filteredAlbums.length} albums</>
-            )}
-          </div>
-          
-          {/* FIXED: Suggestion button with proper spacing and sizing */}
-          {!hasNoResults && !showSuggestionBox && (
-            <div style={{ 
-              flexShrink: 0, // Don't shrink
-              marginLeft: 'auto' // Push to right side
-            }}>
-              <button
-                onClick={() => setShowSuggestionBox(true)}
-                style={{
-                  background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: 8,
-                  padding: '10px 20px',
-                  fontSize: 14,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  boxShadow: '0 2px 6px rgba(59, 130, 246, 0.3)',
-                  whiteSpace: 'nowrap' // Prevent text wrapping
-                }}
-              >
-                💡 Suggest an Album
-              </button>
-            </div>
+          {hasSearchQuery ? (
+            <>Showing {filteredAlbums.length} results for &ldquo;{searchTerm}&rdquo;</>
+          ) : (
+            <>Showing {filteredAlbums.length} albums</>
           )}
         </div>
 

@@ -57,8 +57,14 @@ export default function AdminAlbumSuggestionsPage() {
     loadSuggestions();
   }, [loadSuggestions]);
 
+  const [error, setError] = useState<string>('');
+  const [successMessage, setSuccessMessage] = useState<string>('');
+
   const updateSuggestionStatus = async (id: number, status: string, adminNotes?: string) => {
     setUpdatingId(id);
+    setError('');
+    setSuccessMessage('');
+    
     try {
       const response = await fetch('/api/album-suggestions', {
         method: 'PUT',
@@ -70,13 +76,20 @@ export default function AdminAlbumSuggestionsPage() {
         })
       });
 
-      if (response.ok) {
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setSuccessMessage(`Successfully updated suggestion to ${status}`);
+        setTimeout(() => setSuccessMessage(''), 3000);
         // Refresh suggestions
         loadSuggestions();
       } else {
-        console.error('Failed to update suggestion');
+        throw new Error(data.error || 'Failed to update suggestion');
       }
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error occurred';
+      setError(`Failed to update suggestion: ${errorMsg}`);
+      setTimeout(() => setError(''), 5000);
       console.error('Error updating suggestion:', error);
     } finally {
       setUpdatingId(null);
@@ -126,7 +139,43 @@ export default function AdminAlbumSuggestionsPage() {
   const getVenmoUrl = (suggestion: AlbumSuggestion) => {
     const amount = suggestion.contribution_amount || '10';
     const note = `Album purchase: ${suggestion.artist} - ${suggestion.album}`;
-    return `https://venmo.com/deadwaxdialogues?txn=pay&amount=${amount}&note=${encodeURIComponent(note)}`;
+    return `https://venmo.com/u/deadwaxdialogues?txn=pay&amount=${amount}&note=${encodeURIComponent(note)}`;
+  };
+
+  const deleteSuggestion = async (id: number) => {
+    if (!confirm('Are you sure you want to delete this suggestion? This cannot be undone.')) {
+      return;
+    }
+    
+    setUpdatingId(id);
+    setError('');
+    setSuccessMessage('');
+    
+    try {
+      const response = await fetch('/api/album-suggestions', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setSuccessMessage('Successfully deleted suggestion');
+        setTimeout(() => setSuccessMessage(''), 3000);
+        // Refresh suggestions
+        loadSuggestions();
+      } else {
+        throw new Error(data.error || 'Failed to delete suggestion');
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error occurred';
+      setError(`Failed to delete suggestion: ${errorMsg}`);
+      setTimeout(() => setError(''), 5000);
+      console.error('Error deleting suggestion:', error);
+    } finally {
+      setUpdatingId(null);
+    }
   };
 
   if (loading) {
@@ -200,6 +249,37 @@ export default function AdminAlbumSuggestionsPage() {
           <div style={{ fontSize: 12, color: '#059669' }}>Total Contributions</div>
         </div>
       </div>
+
+      {/* Success/Error Messages */}
+      {successMessage && (
+        <div style={{
+          background: '#dcfce7',
+          border: '1px solid #22c55e',
+          color: '#15803d',
+          borderRadius: 8,
+          padding: 12,
+          marginBottom: 16,
+          fontSize: 14,
+          fontWeight: 600
+        }}>
+          ✅ {successMessage}
+        </div>
+      )}
+
+      {error && (
+        <div style={{
+          background: '#fee2e2',
+          border: '1px solid #ef4444',
+          color: '#dc2626',
+          borderRadius: 8,
+          padding: 12,
+          marginBottom: 16,
+          fontSize: 14,
+          fontWeight: 600
+        }}>
+          ❌ {error}
+        </div>
+      )}
 
       {/* Filters and Sort */}
       <div style={{
@@ -353,7 +433,7 @@ export default function AdminAlbumSuggestionsPage() {
                   {getStatusBadge(suggestion.status)}
                 </div>
 
-                <div style={{ display: 'flex', gap: 4, fontSize: 12 }}>
+                <div style={{ display: 'flex', gap: 4, fontSize: 12, flexWrap: 'wrap' }}>
                   {suggestion.status === 'pending' && (
                     <>
                       <button
@@ -365,11 +445,12 @@ export default function AdminAlbumSuggestionsPage() {
                           border: 'none',
                           borderRadius: 4,
                           padding: '4px 8px',
-                          cursor: 'pointer',
-                          fontSize: 11
+                          cursor: updatingId === suggestion.id ? 'not-allowed' : 'pointer',
+                          fontSize: 11,
+                          opacity: updatingId === suggestion.id ? 0.5 : 1
                         }}
                       >
-                        ✓ Approve
+                        {updatingId === suggestion.id ? '...' : '✓'}
                       </button>
                       <button
                         onClick={() => updateSuggestionStatus(suggestion.id, 'declined')}
@@ -380,11 +461,12 @@ export default function AdminAlbumSuggestionsPage() {
                           border: 'none',
                           borderRadius: 4,
                           padding: '4px 8px',
-                          cursor: 'pointer',
-                          fontSize: 11
+                          cursor: updatingId === suggestion.id ? 'not-allowed' : 'pointer',
+                          fontSize: 11,
+                          opacity: updatingId === suggestion.id ? 0.5 : 1
                         }}
                       >
-                        ✕ Decline
+                        {updatingId === suggestion.id ? '...' : '✕'}
                       </button>
                     </>
                   )}
@@ -398,11 +480,12 @@ export default function AdminAlbumSuggestionsPage() {
                         border: 'none',
                         borderRadius: 4,
                         padding: '4px 8px',
-                        cursor: 'pointer',
-                        fontSize: 11
+                        cursor: updatingId === suggestion.id ? 'not-allowed' : 'pointer',
+                        fontSize: 11,
+                        opacity: updatingId === suggestion.id ? 0.5 : 1
                       }}
                     >
-                      🛒 Purchased
+                      {updatingId === suggestion.id ? '...' : '🛒'}
                     </button>
                   )}
                   <button
@@ -418,6 +501,23 @@ export default function AdminAlbumSuggestionsPage() {
                     }}
                   >
                     {expandedId === suggestion.id ? '▲' : '▼'}
+                  </button>
+                  <button
+                    onClick={() => deleteSuggestion(suggestion.id)}
+                    disabled={updatingId === suggestion.id}
+                    style={{
+                      background: '#dc2626',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: 4,
+                      padding: '4px 8px',
+                      cursor: updatingId === suggestion.id ? 'not-allowed' : 'pointer',
+                      fontSize: 11,
+                      opacity: updatingId === suggestion.id ? 0.5 : 1
+                    }}
+                    title="Delete suggestion permanently"
+                  >
+                    {updatingId === suggestion.id ? '...' : '🗑️'}
                   </button>
                 </div>
               </div>
