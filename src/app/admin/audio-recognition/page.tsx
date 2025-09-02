@@ -254,34 +254,28 @@ export default function AudioRecognitionPage() {
     // Use time-domain data for accurate volume detection
     analyser.getByteTimeDomainData(dataArray);
     
-    // Try multiple volume calculation methods
-    // Method 1: Simple peak detection
-    const peakLevel = Math.max(...dataArray.map(val => Math.abs(val - 128))) / 128 * 100;
-    
-    // Method 2: RMS calculation
-    let sum = 0;
+    // MUCH SIMPLER: Just measure how much the audio varies from silence (128)
+    // Calculate the average deviation from the center point
+    let totalDeviation = 0;
     for (let i = 0; i < bufferLength; i++) {
-      const normalized = (dataArray[i] - 128) / 128;
-      sum += normalized * normalized;
+      totalDeviation += Math.abs(dataArray[i] - 128);
     }
-    const rms = Math.sqrt(sum / bufferLength);
-    const rmsLevel = Math.round(rms * 100);
+    const avgDeviation = totalDeviation / bufferLength;
     
-    // Method 3: Standard deviation (shows audio activity)
-    const avgVal = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
-    const stdDev = Math.sqrt(dataArray.reduce((acc, val) => acc + Math.pow(val - avgVal, 2), 0) / bufferLength);
-    const stdDevLevel = Math.round(stdDev * 2); // Scale up for visibility
+    // Scale aggressively for real-world audio levels
+    // Typical audio might only deviate 1-10 points from 128, so multiply by 10-20
+    let scaledLevel = Math.round(avgDeviation * 15); // Much more aggressive scaling
     
-    // Use the highest of the three methods
-    const scaledLevel = Math.max(peakLevel, rmsLevel, stdDevLevel);
+    // Cap at 100%
+    scaledLevel = Math.min(scaledLevel, 100);
     
-    setAudioLevel(Math.round(scaledLevel));
+    setAudioLevel(scaledLevel);
 
-    // Debug: Log more detailed info
+    // Debug: Log simpler, clearer info
     if (Math.random() < 0.02) { // Log ~2% of the time
       const minVal = Math.min(...dataArray);
       const maxVal = Math.max(...dataArray);
-      addDebugLog(`📊 Raw: min=${minVal} max=${maxVal} avg=${avgVal.toFixed(1)} | Peak=${peakLevel.toFixed(1)}% RMS=${rmsLevel}% StdDev=${stdDevLevel}% -> Final=${scaledLevel.toFixed(1)}%`);
+      addDebugLog(`📊 Raw audio: min=${minVal} max=${maxVal} | Avg deviation from 128: ${avgDeviation.toFixed(2)} | Scaled level: ${scaledLevel}%`);
     }
 
     const now = Date.now();
