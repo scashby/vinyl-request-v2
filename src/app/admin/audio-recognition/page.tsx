@@ -251,23 +251,37 @@ export default function AudioRecognitionPage() {
     const bufferLength = analyser.fftSize;
     const dataArray = new Uint8Array(bufferLength);
     
-    // Use time-domain data for accurate volume detection (like before)
+    // Use time-domain data for accurate volume detection
     analyser.getByteTimeDomainData(dataArray);
     
-    // Calculate RMS (Root Mean Square) for proper volume measurement
+    // Try multiple volume calculation methods
+    // Method 1: Simple peak detection
+    const peakLevel = Math.max(...dataArray.map(val => Math.abs(val - 128))) / 128 * 100;
+    
+    // Method 2: RMS calculation
     let sum = 0;
     for (let i = 0; i < bufferLength; i++) {
-      const normalized = (dataArray[i] - 128) / 128; // Convert from 0-255 to -1 to +1
+      const normalized = (dataArray[i] - 128) / 128;
       sum += normalized * normalized;
     }
-    const rms = Math.sqrt(sum / bufferLength); // 0-1 range
-    const scaledLevel = Math.round(rms * 100); // Convert to 0-100 percentage
+    const rms = Math.sqrt(sum / bufferLength);
+    const rmsLevel = Math.round(rms * 100);
     
-    setAudioLevel(scaledLevel);
+    // Method 3: Standard deviation (shows audio activity)
+    const avgVal = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
+    const stdDev = Math.sqrt(dataArray.reduce((acc, val) => acc + Math.pow(val - avgVal, 2), 0) / bufferLength);
+    const stdDevLevel = Math.round(stdDev * 2); // Scale up for visibility
+    
+    // Use the highest of the three methods
+    const scaledLevel = Math.max(peakLevel, rmsLevel, stdDevLevel);
+    
+    setAudioLevel(Math.round(scaledLevel));
 
-    // Debug: Log audio levels periodically so we can see what's happening
-    if (Math.random() < 0.01) { // Log ~1% of the time to avoid spam
-      addDebugLog(`🔊 Audio level: ${scaledLevel}% (RMS: ${rms.toFixed(3)})`);
+    // Debug: Log more detailed info
+    if (Math.random() < 0.02) { // Log ~2% of the time
+      const minVal = Math.min(...dataArray);
+      const maxVal = Math.max(...dataArray);
+      addDebugLog(`📊 Raw: min=${minVal} max=${maxVal} avg=${avgVal.toFixed(1)} | Peak=${peakLevel.toFixed(1)}% RMS=${rmsLevel}% StdDev=${stdDevLevel}% -> Final=${scaledLevel.toFixed(1)}%`);
     }
 
     const now = Date.now();
@@ -516,6 +530,16 @@ export default function AudioRecognitionPage() {
             {isListening ? '🛑 Stop Listening' : '🎤 Start Listening'}
           </button>
 
+          {/* Manual trigger button for testing */}
+          {isListening && (
+            <button
+              onClick={() => triggerRecognition('Manual trigger')}
+              disabled={isProcessing}
+              style={{ background: '#7c3aed', color: 'white', border: 'none', borderRadius: 8, padding: '12px 24px', fontSize: 16, fontWeight: 600, cursor: isProcessing ? 'not-allowed' : 'pointer', opacity: isProcessing ? 0.6 : 1 }}>
+              {isProcessing ? '🎤 Processing...' : '🎯 Trigger Now'}
+            </button>
+          )}
+
           {currentTrack && (
             <button onClick={clearCurrentTrack} style={{ background: '#6b7280', color: 'white', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 14, cursor: 'pointer' }}>
               🗑️ Clear Current Track
@@ -626,7 +650,8 @@ export default function AudioRecognitionPage() {
 
         <div style={{ marginTop: 16, padding: 12, background: '#f0fdf4', border: '1px solid #22c55e', borderRadius: 8, fontSize: 12, color: '#15803d' }}>
           <strong>📊 VU METER GUIDE:</strong> First 2 boxes (red) = silence detection zone. Remaining 8 boxes (green) = audio levels. 
-          Adjust the silence threshold slider to set when recognition should trigger.
+          Adjust the silence threshold slider to set when recognition should trigger.<br/>
+          <strong>🎯 MANUAL TRIGGER:</strong> Use the &quot;Trigger Now&quot; button to test recognition while debugging audio detection.
         </div>
       </div>
 
