@@ -47,9 +47,10 @@ export default function AudioRecognitionPage() {
   const [isInSilence, setIsInSilence] = useState(false);
   const [silenceDuration, setSilenceDuration] = useState(0);
 
-  // Simple calibration - just two values
+  // Simple calibration - two values + adjustable silence threshold
   const [musicLevel, setMusicLevel] = useState<number | null>(null);
   const [silenceLevel, setSilenceLevel] = useState<number | null>(null);
+  const [silenceThreshold, setSilenceThreshold] = useState(5); // Percentage below which = silence
 
   // Refs
   const streamRef = useRef<MediaStream | null>(null);
@@ -223,7 +224,7 @@ export default function AudioRecognitionPage() {
     }
   }, [isProcessing, processAudioBuffer]);
 
-  // Simple monitoring - just compare to calibrated values
+  // Simple monitoring - scale where silence=0% and music=50%
   const runMonitoring = useCallback(() => {
     if (!isRunningRef.current || !analyserRef.current || musicLevel === null || silenceLevel === null) return;
 
@@ -232,17 +233,23 @@ export default function AudioRecognitionPage() {
     const dataArray = new Uint8Array(bufferLength);
     analyser.getByteTimeDomainData(dataArray);
 
-    // Calculate current audio level
+    // Calculate current raw audio level
     let totalDeviation = 0;
     for (let i = 0; i < bufferLength; i++) {
       totalDeviation += Math.abs(dataArray[i] - 128);
     }
-    const currentLevel = Math.round(totalDeviation / bufferLength * 50);
-    setAudioLevel(Math.min(currentLevel, 100));
+    const rawLevel = Math.round(totalDeviation / bufferLength * 50);
+    setAudioLevel(Math.min(rawLevel, 100));
 
-    // Simple logic: is current level closer to silence or music?
-    const midPoint = (musicLevel + silenceLevel) / 2;
-    const currentlyInSilence = currentLevel < midPoint;
+    // Scale to 0-50 where silenceLevel = 0% and musicLevel = 50%
+    const range = musicLevel - silenceLevel;
+    let scaledPercentage = 0;
+    if (range > 0) {
+      scaledPercentage = Math.max(0, Math.min(50, ((rawLevel - silenceLevel) / range) * 50));
+    }
+
+    // Check if scaled percentage is below silence threshold
+    const currentlyInSilence = scaledPercentage < silenceThreshold;
 
     const now = Date.now();
     const timeSinceLast = now - lastRecognitionTimeRef.current;
@@ -250,7 +257,7 @@ export default function AudioRecognitionPage() {
     // Cooldown period
     if (timeSinceLast < 15000) {
       const remain = Math.ceil((15000 - timeSinceLast) / 1000);
-      setStatus(`Cooldown: ${remain}s (level: ${currentLevel})`);
+      setStatus(`Cooldown: ${remain}s (${scaledPercentage.toFixed(1)}%)`);
       setIsInSilence(false);
       setSilenceDuration(0);
       silenceStartTimeRef.current = null;
@@ -258,24 +265,20 @@ export default function AudioRecognitionPage() {
     }
 
     if (currentlyInSilence && !isInSilence) {
-      // Entered silence
       setIsInSilence(true);
       silenceStartTimeRef.current = now;
       setSilenceDuration(0);
-      setStatus('Silence detected...');
+      setStatus(`Silence detected (${scaledPercentage.toFixed(1)}% < ${silenceThreshold}%)`);
     } else if (!currentlyInSilence && isInSilence) {
-      // Exited silence
       setIsInSilence(false);
       silenceStartTimeRef.current = null;
       setSilenceDuration(0);
-      setStatus(`Audio level: ${currentLevel} (music: ${musicLevel}, silence: ${silenceLevel})`);
+      setStatus(`Audio: ${scaledPercentage.toFixed(1)}%`);
     } else if (currentlyInSilence && isInSilence) {
-      // Still in silence
       const elapsed = now - (silenceStartTimeRef.current || now);
       setSilenceDuration(elapsed);
 
       if (elapsed >= 3000) {
-        // Trigger recognition after 3 seconds of silence
         setIsInSilence(false);
         silenceStartTimeRef.current = null;
         setSilenceDuration(0);
@@ -283,13 +286,12 @@ export default function AudioRecognitionPage() {
           triggerRecognition('Silence detection');
         }
       } else {
-        setStatus(`Silence: ${Math.floor(elapsed/1000)}s / 3s`);
+        setStatus(`Silence: ${Math.floor(elapsed/1000)}s / 3s (${scaledPercentage.toFixed(1)}%)`);
       }
     } else {
-      // Not in silence
-      setStatus(`Audio level: ${currentLevel} (music: ${musicLevel}, silence: ${silenceLevel})`);
+      setStatus(`Audio: ${scaledPercentage.toFixed(1)}% (threshold: ${silenceThreshold}%)`);
     }
-  }, [isInSilence, isProcessing, musicLevel, silenceLevel, triggerRecognition]);
+  }, [isInSilence, isProcessing, musicLevel, silenceLevel, silenceThreshold, triggerRecognition]);
 
   // Calibration functions - capture current audio level
   const calibrateMusic = useCallback(() => {
@@ -647,6 +649,30 @@ export default function AudioRecognitionPage() {
             >
               Set Silence Level ({silenceLevel || '--'})
             </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 14, fontWeight: 600 }}>Silence Threshold:</span>
+              <input
+                type="number"
+                min="1"
+                max="20"
+                value={silenceThreshold}
+                onChange={(e) => setSilenceThreshold(parseInt(e.target.value) || 5)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.currentTarget.blur();
+                  }
+                }}
+                style={{
+                  width: 60,
+                  padding: '4px 8px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: 4,
+                  fontSize: 14,
+                  textAlign: 'center'
+                }}
+              />
+              <span style={{ fontSize: 14 }}>%</span>
+            </div>
           </div>
 
           {isInSilence && (
