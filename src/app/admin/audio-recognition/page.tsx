@@ -77,16 +77,16 @@ export default function AudioRecognitionPage() {
     // Convert to decibels (logarithmic scale)
     const decibels = 20 * Math.log10(rms + 0.0001); // Add small value to avoid log(0)
     
-    // Map decibels to 0-100 scale
-    // Typical range: -60dB (quiet) to -10dB (loud)
-    // Map -60dB = 0, -10dB = 100
-    const minDB = -60;
-    const maxDB = -10;
+    // Adjust mapping for typical microphone input levels
+    // Map -45dB (ambient) = 0, -15dB (loud music) = 100
+    // This should better align with 75dB actual SPL showing around 70-80 on scale
+    const minDB = -45;
+    const maxDB = -15;
     const level = Math.max(0, Math.min(100, ((decibels - minDB) / (maxDB - minDB)) * 100));
     
     console.log('=== AUDIO LEVEL ===');
     console.log('RMS:', rms.toFixed(4));
-    console.log('Decibels:', decibels.toFixed(1), 'dB');
+    console.log('Decibels (digital):', decibels.toFixed(1), 'dB');
     console.log('Scaled level (0-100):', Math.round(level));
     console.log('Music threshold:', musicLevel);
     console.log('Silence threshold:', silenceLevel);
@@ -97,7 +97,7 @@ export default function AudioRecognitionPage() {
     // Update debug info for on-page console
     setDebugInfo([
       `RMS: ${rms.toFixed(4)}`,
-      `Decibels: ${decibels.toFixed(1)} dB`,
+      `Digital dB: ${decibels.toFixed(1)} dB`,
       `Scaled level: ${Math.round(level)}`,
       `Music threshold: ${musicLevel}`,
       `Silence threshold: ${silenceLevel}`,
