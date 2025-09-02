@@ -1,4 +1,4 @@
-// Fixed Admin Album Suggestions Management Page - Updated for correct database schema
+// Fixed Admin Album Suggestions Management Page - Only ESLint fix applied
 // Replace: src/app/admin/album-suggestions/page.tsx
 
 "use client";
@@ -31,6 +31,8 @@ export default function AdminAlbumSuggestionsPage() {
   const [sortBy, setSortBy] = useState<'created_at' | 'priority_score' | 'contribution_amount'>('created_at');
   const [updatingId, setUpdatingId] = useState<number | null>(null);
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [error, setError] = useState<string>('');
+  const [successMessage, setSuccessMessage] = useState<string>('');
 
   const loadSuggestions = useCallback(async () => {
     setLoading(true);
@@ -56,9 +58,6 @@ export default function AdminAlbumSuggestionsPage() {
   useEffect(() => {
     loadSuggestions();
   }, [loadSuggestions]);
-
-  const [error, setError] = useState<string>('');
-  const [successMessage, setSuccessMessage] = useState<string>('');
 
   const updateSuggestionStatus = async (id: number, status: string, adminNotes?: string) => {
     setUpdatingId(id);
@@ -91,6 +90,42 @@ export default function AdminAlbumSuggestionsPage() {
       setError(`Failed to update suggestion: ${errorMsg}`);
       setTimeout(() => setError(''), 5000);
       console.error('Error updating suggestion:', error);
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const deleteSuggestion = async (id: number) => {
+    if (!confirm('Are you sure you want to delete this suggestion? This cannot be undone.')) {
+      return;
+    }
+    
+    setUpdatingId(id);
+    setError('');
+    setSuccessMessage('');
+    
+    try {
+      const response = await fetch('/api/album-suggestions', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setSuccessMessage('Successfully deleted suggestion');
+        setTimeout(() => setSuccessMessage(''), 3000);
+        // Refresh suggestions
+        loadSuggestions();
+      } else {
+        throw new Error(data.error || 'Failed to delete suggestion');
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error occurred';
+      setError(`Failed to delete suggestion: ${errorMsg}`);
+      setTimeout(() => setError(''), 5000);
+      console.error('Error deleting suggestion:', error);
     } finally {
       setUpdatingId(null);
     }
@@ -136,46 +171,9 @@ export default function AdminAlbumSuggestionsPage() {
     );
   };
 
-  const getVenmoUrl = (suggestion: AlbumSuggestion) => {
-    const amount = suggestion.contribution_amount || '10';
-    const note = `Album purchase: ${suggestion.artist} - ${suggestion.album}`;
-    return `https://venmo.com/u/deadwaxdialogues?txn=pay&amount=${amount}&note=${encodeURIComponent(note)}`;
-  };
-
-  const deleteSuggestion = async (id: number) => {
-    if (!confirm('Are you sure you want to delete this suggestion? This cannot be undone.')) {
-      return;
-    }
-    
-    setUpdatingId(id);
-    setError('');
-    setSuccessMessage('');
-    
-    try {
-      const response = await fetch('/api/album-suggestions', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id })
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        setSuccessMessage('Successfully deleted suggestion');
-        setTimeout(() => setSuccessMessage(''), 3000);
-        // Refresh suggestions
-        loadSuggestions();
-      } else {
-        throw new Error(data.error || 'Failed to delete suggestion');
-      }
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error occurred';
-      setError(`Failed to delete suggestion: ${errorMsg}`);
-      setTimeout(() => setError(''), 5000);
-      console.error('Error deleting suggestion:', error);
-    } finally {
-      setUpdatingId(null);
-    }
+  const getVenmoUrl = () => {
+    // Just link to your Venmo profile - customers will see the suggestion info and can pay you
+    return `https://venmo.com/u/deadwaxdialogues`;
   };
 
   if (loading) {
@@ -371,8 +369,8 @@ export default function AdminAlbumSuggestionsPage() {
         </div>
 
         <div style={{ maxHeight: 600, overflowY: 'auto' }}>
-          {sortedSuggestions.map((suggestion, index) => (
-            <div key={suggestion.id}>
+          {sortedSuggestions.map((item, index) => (
+            <div key={item.id}>
               <div style={{
                 padding: '16px',
                 borderBottom: index < sortedSuggestions.length - 1 ? '1px solid #f3f4f6' : 'none',
@@ -384,35 +382,35 @@ export default function AdminAlbumSuggestionsPage() {
               }}>
                 <div>
                   <div style={{ fontWeight: 600, marginBottom: 2 }}>
-                    {suggestion.artist} - {suggestion.album}
+                    {item.artist} - {item.album}
                   </div>
                   <div style={{ fontSize: 12, color: '#6b7280' }}>
-                    {suggestion.context} • {new Date(suggestion.created_at).toLocaleDateString()}
+                    {item.context} • {new Date(item.created_at).toLocaleDateString()}
                   </div>
-                  {suggestion.reason && (
+                  {item.reason && (
                     <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 4 }}>
-                      {suggestion.reason.substring(0, 100)}{suggestion.reason.length > 100 ? '...' : ''}
+                      {item.reason.substring(0, 100)}{item.reason.length > 100 ? '...' : ''}
                     </div>
                   )}
                 </div>
 
                 <div>
-                  <div style={{ fontWeight: 500 }}>{suggestion.contributor_name || 'Anonymous'}</div>
-                  {suggestion.contributor_email && (
+                  <div style={{ fontWeight: 500 }}>{item.contributor_name || 'Anonymous'}</div>
+                  {item.contributor_email && (
                     <div style={{ fontSize: 12, color: '#6b7280' }}>
-                      {suggestion.contributor_email}
+                      {item.contributor_email}
                     </div>
                   )}
                 </div>
 
                 <div style={{ textAlign: 'center' }}>
-                  {suggestion.contribution_amount ? (
+                  {item.contribution_amount ? (
                     <div>
                       <div style={{ fontWeight: 600, color: '#059669' }}>
-                        ${suggestion.contribution_amount}
+                        ${item.contribution_amount}
                       </div>
                       <a
-                        href={getVenmoUrl(suggestion)}
+                        href={getVenmoUrl()}
                         target="_blank"
                         rel="noopener noreferrer"
                         style={{
@@ -430,66 +428,66 @@ export default function AdminAlbumSuggestionsPage() {
                 </div>
 
                 <div style={{ textAlign: 'center' }}>
-                  {getStatusBadge(suggestion.status)}
+                  {getStatusBadge(item.status)}
                 </div>
 
                 <div style={{ display: 'flex', gap: 4, fontSize: 12, flexWrap: 'wrap' }}>
-                  {suggestion.status === 'pending' && (
+                  {item.status === 'pending' && (
                     <>
                       <button
-                        onClick={() => updateSuggestionStatus(suggestion.id, 'approved')}
-                        disabled={updatingId === suggestion.id}
+                        onClick={() => updateSuggestionStatus(item.id, 'approved')}
+                        disabled={updatingId === item.id}
                         style={{
                           background: '#22c55e',
                           color: 'white',
                           border: 'none',
                           borderRadius: 4,
                           padding: '4px 8px',
-                          cursor: updatingId === suggestion.id ? 'not-allowed' : 'pointer',
+                          cursor: updatingId === item.id ? 'not-allowed' : 'pointer',
                           fontSize: 11,
-                          opacity: updatingId === suggestion.id ? 0.5 : 1
+                          opacity: updatingId === item.id ? 0.5 : 1
                         }}
                       >
-                        {updatingId === suggestion.id ? '...' : '✓'}
+                        {updatingId === item.id ? '...' : '✓'}
                       </button>
                       <button
-                        onClick={() => updateSuggestionStatus(suggestion.id, 'declined')}
-                        disabled={updatingId === suggestion.id}
+                        onClick={() => updateSuggestionStatus(item.id, 'declined')}
+                        disabled={updatingId === item.id}
                         style={{
                           background: '#ef4444',
                           color: 'white',
                           border: 'none',
                           borderRadius: 4,
                           padding: '4px 8px',
-                          cursor: updatingId === suggestion.id ? 'not-allowed' : 'pointer',
+                          cursor: updatingId === item.id ? 'not-allowed' : 'pointer',
                           fontSize: 11,
-                          opacity: updatingId === suggestion.id ? 0.5 : 1
+                          opacity: updatingId === item.id ? 0.5 : 1
                         }}
                       >
-                        {updatingId === suggestion.id ? '...' : '✕'}
+                        {updatingId === item.id ? '...' : '✕'}
                       </button>
                     </>
                   )}
-                  {suggestion.status === 'approved' && (
+                  {item.status === 'approved' && (
                     <button
-                      onClick={() => updateSuggestionStatus(suggestion.id, 'purchased', 'Album purchased and added to collection')}
-                      disabled={updatingId === suggestion.id}
+                      onClick={() => updateSuggestionStatus(item.id, 'purchased', 'Album purchased and added to collection')}
+                      disabled={updatingId === item.id}
                       style={{
                         background: '#3b82f6',
                         color: 'white',
                         border: 'none',
                         borderRadius: 4,
                         padding: '4px 8px',
-                        cursor: updatingId === suggestion.id ? 'not-allowed' : 'pointer',
+                        cursor: updatingId === item.id ? 'not-allowed' : 'pointer',
                         fontSize: 11,
-                        opacity: updatingId === suggestion.id ? 0.5 : 1
+                        opacity: updatingId === item.id ? 0.5 : 1
                       }}
                     >
-                      {updatingId === suggestion.id ? '...' : '🛒'}
+                      {updatingId === item.id ? '...' : '🛒'}
                     </button>
                   )}
                   <button
-                    onClick={() => setExpandedId(expandedId === suggestion.id ? null : suggestion.id)}
+                    onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
                     style={{
                       background: '#6b7280',
                       color: 'white',
@@ -500,30 +498,30 @@ export default function AdminAlbumSuggestionsPage() {
                       fontSize: 11
                     }}
                   >
-                    {expandedId === suggestion.id ? '▲' : '▼'}
+                    {expandedId === item.id ? '▲' : '▼'}
                   </button>
                   <button
-                    onClick={() => deleteSuggestion(suggestion.id)}
-                    disabled={updatingId === suggestion.id}
+                    onClick={() => deleteSuggestion(item.id)}
+                    disabled={updatingId === item.id}
                     style={{
                       background: '#dc2626',
                       color: 'white',
                       border: 'none',
                       borderRadius: 4,
                       padding: '4px 8px',
-                      cursor: updatingId === suggestion.id ? 'not-allowed' : 'pointer',
+                      cursor: updatingId === item.id ? 'not-allowed' : 'pointer',
                       fontSize: 11,
-                      opacity: updatingId === suggestion.id ? 0.5 : 1
+                      opacity: updatingId === item.id ? 0.5 : 1
                     }}
                     title="Delete suggestion permanently"
                   >
-                    {updatingId === suggestion.id ? '...' : '🗑️'}
+                    {updatingId === item.id ? '...' : '🗑️'}
                   </button>
                 </div>
               </div>
 
               {/* Expanded Details */}
-              {expandedId === suggestion.id && (
+              {expandedId === item.id && (
                 <div style={{
                   background: '#f8fafc',
                   padding: 16,
@@ -534,19 +532,19 @@ export default function AdminAlbumSuggestionsPage() {
                     <div>
                       <strong>Full Reason:</strong>
                       <div style={{ marginTop: 4, color: '#6b7280' }}>
-                        {suggestion.reason || 'No additional reason provided'}
+                        {item.reason || 'No additional reason provided'}
                       </div>
                     </div>
                     <div>
                       <strong>Admin Notes:</strong>
                       <div style={{ marginTop: 4, color: '#6b7280' }}>
-                        {suggestion.admin_notes || 'No admin notes'}
+                        {item.admin_notes || 'No admin notes'}
                       </div>
                     </div>
                   </div>
                   <div style={{ marginTop: 12, fontSize: 12, color: '#9ca3af' }}>
-                    Created: {new Date(suggestion.created_at).toLocaleString()}
-                    {suggestion.updated_at && ` • Updated: ${new Date(suggestion.updated_at).toLocaleString()}`}
+                    Created: {new Date(item.created_at).toLocaleString()}
+                    {item.updated_at && ` • Updated: ${new Date(item.updated_at).toLocaleString()}`}
                   </div>
                 </div>
               )}

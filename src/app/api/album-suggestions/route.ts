@@ -100,18 +100,14 @@ export async function POST(request: NextRequest) {
     if (existing) {
       debugLog('Found existing suggestion, updating:', existing.id);
       
-      // Just update the record with new notes if provided - don't try to sum contributions
-      // since contribution_amount in the schema is text, not numeric
+      // Update existing record with proper field handling
       const { data: updateData, error } = await supabase
         .from('album_suggestions')
         .update({
           updated_at: new Date().toISOString(),
-          // Update reason if provided
+          // Map to correct database field names
           ...(notes?.trim() && { reason: notes.trim() }),
-          // Update contribution amount if provided
-          ...(contribution_amount && {
-            contribution_amount: contribution_amount.toString()
-          })
+          ...(contribution_amount && { contribution_amount: contribution_amount.toString() })
         })
         .eq('id', existing.id)
         .select()
@@ -127,7 +123,7 @@ export async function POST(request: NextRequest) {
     } else {
       debugLog('Creating new suggestion');
       
-      // Create new suggestion
+      // Create new suggestion with correct field mapping
       const insertData = {
         artist: artist.trim(),
         album: album.trim(),
@@ -257,20 +253,32 @@ export async function PUT(request: NextRequest) {
       }, { status: 400 });
     }
 
+    const updateData: Record<string, string | null> = {
+      updated_at: new Date().toISOString()
+    };
+    
+    if (status) {
+      updateData.status = status;
+    }
+    
+    if (admin_notes !== undefined) {
+      updateData.admin_notes = admin_notes;
+    }
+
     const { data, error } = await supabase
       .from('album_suggestions')
-      .update({
-        status: status || 'pending',
-        admin_notes: admin_notes || null,
-        updated_at: new Date().toISOString()
-      })
+      .update(updateData)
       .eq('id', id)
       .select()
       .single();
 
     if (error) {
       debugLog('PUT error:', error);
-      throw error;
+      return NextResponse.json({
+        success: false,
+        error: error.message,
+        details: error.details
+      }, { status: 500 });
     }
 
     debugLog('Successfully updated suggestion');
@@ -282,12 +290,10 @@ export async function PUT(request: NextRequest) {
     });
 
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to update suggestion';
-    debugLog('PUT error:', error);
-    
+    debugLog('PUT caught error:', error);
     return NextResponse.json({
       success: false,
-      error: errorMessage
+      error: error instanceof Error ? error.message : 'Failed to update suggestion'
     }, { status: 500 });
   }
 }
@@ -299,8 +305,6 @@ export async function DELETE(request: NextRequest) {
   try {
     const body = await request.json();
     const { id } = body;
-
-    debugLog('DELETE body:', { id });
 
     if (!id) {
       return NextResponse.json({
@@ -316,10 +320,11 @@ export async function DELETE(request: NextRequest) {
 
     if (error) {
       debugLog('DELETE error:', error);
-      throw error;
+      return NextResponse.json({
+        success: false,
+        error: error.message
+      }, { status: 500 });
     }
-
-    debugLog('Successfully deleted suggestion');
 
     return NextResponse.json({
       success: true,
@@ -327,12 +332,10 @@ export async function DELETE(request: NextRequest) {
     });
 
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to delete suggestion';
-    debugLog('DELETE error:', error);
-    
+    debugLog('DELETE caught error:', error);
     return NextResponse.json({
       success: false,
-      error: errorMessage
+      error: error instanceof Error ? error.message : 'Failed to delete suggestion'
     }, { status: 500 });
   }
 }
