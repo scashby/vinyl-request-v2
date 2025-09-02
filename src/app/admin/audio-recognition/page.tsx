@@ -1,4 +1,4 @@
-// src/app/admin/audio-recognition/page.tsx - SIMPLIFIED SILENCE DETECTION
+// src/app/admin/audio-recognition/page.tsx - SIMPLIFIED SILENCE DETECTION WITH CALIBRATION
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from 'react';
@@ -48,15 +48,20 @@ export default function AudioRecognitionPage() {
   const [status, setStatus] = useState('Ready to listen');
 
   // Simple monitoring state
-  const [audioLevel, setAudioLevel] = useState(0); // 0-100 scale
+  const [audioLevel, setAudioLevel] = useState(0);
   const [isInSilence, setIsInSilence] = useState(false);
   const [silenceDuration, setSilenceDuration] = useState(0);
   const [debugInfo, setDebugInfo] = useState<string[]>([]);
 
-  // Simple settings
-  const [silenceThreshold, setSilenceThreshold] = useState(5); // 0-100 scale, lowered default for RMS
-  const [silenceRequiredTime, setSilenceRequiredTime] = useState(3000); // ms
-  const [cooldownTime, setCooldownTime] = useState(15000); // ms
+  // Simple settings with calibration values
+  const [silenceThreshold, setSilenceThreshold] = useState(50);
+  const [silenceRequiredTime, setSilenceRequiredTime] = useState(3000);
+  const [cooldownTime, setCooldownTime] = useState(15000);
+  
+  // Calibration values
+  const [musicBaseline, setMusicBaseline] = useState<number | null>(null);
+  const [silenceBaseline, setSilenceBaseline] = useState<number | null>(null);
+  const [isCalibrating, setIsCalibrating] = useState(false);
 
   // Refs
   const streamRef = useRef<MediaStream | null>(null);
@@ -75,6 +80,38 @@ export default function AudioRecognitionPage() {
     }
     setDebugInfo(prev => [`${timestamp}: ${message}`, ...prev.slice(0, 49)]);
   }, []);
+
+  // Calibration functions
+  const calibrateMusic = useCallback(() => {
+    if (!isListening) return;
+    setIsCalibrating(true);
+    setTimeout(() => {
+      setMusicBaseline(audioLevel);
+      setIsCalibrating(false);
+      addDebugLog(`🎵 Music baseline calibrated: ${audioLevel}%`);
+    }, 500);
+  }, [addDebugLog, audioLevel, isListening]);
+
+  const calibrateSilence = useCallback(() => {
+    if (!isListening) return;
+    setIsCalibrating(true);
+    setTimeout(() => {
+      setSilenceBaseline(audioLevel);
+      setIsCalibrating(false);
+      addDebugLog(`🔇 Silence baseline calibrated: ${audioLevel}%`);
+    }, 500);
+  }, [addDebugLog, audioLevel, isListening]);
+
+  // Calculate dynamic threshold based on calibrated values
+  const getEffectiveThreshold = useCallback(() => {
+    if (musicBaseline === null || silenceBaseline === null) {
+      return silenceThreshold;
+    }
+    
+    const range = musicBaseline - silenceBaseline;
+    const effectiveThreshold = silenceBaseline + (range * silenceThreshold / 100);
+    return effectiveThreshold;
+  }, [musicBaseline, silenceBaseline, silenceThreshold]);
 
   const convertAudioBufferToRawPCM = useCallback(async (audioBuffer: AudioBuffer): Promise<ArrayBuffer> => {
     const maxSamples = Math.min(audioBuffer.length, Math.floor(3 * audioBuffer.sampleRate));
@@ -131,8 +168,8 @@ export default function AudioRecognitionPage() {
         setRecognitionHistory(prev => [newHistoryEntry, ...prev.slice(0, 19)]);
 
         const isNewTrack = !currentTrack ||
-          currentTrack.artist?.toLowerCase() != result.track.artist?.toLowerCase() ||
-          currentTrack.title?.toLowerCase() != result.track.title?.toLowerCase();
+          currentTrack.artist?.toLowerCase() !== result.track.artist?.toLowerCase() ||
+          currentTrack.title?.toLowerCase() !== result.track.title?.toLowerCase();
 
         if (isNewTrack) {
           try {
@@ -215,7 +252,9 @@ export default function AudioRecognitionPage() {
           try {
             processor.disconnect();
             source.disconnect();
-          } catch {}
+          } catch {
+            // ignore
+          }
           addDebugLog(`📊 Captured ${sampleIndex} samples -> processing`);
           processAudioBuffer(audioBuffer, reason).finally(() => {
             captureContext.close();
@@ -229,7 +268,12 @@ export default function AudioRecognitionPage() {
       window.setTimeout(() => {
         if (sampleIndex < bufferSize / 2) {
           addDebugLog(`⚠️ Timeout: only ${sampleIndex}/${bufferSize} samples`);
-          try { processor.disconnect(); source.disconnect(); } catch {}
+          try { 
+            processor.disconnect(); 
+            source.disconnect(); 
+          } catch {
+            // ignore
+          }
           captureContext.close();
           setIsProcessing(false);
           setStatus('❌ Not enough audio captured (timeout)');
@@ -243,7 +287,7 @@ export default function AudioRecognitionPage() {
     }
   }, [addDebugLog, isProcessing, processAudioBuffer]);
 
-  // Simple monitoring loop - just check if we're in silence or not
+  // Simple monitoring loop
   const runMonitoringLoop = useCallback(() => {
     if (!isRunningRef.current || !analyserRef.current) return;
 
@@ -251,36 +295,32 @@ export default function AudioRecognitionPage() {
     const bufferLength = analyser.fftSize;
     const dataArray = new Uint8Array(bufferLength);
     
-    // Use time-domain data for accurate volume detection
     analyser.getByteTimeDomainData(dataArray);
     
-    // MUCH MORE AGGRESSIVE: Just measure how much the audio varies from silence (128)
+    // Calculate audio level
     let totalDeviation = 0;
     for (let i = 0; i < bufferLength; i++) {
       totalDeviation += Math.abs(dataArray[i] - 128);
     }
     const avgDeviation = totalDeviation / bufferLength;
-    
-    // Scale MUCH more aggressively - TV at 15/100 should register as audio, not silence
-    // Your debug shows deviations around 0.5-0.7, so we need 50-100x scaling
-    let scaledLevel = Math.round(avgDeviation * 50); // Much more aggressive scaling
-    
-    // Cap at 100%
+    let scaledLevel = Math.round(avgDeviation * 50);
     scaledLevel = Math.min(scaledLevel, 100);
     
     setAudioLevel(scaledLevel);
 
-    // Debug: Log simpler, clearer info
-    if (Math.random() < 0.02) { // Log ~2% of the time
-      const minVal = Math.min(...dataArray);
-      const maxVal = Math.max(...dataArray);
-      addDebugLog(`📊 Raw audio: min=${minVal} max=${maxVal} | Avg deviation: ${avgDeviation.toFixed(2)} | Scaled: ${scaledLevel}% | TV@15/100 should be >20%`);
-    }
-
     const now = Date.now();
     const timeSinceLast = now - lastRecognitionTimeRef.current;
+    const effectiveThreshold = getEffectiveThreshold();
 
-    // Check if we're in cooldown period
+    if (Math.random() < 0.02) {
+      const minVal = Math.min(...dataArray);
+      const maxVal = Math.max(...dataArray);
+      const calibStatus = musicBaseline !== null && silenceBaseline !== null 
+        ? `Music:${musicBaseline}% Silence:${silenceBaseline}% Threshold:${effectiveThreshold.toFixed(1)}%`
+        : 'Not calibrated - using raw threshold';
+      addDebugLog(`📊 Level: ${scaledLevel}% | ${calibStatus} | Raw: min=${minVal} max=${maxVal}`);
+    }
+
     if (timeSinceLast < cooldownTime) {
       const remain = Math.ceil((cooldownTime - timeSinceLast) / 1000);
       setStatus(`⏱️ Cooldown: ${remain}s (level: ${scaledLevel}%)`);
@@ -290,25 +330,21 @@ export default function AudioRecognitionPage() {
       return;
     }
 
-    // Simple silence detection
-    const currentlyInSilence = scaledLevel < silenceThreshold;
+    const currentlyInSilence = scaledLevel < effectiveThreshold;
 
     if (currentlyInSilence && !isInSilence) {
-      // Just entered silence
       setIsInSilence(true);
       silenceStartTimeRef.current = now;
       setSilenceDuration(0);
-      addDebugLog(`🔇 Entered silence (level ${scaledLevel}% < threshold ${silenceThreshold}%)`);
+      addDebugLog(`🔇 Entered silence (level ${scaledLevel}% < threshold ${effectiveThreshold.toFixed(1)}%)`);
       setStatus(`🔇 Silence detected...`);
     } else if (!currentlyInSilence && isInSilence) {
-      // Just exited silence
       setIsInSilence(false);
       silenceStartTimeRef.current = null;
       setSilenceDuration(0);
-      addDebugLog(`🔊 Exited silence (level ${scaledLevel}% >= threshold ${silenceThreshold}%)`);
+      addDebugLog(`🔊 Exited silence (level ${scaledLevel}% >= threshold ${effectiveThreshold.toFixed(1)}%)`);
       setStatus(`🎧 Audio detected (level: ${scaledLevel}%)`);
     } else if (currentlyInSilence && isInSilence) {
-      // Still in silence - check duration
       const elapsed = now - (silenceStartTimeRef.current || now);
       setSilenceDuration(elapsed);
 
@@ -328,10 +364,12 @@ export default function AudioRecognitionPage() {
         }
       }
     } else {
-      // Not in silence
-      setStatus(`🎧 Audio level: ${scaledLevel}% (threshold: ${silenceThreshold}%)`);
+      const calibStatus = musicBaseline !== null && silenceBaseline !== null
+        ? `Calibrated (Music: ${musicBaseline}%, Silence: ${silenceBaseline}%)`
+        : 'Not calibrated - please set baselines';
+      setStatus(`🎧 Audio level: ${scaledLevel}% | Threshold: ${effectiveThreshold.toFixed(1)}% | ${calibStatus}`);
     }
-  }, [addDebugLog, cooldownTime, isInSilence, isProcessing, silenceRequiredTime, silenceThreshold, triggerRecognition]);
+  }, [addDebugLog, cooldownTime, getEffectiveThreshold, isInSilence, isProcessing, musicBaseline, silenceBaseline, silenceRequiredTime, triggerRecognition]);
 
   const startListening = useCallback(async () => {
     addDebugLog('🎤 Starting audio recognition system...');
@@ -352,7 +390,7 @@ export default function AudioRecognitionPage() {
 
       const analyser = audioContext.createAnalyser();
       analyser.fftSize = 2048;
-      analyser.smoothingTimeConstant = 0.3; // Smooth out the levels
+      analyser.smoothingTimeConstant = 0.3;
       const source = audioContext.createMediaStreamSource(stream);
       source.connect(analyser);
 
@@ -375,14 +413,11 @@ export default function AudioRecognitionPage() {
         document.removeEventListener('visibilitychange', onVisibility);
       };
 
-      // RESTORE PROPER WORKFLOW: Recognize immediately, then monitor for silence
-      // Initial recognition after short startup delay
       window.setTimeout(() => {
         addDebugLog('🎯 Starting with immediate recognition...');
         triggerRecognition('Initial recognition');
       }, 1000);
 
-      // Start monitoring for silence detection immediately
       addDebugLog('📊 Starting silence monitoring...');
       monitoringIntervalRef.current = window.setInterval(runMonitoringLoop, 200);
 
@@ -470,13 +505,12 @@ export default function AudioRecognitionPage() {
     return `${m}:${r.toString().padStart(2, '0')}`;
   }, []);
 
-  // Create 10-box VU meter component
   const VUMeter = ({ level }: { level: number }) => {
     const boxes = [];
     for (let i = 0; i < 10; i++) {
-      const threshold = (i + 1) * 10; // 10%, 20%, 30%, etc.
+      const threshold = (i + 1) * 10;
       const isActive = level >= threshold;
-      const isSilence = i < 2; // First two boxes are silence indicators
+      const isSilence = i < 2;
       
       boxes.push(
         <div
@@ -518,7 +552,7 @@ export default function AudioRecognitionPage() {
     <div style={{ padding: 24, background: '#fff', color: '#222', minHeight: '100vh', maxWidth: 1200, margin: '0 auto' }}>
       <div style={{ marginBottom: 32 }}>
         <h1 style={{ fontSize: 32, fontWeight: 'bold', marginBottom: 8 }}>🎵 Audio Recognition Control</h1>
-        <p style={{ color: '#666', fontSize: 16 }}>Simple silence detection with mixer-style VU meter</p>
+        <p style={{ color: '#666', fontSize: 16 }}>Simple silence detection with calibration and mixer-style VU meter</p>
       </div>
 
       <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 24, marginBottom: 32 }}>
@@ -526,16 +560,37 @@ export default function AudioRecognitionPage() {
           <button
             onClick={isListening ? stopListening : startListening}
             disabled={isProcessing}
-            style={{ background: isListening ? '#dc2626' : '#16a34a', color: 'white', border: 'none', borderRadius: 8, padding: '12px 24px', fontSize: 16, fontWeight: 600, cursor: isProcessing ? 'not-allowed' : 'pointer', opacity: isProcessing ? 0.6 : 1 }}>
+            style={{ 
+              background: isListening ? '#dc2626' : '#16a34a', 
+              color: 'white', 
+              border: 'none', 
+              borderRadius: 8, 
+              padding: '12px 24px', 
+              fontSize: 16, 
+              fontWeight: 600, 
+              cursor: isProcessing ? 'not-allowed' : 'pointer', 
+              opacity: isProcessing ? 0.6 : 1 
+            }}
+          >
             {isListening ? '🛑 Stop Listening' : '🎤 Start Listening'}
           </button>
 
-          {/* Manual trigger button for testing */}
           {isListening && (
             <button
               onClick={() => triggerRecognition('Manual trigger')}
               disabled={isProcessing}
-              style={{ background: '#7c3aed', color: 'white', border: 'none', borderRadius: 8, padding: '12px 24px', fontSize: 16, fontWeight: 600, cursor: isProcessing ? 'not-allowed' : 'pointer', opacity: isProcessing ? 0.6 : 1 }}>
+              style={{ 
+                background: '#7c3aed', 
+                color: 'white', 
+                border: 'none', 
+                borderRadius: 8, 
+                padding: '12px 24px', 
+                fontSize: 16, 
+                fontWeight: 600, 
+                cursor: isProcessing ? 'not-allowed' : 'pointer', 
+                opacity: isProcessing ? 0.6 : 1 
+              }}
+            >
               {isProcessing ? '🎤 Processing...' : '🎯 Trigger Now'}
             </button>
           )}
@@ -564,20 +619,20 @@ export default function AudioRecognitionPage() {
                 fontSize: 24, 
                 fontWeight: 'bold', 
                 minWidth: 60,
-                color: audioLevel < silenceThreshold ? '#dc2626' : '#16a34a' 
+                color: audioLevel < getEffectiveThreshold() ? '#dc2626' : '#16a34a' 
               }}>
                 {audioLevel}%
               </div>
               <div style={{ 
                 fontSize: 12, 
                 fontWeight: 700, 
-                color: audioLevel < silenceThreshold ? '#dc2626' : '#16a34a',
+                color: audioLevel < getEffectiveThreshold() ? '#dc2626' : '#16a34a',
                 padding: '4px 12px', 
                 borderRadius: 4, 
-                background: audioLevel < silenceThreshold ? '#fef2f2' : '#f0fdf4',
-                border: `2px solid ${audioLevel < silenceThreshold ? '#fca5a5' : '#bbf7d0'}`
+                background: audioLevel < getEffectiveThreshold() ? '#fef2f2' : '#f0fdf4',
+                border: `2px solid ${audioLevel < getEffectiveThreshold() ? '#fca5a5' : '#bbf7d0'}`
               }}>
-                {audioLevel < silenceThreshold ? '🔇 SILENCE' : '🔊 AUDIO'}
+                {audioLevel < getEffectiveThreshold() ? '🔇 SILENCE' : '🔊 AUDIO'}
               </div>
             </div>
 
@@ -587,6 +642,65 @@ export default function AudioRecognitionPage() {
                 {silenceDuration >= silenceRequiredTime * 0.8 && (<span style={{ color: '#dc2626', marginLeft: 8 }}>⚡ ALMOST TRIGGERING!</span>)}
               </div>
             )}
+          </div>
+        )}
+
+        {isListening && (
+          <div style={{ marginBottom: 16, padding: 16, background: '#fef3c7', border: '2px solid #f59e0b', borderRadius: 8 }}>
+            <h3 style={{ margin: '0 0 12px 0', fontSize: 16, fontWeight: 600, color: '#92400e' }}>
+              📏 Audio Calibration
+            </h3>
+            <div style={{ display: 'flex', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+              <button
+                onClick={calibrateMusic}
+                disabled={isCalibrating || isProcessing}
+                style={{ 
+                  background: '#16a34a', 
+                  color: 'white', 
+                  border: 'none', 
+                  borderRadius: 6, 
+                  padding: '8px 16px', 
+                  fontSize: 14, 
+                  fontWeight: 600,
+                  cursor: isCalibrating || isProcessing ? 'not-allowed' : 'pointer',
+                  opacity: isCalibrating || isProcessing ? 0.6 : 1
+                }}
+              >
+                🎵 Calibrate Music Level
+              </button>
+              <button
+                onClick={calibrateSilence}
+                disabled={isCalibrating || isProcessing}
+                style={{ 
+                  background: '#dc2626', 
+                  color: 'white', 
+                  border: 'none', 
+                  borderRadius: 6, 
+                  padding: '8px 16px', 
+                  fontSize: 14, 
+                  fontWeight: 600,
+                  cursor: isCalibrating || isProcessing ? 'not-allowed' : 'pointer',
+                  opacity: isCalibrating || isProcessing ? 0.6 : 1
+                }}
+              >
+                🔇 Calibrate Silence Level
+              </button>
+            </div>
+            <div style={{ fontSize: 12, color: '#92400e' }}>
+              <strong>Instructions:</strong> Play music at normal volume, click &quot;Calibrate Music Level&quot;. 
+              Then pause/mute music and click &quot;Calibrate Silence Level&quot;. 
+              The threshold slider then works as a percentage between these two points.
+              {musicBaseline !== null && silenceBaseline !== null && (
+                <div style={{ marginTop: 8, fontWeight: 600, color: '#16a34a' }}>
+                  ✅ Calibrated: Music at {musicBaseline}%, Silence at {silenceBaseline}%
+                </div>
+              )}
+              {(musicBaseline === null || silenceBaseline === null) && (
+                <div style={{ marginTop: 8, fontWeight: 600, color: '#dc2626' }}>
+                  ⚠️ Not calibrated - system will use raw threshold values
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -600,13 +714,16 @@ export default function AudioRecognitionPage() {
               <input 
                 type="range" 
                 min="5" 
-                max="50" 
+                max="95" 
                 value={silenceThreshold} 
                 onChange={(e) => setSilenceThreshold(parseInt(e.target.value))}
                 style={{ width: '100%' }}
               />
               <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
-                Audio below this level = silence
+                {musicBaseline !== null && silenceBaseline !== null 
+                  ? `Percentage between silence (${silenceBaseline}%) and music (${musicBaseline}%)`
+                  : 'Raw audio threshold - calibrate for better accuracy'
+                }
               </div>
             </div>
             
@@ -650,7 +767,7 @@ export default function AudioRecognitionPage() {
 
         <div style={{ marginTop: 16, padding: 12, background: '#f0fdf4', border: '1px solid #22c55e', borderRadius: 8, fontSize: 12, color: '#15803d' }}>
           <strong>📊 VU METER GUIDE:</strong> First 2 boxes (red) = silence detection zone. Remaining 8 boxes (green) = audio levels. 
-          Adjust the silence threshold slider to set when recognition should trigger.<br/>
+          Calibrate your system first for accurate detection.<br/>
           <strong>🎯 MANUAL TRIGGER:</strong> Use the &quot;Trigger Now&quot; button to test recognition while debugging audio detection.
         </div>
       </div>
