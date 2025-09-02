@@ -35,24 +35,18 @@ interface WindowWithWebkitAudioContext extends Window {
 }
 
 export default function AudioRecognitionPage() {
-  // System state
   const [isListening, setIsListening] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentTrack, setCurrentTrack] = useState<NowPlayingState | null>(null);
   const [recognitionHistory, setRecognitionHistory] = useState<RecognitionResult[]>([]);
   const [status, setStatus] = useState('System ready - calibrate first');
-
-  // Audio monitoring
   const [audioLevel, setAudioLevel] = useState(0);
   const [isInSilence, setIsInSilence] = useState(false);
   const [silenceDuration, setSilenceDuration] = useState(0);
-
-  // Simple calibration - two values + adjustable silence threshold
   const [musicLevel, setMusicLevel] = useState<number | null>(null);
   const [silenceLevel, setSilenceLevel] = useState<number | null>(null);
-  const [silenceThreshold, setSilenceThreshold] = useState(5); // Percentage below which = silence
+  const [silenceThreshold, setSilenceThreshold] = useState(5);
 
-  // Refs
   const streamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -224,7 +218,6 @@ export default function AudioRecognitionPage() {
     }
   }, [isProcessing, processAudioBuffer]);
 
-  // Simple monitoring - scale where silence=0% and music=50%
   const runMonitoring = useCallback(() => {
     if (!isRunningRef.current || !analyserRef.current || musicLevel === null || silenceLevel === null) return;
 
@@ -233,28 +226,24 @@ export default function AudioRecognitionPage() {
     const dataArray = new Uint8Array(bufferLength);
     analyser.getByteTimeDomainData(dataArray);
 
-    // Calculate current raw audio level
-    let totalDeviation = 0;
+    let sum = 0;
     for (let i = 0; i < bufferLength; i++) {
-      totalDeviation += Math.abs(dataArray[i] - 128);
+      sum += Math.abs(dataArray[i] - 128);
     }
-    const rawLevel = Math.round(totalDeviation / bufferLength * 50);
-    setAudioLevel(Math.min(rawLevel, 100));
+    const rawLevel = Math.round(sum / bufferLength * 50);
 
-    // Scale to 0-50 where silenceLevel = 0% and musicLevel = 50%
     const range = musicLevel - silenceLevel;
     let scaledPercentage = 0;
     if (range > 0) {
       scaledPercentage = Math.max(0, Math.min(50, ((rawLevel - silenceLevel) / range) * 50));
     }
 
-    // Check if scaled percentage is below silence threshold
-    const currentlyInSilence = scaledPercentage < silenceThreshold;
+    setAudioLevel(Math.round(scaledPercentage));
 
+    const currentlyInSilence = scaledPercentage < silenceThreshold;
     const now = Date.now();
     const timeSinceLast = now - lastRecognitionTimeRef.current;
 
-    // Cooldown period
     if (timeSinceLast < 15000) {
       const remain = Math.ceil((15000 - timeSinceLast) / 1000);
       setStatus(`Cooldown: ${remain}s (${scaledPercentage.toFixed(1)}%)`);
@@ -293,7 +282,6 @@ export default function AudioRecognitionPage() {
     }
   }, [isInSilence, isProcessing, musicLevel, silenceLevel, silenceThreshold, triggerRecognition]);
 
-  // Calibration functions - capture current audio level
   const calibrateMusic = useCallback(() => {
     if (!audioContextRef.current) return;
     setMusicLevel(audioLevel);
@@ -306,7 +294,6 @@ export default function AudioRecognitionPage() {
     setStatus(`Silence level set to: ${audioLevel}`);
   }, [audioLevel]);
 
-  // Setup audio monitoring (for calibration and recognition)
   const setupAudioMonitoring = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -331,18 +318,17 @@ export default function AudioRecognitionPage() {
       audioContextRef.current = audioContext;
       analyserRef.current = analyser;
 
-      // Start basic audio level monitoring
       const updateLevel = () => {
         if (!analyser) return;
         const bufferLength = analyser.fftSize;
         const dataArray = new Uint8Array(bufferLength);
         analyser.getByteTimeDomainData(dataArray);
         
-        let totalDeviation = 0;
+        let totalDev = 0;
         for (let i = 0; i < bufferLength; i++) {
-          totalDeviation += Math.abs(dataArray[i] - 128);
+          totalDev += Math.abs(dataArray[i] - 128);
         }
-        const level = Math.round(totalDeviation / bufferLength * 50);
+        const level = Math.round(totalDev / bufferLength * 50);
         setAudioLevel(Math.min(level, 100));
       };
 
@@ -365,12 +351,10 @@ export default function AudioRecognitionPage() {
     setIsListening(true);
     setStatus('Starting recognition system...');
 
-    // Immediate recognition
     setTimeout(() => {
       triggerRecognition('Initial recognition');
     }, 1000);
 
-    // Start monitoring for silence
     monitoringIntervalRef.current = window.setInterval(runMonitoring, 200);
   }, [musicLevel, runMonitoring, silenceLevel, triggerRecognition]);
 
@@ -424,11 +408,10 @@ export default function AudioRecognitionPage() {
     }
   }, []);
 
-  // VU Meter - 10 boxes
   const VUMeter = ({ level }: { level: number }) => {
     const boxes = [];
     for (let i = 0; i < 10; i++) {
-      const threshold = (i + 1) * 10;
+      const threshold = (i + 1) * 5; // 0-50% scale, so each box is 5%
       const isActive = level >= threshold;
       const isSilence = i < 2;
       
@@ -477,7 +460,6 @@ export default function AudioRecognitionPage() {
         <p style={{ color: '#666', fontSize: 16 }}>Simple calibration-based silence detection</p>
       </div>
 
-      {/* Calibration Section */}
       {!audioContextRef.current && (
         <div style={{ background: '#fef3c7', border: '2px solid #f59e0b', borderRadius: 12, padding: 24, marginBottom: 24 }}>
           <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 16, color: '#92400e' }}>
@@ -559,7 +541,6 @@ export default function AudioRecognitionPage() {
         </div>
       )}
 
-      {/* Recognition System */}
       {isCalibrated && (
         <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 24, marginBottom: 32 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
@@ -613,12 +594,12 @@ export default function AudioRecognitionPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
             <span style={{ fontSize: 14, fontWeight: 600 }}>Audio Level:</span>
             <VUMeter level={audioLevel} />
-            <span style={{ fontSize: 20, fontWeight: 'bold', color: musicLevel !== null && silenceLevel !== null && audioLevel < (musicLevel + silenceLevel) / 2 ? '#dc2626' : '#16a34a' }}>
+            <span style={{ fontSize: 20, fontWeight: 'bold', color: musicLevel !== null && silenceLevel !== null && audioLevel < silenceThreshold ? '#dc2626' : '#16a34a' }}>
               {audioLevel}%
             </span>
           </div>
 
-          <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
+          <div style={{ display: 'flex', gap: 16, marginBottom: 16, alignItems: 'center' }}>
             <button
               onClick={calibrateMusic}
               style={{
