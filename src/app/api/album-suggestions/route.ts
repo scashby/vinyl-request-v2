@@ -2,7 +2,7 @@
 // Replace: src/app/api/album-suggestions/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from 'src/lib/supabaseClient';
+import { supabaseAdmin } from 'src/lib/supabaseAdmin'; // Use service role client
 
 // Enable detailed logging
 const DEBUG = true;
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
     debugLog('Attempting to check for existing suggestion');
     
     // Check if suggestion already exists (to avoid duplicates)
-    const { data: existing, error: existingError } = await supabase
+    const { data: existing, error: existingError } = await supabaseAdmin()
       .from('album_suggestions')
       .select('id, contribution_amount')
       .eq('artist', artist.trim())
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
       debugLog('Found existing suggestion, updating:', existing.id);
       
       // Update existing record with proper field handling
-      const { data: updateData, error } = await supabase
+      const { data: updateData, error } = await supabaseAdmin()
         .from('album_suggestions')
         .update({
           updated_at: new Date().toISOString(),
@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
 
       debugLog('Insert data prepared:', insertData);
 
-      const { data: insertedData, error } = await supabase
+      const { data: insertedData, error } = await supabaseAdmin()
         .from('album_suggestions')
         .insert(insertData)
         .select()
@@ -200,7 +200,7 @@ export async function GET(request: NextRequest) {
 
     debugLog('GET parameters:', { status, limit });
 
-    let query = supabase
+    let query = supabaseAdmin()
       .from('album_suggestions')
       .select('*')
       .order('created_at', { ascending: false })
@@ -236,7 +236,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// PUT - Update suggestion status (for admin)
+// PUT - Update suggestion status (for admin)  
 export async function PUT(request: NextRequest) {
   debugLog('PUT request received');
   
@@ -263,8 +263,8 @@ export async function PUT(request: NextRequest) {
       updateData.admin_notes = admin_notes;
     }
 
-    // Don't use .single() - just update and check the count
-    const { data, error, count } = await supabase
+    // Use service role client to bypass RLS
+    const { data, error } = await supabaseAdmin()
       .from('album_suggestions')
       .update(updateData)
       .eq('id', id)
@@ -274,14 +274,14 @@ export async function PUT(request: NextRequest) {
       debugLog('PUT error:', error);
       return NextResponse.json({
         success: false,
-        error: error.message
+        error: `Database error: ${error.message}. This is likely an RLS permissions issue. Check that your API is using service role key.`
       }, { status: 500 });
     }
 
-    if (count === 0 || !data || data.length === 0) {
+    if (!data || data.length === 0) {
       return NextResponse.json({
         success: false,
-        error: 'Suggestion not found'
+        error: 'No records updated. This suggests RLS is blocking the update operation.'
       }, { status: 404 });
     }
 
@@ -289,7 +289,7 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: data[0], // Return the first (and only) updated record
+      data: data[0],
       message: 'Suggestion updated successfully'
     });
 
@@ -318,7 +318,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Don't use .single() - just delete and check the count
-    const { error, count } = await supabase
+    const { error } = await supabaseAdmin()
       .from('album_suggestions')
       .delete()
       .eq('id', id);
