@@ -49,6 +49,11 @@ export default function AudioRecognitionPage() {
   const [isInSilence, setIsInSilence] = useState(false);
   const [silenceCounter, setSilenceCounter] = useState(0);
   const [debugInfo, setDebugInfo] = useState<string[]>([]);
+  const [activityLog, setActivityLog] = useState<Array<{
+    timestamp: string;
+    message: string;
+    type: 'info' | 'warning' | 'error' | 'success';
+  }>>([]);
 
   const streamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -56,6 +61,32 @@ export default function AudioRecognitionPage() {
   const isRunningRef = useRef<boolean>(false);
   const monitoringIntervalRef = useRef<number | null>(null);
   const silenceStartRef = useRef<number>(0);
+  const musicLevelRef = useRef<number>(50);
+  const silenceLevelRef = useRef<number>(10);
+  const silenceThresholdRef = useRef<number>(3);
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    musicLevelRef.current = musicLevel;
+  }, [musicLevel]);
+
+  useEffect(() => {
+    silenceLevelRef.current = silenceLevel;
+  }, [silenceLevel]);
+
+  useEffect(() => {
+    silenceThresholdRef.current = silenceThreshold;
+  }, [silenceThreshold]);
+
+  // Add entries to activity log
+  const addLogEntry = useCallback((message: string, type: 'info' | 'warning' | 'error' | 'success' = 'info') => {
+    const timestamp = new Date().toLocaleTimeString();
+    setActivityLog(prev => [{
+      timestamp,
+      message,
+      type
+    }, ...prev.slice(0, 99)]); // Keep last 100 entries
+  }, []);
 
   // Use actual calibration data from your measurements
   const getCurrentAudioLevel = useCallback((): number => {
@@ -285,17 +316,22 @@ export default function AudioRecognitionPage() {
     }
   }, [isProcessing, processAudioBuffer]);
 
-  // Main monitoring loop
+  // Main monitoring loop with logging - uses refs for current values
   const runMonitoring = useCallback(() => {
     if (!isRunningRef.current || !analyserRef.current) return;
 
     const level = getCurrentAudioLevel();
     setCurrentLevel(level);
 
+    // Use current values from refs (not stale closure values)
+    const currentSilenceLevel = silenceLevelRef.current;
+    const currentSilenceThreshold = silenceThresholdRef.current;
+    const currentMusicLevel = musicLevelRef.current;
+
     // Simple silence detection logic
-    if (level < silenceLevel) {
+    if (level < currentSilenceLevel) {
       if (!isInSilence) {
-        console.log('ENTERING SILENCE');
+        addLogEntry(`Entering silence - Level: ${level}dB (threshold: ${currentSilenceLevel}dB)`, 'warning');
         setIsInSilence(true);
         silenceStartRef.current = Date.now();
         setSilenceCounter(0);
@@ -304,8 +340,8 @@ export default function AudioRecognitionPage() {
         const secondsElapsed = Math.floor(elapsed / 1000);
         setSilenceCounter(secondsElapsed);
         
-        if (secondsElapsed >= silenceThreshold) {
-          console.log(`SILENCE THRESHOLD REACHED (${silenceThreshold}s) - TRIGGERING RECOGNITION`);
+        if (secondsElapsed >= currentSilenceThreshold) {
+          addLogEntry(`Silence threshold reached (${currentSilenceThreshold}s) - Triggering recognition`, 'success');
           setIsInSilence(false);
           setSilenceCounter(0);
           captureAudio('Silence detected');
@@ -313,21 +349,21 @@ export default function AudioRecognitionPage() {
       }
     } else {
       if (isInSilence) {
-        console.log('EXITING SILENCE');
+        addLogEntry(`Exiting silence - Level: ${level}dB`, 'info');
         setIsInSilence(false);
         setSilenceCounter(0);
       }
     }
 
-    // Update status
+    // Update status with current values
     if (isProcessing) {
       setStatus('🎙️ Processing audio...');
     } else if (isInSilence) {
-      setStatus(`🔇 Silence: ${silenceCounter}s / ${silenceThreshold}s (Level: ${level})`);
+      setStatus(`🔇 Silence: ${silenceCounter}s / ${currentSilenceThreshold}s (Level: ${level})`);
     } else {
-      setStatus(`🎵 Monitoring (Level: ${level} | Music: ${musicLevel} | Silence: ${silenceLevel})`);
+      setStatus(`🎵 Monitoring (Level: ${level} | Music: ${currentMusicLevel} | Silence: ${currentSilenceLevel})`);
     }
-  }, [getCurrentAudioLevel, isInSilence, isProcessing, musicLevel, silenceLevel, silenceThreshold, silenceCounter, captureAudio]);
+  }, [getCurrentAudioLevel, isInSilence, isProcessing, silenceCounter, captureAudio, addLogEntry]);
 
   // Setup microphone
   const setupMicrophone = useCallback(async () => {
@@ -656,7 +692,7 @@ export default function AudioRecognitionPage() {
             {status}
           </div>
 
-          {/* Debug Console */}
+          {/* Live Debug Monitor */}
           {debugInfo.length > 0 && (
             <div style={{ 
               marginTop: 16,
@@ -668,10 +704,54 @@ export default function AudioRecognitionPage() {
               fontSize: 12,
               border: '2px solid #374151'
             }}>
-              <div style={{ fontWeight: 600, marginBottom: 8, color: '#10b981' }}>🖥️ Debug Console:</div>
+              <div style={{ fontWeight: 600, marginBottom: 8, color: '#10b981' }}>📊 Live Monitor:</div>
               {debugInfo.map((info, i) => (
                 <div key={i} style={{ marginBottom: 2, color: '#e5e7eb' }}>{info}</div>
               ))}
+            </div>
+          )}
+
+          {/* Activity Log */}
+          {activityLog.length > 0 && (
+            <div style={{
+              marginTop: 16,
+              background: '#111827',
+              border: '2px solid #374151',
+              borderRadius: 8,
+              overflow: 'hidden'
+            }}>
+              <div style={{ 
+                background: '#1f2937', 
+                color: '#10b981', 
+                padding: '12px 16px', 
+                fontWeight: 600, 
+                fontSize: 14,
+                borderBottom: '1px solid #374151'
+              }}>
+                📋 Activity Log
+              </div>
+              <div style={{ 
+                maxHeight: 200, 
+                overflowY: 'auto',
+                fontFamily: 'monospace',
+                fontSize: 11
+              }}>
+                {activityLog.map((entry, i) => (
+                  <div 
+                    key={i} 
+                    style={{ 
+                      padding: '8px 16px', 
+                      borderBottom: i < activityLog.length - 1 ? '1px solid #374151' : 'none',
+                      color: entry.type === 'error' ? '#f87171' : 
+                             entry.type === 'warning' ? '#fbbf24' :
+                             entry.type === 'success' ? '#34d399' : '#e5e7eb'
+                    }}
+                  >
+                    <span style={{ color: '#9ca3af', marginRight: 8 }}>[{entry.timestamp}]</span>
+                    {entry.message}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
