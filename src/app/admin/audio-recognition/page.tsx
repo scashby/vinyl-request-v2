@@ -254,17 +254,16 @@ export default function AudioRecognitionPage() {
     // Use time-domain data for accurate volume detection
     analyser.getByteTimeDomainData(dataArray);
     
-    // MUCH SIMPLER: Just measure how much the audio varies from silence (128)
-    // Calculate the average deviation from the center point
+    // MUCH MORE AGGRESSIVE: Just measure how much the audio varies from silence (128)
     let totalDeviation = 0;
     for (let i = 0; i < bufferLength; i++) {
       totalDeviation += Math.abs(dataArray[i] - 128);
     }
     const avgDeviation = totalDeviation / bufferLength;
     
-    // Scale aggressively for real-world audio levels
-    // Typical audio might only deviate 1-10 points from 128, so multiply by 10-20
-    let scaledLevel = Math.round(avgDeviation * 15); // Much more aggressive scaling
+    // Scale MUCH more aggressively - TV at 15/100 should register as audio, not silence
+    // Your debug shows deviations around 0.5-0.7, so we need 50-100x scaling
+    let scaledLevel = Math.round(avgDeviation * 50); // Much more aggressive scaling
     
     // Cap at 100%
     scaledLevel = Math.min(scaledLevel, 100);
@@ -275,7 +274,7 @@ export default function AudioRecognitionPage() {
     if (Math.random() < 0.02) { // Log ~2% of the time
       const minVal = Math.min(...dataArray);
       const maxVal = Math.max(...dataArray);
-      addDebugLog(`📊 Raw audio: min=${minVal} max=${maxVal} | Avg deviation from 128: ${avgDeviation.toFixed(2)} | Scaled level: ${scaledLevel}%`);
+      addDebugLog(`📊 Raw audio: min=${minVal} max=${maxVal} | Avg deviation: ${avgDeviation.toFixed(2)} | Scaled: ${scaledLevel}% | TV@15/100 should be >20%`);
     }
 
     const now = Date.now();
@@ -364,7 +363,7 @@ export default function AudioRecognitionPage() {
 
       setIsListening(true);
       setDebugInfo([]);
-      setStatus('🎤 System started - listening for silence...');
+      setStatus('🎤 System started - initial recognition...');
 
       const onVisibility = () => {
         if (document.visibilityState === 'visible') {
@@ -376,16 +375,23 @@ export default function AudioRecognitionPage() {
         document.removeEventListener('visibilitychange', onVisibility);
       };
 
-      // Start monitoring immediately
-      addDebugLog('📊 Starting simple silence monitoring...');
-      monitoringIntervalRef.current = window.setInterval(runMonitoringLoop, 200); // Check every 200ms
+      // RESTORE PROPER WORKFLOW: Recognize immediately, then monitor for silence
+      // Initial recognition after short startup delay
+      window.setTimeout(() => {
+        addDebugLog('🎯 Starting with immediate recognition...');
+        triggerRecognition('Initial recognition');
+      }, 1000);
+
+      // Start monitoring for silence detection immediately
+      addDebugLog('📊 Starting silence monitoring...');
+      monitoringIntervalRef.current = window.setInterval(runMonitoringLoop, 200);
 
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       addDebugLog(`❌ Microphone error: ${msg}`);
       setStatus(`❌ Microphone access failed: ${msg}`);
     }
-  }, [addDebugLog, runMonitoringLoop]);
+  }, [addDebugLog, runMonitoringLoop, triggerRecognition]);
 
   const stopListening = useCallback(() => {
     addDebugLog('🛑 Stopping audio recognition system');
