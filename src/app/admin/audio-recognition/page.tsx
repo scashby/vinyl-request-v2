@@ -54,7 +54,7 @@ export default function AudioRecognitionPage() {
   const [debugInfo, setDebugInfo] = useState<string[]>([]);
 
   // Simple settings
-  const [silenceThreshold, setSilenceThreshold] = useState(15); // 0-100 scale, default 15%
+  const [silenceThreshold, setSilenceThreshold] = useState(5); // 0-100 scale, lowered default for RMS
   const [silenceRequiredTime, setSilenceRequiredTime] = useState(3000); // ms
   const [cooldownTime, setCooldownTime] = useState(15000); // ms
 
@@ -248,21 +248,27 @@ export default function AudioRecognitionPage() {
     if (!isRunningRef.current || !analyserRef.current) return;
 
     const analyser = analyserRef.current;
-    const bufferLength = analyser.frequencyBinCount;
+    const bufferLength = analyser.fftSize;
     const dataArray = new Uint8Array(bufferLength);
     
-    // Use frequency data for better volume detection
-    analyser.getByteFrequencyData(dataArray);
+    // Use time-domain data for accurate volume detection (like before)
+    analyser.getByteTimeDomainData(dataArray);
     
-    // Calculate average level and scale to 0-100
+    // Calculate RMS (Root Mean Square) for proper volume measurement
     let sum = 0;
     for (let i = 0; i < bufferLength; i++) {
-      sum += dataArray[i];
+      const normalized = (dataArray[i] - 128) / 128; // Convert from 0-255 to -1 to +1
+      sum += normalized * normalized;
     }
-    const avgLevel = sum / bufferLength; // 0-255
-    const scaledLevel = Math.round((avgLevel / 255) * 100); // 0-100
+    const rms = Math.sqrt(sum / bufferLength); // 0-1 range
+    const scaledLevel = Math.round(rms * 100); // Convert to 0-100 percentage
     
     setAudioLevel(scaledLevel);
+
+    // Debug: Log audio levels periodically so we can see what's happening
+    if (Math.random() < 0.01) { // Log ~1% of the time to avoid spam
+      addDebugLog(`🔊 Audio level: ${scaledLevel}% (RMS: ${rms.toFixed(3)})`);
+    }
 
     const now = Date.now();
     const timeSinceLast = now - lastRecognitionTimeRef.current;
