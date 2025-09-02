@@ -1,4 +1,4 @@
-// src/app/admin/audio-recognition/page.tsx - SIMPLE CALIBRATION SYSTEM
+// src/app/admin/audio-recognition/page.tsx - SIMPLE WORKING SYSTEM
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from 'react';
@@ -39,23 +39,68 @@ export default function AudioRecognitionPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentTrack, setCurrentTrack] = useState<NowPlayingState | null>(null);
   const [recognitionHistory, setRecognitionHistory] = useState<RecognitionResult[]>([]);
-  const [status, setStatus] = useState('System ready - calibrate first');
-  const [audioLevel, setAudioLevel] = useState(0);
+  const [status, setStatus] = useState('Enable microphone to start');
+  const [currentLevel, setCurrentLevel] = useState(0);
+  
+  // Simple manual controls
+  const [musicLevel, setMusicLevel] = useState(50); // Manual input for music level (75-85dB range)
+  const [silenceLevel, setSilenceLevel] = useState(10); // Manual input for silence level (ambient)
+  const [silenceThreshold, setSilenceThreshold] = useState(3); // Seconds to wait in silence
   const [isInSilence, setIsInSilence] = useState(false);
-  const [silenceDuration, setSilenceDuration] = useState(0);
-  const [musicLevel, setMusicLevel] = useState<number | null>(null);
-  const [silenceLevel, setSilenceLevel] = useState<number | null>(null);
-  const [silenceThreshold, setSilenceThreshold] = useState(5);
+  const [silenceCounter, setSilenceCounter] = useState(0);
   const [debugInfo, setDebugInfo] = useState<string[]>([]);
 
   const streamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const isRunningRef = useRef<boolean>(false);
-  const silenceStartTimeRef = useRef<number | null>(null);
-  const lastRecognitionTimeRef = useRef<number>(0);
   const monitoringIntervalRef = useRef<number | null>(null);
+  const silenceStartRef = useRef<number>(0);
 
+  // SIMPLE amplitude detection - no fancy math
+  const getCurrentAudioLevel = useCallback((): number => {
+    if (!analyserRef.current) return 0;
+    
+    const analyser = analyserRef.current;
+    const bufferLength = analyser.fftSize;
+    const dataArray = new Uint8Array(bufferLength);
+    analyser.getByteFrequencyData(dataArray); // Use frequency data for more stable readings
+    
+    // Get average amplitude across all frequencies
+    let sum = 0;
+    for (let i = 0; i < bufferLength; i++) {
+      sum += dataArray[i];
+    }
+    const average = sum / bufferLength;
+    
+    // Scale to 0-100 for display
+    const level = Math.round((average / 255) * 100);
+    
+    console.log('=== AUDIO LEVEL ===');
+    console.log('Raw average:', average);
+    console.log('Scaled level (0-100):', level);
+    console.log('Music threshold:', musicLevel);
+    console.log('Silence threshold:', silenceLevel);
+    console.log('Currently above music level?', level > musicLevel);
+    console.log('Currently below silence level?', level < silenceLevel);
+    console.log('==================');
+    
+    // Update debug info for on-page console
+    setDebugInfo([
+      `Raw average: ${average.toFixed(1)}`,
+      `Scaled level: ${level}`,
+      `Music threshold: ${musicLevel}`,
+      `Silence threshold: ${silenceLevel}`,
+      `Above music? ${level > musicLevel}`,
+      `Below silence? ${level < silenceLevel}`,
+      `Is in silence: ${isInSilence}`,
+      `Silence counter: ${silenceCounter}s`
+    ]);
+    
+    return level;
+  }, [musicLevel, silenceLevel, isInSilence, silenceCounter]);
+
+  // Convert audio buffer for recognition API
   const convertAudioBufferToRawPCM = useCallback(async (audioBuffer: AudioBuffer): Promise<ArrayBuffer> => {
     const maxSamples = Math.min(audioBuffer.length, Math.floor(3 * audioBuffer.sampleRate));
     const channelData = audioBuffer.getChannelData(0);
@@ -67,10 +112,17 @@ export default function AudioRecognitionPage() {
     return pcmData.buffer;
   }, []);
 
+  // Process audio for recognition
   const processAudioBuffer = useCallback(async (audioBuffer: AudioBuffer, reason: string) => {
     try {
       setStatus(`Processing audio for ${reason}...`);
+      console.log('=== PROCESSING AUDIO ===');
+      console.log('Reason:', reason);
+      console.log('Buffer length:', audioBuffer.length);
+      console.log('Sample rate:', audioBuffer.sampleRate);
+      
       const rawPCMAudio = await convertAudioBufferToRawPCM(audioBuffer);
+      
       const response = await fetch('/api/audio-recognition', {
         method: 'POST',
         headers: { 'Content-Type': 'application/octet-stream' },
@@ -96,7 +148,8 @@ export default function AudioRecognitionPage() {
       } = await response.json();
 
       if (result.success && result.track) {
-        setStatus(`Recognized: ${result.track.artist} - ${result.track.title}`);
+        console.log('SUCCESS:', result.track);
+        setStatus(`✅ ${result.track.artist} - ${result.track.title}`);
         
         const newHistoryEntry: RecognitionResult = {
           id: Date.now(),
@@ -149,30 +202,37 @@ export default function AudioRecognitionPage() {
           }
         }
       } else {
-        setStatus(`No match found: ${result.error || 'Unknown error'}`);
+        console.log('NO MATCH:', result.error);
+        setStatus(`❌ No match found`);
       }
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
-      setStatus(`Processing error: ${msg}`);
+      console.log('PROCESSING ERROR:', error);
+      setStatus(`❌ Error: ${msg}`);
     } finally {
-      lastRecognitionTimeRef.current = Date.now();
       setIsProcessing(false);
     }
   }, [convertAudioBufferToRawPCM, currentTrack]);
 
-  const triggerRecognition = useCallback(async (reason: string) => {
-    if (isProcessing || !audioContextRef.current || !streamRef.current) return;
+  // Capture 3 seconds of audio for recognition
+  const captureAudio = useCallback(async (reason: string) => {
+    if (isProcessing || !audioContextRef.current || !streamRef.current) {
+      console.log('SKIPPING CAPTURE - processing or no audio context');
+      return;
+    }
     
     setIsProcessing(true);
+    console.log('=== STARTING AUDIO CAPTURE ===');
+    console.log('Reason:', reason);
 
     try {
       const AudioContextClass = window.AudioContext || (window as WindowWithWebkitAudioContext).webkitAudioContext;
       const captureContext = new AudioContextClass({ sampleRate: 44100 });
-      await captureContext.resume().catch(() => {});
+      await captureContext.resume();
 
       const source = captureContext.createMediaStreamSource(streamRef.current);
       const processor = captureContext.createScriptProcessor(4096, 1, 1);
-      const bufferSize = 3 * captureContext.sampleRate;
+      const bufferSize = 3 * captureContext.sampleRate; // 3 seconds
       const audioBuffer = captureContext.createBuffer(1, bufferSize, captureContext.sampleRate);
       const channelData = audioBuffer.getChannelData(0);
       let sampleIndex = 0;
@@ -184,12 +244,9 @@ export default function AudioRecognitionPage() {
         sampleIndex += n;
 
         if (sampleIndex >= bufferSize) {
-          try {
-            processor.disconnect();
-            source.disconnect();
-          } catch {
-            // ignore
-          }
+          console.log('CAPTURE COMPLETE - processing audio');
+          processor.disconnect();
+          source.disconnect();
           processAudioBuffer(audioBuffer, reason).finally(() => {
             captureContext.close();
           });
@@ -199,118 +256,73 @@ export default function AudioRecognitionPage() {
       source.connect(processor);
       processor.connect(captureContext.destination);
 
+      // Timeout fallback
       setTimeout(() => {
         if (sampleIndex < bufferSize / 2) {
-          try { 
-            processor.disconnect(); 
-            source.disconnect(); 
-          } catch {
-            // ignore
-          }
+          console.log('CAPTURE TIMEOUT');
+          processor.disconnect();
+          source.disconnect();
           captureContext.close();
           setIsProcessing(false);
-          setStatus('Audio capture timeout');
+          setStatus('❌ Audio capture timeout');
         }
       }, 5000);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
-      setStatus(`Recognition failed: ${msg}`);
+      console.log('CAPTURE ERROR:', e);
+      setStatus(`❌ Capture failed: ${msg}`);
       setIsProcessing(false);
     }
   }, [isProcessing, processAudioBuffer]);
 
+  // Main monitoring loop
   const runMonitoring = useCallback(() => {
-    if (!isRunningRef.current || !analyserRef.current || musicLevel === null || silenceLevel === null) return;
+    if (!isRunningRef.current || !analyserRef.current) return;
 
-    const analyser = analyserRef.current;
-    const bufferLength = analyser.fftSize;
-    const dataArray = new Uint8Array(bufferLength);
-    analyser.getByteTimeDomainData(dataArray);
+    const level = getCurrentAudioLevel();
+    setCurrentLevel(level);
 
-    let sum = 0;
-    for (let i = 0; i < bufferLength; i++) {
-      sum += Math.abs(dataArray[i] - 128);
-    }
-    const rawLevel = Math.round(sum / bufferLength * 50);
-
-    // Scale so that silenceLevel = 0% and musicLevel = 50%
-    const range = musicLevel - silenceLevel;
-    let scaledPercentage = 0;
-    if (range > 0 && rawLevel >= silenceLevel) {
-      scaledPercentage = Math.min(50, ((rawLevel - silenceLevel) / range) * 50);
-    }
-
-    // For display, scale to 0-100 where silence=0 and music=50
-    const displayPercentage = Math.round(scaledPercentage * 2); // 0-50 becomes 0-100
-    setAudioLevel(displayPercentage);
-
-    // Debug info
-    const debugUpdate = [
-      `Raw Level: ${rawLevel}`,
-      `Silence Level: ${silenceLevel}`,
-      `Music Level: ${musicLevel}`, 
-      `Range: ${range}`,
-      `Scaled %: ${scaledPercentage.toFixed(1)}`,
-      `Display %: ${displayPercentage}`
-    ];
-    setDebugInfo(debugUpdate);
-
-    const currentlyInSilence = scaledPercentage < silenceThreshold;
-    const now = Date.now();
-    const timeSinceLast = now - lastRecognitionTimeRef.current;
-
-    if (timeSinceLast < 15000) {
-      const remain = Math.ceil((15000 - timeSinceLast) / 1000);
-      setStatus(`Cooldown: ${remain}s (${displayPercentage}%)`);
-      setIsInSilence(false);
-      setSilenceDuration(0);
-      silenceStartTimeRef.current = null;
-      return;
-    }
-
-    if (currentlyInSilence && !isInSilence) {
-      setIsInSilence(true);
-      silenceStartTimeRef.current = now;
-      setSilenceDuration(0);
-      setStatus(`Silence detected (${displayPercentage}% < ${silenceThreshold}%)`);
-    } else if (!currentlyInSilence && isInSilence) {
-      setIsInSilence(false);
-      silenceStartTimeRef.current = null;
-      setSilenceDuration(0);
-      setStatus(`Audio: ${displayPercentage}%`);
-    } else if (currentlyInSilence && isInSilence) {
-      const elapsed = now - (silenceStartTimeRef.current || now);
-      setSilenceDuration(elapsed);
-
-      if (elapsed >= 3000) {
-        setIsInSilence(false);
-        silenceStartTimeRef.current = null;
-        setSilenceDuration(0);
-        if (!isProcessing) {
-          triggerRecognition('Silence detection');
-        }
+    // Simple silence detection logic
+    if (level < silenceLevel) {
+      if (!isInSilence) {
+        console.log('ENTERING SILENCE');
+        setIsInSilence(true);
+        silenceStartRef.current = Date.now();
+        setSilenceCounter(0);
       } else {
-        setStatus(`Silence: ${Math.floor(elapsed/1000)}s / 3s (${displayPercentage}%)`);
+        const elapsed = Date.now() - silenceStartRef.current;
+        const secondsElapsed = Math.floor(elapsed / 1000);
+        setSilenceCounter(secondsElapsed);
+        
+        if (secondsElapsed >= silenceThreshold) {
+          console.log(`SILENCE THRESHOLD REACHED (${silenceThreshold}s) - TRIGGERING RECOGNITION`);
+          setIsInSilence(false);
+          setSilenceCounter(0);
+          captureAudio('Silence detected');
+        }
       }
     } else {
-      setStatus(`Audio: ${displayPercentage}% (threshold: ${silenceThreshold}%)`);
+      if (isInSilence) {
+        console.log('EXITING SILENCE');
+        setIsInSilence(false);
+        setSilenceCounter(0);
+      }
     }
-  }, [isInSilence, isProcessing, musicLevel, silenceLevel, silenceThreshold, triggerRecognition]);
 
-  const calibrateMusic = useCallback(() => {
-    if (!audioContextRef.current) return;
-    setMusicLevel(audioLevel);
-    setStatus(`Music level set to: ${audioLevel}`);
-  }, [audioLevel]);
+    // Update status
+    if (isProcessing) {
+      setStatus('🎙️ Processing audio...');
+    } else if (isInSilence) {
+      setStatus(`🔇 Silence: ${silenceCounter}s / ${silenceThreshold}s (Level: ${level})`);
+    } else {
+      setStatus(`🎵 Monitoring (Level: ${level} | Music: ${musicLevel} | Silence: ${silenceLevel})`);
+    }
+  }, [getCurrentAudioLevel, isInSilence, isProcessing, musicLevel, silenceLevel, silenceThreshold, silenceCounter, captureAudio]);
 
-  const calibrateSilence = useCallback(() => {
-    if (!audioContextRef.current) return;
-    setSilenceLevel(audioLevel);
-    setStatus(`Silence level set to: ${audioLevel}`);
-  }, [audioLevel]);
-
-  const setupAudioMonitoring = useCallback(async () => {
+  // Setup microphone
+  const setupMicrophone = useCallback(async () => {
     try {
+      console.log('=== SETTING UP MICROPHONE ===');
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: false,
@@ -322,10 +334,11 @@ export default function AudioRecognitionPage() {
 
       const AudioContextClass = window.AudioContext || (window as WindowWithWebkitAudioContext).webkitAudioContext;
       const audioContext = new AudioContextClass({ sampleRate: 44100 });
-      await audioContext.resume().catch(() => {});
+      await audioContext.resume();
 
       const analyser = audioContext.createAnalyser();
       analyser.fftSize = 2048;
+      analyser.smoothingTimeConstant = 0.8;
       const source = audioContext.createMediaStreamSource(stream);
       source.connect(analyser);
 
@@ -333,49 +346,44 @@ export default function AudioRecognitionPage() {
       audioContextRef.current = audioContext;
       analyserRef.current = analyser;
 
-      const updateLevel = () => {
-        if (!analyser) return;
-        const bufferLength = analyser.fftSize;
-        const dataArray = new Uint8Array(bufferLength);
-        analyser.getByteTimeDomainData(dataArray);
-        
-        let totalDev = 0;
-        for (let i = 0; i < bufferLength; i++) {
-          totalDev += Math.abs(dataArray[i] - 128);
-        }
-        const level = Math.round(totalDev / bufferLength * 100); // Scale to 0-100 for calibration
-        setAudioLevel(Math.min(level, 100));
-      };
-
-      setInterval(updateLevel, 100);
-      setStatus('Audio monitoring active - ready to calibrate');
+      console.log('MICROPHONE SETUP COMPLETE');
+      setStatus('🎙️ Microphone ready - adjust levels and start monitoring');
       
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
-      setStatus(`Microphone error: ${msg}`);
+      console.log('MICROPHONE ERROR:', error);
+      setStatus(`❌ Microphone error: ${msg}`);
     }
   }, []);
 
-  const startRecognition = useCallback(() => {
-    if (musicLevel === null || silenceLevel === null) {
-      setStatus('Please calibrate music and silence levels first');
+  // Start/stop monitoring
+  const startMonitoring = useCallback(() => {
+    if (!audioContextRef.current) {
+      setStatus('❌ Setup microphone first');
       return;
     }
 
+    console.log('=== STARTING MONITORING ===');
+    console.log('Music level:', musicLevel);
+    console.log('Silence level:', silenceLevel);
+    console.log('Silence threshold:', silenceThreshold, 'seconds');
+
     isRunningRef.current = true;
     setIsListening(true);
-    setStatus('Starting recognition system...');
 
-    setTimeout(() => {
-      triggerRecognition('Initial recognition');
-    }, 1000);
+    // Start with initial recognition
+    setTimeout(() => captureAudio('Initial recognition'), 1000);
 
-    monitoringIntervalRef.current = window.setInterval(runMonitoring, 200);
-  }, [musicLevel, runMonitoring, silenceLevel, triggerRecognition]);
+    // Start monitoring loop
+    monitoringIntervalRef.current = window.setInterval(runMonitoring, 250);
+  }, [musicLevel, silenceLevel, silenceThreshold, captureAudio, runMonitoring]);
 
-  const stopRecognition = useCallback(() => {
+  const stopMonitoring = useCallback(() => {
+    console.log('=== STOPPING MONITORING ===');
     isRunningRef.current = false;
     setIsListening(false);
+    setIsInSilence(false);
+    setSilenceCounter(0);
     
     if (monitoringIntervalRef.current) {
       clearInterval(monitoringIntervalRef.current);
@@ -393,9 +401,10 @@ export default function AudioRecognitionPage() {
     }
 
     analyserRef.current = null;
-    setStatus('Recognition stopped');
+    setStatus('⏹️ Monitoring stopped');
   }, []);
 
+  // Load existing data
   const loadCurrentTrack = useCallback(async () => {
     try {
       const { data, error } = await supabase
@@ -423,28 +432,31 @@ export default function AudioRecognitionPage() {
     }
   }, []);
 
+  useEffect(() => {
+    void loadCurrentTrack();
+    void loadRecentHistory();
+    return stopMonitoring;
+  }, [loadCurrentTrack, loadRecentHistory, stopMonitoring]);
+
   const VUMeter = ({ level }: { level: number }) => {
     const boxes = [];
     for (let i = 0; i < 10; i++) {
-      const threshold = (i + 1) * 10; // 0-100% scale, so each box is 10%
+      const threshold = (i + 1) * 10; // 0-100 scale, each box is 10%
       const isActive = level >= threshold;
-      const isSilence = i < 5; // First 5 boxes (0-50%) represent silence to music range
       
       boxes.push(
         <div
           key={i}
           style={{
-            width: 25,
+            width: 30,
             height: 40,
-            backgroundColor: isActive 
-              ? (isSilence ? '#22c55e' : '#f59e0b') // Green for 0-50%, yellow/orange for 50-100%
-              : (isSilence ? '#f0fdf4' : '#fef3c7'), // Light versions when inactive
-            border: `2px solid ${isSilence ? '#bbf7d0' : '#fde68a'}`,
+            backgroundColor: isActive ? '#22c55e' : '#f0fdf4',
+            border: '2px solid #bbf7d0',
             borderRadius: 4,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: 9,
+            fontSize: 10,
             fontWeight: 'bold',
             color: isActive ? 'white' : '#6b7280'
           }}
@@ -460,28 +472,21 @@ export default function AudioRecognitionPage() {
     );
   };
 
-  useEffect(() => {
-    void loadCurrentTrack();
-    void loadRecentHistory();
-    return stopRecognition;
-  }, [loadCurrentTrack, loadRecentHistory, stopRecognition]);
-
-  const isCalibrated = musicLevel !== null && silenceLevel !== null;
-
   return (
     <div style={{ padding: 24, background: '#fff', color: '#222', minHeight: '100vh', maxWidth: 1200, margin: '0 auto' }}>
       <div style={{ marginBottom: 32 }}>
-        <h1 style={{ fontSize: 32, fontWeight: 'bold', marginBottom: 8 }}>Audio Recognition Control</h1>
-        <p style={{ color: '#666', fontSize: 16 }}>Simple calibration-based silence detection</p>
+        <h1 style={{ fontSize: 32, fontWeight: 'bold', marginBottom: 8 }}>🎵 Audio Recognition Control</h1>
+        <p style={{ color: '#666', fontSize: 16 }}>Simple, working audio monitoring system</p>
       </div>
 
+      {/* Microphone Setup */}
       {!audioContextRef.current && (
         <div style={{ background: '#fef3c7', border: '2px solid #f59e0b', borderRadius: 12, padding: 24, marginBottom: 24 }}>
           <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 16, color: '#92400e' }}>
-            Step 1: Setup Audio Monitoring
+            Step 1: Enable Microphone
           </h2>
           <button
-            onClick={setupAudioMonitoring}
+            onClick={setupMicrophone}
             style={{
               background: '#2563eb',
               color: 'white',
@@ -493,74 +498,93 @@ export default function AudioRecognitionPage() {
               cursor: 'pointer'
             }}
           >
-            Enable Microphone
+            🎙️ Enable Microphone
           </button>
         </div>
       )}
 
-      {audioContextRef.current && !isCalibrated && (
-        <div style={{ background: '#fef3c7', border: '2px solid #f59e0b', borderRadius: 12, padding: 24, marginBottom: 24 }}>
-          <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 16, color: '#92400e' }}>
-            Step 2: Calibrate System
-          </h2>
-          <div style={{ marginBottom: 16 }}>
-            <span style={{ fontSize: 14, fontWeight: 600, marginRight: 16 }}>Current Audio Level:</span>
-            <span style={{ fontSize: 24, fontWeight: 'bold' }}>{audioLevel}</span>
+      {/* Manual Controls */}
+      {audioContextRef.current && (
+        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 24, marginBottom: 32 }}>
+          <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 16 }}>Controls</h2>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24 }}>
+            <span style={{ fontSize: 14, fontWeight: 600 }}>Current Level:</span>
+            <VUMeter level={currentLevel} />
+            <span style={{ fontSize: 24, fontWeight: 'bold', color: '#16a34a' }}>
+              {currentLevel}
+            </span>
           </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 24 }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 14, fontWeight: 600, marginBottom: 8 }}>
+                Music Level (75-85dB range):
+              </label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                value={musicLevel}
+                onChange={(e) => setMusicLevel(parseInt(e.target.value) || 50)}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '2px solid #16a34a',
+                  borderRadius: 6,
+                  fontSize: 16,
+                  fontWeight: 600,
+                  textAlign: 'center'
+                }}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 14, fontWeight: 600, marginBottom: 8 }}>
+                Silence Level (ambient noise):
+              </label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                value={silenceLevel}
+                onChange={(e) => setSilenceLevel(parseInt(e.target.value) || 10)}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '2px solid #dc2626',
+                  borderRadius: 6,
+                  fontSize: 16,
+                  fontWeight: 600,
+                  textAlign: 'center'
+                }}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 14, fontWeight: 600, marginBottom: 8 }}>
+                Silence Duration (seconds):
+              </label>
+              <input
+                type="number"
+                min="1"
+                max="10"
+                value={silenceThreshold}
+                onChange={(e) => setSilenceThreshold(parseInt(e.target.value) || 3)}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '2px solid #7c3aed',
+                  borderRadius: 6,
+                  fontSize: 16,
+                  fontWeight: 600,
+                  textAlign: 'center'
+                }}
+              />
+            </div>
+          </div>
+
           <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
             <button
-              onClick={calibrateMusic}
-              style={{
-                background: '#16a34a',
-                color: 'white',
-                border: 'none',
-                borderRadius: 8,
-                padding: '12px 24px',
-                fontSize: 16,
-                fontWeight: 600,
-                cursor: 'pointer'
-              }}
-            >
-              Set Music Level
-            </button>
-            <button
-              onClick={calibrateSilence}
-              style={{
-                background: '#dc2626',
-                color: 'white',
-                border: 'none',
-                borderRadius: 8,
-                padding: '12px 24px',
-                fontSize: 16,
-                fontWeight: 600,
-                cursor: 'pointer'
-              }}
-            >
-              Set Silence Level
-            </button>
-          </div>
-          <div style={{ fontSize: 14, color: '#92400e' }}>
-            <strong>Instructions:</strong> Play music at normal volume, click &quot;Set Music Level&quot;. 
-            Then pause music and click &quot;Set Silence Level&quot;.
-          </div>
-          {musicLevel !== null && (
-            <div style={{ marginTop: 8, color: '#16a34a', fontWeight: 600 }}>
-              Music level set: {musicLevel}
-            </div>
-          )}
-          {silenceLevel !== null && (
-            <div style={{ marginTop: 4, color: '#dc2626', fontWeight: 600 }}>
-              Silence level set: {silenceLevel}
-            </div>
-          )}
-        </div>
-      )}
-
-      {isCalibrated && (
-        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 24, marginBottom: 32 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
-            <button
-              onClick={isListening ? stopRecognition : startRecognition}
+              onClick={isListening ? stopMonitoring : startMonitoring}
               disabled={isProcessing}
               style={{
                 background: isListening ? '#dc2626' : '#16a34a',
@@ -574,120 +598,91 @@ export default function AudioRecognitionPage() {
                 opacity: isProcessing ? 0.6 : 1
               }}
             >
-              {isListening ? 'Stop Recognition' : 'Start Recognition'}
+              {isListening ? '⏹️ Stop Monitoring' : '▶️ Start Monitoring'}
             </button>
 
-            {isListening && (
-              <button
-                onClick={() => triggerRecognition('Manual trigger')}
-                disabled={isProcessing}
-                style={{
-                  background: '#7c3aed',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: 8,
-                  padding: '12px 24px',
-                  fontSize: 16,
-                  fontWeight: 600,
-                  cursor: isProcessing ? 'not-allowed' : 'pointer',
-                  opacity: isProcessing ? 0.6 : 1
-                }}
-              >
-                Trigger Now
-              </button>
-            )}
+            <button
+              onClick={() => captureAudio('Manual trigger')}
+              disabled={isProcessing || !audioContextRef.current}
+              style={{
+                background: '#7c3aed',
+                color: 'white',
+                border: 'none',
+                borderRadius: 8,
+                padding: '12px 24px',
+                fontSize: 16,
+                fontWeight: 600,
+                cursor: (isProcessing || !audioContextRef.current) ? 'not-allowed' : 'pointer',
+                opacity: (isProcessing || !audioContextRef.current) ? 0.6 : 1
+              }}
+            >
+              🎙️ Recognize Now
+            </button>
 
-            <a href="/tv-display" target="_blank" rel="noopener noreferrer" style={{ background: '#2563eb', color: 'white', padding: '8px 16px', borderRadius: 8, textDecoration: 'none', fontSize: 14, fontWeight: 600 }}>
-              TV Display
+            <a href="/tv-display" target="_blank" rel="noopener noreferrer" style={{ 
+              background: '#2563eb', 
+              color: 'white', 
+              padding: '12px 24px', 
+              borderRadius: 8, 
+              textDecoration: 'none', 
+              fontSize: 16, 
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center'
+            }}>
+              📺 TV Display
             </a>
           </div>
 
-          <div style={{ fontSize: 14, color: isProcessing ? '#ea580c' : isListening ? '#16a34a' : '#6b7280', marginBottom: 16, fontWeight: 600, padding: '8px 12px', background: isProcessing ? '#fef3c7' : isListening ? '#f0fdf4' : '#f9fafb', borderRadius: 6 }}>
+          <div style={{ 
+            fontSize: 14, 
+            fontWeight: 600, 
+            padding: '12px 16px', 
+            background: isProcessing ? '#fef3c7' : isListening ? '#f0fdf4' : '#f9fafb', 
+            color: isProcessing ? '#ea580c' : isListening ? '#16a34a' : '#6b7280',
+            borderRadius: 8,
+            border: `2px solid ${isProcessing ? '#f59e0b' : isListening ? '#bbf7d0' : '#e5e7eb'}`
+          }}>
             {status}
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
-            <span style={{ fontSize: 14, fontWeight: 600 }}>Audio Level:</span>
-            <VUMeter level={audioLevel} />
-            <span style={{ fontSize: 20, fontWeight: 'bold', color: musicLevel !== null && silenceLevel !== null && audioLevel < silenceThreshold ? '#dc2626' : '#16a34a' }}>
-              {audioLevel}%
-            </span>
-          </div>
-
+          {/* Debug Console */}
           {debugInfo.length > 0 && (
-            <div style={{ background: '#1f2937', color: '#f9fafb', padding: 16, borderRadius: 8, marginBottom: 16, fontFamily: 'monospace', fontSize: 12 }}>
-              <div style={{ fontWeight: 600, marginBottom: 8 }}>Debug Console:</div>
+            <div style={{ 
+              marginTop: 16,
+              background: '#1f2937', 
+              color: '#f9fafb', 
+              padding: 16, 
+              borderRadius: 8, 
+              fontFamily: 'monospace', 
+              fontSize: 12,
+              border: '2px solid #374151'
+            }}>
+              <div style={{ fontWeight: 600, marginBottom: 8, color: '#10b981' }}>🖥️ Debug Console:</div>
               {debugInfo.map((info, i) => (
-                <div key={i} style={{ marginBottom: 2 }}>{info}</div>
+                <div key={i} style={{ marginBottom: 2, color: '#e5e7eb' }}>{info}</div>
               ))}
             </div>
           )}
 
-          <div style={{ display: 'flex', gap: 16, marginBottom: 16, alignItems: 'center' }}>
-            <button
-              onClick={calibrateMusic}
-              style={{
-                background: '#16a34a',
-                color: 'white',
-                border: 'none',
-                borderRadius: 6,
-                padding: '8px 16px',
-                fontSize: 14,
-                fontWeight: 600,
-                cursor: 'pointer'
-              }}
-            >
-              Set Music Level ({musicLevel || '--'})
-            </button>
-            <button
-              onClick={calibrateSilence}
-              style={{
-                background: '#dc2626',
-                color: 'white',
-                border: 'none',
-                borderRadius: 6,
-                padding: '8px 16px',
-                fontSize: 14,
-                fontWeight: 600,
-                cursor: 'pointer'
-              }}
-            >
-              Set Silence Level ({silenceLevel || '--'})
-            </button>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 14, fontWeight: 600 }}>Silence Threshold:</span>
-              <input
-                type="number"
-                min="1"
-                max="20"
-                value={silenceThreshold}
-                onChange={(e) => setSilenceThreshold(parseInt(e.target.value) || 5)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.currentTarget.blur();
-                  }
-                }}
-                style={{
-                  width: 60,
-                  padding: '4px 8px',
-                  border: '1px solid #d1d5db',
-                  borderRadius: 4,
-                  fontSize: 14,
-                  textAlign: 'center'
-                }}
-              />
-              <span style={{ fontSize: 14 }}>%</span>
-            </div>
-          </div>
-
           {isInSilence && (
-            <div style={{ fontSize: 14, color: '#7c3aed', background: '#faf5ff', border: '2px solid #d8b4fe', padding: '8px 12px', borderRadius: 8, display: 'inline-block', fontWeight: 600 }}>
-              Silence Duration: {Math.floor(silenceDuration / 1000)}s / 3s
+            <div style={{ 
+              marginTop: 16, 
+              fontSize: 16, 
+              color: '#7c3aed', 
+              background: '#faf5ff', 
+              border: '2px solid #d8b4fe', 
+              padding: '12px 16px', 
+              borderRadius: 8, 
+              fontWeight: 600 
+            }}>
+              🔇 Silence detected: {silenceCounter}s / {silenceThreshold}s
             </div>
           )}
         </div>
       )}
 
+      {/* Current Track */}
       {currentTrack && (
         <div style={{ background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)', color: 'white', borderRadius: 16, padding: 32, marginBottom: 32, display: 'flex', alignItems: 'center', gap: 24 }}>
           {currentTrack.recognition_image_url && (
@@ -704,13 +699,14 @@ export default function AudioRecognitionPage() {
         </div>
       )}
 
+      {/* Recognition History */}
       <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden' }}>
         <div style={{ background: '#f9fafb', padding: '16px 24px', borderBottom: '1px solid #e5e7eb', fontWeight: 600, fontSize: 16 }}>
           Recent Recognition History
         </div>
         <div style={{ maxHeight: 400, overflowY: 'auto' }}>
           {recognitionHistory.length === 0 ? (
-            <div style={{ padding: 24, textAlign: 'center', color: '#6b7280' }}>No recognition history yet. Start listening to see results.</div>
+            <div style={{ padding: 24, textAlign: 'center', color: '#6b7280' }}>No recognition history yet.</div>
           ) : (
             recognitionHistory.map((track, i) => (
               <div key={track.id || i} style={{ padding: '16px 24px', borderBottom: i < recognitionHistory.length - 1 ? '1px solid #f3f4f6' : 'none', display: 'flex', alignItems: 'center', gap: 16 }}>
