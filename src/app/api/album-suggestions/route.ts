@@ -331,13 +331,6 @@ export async function DELETE(request: NextRequest) {
       }, { status: 500 });
     }
 
-    if (count === 0) {
-      return NextResponse.json({
-        success: false,
-        error: 'Suggestion not found'
-      }, { status: 404 });
-    }
-
     return NextResponse.json({
       success: true,
       message: 'Suggestion deleted successfully'
