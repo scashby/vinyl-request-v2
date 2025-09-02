@@ -46,6 +46,7 @@ export default function AudioRecognitionPage() {
   const [musicLevel, setMusicLevel] = useState<number | null>(null);
   const [silenceLevel, setSilenceLevel] = useState<number | null>(null);
   const [silenceThreshold, setSilenceThreshold] = useState(5);
+  const [debugInfo, setDebugInfo] = useState<string[]>([]);
 
   const streamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -232,13 +233,27 @@ export default function AudioRecognitionPage() {
     }
     const rawLevel = Math.round(sum / bufferLength * 50);
 
+    // Scale so that silenceLevel = 0% and musicLevel = 50%
     const range = musicLevel - silenceLevel;
     let scaledPercentage = 0;
-    if (range > 0) {
-      scaledPercentage = Math.max(0, Math.min(50, ((rawLevel - silenceLevel) / range) * 50));
+    if (range > 0 && rawLevel >= silenceLevel) {
+      scaledPercentage = Math.min(50, ((rawLevel - silenceLevel) / range) * 50);
     }
 
-    setAudioLevel(Math.round(scaledPercentage));
+    // For display, scale to 0-100 where silence=0 and music=50
+    const displayPercentage = Math.round(scaledPercentage * 2); // 0-50 becomes 0-100
+    setAudioLevel(displayPercentage);
+
+    // Debug info
+    const debugUpdate = [
+      `Raw Level: ${rawLevel}`,
+      `Silence Level: ${silenceLevel}`,
+      `Music Level: ${musicLevel}`, 
+      `Range: ${range}`,
+      `Scaled %: ${scaledPercentage.toFixed(1)}`,
+      `Display %: ${displayPercentage}`
+    ];
+    setDebugInfo(debugUpdate);
 
     const currentlyInSilence = scaledPercentage < silenceThreshold;
     const now = Date.now();
@@ -246,7 +261,7 @@ export default function AudioRecognitionPage() {
 
     if (timeSinceLast < 15000) {
       const remain = Math.ceil((15000 - timeSinceLast) / 1000);
-      setStatus(`Cooldown: ${remain}s (${scaledPercentage.toFixed(1)}%)`);
+      setStatus(`Cooldown: ${remain}s (${displayPercentage}%)`);
       setIsInSilence(false);
       setSilenceDuration(0);
       silenceStartTimeRef.current = null;
@@ -257,12 +272,12 @@ export default function AudioRecognitionPage() {
       setIsInSilence(true);
       silenceStartTimeRef.current = now;
       setSilenceDuration(0);
-      setStatus(`Silence detected (${scaledPercentage.toFixed(1)}% < ${silenceThreshold}%)`);
+      setStatus(`Silence detected (${displayPercentage}% < ${silenceThreshold}%)`);
     } else if (!currentlyInSilence && isInSilence) {
       setIsInSilence(false);
       silenceStartTimeRef.current = null;
       setSilenceDuration(0);
-      setStatus(`Audio: ${scaledPercentage.toFixed(1)}%`);
+      setStatus(`Audio: ${displayPercentage}%`);
     } else if (currentlyInSilence && isInSilence) {
       const elapsed = now - (silenceStartTimeRef.current || now);
       setSilenceDuration(elapsed);
@@ -275,10 +290,10 @@ export default function AudioRecognitionPage() {
           triggerRecognition('Silence detection');
         }
       } else {
-        setStatus(`Silence: ${Math.floor(elapsed/1000)}s / 3s (${scaledPercentage.toFixed(1)}%)`);
+        setStatus(`Silence: ${Math.floor(elapsed/1000)}s / 3s (${displayPercentage}%)`);
       }
     } else {
-      setStatus(`Audio: ${scaledPercentage.toFixed(1)}% (threshold: ${silenceThreshold}%)`);
+      setStatus(`Audio: ${displayPercentage}% (threshold: ${silenceThreshold}%)`);
     }
   }, [isInSilence, isProcessing, musicLevel, silenceLevel, silenceThreshold, triggerRecognition]);
 
@@ -328,7 +343,7 @@ export default function AudioRecognitionPage() {
         for (let i = 0; i < bufferLength; i++) {
           totalDev += Math.abs(dataArray[i] - 128);
         }
-        const level = Math.round(totalDev / bufferLength * 50);
+        const level = Math.round(totalDev / bufferLength * 100); // Scale to 0-100 for calibration
         setAudioLevel(Math.min(level, 100));
       };
 
@@ -411,9 +426,9 @@ export default function AudioRecognitionPage() {
   const VUMeter = ({ level }: { level: number }) => {
     const boxes = [];
     for (let i = 0; i < 10; i++) {
-      const threshold = (i + 1) * 5; // 0-50% scale, so each box is 5%
+      const threshold = (i + 1) * 10; // 0-100% scale, so each box is 10%
       const isActive = level >= threshold;
-      const isSilence = i < 2;
+      const isSilence = i < 5; // First 5 boxes (0-50%) represent silence to music range
       
       boxes.push(
         <div
@@ -422,14 +437,14 @@ export default function AudioRecognitionPage() {
             width: 25,
             height: 40,
             backgroundColor: isActive 
-              ? (isSilence ? '#ef4444' : '#22c55e') 
-              : (isSilence ? '#fee2e2' : '#f0fdf4'),
-            border: `2px solid ${isSilence ? '#fca5a5' : '#bbf7d0'}`,
+              ? (isSilence ? '#22c55e' : '#f59e0b') // Green for 0-50%, yellow/orange for 50-100%
+              : (isSilence ? '#f0fdf4' : '#fef3c7'), // Light versions when inactive
+            border: `2px solid ${isSilence ? '#bbf7d0' : '#fde68a'}`,
             borderRadius: 4,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: 10,
+            fontSize: 9,
             fontWeight: 'bold',
             color: isActive ? 'white' : '#6b7280'
           }}
@@ -598,6 +613,15 @@ export default function AudioRecognitionPage() {
               {audioLevel}%
             </span>
           </div>
+
+          {debugInfo.length > 0 && (
+            <div style={{ background: '#1f2937', color: '#f9fafb', padding: 16, borderRadius: 8, marginBottom: 16, fontFamily: 'monospace', fontSize: 12 }}>
+              <div style={{ fontWeight: 600, marginBottom: 8 }}>Debug Console:</div>
+              {debugInfo.map((info, i) => (
+                <div key={i} style={{ marginBottom: 2 }}>{info}</div>
+              ))}
+            </div>
+          )}
 
           <div style={{ display: 'flex', gap: 16, marginBottom: 16, alignItems: 'center' }}>
             <button
