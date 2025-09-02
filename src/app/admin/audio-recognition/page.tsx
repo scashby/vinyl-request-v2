@@ -57,57 +57,57 @@ export default function AudioRecognitionPage() {
   const monitoringIntervalRef = useRef<number | null>(null);
   const silenceStartRef = useRef<number>(0);
 
-  // PROPER amplitude detection using time domain data
+  // Use actual calibration data from your measurements
   const getCurrentAudioLevel = useCallback((): number => {
     if (!analyserRef.current) return 0;
     
     const analyser = analyserRef.current;
     const bufferLength = analyser.fftSize;
     const dataArray = new Uint8Array(bufferLength);
-    analyser.getByteTimeDomainData(dataArray); // Use TIME DOMAIN data for amplitude
+    analyser.getByteTimeDomainData(dataArray);
     
-    // Calculate RMS (Root Mean Square) for proper amplitude measurement
+    // Calculate RMS
     let sumSquares = 0;
     for (let i = 0; i < bufferLength; i++) {
-      const sample = (dataArray[i] - 128) / 128; // Convert to -1 to 1 range
+      const sample = (dataArray[i] - 128) / 128;
       sumSquares += sample * sample;
     }
     const rms = Math.sqrt(sumSquares / bufferLength);
+    const decibels = 20 * Math.log10(rms + 0.0001);
     
-    // Convert to decibels (logarithmic scale)
-    const decibels = 20 * Math.log10(rms + 0.0001); // Add small value to avoid log(0)
+    // Convert to raw 0-100 based on decibel range
+    const minDB = -50;
+    const maxDB = -20;
+    const rawLevel = Math.max(0, Math.min(100, ((decibels - minDB) / (maxDB - minDB)) * 100));
     
-    // Adjust mapping for typical microphone input levels
-    // Map -45dB (ambient) = 0, -15dB (loud music) = 100
-    // This should better align with 75dB actual SPL showing around 70-80 on scale
-    const minDB = -45;
-    const maxDB = -15;
-    const level = Math.max(0, Math.min(100, ((decibels - minDB) / (maxDB - minDB)) * 100));
+    // Use actual calibration data from your screenshots:
+    // 50dB actual = 18 raw level
+    // 75dB actual = 56 raw level  
+    // Linear interpolation: actualDB = 50 + (rawLevel - 18) * (25/38)
+    const calibratedLevel = 50 + (rawLevel - 18) * (25 / 38);
+    const clampedLevel = Math.max(0, Math.min(100, calibratedLevel));
     
     console.log('=== AUDIO LEVEL ===');
-    console.log('RMS:', rms.toFixed(4));
-    console.log('Decibels (digital):', decibels.toFixed(1), 'dB');
-    console.log('Scaled level (0-100):', Math.round(level));
+    console.log('Raw level:', Math.round(rawLevel));
+    console.log('Calibrated dB:', Math.round(clampedLevel));
     console.log('Music threshold:', musicLevel);
     console.log('Silence threshold:', silenceLevel);
-    console.log('Currently above music level?', level > musicLevel);
-    console.log('Currently below silence level?', level < silenceLevel);
+    console.log('Above music?', clampedLevel > musicLevel);
+    console.log('Below silence?', clampedLevel < silenceLevel);
     console.log('==================');
     
-    // Update debug info for on-page console
     setDebugInfo([
-      `RMS: ${rms.toFixed(4)}`,
-      `Digital dB: ${decibels.toFixed(1)} dB`,
-      `Scaled level: ${Math.round(level)}`,
+      `Raw level: ${Math.round(rawLevel)}`,
+      `Calibrated dB: ${Math.round(clampedLevel)}`,
       `Music threshold: ${musicLevel}`,
       `Silence threshold: ${silenceLevel}`,
-      `Above music? ${level > musicLevel}`,
-      `Below silence? ${level < silenceLevel}`,
+      `Above music? ${clampedLevel > musicLevel}`,
+      `Below silence? ${clampedLevel < silenceLevel}`,
       `Is in silence: ${isInSilence}`,
       `Silence counter: ${silenceCounter}s`
     ]);
     
-    return Math.round(level);
+    return Math.round(clampedLevel);
   }, [musicLevel, silenceLevel, isInSilence, silenceCounter]);
 
   // Convert audio buffer for recognition API
