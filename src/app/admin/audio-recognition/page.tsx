@@ -1,4 +1,4 @@
-// src/app/admin/audio-recognition/page.tsx - ADAPTIVE SILENCE + HYSTERESIS + RELIABLE TRIGGERS (v3, ESLint-clean)
+// src/app/admin/audio-recognition/page.tsx - SIMPLIFIED SILENCE DETECTION
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from 'react';
@@ -36,16 +36,6 @@ interface NowPlayingState {
   song_offset?: number;
 }
 
-interface SilenceConfig {
-  absoluteFloor: number;
-  silenceDuration: number;
-  postRecognitionCooldown: number;
-  emaAlpha: number;
-  enterFactor: number;
-  exitFactor: number;
-  spikeToleranceMs: number;
-}
-
 interface WindowWithWebkitAudioContext extends Window {
   webkitAudioContext?: typeof AudioContext;
 }
@@ -57,23 +47,16 @@ export default function AudioRecognitionPage() {
   const [recognitionHistory, setRecognitionHistory] = useState<RecognitionResult[]>([]);
   const [status, setStatus] = useState('Ready to listen');
 
-  // Monitoring state
-  const [audioLevel, setAudioLevel] = useState(0);
-  const [rawAudioLevel, setRawAudioLevel] = useState(0);
+  // Simple monitoring state
+  const [audioLevel, setAudioLevel] = useState(0); // 0-100 scale
   const [isInSilence, setIsInSilence] = useState(false);
   const [silenceDuration, setSilenceDuration] = useState(0);
   const [debugInfo, setDebugInfo] = useState<string[]>([]);
-  const [baselineRMS, setBaselineRMS] = useState(0);
 
-  const [config, setConfig] = useState<SilenceConfig>({
-    absoluteFloor: 0.004,
-    silenceDuration: 2500,
-    postRecognitionCooldown: 12000,
-    emaAlpha: 0.05,
-    enterFactor: 0.35,
-    exitFactor: 0.60,
-    spikeToleranceMs: 250
-  });
+  // Simple settings
+  const [silenceThreshold, setSilenceThreshold] = useState(15); // 0-100 scale, default 15%
+  const [silenceRequiredTime, setSilenceRequiredTime] = useState(3000); // ms
+  const [cooldownTime, setCooldownTime] = useState(15000); // ms
 
   // Refs
   const streamRef = useRef<MediaStream | null>(null);
@@ -81,22 +64,19 @@ export default function AudioRecognitionPage() {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const silenceStartTimeRef = useRef<number | null>(null);
   const lastRecognitionTimeRef = useRef<number>(0);
-  const monitoringIntervalRef = useRef<number | null>(null); // browser setInterval id
+  const monitoringIntervalRef = useRef<number | null>(null);
   const isRunningRef = useRef<boolean>(false);
-  const lastSpikeTimeRef = useRef<number | null>(null);
   const removeVisibilityHandlerRef = useRef<(() => void) | null>(null);
 
   const addDebugLog = useCallback((message: string) => {
     const timestamp = new Date().toLocaleTimeString();
     if (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'development') {
-      // Safe dev-only logging
       console.log(`[${timestamp}] ${message}`);
     }
     setDebugInfo(prev => [`${timestamp}: ${message}`, ...prev.slice(0, 49)]);
   }, []);
 
   const convertAudioBufferToRawPCM = useCallback(async (audioBuffer: AudioBuffer): Promise<ArrayBuffer> => {
-    // mono, max 3s
     const maxSamples = Math.min(audioBuffer.length, Math.floor(3 * audioBuffer.sampleRate));
     const channelData = audioBuffer.getChannelData(0);
     const pcmData = new Int16Array(maxSamples);
@@ -199,7 +179,6 @@ export default function AudioRecognitionPage() {
       addDebugLog(`❌ Processing error: ${msg}`);
       setStatus(`❌ Processing error: ${msg}`);
     } finally {
-      // cooldown starts when recognition finishes, not when it starts
       lastRecognitionTimeRef.current = Date.now();
       setIsProcessing(false);
     }
@@ -247,7 +226,6 @@ export default function AudioRecognitionPage() {
       source.connect(processor);
       processor.connect(captureContext.destination);
 
-      // Safety timeout
       window.setTimeout(() => {
         if (sampleIndex < bufferSize / 2) {
           addDebugLog(`⚠️ Timeout: only ${sampleIndex}/${bufferSize} samples`);
@@ -265,106 +243,70 @@ export default function AudioRecognitionPage() {
     }
   }, [addDebugLog, isProcessing, processAudioBuffer]);
 
-  // Adaptive monitoring loop
+  // Simple monitoring loop - just check if we're in silence or not
   const runMonitoringLoop = useCallback(() => {
     if (!isRunningRef.current || !analyserRef.current) return;
 
     const analyser = analyserRef.current;
-    const bufferLength = analyser.fftSize;
+    const bufferLength = analyser.frequencyBinCount;
     const dataArray = new Uint8Array(bufferLength);
-    analyser.getByteTimeDomainData(dataArray);
-
-    // RMS of time-domain (0..255 around 128)
+    
+    // Use frequency data for better volume detection
+    analyser.getByteFrequencyData(dataArray);
+    
+    // Calculate average level and scale to 0-100
     let sum = 0;
     for (let i = 0; i < bufferLength; i++) {
-      const normalized = (dataArray[i] - 128) / 128;
-      sum += normalized * normalized;
+      sum += dataArray[i];
     }
-    const rms = Math.sqrt(sum / bufferLength);
-
-    // update visible meters
-    setRawAudioLevel(rms);
-    setAudioLevel(rms * 100);
-
-    // Update EMA baseline (avoid learning during silence windows)
-    setBaselineRMS(prev => {
-      const target = rms;
-      return prev ? (prev + config.emaAlpha * (target - prev)) : target;
-    });
+    const avgLevel = sum / bufferLength; // 0-255
+    const scaledLevel = Math.round((avgLevel / 255) * 100); // 0-100
+    
+    setAudioLevel(scaledLevel);
 
     const now = Date.now();
     const timeSinceLast = now - lastRecognitionTimeRef.current;
 
-    // Cooldown window
-    if (timeSinceLast < config.postRecognitionCooldown) {
-      const remain = Math.ceil((config.postRecognitionCooldown - timeSinceLast) / 1000);
-      setStatus(`⏱️ Cooldown: ${remain}s (level: ${(rms*100).toFixed(1)})`);
-      // reset silence state
+    // Check if we're in cooldown period
+    if (timeSinceLast < cooldownTime) {
+      const remain = Math.ceil((cooldownTime - timeSinceLast) / 1000);
+      setStatus(`⏱️ Cooldown: ${remain}s (level: ${scaledLevel}%)`);
       setIsInSilence(false);
       setSilenceDuration(0);
       silenceStartTimeRef.current = null;
-      lastSpikeTimeRef.current = null;
       return;
     }
 
-    // adaptive thresholds (hysteresis)
-    const dynamicFloor = Math.max(config.absoluteFloor, baselineRMS * config.enterFactor);
-    const dynamicExit  = Math.max(config.absoluteFloor, baselineRMS * config.exitFactor);
+    // Simple silence detection
+    const currentlyInSilence = scaledLevel < silenceThreshold;
 
-    // treat micro-spikes during silence window as tolerable if brief
-    if (isInSilence) {
-      if (rms > dynamicExit) {
-        // spike: if within tolerance, don't exit silence immediately
-        if (!lastSpikeTimeRef.current) lastSpikeTimeRef.current = now;
-        const spikeAge = now - (lastSpikeTimeRef.current || now);
-        if (spikeAge <= config.spikeToleranceMs) {
-          // tolerate brief spike
-        } else {
-          // sustained audio -> exit silence
-          addDebugLog(`🔊 Exit silence (rms ${(rms*100).toFixed(2)} > exit ${(dynamicExit*100).toFixed(2)})`);
-          setIsInSilence(false);
-          silenceStartTimeRef.current = null;
-          setSilenceDuration(0);
-          lastSpikeTimeRef.current = null;
-        }
-      } else {
-        lastSpikeTimeRef.current = null; // no spike
-      }
-    }
-
-    if (!isInSilence) {
-      if (rms < dynamicFloor) {
-        setIsInSilence(true);
-        silenceStartTimeRef.current = now;
-        setSilenceDuration(0);
-        addDebugLog(`🔇 Enter silence (rms ${(rms*100).toFixed(2)} < floor ${(dynamicFloor*100).toFixed(2)}; baseline ${(baselineRMS*100).toFixed(2)})`);
-        setStatus(`🔇 Silence...`);
-      } else {
-        setStatus(`🎧 Audio ${(rms*100).toFixed(1)}; baseline ${(baselineRMS*100).toFixed(1)} — waiting for drop`);
-      }
-    } else {
+    if (currentlyInSilence && !isInSilence) {
+      // Just entered silence
+      setIsInSilence(true);
+      silenceStartTimeRef.current = now;
+      setSilenceDuration(0);
+      addDebugLog(`🔇 Entered silence (level ${scaledLevel}% < threshold ${silenceThreshold}%)`);
+      setStatus(`🔇 Silence detected...`);
+    } else if (!currentlyInSilence && isInSilence) {
+      // Just exited silence
+      setIsInSilence(false);
+      silenceStartTimeRef.current = null;
+      setSilenceDuration(0);
+      addDebugLog(`🔊 Exited silence (level ${scaledLevel}% >= threshold ${silenceThreshold}%)`);
+      setStatus(`🎧 Audio detected (level: ${scaledLevel}%)`);
+    } else if (currentlyInSilence && isInSilence) {
+      // Still in silence - check duration
       const elapsed = now - (silenceStartTimeRef.current || now);
       setSilenceDuration(elapsed);
 
-      let effectiveElapsed = elapsed;
-      if (lastSpikeTimeRef.current) {
-        const sinceSpike = now - lastSpikeTimeRef.current;
-        if (sinceSpike <= config.spikeToleranceMs) {
-          effectiveElapsed = Math.max(0, effectiveElapsed - config.spikeToleranceMs);
-        } else {
-          lastSpikeTimeRef.current = null;
-        }
-      }
+      const remain = Math.max(0, silenceRequiredTime - elapsed);
+      setStatus(`🔇 Silence ${Math.floor(elapsed/1000)}s / ${Math.floor(silenceRequiredTime/1000)}s (${Math.ceil(remain/1000)}s remaining)`);
 
-      const remain = Math.max(0, config.silenceDuration - effectiveElapsed);
-      setStatus(`🔇 Silence ${Math.floor(effectiveElapsed/1000)}s / ${Math.floor(config.silenceDuration/1000)}s (${Math.ceil(remain/1000)}s)`);
-
-      if (effectiveElapsed >= config.silenceDuration) {
-        addDebugLog(`🎯 Silence window reached -> trigger recognition`);
+      if (elapsed >= silenceRequiredTime) {
+        addDebugLog(`🎯 Silence duration reached -> trigger recognition`);
         setIsInSilence(false);
         silenceStartTimeRef.current = null;
         setSilenceDuration(0);
-        lastSpikeTimeRef.current = null;
 
         if (!isProcessing) {
           triggerRecognition('Silence detection');
@@ -372,8 +314,11 @@ export default function AudioRecognitionPage() {
           addDebugLog(`⚠️ Recognition already running; skip`);
         }
       }
+    } else {
+      // Not in silence
+      setStatus(`🎧 Audio level: ${scaledLevel}% (threshold: ${silenceThreshold}%)`);
     }
-  }, [addDebugLog, baselineRMS, config.absoluteFloor, config.emaAlpha, config.enterFactor, config.exitFactor, config.postRecognitionCooldown, config.silenceDuration, config.spikeToleranceMs, isInSilence, isProcessing, triggerRecognition]);
+  }, [addDebugLog, cooldownTime, isInSilence, isProcessing, silenceRequiredTime, silenceThreshold, triggerRecognition]);
 
   const startListening = useCallback(async () => {
     addDebugLog('🎤 Starting audio recognition system...');
@@ -394,6 +339,7 @@ export default function AudioRecognitionPage() {
 
       const analyser = audioContext.createAnalyser();
       analyser.fftSize = 2048;
+      analyser.smoothingTimeConstant = 0.3; // Smooth out the levels
       const source = audioContext.createMediaStreamSource(stream);
       source.connect(analyser);
 
@@ -404,7 +350,7 @@ export default function AudioRecognitionPage() {
 
       setIsListening(true);
       setDebugInfo([]);
-      setStatus('🎤 System started - initial recognition...');
+      setStatus('🎤 System started - listening for silence...');
 
       const onVisibility = () => {
         if (document.visibilityState === 'visible') {
@@ -416,21 +362,16 @@ export default function AudioRecognitionPage() {
         document.removeEventListener('visibilitychange', onVisibility);
       };
 
-      // kick off immediately
-      window.setTimeout(() => triggerRecognition('Initial recognition'), 1000);
-
-      // start monitoring a few seconds later to avoid learning the first capture as "silence"
-      window.setTimeout(() => {
-        addDebugLog('📊 Starting adaptive silence monitoring loop...');
-        monitoringIntervalRef.current = window.setInterval(runMonitoringLoop, 100);
-      }, 6000);
+      // Start monitoring immediately
+      addDebugLog('📊 Starting simple silence monitoring...');
+      monitoringIntervalRef.current = window.setInterval(runMonitoringLoop, 200); // Check every 200ms
 
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       addDebugLog(`❌ Microphone error: ${msg}`);
       setStatus(`❌ Microphone access failed: ${msg}`);
     }
-  }, [addDebugLog, runMonitoringLoop, triggerRecognition]);
+  }, [addDebugLog, runMonitoringLoop]);
 
   const stopListening = useCallback(() => {
     addDebugLog('🛑 Stopping audio recognition system');
@@ -459,8 +400,6 @@ export default function AudioRecognitionPage() {
     setIsInSilence(false);
     setSilenceDuration(0);
     setAudioLevel(0);
-    setRawAudioLevel(0);
-    setBaselineRMS(0);
     setStatus('🛑 Stopped listening');
   }, [addDebugLog]);
 
@@ -511,6 +450,44 @@ export default function AudioRecognitionPage() {
     return `${m}:${r.toString().padStart(2, '0')}`;
   }, []);
 
+  // Create 10-box VU meter component
+  const VUMeter = ({ level }: { level: number }) => {
+    const boxes = [];
+    for (let i = 0; i < 10; i++) {
+      const threshold = (i + 1) * 10; // 10%, 20%, 30%, etc.
+      const isActive = level >= threshold;
+      const isSilence = i < 2; // First two boxes are silence indicators
+      
+      boxes.push(
+        <div
+          key={i}
+          style={{
+            width: 20,
+            height: 40,
+            backgroundColor: isActive 
+              ? (isSilence ? '#ef4444' : '#22c55e') 
+              : (isSilence ? '#fee2e2' : '#f0fdf4'),
+            border: `1px solid ${isSilence ? '#fca5a5' : '#bbf7d0'}`,
+            borderRadius: 2,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 10,
+            fontWeight: 'bold',
+            color: isActive ? 'white' : '#6b7280'
+          }}
+        >
+          {threshold}
+        </div>
+      );
+    }
+    return (
+      <div style={{ display: 'flex', gap: 2, alignItems: 'end' }}>
+        {boxes}
+      </div>
+    );
+  };
+
   useEffect(() => {
     void loadCurrentTrack();
     void loadRecentHistory();
@@ -521,7 +498,7 @@ export default function AudioRecognitionPage() {
     <div style={{ padding: 24, background: '#fff', color: '#222', minHeight: '100vh', maxWidth: 1200, margin: '0 auto' }}>
       <div style={{ marginBottom: 32 }}>
         <h1 style={{ fontSize: 32, fontWeight: 'bold', marginBottom: 8 }}>🎵 Audio Recognition Control</h1>
-        <p style={{ color: '#666', fontSize: 16 }}>Adaptive silence detection (EMA + hysteresis) and safer trigger timing</p>
+        <p style={{ color: '#666', fontSize: 16 }}>Simple silence detection with mixer-style VU meter</p>
       </div>
 
       <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 24, marginBottom: 32 }}>
@@ -549,68 +526,101 @@ export default function AudioRecognitionPage() {
         </div>
 
         {isListening && (
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-              <span style={{ fontSize: 14, fontWeight: 600, color: '#374151', minWidth: 100 }}>Audio Level:</span>
-              <div style={{ flex: 1, height: 24, background: '#f3f4f6', borderRadius: 12, overflow: 'hidden', border: '2px solid #e5e7eb', position: 'relative' }}>
-                <div style={{ width: `${Math.min(audioLevel * 2, 100)}%`, height: '100%', background: rawAudioLevel < Math.max(config.absoluteFloor, baselineRMS * config.enterFactor) ? 'linear-gradient(90deg, #ef4444, #f87171)' : 'linear-gradient(90deg, #22c55e, #4ade80)', transition: 'width 0.1s ease' }}></div>
-                <div title="dynamic enter-floor" style={{ position: 'absolute', left: `${Math.max(config.absoluteFloor, baselineRMS * config.enterFactor) * 200}%`, top: 0, bottom: 0, width: 2, background: '#1f2937', zIndex: 10 }}></div>
-                <div title="dynamic exit-thresh" style={{ position: 'absolute', left: `${Math.max(config.absoluteFloor, baselineRMS * config.exitFactor) * 200}%`, top: 0, bottom: 0, width: 2, background: '#6b7280', zIndex: 10 }}></div>
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 12 }}>
+              <span style={{ fontSize: 14, fontWeight: 600, color: '#374151', minWidth: 80 }}>Audio Level:</span>
+              <VUMeter level={audioLevel} />
+              <div style={{ 
+                fontSize: 24, 
+                fontWeight: 'bold', 
+                minWidth: 60,
+                color: audioLevel < silenceThreshold ? '#dc2626' : '#16a34a' 
+              }}>
+                {audioLevel}%
               </div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: rawAudioLevel < Math.max(config.absoluteFloor, baselineRMS * config.enterFactor) ? '#dc2626' : '#16a34a', minWidth: 110, textAlign: 'center', padding: '2px 8px', borderRadius: 4, background: rawAudioLevel < Math.max(config.absoluteFloor, baselineRMS * config.enterFactor) ? '#fef2f2' : '#f0fdf4' }}>
-                {rawAudioLevel < Math.max(config.absoluteFloor, baselineRMS * config.enterFactor) ? '🔇 SILENCE' : '🔊 AUDIO'}
+              <div style={{ 
+                fontSize: 12, 
+                fontWeight: 700, 
+                color: audioLevel < silenceThreshold ? '#dc2626' : '#16a34a',
+                padding: '4px 12px', 
+                borderRadius: 4, 
+                background: audioLevel < silenceThreshold ? '#fef2f2' : '#f0fdf4',
+                border: `2px solid ${audioLevel < silenceThreshold ? '#fca5a5' : '#bbf7d0'}`
+              }}>
+                {audioLevel < silenceThreshold ? '🔇 SILENCE' : '🔊 AUDIO'}
               </div>
-            </div>
-            <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}>
-              Raw: {(rawAudioLevel*100).toFixed(3)} | Baseline: {(baselineRMS*100).toFixed(3)} | Enter floor: {(Math.max(config.absoluteFloor, baselineRMS*config.enterFactor)*100).toFixed(2)} | Exit: {(Math.max(config.absoluteFloor, baselineRMS*config.exitFactor)*100).toFixed(2)}
             </div>
 
             {isInSilence && (
               <div style={{ fontSize: 14, color: '#7c3aed', background: 'linear-gradient(90deg, #faf5ff, #f3e8ff)', border: '2px solid #d8b4fe', padding: '8px 12px', borderRadius: 8, display: 'inline-block', fontWeight: 600 }}>
-                🔇 Silence Duration: {formatTime(Math.floor(silenceDuration / 1000))} / {formatTime(Math.floor(config.silenceDuration / 1000))}
-                {silenceDuration >= config.silenceDuration * 0.8 && (<span style={{ color: '#dc2626', marginLeft: 8 }}>⚡ ALMOST TRIGGERING!</span>)}
+                🔇 Silence Duration: {formatTime(Math.floor(silenceDuration / 1000))} / {formatTime(Math.floor(silenceRequiredTime / 1000))}
+                {silenceDuration >= silenceRequiredTime * 0.8 && (<span style={{ color: '#dc2626', marginLeft: 8 }}>⚡ ALMOST TRIGGERING!</span>)}
               </div>
             )}
           </div>
         )}
 
-        <details style={{ marginTop: 16 }}>
-          <summary style={{ cursor: 'pointer', fontWeight: 600, fontSize: 14 }}>🔧 Silence Detection Settings</summary>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 16, marginTop: 16, padding: 16, background: '#f3f4f6', borderRadius: 8 }}>
+        <div style={{ background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 8, padding: 16 }}>
+          <h3 style={{ margin: '0 0 16px 0', fontSize: 16, fontWeight: 600, color: '#374151' }}>⚙️ Simple Settings</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 16 }}>
             <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Absolute Floor: {(config.absoluteFloor * 100).toFixed(3)}</label>
-              <input type="range" min="0.001" max="0.02" step="0.001" value={config.absoluteFloor} onChange={(e) => setConfig(prev => ({ ...prev, absoluteFloor: parseFloat(e.target.value) }))} style={{ width: '100%' }}/>
+              <label style={{ display: 'block', fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>
+                Silence Threshold: {silenceThreshold}%
+              </label>
+              <input 
+                type="range" 
+                min="5" 
+                max="50" 
+                value={silenceThreshold} 
+                onChange={(e) => setSilenceThreshold(parseInt(e.target.value))}
+                style={{ width: '100%' }}
+              />
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+                Audio below this level = silence
+              </div>
             </div>
+            
             <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Silence Duration: {formatTime(Math.floor(config.silenceDuration / 1000))}</label>
-              <input type="range" min="1500" max="8000" step="250" value={config.silenceDuration} onChange={(e) => setConfig(prev => ({ ...prev, silenceDuration: parseInt(e.target.value, 10) }))} style={{ width: '100%' }}/>
+              <label style={{ display: 'block', fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>
+                Silence Required: {formatTime(Math.floor(silenceRequiredTime / 1000))}
+              </label>
+              <input 
+                type="range" 
+                min="2000" 
+                max="10000" 
+                step="500"
+                value={silenceRequiredTime} 
+                onChange={(e) => setSilenceRequiredTime(parseInt(e.target.value))}
+                style={{ width: '100%' }}
+              />
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+                How long to wait before triggering
+              </div>
             </div>
+            
             <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Cooldown: {formatTime(Math.floor(config.postRecognitionCooldown / 1000))}</label>
-              <input type="range" min="8000" max="30000" step="1000" value={config.postRecognitionCooldown} onChange={(e) => setConfig(prev => ({ ...prev, postRecognitionCooldown: parseInt(e.target.value, 10) }))} style={{ width: '100%' }}/>
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>EMA Alpha: {config.emaAlpha.toFixed(2)}</label>
-              <input type="range" min="0.02" max="0.20" step="0.01" value={config.emaAlpha} onChange={(e) => setConfig(prev => ({ ...prev, emaAlpha: parseFloat(e.target.value) }))} style={{ width: '100%' }}/>
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Enter Factor: {config.enterFactor.toFixed(2)}</label>
-              <input type="range" min="0.20" max="0.90" step="0.05" value={config.enterFactor} onChange={(e) => setConfig(prev => ({ ...prev, enterFactor: parseFloat(e.target.value) }))} style={{ width: '100%' }}/>
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Exit Factor: {config.exitFactor.toFixed(2)}</label>
-              <input type="range" min="0.30" max="0.95" step="0.05" value={config.exitFactor} onChange={(e) => setConfig(prev => ({ ...prev, exitFactor: parseFloat(e.target.value) }))} style={{ width: '100%' }}/>
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Spike Tolerance (ms): {config.spikeToleranceMs} </label>
-              <input type="range" min="0" max="750" step="50" value={config.spikeToleranceMs} onChange={(e) => setConfig(prev => ({ ...prev, spikeToleranceMs: parseInt(e.target.value, 10) }))} style={{ width: '100%' }}/>
+              <label style={{ display: 'block', fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>
+                Cooldown: {formatTime(Math.floor(cooldownTime / 1000))}
+              </label>
+              <input 
+                type="range" 
+                min="10000" 
+                max="30000" 
+                step="1000"
+                value={cooldownTime} 
+                onChange={(e) => setCooldownTime(parseInt(e.target.value))}
+                style={{ width: '100%' }}
+              />
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+                Wait time between recognitions
+              </div>
             </div>
           </div>
-        </details>
+        </div>
 
-        <div style={{ marginTop: 12, padding: 12, background: '#f0fdf4', border: '1px solid #22c55e', borderRadius: 8, fontSize: 12, color: '#15803d' }}>
-          <strong>📊 VISUAL GUIDE:</strong>
-          🔴 RED = below dynamic floor (likely silence) • 🟢 GREEN = above • Black line = enter-floor • Gray line = exit (hysteresis)
+        <div style={{ marginTop: 16, padding: 12, background: '#f0fdf4', border: '1px solid #22c55e', borderRadius: 8, fontSize: 12, color: '#15803d' }}>
+          <strong>📊 VU METER GUIDE:</strong> First 2 boxes (red) = silence detection zone. Remaining 8 boxes (green) = audio levels. 
+          Adjust the silence threshold slider to set when recognition should trigger.
         </div>
       </div>
 
@@ -620,7 +630,7 @@ export default function AudioRecognitionPage() {
             🔍 Debug Log (Last 50 entries)
           </div>
           {debugInfo.map((log, idx) => (
-            <div key={idx} style={{ marginBottom: 4, color: log.includes('❌') ? '#ef4444' : log.includes('✅') ? '#22c55e' : log.includes('🎯') || log.includes('🔇') || log.includes('🔊') ? '#fbbf24' : log.includes('🆕') ? '#a78bfa' : '#d1d5db' }}>
+            <div key={idx} style={{ marginBottom: 4, color: log.includes('❌') ? '#ef4444' : log.includes('✅') ? '#22c55e' : log.includes('🎯') || log.includes('🔇') || log.includes('🔊') ? '#fbbf24' : '#d1d5db' }}>
               {log}
             </div>
           ))}
