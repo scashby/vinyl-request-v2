@@ -253,9 +253,7 @@ export async function PUT(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const updateData: Record<string, string | null> = {
-      updated_at: new Date().toISOString()
-    };
+    const updateData: Record<string, string | null> = {};
     
     if (status) {
       updateData.status = status;
@@ -265,27 +263,33 @@ export async function PUT(request: NextRequest) {
       updateData.admin_notes = admin_notes;
     }
 
-    const { data, error } = await supabase
+    // Don't use .single() - just update and check the count
+    const { data, error, count } = await supabase
       .from('album_suggestions')
       .update(updateData)
       .eq('id', id)
-      .select()
-      .single();
+      .select();
 
     if (error) {
       debugLog('PUT error:', error);
       return NextResponse.json({
         success: false,
-        error: error.message,
-        details: error.details
+        error: error.message
       }, { status: 500 });
+    }
+
+    if (count === 0 || !data || data.length === 0) {
+      return NextResponse.json({
+        success: false,
+        error: 'Suggestion not found'
+      }, { status: 404 });
     }
 
     debugLog('Successfully updated suggestion');
 
     return NextResponse.json({
       success: true,
-      data,
+      data: data[0], // Return the first (and only) updated record
       message: 'Suggestion updated successfully'
     });
 
@@ -313,7 +317,8 @@ export async function DELETE(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const { error } = await supabase
+    // Don't use .single() - just delete and check the count
+    const { error, count } = await supabase
       .from('album_suggestions')
       .delete()
       .eq('id', id);
@@ -324,6 +329,13 @@ export async function DELETE(request: NextRequest) {
         success: false,
         error: error.message
       }, { status: 500 });
+    }
+
+    if (count === 0) {
+      return NextResponse.json({
+        success: false,
+        error: 'Suggestion not found'
+      }, { status: 404 });
     }
 
     return NextResponse.json({
