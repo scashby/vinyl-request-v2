@@ -446,6 +446,16 @@ export default function AudioRecognitionPage() {
     return stopMonitoring;
   }, [loadCurrentTrack, loadRecentHistory, stopMonitoring]);
 
+  // Restart monitoring when thresholds change (for live updates)
+  useEffect(() => {
+    if (isListening && monitoringIntervalRef.current) {
+      // Clear old interval and start new one with updated values
+      clearInterval(monitoringIntervalRef.current);
+      monitoringIntervalRef.current = window.setInterval(runMonitoring, 250);
+      addLogEntry(`Thresholds updated - Music: ${musicLevel}dB, Silence: ${silenceLevel}dB, Duration: ${silenceThreshold}s`, 'info');
+    }
+  }, [musicLevel, silenceLevel, silenceThreshold, isListening, runMonitoring, addLogEntry]);
+
   const VUMeter = ({ level }: { level: number }) => {
     const boxes = [];
     for (let i = 0; i < 10; i++) {
