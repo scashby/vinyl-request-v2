@@ -54,6 +54,7 @@ export default function AudioRecognitionPage() {
   }>>([]);
   const [backgroundNoiseProfile, setBackgroundNoiseProfile] = useState<number | null>(null);
   const [isCalibratingBackground, setIsCalibratingBackground] = useState(false);
+  const [debugUpdateInterval, setDebugUpdateInterval] = useState<number | null>(null);
 
   const streamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -125,8 +126,13 @@ export default function AudioRecognitionPage() {
         setBackgroundNoiseProfile(backgroundProfile);
         addLogEntry(`Background noise profile set to ${backgroundProfile}dB (avg: ${Math.round(average)}dB + 5dB buffer)`, 'success');
         
-        setSilenceLevel(backgroundProfile + 10);
-        addLogEntry(`Silence level auto-adjusted to ${backgroundProfile + 10}dB`, 'info');
+        // Auto-adjust both silence and music levels based on ambient noise
+        const newSilenceLevel = backgroundProfile + 10;
+        const newMusicLevel = backgroundProfile + 25; // Music should be significantly above ambient
+        
+        setSilenceLevel(newSilenceLevel);
+        setMusicLevel(newMusicLevel);
+        addLogEntry(`Levels auto-adjusted - Silence: ${newSilenceLevel}dB, Music: ${newMusicLevel}dB`, 'info');
       } else {
         addLogEntry('Background calibration failed - no samples collected', 'error');
       }
@@ -422,12 +428,18 @@ export default function AudioRecognitionPage() {
       addLogEntry('Microphone setup complete', 'success');
       setStatus('Microphone ready - adjust levels and start monitoring');
       
+      // Start continuous debug updates
+      const debugInterval = window.setInterval(() => {
+        getCurrentAudioLevel();
+      }, 250);
+      setDebugUpdateInterval(debugInterval);
+      
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       addLogEntry(`Microphone setup failed: ${msg}`, 'error');
       setStatus(`Microphone error: ${msg}`);
     }
-  }, [addLogEntry]);
+  }, [addLogEntry, getCurrentAudioLevel]);
 
   const startMonitoring = useCallback(() => {
     if (!audioContextRef.current) {
@@ -457,6 +469,14 @@ export default function AudioRecognitionPage() {
 
     setStatus('Monitoring stopped - microphone still active');
   }, [addLogEntry]);
+
+  const cleanup = useCallback(() => {
+    stopMonitoring();
+    if (debugUpdateInterval) {
+      clearInterval(debugUpdateInterval);
+      setDebugUpdateInterval(null);
+    }
+  }, [stopMonitoring, debugUpdateInterval]);
 
   const loadCurrentTrack = useCallback(async () => {
     try {
@@ -488,8 +508,8 @@ export default function AudioRecognitionPage() {
   useEffect(() => {
     void loadCurrentTrack();
     void loadRecentHistory();
-    return stopMonitoring;
-  }, [loadCurrentTrack, loadRecentHistory, stopMonitoring]);
+    return cleanup;
+  }, [loadCurrentTrack, loadRecentHistory, cleanup]);
 
   useEffect(() => {
     if (isListening && monitoringIntervalRef.current) {
@@ -559,6 +579,34 @@ export default function AudioRecognitionPage() {
             }}
           >
             Enable Microphone
+          </button>
+        </div>
+      )}
+
+      {audioContextRef.current && !backgroundNoiseProfile && (
+        <div style={{ background: '#fef3c7', border: '2px solid #f59e0b', borderRadius: 12, padding: 24, marginBottom: 24 }}>
+          <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 16, color: '#92400e' }}>
+            Step 2: Calibrate Background Noise
+          </h2>
+          <p style={{ marginBottom: 16, color: '#92400e' }}>
+            Keep your room quiet and click below to measure ambient noise levels. This will automatically set optimal thresholds.
+          </p>
+          <button
+            onClick={calibrateBackgroundNoise}
+            disabled={isCalibratingBackground}
+            style={{
+              background: '#f59e0b',
+              color: 'white',
+              border: 'none',
+              borderRadius: 8,
+              padding: '12px 24px',
+              fontSize: 16,
+              fontWeight: 600,
+              cursor: isCalibratingBackground ? 'not-allowed' : 'pointer',
+              opacity: isCalibratingBackground ? 0.6 : 1
+            }}
+          >
+            {isCalibratingBackground ? 'Sampling Environment...' : 'Calibrate Background Noise'}
           </button>
         </div>
       )}
@@ -738,7 +786,7 @@ export default function AudioRecognitionPage() {
             {status}
           </div>
 
-          {debugInfo.length > 0 && (
+          {audioContextRef.current && (
             <div style={{ 
               marginTop: 16,
               background: '#1f2937', 
@@ -750,9 +798,13 @@ export default function AudioRecognitionPage() {
               border: '2px solid #374151'
             }}>
               <div style={{ fontWeight: 600, marginBottom: 8, color: '#10b981' }}>Live Monitor:</div>
-              {debugInfo.map((info, i) => (
-                <div key={i} style={{ marginBottom: 2, color: '#e5e7eb' }}>{info}</div>
-              ))}
+              {debugInfo.length > 0 ? (
+                debugInfo.map((info, i) => (
+                  <div key={i} style={{ marginBottom: 2, color: '#e5e7eb' }}>{info}</div>
+                ))
+              ) : (
+                <div style={{ color: '#9ca3af', fontStyle: 'italic' }}>Starting audio level monitoring...</div>
+              )}
             </div>
           )}
 
