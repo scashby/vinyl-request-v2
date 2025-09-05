@@ -1,26 +1,31 @@
-// Fixed Album Detail page - replace the import
+// Fixed Album Detail page with track listings, event context, and navigation
 // Replace: src/app/browse/album-detail/[id]/page.js
 
 "use client";
 
 import { useEffect, useState, useCallback, Suspense } from 'react';
-import { useParams, useSearchParams } from 'next/navigation';
+import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { supabase } from 'src/lib/supabaseClient';
-import AlbumSuggestionBox from 'components/AlbumSuggestionBox'; // Fixed import
+import AlbumSuggestionBox from 'components/AlbumSuggestionBox';
 import 'styles/internal.css';
+import 'styles/album-detail.css';
 
 function AlbumDetailContent() {
   const params = useParams();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const id = params.id;
   const eventId = searchParams.get('eventId');
 
   const [album, setAlbum] = useState(null);
+  const [eventData, setEventData] = useState(null);
+  const [trackListings, setTrackListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [requestStatus, setRequestStatus] = useState('');
   const [submittingRequest, setSubmittingRequest] = useState(false);
+  const [showSuggestionBox, setShowSuggestionBox] = useState(false);
 
   const fetchAlbum = useCallback(async () => {
     try {
@@ -35,6 +40,17 @@ function AlbumDetailContent() {
         setError(error.message);
       } else {
         setAlbum(data);
+        
+        // Fetch track listings if available
+        const { data: tracks, error: trackError } = await supabase
+          .from('track_listings')
+          .select('*')
+          .eq('album_id', id)
+          .order('track_number', { ascending: true });
+        
+        if (!trackError && tracks) {
+          setTrackListings(tracks);
+        }
       }
     } catch {
       setError('Failed to load album');
@@ -43,11 +59,32 @@ function AlbumDetailContent() {
     }
   }, [id]);
 
+  const fetchEventData = useCallback(async () => {
+    if (!eventId) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('events')
+        .select('*')
+        .eq('id', eventId)
+        .single();
+
+      if (!error && data) {
+        setEventData(data);
+      }
+    } catch (error) {
+      console.error('Error fetching event data:', error);
+    }
+  }, [eventId]);
+
   useEffect(() => {
     if (id) {
       fetchAlbum();
     }
-  }, [id, fetchAlbum]);
+    if (eventId) {
+      fetchEventData();
+    }
+  }, [id, eventId, fetchAlbum, fetchEventData]);
 
   const handleAddToQueue = async (side) => {
     if (!eventId) {
@@ -81,6 +118,26 @@ function AlbumDetailContent() {
     }
   };
 
+  const goToEvent = () => {
+    if (eventId) {
+      router.push(`/events/event-detail/${eventId}`);
+    }
+  };
+
+  const goToBrowse = () => {
+    if (eventId) {
+      router.push(`/browse/browse-albums?eventId=${eventId}`);
+    } else {
+      router.push('/browse/browse-albums');
+    }
+  };
+
+  const goToQueue = () => {
+    if (eventId) {
+      router.push(`/browse/browse-queue?eventId=${eventId}`);
+    }
+  };
+
   if (loading) {
     return (
       <div className="page-wrapper">
@@ -96,7 +153,11 @@ function AlbumDetailContent() {
       <div className="page-wrapper">
         <div style={{ padding: 40, textAlign: 'center', color: 'red' }}>
           <p>Error: {error}</p>
-          <AlbumSuggestionBox context="general" />
+          <AlbumSuggestionBox 
+            context="general" 
+            eventId={eventId}
+            eventTitle={eventData?.title}
+          />
         </div>
       </div>
     );
@@ -107,7 +168,11 @@ function AlbumDetailContent() {
       <div className="page-wrapper">
         <div style={{ padding: 40, textAlign: 'center' }}>
           <p>Album not found</p>
-          <AlbumSuggestionBox context="general" />
+          <AlbumSuggestionBox 
+            context="general"
+            eventId={eventId}
+            eventTitle={eventData?.title}
+          />
         </div>
       </div>
     );
@@ -118,127 +183,295 @@ function AlbumDetailContent() {
     : '/images/coverplaceholder.png';
 
   return (
-    <div className="page-wrapper">
-      <main className="page-body" style={{ padding: 20 }}>
+    <div className="album-detail">
+      {/* Background blur effect */}
+      <div 
+        className="background-blur"
+        style={{ backgroundImage: `url(${imageUrl})` }}
+      />
+
+      {/* Navigation Bar */}
+      {eventId && (
         <div style={{
-          display: 'grid',
-          gridTemplateColumns: '300px 1fr',
-          gap: 40,
-          maxWidth: 1200,
-          margin: '0 auto'
+          position: 'relative',
+          zIndex: 10,
+          background: 'rgba(0, 0, 0, 0.8)',
+          padding: '12px 24px',
+          display: 'flex',
+          gap: '16px',
+          alignItems: 'center',
+          flexWrap: 'wrap'
         }}>
-          {/* Album Image */}
-          <div>
-            <Image
-              src={imageUrl}
-              alt={`${album.artist} - ${album.title}`}
-              width={300}
-              height={300}
-              style={{ 
-                borderRadius: 8, 
-                objectFit: 'cover',
-                boxShadow: '0 4px 8px rgba(0,0,0,0.1)'
+          <button
+            onClick={goToBrowse}
+            style={{
+              background: '#059669',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              padding: '8px 16px',
+              fontSize: '14px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            ← Browse Collection
+          </button>
+          
+          <button
+            onClick={goToQueue}
+            style={{
+              background: '#3b82f6',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              padding: '8px 16px',
+              fontSize: '14px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            🎵 View Queue
+          </button>
+
+          <button
+            onClick={goToEvent}
+            style={{
+              background: '#9333ea',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              padding: '8px 16px',
+              fontSize: '14px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            📅 Event Details
+          </button>
+
+          {eventData && (
+            <span style={{
+              color: '#fff',
+              fontSize: '14px',
+              marginLeft: 'auto',
+              opacity: 0.9
+            }}>
+              Event: {eventData.title}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Album Header */}
+      <div className="album-header">
+        <Image
+          src={imageUrl}
+          alt={`${album.artist} - ${album.title}`}
+          width={200}
+          height={200}
+          className="album-art"
+          unoptimized
+        />
+        
+        <div className="album-info">
+          <h1 className="title">{album.title}</h1>
+          <h2 className="artist">{album.artist}</h2>
+          
+          <div className="meta">
+            {album.year && <span>Year: {album.year} • </span>}
+            {album.format && <span>Format: {album.format} • </span>}
+            {album.folder && <span>Category: {album.folder}</span>}
+          </div>
+          
+          {album.media_condition && (
+            <div className="meta" style={{ marginTop: '8px' }}>
+              Condition: {album.media_condition}
+            </div>
+          )}
+          
+          {album.folder && (
+            <span className="badge">{album.folder}</span>
+          )}
+          
+          {album.notes && (
+            <div style={{ 
+              marginTop: '16px',
+              padding: '12px',
+              background: 'rgba(255, 255, 255, 0.1)',
+              borderRadius: '6px',
+              backdropFilter: 'blur(10px)'
+            }}>
+              <strong>Notes:</strong> {album.notes}
+            </div>
+          )}
+
+          {/* Queue Actions */}
+          {eventId && (
+            <div style={{ marginTop: '20px' }}>
+              <h3 style={{ color: '#fff', marginBottom: '12px', fontSize: '18px' }}>
+                Add to Event Queue:
+              </h3>
+              <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
+                <button
+                  onClick={() => handleAddToQueue('A')}
+                  disabled={submittingRequest}
+                  style={{
+                    background: '#3b82f6',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: 6,
+                    padding: '12px 24px',
+                    cursor: submittingRequest ? 'not-allowed' : 'pointer',
+                    fontSize: 16,
+                    fontWeight: 'bold',
+                    opacity: submittingRequest ? 0.7 : 1
+                  }}
+                >
+                  Side A
+                </button>
+                <button
+                  onClick={() => handleAddToQueue('B')}
+                  disabled={submittingRequest}
+                  style={{
+                    background: '#10b981',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: 6,
+                    padding: '12px 24px',
+                    cursor: submittingRequest ? 'not-allowed' : 'pointer',
+                    fontSize: 16,
+                    fontWeight: 'bold',
+                    opacity: submittingRequest ? 0.7 : 1
+                  }}
+                >
+                  Side B
+                </button>
+              </div>
+              
+              {requestStatus && (
+                <p style={{ 
+                  color: requestStatus.includes('Error') ? '#ef4444' : '#10b981',
+                  fontWeight: 'bold',
+                  fontSize: '14px'
+                }}>
+                  {requestStatus}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Track Listings */}
+      {trackListings.length > 0 && (
+        <div className="tracklist">
+          <h3 style={{ 
+            color: '#fff', 
+            marginBottom: '20px', 
+            fontSize: '20px',
+            fontWeight: 'bold'
+          }}>
+            Track Listing
+          </h3>
+          
+          <div className="tracklist-header">
+            <div>#</div>
+            <div>Title</div>
+            <div>Artist</div>
+            <div>Duration</div>
+          </div>
+          
+          {trackListings.map((track, index) => (
+            <div key={track.id} className="track">
+              <div>{track.track_number || index + 1}</div>
+              <div style={{ color: '#fff', fontWeight: '500' }}>
+                {track.title}
+              </div>
+              <div style={{ color: '#ccc' }}>
+                {track.artist || album.artist}
+              </div>
+              <div style={{ color: '#aaa', fontSize: '14px' }}>
+                {track.duration || '--:--'}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Album Suggestion Section */}
+      <div style={{ 
+        position: 'relative',
+        zIndex: 10,
+        maxWidth: '900px',
+        margin: '40px auto',
+        padding: '20px'
+      }}>
+        {!showSuggestionBox ? (
+          <div style={{
+            background: 'rgba(0, 0, 0, 0.7)',
+            borderRadius: '12px',
+            padding: '24px',
+            textAlign: 'center',
+            backdropFilter: 'blur(10px)',
+            border: '1px solid rgba(255, 255, 255, 0.1)'
+          }}>
+            <h3 style={{ 
+              color: '#fff', 
+              marginBottom: '12px', 
+              fontSize: '20px' 
+            }}>
+              Don&apos;t see what you&apos;re looking for?
+            </h3>
+            <p style={{ 
+              color: '#ccc', 
+              marginBottom: '20px',
+              fontSize: '16px'
+            }}>
+              Suggest an album for the Dead Wax Dialogues collection
+            </p>
+            <button
+              onClick={() => setShowSuggestionBox(true)}
+              style={{
+                background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                padding: '12px 24px',
+                fontSize: '16px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
               }}
-              unoptimized
+            >
+              💡 Suggest an Album
+            </button>
+          </div>
+        ) : (
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.95)',
+            borderRadius: '12px',
+            padding: '4px',
+            backdropFilter: 'blur(10px)'
+          }}>
+            <AlbumSuggestionBox 
+              context="general"
+              eventId={eventId}
+              eventTitle={eventData?.title}
+              onClose={() => setShowSuggestionBox(false)}
             />
           </div>
-
-          {/* Album Info */}
-          <div>
-            <h1 style={{ fontSize: 32, fontWeight: 'bold', marginBottom: 8 }}>
-              {album.title}
-            </h1>
-            <h2 style={{ fontSize: 24, color: '#666', marginBottom: 16 }}>
-              {album.artist}
-            </h2>
-            
-            <div style={{ marginBottom: 20 }}>
-              {album.year && (
-                <p><strong>Year:</strong> {album.year}</p>
-              )}
-              {album.format && (
-                <p><strong>Format:</strong> {album.format}</p>
-              )}
-              {album.folder && (
-                <p><strong>Category:</strong> {album.folder}</p>
-              )}
-              {album.media_condition && (
-                <p><strong>Condition:</strong> {album.media_condition}</p>
-              )}
-            </div>
-
-            {album.notes && (
-              <div style={{ marginBottom: 20 }}>
-                <h3>Notes:</h3>
-                <p style={{ 
-                  background: '#f5f5f5', 
-                  padding: 12, 
-                  borderRadius: 6,
-                  fontStyle: 'italic'
-                }}>
-                  {album.notes}
-                </p>
-              </div>
-            )}
-
-            {/* Queue Actions */}
-            {eventId && (
-              <div style={{ marginBottom: 30 }}>
-                <h3 style={{ marginBottom: 12 }}>Add to Event Queue:</h3>
-                <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
-                  <button
-                    onClick={() => handleAddToQueue('A')}
-                    disabled={submittingRequest}
-                    style={{
-                      background: '#3b82f6',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: 6,
-                      padding: '10px 20px',
-                      cursor: submittingRequest ? 'not-allowed' : 'pointer',
-                      fontSize: 16,
-                      fontWeight: 'bold'
-                    }}
-                  >
-                    Side A
-                  </button>
-                  <button
-                    onClick={() => handleAddToQueue('B')}
-                    disabled={submittingRequest}
-                    style={{
-                      background: '#10b981',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: 6,
-                      padding: '10px 20px',
-                      cursor: submittingRequest ? 'not-allowed' : 'pointer',
-                      fontSize: 16,
-                      fontWeight: 'bold'
-                    }}
-                  >
-                    Side B
-                  </button>
-                </div>
-                
-                {requestStatus && (
-                  <p style={{ 
-                    color: requestStatus.includes('Error') ? 'red' : 'green',
-                    fontWeight: 'bold' 
-                  }}>
-                    {requestStatus}
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Album Suggestion */}
-            <div style={{ marginTop: 40 }}>
-              <h3 style={{ marginBottom: 16 }}>Don&apos;t see what you&apos;re looking for?</h3>
-              <AlbumSuggestionBox context="general" compact={false} />
-            </div>
-          </div>
-        </div>
-      </main>
+        )}
+      </div>
     </div>
   );
 }

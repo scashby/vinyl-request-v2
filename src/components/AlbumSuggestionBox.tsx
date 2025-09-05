@@ -1,4 +1,4 @@
-// Fixed Album Suggestion Component with correct database field mapping
+// Fixed Album Suggestion Component with Event Context Support
 // Replace: src/components/AlbumSuggestionBox.tsx
 
 import { useState } from 'react';
@@ -6,6 +6,8 @@ import { useState } from 'react';
 interface AlbumSuggestionBoxProps {
   context?: 'search' | 'voting' | 'general';
   searchQuery?: string;
+  eventId?: string | null;
+  eventTitle?: string | null;
   onClose?: () => void;
   compact?: boolean;
 }
@@ -13,6 +15,8 @@ interface AlbumSuggestionBoxProps {
 export default function AlbumSuggestionBox({ 
   context = 'general', 
   searchQuery = '', 
+  eventId = null,
+  eventTitle = null,
   onClose,
   compact = false 
 }: AlbumSuggestionBoxProps) {
@@ -20,10 +24,10 @@ export default function AlbumSuggestionBox({
   const [suggestion, setSuggestion] = useState({
     artist: '',
     album: '',
-    reason: '', // Updated to match database schema
+    reason: '',
     contributionAmount: '',
-    contributorName: '', // Updated to match database schema
-    contributorEmail: '' // Updated to match database schema
+    contributorName: '',
+    contributorEmail: ''
   });
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -77,12 +81,14 @@ export default function AlbumSuggestionBox({
         body: JSON.stringify({
           artist: suggestion.artist.trim(),
           album: suggestion.album.trim(),
-          notes: suggestion.reason.trim(), // Maps to 'reason' field in database
+          notes: suggestion.reason.trim(),
           contribution_amount: suggestion.contributionAmount || null,
-          suggestor_name: suggestion.contributorName.trim(), // Maps to 'contributor_name' in database  
-          suggestor_email: suggestion.contributorEmail.trim(), // Maps to 'contributor_email' in database
+          suggestor_name: suggestion.contributorName.trim(),
+          suggestor_email: suggestion.contributorEmail.trim(),
           context,
-          search_query: searchQuery
+          search_query: searchQuery,
+          event_id: eventId,
+          event_title: eventTitle
         })
       });
 
@@ -100,18 +106,19 @@ export default function AlbumSuggestionBox({
   };
 
   const getContextMessage = () => {
+    const eventContext = eventId && eventTitle ? ` for ${eventTitle}` : '';
+    
     switch (context) {
       case 'search':
-        return `Couldn't find "${searchQuery}"? Suggest it for the collection!`;
+        return `Couldn't find "${searchQuery}"? Suggest it for the collection${eventContext}!`;
       case 'voting':
-        return "Don't see your favorite album? Suggest it for future additions!";
+        return `Don't see your favorite album? Suggest it for future additions${eventContext}!`;
       default:
-        return "Suggest an album for the Dead Wax Dialogues collection";
+        return `Suggest an album for the Dead Wax Dialogues collection${eventContext}`;
     }
   };
 
   const getVenmoUrl = () => {
-    // Just link to your Venmo profile - customers will see the suggestion and can pay you
     return `https://venmo.com/u/deadwaxdialogues`;
   };
 
@@ -177,6 +184,7 @@ export default function AlbumSuggestionBox({
         </h3>
         <p style={{ fontSize: 14, margin: '0 0 16px 0', opacity: 0.9 }}>
           Thanks for suggesting &ldquo;{suggestion.artist} - {suggestion.album}&rdquo;
+          {eventId && eventTitle && ` for ${eventTitle}`}
         </p>
         
         {suggestion.contributionAmount && (
