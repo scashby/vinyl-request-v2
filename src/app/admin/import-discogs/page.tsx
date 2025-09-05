@@ -4,7 +4,6 @@ import { useState } from 'react';
 import Papa from 'papaparse';
 import { supabase } from 'src/lib/supabaseClient';
 
-
 // Updated type to match actual Discogs CSV export structure
 type DiscogsCSVRow = {
   'Catalog#': string;
@@ -14,7 +13,7 @@ type DiscogsCSVRow = {
   Format: string;
   Rating: string | null;
   Released: number;
-  release_id: number | string | null; // Can be number, string, or null from CSV parsing
+  release_id: number | string | null;
   CollectionFolder: string;
   'Date Added': string;
   'Collection Media Condition': string;
@@ -22,7 +21,6 @@ type DiscogsCSVRow = {
   'Collection Notes': string | null;
 };
 
-// Type for the processed row that will go to Supabase
 type ProcessedRow = {
   artist: string;
   title: string;
@@ -30,7 +28,7 @@ type ProcessedRow = {
   format: string;
   folder: string;
   media_condition: string;
-  discogs_release_id: string; // String to match database schema
+  discogs_release_id: string;
   date_added: string;
   image_url: string | null;
   tracklists: string | null;
@@ -64,26 +62,21 @@ export default function ImportDiscogsPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [debugInfo, setDebugInfo] = useState<string>('');
 
-  // Add rate limiting for Discogs API
   const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+  // FIXED: Use existing discogsProxy endpoint instead of direct fetch
   const fetchDiscogsData = async (
     releaseId: string,
     retries = 3
   ): Promise<{ image_url: string | null; tracklists: string | null }> => {
-    const url = `https://api.discogs.com/releases/${releaseId}`;
     
     for (let attempt = 0; attempt < retries; attempt++) {
       try {
-        // Add delay to respect rate limits (1 request per second for free accounts)
+        // Add delay to respect rate limits
         if (attempt > 0) await delay(1000);
         
-        const res = await fetch(url, {
-          headers: {
-            'User-Agent': 'DeadwaxDialogues/1.0 +https://yourwebsite.com', // Replace with your actual website
-            'Authorization': `Discogs token=${process.env.NEXT_PUBLIC_DISCOGS_TOKEN}`
-          }
-        });
+        // Use the existing proxy endpoint that handles CORS properly
+        const res = await fetch(`/api/discogsProxy?releaseId=${releaseId}`);
         
         if (res.status === 429) {
           // Rate limited, wait longer
@@ -142,7 +135,7 @@ export default function ImportDiscogsPage() {
       Papa.parse(file, {
         header: true,
         skipEmptyLines: true,
-        dynamicTyping: true, // This will convert numbers properly
+        dynamicTyping: true,
         complete: async (results: { data: DiscogsCSVRow[], meta: { fields?: string[] } }) => {
           console.log('CSV Headers:', results.meta.fields);
           console.log('Sample row:', results.data[0]);
@@ -154,9 +147,8 @@ export default function ImportDiscogsPage() {
           // Filter out rows without Release ID and log issues
           const validRows = results.data.filter((row, index) => {
             const releaseId = row.release_id;
-            // Check for missing, null, undefined, empty string, or zero values
             if (!releaseId || releaseId === 0 || releaseId === '' || releaseId === null || releaseId === undefined) {
-              if (index < 10) { // Only log first 10 for brevity
+              if (index < 10) {
                 console.log(`Row ${index} missing/invalid release_id:`, { 
                   catalog: row['Catalog#'], 
                   artist: row.Artist, 
@@ -167,7 +159,6 @@ export default function ImportDiscogsPage() {
               }
               return false;
             }
-            // Also filter out non-numeric strings (we'll convert valid numbers to strings later)
             const numericValue = Number(releaseId);
             if (isNaN(numericValue) || numericValue <= 0) {
               if (index < 10) {
@@ -195,7 +186,7 @@ export default function ImportDiscogsPage() {
             format: row.Format,
             folder: row.CollectionFolder,
             media_condition: row['Collection Media Condition'],
-            discogs_release_id: String(row.release_id), // Convert to string to match database
+            discogs_release_id: String(row.release_id),
             date_added: parseDiscogsDate(row['Date Added']),
             image_url: null,
             tracklists: null
@@ -203,23 +194,11 @@ export default function ImportDiscogsPage() {
 
           const releaseIds = processedRows.map(r => r.discogs_release_id);
           
-          console.log('Release IDs to check (converted to strings):', releaseIds.slice(0, 5)); // Log first 5 for debugging
+          console.log('Release IDs to check (converted to strings):', releaseIds.slice(0, 5));
           
           setStatus(`Checking Supabase for existing entries among ${releaseIds.length} items...`);
           
-          // First, get a count of all records with discogs_release_id
-          const { count: totalCount, error: countError } = await supabase
-            .from('collection')
-            .select('*', { count: 'exact', head: true })
-            .not('discogs_release_id', 'is', null);
-
-          if (countError) {
-            console.warn('Count query failed:', countError);
-          } else {
-            console.log('Total records with discogs_release_id in database:', totalCount);
-          }
-          
-          // Use pagination to get ALL existing release IDs
+          // Get existing release IDs using pagination
           let allExisting: { discogs_release_id: string }[] = [];
           let start = 0;
           const pageSize = 1000;
@@ -239,7 +218,7 @@ export default function ImportDiscogsPage() {
             if (pageData && pageData.length > 0) {
               allExisting = allExisting.concat(pageData);
               start += pageSize;
-              hasMore = pageData.length === pageSize; // Continue if we got a full page
+              hasMore = pageData.length === pageSize;
               console.log(`Fetched page: ${pageData.length} records, total so far: ${allExisting.length}`);
             } else {
               hasMore = false;
@@ -247,26 +226,16 @@ export default function ImportDiscogsPage() {
           }
 
           console.log('Total existing entries fetched from database via pagination:', allExisting.length);
-          console.log('Expected around 1178, fetched:', allExisting.length, 'Count query returned:', totalCount);
           
           // Create a Set of all existing release IDs for fast lookup
           const allExistingIds = new Set(
             (allExisting || [])
               .map((r: { discogs_release_id: string }) => r.discogs_release_id)
-              .filter(id => id) // Remove any null/undefined values
+              .filter(id => id)
           );
 
           console.log('All existing release IDs count:', allExistingIds.size);
           
-          // Debug: Check specific IDs that should be duplicates
-          const testIds = ['24532220', '21975574', '2775546', '8315395', '1841179'];
-          testIds.forEach(id => {
-            const inDatabase = allExistingIds.has(id);
-            const inCsv = releaseIds.includes(id);
-            console.log(`Test ID ${id}: In database: ${inDatabase}, In CSV: ${inCsv}`);
-          });
-          
-          // Now filter our CSV data to find only the ones that don't exist
           const existingInCsv = releaseIds.filter(id => allExistingIds.has(id));
           const newRows = processedRows.filter(row => !allExistingIds.has(row.discogs_release_id));
 
@@ -275,7 +244,7 @@ export default function ImportDiscogsPage() {
           console.log('Sample new release IDs:', newRows.slice(0, 5).map(r => r.discogs_release_id));
           
           setStatus(`Found ${newRows.length} new items out of ${releaseIds.length} total. ${existingInCsv.length} already exist in database.`);
-          setDebugInfo(prev => prev + `\nTotal CSV rows: ${results.data.length}, Valid rows with release_id: ${validRows.length}, New items: ${newRows.length}, Existing in DB: ${existingInCsv.length}\nTotal existing items in database: ${allExistingIds.size}\nNote: Converting release IDs to strings to match database schema`);
+          setDebugInfo(prev => prev + `\nTotal CSV rows: ${results.data.length}, Valid rows with release_id: ${validRows.length}, New items: ${newRows.length}, Existing in DB: ${existingInCsv.length}\nTotal existing items in database: ${allExistingIds.size}\nNote: Using proxy endpoint to avoid CORS issues`);
           
           if (validRows.length === 0) {
             setDebugInfo(prev => prev + `\nPROBLEM: No rows have valid release_id values! This suggests the Discogs export may be missing release IDs.`);
@@ -319,7 +288,6 @@ export default function ImportDiscogsPage() {
           enriched.push({ ...row, image_url, tracklists });
         } catch (error) {
           console.warn(`Failed to enrich ${row.discogs_release_id}:`, error);
-          // Add the row without enrichment if Discogs API fails
           enriched.push({ ...row, image_url: null, tracklists: null });
         }
         
@@ -332,7 +300,7 @@ export default function ImportDiscogsPage() {
       setCsvPreview(enriched);
       setStatus('Processing database operations...');
       
-      // Separate new items from updates
+      // Check for existing items again
       const { data: existingItems, error: existingError } = await supabase
         .from('collection')
         .select('discogs_release_id, date_added')
@@ -474,7 +442,6 @@ export default function ImportDiscogsPage() {
                         height={50}
                         style={{ objectFit: 'cover' }}
                         onError={(e) => {
-                          // Hide broken images
                           e.currentTarget.style.display = 'none';
                         }}
                       />
