@@ -1,5 +1,5 @@
-// Fixed Browse Albums page with proper button spacing
-// Replace: src/app/browse/browse-albums/page.js
+// FILE: src/app/browse/browse-albums/page.js
+// Browse Albums page with Just Added feature (complete file)
 
 "use client";
 
@@ -10,7 +10,6 @@ import AlbumSuggestionBox from 'components/AlbumSuggestionBox';
 import 'styles/album-browse.css';
 import 'styles/internal.css';
 import { supabase } from 'src/lib/supabaseClient';
-
 import { useSearchParams } from 'next/navigation';
 
 function BrowseAlbumsContent() {
@@ -24,10 +23,20 @@ function BrowseAlbumsContent() {
   const [allowedFormats, setAllowedFormats] = useState(null);
   const [eventTitle, setEventTitle] = useState('');
   const [mediaFilter, setMediaFilter] = useState('');
-  const [sortField, setSortField] = useState('title');
-  const [sortAsc, setSortAsc] = useState(true);
+  const [sortField, setSortField] = useState('date_added'); // Default to newest first
+  const [sortAsc, setSortAsc] = useState(false); // Newest first = descending
+  const [showJustAdded, setShowJustAdded] = useState(false);
   const [showSuggestionBox, setShowSuggestionBox] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  // Helper function to check if album was added in last 2 weeks
+  const isJustAdded = (dateAdded) => {
+    if (!dateAdded) return false;
+    const addedDate = new Date(dateAdded);
+    const twoWeeksAgo = new Date();
+    twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+    return addedDate >= twoWeeksAgo;
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -90,6 +99,8 @@ function BrowseAlbumsContent() {
         year: album.year,
         folder: album.folder,
         mediaType: album.folder,
+        dateAdded: album.date_added,
+        justAdded: isJustAdded(album.date_added),
         image:
           album.image_url && album.image_url.trim().toLowerCase() !== 'no'
             ? album.image_url.trim()
@@ -133,18 +144,34 @@ function BrowseAlbumsContent() {
       const matchesFilter =
         !mediaFilter ||
         formatVariants(mediaFilter).includes(folder);
-      return matchesSearch && isAllowed && matchesFilter;
+      const matchesJustAdded =
+        !showJustAdded || album.justAdded;
+        
+      return matchesSearch && isAllowed && matchesFilter && matchesJustAdded;
     });
     
+    // Sort albums
     fa = [...fa].sort((a, b) => {
-      let va = (a[sortField] || '').toString().toLowerCase();
-      let vb = (b[sortField] || '').toString().toLowerCase();
-      if (va > vb) return sortAsc ? 1 : -1;
-      if (va < vb) return sortAsc ? -1 : 1;
-      return 0;
+      let va, vb;
+      
+      if (sortField === 'date_added') {
+        va = new Date(a.dateAdded || '1970-01-01');
+        vb = new Date(b.dateAdded || '1970-01-01');
+        return sortAsc ? va.getTime() - vb.getTime() : vb.getTime() - va.getTime();
+      } else {
+        va = (a[sortField] || '').toString().toLowerCase();
+        vb = (b[sortField] || '').toString().toLowerCase();
+        if (va > vb) return sortAsc ? 1 : -1;
+        if (va < vb) return sortAsc ? -1 : 1;
+        return 0;
+      }
     });
+    
     return fa;
-  }, [albums, searchTerm, mediaFilter, allowedFormats, normalizedFormats, sortField, sortAsc]);
+  }, [albums, searchTerm, mediaFilter, allowedFormats, normalizedFormats, sortField, sortAsc, showJustAdded]);
+
+  // Count just added albums
+  const justAddedCount = albums.filter(album => album.justAdded).length;
 
   const hasSearchQuery = searchTerm.trim().length > 0;
   const hasNoResults = hasSearchQuery && filteredAlbums.length === 0;
@@ -200,7 +227,30 @@ function BrowseAlbumsContent() {
               </option>
             ))}
           </select>
+          
+          {/* Just Added Filter */}
+          {justAddedCount > 0 && (
+            <label style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px',
+              fontSize: '14px',
+              fontWeight: '600',
+              color: '#059669',
+              whiteSpace: 'nowrap'
+            }}>
+              <input
+                type="checkbox"
+                checked={showJustAdded}
+                onChange={(e) => setShowJustAdded(e.target.checked)}
+                style={{ transform: 'scale(1.2)' }}
+              />
+              ✨ Just Added ({justAddedCount})
+            </label>
+          )}
+          
           <select value={sortField} onChange={e => setSortField(e.target.value)}>
+            <option value="date_added">Date Added</option>
             <option value="title">Title</option>
             <option value="artist">Artist</option>
             <option value="year">Year</option>
@@ -212,7 +262,6 @@ function BrowseAlbumsContent() {
             Sort: {sortAsc ? 'Ascending' : 'Descending'}
           </button>
           
-          {/* Add suggest button inline with other controls */}
           {!hasNoResults && !showSuggestionBox && (
             <button
               onClick={() => setShowSuggestionBox(true)}
@@ -228,7 +277,7 @@ function BrowseAlbumsContent() {
                 transition: 'all 0.2s ease',
                 boxShadow: '0 2px 6px rgba(59, 130, 246, 0.3)',
                 whiteSpace: 'nowrap',
-                marginLeft: 'auto' // Push to the right
+                marginLeft: 'auto'
               }}
             >
               💡 Suggest an Album
@@ -236,7 +285,6 @@ function BrowseAlbumsContent() {
           )}
         </div>
 
-        {/* Simplified results display without separate button */}
         <div style={{ 
           fontSize: '14px', 
           color: '#666',
@@ -245,8 +293,10 @@ function BrowseAlbumsContent() {
         }}>
           {hasSearchQuery ? (
             <>Showing {filteredAlbums.length} results for &ldquo;{searchTerm}&rdquo;</>
+          ) : showJustAdded ? (
+            <>Showing {filteredAlbums.length} just added albums</>
           ) : (
-            <>Showing {filteredAlbums.length} albums</>
+            <>Showing {filteredAlbums.length} albums{justAddedCount > 0 ? ` (${justAddedCount} just added)` : ''}</>
           )}
         </div>
 
@@ -266,7 +316,8 @@ function BrowseAlbumsContent() {
               key={album.id}
               album={{
                 ...album,
-                eventId: eventId
+                eventId: eventId,
+                justAdded: album.justAdded // Pass through the just added flag
               }}
             />
           ))}
@@ -282,7 +333,7 @@ function BrowseAlbumsContent() {
             <div style={{ fontSize: 48, marginBottom: 16 }}>🎵</div>
             <p>The collection is loading or no albums match your filters.</p>
             <p style={{ fontSize: 14 }}>
-              Try adjusting your media type filter or suggest new albums above!
+              Try adjusting your filters or suggest new albums above!
             </p>
           </div>
         )}

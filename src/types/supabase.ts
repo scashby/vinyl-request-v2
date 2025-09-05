@@ -1,4 +1,5 @@
-// src/types/supabase.ts
+// FILE: src/types/supabase.ts
+// Complete file with date_added field added
 
 export type Json =
   | string
@@ -154,6 +155,7 @@ export interface Database {
           media_condition: string | null;
           image_url: string | null;
           notes: string | null;
+          date_added: string | null; // NEW: Added this field
           created_at: string | null;
           updated_at: string | null;
         };
@@ -167,6 +169,7 @@ export interface Database {
           media_condition?: string | null;
           image_url?: string | null;
           notes?: string | null;
+          date_added?: string | null; // NEW: Added this field
           created_at?: string | null;
           updated_at?: string | null;
         };
@@ -180,6 +183,7 @@ export interface Database {
           media_condition?: string | null;
           image_url?: string | null;
           notes?: string | null;
+          date_added?: string | null; // NEW: Added this field
           created_at?: string | null;
           updated_at?: string | null;
         };

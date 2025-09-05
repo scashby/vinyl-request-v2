@@ -1,9 +1,11 @@
+// FILE: src/app/admin/import-discogs/page.tsx
+// Complete Discogs import page with date_added field support
+
 'use client';
 
 import { useState } from 'react';
 import Papa from 'papaparse';
 import { supabase } from 'src/lib/supabaseClient';
-
 
 // Updated type to match actual Discogs CSV export structure
 type DiscogsCSVRow = {
@@ -31,6 +33,7 @@ type ProcessedRow = {
   folder: string;
   media_condition: string;
   discogs_release_id: string; // String to match database schema
+  date_added: string; // NEW: Add this field
   image_url: string | null;
   tracklists: string | null;
 };
@@ -178,6 +181,7 @@ export default function ImportDiscogsPage() {
             folder: row.CollectionFolder,
             media_condition: row['Collection Media Condition'],
             discogs_release_id: String(row.release_id), // Convert to string to match database
+            date_added: row['Date Added'] || new Date().toISOString().split('T')[0], // NEW: Use Discogs date or today
             image_url: null,
             tracklists: null
           }));
@@ -256,7 +260,7 @@ export default function ImportDiscogsPage() {
           console.log('Sample new release IDs:', newRows.slice(0, 5).map(r => r.discogs_release_id));
           
           setStatus(`Found ${newRows.length} new items out of ${releaseIds.length} total. ${existingInCsv.length} already exist in database.`);
-          setDebugInfo(prev => prev + `\nTotal CSV rows: ${results.data.length}, Valid rows with release_id: ${validRows.length}, New items: ${newRows.length}, Existing in DB: ${existingInCsv.length}\nTotal existing items in database: ${allExistingIds.size}\nNote: Converting release IDs to strings to match database schema`);
+          setDebugInfo(prev => prev + `\nTotal CSV rows: ${results.data.length}, Valid rows with release_id: ${validRows.length}, New items: ${newRows.length}, Existing in DB: ${existingInCsv.length}\nTotal existing items in database: ${allExistingIds.size}\nNote: Converting release IDs to strings to match database schema, including Date Added field`);
           
           if (validRows.length === 0) {
             setDebugInfo(prev => prev + `\nPROBLEM: No rows have valid release_id values! This suggests the Discogs export may be missing release IDs.`);
@@ -322,7 +326,7 @@ export default function ImportDiscogsPage() {
         throw new Error(`Database insert failed: ${insertError.message}`);
       }
 
-      setStatus(`✅ Successfully imported ${enriched.length} new items with Discogs enrichment!`);
+      setStatus(`✅ Successfully imported ${enriched.length} new items with Discogs enrichment and date tracking!`);
     } catch (error) {
       console.error('Enrichment error:', error);
       setStatus(`❌ Enrichment failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -387,6 +391,7 @@ export default function ImportDiscogsPage() {
                 <th>Folder</th>
                 <th>Media Condition</th>
                 <th>Release ID</th>
+                <th>Date Added</th>
                 <th>Image</th>
                 <th>Tracklist Status</th>
               </tr>
@@ -401,6 +406,7 @@ export default function ImportDiscogsPage() {
                   <td>{row.folder}</td>
                   <td>{row.media_condition}</td>
                   <td>{row.discogs_release_id}</td>
+                  <td>{row.date_added}</td>
                   <td>
                     {row.image_url ? (
                       // eslint-disable-next-line @next/next/no-img-element

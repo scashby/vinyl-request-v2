@@ -1,11 +1,13 @@
-// Enhanced Admin Edit Collection page with sell price and sticky sorting
-// Replacement for: src/app/admin/edit-collection/page.tsx
+// FILE: src/app/admin/edit-collection/page.tsx
+// Enhanced Admin Edit Collection page with sell price, sticky sorting, and Just Added feature
+
 "use client";
 
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { supabase } from 'src/lib/supabaseClient';
 import Image from 'next/image';
+
 interface CollectionRow {
   id: number;
   image_url?: string | null;
@@ -16,6 +18,7 @@ interface CollectionRow {
   format?: string;
   media_condition?: string;
   sell_price?: string | null;
+  date_added?: string | null; // NEW: Add this field
   steves_top_200?: boolean | null;
   this_weeks_top_10?: boolean | null;
   inner_circle_preferred?: boolean | null;
@@ -23,7 +26,7 @@ interface CollectionRow {
   blocked?: boolean;
 }
 
-type SortColumn = 'id' | 'artist' | 'title' | 'year' | 'folder' | 'format' | 'media_condition' | 'sell_price';
+type SortColumn = 'id' | 'artist' | 'title' | 'year' | 'folder' | 'format' | 'media_condition' | 'sell_price' | 'date_added';
 type SortDirection = 'asc' | 'desc';
 
 const STORAGE_KEY = 'editCollection_state';
@@ -35,6 +38,7 @@ interface PageState {
   showMissingImages: boolean;
   showMissingTracklists: boolean;
   showForSale: boolean;
+  showJustAdded: boolean; // NEW: Add this field
   showTop200Only: boolean;
   showTop10Only: boolean;
   showInnerCircleOnly: boolean;
@@ -50,12 +54,22 @@ export default function EditCollectionPage() {
   const [showMissingImages, setShowMissingImages] = useState<boolean>(false);
   const [showMissingTracklists, setShowMissingTracklists] = useState<boolean>(false);
   const [showForSale, setShowForSale] = useState<boolean>(false);
+  const [showJustAdded, setShowJustAdded] = useState<boolean>(false); // NEW: Add this state
   const [showTop200Only, setShowTop200Only] = useState<boolean>(false);
   const [showTop10Only, setShowTop10Only] = useState<boolean>(false);
   const [showInnerCircleOnly, setShowInnerCircleOnly] = useState<boolean>(false);
   const [editingPrice, setEditingPrice] = useState<number | null>(null);
   const [tempPrice, setTempPrice] = useState<string>('');
   const [updatingRow, setUpdatingRow] = useState<number | null>(null);
+
+  // NEW: Helper function to check if album was added in last 2 weeks
+  const isJustAdded = (dateAdded: string | null | undefined): boolean => {
+    if (!dateAdded) return false;
+    const addedDate = new Date(dateAdded);
+    const twoWeeksAgo = new Date();
+    twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+    return addedDate >= twoWeeksAgo;
+  };
 
   // Save state to localStorage
   const saveState = useCallback(() => {
@@ -66,13 +80,14 @@ export default function EditCollectionPage() {
       showMissingImages,
       showMissingTracklists,
       showForSale,
+      showJustAdded, // NEW: Include this in state
       showTop200Only,
       showTop10Only,
       showInnerCircleOnly,
       scrollPosition: window.scrollY
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  }, [sortColumn, sortDirection, query, showMissingImages, showMissingTracklists, showForSale, showTop200Only, showTop10Only, showInnerCircleOnly]);
+  }, [sortColumn, sortDirection, query, showMissingImages, showMissingTracklists, showForSale, showJustAdded, showTop200Only, showTop10Only, showInnerCircleOnly]);
 
   // Load state from localStorage
   const loadState = useCallback(() => {
@@ -86,6 +101,7 @@ export default function EditCollectionPage() {
         setShowMissingImages(state.showMissingImages || false);
         setShowMissingTracklists(state.showMissingTracklists || false);
         setShowForSale(state.showForSale || false);
+        setShowJustAdded(state.showJustAdded || false); // NEW: Load this state
         setShowTop200Only(state.showTop200Only || false);
         setShowTop10Only(state.showTop10Only || false);
         setShowInnerCircleOnly(state.showInnerCircleOnly || false);
@@ -209,6 +225,37 @@ export default function EditCollectionPage() {
           }
           break;
       }
+        case 'date_added': // NEW: Add sorting for date_added
+          aVal = new Date(a.date_added || '1970-01-01');
+          bVal = new Date(b.date_added || '1970-01-01');
+          return sortDirection === 'asc' ? aVal.getTime() - bVal.getTime() : bVal.getTime() - aVal.getTime();
+        case 'sell_price':
+          // Custom sorting for sell price
+          const priceA = a.sell_price;
+          const priceB = b.sell_price;
+          
+          // NFS should sort after prices, nulls at the end
+          if (!priceA && !priceB) return 0;
+          if (!priceA) return 1;
+          if (!priceB) return -1;
+          
+          if (priceA === 'NFS' && priceB !== 'NFS') return 1;
+          if (priceB === 'NFS' && priceA !== 'NFS') return -1;
+          if (priceA === 'NFS' && priceB === 'NFS') return 0;
+          
+          // Try to parse as numbers for proper price sorting
+          const numA = parseFloat(priceA.replace(/[^0-9.]/g, ''));
+          const numB = parseFloat(priceB.replace(/[^0-9.]/g, ''));
+          
+          if (!isNaN(numA) && !isNaN(numB)) {
+            aVal = numA;
+            bVal = numB;
+          } else {
+            aVal = priceA.toLowerCase();
+            bVal = priceB.toLowerCase();
+          }
+          break;
+      }
 
       if (typeof aVal === 'number' && typeof bVal === 'number') {
         return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
@@ -251,13 +298,16 @@ export default function EditCollectionPage() {
     // For sale filter
     const matchesForSaleFilter = !showForSale || (row.sell_price && row.sell_price !== '');
 
+    // NEW: Just added filter
+    const matchesJustAddedFilter = !showJustAdded || isJustAdded(row.date_added);
+
     // Individual badge filters
     const matchesTop200Filter = !showTop200Only || !!row.steves_top_200;
     const matchesTop10Filter = !showTop10Only || !!row.this_weeks_top_10;
     const matchesInnerCircleFilter = !showInnerCircleOnly || !!row.inner_circle_preferred;
 
     return matchesQuery && matchesImageFilter && matchesTracklistFilter && matchesForSaleFilter && 
-           matchesTop200Filter && matchesTop10Filter && matchesInnerCircleFilter;
+           matchesJustAddedFilter && matchesTop200Filter && matchesTop10Filter && matchesInnerCircleFilter;
   });
 
   const sortedAndFiltered = sortData(filtered);
@@ -318,6 +368,7 @@ export default function EditCollectionPage() {
       setUpdatingRow(null);
     }
   }
+
   async function updateSellPrice(rowId: number, newPrice: string) {
     setUpdatingRow(rowId);
     try {
@@ -409,6 +460,7 @@ export default function EditCollectionPage() {
             .top200 { background: #fee2e2; color: #dc2626; }
             .top10 { background: #fed7aa; color: #ea580c; }
             .inner { background: #e9d5ff; color: #7c3aed; }
+            .just-added { background: #dcfce7; color: #059669; }
             @media print {
               body { margin: 10px; }
               .no-print { display: none; }
@@ -425,10 +477,11 @@ export default function EditCollectionPage() {
             ${showMissingImages ? 'Missing Images • ' : ''}
             ${showMissingTracklists ? 'Missing Tracklists • ' : ''}
             ${showForSale ? 'For Sale Only • ' : ''}
+            ${showJustAdded ? 'Just Added Only • ' : ''}
             ${showTop200Only ? 'Steve\'s Top 200 Only • ' : ''}
             ${showTop10Only ? 'This Week\'s Top 10 Only • ' : ''}
             ${showInnerCircleOnly ? 'Inner Circle Preferred Only • ' : ''}
-            ${!query && !showMissingImages && !showMissingTracklists && !showForSale && !showTop200Only && !showTop10Only && !showInnerCircleOnly ? 'None' : ''}
+            ${!query && !showMissingImages && !showMissingTracklists && !showForSale && !showJustAdded && !showTop200Only && !showTop10Only && !showInnerCircleOnly ? 'None' : ''}
           </div>
           
           <table>
@@ -449,6 +502,7 @@ export default function EditCollectionPage() {
                   <td>${[row.format, row.folder].filter(Boolean).join(' / ')}</td>
                   <td>${row.sell_price || ''}</td>
                   <td>
+                    ${isJustAdded(row.date_added) ? '<span class="badge just-added">✨NEW</span>' : ''}
                     ${row.steves_top_200 ? '<span class="badge top200">⭐T200</span>' : ''}
                     ${row.this_weeks_top_10 ? '<span class="badge top10">🔥T10</span>' : ''}
                     ${row.inner_circle_preferred ? '<span class="badge inner">💎IC</span>' : ''}
@@ -477,6 +531,7 @@ export default function EditCollectionPage() {
   };
 
   const forSaleCount = data.filter(row => row.sell_price && row.sell_price !== '').length;
+  const justAddedCount = data.filter(row => isJustAdded(row.date_added)).length; // NEW: Add this count
   const top200Count = data.filter(row => row.steves_top_200).length;
   const top10Count = data.filter(row => row.this_weeks_top_10).length; 
   const innerCircleCount = data.filter(row => row.inner_circle_preferred).length;
@@ -562,6 +617,18 @@ export default function EditCollectionPage() {
             />
             For sale only ({forSaleCount})
           </label>
+
+          {/* NEW: Just Added filter */}
+          {justAddedCount > 0 && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: 4, color: "#222", fontSize: 14 }}>
+              <input
+                type="checkbox"
+                checked={showJustAdded}
+                onChange={e => setShowJustAdded(e.target.checked)}
+              />
+              <span style={{ color: '#059669', fontWeight: 'bold' }}>✨ Just Added ({justAddedCount})</span>
+            </label>
+          )}
         </div>
 
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
@@ -626,6 +693,11 @@ export default function EditCollectionPage() {
               <th style={{ cursor: 'pointer', userSelect: 'none', padding: '8px 4px', borderBottom: '1px solid #ddd', textAlign: 'left' }}
                   onClick={() => handleSort('sell_price')}>
                 💰 Sell Price{getSortIcon('sell_price')}
+              </th>
+              {/* NEW: Date Added column */}
+              <th style={{ cursor: 'pointer', userSelect: 'none', padding: '8px 4px', borderBottom: '1px solid #ddd', textAlign: 'left' }}
+                  onClick={() => handleSort('date_added')}>
+                📅 Added{getSortIcon('date_added')}
               </th>
               <th style={{ padding: '8px 4px', borderBottom: '1px solid #ddd', fontSize: 11, textAlign: 'center' }}
                   title="Steve's Top 200">
@@ -715,6 +787,31 @@ export default function EditCollectionPage() {
                     </div>
                   )}
                 </td>
+                {/* NEW: Date Added column */}
+                <td style={{ padding: '4px', fontSize: 11, textAlign: 'center' }}>
+                  <div style={{ 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    alignItems: 'center',
+                    gap: 2
+                  }}>
+                    <span style={{ color: '#666' }}>
+                      {row.date_added ? new Date(row.date_added).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
+                    </span>
+                    {isJustAdded(row.date_added) && (
+                      <span style={{
+                        background: '#059669',
+                        color: 'white',
+                        padding: '1px 4px',
+                        borderRadius: '4px',
+                        fontSize: '9px',
+                        fontWeight: 'bold'
+                      }}>
+                        ✨NEW
+                      </span>
+                    )}
+                  </div>
+                </td>
                 <td style={{ padding: '4px', textAlign: 'center' }}>
                   <input
                     type="checkbox"
@@ -745,7 +842,7 @@ export default function EditCollectionPage() {
                   <input
                     type="checkbox"
                     checked={!!row.inner_circle_preferred}
-                    onChange={e => updateBadge(row.id, 'inner_circle_preferred', e.target.checked)}
+                    onChange={e => updateBadge(row.id, 'inner_circle_preferred', e.target.changed)}
                     disabled={updatingRow === row.id}
                     style={{ 
                       transform: 'scale(1.2)',
@@ -795,13 +892,14 @@ export default function EditCollectionPage() {
           {showMissingImages && ` (${data.filter(row => !hasValidImage(row)).length} missing images)`}
           {showMissingTracklists && ` (${data.filter(row => !hasValidTracklist(row)).length} missing tracklists)`}
           {showForSale && ` (${forSaleCount} for sale)`}
+          {showJustAdded && ` (${justAddedCount} just added)`} {/* NEW: Include just added count */}
           {showTop200Only && ` (${top200Count} top 200)`}
           {showTop10Only && ` (${top10Count} top 10)`}
           {showInnerCircleOnly && ` (${innerCircleCount} inner circle)`}
         </div>
         <div style={{ fontSize: 12, color: '#666' }}>
           💡 Click price field to edit • Check boxes to toggle badges • Delete button available for all items<br/>
-          📊 Badges: ⭐{top200Count} • 🔥{top10Count} • 💎{innerCircleCount} • Total: {badgedCount}<br/>
+          📊 Badges: ⭐{top200Count} • 🔥{top10Count} • 💎{innerCircleCount} • ✨{justAddedCount} • Total: {badgedCount + justAddedCount}<br/>
           📄 Export current filtered view to PDF/Print with title, artist, format/folder, and price
         </div>
       </div>

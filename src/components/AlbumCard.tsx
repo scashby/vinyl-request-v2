@@ -1,4 +1,5 @@
-// AlbumCard.tsx — Next.js compatible album grid/list card
+// FILE: src/components/AlbumCard.tsx
+// AlbumCard component with Just Added badge support
 
 "use client";
 
@@ -13,6 +14,7 @@ type Album = {
   title: string;
   artist: string;
   year: string | number;
+  justAdded?: boolean; // NEW: Add this prop
 };
 
 export default function AlbumCard({ album }: { album: Album }) {
@@ -36,15 +38,38 @@ export default function AlbumCard({ album }: { album: Album }) {
   return (
     <div className="album-card">
       <Link href={href}>
-        <span className={`badge ${typeClass}`}>{album.mediaType}</span>
-        <Image
-          src={album.image}
-          alt={album.title}
-          width={180}
-          height={180}
-          style={{ borderRadius: 12, objectFit: "cover" }}
-          unoptimized
-        />
+        <div style={{ position: 'relative' }}>
+          <span className={`badge ${typeClass}`}>{album.mediaType}</span>
+          {/* Just Added Badge */}
+          {album.justAdded && (
+            <span 
+              className="badge"
+              style={{
+                position: 'absolute',
+                top: '6px',
+                right: '6px',
+                backgroundColor: '#059669',
+                color: 'white',
+                fontSize: '0.6rem',
+                padding: '3px 6px',
+                borderRadius: '4px',
+                fontWeight: '700',
+                letterSpacing: '0.5px',
+                zIndex: 10
+              }}
+            >
+              ✨ NEW
+            </span>
+          )}
+          <Image
+            src={album.image}
+            alt={album.title}
+            width={180}
+            height={180}
+            style={{ borderRadius: 12, objectFit: "cover" }}
+            unoptimized
+          />
+        </div>
       </Link>
 
       <div className="info">
