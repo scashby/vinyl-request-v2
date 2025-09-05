@@ -20,7 +20,6 @@ function AlbumDetailContent() {
 
   const [album, setAlbum] = useState(null);
   const [eventData, setEventData] = useState(null);
-  const [trackListings, setTrackListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [requestStatus, setRequestStatus] = useState('');
@@ -40,17 +39,6 @@ function AlbumDetailContent() {
         setError(error.message);
       } else {
         setAlbum(data);
-        
-        // Fetch track listings if available
-        const { data: tracks, error: trackError } = await supabase
-          .from('track_listings')
-          .select('*')
-          .eq('album_id', id)
-          .order('track_number', { ascending: true });
-        
-        if (!trackError && tracks) {
-          setTrackListings(tracks);
-        }
       }
     } catch {
       setError('Failed to load album');
@@ -373,7 +361,7 @@ function AlbumDetailContent() {
       </div>
 
       {/* Track Listings */}
-      {trackListings.length > 0 && (
+      {album?.tracklists && (
         <div className="tracklist">
           <h3 style={{ 
             color: '#fff', 
@@ -388,21 +376,90 @@ function AlbumDetailContent() {
             <div>#</div>
             <div>Title</div>
             <div>Artist</div>
-            <div>Duration</div>
+            <div>Side</div>
           </div>
           
-          {trackListings.map((track, index) => (
-            <div key={track.id} className="track">
-              <div>{track.track_number || index + 1}</div>
-              <div style={{ color: '#fff', fontWeight: '500' }}>
-                {track.title}
+          {album.tracklists.split('\n').filter(track => track.trim()).map((track, index) => {
+            // Parse track format: could be "1. Track Name" or just "Track Name"
+            const trackMatch = track.trim().match(/^(\d+\.?\s*)?(.+)$/);
+            const trackName = trackMatch ? trackMatch[2] : track.trim();
+            
+            return (
+              <div key={index} className="track">
+                <div>{index + 1}</div>
+                <div style={{ color: '#fff', fontWeight: '500' }}>
+                  {trackName}
+                </div>
+                <div style={{ color: '#ccc' }}>
+                  {album.artist}
+                </div>
+                <div style={{ color: '#aaa', fontSize: '14px' }}>
+                  {index < (album.tracklists.split('\n').length / 2) ? 'A' : 'B'}
+                </div>
               </div>
-              <div style={{ color: '#ccc' }}>
-                {track.artist || album.artist}
+            );
+          })}
+        </div>
+      )}
+
+      {/* Alternative: Show sides data if available */}
+      {!album?.tracklists && album?.sides && (
+        <div className="tracklist">
+          <h3 style={{ 
+            color: '#fff', 
+            marginBottom: '20px', 
+            fontSize: '20px',
+            fontWeight: 'bold'
+          }}>
+            Album Sides
+          </h3>
+          
+          {Object.entries(album.sides).map(([sideName, tracks]) => (
+            <div key={sideName} style={{ marginBottom: '24px' }}>
+              <h4 style={{ 
+                color: '#fff', 
+                fontSize: '16px', 
+                marginBottom: '12px',
+                textTransform: 'uppercase',
+                letterSpacing: '1px'
+              }}>
+                Side {sideName}
+              </h4>
+              
+              <div className="tracklist-header">
+                <div>#</div>
+                <div>Title</div>
+                <div>Artist</div>
+                <div>Duration</div>
               </div>
-              <div style={{ color: '#aaa', fontSize: '14px' }}>
-                {track.duration || '--:--'}
-              </div>
+              
+              {Array.isArray(tracks) ? tracks.map((track, index) => (
+                <div key={index} className="track">
+                  <div>{index + 1}</div>
+                  <div style={{ color: '#fff', fontWeight: '500' }}>
+                    {typeof track === 'string' ? track : track.title || track.name || 'Unknown Track'}
+                  </div>
+                  <div style={{ color: '#ccc' }}>
+                    {typeof track === 'object' && track.artist ? track.artist : album.artist}
+                  </div>
+                  <div style={{ color: '#aaa', fontSize: '14px' }}>
+                    {typeof track === 'object' && track.duration ? track.duration : '--:--'}
+                  </div>
+                </div>
+              )) : (
+                <div className="track">
+                  <div>1</div>
+                  <div style={{ color: '#fff', fontWeight: '500' }}>
+                    {typeof tracks === 'string' ? tracks : 'No track information'}
+                  </div>
+                  <div style={{ color: '#ccc' }}>
+                    {album.artist}
+                  </div>
+                  <div style={{ color: '#aaa', fontSize: '14px' }}>
+                    --:--
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>
