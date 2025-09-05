@@ -376,29 +376,70 @@ function AlbumDetailContent() {
             <div>#</div>
             <div>Title</div>
             <div>Artist</div>
-            <div>Side</div>
+            <div>Duration</div>
           </div>
           
-          {album.tracklists.split('\n').filter(track => track.trim()).map((track, index) => {
-            // Parse track format: could be "1. Track Name" or just "Track Name"
-            const trackMatch = track.trim().match(/^(\d+\.?\s*)?(.+)$/);
-            const trackName = trackMatch ? trackMatch[2] : track.trim();
-            
-            return (
-              <div key={index} className="track">
-                <div>{index + 1}</div>
-                <div style={{ color: '#fff', fontWeight: '500' }}>
-                  {trackName}
-                </div>
-                <div style={{ color: '#ccc' }}>
-                  {album.artist}
-                </div>
-                <div style={{ color: '#aaa', fontSize: '14px' }}>
-                  {index < (album.tracklists.split('\n').length / 2) ? 'A' : 'B'}
-                </div>
-              </div>
-            );
-          })}
+          {(() => {
+            try {
+              // Try to parse as JSON first
+              const parsedTracks = JSON.parse(album.tracklists);
+              
+              if (Array.isArray(parsedTracks)) {
+                // Handle array of track objects
+                return parsedTracks.map((track, index) => (
+                  <div key={index} className="track">
+                    <div>{track.position || index + 1}</div>
+                    <div style={{ color: '#fff', fontWeight: '500' }}>
+                      {track.title || track.name || 'Unknown Track'}
+                    </div>
+                    <div style={{ color: '#ccc' }}>
+                      {track.artist || album.artist}
+                    </div>
+                    <div style={{ color: '#aaa', fontSize: '14px' }}>
+                      {track.duration || '--:--'}
+                    </div>
+                  </div>
+                ));
+              } else {
+                // Handle object with track data
+                return (
+                  <div className="track">
+                    <div>1</div>
+                    <div style={{ color: '#fff', fontWeight: '500' }}>
+                      JSON data structure not recognized
+                    </div>
+                    <div style={{ color: '#ccc' }}>
+                      {album.artist}
+                    </div>
+                    <div style={{ color: '#aaa', fontSize: '14px' }}>
+                      --:--
+                    </div>
+                  </div>
+                );
+              }
+            } catch {
+              // If JSON parsing fails, treat as plain text
+              return album.tracklists.split('\n').filter(track => track.trim()).map((track, index) => {
+                const trackMatch = track.trim().match(/^(\d+\.?\s*)?(.+)$/);
+                const trackName = trackMatch ? trackMatch[2] : track.trim();
+                
+                return (
+                  <div key={index} className="track">
+                    <div>{index + 1}</div>
+                    <div style={{ color: '#fff', fontWeight: '500' }}>
+                      {trackName}
+                    </div>
+                    <div style={{ color: '#ccc' }}>
+                      {album.artist}
+                    </div>
+                    <div style={{ color: '#aaa', fontSize: '14px' }}>
+                      --:--
+                    </div>
+                  </div>
+                );
+              });
+            }
+          })()}
         </div>
       )}
 
