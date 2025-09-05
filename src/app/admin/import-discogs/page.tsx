@@ -296,29 +296,55 @@ export default function ImportDiscogsPage() {
     if (csvPreview.length === 0) return;
     
     setIsProcessing(true);
-    setStatus(`Starting enrichment process for ${csvPreview.length} items...`);
+    const BATCH_SIZE = 50; // Process 50 items at a time
+    const totalItems = csvPreview.length;
+    let allEnriched: EnrichedRow[] = [];
+    
+    setStatus(`Starting enrichment process for ${totalItems} items in batches of ${BATCH_SIZE}...`);
 
     try {
-      // Enrich with Discogs data (with rate limiting)
-      const enriched: EnrichedRow[] = [];
-      for (let i = 0; i < csvPreview.length; i++) {
-        const row = csvPreview[i];
-        setStatus(`Enriching ${i + 1}/${csvPreview.length}: ${row.artist} - ${row.title}`);
+      // Process in batches
+      for (let batchStart = 0; batchStart < totalItems; batchStart += BATCH_SIZE) {
+        const batchEnd = Math.min(batchStart + BATCH_SIZE, totalItems);
+        const currentBatch = csvPreview.slice(batchStart, batchEnd);
+        const batchNumber = Math.floor(batchStart / BATCH_SIZE) + 1;
+        const totalBatches = Math.ceil(totalItems / BATCH_SIZE);
         
-        try {
-          const { image_url, tracklists } = await fetchDiscogsData(row.discogs_release_id);
-          enriched.push({ ...row, image_url, tracklists });
-        } catch (error) {
-          console.warn(`Failed to enrich ${row.discogs_release_id}:`, error);
-          // Add the row without enrichment if Discogs API fails
-          enriched.push({ ...row, image_url: null, tracklists: null });
+        setStatus(`Processing batch ${batchNumber}/${totalBatches} (items ${batchStart + 1}-${batchEnd})...`);
+        
+        // Enrich current batch
+        const batchEnriched: EnrichedRow[] = [];
+        for (let i = 0; i < currentBatch.length; i++) {
+          const row = currentBatch[i];
+          const globalIndex = batchStart + i + 1;
+          setStatus(`Batch ${batchNumber}/${totalBatches}: Enriching ${globalIndex}/${totalItems}: ${row.artist} - ${row.title}`);
+          
+          try {
+            const { image_url, tracklists } = await fetchDiscogsData(row.discogs_release_id);
+            batchEnriched.push({ ...row, image_url, tracklists });
+          } catch (error) {
+            console.warn(`Failed to enrich ${row.discogs_release_id}:`, error);
+            // Add the row without enrichment if Discogs API fails
+            batchEnriched.push({ ...row, image_url: null, tracklists: null });
+          }
+          
+          // Rate limiting: wait 2 seconds between requests
+          if (i < currentBatch.length - 1) {
+            await delay(2000);
+          }
         }
         
-        // Rate limiting: wait 1 second between requests
-        if (i < csvPreview.length - 1) {
-          await delay(1000);
+        // Add this batch to all enriched items
+        allEnriched = allEnriched.concat(batchEnriched);
+        
+        // Longer delay between batches to avoid rate limiting
+        if (batchEnd < totalItems) {
+          setStatus(`Batch ${batchNumber} complete. Waiting 10 seconds before next batch...`);
+          await delay(10000);
         }
       }
+      
+      const enriched = allEnriched;
 
       setCsvPreview(enriched);
       setStatus('Processing database operations...');
