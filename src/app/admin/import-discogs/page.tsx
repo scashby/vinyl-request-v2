@@ -31,6 +31,7 @@ type ProcessedRow = {
   folder: string;
   media_condition: string;
   discogs_release_id: string; // String to match database schema
+  date_added: string;
   image_url: string | null;
   tracklists: string | null;
 };
@@ -39,6 +40,23 @@ type EnrichedRow = ProcessedRow & {
   image_url: string | null;
   tracklists: string | null;
 };
+
+function parseDiscogsDate(dateString: string): string {
+  if (!dateString || dateString.trim() === '') {
+    return new Date().toISOString();
+  }
+  
+  try {
+    const parsed = new Date(dateString);
+    if (isNaN(parsed.getTime())) {
+      return new Date().toISOString();
+    }
+    return parsed.toISOString();
+  } catch (error) {
+    console.warn('Failed to parse Discogs date:', dateString, error);
+    return new Date().toISOString();
+  }
+}
 
 export default function ImportDiscogsPage() {
   const [csvPreview, setCsvPreview] = useState<EnrichedRow[]>([]);
@@ -178,6 +196,7 @@ export default function ImportDiscogsPage() {
             folder: row.CollectionFolder,
             media_condition: row['Collection Media Condition'],
             discogs_release_id: String(row.release_id), // Convert to string to match database
+            date_added: parseDiscogsDate(row['Date Added']),
             image_url: null,
             tracklists: null
           }));
