@@ -1,10 +1,11 @@
-// src/app/admin/import-discogs/page.tsx
 'use client';
 
 import { useState } from 'react';
 import Papa from 'papaparse';
 import { supabase } from 'src/lib/supabaseClient';
 
+
+// Updated type to match actual Discogs CSV export structure
 type DiscogsCSVRow = {
   'Catalog#': string;
   Artist: string;
@@ -13,7 +14,7 @@ type DiscogsCSVRow = {
   Format: string;
   Rating: string | null;
   Released: number;
-  release_id: number | string | null;
+  release_id: number | string | null; // Can be number, string, or null from CSV parsing
   CollectionFolder: string;
   'Date Added': string;
   'Collection Media Condition': string;
@@ -21,6 +22,7 @@ type DiscogsCSVRow = {
   'Collection Notes': string | null;
 };
 
+// Type for the processed row that will go to Supabase
 type ProcessedRow = {
   artist: string;
   title: string;
@@ -28,352 +30,406 @@ type ProcessedRow = {
   format: string;
   folder: string;
   media_condition: string;
-  discogs_release_id: string;
-  date_added: string;
+  discogs_release_id: string; // String to match database schema
   image_url: string | null;
   tracklists: string | null;
 };
 
 type EnrichedRow = ProcessedRow & {
-  status: 'pending' | 'processing' | 'success' | 'error';
-  error?: string;
+  image_url: string | null;
+  tracklists: string | null;
 };
 
-interface DiscogsTrack {
-  position?: string;
-  title?: string;
-  duration?: string;
-}
-
-interface DiscogsRelease {
-  tracklist?: DiscogsTrack[];
-  images?: { uri: string }[];
-}
-
-interface PapaParseResult {
-  data: DiscogsCSVRow[];
-  meta: { fields?: string[] };
-  errors: Error[];
-}
-
-function parseDiscogsDate(dateString: string): string {
-  if (!dateString || dateString.trim() === '') {
-    return new Date().toISOString();
-  }
-  
-  try {
-    const parsed = new Date(dateString);
-    if (isNaN(parsed.getTime())) {
-      return new Date().toISOString();
-    }
-    return parsed.toISOString();
-  } catch (error) {
-    console.warn('Failed to parse Discogs date:', dateString, error);
-    return new Date().toISOString();
-  }
-}
-
 export default function ImportDiscogsPage() {
-  const [csvData, setCsvData] = useState<DiscogsCSVRow[]>([]);
-  const [enrichedData, setEnrichedData] = useState<EnrichedRow[]>([]);
+  const [csvPreview, setCsvPreview] = useState<EnrichedRow[]>([]);
   const [status, setStatus] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [debugInfo, setDebugInfo] = useState<string>('');
 
+  // Add rate limiting for Discogs API
   const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-  const fetchDiscogsData = async (releaseId: string): Promise<{ image_url: string | null; tracklists: string | null }> => {
-    try {
-      const response = await fetch(`https://api.discogs.com/releases/${releaseId}`, {
-        headers: {
-          'User-Agent': 'DeadwaxDialogues/1.0 +https://deadwaxdialogues.com',
-          'Authorization': `Discogs token=${process.env.NEXT_PUBLIC_DISCOGS_TOKEN}`
+  const fetchDiscogsData = async (
+    releaseId: string,
+    retries = 3
+  ): Promise<{ image_url: string | null; tracklists: string | null }> => {
+    const url = `https://api.discogs.com/releases/${releaseId}`;
+    
+    for (let attempt = 0; attempt < retries; attempt++) {
+      try {
+        // Add delay to respect rate limits (1 request per second for free accounts)
+        if (attempt > 0) await delay(1000);
+        
+        const res = await fetch(url, {
+          headers: {
+            'User-Agent': 'DeadwaxDialogues/1.0 +https://yourwebsite.com', // Replace with your actual website
+            'Authorization': `Discogs token=${process.env.NEXT_PUBLIC_DISCOGS_TOKEN}`
+          }
+        });
+        
+        if (res.status === 429) {
+          // Rate limited, wait longer
+          await delay(2000);
+          continue;
         }
-      });
-      
-      if (!response.ok) {
-        console.warn(`Failed to fetch release ${releaseId}, status: ${response.status}`);
-        return { image_url: null, tracklists: null };
+        
+        if (!res.ok) {
+          console.warn(`Failed to fetch release ${releaseId}, status: ${res.status}`);
+          return { image_url: null, tracklists: null };
+        }
+        
+        const data = await res.json();
+        
+        // Process tracklist - store as JSON string for Supabase
+        let tracklistsStr = null;
+        if (Array.isArray(data.tracklist) && data.tracklist.length > 0) {
+          tracklistsStr = JSON.stringify(data.tracklist.map((track: {
+            position?: string;
+            type_?: string;
+            title?: string;
+            duration?: string;
+          }) => ({
+            position: track.position || '',
+            type_: track.type_ || 'track',
+            title: track.title || '',
+            duration: track.duration || ''
+          })));
+        }
+        
+        return {
+          image_url: data.images?.[0]?.uri || null,
+          tracklists: tracklistsStr
+        };
+      } catch (error) {
+        console.warn(`Attempt ${attempt + 1} failed for release ${releaseId}:`, error);
+        if (attempt === retries - 1) {
+          return { image_url: null, tracklists: null };
+        }
+        await delay(1000);
       }
-      
-      const data: DiscogsRelease = await response.json();
-      
-      let tracklistsStr: string | null = null;
-      if (Array.isArray(data.tracklist) && data.tracklist.length > 0) {
-        tracklistsStr = JSON.stringify(data.tracklist.map((track: DiscogsTrack) => ({
-          position: track.position || '',
-          title: track.title || '',
-          duration: track.duration || ''
-        })));
-      }
-      
-      return {
-        image_url: Array.isArray(data.images) && data.images.length > 0 ? data.images[0].uri : null,
-        tracklists: tracklistsStr
-      };
-      
-    } catch (error) {
-      console.error(`Error fetching release ${releaseId}:`, error);
-      return { image_url: null, tracklists: null };
     }
+    
+    return { image_url: null, tracklists: null };
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setIsProcessing(true);
     setStatus('Parsing CSV...');
+    setDebugInfo('');
     
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      dynamicTyping: true,
-      complete: (results: PapaParseResult) => {
-        const data = results.data as DiscogsCSVRow[];
-        setCsvData(data.filter(row => row.Artist && row.Title && row.release_id));
-        setStatus(`Parsed ${data.length} rows from CSV`);
-      },
-      error: (error: Error) => {
-        setStatus(`Error parsing CSV: ${error.message}`);
-      }
-    });
-  };
-
-  const processAndEnrichData = async () => {
-    if (csvData.length === 0) return;
-    
-    setIsProcessing(true);
-    setStatus('Processing and enriching data...');
-    
-    const processed: EnrichedRow[] = [];
-    
-    for (let i = 0; i < csvData.length; i++) {
-      const row = csvData[i];
-      
-      try {
-        setStatus(`Processing ${i + 1}/${csvData.length}: ${row.Artist} - ${row.Title}`);
-        
-        const processedRow: ProcessedRow = {
-          artist: row.Artist,
-          title: row.Title,
-          year: row.Released || 0,
-          format: row.Format || '',
-          folder: row.CollectionFolder || '',
-          media_condition: row['Collection Media Condition'] || '',
-          discogs_release_id: String(row.release_id),
-          date_added: parseDiscogsDate(row['Date Added']),
-          image_url: null,
-          tracklists: null
-        };
-        
-        const { image_url, tracklists } = await fetchDiscogsData(processedRow.discogs_release_id);
-        
-        processed.push({
-          ...processedRow,
-          image_url,
-          tracklists,
-          status: 'success'
-        });
-        
-        await delay(100);
-        
-      } catch (error) {
-        processed.push({
-          artist: row.Artist,
-          title: row.Title,
-          year: row.Released || 0,
-          format: row.Format || '',
-          folder: row.CollectionFolder || '',
-          media_condition: row['Collection Media Condition'] || '',
-          discogs_release_id: String(row.release_id),
-          date_added: parseDiscogsDate(row['Date Added']),
-          image_url: null,
-          tracklists: null,
-          status: 'error',
-          error: error instanceof Error ? error.message : 'Unknown error'
-        });
-      }
-    }
-    
-    setEnrichedData(processed);
-    setStatus(`Processing complete. ${processed.filter(r => r.status === 'success').length} successful, ${processed.filter(r => r.status === 'error').length} errors.`);
-    setIsProcessing(false);
-  };
-
-  const insertToDatabase = async () => {
-    if (enrichedData.length === 0) return;
-    
-    setIsProcessing(true);
-    setStatus('Inserting to database...');
-    
-    const results: string[] = [];
-    
-    for (let i = 0; i < enrichedData.length; i++) {
-      const row = enrichedData[i];
-      
-      try {
-        const { data: existing, error: checkError } = await supabase
-          .from('collection')
-          .select('id, date_added')
-          .eq('discogs_release_id', row.discogs_release_id)
-          .single();
-        
-        if (checkError && checkError.code !== 'PGRST116') {
-          throw checkError;
-        }
-        
-        if (existing) {
-          if (!existing.date_added) {
-            const { error: updateError } = await supabase
-              .from('collection')
-              .update({ 
-                date_added: row.date_added,
-                image_url: row.image_url,
-                tracklists: row.tracklists
-              })
-              .eq('id', existing.id);
-            
-            if (updateError) throw updateError;
-            results.push(`Updated: ${row.artist} - ${row.title}`);
-          } else {
-            results.push(`Skipped (exists): ${row.artist} - ${row.title}`);
-          }
-        } else {
-          const { error: insertError } = await supabase
-            .from('collection')
-            .insert({
-              artist: row.artist,
-              title: row.title,
-              year: row.year,
-              format: row.format,
-              folder: row.folder,
-              media_condition: row.media_condition,
-              discogs_release_id: row.discogs_release_id,
-              date_added: row.date_added,
-              image_url: row.image_url,
-              tracklists: row.tracklists
-            });
+    try {
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        dynamicTyping: true, // This will convert numbers properly
+        complete: async (results: { data: DiscogsCSVRow[], meta: { fields?: string[] } }) => {
+          console.log('CSV Headers:', results.meta.fields);
+          console.log('Sample row:', results.data[0]);
+          console.log('Sample release_id value:', results.data[0]?.release_id);
+          console.log('Sample release_id type:', typeof results.data[0]?.release_id);
           
-          if (insertError) throw insertError;
-          results.push(`Inserted: ${row.artist} - ${row.title}`);
+          setDebugInfo(`CSV Headers: ${results.meta.fields?.join(', ')}`);
+          
+          // Filter out rows without Release ID and log issues
+          const validRows = results.data.filter((row, index) => {
+            const releaseId = row.release_id;
+            // Check for missing, null, undefined, empty string, or zero values
+            if (!releaseId || releaseId === 0 || releaseId === '' || releaseId === null || releaseId === undefined) {
+              if (index < 10) { // Only log first 10 for brevity
+                console.log(`Row ${index} missing/invalid release_id:`, { 
+                  catalog: row['Catalog#'], 
+                  artist: row.Artist, 
+                  title: row.Title,
+                  release_id: releaseId,
+                  release_id_type: typeof releaseId 
+                });
+              }
+              return false;
+            }
+            // Also filter out non-numeric strings (we'll convert valid numbers to strings later)
+            const numericValue = Number(releaseId);
+            if (isNaN(numericValue) || numericValue <= 0) {
+              if (index < 10) {
+                console.log(`Row ${index} invalid release_id (not a positive number):`, { 
+                  catalog: row['Catalog#'], 
+                  artist: row.Artist, 
+                  title: row.Title,
+                  release_id: releaseId,
+                  release_id_type: typeof releaseId,
+                  numeric_value: numericValue
+                });
+              }
+              return false;
+            }
+            return true;
+          });
+          
+          console.log(`Total rows: ${results.data.length}, Valid rows: ${validRows.length}`);
+          
+          // Convert to the format expected by Supabase
+          const processedRows: ProcessedRow[] = validRows.map(row => ({
+            artist: row.Artist,
+            title: row.Title,
+            year: row.Released,
+            format: row.Format,
+            folder: row.CollectionFolder,
+            media_condition: row['Collection Media Condition'],
+            discogs_release_id: String(row.release_id), // Convert to string to match database
+            image_url: null,
+            tracklists: null
+          }));
+
+          const releaseIds = processedRows.map(r => r.discogs_release_id);
+          
+          console.log('Release IDs to check (converted to strings):', releaseIds.slice(0, 5)); // Log first 5 for debugging
+          
+          setStatus(`Checking Supabase for existing entries among ${releaseIds.length} items...`);
+          
+          // First, get a count of all records with discogs_release_id
+          const { count: totalCount, error: countError } = await supabase
+            .from('collection')
+            .select('*', { count: 'exact', head: true })
+            .not('discogs_release_id', 'is', null);
+
+          if (countError) {
+            console.warn('Count query failed:', countError);
+          } else {
+            console.log('Total records with discogs_release_id in database:', totalCount);
+          }
+          
+          // Use pagination to get ALL existing release IDs
+          let allExisting: { discogs_release_id: string }[] = [];
+          let start = 0;
+          const pageSize = 1000;
+          let hasMore = true;
+
+          while (hasMore) {
+            const { data: pageData, error: queryError } = await supabase
+              .from('collection')
+              .select('discogs_release_id')
+              .not('discogs_release_id', 'is', null)
+              .range(start, start + pageSize - 1);
+
+            if (queryError) {
+              throw new Error(`Database query failed: ${queryError.message}`);
+            }
+
+            if (pageData && pageData.length > 0) {
+              allExisting = allExisting.concat(pageData);
+              start += pageSize;
+              hasMore = pageData.length === pageSize; // Continue if we got a full page
+              console.log(`Fetched page: ${pageData.length} records, total so far: ${allExisting.length}`);
+            } else {
+              hasMore = false;
+            }
+          }
+
+          console.log('Total existing entries fetched from database via pagination:', allExisting.length);
+          console.log('Expected around 1178, fetched:', allExisting.length, 'Count query returned:', totalCount);
+          
+          // Create a Set of all existing release IDs for fast lookup
+          const allExistingIds = new Set(
+            (allExisting || [])
+              .map((r: { discogs_release_id: string }) => r.discogs_release_id)
+              .filter(id => id) // Remove any null/undefined values
+          );
+
+          console.log('All existing release IDs count:', allExistingIds.size);
+          
+          // Debug: Check specific IDs that should be duplicates
+          const testIds = ['24532220', '21975574', '2775546', '8315395', '1841179'];
+          testIds.forEach(id => {
+            const inDatabase = allExistingIds.has(id);
+            const inCsv = releaseIds.includes(id);
+            console.log(`Test ID ${id}: In database: ${inDatabase}, In CSV: ${inCsv}`);
+          });
+          
+          // Now filter our CSV data to find only the ones that don't exist
+          const existingInCsv = releaseIds.filter(id => allExistingIds.has(id));
+          const newRows = processedRows.filter(row => !allExistingIds.has(row.discogs_release_id));
+
+          console.log(`CSV analysis: ${existingInCsv.length} already exist, ${newRows.length} are new`);
+          console.log('Sample existing in CSV:', existingInCsv.slice(0, 5));
+          console.log('Sample new release IDs:', newRows.slice(0, 5).map(r => r.discogs_release_id));
+          
+          setStatus(`Found ${newRows.length} new items out of ${releaseIds.length} total. ${existingInCsv.length} already exist in database.`);
+          setDebugInfo(prev => prev + `\nTotal CSV rows: ${results.data.length}, Valid rows with release_id: ${validRows.length}, New items: ${newRows.length}, Existing in DB: ${existingInCsv.length}\nTotal existing items in database: ${allExistingIds.size}\nNote: Converting release IDs to strings to match database schema`);
+          
+          if (validRows.length === 0) {
+            setDebugInfo(prev => prev + `\nPROBLEM: No rows have valid release_id values! This suggests the Discogs export may be missing release IDs.`);
+            setStatus('No rows with valid Release IDs found. Please check your Discogs CSV export includes Release IDs.');
+            setIsProcessing(false);
+            return;
+          }
+
+          // Show preview without enriching first
+          setCsvPreview(newRows);
+          setStatus(`Preview of ${newRows.length} new items ready. Click "Enrich with Discogs Data" to continue.`);
+          setIsProcessing(false);
+        },
+        error: (error: Error) => {
+          setStatus(`CSV parsing error: ${error.message}`);
+          setIsProcessing(false);
+        }
+      });
+    } catch (error) {
+      console.error('Import error:', error);
+      setStatus(`Import failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setIsProcessing(false);
+    }
+  };
+
+  const enrichAndImport = async () => {
+    if (csvPreview.length === 0) return;
+    
+    setIsProcessing(true);
+    setStatus(`Starting enrichment process for ${csvPreview.length} items...`);
+
+    try {
+      // Enrich with Discogs data (with rate limiting)
+      const enriched: EnrichedRow[] = [];
+      for (let i = 0; i < csvPreview.length; i++) {
+        const row = csvPreview[i];
+        setStatus(`Enriching ${i + 1}/${csvPreview.length}: ${row.artist} - ${row.title}`);
+        
+        try {
+          const { image_url, tracklists } = await fetchDiscogsData(row.discogs_release_id);
+          enriched.push({ ...row, image_url, tracklists });
+        } catch (error) {
+          console.warn(`Failed to enrich ${row.discogs_release_id}:`, error);
+          // Add the row without enrichment if Discogs API fails
+          enriched.push({ ...row, image_url: null, tracklists: null });
         }
         
-      } catch (error) {
-        results.push(`Error: ${row.artist} - ${row.title} - ${error instanceof Error ? error.message : 'Unknown error'}`);
+        // Rate limiting: wait 1 second between requests
+        if (i < csvPreview.length - 1) {
+          await delay(1000);
+        }
       }
+
+      setCsvPreview(enriched);
+      setStatus('Inserting enriched data into Supabase...');
+      
+      // Insert into database
+      const { error: insertError } = await supabase
+        .from('collection')
+        .insert(enriched);
+
+      if (insertError) {
+        throw new Error(`Database insert failed: ${insertError.message}`);
+      }
+
+      setStatus(`✅ Successfully imported ${enriched.length} new items with Discogs enrichment!`);
+    } catch (error) {
+      console.error('Enrichment error:', error);
+      setStatus(`❌ Enrichment failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsProcessing(false);
     }
-    
-    setDebugInfo(results.join('\n'));
-    setStatus('Database insertion complete');
-    setIsProcessing(false);
   };
 
   return (
-    <div style={{ padding: 24, background: "#fff", color: "#222", minHeight: "100vh" }}>
-      <h2 style={{ color: "#222", marginBottom: 24 }}>Import Discogs Collection</h2>
+    <div style={{ padding: '1rem' }}>
+      <h1>Import Discogs CSV</h1>
+      <input 
+        type="file" 
+        accept=".csv" 
+        onChange={handleFileUpload} 
+        disabled={isProcessing}
+      />
       
-      <div style={{ marginBottom: 24 }}>
-        <input
-          type="file"
-          accept=".csv"
-          onChange={handleFileUpload}
+      {csvPreview.length > 0 && (
+        <button 
+          onClick={enrichAndImport}
           disabled={isProcessing}
-        />
-        <p style={{ fontSize: 14, color: '#666', marginTop: 8 }}>
-          Upload your Discogs collection CSV export
-        </p>
-      </div>
-
-      {csvData.length > 0 && (
-        <div style={{ marginBottom: 24 }}>
-          <button
-            onClick={processAndEnrichData}
-            disabled={isProcessing}
-            style={{
-              padding: '8px 16px',
-              background: '#2563eb',
-              color: 'white',
-              border: 'none',
-              borderRadius: 4,
-              cursor: isProcessing ? 'not-allowed' : 'pointer',
-              marginRight: 12
-            }}
-          >
-            Process & Enrich Data
-          </button>
-          
-          {enrichedData.length > 0 && (
-            <button
-              onClick={insertToDatabase}
-              disabled={isProcessing}
-              style={{
-                padding: '8px 16px',
-                background: '#059669',
-                color: 'white',
-                border: 'none',
-                borderRadius: 4,
-                cursor: isProcessing ? 'not-allowed' : 'pointer'
-              }}
-            >
-              Insert to Database
-            </button>
-          )}
-        </div>
+          style={{ 
+            marginLeft: '1rem', 
+            padding: '0.5rem 1rem',
+            backgroundColor: isProcessing ? '#6c757d' : '#007bff',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: isProcessing ? 'not-allowed' : 'pointer',
+            opacity: isProcessing ? 0.6 : 1
+          }}
+        >
+          {isProcessing ? 'Processing...' : 'Enrich with Discogs Data & Import'}
+        </button>
       )}
-
-      {status && (
-        <div style={{ marginBottom: 16, padding: 12, background: '#f3f4f6', borderRadius: 4 }}>
-          <strong>Status:</strong> {status}
-        </div>
-      )}
+      
+      <p style={{ 
+        color: status.includes('error') || status.includes('failed') ? 'red' : 'black',
+        fontWeight: status.includes('Successfully') ? 'bold' : 'normal'
+      }}>
+        {status}
+      </p>
 
       {debugInfo && (
-        <div style={{ marginBottom: 16, padding: 12, background: '#fef3c7', borderRadius: 4 }}>
-          <strong>Results:</strong>
-          <pre style={{ fontSize: 12, marginTop: 8, whiteSpace: 'pre-wrap' }}>{debugInfo}</pre>
-        </div>
+        <details style={{ marginTop: '1rem', fontSize: '0.9em', color: '#666' }}>
+          <summary>Debug Info</summary>
+          <pre>{debugInfo}</pre>
+        </details>
       )}
 
-      {enrichedData.length > 0 && (
+      {csvPreview.length > 0 && (
         <div>
-          <h3>Preview ({enrichedData.length} items)</h3>
-          <div style={{ overflowX: 'auto', maxHeight: 400, border: '1px solid #ddd' }}>
-            <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: 13 }}>
-              <thead style={{ background: '#f5f5f5' }}>
-                <tr>
-                  <th style={{ padding: '8px 4px', borderBottom: '1px solid #ddd' }}>Status</th>
-                  <th style={{ padding: '8px 4px', borderBottom: '1px solid #ddd' }}>Artist</th>
-                  <th style={{ padding: '8px 4px', borderBottom: '1px solid #ddd' }}>Title</th>
-                  <th style={{ padding: '8px 4px', borderBottom: '1px solid #ddd' }}>Year</th>
-                  <th style={{ padding: '8px 4px', borderBottom: '1px solid #ddd' }}>Date Added</th>
+          <h2>Preview ({csvPreview.length} items)</h2>
+          <table border={1} cellPadding={4} style={{ marginTop: '1rem' }}>
+            <thead>
+              <tr>
+                <th>Artist</th>
+                <th>Title</th>
+                <th>Year</th>
+                <th>Format</th>
+                <th>Folder</th>
+                <th>Media Condition</th>
+                <th>Release ID</th>
+                <th>Image</th>
+                <th>Tracklist Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {csvPreview.map((row, i) => (
+                <tr key={i}>
+                  <td>{row.artist}</td>
+                  <td>{row.title}</td>
+                  <td>{row.year}</td>
+                  <td>{row.format}</td>
+                  <td>{row.folder}</td>
+                  <td>{row.media_condition}</td>
+                  <td>{row.discogs_release_id}</td>
+                  <td>
+                    {row.image_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={row.image_url}
+                        alt={`${row.artist} - ${row.title}`}
+                        width={50}
+                        height={50}
+                        style={{ objectFit: 'cover' }}
+                        onError={(e) => {
+                          // Hide broken images
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    ) : (
+                      '—'
+                    )}
+                  </td>
+                  <td>
+                    {row.tracklists ? (
+                      `${JSON.parse(row.tracklists).length} tracks`
+                    ) : (
+                      '—'
+                    )}
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {enrichedData.map((row, index) => (
-                  <tr key={index}>
-                    <td style={{ padding: '4px' }}>
-                      <span style={{
-                        padding: '2px 6px',
-                        borderRadius: 3,
-                        fontSize: 11,
-                        fontWeight: 'bold',
-                        color: 'white',
-                        background: row.status === 'success' ? '#059669' : '#dc2626'
-                      }}>
-                        {row.status}
-                      </span>
-                    </td>
-                    <td style={{ padding: '4px' }}>{row.artist}</td>
-                    <td style={{ padding: '4px' }}>{row.title}</td>
-                    <td style={{ padding: '4px' }}>{row.year}</td>
-                    <td style={{ padding: '4px', fontSize: 11 }}>
-                      {new Date(row.date_added).toLocaleDateString()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
