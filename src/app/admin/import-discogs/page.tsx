@@ -31,7 +31,6 @@ type ProcessedRow = {
   folder: string;
   media_condition: string;
   discogs_release_id: string; // String to match database schema
-  date_added: string;
   image_url: string | null;
   tracklists: string | null;
 };
@@ -40,23 +39,6 @@ type EnrichedRow = ProcessedRow & {
   image_url: string | null;
   tracklists: string | null;
 };
-
-function parseDiscogsDate(dateString: string): string {
-  if (!dateString || dateString.trim() === '') {
-    return new Date().toISOString();
-  }
-  
-  try {
-    const parsed = new Date(dateString);
-    if (isNaN(parsed.getTime())) {
-      return new Date().toISOString();
-    }
-    return parsed.toISOString();
-  } catch (error) {
-    console.warn('Failed to parse Discogs date:', dateString, error);
-    return new Date().toISOString();
-  }
-}
 
 export default function ImportDiscogsPage() {
   const [csvPreview, setCsvPreview] = useState<EnrichedRow[]>([]);
@@ -196,7 +178,6 @@ export default function ImportDiscogsPage() {
             folder: row.CollectionFolder,
             media_condition: row['Collection Media Condition'],
             discogs_release_id: String(row.release_id), // Convert to string to match database
-            date_added: parseDiscogsDate(row['Date Added']),
             image_url: null,
             tracklists: null
           }));
@@ -330,65 +311,21 @@ export default function ImportDiscogsPage() {
       }
 
       setCsvPreview(enriched);
-      setStatus('Processing database operations...');
+      setStatus('Inserting enriched data into Supabase...');
       
-      // Separate new items from updates
-      const { data: existingItems, error: existingError } = await supabase
+      // Insert into database
+      const { error: insertError } = await supabase
         .from('collection')
-        .select('discogs_release_id, date_added')
-        .in('discogs_release_id', enriched.map(r => r.discogs_release_id));
-      
-      if (existingError) {
-        throw new Error(`Failed to check existing items: ${existingError.message}`);
-      }
-      
-      const existingMap = new Map(
-        (existingItems || []).map(item => [item.discogs_release_id, item.date_added])
-      );
-      
-      const newItems = enriched.filter(row => !existingMap.has(row.discogs_release_id));
-      const updateItems = enriched.filter(row => {
-        const dateAdded = existingMap.get(row.discogs_release_id);
-        return existingMap.has(row.discogs_release_id) && !dateAdded;
-      });
-      
-      let insertCount = 0;
-      let updateCount = 0;
-      
-      // Insert new items
-      if (newItems.length > 0) {
-        const { error: insertError } = await supabase
-          .from('collection')
-          .insert(newItems);
+        .insert(enriched);
 
-        if (insertError) {
-          throw new Error(`Database insert failed: ${insertError.message}`);
-        }
-        insertCount = newItems.length;
-      }
-      
-      // Update existing items with date_added
-      for (const item of updateItems) {
-        const { error: updateError } = await supabase
-          .from('collection')
-          .update({ 
-            date_added: item.date_added,
-            image_url: item.image_url,
-            tracklists: item.tracklists
-          })
-          .eq('discogs_release_id', item.discogs_release_id);
-        
-        if (updateError) {
-          console.warn(`Failed to update ${item.discogs_release_id}:`, updateError);
-        } else {
-          updateCount++;
-        }
+      if (insertError) {
+        throw new Error(`Database insert failed: ${insertError.message}`);
       }
 
-      setStatus(`✅ Successfully processed ${enriched.length} items: ${insertCount} new inserts, ${updateCount} updates with date_added!`);
+      setStatus(`✅ Successfully imported ${enriched.length} new items with Discogs enrichment!`);
     } catch (error) {
-      console.error('Processing error:', error);
-      setStatus(`❌ Processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('Enrichment error:', error);
+      setStatus(`❌ Enrichment failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsProcessing(false);
     }
