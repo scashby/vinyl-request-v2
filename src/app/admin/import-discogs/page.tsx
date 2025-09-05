@@ -330,21 +330,65 @@ export default function ImportDiscogsPage() {
       }
 
       setCsvPreview(enriched);
-      setStatus('Inserting enriched data into Supabase...');
+      setStatus('Processing database operations...');
       
-      // Insert into database
-      const { error: insertError } = await supabase
+      // Separate new items from updates
+      const { data: existingItems, error: existingError } = await supabase
         .from('collection')
-        .insert(enriched);
+        .select('discogs_release_id, date_added')
+        .in('discogs_release_id', enriched.map(r => r.discogs_release_id));
+      
+      if (existingError) {
+        throw new Error(`Failed to check existing items: ${existingError.message}`);
+      }
+      
+      const existingMap = new Map(
+        (existingItems || []).map(item => [item.discogs_release_id, item.date_added])
+      );
+      
+      const newItems = enriched.filter(row => !existingMap.has(row.discogs_release_id));
+      const updateItems = enriched.filter(row => {
+        const dateAdded = existingMap.get(row.discogs_release_id);
+        return existingMap.has(row.discogs_release_id) && !dateAdded;
+      });
+      
+      let insertCount = 0;
+      let updateCount = 0;
+      
+      // Insert new items
+      if (newItems.length > 0) {
+        const { error: insertError } = await supabase
+          .from('collection')
+          .insert(newItems);
 
-      if (insertError) {
-        throw new Error(`Database insert failed: ${insertError.message}`);
+        if (insertError) {
+          throw new Error(`Database insert failed: ${insertError.message}`);
+        }
+        insertCount = newItems.length;
+      }
+      
+      // Update existing items with date_added
+      for (const item of updateItems) {
+        const { error: updateError } = await supabase
+          .from('collection')
+          .update({ 
+            date_added: item.date_added,
+            image_url: item.image_url,
+            tracklists: item.tracklists
+          })
+          .eq('discogs_release_id', item.discogs_release_id);
+        
+        if (updateError) {
+          console.warn(`Failed to update ${item.discogs_release_id}:`, updateError);
+        } else {
+          updateCount++;
+        }
       }
 
-      setStatus(`✅ Successfully imported ${enriched.length} new items with Discogs enrichment!`);
+      setStatus(`✅ Successfully processed ${enriched.length} items: ${insertCount} new inserts, ${updateCount} updates with date_added!`);
     } catch (error) {
-      console.error('Enrichment error:', error);
-      setStatus(`❌ Enrichment failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('Processing error:', error);
+      setStatus(`❌ Processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsProcessing(false);
     }
