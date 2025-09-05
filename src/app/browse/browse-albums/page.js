@@ -1,5 +1,5 @@
-// FILE: src/app/browse/browse-albums/page.js
-// Browse Albums page with Just Added feature (complete file)
+// Fixed Browse Albums page with proper search controls visibility
+// Replace: src/app/browse/browse-albums/page.js
 
 "use client";
 
@@ -23,8 +23,8 @@ function BrowseAlbumsContent() {
   const [allowedFormats, setAllowedFormats] = useState(null);
   const [eventTitle, setEventTitle] = useState('');
   const [mediaFilter, setMediaFilter] = useState('');
-  const [sortField, setSortField] = useState('date_added'); // Default to newest first
-  const [sortAsc, setSortAsc] = useState(false); // Newest first = descending
+  const [sortField, setSortField] = useState('date_added');
+  const [sortAsc, setSortAsc] = useState(false);
   const [showJustAdded, setShowJustAdded] = useState(false);
   const [showSuggestionBox, setShowSuggestionBox] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -209,86 +209,210 @@ function BrowseAlbumsContent() {
       </header>
 
       <main className="browse-collection-body">
-        <div className="search-filter-bar">
-          <input
-            type="text"
-            placeholder="Search by artist or title"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-          <select
-            value={mediaFilter}
-            onChange={(e) => setMediaFilter(e.target.value)}
-          >
-            <option value="">All Media Types</option>
-            {normalizedDropdown.map((format) => (
-              <option key={format} value={format.trim().toLowerCase()}>
-                {format}
-              </option>
-            ))}
-          </select>
-          
-          {/* Just Added Filter */}
-          {justAddedCount > 0 && (
-            <label style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '8px',
-              fontSize: '14px',
-              fontWeight: '600',
-              color: '#059669',
-              whiteSpace: 'nowrap'
-            }}>
+        {/* Fixed Search Filter Bar */}
+        <div style={{
+          background: '#fff',
+          padding: '20px',
+          marginBottom: '24px',
+          borderRadius: '8px',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+          border: '1px solid #e5e7eb'
+        }}>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: '16px',
+            alignItems: 'end',
+            marginBottom: '16px'
+          }}>
+            {/* Search Input */}
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: '14px',
+                fontWeight: '600',
+                color: '#374151',
+                marginBottom: '4px'
+              }}>
+                Search Albums
+              </label>
               <input
-                type="checkbox"
-                checked={showJustAdded}
-                onChange={(e) => setShowJustAdded(e.target.checked)}
-                style={{ transform: 'scale(1.2)' }}
+                type="text"
+                placeholder="Search by artist or title"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  border: '2px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  outline: 'none',
+                  backgroundColor: '#fff'
+                }}
               />
-              ✨ Just Added ({justAddedCount})
-            </label>
-          )}
-          
-          <select value={sortField} onChange={e => setSortField(e.target.value)}>
-            <option value="date_added">Date Added</option>
-            <option value="title">Title</option>
-            <option value="artist">Artist</option>
-            <option value="year">Year</option>
-          </select>
-          <button
-            className="button-secondary"
-            onClick={() => setSortAsc(a => !a)}
-          >
-            Sort: {sortAsc ? 'Ascending' : 'Descending'}
-          </button>
-          
-          {!hasNoResults && !showSuggestionBox && (
-            <button
-              onClick={() => setShowSuggestionBox(true)}
-              style={{
-                background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
-                color: 'white',
-                border: 'none',
-                borderRadius: 8,
-                padding: '10px 20px',
-                fontSize: 14,
-                fontWeight: 600,
+            </div>
+
+            {/* Media Type Filter */}
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: '14px',
+                fontWeight: '600',
+                color: '#374151',
+                marginBottom: '4px'
+              }}>
+                Media Type
+              </label>
+              <select
+                value={mediaFilter}
+                onChange={(e) => setMediaFilter(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  border: '2px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  backgroundColor: '#fff',
+                  outline: 'none'
+                }}
+              >
+                <option value="">All Media Types</option>
+                {normalizedDropdown.map((format) => (
+                  <option key={format} value={format.trim().toLowerCase()}>
+                    {format}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Sort Field */}
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: '14px',
+                fontWeight: '600',
+                color: '#374151',
+                marginBottom: '4px'
+              }}>
+                Sort By
+              </label>
+              <select 
+                value={sortField} 
+                onChange={e => setSortField(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  border: '2px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  backgroundColor: '#fff',
+                  outline: 'none'
+                }}
+              >
+                <option value="date_added">Date Added</option>
+                <option value="title">Title</option>
+                <option value="artist">Artist</option>
+                <option value="year">Year</option>
+              </select>
+            </div>
+
+            {/* Sort Direction */}
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: '14px',
+                fontWeight: '600',
+                color: '#374151',
+                marginBottom: '4px'
+              }}>
+                Sort Order
+              </label>
+              <button
+                onClick={() => setSortAsc(a => !a)}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  background: '#f3f4f6',
+                  border: '2px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  color: '#374151'
+                }}
+              >
+                {sortAsc ? '↑ Ascending' : '↓ Descending'}
+              </button>
+            </div>
+          </div>
+
+          {/* Second row for filters and actions */}
+          <div style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '16px',
+            alignItems: 'center',
+            justifyContent: 'space-between'
+          }}>
+            {/* Just Added Filter */}
+            {justAddedCount > 0 && (
+              <label style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '8px',
+                fontSize: '14px',
+                fontWeight: '600',
+                color: '#059669',
                 cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                boxShadow: '0 2px 6px rgba(59, 130, 246, 0.3)',
-                whiteSpace: 'nowrap',
-                marginLeft: 'auto'
-              }}
-            >
-              💡 Suggest an Album
-            </button>
-          )}
+                background: '#f0fdf4',
+                padding: '8px 12px',
+                borderRadius: '6px',
+                border: '1px solid #bbf7d0'
+              }}>
+                <input
+                  type="checkbox"
+                  checked={showJustAdded}
+                  onChange={(e) => setShowJustAdded(e.target.checked)}
+                  style={{ 
+                    accentColor: '#059669',
+                    transform: 'scale(1.2)'
+                  }}
+                />
+                ✨ Just Added ({justAddedCount})
+              </label>
+            )}
+            
+            {/* Suggest Album Button */}
+            {!hasNoResults && !showSuggestionBox && (
+              <button
+                onClick={() => setShowSuggestionBox(true)}
+                style={{
+                  background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '10px 20px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 6px rgba(59, 130, 246, 0.3)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                💡 Suggest an Album
+              </button>
+            )}
+          </div>
         </div>
 
+        {/* Results Count */}
         <div style={{ 
           fontSize: '14px', 
           color: '#666',
-          marginBottom: 24,
+          marginBottom: '24px',
           padding: '0 8px'
         }}>
           {hasSearchQuery ? (
@@ -300,16 +424,20 @@ function BrowseAlbumsContent() {
           )}
         </div>
 
+        {/* Album Suggestion Box */}
         {(hasNoResults || showSuggestionBox) && (
-          <div style={{ marginBottom: 40 }}>
+          <div style={{ marginBottom: '40px' }}>
             <AlbumSuggestionBox 
               context={hasNoResults ? "search" : "general"}
               searchQuery={hasNoResults ? searchTerm : ''}
+              eventId={eventId}
+              eventTitle={eventTitle}
               onClose={() => setShowSuggestionBox(false)}
             />
           </div>
         )}
 
+        {/* Album Grid */}
         <section className="album-grid">
           {filteredAlbums.map((album) => (
             <AlbumCard
@@ -317,22 +445,23 @@ function BrowseAlbumsContent() {
               album={{
                 ...album,
                 eventId: eventId,
-                justAdded: album.justAdded // Pass through the just added flag
+                justAdded: album.justAdded
               }}
             />
           ))}
         </section>
 
+        {/* Empty States */}
         {filteredAlbums.length === 0 && !hasSearchQuery && (
           <div style={{
             textAlign: 'center',
-            padding: 40,
+            padding: '40px',
             color: '#6b7280',
-            fontSize: 16
+            fontSize: '16px'
           }}>
-            <div style={{ fontSize: 48, marginBottom: 16 }}>🎵</div>
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎵</div>
             <p>The collection is loading or no albums match your filters.</p>
-            <p style={{ fontSize: 14 }}>
+            <p style={{ fontSize: '14px' }}>
               Try adjusting your filters or suggest new albums above!
             </p>
           </div>
@@ -341,22 +470,22 @@ function BrowseAlbumsContent() {
         {hasNoResults && (
           <div style={{
             textAlign: 'center',
-            padding: 40,
+            padding: '40px',
             color: '#6b7280',
-            fontSize: 16,
+            fontSize: '16px',
             background: '#f9fafb',
-            borderRadius: 12,
+            borderRadius: '12px',
             border: '2px dashed #d1d5db',
             margin: '20px 0'
           }}>
-            <div style={{ fontSize: 48, marginBottom: 16 }}>🔍</div>
-            <h3 style={{ fontSize: 24, marginBottom: 12, color: '#374151' }}>
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔍</div>
+            <h3 style={{ fontSize: '24px', marginBottom: '12px', color: '#374151' }}>
               No albums found
             </h3>
-            <p style={{ marginBottom: 16 }}>
+            <p style={{ marginBottom: '16px' }}>
               No albums match your search for &ldquo;<strong>{searchTerm}</strong>&rdquo;
             </p>
-            <p style={{ fontSize: 14 }}>
+            <p style={{ fontSize: '14px' }}>
               The album suggestion form above can help you request this album for the collection.
             </p>
           </div>
