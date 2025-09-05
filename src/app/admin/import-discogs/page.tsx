@@ -334,78 +334,80 @@ export default function ImportDiscogsPage() {
           }
         }
         
-        // Add this batch to all enriched items
+        // Save this batch to database immediately
+        setStatus(`Batch ${batchNumber}: Saving ${batchEnriched.length} items to database...`);
+        
+        // Check for existing items in this batch
+        const { data: existingItems, error: existingError } = await supabase
+          .from('collection')
+          .select('discogs_release_id, date_added')
+          .in('discogs_release_id', batchEnriched.map(r => r.discogs_release_id));
+        
+        if (existingError) {
+          console.warn(`Failed to check existing items in batch ${batchNumber}:`, existingError);
+        } else {
+          const existingMap = new Map(
+            (existingItems || []).map(item => [item.discogs_release_id, item.date_added])
+          );
+          
+          const newItems = batchEnriched.filter(row => !existingMap.has(row.discogs_release_id));
+          const updateItems = batchEnriched.filter(row => {
+            const dateAdded = existingMap.get(row.discogs_release_id);
+            return existingMap.has(row.discogs_release_id) && !dateAdded;
+          });
+          
+          let batchInsertCount = 0;
+          let batchUpdateCount = 0;
+          
+          // Insert new items from this batch
+          if (newItems.length > 0) {
+            const { error: insertError } = await supabase
+              .from('collection')
+              .insert(newItems);
+
+            if (insertError) {
+              console.warn(`Database insert failed for batch ${batchNumber}:`, insertError);
+            } else {
+              batchInsertCount = newItems.length;
+            }
+          }
+          
+          // Update existing items from this batch
+          for (const item of updateItems) {
+            const { error: updateError } = await supabase
+              .from('collection')
+              .update({ 
+                date_added: item.date_added,
+                image_url: item.image_url,
+                tracklists: item.tracklists
+              })
+              .eq('discogs_release_id', item.discogs_release_id);
+            
+            if (updateError) {
+              console.warn(`Failed to update ${item.discogs_release_id} in batch ${batchNumber}:`, updateError);
+            } else {
+              batchUpdateCount++;
+            }
+          }
+          
+          setStatus(`Batch ${batchNumber} complete: ${batchInsertCount} inserted, ${batchUpdateCount} updated`);
+        }
+        
+        // Add this batch to preview
         allEnriched = allEnriched.concat(batchEnriched);
+        setCsvPreview(allEnriched); // Update preview after each batch
         
         // Longer delay between batches to avoid rate limiting
         if (batchEnd < totalItems) {
-          setStatus(`Batch ${batchNumber} complete. Waiting 10 seconds before next batch...`);
+          setStatus(`Batch ${batchNumber} saved. Waiting 10 seconds before next batch...`);
           await delay(10000);
         }
       }
       
-      const enriched = allEnriched;
-
-      setCsvPreview(enriched);
-      setStatus('Processing database operations...');
-      
-      // Separate new items from updates
-      const { data: existingItems, error: existingError } = await supabase
-        .from('collection')
-        .select('discogs_release_id, date_added')
-        .in('discogs_release_id', enriched.map(r => r.discogs_release_id));
-      
-      if (existingError) {
-        throw new Error(`Failed to check existing items: ${existingError.message}`);
-      }
-      
-      const existingMap = new Map(
-        (existingItems || []).map(item => [item.discogs_release_id, item.date_added])
-      );
-      
-      const newItems = enriched.filter(row => !existingMap.has(row.discogs_release_id));
-      const updateItems = enriched.filter(row => {
-        const dateAdded = existingMap.get(row.discogs_release_id);
-        return existingMap.has(row.discogs_release_id) && !dateAdded;
-      });
-      
-      let insertCount = 0;
-      let updateCount = 0;
-      
-      // Insert new items
-      if (newItems.length > 0) {
-        const { error: insertError } = await supabase
-          .from('collection')
-          .insert(newItems);
-
-        if (insertError) {
-          throw new Error(`Database insert failed: ${insertError.message}`);
-        }
-        insertCount = newItems.length;
-      }
-      
-      // Update existing items with date_added
-      for (const item of updateItems) {
-        const { error: updateError } = await supabase
-          .from('collection')
-          .update({ 
-            date_added: item.date_added,
-            image_url: item.image_url,
-            tracklists: item.tracklists
-          })
-          .eq('discogs_release_id', item.discogs_release_id);
-        
-        if (updateError) {
-          console.warn(`Failed to update ${item.discogs_release_id}:`, updateError);
-        } else {
-          updateCount++;
-        }
-      }
-
-      setStatus(`✅ Successfully processed ${enriched.length} items: ${insertCount} new inserts, ${updateCount} updates with date_added!`);
+      setStatus(`✅ All batches complete! Total processed: ${allEnriched.length} items across ${Math.ceil(totalItems / BATCH_SIZE)} batches.`);
     } catch (error) {
       console.error('Processing error:', error);
-      setStatus(`❌ Processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setStatus(`❌ Processing failed after ${allEnriched.length} items: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsProcessing(false);
     }
