@@ -1,4 +1,4 @@
-// Fixed Browse Queue page with Suspense boundary
+// Fixed Browse Queue page with consistent queue loading
 // Replace: src/app/browse/browse-queue/page.js
 
 "use client";
@@ -73,36 +73,77 @@ function BrowseQueueContent() {
         setEventData(event);
       }
 
-      // Load queue items for this event
-      const { data: queue, error: queueError } = await supabase
+      // Load queue items for this event (using same approach as QueueSection)
+      const { data: requests, error: requestsError } = await supabase
         .from('requests')
-        .select(`
-          id,
-          artist,
-          title,
-          side,
-          votes,
-          album_id,
-          status,
-          created_at,
-          collection:album_id (
-            id,
-            image_url,
-            year,
-            format
-          )
-        `)
+        .select('*')
         .eq('event_id', eventId)
-        .eq('status', 'open')
         .order('votes', { ascending: false })
         .order('created_at', { ascending: true });
 
-      if (queueError) {
-        console.error('Error loading queue:', queueError);
+      if (requestsError) {
+        console.error('Error loading requests:', requestsError);
         setQueueItems([]);
-      } else {
-        setQueueItems(queue || []);
+        return;
       }
+
+      if (!requests || requests.length === 0) {
+        setQueueItems([]);
+        return;
+      }
+
+      // Get unique album IDs
+      const albumIds = requests.map(r => r.album_id).filter(Boolean);
+      
+      if (albumIds.length === 0) {
+        // Handle requests without album_id (direct artist/title entries)
+        const mapped = requests.map(req => ({
+          id: req.id,
+          artist: req.artist || '',
+          title: req.title || '',
+          side: req.side || 'A',
+          votes: req.votes || 1,
+          album_id: req.album_id,
+          created_at: req.created_at,
+          collection: null
+        }));
+        setQueueItems(mapped);
+        return;
+      }
+
+      // Load album details
+      const { data: albums, error: albumsError } = await supabase
+        .from('collection')
+        .select('id, artist, title, image_url, year, format')
+        .in('id', albumIds);
+
+      if (albumsError) {
+        console.error('Error loading albums:', albumsError);
+        setQueueItems([]);
+        return;
+      }
+
+      // Map requests with album data
+      const mapped = requests.map(req => {
+        const album = albums?.find(a => a.id === req.album_id);
+        return {
+          id: req.id,
+          artist: req.artist || album?.artist || '',
+          title: req.title || album?.title || '',
+          side: req.side || 'A',
+          votes: req.votes || 1,
+          album_id: req.album_id,
+          created_at: req.created_at,
+          collection: album ? {
+            id: album.id,
+            image_url: album.image_url,
+            year: album.year,
+            format: album.format
+          } : null
+        };
+      });
+
+      setQueueItems(mapped);
 
     } catch (error) {
       console.error('Error loading event and queue:', error);
@@ -117,11 +158,12 @@ function BrowseQueueContent() {
 
   const voteForItem = async (itemId) => {
     try {
+      const currentItem = queueItems.find(item => item.id === itemId);
+      const newVotes = (currentItem?.votes || 1) + 1;
+      
       const { error } = await supabase
         .from('requests')
-        .update({ 
-          votes: queueItems.find(item => item.id === itemId)?.votes + 1 || 1 
-        })
+        .update({ votes: newVotes })
         .eq('id', itemId);
 
       if (!error) {
@@ -129,9 +171,15 @@ function BrowseQueueContent() {
         setQueueItems(prev => 
           prev.map(item => 
             item.id === itemId 
-              ? { ...item, votes: item.votes + 1 }
+              ? { ...item, votes: newVotes }
               : item
-          ).sort((a, b) => b.votes - a.votes || new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+          ).sort((a, b) => {
+            // Sort by votes descending, then by created_at ascending
+            if (b.votes !== a.votes) {
+              return b.votes - a.votes;
+            }
+            return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+          })
         );
       }
     } catch (error) {
