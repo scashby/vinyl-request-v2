@@ -1,4 +1,4 @@
-// Fixed Browse Queue page with consistent queue loading
+// Fixed Browse Queue page - Clean version without renderVoteStars
 // Replace: src/app/browse/browse-queue/page.js
 
 "use client";
@@ -21,12 +21,7 @@ function BrowseQueueContent() {
   const [showSuggestionBox, setShowSuggestionBox] = useState(false);
 
   const loadEventAndQueue = useCallback(async () => {
-    // Add debugging
-    console.log('🔍 Debug: eventId from URL:', eventId);
-    console.log('🔍 Debug: Loading event and queue...');
-    
     if (!eventId) {
-      console.log('🔍 Debug: No eventId provided, showing placeholder');
       // Show placeholder data if no eventId
       setEventData({
         id: 'placeholder',
@@ -66,14 +61,11 @@ function BrowseQueueContent() {
 
     try {
       // Load event details
-      console.log('🔍 Debug: Fetching event with ID:', eventId);
       const { data: event, error: eventError } = await supabase
         .from('events')
         .select('*')
         .eq('id', eventId)
         .single();
-
-      console.log('🔍 Debug: Event query result:', { event, eventError });
 
       if (eventError) {
         console.error('Error loading event:', eventError);
@@ -82,14 +74,11 @@ function BrowseQueueContent() {
       }
 
       // Load queue items for this event - using EXACT same approach as QueueSection
-      console.log('🔍 Debug: Fetching requests for event_id:', eventId);
       const { data: requests, error: requestsError } = await supabase
         .from('requests')
         .select('*')
         .eq('event_id', eventId)
         .order('id', { ascending: true }); // Same ordering as QueueSection
-
-      console.log('🔍 Debug: Requests query result:', { requests, requestsError, count: requests?.length });
 
       if (requestsError) {
         console.error('Error loading requests:', requestsError);
@@ -98,17 +87,14 @@ function BrowseQueueContent() {
       }
 
       if (!requests || requests.length === 0) {
-        console.log('🔍 Debug: No requests found, setting empty queue');
         setQueueItems([]);
         return;
       }
 
       // Get unique album IDs
       const albumIds = requests.map(r => r.album_id).filter(Boolean);
-      console.log('🔍 Debug: Album IDs found:', albumIds);
       
       if (albumIds.length === 0) {
-        console.log('🔍 Debug: No album IDs, using direct request data');
         // Handle requests without album_id (direct artist/title entries)
         const mapped = requests.map(req => ({
           id: req.id,
@@ -120,19 +106,15 @@ function BrowseQueueContent() {
           created_at: req.created_at,
           collection: null
         }));
-        console.log('🔍 Debug: Mapped requests without albums:', mapped);
         setQueueItems(mapped);
         return;
       }
 
       // Load album details
-      console.log('🔍 Debug: Fetching albums for IDs:', albumIds);
       const { data: albums, error: albumsError } = await supabase
         .from('collection')
         .select('id, artist, title, image_url, year, format')
         .in('id', albumIds);
-
-      console.log('🔍 Debug: Albums query result:', { albums, albumsError });
 
       if (albumsError) {
         console.error('Error loading albums:', albumsError);
@@ -159,8 +141,6 @@ function BrowseQueueContent() {
           } : null
         };
       });
-
-      console.log('🔍 Debug: Final mapped queue items:', mapped);
       
       // Sort by votes desc, then by created_at asc
       const sorted = mapped.sort((a, b) => {
@@ -273,66 +253,9 @@ function BrowseQueueContent() {
             <h2>{eventData?.title || 'Event Name'}</h2>
             <p>{eventData?.date ? formatDate(eventData.date) : 'Date TBD'}</p>
             
-            {/* Queue Stats */}
-            <div style={{
-              marginTop: '20px',
-              padding: '16px',
-              background: '#f8fafc',
-              borderRadius: '8px',
-              fontSize: '14px'
-            }}>
-              <div style={{ marginBottom: '8px' }}>
-                <strong>Queue Status:</strong>
-              </div>
-              <div>📀 {queueItems.length} requests</div>
-              <div>🗳️ {queueItems.reduce((sum, item) => sum + item.votes, 0)} total votes</div>
-              {queueItems.length > 0 && (
-                <div>🏆 Top: {queueItems[0]?.votes || 0} votes</div>
-              )}
-            </div>
-            
-            {/* Suggestion Box Toggle */}
-            <div style={{ marginTop: '20px' }}>
-              <button
-                onClick={() => setShowSuggestionBox(!showSuggestionBox)}
-                style={{
-                  width: '100%',
-                  background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  padding: '12px 16px',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease'
-                }}
-              >
-                {showSuggestionBox ? '✕ Hide Suggestions' : '💡 Suggest an Album'}
-              </button>
-            </div>
-
             {/* Event Actions */}
             {eventId && (
-              <div style={{ marginTop: '16px' }}>
-                <a
-                  href={`/browse/browse-albums?eventId=${eventId}`}
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    background: '#059669',
-                    color: 'white',
-                    textAlign: 'center',
-                    padding: '10px 16px',
-                    borderRadius: '6px',
-                    textDecoration: 'none',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    marginBottom: '8px'
-                  }}
-                >
-                  📚 Browse Collection
-                </a>
+              <div style={{ marginTop: '20px' }}>
                 <a
                   href={`/events/event-detail/${eventId}`}
                   style={{
@@ -341,121 +264,199 @@ function BrowseQueueContent() {
                     background: '#9333ea',
                     color: 'white',
                     textAlign: 'center',
-                    padding: '10px 16px',
-                    borderRadius: '6px',
+                    padding: '12px 16px',
+                    borderRadius: '8px',
                     textDecoration: 'none',
                     fontSize: '14px',
                     fontWeight: '600'
                   }}
                 >
-                  📅 Event Details
+                  📅 View Event Details
                 </a>
               </div>
             )}
           </article>
+        </aside>
 
-          {/* Album Suggestion Box in Sidebar */}
+        <section className="queue-display">
+          {/* Queue Header with Stats and Actions */}
+          <div style={{
+            background: '#f8fafc',
+            border: '1px solid #e5e7eb',
+            borderRadius: '12px',
+            padding: '20px',
+            marginBottom: '24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '16px'
+          }}>
+            <div>
+              <h3 style={{ 
+                margin: '0 0 8px 0', 
+                fontSize: '1.5rem', 
+                fontWeight: '700', 
+                color: '#1f2937' 
+              }}>
+                Current Queue
+              </h3>
+              <div style={{ 
+                display: 'flex', 
+                gap: '24px', 
+                fontSize: '14px', 
+                color: '#6b7280',
+                fontWeight: '500'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>📀</span> {queueItems.length} requests
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>🗳️</span> {queueItems.reduce((sum, item) => sum + item.votes, 0)} total votes
+                </div>
+                {queueItems.length > 0 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span>🏆</span> Top: {queueItems[0]?.votes || 0} votes
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              {!showSuggestionBox && (
+                <button
+                  onClick={() => setShowSuggestionBox(true)}
+                  style={{
+                    background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    padding: '10px 16px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    boxShadow: '0 2px 4px rgba(59, 130, 246, 0.2)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  💡 Suggest an Album
+                </button>
+              )}
+              {eventId && (
+                <a
+                  href={`/browse/browse-albums?eventId=${eventId}`}
+                  style={{
+                    background: '#059669',
+                    color: 'white',
+                    padding: '10px 16px',
+                    borderRadius: '8px',
+                    textDecoration: 'none',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  📚 Browse Collection
+                </a>
+              )}
+            </div>
+          </div>
+
+          {/* Suggestion Box (when shown) */}
           {showSuggestionBox && (
-            <div style={{ marginTop: '20px' }}>
+            <div style={{ marginBottom: '24px' }}>
               <AlbumSuggestionBox 
                 context="general"
                 onClose={() => setShowSuggestionBox(false)}
               />
             </div>
           )}
-        </aside>
 
-        <section className="queue-display">
           {queueItems.length > 0 ? (
-            <>
-              <div className="spotify-header-row" style={{
-                display: 'grid',
-                gridTemplateColumns: '2fr 2fr 80px 100px 80px',
-                gap: '16px',
-                padding: '16px 20px',
-                background: '#f8fafc',
-                fontWeight: 'bold',
-                fontSize: '14px',
-                color: '#374151',
-                borderRadius: '8px 8px 0 0',
-                border: '1px solid #e5e7eb'
-              }}>
-                <div>Album</div>
-                <div>Artist</div>
-                <div>Side</div>
-                <div>Votes</div>
-                <div>Like</div>
-              </div>
-
-              {queueItems.map((item, index) => (
-                <div 
-                  key={item.id}
-                  className="spotify-row"
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '2fr 2fr 80px 100px 80px',
-                    gap: '16px',
-                    padding: '16px 20px',
-                    background: index % 2 === 0 ? '#fff' : '#f9fafb',
-                    borderLeft: '1px solid #e5e7eb',
-                    borderRight: '1px solid #e5e7eb',
-                    borderBottom: '1px solid #e5e7eb',
-                    alignItems: 'center',
-                    fontSize: '14px',
-                    ...(index === queueItems.length - 1 && { 
-                      borderRadius: '0 0 8px 8px' 
-                    })
-                  }}
-                >
-                  <div style={{ 
-                    fontWeight: index < 3 ? 'bold' : 'normal',
-                    color: index === 0 ? '#059669' : index === 1 ? '#0369a1' : index === 2 ? '#7c3aed' : '#374151'
-                  }}>
-                    {index < 3 && (
-                      <span style={{ marginRight: '8px', fontSize: '16px' }}>
-                        {index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}
-                      </span>
-                    )}
-                    {item.title}
-                  </div>
-                  <div style={{ color: '#6b7280' }}>{item.artist}</div>
-                  <div style={{ 
-                    textAlign: 'center',
-                    fontWeight: 'bold',
-                    color: '#374151'
-                  }}>
-                    {item.side}
-                  </div>
-                  <div className="votes" style={{
-                    fontSize: '16px',
-                    color: item.votes > 0 ? '#f59e0b' : '#d1d5db',
-                    textAlign: 'center'
-                  }}>
-                    {renderVoteStars(item.votes)}
-                  </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <button 
-                      className="vote-button"
-                      onClick={() => voteForItem(item.id)}
-                      style={{
-                        background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '6px',
-                        padding: '8px 12px',
-                        fontSize: '16px',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease',
-                        boxShadow: '0 2px 4px rgba(59, 130, 246, 0.2)'
-                      }}
-                      title="Vote for this request"
-                    >
-                      👍
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </>
+            <div className="queue-wrapper">
+              <table className="queue-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th></th>
+                    <th>Album / Artist</th>
+                    <th>Side</th>
+                    <th>👍</th>
+                    <th>Votes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {queueItems.map((item, index) => (
+                    <tr key={item.id}>
+                      <td className="queue-index">{index + 1}</td>
+                      <td>
+                        <Image
+                          src={item.collection?.image_url || "/images/placeholder.png"}
+                          alt={item.title || ""}
+                          className="queue-cover"
+                          width={48}
+                          height={48}
+                          style={{ cursor: "pointer", objectFit: "cover", borderRadius: "4px" }}
+                          unoptimized
+                        />
+                      </td>
+                      <td className="queue-meta">
+                        <div className="queue-title" style={{
+                          fontWeight: index < 3 ? 'bold' : '600',
+                          color: index === 0 ? '#059669' : index === 1 ? '#0369a1' : index === 2 ? '#7c3aed' : '#2563eb'
+                        }}>
+                          {index < 3 && (
+                            <span style={{ marginRight: '8px', fontSize: '16px' }}>
+                              {index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}
+                            </span>
+                          )}
+                          {item.title}
+                        </div>
+                        <div className="queue-artist">{item.artist}</div>
+                      </td>
+                      <td className="queue-side">{item.side}</td>
+                      <td className="queue-plus">
+                        <button
+                          className="queue-plus-btn"
+                          onClick={() => voteForItem(item.id)}
+                          style={{
+                            fontSize: 20,
+                            color: "#2563eb",
+                            cursor: "pointer",
+                            background: "none",
+                            border: "none",
+                            padding: "4px 8px",
+                            borderRadius: "4px",
+                            transition: "all 0.2s ease"
+                          }}
+                          title="Vote for this entry"
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.backgroundColor = "#f3f4f6";
+                            e.currentTarget.style.color = "#1d4ed8";
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.backgroundColor = "transparent";
+                            e.currentTarget.style.color = "#2563eb";
+                          }}
+                        >
+                          ＋
+                        </button>
+                      </td>
+                      <td className="queue-votes">
+                        <span className="queue-heart">♥</span>
+                        <span className="queue-count">x{item.votes}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           ) : (
             /* Empty Queue State */
             <div style={{
@@ -526,58 +527,6 @@ function BrowseQueueContent() {
               ) : (
                 <AlbumSuggestionBox context="general" />
               )}
-            </div>
-          )}
-
-          {/* Bottom suggestion area for when there are items but user might want more */}
-          {queueItems.length > 0 && !showSuggestionBox && (
-            <div style={{
-              background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(139, 92, 246, 0.08))',
-              border: '2px dashed #3b82f6',
-              borderRadius: '12px',
-              padding: '24px',
-              textAlign: 'center',
-              margin: '32px 0',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              boxShadow: '0 4px 12px rgba(59, 130, 246, 0.1)'
-            }}
-            onClick={() => setShowSuggestionBox(true)}
-            onMouseOver={(e) => {
-              e.currentTarget.style.background = 'linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(139, 92, 246, 0.12))';
-              e.currentTarget.style.transform = 'translateY(-2px)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.background = 'linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(139, 92, 246, 0.08))';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}>
-              <div style={{ fontSize: '28px', marginBottom: '12px' }}>💡</div>
-              <div style={{ 
-                fontSize: '18px', 
-                fontWeight: '700', 
-                color: '#1e40af', 
-                marginBottom: '8px',
-                letterSpacing: '-0.02em'
-              }}>
-                Don&rsquo;t see your favorite album in the queue?
-              </div>
-              <div style={{ 
-                fontSize: '15px', 
-                color: '#64748b',
-                fontWeight: '500'
-              }}>
-                Click to suggest new albums for the collection
-              </div>
-            </div>
-          )}
-
-          {/* Expanded suggestion box at bottom */}
-          {showSuggestionBox && queueItems.length > 0 && (
-            <div style={{ margin: '24px 0' }}>
-              <AlbumSuggestionBox 
-                context="general"
-                onClose={() => setShowSuggestionBox(false)}
-              />
             </div>
           )}
         </section>
