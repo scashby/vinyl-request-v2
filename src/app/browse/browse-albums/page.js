@@ -226,22 +226,22 @@ function BrowseAlbumsContent() {
       </header>
 
       <main className="browse-collection-body">
-        {/* Compact Search Filter Bar */}
+        {/* FIXED Search Filter Bar */}
         <div style={{
-          background: '#fff',
-          padding: '12px 16px',
-          marginBottom: '16px',
+          background: '#ffffff',
+          padding: '16px 20px',
+          marginBottom: '20px',
           borderRadius: '8px',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-          border: '1px solid #e5e7eb'
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+          border: '2px solid #e5e7eb'
         }}>
           {/* Main controls row */}
           <div style={{
             display: 'flex',
             flexWrap: 'wrap',
-            gap: '10px',
+            gap: '12px',
             alignItems: 'center',
-            marginBottom: '10px'
+            marginBottom: '12px'
           }}>
             {/* Search Input */}
             <input
@@ -250,14 +250,16 @@ function BrowseAlbumsContent() {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               style={{
-                flex: '2 1 200px',
-                minWidth: '200px',
-                padding: '6px 10px',
-                border: '1px solid #d1d5db',
-                borderRadius: '4px',
-                fontSize: '14px',
+                flex: '2 1 250px',
+                minWidth: '250px',
+                padding: '10px 12px',
+                border: '2px solid #374151',
+                borderRadius: '6px',
+                fontSize: '16px',
                 outline: 'none',
-                backgroundColor: '#fff'
+                backgroundColor: '#ffffff',
+                color: '#000000',
+                fontFamily: 'system-ui, sans-serif'
               }}
             />
 
@@ -266,19 +268,25 @@ function BrowseAlbumsContent() {
               value={mediaFilter}
               onChange={(e) => setMediaFilter(e.target.value)}
               style={{
-                flex: '1 1 120px',
-                minWidth: '120px',
-                padding: '6px 10px',
-                border: '1px solid #d1d5db',
-                borderRadius: '4px',
-                fontSize: '14px',
-                backgroundColor: '#fff',
-                outline: 'none'
+                flex: '1 1 150px',
+                minWidth: '150px',
+                padding: '10px 12px',
+                border: '2px solid #374151',
+                borderRadius: '6px',
+                fontSize: '16px',
+                backgroundColor: '#ffffff',
+                color: '#000000',
+                outline: 'none',
+                fontFamily: 'system-ui, sans-serif'
               }}
             >
-              <option value="">All Media</option>
+              <option value="" style={{ color: '#000000', backgroundColor: '#ffffff' }}>All Media Types</option>
               {normalizedDropdown.map((format) => (
-                <option key={format} value={format.trim().toLowerCase()}>
+                <option 
+                  key={format} 
+                  value={format.trim().toLowerCase()}
+                  style={{ color: '#000000', backgroundColor: '#ffffff' }}
+                >
                   {format}
                 </option>
               ))}
@@ -289,20 +297,22 @@ function BrowseAlbumsContent() {
               value={sortField} 
               onChange={e => setSortField(e.target.value)}
               style={{
-                flex: '1 1 100px',
-                minWidth: '100px',
-                padding: '6px 10px',
-                border: '1px solid #d1d5db',
-                borderRadius: '4px',
-                fontSize: '14px',
-                backgroundColor: '#fff',
-                outline: 'none'
+                flex: '1 1 130px',
+                minWidth: '130px',
+                padding: '10px 12px',
+                border: '2px solid #374151',
+                borderRadius: '6px',
+                fontSize: '16px',
+                backgroundColor: '#ffffff',
+                color: '#000000',
+                outline: 'none',
+                fontFamily: 'system-ui, sans-serif'
               }}
             >
-              <option value="date_added">Date Added</option>
-              <option value="title">Title</option>
-              <option value="artist">Artist</option>
-              <option value="year">Year</option>
+              <option value="date_added" style={{ color: '#000000', backgroundColor: '#ffffff' }}>Date Added</option>
+              <option value="title" style={{ color: '#000000', backgroundColor: '#ffffff' }}>Title</option>
+              <option value="artist" style={{ color: '#000000', backgroundColor: '#ffffff' }}>Artist</option>
+              <option value="year" style={{ color: '#000000', backgroundColor: '#ffffff' }}>Year</option>
             </select>
 
             {/* Sort Direction */}
@@ -310,18 +320,19 @@ function BrowseAlbumsContent() {
               onClick={() => setSortAsc(a => !a)}
               style={{
                 flex: '0 0 auto',
-                padding: '6px 10px',
+                padding: '10px 16px',
                 background: '#f3f4f6',
-                border: '1px solid #d1d5db',
-                borderRadius: '4px',
-                fontSize: '14px',
+                border: '2px solid #374151',
+                borderRadius: '6px',
+                fontSize: '16px',
                 fontWeight: '600',
                 cursor: 'pointer',
-                color: '#374151',
-                whiteSpace: 'nowrap'
+                color: '#000000',
+                whiteSpace: 'nowrap',
+                fontFamily: 'system-ui, sans-serif'
               }}
             >
-              {sortAsc ? '↑ Asc' : '↓ Desc'}
+              Sort: {sortAsc ? 'A→Z' : 'Z→A'}
             </button>
 
             {/* Suggest Album Button */}
@@ -330,19 +341,19 @@ function BrowseAlbumsContent() {
                 onClick={() => setShowSuggestionBox(true)}
                 style={{
                   flex: '0 0 auto',
-                  background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  padding: '6px 12px',
-                  fontSize: '14px',
+                  background: '#3b82f6',
+                  color: '#ffffff',
+                  border: '2px solid #1d4ed8',
+                  borderRadius: '6px',
+                  padding: '10px 16px',
+                  fontSize: '16px',
                   fontWeight: '600',
                   cursor: 'pointer',
-                  boxShadow: '0 2px 6px rgba(59, 130, 246, 0.3)',
-                  whiteSpace: 'nowrap'
+                  whiteSpace: 'nowrap',
+                  fontFamily: 'system-ui, sans-serif'
                 }}
               >
-                💡 Suggest
+                💡 Suggest Album
               </button>
             )}
           </div>
@@ -351,7 +362,7 @@ function BrowseAlbumsContent() {
           <div style={{
             display: 'flex',
             flexWrap: 'wrap',
-            gap: '6px',
+            gap: '8px',
             alignItems: 'center'
           }}>
             {/* Just Added Filter */}
@@ -359,23 +370,24 @@ function BrowseAlbumsContent() {
               <label style={{ 
                 display: 'flex', 
                 alignItems: 'center', 
-                gap: '4px',
-                fontSize: '11px',
+                gap: '6px',
+                fontSize: '14px',
                 fontWeight: '600',
-                color: '#059669',
+                color: '#000000',
                 cursor: 'pointer',
-                background: '#f0fdf4',
-                padding: '3px 6px',
-                borderRadius: '3px',
-                border: '1px solid #bbf7d0'
+                background: '#dcfce7',
+                padding: '6px 10px',
+                borderRadius: '6px',
+                border: '2px solid #16a34a',
+                fontFamily: 'system-ui, sans-serif'
               }}>
                 <input
                   type="checkbox"
                   checked={showJustAdded}
                   onChange={(e) => setShowJustAdded(e.target.checked)}
                   style={{ 
-                    accentColor: '#059669',
-                    transform: 'scale(0.9)'
+                    accentColor: '#16a34a',
+                    transform: 'scale(1.2)'
                   }}
                 />
                 ✨ Just Added ({justAddedCount})
@@ -387,15 +399,16 @@ function BrowseAlbumsContent() {
               <label style={{ 
                 display: 'flex', 
                 alignItems: 'center', 
-                gap: '4px',
-                fontSize: '11px',
+                gap: '6px',
+                fontSize: '14px',
                 fontWeight: '600',
-                color: '#dc2626',
+                color: '#000000',
                 cursor: 'pointer',
-                background: '#fef2f2',
-                padding: '3px 6px',
-                borderRadius: '3px',
-                border: '1px solid #fecaca'
+                background: '#fecaca',
+                padding: '6px 10px',
+                borderRadius: '6px',
+                border: '2px solid #dc2626',
+                fontFamily: 'system-ui, sans-serif'
               }}>
                 <input
                   type="checkbox"
@@ -403,10 +416,10 @@ function BrowseAlbumsContent() {
                   onChange={(e) => setShowStevesTop200(e.target.checked)}
                   style={{ 
                     accentColor: '#dc2626',
-                    transform: 'scale(0.9)'
+                    transform: 'scale(1.2)'
                   }}
                 />
-                🏆 Top 200 ({stevesTop200Count})
+                🏆 Steve&apos;s Top 200 ({stevesTop200Count})
               </label>
             )}
 
@@ -415,15 +428,16 @@ function BrowseAlbumsContent() {
               <label style={{ 
                 display: 'flex', 
                 alignItems: 'center', 
-                gap: '4px',
-                fontSize: '11px',
+                gap: '6px',
+                fontSize: '14px',
                 fontWeight: '600',
-                color: '#7c3aed',
+                color: '#000000',
                 cursor: 'pointer',
-                background: '#faf5ff',
-                padding: '3px 6px',
-                borderRadius: '3px',
-                border: '1px solid #e9d5ff'
+                background: '#e9d5ff',
+                padding: '6px 10px',
+                borderRadius: '6px',
+                border: '2px solid #7c3aed',
+                fontFamily: 'system-ui, sans-serif'
               }}>
                 <input
                   type="checkbox"
@@ -431,10 +445,10 @@ function BrowseAlbumsContent() {
                   onChange={(e) => setShowThisWeeksTop10(e.target.checked)}
                   style={{ 
                     accentColor: '#7c3aed',
-                    transform: 'scale(0.9)'
+                    transform: 'scale(1.2)'
                   }}
                 />
-                📈 Top 10 ({thisWeeksTop10Count})
+                📈 This Week&apos;s Top 10 ({thisWeeksTop10Count})
               </label>
             )}
 
@@ -443,15 +457,16 @@ function BrowseAlbumsContent() {
               <label style={{ 
                 display: 'flex', 
                 alignItems: 'center', 
-                gap: '4px',
-                fontSize: '11px',
+                gap: '6px',
+                fontSize: '14px',
                 fontWeight: '600',
-                color: '#ea580c',
+                color: '#000000',
                 cursor: 'pointer',
-                background: '#fff7ed',
-                padding: '3px 6px',
-                borderRadius: '3px',
-                border: '1px solid #fed7aa'
+                background: '#fed7aa',
+                padding: '6px 10px',
+                borderRadius: '6px',
+                border: '2px solid #ea580c',
+                fontFamily: 'system-ui, sans-serif'
               }}>
                 <input
                   type="checkbox"
@@ -459,10 +474,10 @@ function BrowseAlbumsContent() {
                   onChange={(e) => setShowInnerCirclePreferred(e.target.checked)}
                   style={{ 
                     accentColor: '#ea580c',
-                    transform: 'scale(0.9)'
+                    transform: 'scale(1.2)'
                   }}
                 />
-                ⭐ Inner Circle ({innerCirclePreferredCount})
+                ⭐ Inner Circle Preferred ({innerCirclePreferredCount})
               </label>
             )}
           </div>
