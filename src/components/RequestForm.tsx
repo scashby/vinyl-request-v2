@@ -1,8 +1,8 @@
+// src/components/RequestForm.tsx
 "use client";
 
 import { useState } from "react";
-import { supabase } from 'src/lib/supabaseClient';
-
+import { addOrVoteRequest } from "src/lib/addOrVoteRequest";
 
 interface RequestFormProps {
   eventId: string;
@@ -26,24 +26,39 @@ export default function RequestForm({ eventId }: RequestFormProps) {
   });
 
   const [status, setStatus] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const { error } = await supabase.from("requests").insert([
-      { ...formData, event_id: eventId, status: "queued", votes: 1 },
-    ]);
-    if (error) setStatus("Error submitting request.");
-    else setStatus("Request submitted!");
+    setSubmitting(true);
+    setStatus(null);
+
+    try {
+      const updated = await addOrVoteRequest({
+        eventId,
+        albumId: null, // manual request; match by artist+title+side
+        side: formData.side.trim(),
+        artist: formData.artist.trim(),
+        title: formData.title.trim(),
+        status: "queued",
+        // name/comment are not in the 'requests' schema by default voting logic;
+        // if you want to store them, add columns or a separate table.
+      });
+      setStatus(`Request recorded. Votes: x${updated?.votes ?? 1}`);
+      setFormData({ artist: "", title: "", side: "", name: "", comment: "" });
+    } catch (err) {
+      console.error(err);
+      setStatus("Error submitting request.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -82,7 +97,6 @@ export default function RequestForm({ eventId }: RequestFormProps) {
           name="name"
           placeholder="Your Name"
           onChange={handleChange}
-          required
           className="w-full p-2 border rounded"
           value={formData.name}
         />
@@ -93,12 +107,14 @@ export default function RequestForm({ eventId }: RequestFormProps) {
           className="w-full p-2 border rounded"
           value={formData.comment}
         />
-        <button className="bg-green-600 text-white py-2 px-4 rounded" type="submit">
-          Submit
+        <button
+          className="bg-green-600 text-white py-2 px-4 rounded disabled:opacity-60"
+          type="submit"
+          disabled={submitting}
+        >
+          {submitting ? "Submitting..." : "Submit"}
         </button>
-        {status && (
-          <p className="text-sm text-center text-gray-600 mt-2">{status}</p>
-        )}
+        {status && <p className="text-sm text-center text-gray-600 mt-2">{status}</p>}
       </div>
     </form>
   );
