@@ -1,11 +1,9 @@
-// Browse Queue page — clean table version with fixed alignment
-// File: src/app/browse/browse-queue/page.js
-
 "use client";
 
 import { useEffect, useState, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
 import AlbumSuggestionBox from "components/AlbumSuggestionBox";
 import { supabase } from "src/lib/supabaseClient";
 import "styles/internal.css";
@@ -22,21 +20,6 @@ function BrowseQueueContent() {
 
   const loadEventAndQueue = useCallback(async () => {
     try {
-      if (!eventId) {
-        setEventData({
-          id: "placeholder",
-          title: "Event Name Placeholder",
-          date: "June 2, 2025",
-          image_url: "/images/event-header-still.jpg",
-        });
-        setQueueItems([
-          { id: 1, artist: "Pink Floyd", title: "The Dark Side of the Moon", side: "A", votes: 4, created_at: new Date().toISOString() },
-          { id: 2, artist: "The Beatles", title: "Abbey Road", side: "B", votes: 5, created_at: new Date().toISOString() },
-        ]);
-        setLoading(false);
-        return;
-      }
-
       const { data: event } = await supabase
         .from("events")
         .select("*")
@@ -90,40 +73,31 @@ function BrowseQueueContent() {
     }
   }, [eventId]);
 
-  useEffect(() => {
-    loadEventAndQueue();
-  }, [loadEventAndQueue]);
+  useEffect(() => { loadEventAndQueue(); }, [loadEventAndQueue]);
 
   const voteForItem = async (itemId) => {
     try {
       const currentItem = queueItems.find(item => item.id === itemId);
       const newVotes = (currentItem?.votes ?? 1) + 1;
-
-      const { error } = await supabase.from("requests").update({ votes: newVotes }).eq("id", itemId);
-      if (!error) {
-        setQueueItems(prev =>
-          prev
-            .map(item => (item.id === itemId ? { ...item, votes: newVotes } : item))
-            .sort((a, b) => (b.votes !== a.votes ? b.votes - a.votes : new Date(a.created_at) - new Date(b.created_at)))
-        );
-      }
+      await supabase.from("requests").update({ votes: newVotes }).eq("id", itemId);
+      setQueueItems(prev =>
+        prev
+          .map(item => (item.id === itemId ? { ...item, votes: newVotes } : item))
+          .sort((a, b) => (b.votes !== a.votes ? b.votes - a.votes : new Date(a.created_at) - new Date(b.created_at)))
+      );
     } catch (e) {
       console.error("Error voting:", e);
     }
   };
 
   const formatDate = (dateString) =>
-    dateString
-      ? new Date(dateString).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
-      : "";
+    dateString ? new Date(dateString).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : "";
 
-  if (loading) {
-    return (
-      <div className="page-wrapper" style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: 400, color: "#666", fontSize: 18 }}>
-        Loading event queue...
-      </div>
-    );
-  }
+  if (loading) return (
+    <div className="page-wrapper" style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: 400 }}>
+      Loading event queue...
+    </div>
+  );
 
   return (
     <div className="page-wrapper">
@@ -131,7 +105,7 @@ function BrowseQueueContent() {
         <div className="overlay">
           <div style={{ textAlign: "center" }}>
             <h1>{eventData?.title || "Event Queue"}</h1>
-            {eventData?.date && <p style={{ fontSize: 18, opacity: 0.9, margin: "16px 0 0", fontWeight: 500 }}>{formatDate(eventData.date)}</p>}
+            {eventData?.date && <p style={{ fontSize: 18, opacity: 0.9, marginTop: 16 }}>{formatDate(eventData.date)}</p>}
           </div>
         </div>
       </header>
@@ -154,9 +128,12 @@ function BrowseQueueContent() {
         </aside>
 
         <section className="queue-display">
-          {/* Header w/ stats & actions (kept) */}
+          {/* Header / stats / actions */}
           <div style={{ background: "#f8fafc", border: "1px solid #e5e7eb", borderRadius: 12, padding: 20, marginBottom: 24 }}>
-            <h3 style={{ margin: 0, marginBottom: 16, fontSize: "1.5rem", fontWeight: 700, color: "#1f2937" }}>Current Queue</h3>
+            <h3 style={{ margin: 0, marginBottom: 16, fontSize: "1.5rem", fontWeight: 700, color: "#1f2937" }}>
+              Current Queue
+            </h3>
+
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
               <div style={{ display: "flex", gap: 24, fontSize: 14, color: "#6b7280", fontWeight: 500, flexWrap: "wrap" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -194,12 +171,14 @@ function BrowseQueueContent() {
                     💡 Suggest an Album
                   </button>
                 )}
+
                 <a
                   href={`/browse/browse-albums?eventId=${eventId}`}
                   style={{ background: "#059669", color: "#fff", padding: "10px 16px", borderRadius: 8, textDecoration: "none", fontSize: 14, fontWeight: 600 }}
                 >
                   📚 Browse Collection
                 </a>
+
                 <a
                   href={`/events/event-detail/${eventId}`}
                   style={{ background: "#9333ea", color: "#fff", padding: "10px 16px", borderRadius: 8, textDecoration: "none", fontSize: 14, fontWeight: 600 }}
@@ -210,99 +189,78 @@ function BrowseQueueContent() {
             </div>
           </div>
 
-          {/* Suggestion Box */}
+          {/* Suggestion Box (restored) */}
           {showSuggestionBox && (
             <div style={{ marginBottom: 24 }}>
               <AlbumSuggestionBox context="general" onClose={() => setShowSuggestionBox(false)} />
             </div>
           )}
 
-          {/* The table */}
-          {queueItems.length > 0 ? (
-            <div className="queue-wrapper">
-              <table className="queue-table">
-                <colgroup>
-                  <col style={{ width: "50px" }} />   {/* # */}
-                  <col style={{ width: "60px" }} />   {/* cover */}
-                  <col />                              {/* album/artist */}
-                  <col style={{ width: "60px" }} />   {/* side */}
-                  <col style={{ width: "60px" }} />   {/* + */}
-                  <col style={{ width: "80px" }} />   {/* votes */}
-                </colgroup>
-                <thead>
-                  <tr>
-                    <th className="queue-index" scope="col">#</th>
-                    <th scope="col"><span className="sr-only">Cover</span></th>
-                    <th scope="col">Album / Artist</th>
-                    <th scope="col">Side</th>
-                    <th scope="col">👍</th>
-                    <th scope="col">Votes</th>
+          {/* Table */}
+          <div className="queue-wrapper">
+            <table className="queue-table">
+              <colgroup>
+                <col style={{ width: "50px" }} />
+                <col style={{ width: "60px" }} />
+                <col />
+                <col style={{ width: "60px" }} />
+                <col style={{ width: "60px" }} />
+                <col style={{ width: "80px" }} />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th><span className="sr-only">Cover</span></th>
+                  <th>Album / Artist</th>
+                  <th>Side</th>
+                  <th>👍</th>
+                  <th>Votes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {queueItems.map((item, index) => (
+                  <tr key={item.id}>
+                    <td className="queue-index">{index + 1}</td>
+                    <td>
+                      <Image
+                        src={item.collection?.image_url || "/images/placeholder.png"}
+                        alt={item.title || ""}
+                        className="queue-cover"
+                        width={48}
+                        height={48}
+                        unoptimized
+                      />
+                    </td>
+                    <td>
+                      <div className="queue-title">
+                        {index < 3 && <span style={{ marginRight: 8 }}>{index === 0 ? "🥇" : index === 1 ? "🥈" : "🥉"}</span>}
+                        {item.collection?.id ? (
+                          <Link
+                            href={`/browse/album-detail/${item.collection.id}${eventId ? `?eventId=${eventId}` : ""}`}
+                            className="queue-title-link"
+                            aria-label={`View album: ${item.title} by ${item.artist}`}
+                          >
+                            {item.title}
+                          </Link>
+                        ) : (
+                          <span>{item.title}</span>
+                        )}
+                      </div>
+                      <div className="queue-artist">{item.artist}</div>
+                    </td>
+                    <td><span className="queue-side-badge">{item.side}</span></td>
+                    <td><button className="queue-plus-btn" onClick={() => voteForItem(item.id)}>＋</button></td>
+                    <td>
+                      <div className="queue-votes-inner">
+                        <span className="queue-heart">♥</span>
+                        <span className="queue-count">x{item.votes}</span>
+                      </div>
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {queueItems.map((item, index) => (
-                    <tr key={item.id}>
-                      <td className="queue-index">{index + 1}</td>
-                      <td>
-                        <Image
-                          src={item.collection?.image_url || "/images/placeholder.png"}
-                          alt={item.title || ""}
-                          className="queue-cover"
-                          width={48}
-                          height={48}
-                          unoptimized
-                        />
-                      </td>
-                      <td>
-                        <div className="queue-title">
-                          {index < 3 && <span style={{ marginRight: 8 }}>{index === 0 ? "🥇" : index === 1 ? "🥈" : "🥉"}</span>}
-                          {item.title}
-                        </div>
-                        <div className="queue-artist">{item.artist}</div>
-                      </td>
-                      <td>
-                        <span className="queue-side-badge">{item.side}</span>
-                      </td>
-                      <td>
-                        <button className="queue-plus-btn" title="Vote for this entry" onClick={() => voteForItem(item.id)}>
-                          ＋
-                        </button>
-                      </td>
-                      <td>
-                        <div className="queue-votes-inner">
-                          <span className="queue-heart">♥</span>
-                          <span className="queue-count">x{item.votes}</span>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div style={{ textAlign: "center", padding: "60px 20px", background: "#fff", borderRadius: 12, border: "2px dashed #d1d5db", margin: "20px 0" }}>
-              <div style={{ fontSize: 48, marginBottom: 16 }}>🎵</div>
-              <h3 style={{ fontSize: 24, fontWeight: "bold", margin: "0 0 12px", color: "#374151" }}>Queue is Empty</h3>
-              <p style={{ fontSize: 16, color: "#6b7280", margin: "0 0 24px", lineHeight: 1.6 }}>
-                No albums have been added to the queue yet.
-                {eventId ? " Browse the collection to add some!" : " Start by suggesting albums below!"}
-              </p>
-              {eventId ? (
-                <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
-                  <a href={`/browse/browse-albums?eventId=${eventId}`} style={{ background: "#059669", color: "#fff", padding: "12px 24px", borderRadius: 8, textDecoration: "none", fontSize: 16, fontWeight: 600 }}>
-                    📚 Browse Collection
-                  </a>
-                  {!showSuggestionBox && (
-                    <button onClick={() => setShowSuggestionBox(true)} style={{ background: "#3b82f6", color: "#fff", border: 0, padding: "12px 24px", borderRadius: 8, fontSize: 16, fontWeight: 600, cursor: "pointer" }}>
-                      💡 Suggest an Album
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <AlbumSuggestionBox context="general" />
-              )}
-            </div>
-          )}
+                ))}
+              </tbody>
+            </table>
+          </div>
         </section>
       </main>
     </div>

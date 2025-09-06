@@ -26,7 +26,7 @@
 .queue-table tbody tr:last-child td{border-bottom:none}
 .queue-table tbody tr:hover{background:rgba(255,255,255,.05)}
 
-/* Column sizes (match <colgroup>) */
+/* Column sizes */
 .queue-table th:nth-child(1),.queue-table td:nth-child(1){width:50px;text-align:center}
 .queue-table th:nth-child(2),.queue-table td:nth-child(2){width:60px}
 .queue-table th:nth-child(3),.queue-table td:nth-child(3){min-width:200px}
@@ -34,14 +34,18 @@
 .queue-table th:nth-child(5),.queue-table td:nth-child(5){width:60px;text-align:center}
 .queue-table th:nth-child(6),.queue-table td:nth-child(6){width:80px;text-align:right;padding-right:.5rem}
 
-/* Absolutely DO NOT turn TDs into flex boxes */
-.queue-table td{display:table-cell}
+/* Hard override: keep TDs as table cells */
+.queue-table td{display:table-cell!important}
 
 /* Cell content */
 .queue-index{color:#9ca3af;font:600 .875rem/1.2 Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
 .queue-cover{width:48px;height:48px;object-fit:cover;border-radius:6px;display:block;box-shadow:0 2px 8px rgba(0,0,0,.3)}
 .queue-title{font-weight:600;font-size:.95rem;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:.25rem}
 .queue-artist{font-size:.825rem;color:#d1d5db;text-transform:uppercase;letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* Title links */
+.queue-title-link{color:#10b981;text-decoration:none}
+.queue-title-link:hover{text-decoration:underline}
 
 /* “Side” pill */
 .queue-side-badge{display:inline-block;min-width:24px;padding:4px 8px;border-radius:4px;background:rgba(59,130,246,.2);font:700 .875rem/1 Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#fff}
