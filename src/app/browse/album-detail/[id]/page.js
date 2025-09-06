@@ -7,7 +7,6 @@ import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { supabase } from 'src/lib/supabaseClient';
-import AlbumSuggestionBox from 'components/AlbumSuggestionBox';
 import 'styles/internal.css';
 import 'styles/album-detail.css';
 
@@ -188,11 +187,6 @@ function AlbumDetailContent() {
       <div className="page-wrapper">
         <div style={{ padding: 40, textAlign: 'center', color: 'red' }}>
           <p>Error: {error}</p>
-          <AlbumSuggestionBox 
-            context="general" 
-            eventId={eventId}
-            eventTitle={eventData?.title}
-          />
         </div>
       </div>
     );
@@ -203,11 +197,6 @@ function AlbumDetailContent() {
       <div className="page-wrapper">
         <div style={{ padding: 40, textAlign: 'center' }}>
           <p>Album not found</p>
-          <AlbumSuggestionBox 
-            context="general"
-            eventId={eventId}
-            eventTitle={eventData?.title}
-          />
         </div>
       </div>
     );
@@ -540,71 +529,6 @@ function AlbumDetailContent() {
           ))}
         </div>
       )}
-
-      {/* Album Suggestion Section */}
-      <div style={{ 
-        position: 'relative',
-        zIndex: 10,
-        maxWidth: '900px',
-        margin: '40px auto',
-        padding: '20px'
-      }}>
-        {!showSuggestionBox ? (
-          <div style={{
-            background: 'rgba(0, 0, 0, 0.7)',
-            borderRadius: '12px',
-            padding: '24px',
-            textAlign: 'center',
-            backdropFilter: 'blur(10px)',
-            border: '1px solid rgba(255, 255, 255, 0.1)'
-          }}>
-            <h3 style={{ 
-              color: '#fff', 
-              marginBottom: '12px', 
-              fontSize: '20px' 
-            }}>
-              Don&apos;t see what you&apos;re looking for?
-            </h3>
-            <p style={{ 
-              color: '#ccc', 
-              marginBottom: '20px',
-              fontSize: '16px'
-            }}>
-              Suggest an album for the Dead Wax Dialogues collection
-            </p>
-            <button
-              onClick={() => setShowSuggestionBox(true)}
-              style={{
-                background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                padding: '12px 24px',
-                fontSize: '16px',
-                fontWeight: '600',
-                cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
-              }}
-            >
-              💡 Suggest an Album
-            </button>
-          </div>
-        ) : (
-          <div style={{
-            background: 'rgba(255, 255, 255, 0.95)',
-            borderRadius: '12px',
-            padding: '4px',
-            backdropFilter: 'blur(10px)'
-          }}>
-            <AlbumSuggestionBox 
-              context="general"
-              eventId={eventId}
-              eventTitle={eventData?.title}
-              onClose={() => setShowSuggestionBox(false)}
-            />
-          </div>
-        )}
-      </div>
     </div>
   );
 }
