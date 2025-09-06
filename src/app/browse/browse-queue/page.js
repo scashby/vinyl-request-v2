@@ -252,29 +252,6 @@ function BrowseQueueContent() {
             />
             <h2>{eventData?.title || 'Event Name'}</h2>
             <p>{eventData?.date ? formatDate(eventData.date) : 'Date TBD'}</p>
-            
-            {/* Event Actions */}
-            {eventId && (
-              <div style={{ marginTop: '20px' }}>
-                <a
-                  href={`/events/event-detail/${eventId}`}
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    background: '#9333ea',
-                    color: 'white',
-                    textAlign: 'center',
-                    padding: '12px 16px',
-                    borderRadius: '8px',
-                    textDecoration: 'none',
-                    fontSize: '14px',
-                    fontWeight: '600'
-                  }}
-                >
-                  📅 View Event Details
-                </a>
-              </div>
-            )}
           </article>
         </aside>
 
