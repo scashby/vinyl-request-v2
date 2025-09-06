@@ -380,36 +380,52 @@ function BrowseQueueContent() {
 
           {queueItems.length > 0 ? (
             <div className="queue-wrapper">
-              <table className="queue-table">
+              <table className="queue-table" style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                tableLayout: 'fixed'
+              }}>
                 <thead>
                   <tr>
-                    <th>#</th>
-                    <th></th>
-                    <th>Album / Artist</th>
-                    <th>Side</th>
-                    <th>👍</th>
-                    <th>Votes</th>
+                    <th style={{ width: '50px', textAlign: 'center', padding: '0.75rem 0.5rem', fontSize: '0.75rem', fontWeight: '700', color: '#9ca3af', textTransform: 'uppercase', border: 'none' }}>#</th>
+                    <th style={{ width: '60px', textAlign: 'left', padding: '0.75rem 0.25rem', fontSize: '0.75rem', fontWeight: '700', color: '#9ca3af', textTransform: 'uppercase', border: 'none' }}></th>
+                    <th style={{ width: 'auto', minWidth: '200px', textAlign: 'left', padding: '0.75rem 0.5rem', fontSize: '0.75rem', fontWeight: '700', color: '#9ca3af', textTransform: 'uppercase', border: 'none' }}>Album / Artist</th>
+                    <th style={{ width: '60px', textAlign: 'center', padding: '0.75rem 0.5rem', fontSize: '0.75rem', fontWeight: '700', color: '#9ca3af', textTransform: 'uppercase', border: 'none' }}>Side</th>
+                    <th style={{ width: '60px', textAlign: 'center', padding: '0.75rem 0.5rem', fontSize: '0.75rem', fontWeight: '700', color: '#9ca3af', textTransform: 'uppercase', border: 'none' }}>👍</th>
+                    <th style={{ width: '80px', textAlign: 'right', padding: '0.75rem 0.5rem', fontSize: '0.75rem', fontWeight: '700', color: '#9ca3af', textTransform: 'uppercase', border: 'none' }}>Votes</th>
                   </tr>
                 </thead>
                 <tbody>
                   {queueItems.map((item, index) => (
-                    <tr key={item.id}>
-                      <td className="queue-index">{index + 1}</td>
-                      <td>
+                    <tr key={item.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                      <td className="queue-index" style={{ width: '50px', textAlign: 'center', padding: '0.75rem 0.5rem', verticalAlign: 'middle', color: '#9ca3af', fontSize: '0.875rem', fontWeight: '600' }}>{index + 1}</td>
+                      <td style={{ width: '60px', textAlign: 'left', padding: '0.75rem 0.25rem', verticalAlign: 'middle' }}>
                         <Image
                           src={item.collection?.image_url || "/images/placeholder.png"}
                           alt={item.title || ""}
                           className="queue-cover"
                           width={48}
                           height={48}
-                          style={{ cursor: "pointer", objectFit: "cover", borderRadius: "4px" }}
+                          style={{ 
+                            cursor: "pointer", 
+                            objectFit: "cover", 
+                            borderRadius: "6px",
+                            display: 'block',
+                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)'
+                          }}
                           unoptimized
                         />
                       </td>
-                      <td className="queue-meta">
+                      <td className="queue-meta" style={{ width: 'auto', minWidth: '200px', textAlign: 'left', padding: '0.75rem 0.5rem', verticalAlign: 'middle' }}>
                         <div className="queue-title" style={{
                           fontWeight: index < 3 ? 'bold' : '600',
-                          color: index === 0 ? '#059669' : index === 1 ? '#0369a1' : index === 2 ? '#7c3aed' : '#2563eb'
+                          color: index === 0 ? '#059669' : index === 1 ? '#0369a1' : index === 2 ? '#7c3aed' : '#2563eb',
+                          fontSize: '0.95rem',
+                          lineHeight: '1.2',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          marginBottom: '0.25rem'
                         }}>
                           {index < 3 && (
                             <span style={{ marginRight: '8px', fontSize: '16px' }}>
@@ -418,39 +434,70 @@ function BrowseQueueContent() {
                           )}
                           {item.title}
                         </div>
-                        <div className="queue-artist">{item.artist}</div>
+                        <div className="queue-artist" style={{
+                          fontSize: '0.825rem',
+                          color: '#d1d5db',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.02em',
+                          fontWeight: '500'
+                        }}>{item.artist}</div>
                       </td>
-                      <td className="queue-side">{item.side}</td>
-                      <td className="queue-plus">
+                      <td className="queue-side" style={{ 
+                        width: '60px', 
+                        textAlign: 'center', 
+                        padding: '0.75rem 0.5rem', 
+                        verticalAlign: 'middle',
+                        fontSize: '0.875rem',
+                        color: '#fff',
+                        fontWeight: '700'
+                      }}>
+                        <span style={{
+                          background: 'rgba(59, 130, 246, 0.2)',
+                          padding: '4px 8px',
+                          borderRadius: '4px',
+                          display: 'inline-block',
+                          minWidth: '24px'
+                        }}>
+                          {item.side}
+                        </span>
+                      </td>
+                      <td className="queue-plus" style={{ width: '60px', textAlign: 'center', padding: '0.75rem 0.5rem', verticalAlign: 'middle' }}>
                         <button
                           className="queue-plus-btn"
                           onClick={() => voteForItem(item.id)}
                           style={{
-                            fontSize: 20,
-                            color: "#2563eb",
-                            cursor: "pointer",
-                            background: "none",
-                            border: "none",
-                            padding: "4px 8px",
-                            borderRadius: "4px",
-                            transition: "all 0.2s ease"
+                            background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            padding: '6px 10px',
+                            fontSize: '16px',
+                            fontWeight: '700',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            boxShadow: '0 2px 4px rgba(59, 130, 246, 0.3)'
                           }}
                           title="Vote for this entry"
                           onMouseOver={(e) => {
-                            e.currentTarget.style.backgroundColor = "#f3f4f6";
-                            e.currentTarget.style.color = "#1d4ed8";
+                            e.currentTarget.style.background = 'linear-gradient(135deg, #2563eb, #1e40af)';
+                            e.currentTarget.style.transform = 'translateY(-1px)';
                           }}
                           onMouseOut={(e) => {
-                            e.currentTarget.style.backgroundColor = "transparent";
-                            e.currentTarget.style.color = "#2563eb";
+                            e.currentTarget.style.background = 'linear-gradient(135deg, #3b82f6, #1d4ed8)';
+                            e.currentTarget.style.transform = 'translateY(0)';
                           }}
                         >
                           ＋
                         </button>
                       </td>
-                      <td className="queue-votes">
-                        <span className="queue-heart">♥</span>
-                        <span className="queue-count">x{item.votes}</span>
+                      <td className="queue-votes" style={{ width: '80px', textAlign: 'right', padding: '0.75rem 0.5rem', verticalAlign: 'middle' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                          <span className="queue-heart" style={{ fontSize: '1.125rem', color: '#ef4444' }}>♥</span>
+                          <span className="queue-count" style={{ fontSize: '0.875rem', color: '#f3f4f6', fontWeight: '600' }}>x{item.votes}</span>
+                        </div>
                       </td>
                     </tr>
                   ))}
