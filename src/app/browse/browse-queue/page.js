@@ -242,16 +242,19 @@ function BrowseQueueContent() {
     <div className="page-wrapper">
       <header className="event-hero">
         <div className="overlay">
-          <h1>{eventData?.title || 'Event Queue'}</h1>
-          {eventData?.date && (
-            <p style={{ 
-              fontSize: '18px', 
-              opacity: 0.9, 
-              margin: '8px 0 0 0' 
-            }}>
-              {formatDate(eventData.date)}
-            </p>
-          )}
+          <div style={{ textAlign: 'center' }}>
+            <h1>{eventData?.title || 'Event Queue'}</h1>
+            {eventData?.date && (
+              <p style={{ 
+                fontSize: '18px', 
+                opacity: 0.9, 
+                margin: '16px 0 0 0',
+                fontWeight: '500'
+              }}>
+                {formatDate(eventData.date)}
+              </p>
+            )}
+          </div>
         </div>
       </header>
 
