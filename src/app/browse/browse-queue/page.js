@@ -536,20 +536,40 @@ function BrowseQueueContent() {
           {/* Bottom suggestion area for when there are items but user might want more */}
           {queueItems.length > 0 && !showSuggestionBox && (
             <div style={{
-              background: 'rgba(59, 130, 246, 0.05)',
+              background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(139, 92, 246, 0.08))',
               border: '2px dashed #3b82f6',
               borderRadius: '12px',
-              padding: '20px',
+              padding: '24px',
               textAlign: 'center',
-              margin: '24px 0',
-              cursor: 'pointer'
+              margin: '32px 0',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              boxShadow: '0 4px 12px rgba(59, 130, 246, 0.1)'
             }}
-            onClick={() => setShowSuggestionBox(true)}>
-              <div style={{ fontSize: '20px', marginBottom: '8px' }}>💡</div>
-              <div style={{ fontSize: '16px', fontWeight: '600', color: '#3b82f6', marginBottom: '4px' }}>
+            onClick={() => setShowSuggestionBox(true)}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = 'linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(139, 92, 246, 0.12))';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = 'linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(139, 92, 246, 0.08))';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}>
+              <div style={{ fontSize: '28px', marginBottom: '12px' }}>💡</div>
+              <div style={{ 
+                fontSize: '18px', 
+                fontWeight: '700', 
+                color: '#1e40af', 
+                marginBottom: '8px',
+                letterSpacing: '-0.02em'
+              }}>
                 Don&rsquo;t see your favorite album in the queue?
               </div>
-              <div style={{ fontSize: '14px', color: '#6b7280' }}>
+              <div style={{ 
+                fontSize: '15px', 
+                color: '#64748b',
+                fontWeight: '500'
+              }}>
                 Click to suggest new albums for the collection
               </div>
             </div>
