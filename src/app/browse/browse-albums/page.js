@@ -299,12 +299,12 @@ function BrowseAlbumsContent() {
               style={{
                 padding: '6px 10px',
                 background: '#f3f4f6',
-                border: '1px solid #d1d5db',
+                border: '2px solid #000000',
                 borderRadius: '4px',
                 fontSize: '14px',
                 cursor: 'pointer',
                 backgroundColor: '#f3f4f6',
-                color: '#374151'
+                color: '#000000'
               }}
             >
               {sortAsc ? '↑' : '↓'}
