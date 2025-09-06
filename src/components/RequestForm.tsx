@@ -48,8 +48,6 @@ export default function RequestForm({ eventId }: RequestFormProps) {
         artist: formData.artist.trim(),
         title: formData.title.trim(),
         status: "queued",
-        // name/comment are not in the 'requests' schema by default voting logic;
-        // if you want to store them, add columns or a separate table.
       });
       setStatus(`Request recorded. Votes: x${updated?.votes ?? 1}`);
       setFormData({ artist: "", title: "", side: "", name: "", comment: "" });
