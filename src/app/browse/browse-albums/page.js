@@ -358,7 +358,7 @@ function BrowseAlbumsContent() {
             )}
           </div>
 
-          {/* Filter badges row */}
+          {/* Filter badges row - ALWAYS SHOW ALL BADGES */}
           <div style={{
             display: 'flex',
             flexWrap: 'wrap',
@@ -366,120 +366,120 @@ function BrowseAlbumsContent() {
             alignItems: 'center'
           }}>
             {/* Just Added Filter */}
-            {justAddedCount > 0 && (
-              <label style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '6px',
-                fontSize: '14px',
-                fontWeight: '600',
-                color: '#000000',
-                cursor: 'pointer',
-                background: '#dcfce7',
-                padding: '6px 10px',
-                borderRadius: '6px',
-                border: '2px solid #16a34a',
-                fontFamily: 'system-ui, sans-serif'
-              }}>
-                <input
-                  type="checkbox"
-                  checked={showJustAdded}
-                  onChange={(e) => setShowJustAdded(e.target.checked)}
-                  style={{ 
-                    accentColor: '#16a34a',
-                    transform: 'scale(1.2)'
-                  }}
-                />
-                ✨ Just Added ({justAddedCount})
-              </label>
-            )}
+            <label style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '6px',
+              fontSize: '14px',
+              fontWeight: '600',
+              color: '#000000',
+              cursor: justAddedCount > 0 ? 'pointer' : 'not-allowed',
+              background: justAddedCount > 0 ? '#dcfce7' : '#f3f4f6',
+              padding: '6px 10px',
+              borderRadius: '6px',
+              border: `2px solid ${justAddedCount > 0 ? '#16a34a' : '#9ca3af'}`,
+              fontFamily: 'system-ui, sans-serif',
+              opacity: justAddedCount > 0 ? 1 : 0.6
+            }}>
+              <input
+                type="checkbox"
+                checked={showJustAdded}
+                onChange={(e) => setShowJustAdded(e.target.checked)}
+                disabled={justAddedCount === 0}
+                style={{ 
+                  accentColor: '#16a34a',
+                  transform: 'scale(1.2)'
+                }}
+              />
+              ✨ Just Added ({justAddedCount})
+            </label>
 
             {/* Steve's Top 200 Filter */}
-            {stevesTop200Count > 0 && (
-              <label style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '6px',
-                fontSize: '14px',
-                fontWeight: '600',
-                color: '#000000',
-                cursor: 'pointer',
-                background: '#fecaca',
-                padding: '6px 10px',
-                borderRadius: '6px',
-                border: '2px solid #dc2626',
-                fontFamily: 'system-ui, sans-serif'
-              }}>
-                <input
-                  type="checkbox"
-                  checked={showStevesTop200}
-                  onChange={(e) => setShowStevesTop200(e.target.checked)}
-                  style={{ 
-                    accentColor: '#dc2626',
-                    transform: 'scale(1.2)'
-                  }}
-                />
-                🏆 Steve&apos;s Top 200 ({stevesTop200Count})
-              </label>
-            )}
+            <label style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '6px',
+              fontSize: '14px',
+              fontWeight: '600',
+              color: '#000000',
+              cursor: stevesTop200Count > 0 ? 'pointer' : 'not-allowed',
+              background: stevesTop200Count > 0 ? '#fecaca' : '#f3f4f6',
+              padding: '6px 10px',
+              borderRadius: '6px',
+              border: `2px solid ${stevesTop200Count > 0 ? '#dc2626' : '#9ca3af'}`,
+              fontFamily: 'system-ui, sans-serif',
+              opacity: stevesTop200Count > 0 ? 1 : 0.6
+            }}>
+              <input
+                type="checkbox"
+                checked={showStevesTop200}
+                onChange={(e) => setShowStevesTop200(e.target.checked)}
+                disabled={stevesTop200Count === 0}
+                style={{ 
+                  accentColor: '#dc2626',
+                  transform: 'scale(1.2)'
+                }}
+              />
+              🏆 Steve&apos;s Top 200 ({stevesTop200Count})
+            </label>
 
             {/* This Week's Top 10 Filter */}
-            {thisWeeksTop10Count > 0 && (
-              <label style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '6px',
-                fontSize: '14px',
-                fontWeight: '600',
-                color: '#000000',
-                cursor: 'pointer',
-                background: '#e9d5ff',
-                padding: '6px 10px',
-                borderRadius: '6px',
-                border: '2px solid #7c3aed',
-                fontFamily: 'system-ui, sans-serif'
-              }}>
-                <input
-                  type="checkbox"
-                  checked={showThisWeeksTop10}
-                  onChange={(e) => setShowThisWeeksTop10(e.target.checked)}
-                  style={{ 
-                    accentColor: '#7c3aed',
-                    transform: 'scale(1.2)'
-                  }}
-                />
-                📈 This Week&apos;s Top 10 ({thisWeeksTop10Count})
-              </label>
-            )}
+            <label style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '6px',
+              fontSize: '14px',
+              fontWeight: '600',
+              color: '#000000',
+              cursor: thisWeeksTop10Count > 0 ? 'pointer' : 'not-allowed',
+              background: thisWeeksTop10Count > 0 ? '#e9d5ff' : '#f3f4f6',
+              padding: '6px 10px',
+              borderRadius: '6px',
+              border: `2px solid ${thisWeeksTop10Count > 0 ? '#7c3aed' : '#9ca3af'}`,
+              fontFamily: 'system-ui, sans-serif',
+              opacity: thisWeeksTop10Count > 0 ? 1 : 0.6
+            }}>
+              <input
+                type="checkbox"
+                checked={showThisWeeksTop10}
+                onChange={(e) => setShowThisWeeksTop10(e.target.checked)}
+                disabled={thisWeeksTop10Count === 0}
+                style={{ 
+                  accentColor: '#7c3aed',
+                  transform: 'scale(1.2)'
+                }}
+              />
+              📈 This Week&apos;s Top 10 ({thisWeeksTop10Count})
+            </label>
 
             {/* Inner Circle Preferred Filter */}
-            {innerCirclePreferredCount > 0 && (
-              <label style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '6px',
-                fontSize: '14px',
-                fontWeight: '600',
-                color: '#000000',
-                cursor: 'pointer',
-                background: '#fed7aa',
-                padding: '6px 10px',
-                borderRadius: '6px',
-                border: '2px solid #ea580c',
-                fontFamily: 'system-ui, sans-serif'
-              }}>
-                <input
-                  type="checkbox"
-                  checked={showInnerCirclePreferred}
-                  onChange={(e) => setShowInnerCirclePreferred(e.target.checked)}
-                  style={{ 
-                    accentColor: '#ea580c',
-                    transform: 'scale(1.2)'
-                  }}
-                />
-                ⭐ Inner Circle Preferred ({innerCirclePreferredCount})
-              </label>
-            )}
+            <label style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '6px',
+              fontSize: '14px',
+              fontWeight: '600',
+              color: '#000000',
+              cursor: innerCirclePreferredCount > 0 ? 'pointer' : 'not-allowed',
+              background: innerCirclePreferredCount > 0 ? '#fed7aa' : '#f3f4f6',
+              padding: '6px 10px',
+              borderRadius: '6px',
+              border: `2px solid ${innerCirclePreferredCount > 0 ? '#ea580c' : '#9ca3af'}`,
+              fontFamily: 'system-ui, sans-serif',
+              opacity: innerCirclePreferredCount > 0 ? 1 : 0.6
+            }}>
+              <input
+                type="checkbox"
+                checked={showInnerCirclePreferred}
+                onChange={(e) => setShowInnerCirclePreferred(e.target.checked)}
+                disabled={innerCirclePreferredCount === 0}
+                style={{ 
+                  accentColor: '#ea580c',
+                  transform: 'scale(1.2)'
+                }}
+              />
+              ⭐ Inner Circle Preferred ({innerCirclePreferredCount})
+            </label>
           </div>
         </div>
 
