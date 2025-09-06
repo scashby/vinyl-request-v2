@@ -7,7 +7,6 @@ import { addOrVoteRequest } from "src/lib/addOrVoteRequest";
 interface RequestFormProps {
   eventId: string;
 }
-
 interface FormData {
   artist: string;
   title: string;
@@ -24,7 +23,6 @@ export default function RequestForm({ eventId }: RequestFormProps) {
     name: "",
     comment: "",
   });
-
   const [status, setStatus] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -112,7 +110,9 @@ export default function RequestForm({ eventId }: RequestFormProps) {
         >
           {submitting ? "Submitting..." : "Submit"}
         </button>
-        {status && <p className="text-sm text-center text-gray-600 mt-2">{status}</p>}
+        {status && (
+          <p className="text-sm text-center text-gray-600 mt-2">{status}</p>
+        )}
       </div>
     </form>
   );
