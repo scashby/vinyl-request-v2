@@ -264,23 +264,44 @@ function BrowseQueueContent() {
             padding: '20px',
             marginBottom: '24px'
           }}>
-            {/* Row 1: Title and Action Buttons */}
+            {/* Row 1: Title Only */}
+            <h3 style={{ 
+              margin: '0 0 16px 0', 
+              fontSize: '1.5rem', 
+              fontWeight: '700', 
+              color: '#1f2937' 
+            }}>
+              Current Queue
+            </h3>
+
+            {/* Row 2: Stats and Action Buttons */}
             <div style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              marginBottom: '12px',
               flexWrap: 'wrap',
-              gap: '12px'
+              gap: '16px'
             }}>
-              <h3 style={{ 
-                margin: '0', 
-                fontSize: '1.5rem', 
-                fontWeight: '700', 
-                color: '#1f2937' 
+              <div style={{ 
+                display: 'flex', 
+                gap: '24px', 
+                fontSize: '14px', 
+                color: '#6b7280',
+                fontWeight: '500',
+                flexWrap: 'wrap'
               }}>
-                Current Queue
-              </h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>📀</span> {queueItems.length} requests
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>🗳️</span> {queueItems.reduce((sum, item) => sum + item.votes, 0)} total votes
+                </div>
+                {queueItems.length > 0 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span>🏆</span> Top: {queueItems[0]?.votes || 0} votes
+                  </div>
+                )}
+              </div>
               
               <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
                 {!showSuggestionBox && (
@@ -344,28 +365,6 @@ function BrowseQueueContent() {
                   📅 Event Details
                 </a>
               </div>
-            </div>
-
-            {/* Row 2: Stats */}
-            <div style={{ 
-              display: 'flex', 
-              gap: '24px', 
-              fontSize: '14px', 
-              color: '#6b7280',
-              fontWeight: '500',
-              flexWrap: 'wrap'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span>📀</span> {queueItems.length} requests
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span>🗳️</span> {queueItems.reduce((sum, item) => sum + item.votes, 0)} total votes
-              </div>
-              {queueItems.length > 0 && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span>🏆</span> Top: {queueItems[0]?.votes || 0} votes
-                </div>
-              )}
             </div>
           </div>
 
