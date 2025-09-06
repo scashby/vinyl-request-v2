@@ -1,6 +1,7 @@
 /* Enhanced Browse Queue Styles */
-/* Replace: src/styles/browse-queue.css */
+/* Fixed: proper table alignment for header/body */
 
+/* Layout */
 .browse-queue {
   display: flex;
   gap: 2rem;
@@ -16,10 +17,10 @@
 
 .queue-display {
   flex: 1;
-  min-width: 0; /* Prevents flex item from overflowing */
+  min-width: 0;
 }
 
-/* Enhanced queue wrapper styling */
+/* Queue wrapper */
 .queue-wrapper {
   background: linear-gradient(135deg, #1a1a1a, #2d2d2d);
   color: #fff;
@@ -31,7 +32,7 @@
   border: 1px solid #333;
 }
 
-/* Table styling improvements - Fixed column alignment */
+/* Table */
 .queue-table {
   width: 100%;
   border-collapse: collapse;
@@ -63,7 +64,7 @@
   background: rgba(255, 255, 255, 0.05);
 }
 
-/* Fixed column widths and alignment */
+/* Fixed column widths */
 .queue-table th:nth-child(1),
 .queue-table td:nth-child(1) {
   width: 50px;
@@ -104,7 +105,7 @@
   padding-right: 0.5rem;
 }
 
-/* Enhanced queue item styling */
+/* Queue item text */
 .queue-index {
   color: #9ca3af;
   font-size: 0.875rem;
@@ -126,9 +127,7 @@
 }
 
 .queue-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
+  display: block; /* keep TD as table-cell, stack content via block children */
   min-width: 0;
 }
 
@@ -139,6 +138,7 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  margin-bottom: 0.25rem;
 }
 
 .queue-artist {
@@ -164,7 +164,7 @@
   text-align: center;
 }
 
-/* Enhanced vote button styling */
+/* Vote button */
 .queue-plus-btn {
   background: linear-gradient(135deg, #3b82f6, #1d4ed8) !important;
   color: white !important;
@@ -188,7 +188,12 @@
   transform: translateY(0) !important;
 }
 
+/* Votes */
 .queue-votes {
+  text-align: right;
+}
+
+.queue-votes > div {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -207,13 +212,12 @@
   font-weight: 600;
 }
 
-/* Responsive improvements */
+/* Responsive */
 @media (max-width: 1024px) {
   .browse-queue {
     flex-direction: column;
     gap: 1.5rem;
   }
-  
   .event-sidebar {
     flex: none;
     position: static;
@@ -225,26 +229,20 @@
   .browse-queue {
     padding: 1rem;
   }
-  
   .queue-wrapper {
     padding: 1rem;
-    margin: 0 -0.5rem; /* Extend to edges on mobile */
+    margin: 0 -0.5rem;
     border-radius: 8px;
   }
-  
   .queue-table th:nth-child(3),
   .queue-table td:nth-child(3) {
     min-width: 150px;
   }
-  
-  .queue-title {
-    font-size: 0.875rem;
-  }
-  
-  .queue-artist {
-    font-size: 0.75rem;
-  }
+  .queue-title { font-size: 0.875rem; }
+  .queue-artist { font-size: 0.75rem; }
 }
+
+/* Accessibility helper */
 .sr-only {
   position: absolute !important;
   width: 1px !important;
