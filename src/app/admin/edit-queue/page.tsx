@@ -114,8 +114,10 @@ export default function Page() {
       <div style={{ 
         padding: '2rem',
         textAlign: 'center',
-        color: '#666',
-        fontSize: '18px'
+        color: '#4b5563',
+        fontSize: '18px',
+        backgroundColor: '#ffffff',
+        minHeight: '100vh'
       }}>
         Loading events...
       </div>
