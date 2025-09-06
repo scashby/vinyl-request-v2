@@ -38,6 +38,7 @@ export default function Page() {
 
   useEffect(() => {
     if (selectedEvent) {
+      console.log('🔍 Admin Debug: Selected event changed, fetching requests for:', selectedEvent.id);
       fetchRequestsForEvent(selectedEvent.id);
     }
   }, [selectedEvent]);
