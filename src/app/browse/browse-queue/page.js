@@ -1,19 +1,19 @@
-// Fixed Browse Queue page - Clean version without inline column widths
-// Replace: src/app/browse/browse-queue/page.js
+// Browse Queue page with colgroup fix (keeps Suggestion Box logic)
+// File: src/app/browse/browse-queue/page.js
 
 "use client";
 
-import { useEffect, useState, useCallback, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
-import Image from 'next/image';
-import AlbumSuggestionBox from 'components/AlbumSuggestionBox';
-import { supabase } from 'src/lib/supabaseClient';
-import 'styles/internal.css';
-import 'styles/browse-queue.css';
+import { useEffect, useState, useCallback, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import Image from "next/image";
+import AlbumSuggestionBox from "components/AlbumSuggestionBox";
+import { supabase } from "src/lib/supabaseClient";
+import "styles/internal.css";
+import "styles/browse-queue.css";
 
 function BrowseQueueContent() {
   const searchParams = useSearchParams();
-  const eventId = searchParams.get('eventId');
+  const eventId = searchParams.get("eventId");
 
   const [queueItems, setQueueItems] = useState([]);
   const [eventData, setEventData] = useState(null);
@@ -21,93 +21,89 @@ function BrowseQueueContent() {
   const [showSuggestionBox, setShowSuggestionBox] = useState(false);
 
   const loadEventAndQueue = useCallback(async () => {
-    if (!eventId) {
-      setEventData({
-        id: 'placeholder',
-        title: 'Event Name Placeholder',
-        date: 'June 2, 2025',
-        image_url: '/images/event-header-still.jpg'
-      });
-      setQueueItems([
-        { id: 1, artist: 'Pink Floyd', title: 'The Dark Side of the Moon', side: 'A', votes: 4, album_id: null },
-        { id: 2, artist: 'The Beatles', title: 'Abbey Road', side: 'B', votes: 5, album_id: null },
-        { id: 3, artist: 'Unknown Artist', title: 'Random Album', side: 'A', votes: 0, album_id: null }
-      ]);
-      setLoading(false);
-      return;
-    }
-
     try {
-      const { data: event, error: eventError } = await supabase
-        .from('events')
-        .select('*')
-        .eq('id', eventId)
+      if (!eventId) {
+        setEventData({
+          id: "placeholder",
+          title: "Event Name Placeholder",
+          date: "June 2, 2025",
+          image_url: "/images/event-header-still.jpg",
+        });
+        setQueueItems([
+          { id: 1, artist: "Pink Floyd", title: "The Dark Side of the Moon", side: "A", votes: 4, album_id: null },
+          { id: 2, artist: "The Beatles", title: "Abbey Road", side: "B", votes: 5, album_id: null },
+          { id: 3, artist: "Unknown Artist", title: "Random Album", side: "A", votes: 0, album_id: null },
+        ]);
+        setLoading(false);
+        return;
+      }
+
+      const { data: event } = await supabase
+        .from("events")
+        .select("*")
+        .eq("id", eventId)
         .single();
 
-      if (!eventError) setEventData(event);
+      setEventData(event || null);
 
-      const { data: requests, error: requestsError } = await supabase
-        .from('requests')
-        .select('*')
-        .eq('event_id', eventId)
-        .order('id', { ascending: true });
+      const { data: requests } = await supabase
+        .from("requests")
+        .select("*")
+        .eq("event_id", eventId)
+        .order("id", { ascending: true });
 
-      if (requestsError || !requests?.length) {
+      if (!requests?.length) {
         setQueueItems([]);
         return;
       }
 
-      const albumIds = requests.map(r => r.album_id).filter(Boolean);
+      const albumIds = requests.map((r) => r.album_id).filter(Boolean);
 
       if (!albumIds.length) {
-        const mapped = requests.map(req => ({
-          id: req.id,
-          artist: req.artist || '',
-          title: req.title || '',
-          side: req.side || 'A',
-          votes: req.votes || 1,
-          album_id: req.album_id,
-          created_at: req.created_at,
-          collection: null
-        }));
-        setQueueItems(mapped);
+        setQueueItems(
+          requests.map((req) => ({
+            id: req.id,
+            artist: req.artist || "",
+            title: req.title || "",
+            side: req.side || "A",
+            votes: req.votes || 1,
+            album_id: req.album_id,
+            created_at: req.created_at,
+            collection: null,
+          }))
+        );
         return;
       }
 
-      const { data: albums, error: albumsError } = await supabase
-        .from('collection')
-        .select('id, artist, title, image_url, year, format')
-        .in('id', albumIds);
+      const { data: albums } = await supabase
+        .from("collection")
+        .select("id, artist, title, image_url, year, format")
+        .in("id", albumIds);
 
-      if (albumsError) {
-        setQueueItems([]);
-        return;
-      }
-
-      const mapped = requests.map(req => {
-        const album = albums?.find(a => a.id === req.album_id);
+      const mapped = requests.map((req) => {
+        const album = albums?.find((a) => a.id === req.album_id);
         return {
           id: req.id,
-          artist: req.artist || album?.artist || '',
-          title: req.title || album?.title || '',
-          side: req.side || 'A',
+          artist: req.artist || album?.artist || "",
+          title: req.title || album?.title || "",
+          side: req.side || "A",
           votes: req.votes || 1,
           album_id: req.album_id,
           created_at: req.created_at,
           collection: album
             ? { id: album.id, image_url: album.image_url, year: album.year, format: album.format }
-            : null
+            : null,
         };
       });
 
       const sorted = mapped.sort((a, b) => {
         if (b.votes !== a.votes) return b.votes - a.votes;
-        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        return new Date(a.created_at) - new Date(b.created_at);
       });
 
       setQueueItems(sorted);
     } catch (error) {
-      console.error('Error loading event and queue:', error);
+      console.error("Error loading event and queue:", error);
     } finally {
       setLoading(false);
     }
@@ -119,34 +115,34 @@ function BrowseQueueContent() {
 
   const voteForItem = async (itemId) => {
     try {
-      const currentItem = queueItems.find(item => item.id === itemId);
+      const currentItem = queueItems.find((item) => item.id === itemId);
       const newVotes = (currentItem?.votes || 1) + 1;
 
-      const { error } = await supabase
-        .from('requests')
-        .update({ votes: newVotes })
-        .eq('id', itemId);
+      const { error } = await supabase.from("requests").update({ votes: newVotes }).eq("id", itemId);
 
       if (!error) {
-        setQueueItems(prev =>
+        setQueueItems((prev) =>
           prev
-            .map(item => (item.id === itemId ? { ...item, votes: newVotes } : item))
+            .map((item) => (item.id === itemId ? { ...item, votes: newVotes } : item))
             .sort((a, b) => (b.votes !== a.votes ? b.votes - a.votes : new Date(a.created_at) - new Date(b.created_at)))
         );
       }
     } catch (error) {
-      console.error('Error voting:', error);
+      console.error("Error voting:", error);
     }
   };
 
-  const formatDate = (dateString) => {
-    if (!dateString) return '';
-    return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-  };
+  const formatDate = (dateString) =>
+    dateString
+      ? new Date(dateString).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+      : "";
 
   if (loading) {
     return (
-      <div className="page-wrapper" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px', color: '#666', fontSize: '18px' }}>
+      <div
+        className="page-wrapper"
+        style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "400px", color: "#666", fontSize: "18px" }}
+      >
         Loading event queue...
       </div>
     );
@@ -156,12 +152,10 @@ function BrowseQueueContent() {
     <div className="page-wrapper">
       <header className="event-hero">
         <div className="overlay">
-          <div style={{ textAlign: 'center' }}>
-            <h1>{eventData?.title || 'Event Queue'}</h1>
+          <div style={{ textAlign: "center" }}>
+            <h1>{eventData?.title || "Event Queue"}</h1>
             {eventData?.date && (
-              <p style={{ fontSize: '18px', opacity: 0.9, margin: '16px 0 0 0', fontWeight: '500' }}>
-                {formatDate(eventData.date)}
-              </p>
+              <p style={{ fontSize: "18px", opacity: 0.9, margin: "16px 0 0 0", fontWeight: "500" }}>{formatDate(eventData.date)}</p>
             )}
           </div>
         </div>
@@ -179,50 +173,57 @@ function BrowseQueueContent() {
               priority
               unoptimized
             />
-            <h2>{eventData?.title || 'Event Name'}</h2>
-            <p>{eventData?.date ? formatDate(eventData.date) : 'Date TBD'}</p>
+            <h2>{eventData?.title || "Event Name"}</h2>
+            <p>{eventData?.date ? formatDate(eventData.date) : "Date TBD"}</p>
           </article>
         </aside>
 
         <section className="queue-display">
-          {/* Header panel (kept as-is) */}
-          <div style={{ background: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '20px', marginBottom: '24px' }}>
-            <h3 style={{ margin: '0 0 16px 0', fontSize: '1.5rem', fontWeight: '700', color: '#1f2937' }}>
-              Current Queue
-            </h3>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
-              <div style={{ display: 'flex', gap: '24px', fontSize: '14px', color: '#6b7280', fontWeight: '500', flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          {/* Queue Header with Stats and Actions (kept) */}
+          <div
+            style={{
+              background: "#f8fafc",
+              border: "1px solid #e5e7eb",
+              borderRadius: "12px",
+              padding: "20px",
+              marginBottom: "24px",
+            }}
+          >
+            <h3 style={{ margin: "0 0 16px 0", fontSize: "1.5rem", fontWeight: "700", color: "#1f2937" }}>Current Queue</h3>
+
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "16px" }}>
+              <div style={{ display: "flex", gap: "24px", fontSize: "14px", color: "#6b7280", fontWeight: "500", flexWrap: "wrap" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                   <span>📀</span> {queueItems.length} requests
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                   <span>🗳️</span> {queueItems.reduce((sum, item) => sum + item.votes, 0)} total votes
                 </div>
                 {queueItems.length > 0 && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                     <span>🏆</span> Top: {queueItems[0]?.votes || 0} votes
                   </div>
                 )}
               </div>
 
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
                 {!showSuggestionBox && (
                   <button
                     onClick={() => setShowSuggestionBox(true)}
                     style={{
-                      background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '8px',
-                      padding: '10px 16px',
-                      fontSize: '14px',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease',
-                      boxShadow: '0 2px 4px rgba(59, 130, 246, 0.2)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px'
+                      background: "linear-gradient(135deg, #3b82f6, #1d4ed8)",
+                      color: "white",
+                      border: "none",
+                      borderRadius: "8px",
+                      padding: "10px 16px",
+                      fontSize: "14px",
+                      fontWeight: "600",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                      boxShadow: "0 2px 4px rgba(59, 130, 246, 0.2)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
                     }}
                   >
                     💡 Suggest an Album
@@ -232,17 +233,17 @@ function BrowseQueueContent() {
                 <a
                   href={`/browse/browse-albums?eventId=${eventId}`}
                   style={{
-                    background: '#059669',
-                    color: 'white',
-                    padding: '10px 16px',
-                    borderRadius: '8px',
-                    textDecoration: 'none',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    transition: 'all 0.2s ease'
+                    background: "#059669",
+                    color: "white",
+                    padding: "10px 16px",
+                    borderRadius: "8px",
+                    textDecoration: "none",
+                    fontSize: "14px",
+                    fontWeight: "600",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    transition: "all 0.2s ease",
                   }}
                 >
                   📚 Browse Collection
@@ -251,17 +252,17 @@ function BrowseQueueContent() {
                 <a
                   href={`/events/event-detail/${eventId}`}
                   style={{
-                    background: '#9333ea',
-                    color: 'white',
-                    padding: '10px 16px',
-                    borderRadius: '8px',
-                    textDecoration: 'none',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    transition: 'all 0.2s ease'
+                    background: "#9333ea",
+                    color: "white",
+                    padding: "10px 16px",
+                    borderRadius: "8px",
+                    textDecoration: "none",
+                    fontSize: "14px",
+                    fontWeight: "600",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    transition: "all 0.2s ease",
                   }}
                 >
                   📅 Event Details
@@ -270,9 +271,9 @@ function BrowseQueueContent() {
             </div>
           </div>
 
-          {/* Suggestion Box */}
+          {/* Suggestion Box (kept) */}
           {showSuggestionBox && (
-            <div style={{ marginBottom: '24px' }}>
+            <div style={{ marginBottom: "24px" }}>
               <AlbumSuggestionBox context="general" onClose={() => setShowSuggestionBox(false)} />
             </div>
           )}
@@ -280,16 +281,27 @@ function BrowseQueueContent() {
           {queueItems.length > 0 ? (
             <div className="queue-wrapper">
               <table className="queue-table">
+                {/* Hard-lock column widths for header/body alignment */}
+                <colgroup>
+                  <col style={{ width: "50px" }} />  {/* # */}
+                  <col style={{ width: "60px" }} />  {/* cover */}
+                  <col />                            {/* album/artist */}
+                  <col style={{ width: "60px" }} />  {/* side */}
+                  <col style={{ width: "60px" }} />  {/* + */}
+                  <col style={{ width: "80px" }} />  {/* votes */}
+                </colgroup>
+
                 <thead>
                   <tr>
                     <th className="queue-index">#</th>
-                    <th></th>
+                    <th><span className="sr-only">Cover</span></th>
                     <th>Album / Artist</th>
                     <th>Side</th>
                     <th>👍</th>
                     <th>Votes</th>
                   </tr>
                 </thead>
+
                 <tbody>
                   {queueItems.map((item, index) => (
                     <tr key={item.id}>
@@ -308,32 +320,29 @@ function BrowseQueueContent() {
                         <div
                           className="queue-title"
                           style={{
-                            fontWeight: index < 3 ? 'bold' : '600',
-                            color: index === 0 ? '#059669' : index === 1 ? '#0369a1' : index === 2 ? '#7c3aed' : '#2563eb',
-                            marginBottom: '0.25rem'
+                            fontWeight: index < 3 ? "bold" : "600",
+                            color:
+                              index === 0 ? "#059669" :
+                              index === 1 ? "#0369a1" :
+                              index === 2 ? "#7c3aed" : "#2563eb",
+                            marginBottom: "0.25rem",
                           }}
                         >
-                          {index < 3 && (
-                            <span style={{ marginRight: '8px', fontSize: '16px' }}>
-                              {index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}
-                            </span>
-                          )}
+                          {index < 3 && <span style={{ marginRight: "8px", fontSize: "16px" }}>{index === 0 ? "🥇" : index === 1 ? "🥈" : "🥉"}</span>}
                           {item.title}
                         </div>
                         <div className="queue-artist">{item.artist}</div>
                       </td>
                       <td className="queue-side">
-                        <span style={{ background: 'rgba(59, 130, 246, 0.2)', padding: '4px 8px', borderRadius: '4px', display: 'inline-block', minWidth: '24px' }}>
+                        <span style={{ background: "rgba(59, 130, 246, 0.2)", padding: "4px 8px", borderRadius: "4px", display: "inline-block", minWidth: "24px" }}>
                           {item.side}
                         </span>
                       </td>
                       <td className="queue-plus">
-                        <button className="queue-plus-btn" title="Vote for this entry" onClick={() => voteForItem(item.id)}>
-                          ＋
-                        </button>
+                        <button className="queue-plus-btn" onClick={() => voteForItem(item.id)}>＋</button>
                       </td>
                       <td className="queue-votes">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", justifyContent: "flex-end" }}>
                           <span className="queue-heart">♥</span>
                           <span className="queue-count">x{item.votes}</span>
                         </div>
@@ -344,30 +353,40 @@ function BrowseQueueContent() {
               </table>
             </div>
           ) : (
-            <div style={{ textAlign: 'center', padding: '60px 20px', background: '#fff', borderRadius: '12px', border: '2px dashed #d1d5db', margin: '20px 0' }}>
-              <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎵</div>
-              <h3 style={{ fontSize: '24px', fontWeight: 'bold', margin: '0 0 12px 0', color: '#374151' }}>
-                Queue is Empty
-              </h3>
-              <p style={{ fontSize: '16px', color: '#6b7280', margin: '0 0 24px 0', lineHeight: 1.6 }}>
+            /* Empty Queue State (kept) */
+            <div
+              style={{
+                textAlign: "center",
+                padding: "60px 20px",
+                background: "#fff",
+                borderRadius: "12px",
+                border: "2px dashed #d1d5db",
+                margin: "20px 0",
+              }}
+            >
+              <div style={{ fontSize: "48px", marginBottom: "16px" }}>🎵</div>
+              <h3 style={{ fontSize: "24px", fontWeight: "bold", margin: "0 0 12px 0", color: "#374151" }}>Queue is Empty</h3>
+              <p style={{ fontSize: "16px", color: "#6b7280", margin: "0 0 24px 0", lineHeight: 1.6 }}>
                 No albums have been added to the queue yet.
-                {eventId ? ' Browse the collection to add some!' : ' Start by suggesting albums below!'}
+                {eventId ? " Browse the collection to add some!" : " Start by suggesting albums below!"}
               </p>
 
               {eventId ? (
-                <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                <div style={{ display: "flex", gap: "12px", justifyContent: "center", flexWrap: "wrap" }}>
                   <a
                     href={`/browse/browse-albums?eventId=${eventId}`}
-                    style={{ background: '#059669', color: 'white', padding: '12px 24px', borderRadius: '8px', textDecoration: 'none', fontSize: '16px', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+                    style={{ background: "#059669", color: "white", padding: "12px 24px", borderRadius: "8px", textDecoration: "none", fontSize: "16px", fontWeight: "600", display: "inline-flex", alignItems: "center", gap: "8px" }}
                   >
                     📚 Browse Collection
                   </a>
-                  <button
-                    onClick={() => setShowSuggestionBox(true)}
-                    style={{ background: '#3b82f6', color: 'white', border: 'none', padding: '12px 24px', borderRadius: '8px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
-                  >
-                    💡 Suggest an Album
-                  </button>
+                  {!showSuggestionBox && (
+                    <button
+                      onClick={() => setShowSuggestionBox(true)}
+                      style={{ background: "#3b82f6", color: "white", border: "none", padding: "12px 24px", borderRadius: "8px", fontSize: "16px", fontWeight: "600", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "8px" }}
+                    >
+                      💡 Suggest an Album
+                    </button>
+                  )}
                 </div>
               ) : (
                 <AlbumSuggestionBox context="general" />
