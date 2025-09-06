@@ -262,67 +262,50 @@ function BrowseQueueContent() {
             border: '1px solid #e5e7eb',
             borderRadius: '12px',
             padding: '20px',
-            marginBottom: '24px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: '16px'
+            marginBottom: '24px'
           }}>
-            <div>
+            {/* Row 1: Title and Action Buttons */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: '12px',
+              flexWrap: 'wrap',
+              gap: '12px'
+            }}>
               <h3 style={{ 
-                margin: '0 0 8px 0', 
+                margin: '0', 
                 fontSize: '1.5rem', 
                 fontWeight: '700', 
                 color: '#1f2937' 
               }}>
                 Current Queue
               </h3>
-              <div style={{ 
-                display: 'flex', 
-                gap: '24px', 
-                fontSize: '14px', 
-                color: '#6b7280',
-                fontWeight: '500'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span>📀</span> {queueItems.length} requests
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span>🗳️</span> {queueItems.reduce((sum, item) => sum + item.votes, 0)} total votes
-                </div>
-                {queueItems.length > 0 && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span>🏆</span> Top: {queueItems[0]?.votes || 0} votes
-                  </div>
+              
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                {!showSuggestionBox && (
+                  <button
+                    onClick={() => setShowSuggestionBox(true)}
+                    style={{
+                      background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      padding: '10px 16px',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      boxShadow: '0 2px 4px rgba(59, 130, 246, 0.2)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    💡 Suggest an Album
+                  </button>
                 )}
-              </div>
-            </div>
-            
-            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-              {!showSuggestionBox && (
-                <button
-                  onClick={() => setShowSuggestionBox(true)}
-                  style={{
-                    background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    padding: '10px 16px',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease',
-                    boxShadow: '0 2px 4px rgba(59, 130, 246, 0.2)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}
-                >
-                  💡 Suggest an Album
-                </button>
-              )}
-              {eventId && (
+                
                 <a
                   href={`/browse/browse-albums?eventId=${eventId}`}
                   style={{
@@ -341,6 +324,47 @@ function BrowseQueueContent() {
                 >
                   📚 Browse Collection
                 </a>
+                
+                <a
+                  href={`/events/event-detail/${eventId}`}
+                  style={{
+                    background: '#9333ea',
+                    color: 'white',
+                    padding: '10px 16px',
+                    borderRadius: '8px',
+                    textDecoration: 'none',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  📅 Event Details
+                </a>
+              </div>
+            </div>
+
+            {/* Row 2: Stats */}
+            <div style={{ 
+              display: 'flex', 
+              gap: '24px', 
+              fontSize: '14px', 
+              color: '#6b7280',
+              fontWeight: '500',
+              flexWrap: 'wrap'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>📀</span> {queueItems.length} requests
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>🗳️</span> {queueItems.reduce((sum, item) => sum + item.votes, 0)} total votes
+              </div>
+              {queueItems.length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>🏆</span> Top: {queueItems[0]?.votes || 0} votes
+                </div>
               )}
             </div>
           </div>
