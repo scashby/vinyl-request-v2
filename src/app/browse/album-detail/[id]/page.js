@@ -24,7 +24,6 @@ function AlbumDetailContent() {
   const [error, setError] = useState(null);
   const [requestStatus, setRequestStatus] = useState('');
   const [submittingRequest, setSubmittingRequest] = useState(false);
-  const [showSuggestionBox, setShowSuggestionBox] = useState(false);
 
   const fetchAlbum = useCallback(async () => {
     try {
@@ -124,6 +123,54 @@ function AlbumDetailContent() {
     if (eventId) {
       router.push(`/browse/browse-queue?eventId=${eventId}`);
     }
+  };
+
+  const getAvailableSides = () => {
+    const sides = new Set();
+    
+    if (album?.tracklists) {
+      try {
+        // Try to parse as JSON first
+        const parsedTracks = JSON.parse(album.tracklists);
+        
+        if (Array.isArray(parsedTracks)) {
+          parsedTracks.forEach(track => {
+            if (track.position) {
+              // Extract side letter from positions like "A1", "B2", "C3", etc.
+              const sideMatch = track.position.match(/^([A-Z])/);
+              if (sideMatch) {
+                sides.add(sideMatch[1]);
+              }
+            }
+          });
+        }
+      } catch {
+        // If JSON parsing fails, treat as plain text and look for side patterns
+        const trackLines = album.tracklists.split('\n').filter(track => track.trim());
+        trackLines.forEach(track => {
+          const sideMatch = track.match(/^([A-Z])\d+/);
+          if (sideMatch) {
+            sides.add(sideMatch[1]);
+          }
+        });
+      }
+    }
+    
+    // If no sides found in tracklists, check the sides property
+    if (sides.size === 0 && album?.sides) {
+      Object.keys(album.sides).forEach(side => {
+        sides.add(side.toUpperCase());
+      });
+    }
+    
+    // If still no sides found, default to A and B
+    if (sides.size === 0) {
+      sides.add('A');
+      sides.add('B');
+    }
+    
+    // Convert to sorted array
+    return Array.from(sides).sort();
   };
 
   if (loading) {
@@ -309,41 +356,29 @@ function AlbumDetailContent() {
               <h3 style={{ color: '#fff', marginBottom: '12px', fontSize: '18px' }}>
                 Add to Event Queue:
               </h3>
-              <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
-                <button
-                  onClick={() => handleAddToQueue('A')}
-                  disabled={submittingRequest}
-                  style={{
-                    background: '#3b82f6',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: 6,
-                    padding: '12px 24px',
-                    cursor: submittingRequest ? 'not-allowed' : 'pointer',
-                    fontSize: 16,
-                    fontWeight: 'bold',
-                    opacity: submittingRequest ? 0.7 : 1
-                  }}
-                >
-                  Side A
-                </button>
-                <button
-                  onClick={() => handleAddToQueue('B')}
-                  disabled={submittingRequest}
-                  style={{
-                    background: '#10b981',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: 6,
-                    padding: '12px 24px',
-                    cursor: submittingRequest ? 'not-allowed' : 'pointer',
-                    fontSize: 16,
-                    fontWeight: 'bold',
-                    opacity: submittingRequest ? 0.7 : 1
-                  }}
-                >
-                  Side B
-                </button>
+              <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
+                {getAvailableSides().map((side, index) => (
+                  <button
+                    key={side}
+                    onClick={() => handleAddToQueue(side)}
+                    disabled={submittingRequest}
+                    style={{
+                      background: index % 4 === 0 ? '#3b82f6' : 
+                                 index % 4 === 1 ? '#10b981' : 
+                                 index % 4 === 2 ? '#f59e0b' : '#ef4444',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: 6,
+                      padding: '12px 24px',
+                      cursor: submittingRequest ? 'not-allowed' : 'pointer',
+                      fontSize: 16,
+                      fontWeight: 'bold',
+                      opacity: submittingRequest ? 0.7 : 1
+                    }}
+                  >
+                    Side {side}
+                  </button>
+                ))}
               </div>
               
               {requestStatus && (
