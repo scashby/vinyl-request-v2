@@ -221,6 +221,7 @@ function AlbumDetailContent() {
           zIndex: 10,
           background: 'rgba(0, 0, 0, 0.8)',
           padding: '12px 24px',
+          paddingLeft: '60px',
           display: 'flex',
           gap: '16px',
           alignItems: 'center',
