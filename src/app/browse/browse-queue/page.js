@@ -21,7 +21,12 @@ function BrowseQueueContent() {
   const [showSuggestionBox, setShowSuggestionBox] = useState(false);
 
   const loadEventAndQueue = useCallback(async () => {
+    // Add debugging
+    console.log('🔍 Debug: eventId from URL:', eventId);
+    console.log('🔍 Debug: Loading event and queue...');
+    
     if (!eventId) {
+      console.log('🔍 Debug: No eventId provided, showing placeholder');
       // Show placeholder data if no eventId
       setEventData({
         id: 'placeholder',
@@ -61,11 +66,14 @@ function BrowseQueueContent() {
 
     try {
       // Load event details
+      console.log('🔍 Debug: Fetching event with ID:', eventId);
       const { data: event, error: eventError } = await supabase
         .from('events')
         .select('*')
         .eq('id', eventId)
         .single();
+
+      console.log('🔍 Debug: Event query result:', { event, eventError });
 
       if (eventError) {
         console.error('Error loading event:', eventError);
@@ -73,13 +81,15 @@ function BrowseQueueContent() {
         setEventData(event);
       }
 
-      // Load queue items for this event (using same approach as QueueSection)
+      // Load queue items for this event - using EXACT same approach as QueueSection
+      console.log('🔍 Debug: Fetching requests for event_id:', eventId);
       const { data: requests, error: requestsError } = await supabase
         .from('requests')
         .select('*')
         .eq('event_id', eventId)
-        .order('votes', { ascending: false })
-        .order('created_at', { ascending: true });
+        .order('id', { ascending: true }); // Same ordering as QueueSection
+
+      console.log('🔍 Debug: Requests query result:', { requests, requestsError, count: requests?.length });
 
       if (requestsError) {
         console.error('Error loading requests:', requestsError);
@@ -88,14 +98,17 @@ function BrowseQueueContent() {
       }
 
       if (!requests || requests.length === 0) {
+        console.log('🔍 Debug: No requests found, setting empty queue');
         setQueueItems([]);
         return;
       }
 
       // Get unique album IDs
       const albumIds = requests.map(r => r.album_id).filter(Boolean);
+      console.log('🔍 Debug: Album IDs found:', albumIds);
       
       if (albumIds.length === 0) {
+        console.log('🔍 Debug: No album IDs, using direct request data');
         // Handle requests without album_id (direct artist/title entries)
         const mapped = requests.map(req => ({
           id: req.id,
@@ -107,15 +120,19 @@ function BrowseQueueContent() {
           created_at: req.created_at,
           collection: null
         }));
+        console.log('🔍 Debug: Mapped requests without albums:', mapped);
         setQueueItems(mapped);
         return;
       }
 
       // Load album details
+      console.log('🔍 Debug: Fetching albums for IDs:', albumIds);
       const { data: albums, error: albumsError } = await supabase
         .from('collection')
         .select('id, artist, title, image_url, year, format')
         .in('id', albumIds);
+
+      console.log('🔍 Debug: Albums query result:', { albums, albumsError });
 
       if (albumsError) {
         console.error('Error loading albums:', albumsError);
@@ -143,7 +160,17 @@ function BrowseQueueContent() {
         };
       });
 
-      setQueueItems(mapped);
+      console.log('🔍 Debug: Final mapped queue items:', mapped);
+      
+      // Sort by votes desc, then by created_at asc
+      const sorted = mapped.sort((a, b) => {
+        if (b.votes !== a.votes) {
+          return b.votes - a.votes;
+        }
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      });
+
+      setQueueItems(sorted);
 
     } catch (error) {
       console.error('Error loading event and queue:', error);
