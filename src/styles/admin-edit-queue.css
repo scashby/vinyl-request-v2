@@ -148,12 +148,17 @@
   grid-template-columns: 2fr 2fr 80px 100px 120px;
   gap: 1rem;
   padding: 1.25rem 1.5rem;
-  background: #1f2937;
-  color: #ffffff;
-  font-weight: 700;
+  background: #1f2937 !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
   font-size: 0.875rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+}
+
+.queue-table-header div {
+  color: #ffffff !important;
+  font-weight: 700 !important;
 }
 
 .queue-table-row {
