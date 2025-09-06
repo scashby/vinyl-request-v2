@@ -214,13 +214,6 @@ function BrowseQueueContent() {
     }
   };
 
-  const renderVoteStars = (votes) => {
-    const maxStars = 5;
-    const filledStars = Math.min(votes, maxStars);
-    const stars = '★'.repeat(filledStars) + '☆'.repeat(maxStars - filledStars);
-    return votes > maxStars ? stars + '+' : stars;
-  };
-
   const formatDate = (dateString) => {
     if (!dateString) return '';
     return new Date(dateString).toLocaleDateString('en-US', {
