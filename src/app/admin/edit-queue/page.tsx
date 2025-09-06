@@ -384,12 +384,13 @@ export default function Page() {
           {requests.length > 0 && (
             <div style={{
               marginTop: '2rem',
-              padding: '1rem',
-              background: '#f0f9ff',
-              borderRadius: '6px',
-              border: '1px solid #0ea5e9',
+              padding: '1.25rem',
+              background: '#dbeafe',
+              borderRadius: '12px',
+              border: '2px solid #3b82f6',
               fontSize: '0.875rem',
-              color: '#0c4a6e'
+              color: '#1e3a8a',
+              fontWeight: '600'
             }}>
               <strong>Queue Summary:</strong> {requests.length} requests, {requests.reduce((sum, req) => sum + req.votes, 0)} total votes
             </div>
