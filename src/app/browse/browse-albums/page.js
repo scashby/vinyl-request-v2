@@ -309,9 +309,9 @@ function BrowseAlbumsContent() {
                 fontFamily: 'system-ui, sans-serif'
               }}
             >
+              <option value="artist" style={{ color: '#000000', backgroundColor: '#ffffff' }}>Artist</option>
               <option value="date_added" style={{ color: '#000000', backgroundColor: '#ffffff' }}>Date Added</option>
               <option value="title" style={{ color: '#000000', backgroundColor: '#ffffff' }}>Title</option>
-              <option value="artist" style={{ color: '#000000', backgroundColor: '#ffffff' }}>Artist</option>
               <option value="year" style={{ color: '#000000', backgroundColor: '#ffffff' }}>Year</option>
             </select>
 
