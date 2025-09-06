@@ -1,5 +1,5 @@
-// FIXED Browse Albums page with compact search and all filters
-// Replace ENTIRE file: src/app/browse/browse-albums/page.js
+// Browse Albums page - ACTUALLY FIXED VERSION
+// Replace: src/app/browse/browse-albums/page.js
 
 "use client";
 
@@ -32,7 +32,6 @@ function BrowseAlbumsContent() {
   const [showSuggestionBox, setShowSuggestionBox] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Helper function to check if album was added in last 2 weeks
   const isJustAdded = (dateAdded) => {
     if (!dateAdded) return false;
     const addedDate = new Date(dateAdded);
@@ -163,7 +162,6 @@ function BrowseAlbumsContent() {
              matchesStevesTop200 && matchesThisWeeksTop10 && matchesInnerCirclePreferred;
     });
     
-    // Sort albums
     fa = [...fa].sort((a, b) => {
       let va, vb;
       
@@ -184,7 +182,6 @@ function BrowseAlbumsContent() {
   }, [albums, searchTerm, mediaFilter, allowedFormats, normalizedFormats, sortField, sortAsc, 
       showJustAdded, showStevesTop200, showThisWeeksTop10, showInnerCirclePreferred]);
 
-  // Count just added albums
   const justAddedCount = albums.filter(album => album.justAdded).length;
   const stevesTop200Count = albums.filter(album => album.steves_top_200).length;
   const thisWeeksTop10Count = albums.filter(album => album.this_weeks_top_10).length;
@@ -226,224 +223,158 @@ function BrowseAlbumsContent() {
       </header>
 
       <main className="browse-collection-body">
-        {/* COMPACT Search Controls */}
-        <div style={{
-          background: '#fff',
-          padding: '12px 16px',
-          marginBottom: '16px',
-          borderRadius: '6px',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-          border: '1px solid #e5e7eb'
-        }}>
-          {/* Row 1: Main Controls */}
-          <div style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '8px',
-            alignItems: 'center',
-            marginBottom: '8px'
-          }}>
-            <input
-              type="text"
-              placeholder="Search by artist or title"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              style={{
-                flex: '1 1 200px',
-                minWidth: '200px',
-                padding: '6px 10px',
-                border: '1px solid #d1d5db',
-                borderRadius: '4px',
-                fontSize: '14px'
-              }}
-            />
+        <div className="search-filter-bar">
+          <input
+            type="text"
+            placeholder="Search by artist or title"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+          <select
+            value={mediaFilter}
+            onChange={(e) => setMediaFilter(e.target.value)}
+          >
+            <option value="">All Media Types</option>
+            {normalizedDropdown.map((format) => (
+              <option key={format} value={format.trim().toLowerCase()}>
+                {format}
+              </option>
+            ))}
+          </select>
+          
+          {justAddedCount > 0 && (
+            <label style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px',
+              fontSize: '14px',
+              fontWeight: '600',
+              color: '#059669',
+              whiteSpace: 'nowrap'
+            }}>
+              <input
+                type="checkbox"
+                checked={showJustAdded}
+                onChange={(e) => setShowJustAdded(e.target.checked)}
+                style={{ transform: 'scale(1.2)' }}
+              />
+              ✨ Just Added ({justAddedCount})
+            </label>
+          )}
 
-            <select
-              value={mediaFilter}
-              onChange={(e) => setMediaFilter(e.target.value)}
-              style={{
-                flex: '0 0 120px',
-                padding: '6px 10px',
-                border: '1px solid #d1d5db',
-                borderRadius: '4px',
-                fontSize: '14px'
-              }}
-            >
-              <option value="">All Types</option>
-              {normalizedDropdown.map((format) => (
-                <option key={format} value={format.trim().toLowerCase()}>
-                  {format}
-                </option>
-              ))}
-            </select>
+          {stevesTop200Count > 0 && (
+            <label style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px',
+              fontSize: '14px',
+              fontWeight: '600',
+              color: '#dc2626',
+              whiteSpace: 'nowrap'
+            }}>
+              <input
+                type="checkbox"
+                checked={showStevesTop200}
+                onChange={(e) => setShowStevesTop200(e.target.checked)}
+                style={{ transform: 'scale(1.2)' }}
+              />
+              🏆 Steve&apos;s Top 200 ({stevesTop200Count})
+            </label>
+          )}
 
-            <select 
-              value={sortField} 
-              onChange={e => setSortField(e.target.value)}
-              style={{
-                flex: '0 0 100px',
-                padding: '6px 10px',
-                border: '1px solid #d1d5db',
-                borderRadius: '4px',
-                fontSize: '14px'
-              }}
-            >
-              <option value="date_added">Date Added</option>
-              <option value="title">Title</option>
-              <option value="artist">Artist</option>
-              <option value="year">Year</option>
-            </select>
+          {thisWeeksTop10Count > 0 && (
+            <label style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px',
+              fontSize: '14px',
+              fontWeight: '600',
+              color: '#7c3aed',
+              whiteSpace: 'nowrap'
+            }}>
+              <input
+                type="checkbox"
+                checked={showThisWeeksTop10}
+                onChange={(e) => setShowThisWeeksTop10(e.target.checked)}
+                style={{ transform: 'scale(1.2)' }}
+              />
+              📈 This Week&apos;s Top 10 ({thisWeeksTop10Count})
+            </label>
+          )}
 
-            <button
-              onClick={() => setSortAsc(a => !a)}
-              style={{
-                padding: '6px 10px',
-                background: '#f3f4f6',
-                border: '2px solid #000000',
-                borderRadius: '4px',
-                fontSize: '14px',
-                cursor: 'pointer',
-                backgroundColor: '#f3f4f6',
-                color: '#000000'
-              }}
-            >
-              {sortAsc ? '↑' : '↓'}
-            </button>
+          {innerCircleCount > 0 && (
+            <label style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px',
+              fontSize: '14px',
+              fontWeight: '600',
+              color: '#ea580c',
+              whiteSpace: 'nowrap'
+            }}>
+              <input
+                type="checkbox"
+                checked={showInnerCirclePreferred}
+                onChange={(e) => setShowInnerCirclePreferred(e.target.checked)}
+                style={{ transform: 'scale(1.2)' }}
+              />
+              ⭐ Inner Circle Preferred ({innerCircleCount})
+            </label>
+          )}
 
+          <select value={sortField} onChange={e => setSortField(e.target.value)}>
+            <option value="date_added">Date Added</option>
+            <option value="title">Title</option>
+            <option value="artist">Artist</option>
+            <option value="year">Year</option>
+          </select>
+          <button
+            className="button-secondary"
+            onClick={() => setSortAsc(a => !a)}
+          >
+            Sort: {sortAsc ? 'Ascending' : 'Descending'}
+          </button>
+          
+          {!hasNoResults && !showSuggestionBox && (
             <button
               onClick={() => setShowSuggestionBox(true)}
               style={{
-                background: '#3b82f6',
+                background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
                 color: 'white',
                 border: 'none',
-                borderRadius: '4px',
-                padding: '6px 12px',
-                fontSize: '14px',
-                cursor: 'pointer'
+                borderRadius: 8,
+                padding: '10px 20px',
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                boxShadow: '0 2px 6px rgba(59, 130, 246, 0.3)',
+                whiteSpace: 'nowrap',
+                marginLeft: 'auto'
               }}
             >
-              💡 Suggest
+              💡 Suggest an Album
             </button>
-          </div>
-
-          {/* Row 2: Filter Badges */}
-          <div style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '6px'
-          }}>
-            {justAddedCount > 0 && (
-              <label style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '4px',
-                fontSize: '11px',
-                fontWeight: '600',
-                color: '#059669',
-                cursor: 'pointer',
-                background: '#f0fdf4',
-                padding: '2px 6px',
-                borderRadius: '3px',
-                border: '1px solid #bbf7d0'
-              }}>
-                <input
-                  type="checkbox"
-                  checked={showJustAdded}
-                  onChange={(e) => setShowJustAdded(e.target.checked)}
-                  style={{ transform: 'scale(0.9)' }}
-                />
-                ✨ Just Added ({justAddedCount})
-              </label>
-            )}
-
-            {stevesTop200Count > 0 && (
-              <label style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '4px',
-                fontSize: '11px',
-                fontWeight: '600',
-                color: '#dc2626',
-                cursor: 'pointer',
-                background: '#fef2f2',
-                padding: '2px 6px',
-                borderRadius: '3px',
-                border: '1px solid #fecaca'
-              }}>
-                <input
-                  type="checkbox"
-                  checked={showStevesTop200}
-                  onChange={(e) => setShowStevesTop200(e.target.checked)}
-                  style={{ transform: 'scale(0.9)' }}
-                />
-                🏆 Top 200 ({stevesTop200Count})
-              </label>
-            )}
-
-            {thisWeeksTop10Count > 0 && (
-              <label style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '4px',
-                fontSize: '11px',
-                fontWeight: '600',
-                color: '#7c3aed',
-                cursor: 'pointer',
-                background: '#faf5ff',
-                padding: '2px 6px',
-                borderRadius: '3px',
-                border: '1px solid #e9d5ff'
-              }}>
-                <input
-                  type="checkbox"
-                  checked={showThisWeeksTop10}
-                  onChange={(e) => setShowThisWeeksTop10(e.target.checked)}
-                  style={{ transform: 'scale(0.9)' }}
-                />
-                📈 Top 10 ({thisWeeksTop10Count})
-              </label>
-            )}
-
-            {innerCircleCount > 0 && (
-              <label style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '4px',
-                fontSize: '11px',
-                fontWeight: '600',
-                color: '#ea580c',
-                cursor: 'pointer',
-                background: '#fff7ed',
-                padding: '2px 6px',
-                borderRadius: '3px',
-                border: '1px solid #fed7aa'
-              }}>
-                <input
-                  type="checkbox"
-                  checked={showInnerCirclePreferred}
-                  onChange={(e) => setShowInnerCirclePreferred(e.target.checked)}
-                  style={{ transform: 'scale(0.9)' }}
-                />
-                ⭐ Inner Circle ({innerCircleCount})
-              </label>
-            )}
-          </div>
+          )}
         </div>
 
-        {/* Results Count */}
         <div style={{ 
           fontSize: '14px', 
           color: '#666',
-          marginBottom: '16px',
-          paddingLeft: '8px'
+          marginBottom: 24,
+          padding: '0 8px'
         }}>
-          Showing {filteredAlbums.length} albums
-          {hasSearchQuery && ` for "${searchTerm}"`}
+          {hasSearchQuery ? (
+            <>Showing {filteredAlbums.length} results for &ldquo;{searchTerm}&rdquo;</>
+          ) : showJustAdded ? (
+            <>Showing {filteredAlbums.length} just added albums</>
+          ) : (
+            <>Showing {filteredAlbums.length} albums{justAddedCount > 0 ? ` (${justAddedCount} just added)` : ''}</>
+          )}
         </div>
 
-        {/* Album Suggestion Box */}
         {(hasNoResults || showSuggestionBox) && (
-          <div style={{ marginBottom: '24px' }}>
+          <div style={{ marginBottom: 40 }}>
             <AlbumSuggestionBox 
               context={hasNoResults ? "search" : "general"}
               searchQuery={hasNoResults ? searchTerm : ''}
@@ -454,7 +385,6 @@ function BrowseAlbumsContent() {
           </div>
         )}
 
-        {/* Album Grid */}
         <section className="album-grid">
           {filteredAlbums.map((album) => (
             <AlbumCard
@@ -468,17 +398,16 @@ function BrowseAlbumsContent() {
           ))}
         </section>
 
-        {/* Empty States */}
         {filteredAlbums.length === 0 && !hasSearchQuery && (
           <div style={{
             textAlign: 'center',
-            padding: '40px',
+            padding: 40,
             color: '#6b7280',
-            fontSize: '16px'
+            fontSize: 16
           }}>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎵</div>
-            <p>No albums match your current filters.</p>
-            <p style={{ fontSize: '14px' }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>🎵</div>
+            <p>The collection is loading or no albums match your filters.</p>
+            <p style={{ fontSize: 14 }}>
               Try adjusting your filters or suggest new albums above!
             </p>
           </div>
@@ -487,20 +416,23 @@ function BrowseAlbumsContent() {
         {hasNoResults && (
           <div style={{
             textAlign: 'center',
-            padding: '40px',
+            padding: 40,
             color: '#6b7280',
-            fontSize: '16px',
+            fontSize: 16,
             background: '#f9fafb',
-            borderRadius: '12px',
+            borderRadius: 12,
             border: '2px dashed #d1d5db',
             margin: '20px 0'
           }}>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔍</div>
-            <h3 style={{ fontSize: '24px', marginBottom: '12px', color: '#374151' }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>🔍</div>
+            <h3 style={{ fontSize: 24, marginBottom: 12, color: '#374151' }}>
               No albums found
             </h3>
-            <p style={{ marginBottom: '16px' }}>
+            <p style={{ marginBottom: 16 }}>
               No albums match your search for &ldquo;<strong>{searchTerm}</strong>&rdquo;
+            </p>
+            <p style={{ fontSize: 14 }}>
+              The album suggestion form above can help you request this album for the collection.
             </p>
           </div>
         )}
