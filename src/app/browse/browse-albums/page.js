@@ -302,7 +302,9 @@ function BrowseAlbumsContent() {
                 border: '1px solid #d1d5db',
                 borderRadius: '4px',
                 fontSize: '14px',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                backgroundColor: '#f3f4f6',
+                color: '#374151'
               }}
             >
               {sortAsc ? '↑' : '↓'}
