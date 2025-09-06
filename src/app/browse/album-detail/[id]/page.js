@@ -1,4 +1,6 @@
-// src/app/browse/album-detail/[id]/page.js
+// Fixed Album Detail page with track listings, event context, and navigation
+// Replace: src/app/browse/album-detail/[id]/page.js
+
 "use client";
 
 import { useEffect, useState, useCallback, Suspense } from 'react';
@@ -74,54 +76,88 @@ function AlbumDetailContent() {
     try {
       const updated = await addOrVoteRequest({
         eventId,
-        albumId: id,                 // ok as string; Supabase will coerce
+        albumId: id,
         side,
         artist: album.artist,
         title: album.title,
-        status: 'queued',
+        status: 'open',                // matches your existing page’s status
         year: album.year ?? null,
         format: album.format ?? null,
         folder: album.folder ?? 'Unknown',
       });
 
       setRequestStatus(`Queued ${album.title} — Side ${side}. Votes: x${updated?.votes ?? 1}`);
-    } catch (e) {
-      console.error(e);
+    } catch (err) {
+      console.error(err);
       setRequestStatus('Failed to add to queue');
     } finally {
       setSubmittingRequest(false);
     }
   };
 
-  const goToEvent = () => eventId && router.push(`/events/event-detail/${eventId}`);
-  const goToBrowse = () => router.push(eventId ? `/browse/browse-albums?eventId=${eventId}` : '/browse/browse-albums');
-  const goToQueue  = () => eventId && router.push(`/browse/browse-queue?eventId=${eventId}`);
+  const goToEvent = () => {
+    if (eventId) {
+      router.push(`/events/event-detail/${eventId}`);
+    }
+  };
+
+  const goToBrowse = () => {
+    if (eventId) {
+      router.push(`/browse/browse-albums?eventId=${eventId}`);
+    } else {
+      router.push('/browse/browse-albums');
+    }
+  };
+
+  const goToQueue = () => {
+    if (eventId) {
+      router.push(`/browse/browse-queue?eventId=${eventId}`);
+    }
+  };
 
   const getAvailableSides = () => {
     const sides = new Set();
+
+    // Try parsing tracklists as JSON first
     if (album?.tracklists) {
       try {
         const parsedTracks = JSON.parse(album.tracklists);
+        
         if (Array.isArray(parsedTracks)) {
           parsedTracks.forEach(track => {
             if (track.position) {
-              const m = track.position.match(/^([A-Z])/);
-              if (m) sides.add(m[1]);
+              const sideMatch = track.position.match(/^([A-Z])/);
+              if (sideMatch) {
+                sides.add(sideMatch[1]);
+              }
             }
           });
         }
       } catch {
-        const trackLines = album.tracklists.split('\n').filter(t => t.trim());
+        // If JSON parsing fails, treat as plain text and look for side patterns
+        const trackLines = album.tracklists.split('\n').filter(track => track.trim());
         trackLines.forEach(track => {
-          const m = track.match(/^([A-Z])\d+/);
-          if (m) sides.add(m[1]);
+          const sideMatch = track.match(/^([A-Z])\d+/);
+          if (sideMatch) {
+            sides.add(sideMatch[1]);
+          }
         });
       }
     }
+    
+    // If no sides found in tracklists, check the sides property
     if (sides.size === 0 && album?.sides) {
-      Object.keys(album.sides).forEach(s => sides.add(s.toUpperCase()));
+      Object.keys(album.sides).forEach(side => {
+        sides.add(side.toUpperCase());
+      });
     }
-    if (sides.size === 0) { sides.add('A'); sides.add('B'); }
+    
+    // If still no sides found, default to A and B
+    if (sides.size === 0) {
+      sides.add('A');
+      sides.add('B');
+    }
+    
     return Array.from(sides).sort();
   };
 
@@ -161,29 +197,29 @@ function AlbumDetailContent() {
 
   return (
     <div className="album-detail">
-      <div className="background-blur" style={{ backgroundImage: `url(${imageUrl})` }} />
-
+      {/* Event shortcuts */}
       {eventId && (
         <div style={{
           position: 'relative', zIndex: 10, background: 'rgba(0, 0, 0, 0.8)',
-          padding: '12px 24px', paddingLeft: '60px', display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap'
+          padding: '12px 24px', paddingLeft: '60px', display: 'flex',
+          gap: '16px', alignItems: 'center', flexWrap: 'wrap'
         }}>
           <button onClick={goToBrowse} style={{
-            background: '#059669', color: 'white', border: 'none', borderRadius: '6px',
-            padding: '8px 16px', fontSize: '14px', fontWeight: '600', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', gap: '6px'
+            background: '#059669', color: 'white', border: 'none',
+            borderRadius: '6px', padding: '8px 16px', fontSize: '14px',
+            fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px'
           }}>← Browse Collection</button>
 
           <button onClick={goToQueue} style={{
-            background: '#3b82f6', color: 'white', border: 'none', borderRadius: '6px',
-            padding: '8px 16px', fontSize: '14px', fontWeight: '600', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', gap: '6px'
+            background: '#3b82f6', color: 'white', border: 'none',
+            borderRadius: '6px', padding: '8px 16px', fontSize: '14px',
+            fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px'
           }}>🎵 View Queue</button>
 
           <button onClick={goToEvent} style={{
-            background: '#9333ea', color: 'white', border: 'none', borderRadius: '6px',
-            padding: '8px 16px', fontSize: '14px', fontWeight: '600', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', gap: '6px'
+            background: '#9333ea', color: 'white', border: 'none',
+            borderRadius: '6px', padding: '8px 16px', fontSize: '14px',
+            fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px'
           }}>📅 Event Details</button>
 
           {eventData && (
@@ -194,6 +230,7 @@ function AlbumDetailContent() {
         </div>
       )}
 
+      {/* Album Header */}
       <div className="album-header">
         <Image
           src={imageUrl}
@@ -203,31 +240,27 @@ function AlbumDetailContent() {
           className="album-art"
           unoptimized
         />
-
+        
         <div className="album-info">
           <h1 className="title">{album.title}</h1>
           <h2 className="artist">{album.artist}</h2>
-
+          
           <div className="meta">
             {album.year && <span>Year: {album.year} • </span>}
             {album.format && <span>Format: {album.format} • </span>}
             {album.folder && <span>Category: {album.folder}</span>}
           </div>
-
+          
           {album.media_condition && (
             <div className="meta" style={{ marginTop: '8px' }}>
               Condition: {album.media_condition}
             </div>
           )}
-
-          {album.folder && <span className="badge">{album.folder}</span>}
-
-          {album.notes && (
-            <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(255, 255, 255, 0.1)', borderRadius: '6px', backdropFilter: 'blur(10px)' }}>
-              <strong>Notes:</strong> {album.notes}
-            </div>
+          
+          {album.folder && (
+            <span className="badge">{album.folder}</span>
           )}
-
+          
           {eventId && (
             <div style={{ marginTop: '20px' }}>
               <h3 style={{ color: '#fff', marginBottom: '12px', fontSize: '18px' }}>
@@ -267,8 +300,77 @@ function AlbumDetailContent() {
         </div>
       </div>
 
-      {/* Tracklist and sides blocks unchanged from your current file */}
-      {/* ... keep the rest of your component exactly as-is ... */}
+      {/* Tracklist / Sides */}
+      <div className="album-tracks">
+        <h3>Tracks</h3>
+        {album.tracklists ? (
+          <div className="track-table">
+            <div className="track head">
+              <div>#</div>
+              <div>Title</div>
+              <div>Artist</div>
+              <div>Duration</div>
+            </div>
+
+            {/* Try JSON format first */}
+            {(() => {
+              try {
+                const tracks = JSON.parse(album.tracklists);
+
+                if (Array.isArray(tracks)) {
+                  // array of track objects
+                  return tracks.map((track, index) => (
+                    <div key={index} className="track">
+                      <div>{track.position || index + 1}</div>
+                      <div style={{ color: '#fff', fontWeight: '500' }}>
+                        {track.title || track.name || 'Unknown Track'}
+                      </div>
+                      <div style={{ color: '#ccc' }}>
+                        {track.artist || album.artist}
+                      </div>
+                      <div style={{ color: '#aaa', fontSize: '14px' }}>
+                        {track.duration || '--:--'}
+                      </div>
+                    </div>
+                  ));
+                } else {
+                  // object with track data not recognized
+                  return (
+                    <div className="track">
+                      <div>1</div>
+                      <div style={{ color: '#fff', fontWeight: '500' }}>
+                        JSON data structure not recognized
+                      </div>
+                      <div style={{ color: '#ccc' }}>{album.artist}</div>
+                      <div style={{ color: '#aaa', fontSize: '14px' }}>--:--</div>
+                    </div>
+                  );
+                }
+              } catch {
+                // Fallback: plain text (one per line)
+                const tracks = album.tracklists.split('\n').filter((t) => t.trim());
+                return tracks.length ? tracks.map((t, i) => (
+                  <div key={i} className="track">
+                    <div>{i + 1}</div>
+                    <div style={{ color: '#fff', fontWeight: '500' }}>{t}</div>
+                    <div style={{ color: '#ccc' }}>{album.artist}</div>
+                    <div style={{ color: '#aaa', fontSize: '14px' }}>--:--</div>
+                  </div>
+                )) : (
+                  <div className="track">
+                    <div>1</div>
+                    <div style={{ color: '#fff', fontWeight: '500' }}>
+                      {typeof tracks === 'string' ? tracks : 'No track information'}
+                    </div>
+                    <div style={{ color: '#ccc' }}>{album.artist}</div>
+                    <div style={{ color: '#aaa', fontSize: '14px' }}>--:--</div>
+                  </div>
+                );
+              }
+            })()}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }

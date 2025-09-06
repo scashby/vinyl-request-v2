@@ -1,20 +1,21 @@
-// Insert a request for (eventId, albumId, side). If it already exists,
-// increment votes by 1 and return the updated row.
-// Works even when albumId is null (manual requests) by matching on artist+title+side.
+// src/lib/addOrVoteRequest.js
+// Insert a request for (eventId, albumId, side). If it already exists, bump votes by 1.
+// For manual requests (no albumId), match by artist+title+side within the same event.
+
 import { supabase } from "src/lib/supabaseClient";
 
 export async function addOrVoteRequest({
   eventId,
   albumId = null,       // number | string | null
   side,                 // 'A' | 'B' | ...
-  artist,               // required for first insert (or when albumId is null)
-  title,                // required for first insert (or when albumId is null)
-  status = "pending",
+  artist,               // required for first insert or when albumId is null
+  title,                // required for first insert or when albumId is null
+  status = "open",      // default matches your existing album-detail usage
   folder = "Unknown",
   year = null,
   format = null,
 }) {
-  // 1) Try to find an existing row for this event/album(or artist+title)/side
+  // 1) find existing row for this event + side (+ albumId OR artist+title)
   let query = supabase
     .from("requests")
     .select("id, votes")
@@ -25,19 +26,19 @@ export async function addOrVoteRequest({
   if (albumId !== null && albumId !== undefined) {
     query = query.eq("album_id", albumId);
   } else {
-    // For manual entries (no album_id), match on artist+title
     query = query
       .is("album_id", null)
       .eq("artist", artist)
       .eq("title", title);
   }
 
-  const found = await query;
-  if (found.error) throw found.error;
-  const existing = Array.isArray(found.data) ? found.data[0] : null;
+  const { data: existingRows, error: findErr } = await query;
+  if (findErr) throw findErr;
+
+  const existing = Array.isArray(existingRows) ? existingRows[0] : null;
 
   if (existing) {
-    // 2) Increment votes on the existing row
+    // 2) increment votes
     const { data, error } = await supabase
       .from("requests")
       .update({ votes: (existing.votes ?? 0) + 1 })
@@ -48,8 +49,8 @@ export async function addOrVoteRequest({
     return data;
   }
 
-  // 3) No match — create a brand new row with votes=1
-  const insertPayload = {
+  // 3) insert new with votes = 1
+  const payload = {
     event_id: eventId,
     album_id: albumId,
     side,
@@ -64,7 +65,7 @@ export async function addOrVoteRequest({
 
   const { data, error } = await supabase
     .from("requests")
-    .insert([insertPayload])
+    .insert([payload])
     .select()
     .single();
 
