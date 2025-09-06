@@ -1,256 +1,73 @@
-/* Enhanced Browse Queue Styles */
-/* Fixed: proper table alignment for header/body */
+/* Browse Queue — clean table version */
 
 /* Layout */
-.browse-queue {
-  display: flex;
-  gap: 2rem;
-  padding: 2rem;
-  align-items: flex-start;
+.browse-queue{display:flex;gap:2rem;padding:2rem;align-items:flex-start}
+.event-sidebar{flex:0 0 280px;position:sticky;top:2rem}
+.queue-display{flex:1;min-width:0}
+
+/* Card around table */
+.queue-wrapper{
+  background:linear-gradient(135deg,#1a1a1a,#2d2d2d);
+  color:#fff;padding:1.5rem;border-radius:12px;overflow-x:auto;
+  box-shadow:0 8px 32px rgba(0,0,0,.3);border:1px solid #333
 }
 
-.event-sidebar {
-  flex: 0 0 280px;
-  position: sticky;
-  top: 2rem;
+/* TRUE table */
+.queue-table{width:100%;border-collapse:collapse;table-layout:fixed}
+.queue-table thead th{
+  font:700 0.75rem/1.2 Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;
+  padding:.75rem .5rem 1rem;text-align:left;border:none
 }
+.queue-table tbody td{
+  padding:.75rem .5rem;vertical-align:middle;
+  border-bottom:1px solid rgba(255,255,255,.1)
+}
+.queue-table tbody tr:last-child td{border-bottom:none}
+.queue-table tbody tr:hover{background:rgba(255,255,255,.05)}
 
-.queue-display {
-  flex: 1;
-  min-width: 0;
-}
+/* Column sizes (match <colgroup>) */
+.queue-table th:nth-child(1),.queue-table td:nth-child(1){width:50px;text-align:center}
+.queue-table th:nth-child(2),.queue-table td:nth-child(2){width:60px}
+.queue-table th:nth-child(3),.queue-table td:nth-child(3){min-width:200px}
+.queue-table th:nth-child(4),.queue-table td:nth-child(4){width:60px;text-align:center}
+.queue-table th:nth-child(5),.queue-table td:nth-child(5){width:60px;text-align:center}
+.queue-table th:nth-child(6),.queue-table td:nth-child(6){width:80px;text-align:right;padding-right:.5rem}
 
-/* Queue wrapper */
-.queue-wrapper {
-  background: linear-gradient(135deg, #1a1a1a, #2d2d2d);
-  color: #fff;
-  padding: 1.5rem;
-  border-radius: 12px;
-  font-family: 'Inter', sans-serif;
-  overflow-x: auto;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-  border: 1px solid #333;
-}
+/* Absolutely DO NOT turn TDs into flex boxes */
+.queue-table td{display:table-cell}
 
-/* Table */
-.queue-table {
-  width: 100%;
-  border-collapse: collapse;
-  table-layout: fixed;
-}
+/* Cell content */
+.queue-index{color:#9ca3af;font:600 .875rem/1.2 Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+.queue-cover{width:48px;height:48px;object-fit:cover;border-radius:6px;display:block;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.queue-title{font-weight:600;font-size:.95rem;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:.25rem}
+.queue-artist{font-size:.825rem;color:#d1d5db;text-transform:uppercase;letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-.queue-table thead th {
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: #9ca3af;
-  text-transform: uppercase;
-  padding: 0.75rem 0.5rem 1rem 0.5rem;
-  border: none;
-  text-align: left;
-  letter-spacing: 0.05em;
-}
+/* “Side” pill */
+.queue-side-badge{display:inline-block;min-width:24px;padding:4px 8px;border-radius:4px;background:rgba(59,130,246,.2);font:700 .875rem/1 Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#fff}
 
-.queue-table tbody td {
-  padding: 0.75rem 0.5rem;
-  vertical-align: middle;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+/* Vote button & count */
+.queue-plus-btn{
+  background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:#fff;border:0;border-radius:6px;
+  padding:6px 10px;font:700 16px/1 Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  cursor:pointer;transition:transform .15s ease
 }
-
-.queue-table tbody tr:last-child td {
-  border-bottom: none;
-}
-
-.queue-table tbody tr:hover {
-  background: rgba(255, 255, 255, 0.05);
-}
-
-/* Fixed column widths */
-.queue-table th:nth-child(1),
-.queue-table td:nth-child(1) {
-  width: 50px;
-  text-align: center;
-}
-
-.queue-table th:nth-child(2),
-.queue-table td:nth-child(2) {
-  width: 60px;
-  text-align: left;
-  padding-left: 0.25rem;
-}
-
-.queue-table th:nth-child(3),
-.queue-table td:nth-child(3) {
-  width: auto;
-  min-width: 200px;
-  text-align: left;
-  padding-left: 0.5rem;
-}
-
-.queue-table th:nth-child(4),
-.queue-table td:nth-child(4) {
-  width: 60px;
-  text-align: center;
-}
-
-.queue-table th:nth-child(5),
-.queue-table td:nth-child(5) {
-  width: 60px;
-  text-align: center;
-}
-
-.queue-table th:nth-child(6),
-.queue-table td:nth-child(6) {
-  width: 80px;
-  text-align: right;
-  padding-right: 0.5rem;
-}
-
-/* Queue item text */
-.queue-index {
-  color: #9ca3af;
-  font-size: 0.875rem;
-  font-weight: 600;
-}
-
-.queue-cover {
-  width: 48px;
-  height: 48px;
-  object-fit: cover;
-  border-radius: 6px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-  transition: transform 0.2s ease;
-  display: block;
-}
-
-.queue-cover:hover {
-  transform: scale(1.05);
-}
-
-.queue-meta {
-  display: block; /* keep TD as table-cell, stack content via block children */
-  min-width: 0;
-}
-
-.queue-title {
-  font-weight: 600;
-  font-size: 0.95rem;
-  line-height: 1.2;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin-bottom: 0.25rem;
-}
-
-.queue-artist {
-  font-size: 0.825rem;
-  color: #d1d5db;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-  font-weight: 500;
-}
-
-.queue-side {
-  font-size: 0.875rem;
-  color: #fff;
-  font-weight: 700;
-  background: rgba(59, 130, 246, 0.2);
-  padding: 4px 8px;
-  border-radius: 4px;
-  display: inline-block;
-  min-width: 24px;
-  text-align: center;
-}
-
-/* Vote button */
-.queue-plus-btn {
-  background: linear-gradient(135deg, #3b82f6, #1d4ed8) !important;
-  color: white !important;
-  border: none !important;
-  border-radius: 6px !important;
-  padding: 6px 10px !important;
-  font-size: 16px !important;
-  font-weight: 700 !important;
-  cursor: pointer !important;
-  transition: all 0.2s ease !important;
-  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3) !important;
-}
-
-.queue-plus-btn:hover {
-  background: linear-gradient(135deg, #2563eb, #1e40af) !important;
-  transform: translateY(-1px) !important;
-  box-shadow: 0 4px 8px rgba(59, 130, 246, 0.4) !important;
-}
-
-.queue-plus-btn:active {
-  transform: translateY(0) !important;
-}
-
-/* Votes */
-.queue-votes {
-  text-align: right;
-}
-
-.queue-votes > div {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  justify-content: flex-end;
-}
-
-.queue-heart {
-  font-size: 1.125rem;
-  color: #ef4444;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
-}
-
-.queue-count {
-  font-size: 0.875rem;
-  color: #f3f4f6;
-  font-weight: 600;
-}
-
-/* Responsive */
-@media (max-width: 1024px) {
-  .browse-queue {
-    flex-direction: column;
-    gap: 1.5rem;
-  }
-  .event-sidebar {
-    flex: none;
-    position: static;
-    max-width: none;
-  }
-}
-
-@media (max-width: 768px) {
-  .browse-queue {
-    padding: 1rem;
-  }
-  .queue-wrapper {
-    padding: 1rem;
-    margin: 0 -0.5rem;
-    border-radius: 8px;
-  }
-  .queue-table th:nth-child(3),
-  .queue-table td:nth-child(3) {
-    min-width: 150px;
-  }
-  .queue-title { font-size: 0.875rem; }
-  .queue-artist { font-size: 0.75rem; }
-}
+.queue-plus-btn:hover{transform:translateY(-1px)}
+.queue-heart{font-size:1.125rem;color:#ef4444}
+.queue-count{font:600 .875rem/1 Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#f3f4f6}
+.queue-votes-inner{display:flex;align-items:center;gap:.5rem;justify-content:flex-end}
 
 /* Accessibility helper */
-.sr-only {
-  position: absolute !important;
-  width: 1px !important;
-  height: 1px !important;
-  padding: 0 !important;
-  margin: -1px !important;
-  overflow: hidden !important;
-  clip: rect(0, 0, 0, 0) !important;
-  white-space: nowrap !important;
-  border: 0 !important;
+.sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+
+/* Responsive */
+@media (max-width:1024px){
+  .browse-queue{flex-direction:column;gap:1.5rem}
+  .event-sidebar{flex:none;position:static;max-width:none}
+}
+@media (max-width:768px){
+  .browse-queue{padding:1rem}
+  .queue-wrapper{padding:1rem;margin:0 -.5rem;border-radius:8px}
+  .queue-table th:nth-child(3),.queue-table td:nth-child(3){min-width:150px}
+  .queue-title{font-size:.875rem}.queue-artist{font-size:.75rem}
 }
