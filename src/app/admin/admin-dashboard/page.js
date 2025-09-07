@@ -1,4 +1,4 @@
-// src/app/admin/admin-dashboard/page.js - UPDATED TV DISPLAY LINK
+// src/app/admin/admin-dashboard/page.js - UPDATED WITH EXTERNAL TOOLS
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -324,6 +324,228 @@ export default function AdminDashboardPage() {
           >
             🎧 Control Panel
           </Link>
+        </div>
+      </div>
+
+      {/* NEW: External Tools Quick Access */}
+      <div style={{
+        background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+        color: 'white',
+        borderRadius: 16,
+        padding: 24,
+        marginBottom: 24
+      }}>
+        <div style={{ marginBottom: 20 }}>
+          <h3 style={{
+            margin: 0,
+            fontSize: 20,
+            fontWeight: 600,
+            marginBottom: 8
+          }}>
+            🔗 External Admin Tools
+          </h3>
+          <p style={{
+            margin: 0,
+            opacity: 0.9,
+            fontSize: 14
+          }}>
+            Quick access to all your external services and platforms
+          </p>
+        </div>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+          gap: 12
+        }}>
+          <a
+            href="https://blog.deadwaxdialogues.com/wp-admin/"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              background: 'rgba(255,255,255,0.15)',
+              color: 'white',
+              padding: '10px 16px',
+              borderRadius: 8,
+              textDecoration: 'none',
+              fontWeight: 600,
+              fontSize: 13,
+              textAlign: 'center',
+              border: '1px solid rgba(255,255,255,0.2)',
+              transition: 'all 0.2s'
+            }}
+            onMouseOver={(e) => e.target.style.background = 'rgba(255,255,255,0.25)'}
+            onMouseOut={(e) => e.target.style.background = 'rgba(255,255,255,0.15)'}
+          >
+            📝 WordPress Admin
+          </a>
+          <a
+            href="https://console.hetzner.com/projects"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              background: 'rgba(255,255,255,0.15)',
+              color: 'white',
+              padding: '10px 16px',
+              borderRadius: 8,
+              textDecoration: 'none',
+              fontWeight: 600,
+              fontSize: 13,
+              textAlign: 'center',
+              border: '1px solid rgba(255,255,255,0.2)',
+              transition: 'all 0.2s'
+            }}
+            onMouseOver={(e) => e.target.style.background = 'rgba(255,255,255,0.25)'}
+            onMouseOut={(e) => e.target.style.background = 'rgba(255,255,255,0.15)'}
+          >
+            🖥️ Hetzner Console
+          </a>
+          <a
+            href="https://business.facebook.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              background: 'rgba(255,255,255,0.15)',
+              color: 'white',
+              padding: '10px 16px',
+              borderRadius: 8,
+              textDecoration: 'none',
+              fontWeight: 600,
+              fontSize: 13,
+              textAlign: 'center',
+              border: '1px solid rgba(255,255,255,0.2)',
+              transition: 'all 0.2s'
+            }}
+            onMouseOver={(e) => e.target.style.background = 'rgba(255,255,255,0.25)'}
+            onMouseOut={(e) => e.target.style.background = 'rgba(255,255,255,0.15)'}
+          >
+            📘 Facebook Business
+          </a>
+          <a
+            href="https://login.buffer.com/login?plan=free&cycle=year&cta=bufferSite-globalNav-login-1"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              background: 'rgba(255,255,255,0.15)',
+              color: 'white',
+              padding: '10px 16px',
+              borderRadius: 8,
+              textDecoration: 'none',
+              fontWeight: 600,
+              fontSize: 13,
+              textAlign: 'center',
+              border: '1px solid rgba(255,255,255,0.2)',
+              transition: 'all 0.2s'
+            }}
+            onMouseOver={(e) => e.target.style.background = 'rgba(255,255,255,0.25)'}
+            onMouseOut={(e) => e.target.style.background = 'rgba(255,255,255,0.15)'}
+          >
+            📱 Buffer
+          </a>
+          <a
+            href="https://supabase.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              background: 'rgba(255,255,255,0.15)',
+              color: 'white',
+              padding: '10px 16px',
+              borderRadius: 8,
+              textDecoration: 'none',
+              fontWeight: 600,
+              fontSize: 13,
+              textAlign: 'center',
+              border: '1px solid rgba(255,255,255,0.2)',
+              transition: 'all 0.2s'
+            }}
+            onMouseOver={(e) => e.target.style.background = 'rgba(255,255,255,0.25)'}
+            onMouseOut={(e) => e.target.style.background = 'rgba(255,255,255,0.15)'}
+          >
+            🗄️ Supabase
+          </a>
+          <a
+            href="https://vercel.com/scashbys-projects/vinyl-request-v2"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              background: 'rgba(255,255,255,0.15)',
+              color: 'white',
+              padding: '10px 16px',
+              borderRadius: 8,
+              textDecoration: 'none',
+              fontWeight: 600,
+              fontSize: 13,
+              textAlign: 'center',
+              border: '1px solid rgba(255,255,255,0.2)',
+              transition: 'all 0.2s'
+            }}
+            onMouseOver={(e) => e.target.style.background = 'rgba(255,255,255,0.25)'}
+            onMouseOut={(e) => e.target.style.background = 'rgba(255,255,255,0.15)'}
+          >
+            ▲ Vercel
+          </a>
+          <a
+            href="https://admin.google.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              background: 'rgba(255,255,255,0.15)',
+              color: 'white',
+              padding: '10px 16px',
+              borderRadius: 8,
+              textDecoration: 'none',
+              fontWeight: 600,
+              fontSize: 13,
+              textAlign: 'center',
+              border: '1px solid rgba(255,255,255,0.2)',
+              transition: 'all 0.2s'
+            }}
+            onMouseOver={(e) => e.target.style.background = 'rgba(255,255,255,0.25)'}
+            onMouseOut={(e) => e.target.style.background = 'rgba(255,255,255,0.15)'}
+          >
+            🔍 Google Admin
+          </a>
+          <a
+            href="https://login.squarespace.com/api/1/login/"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              background: 'rgba(255,255,255,0.15)',
+              color: 'white',
+              padding: '10px 16px',
+              borderRadius: 8,
+              textDecoration: 'none',
+              fontWeight: 600,
+              fontSize: 13,
+              textAlign: 'center',
+              border: '1px solid rgba(255,255,255,0.2)',
+              transition: 'all 0.2s'
+            }}
+            onMouseOver={(e) => e.target.style.background = 'rgba(255,255,255,0.25)'}
+            onMouseOut={(e) => e.target.style.background = 'rgba(255,255,255,0.15)'}
+          >
+            ⬛ Squarespace
+          </a>
+          <a
+            href="https://app.dub.co/login"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              background: 'rgba(255,255,255,0.15)',
+              color: 'white',
+              padding: '10px 16px',
+              borderRadius: 8,
+              textDecoration: 'none',
+              fontWeight: 600,
+              fontSize: 13,
+              textAlign: 'center',
+              border: '1px solid rgba(255,255,255,0.2)',
+              transition: 'all 0.2s'
+            }}
+            onMouseOver={(e) => e.target.style.background = 'rgba(255,255,255,0.25)'}
+            onMouseOut={(e) => e.target.style.background = 'rgba(255,255,255,0.15)'}
+          >
+            🔗 Dub.co
+          </a>
         </div>
       </div>
 

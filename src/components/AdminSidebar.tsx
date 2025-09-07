@@ -1,4 +1,4 @@
-// Updated src/components/AdminSidebar.tsx - Add DJ Sets management
+// Updated src/components/AdminSidebar.tsx - Add external admin tools
 
 "use client";
 
@@ -258,6 +258,85 @@ export default function AdminSidebar() {
         </div>
       </div>
 
+      {/* NEW: External Admin Tools */}
+      <div className="mt-4 p-3 bg-slate-50 border border-slate-200 rounded-lg">
+        <h4 className="text-sm font-semibold text-slate-800 mb-2">🔗 External Tools</h4>
+        <div className="space-y-1.5">
+          <a 
+            href="https://blog.deadwaxdialogues.com/wp-admin/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block w-full text-center bg-slate-600 text-white py-1 px-2 rounded text-xs font-medium hover:bg-slate-700 transition-colors"
+          >
+            📝 WordPress
+          </a>
+          <a 
+            href="https://console.hetzner.com/projects"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block w-full text-center bg-red-600 text-white py-1 px-2 rounded text-xs font-medium hover:bg-red-700 transition-colors"
+          >
+            🖥️ Hetzner
+          </a>
+          <a 
+            href="https://business.facebook.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block w-full text-center bg-blue-600 text-white py-1 px-2 rounded text-xs font-medium hover:bg-blue-700 transition-colors"
+          >
+            📘 Facebook
+          </a>
+          <a 
+            href="https://login.buffer.com/login?plan=free&cycle=year&cta=bufferSite-globalNav-login-1"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block w-full text-center bg-gray-600 text-white py-1 px-2 rounded text-xs font-medium hover:bg-gray-700 transition-colors"
+          >
+            📱 Buffer
+          </a>
+          <a 
+            href="https://supabase.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block w-full text-center bg-green-600 text-white py-1 px-2 rounded text-xs font-medium hover:bg-green-700 transition-colors"
+          >
+            🗄️ Supabase
+          </a>
+          <a 
+            href="https://vercel.com/scashbys-projects/vinyl-request-v2"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block w-full text-center bg-black text-white py-1 px-2 rounded text-xs font-medium hover:bg-gray-800 transition-colors"
+          >
+            ▲ Vercel
+          </a>
+          <a 
+            href="https://admin.google.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block w-full text-center bg-red-500 text-white py-1 px-2 rounded text-xs font-medium hover:bg-red-600 transition-colors"
+          >
+            🔍 Google
+          </a>
+          <a 
+            href="https://login.squarespace.com/api/1/login/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block w-full text-center bg-gray-800 text-white py-1 px-2 rounded text-xs font-medium hover:bg-gray-900 transition-colors"
+          >
+            ⬛ Squarespace
+          </a>
+          <a 
+            href="https://app.dub.co/login"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block w-full text-center bg-purple-600 text-white py-1 px-2 rounded text-xs font-medium hover:bg-purple-700 transition-colors"
+          >
+            🔗 Dub.co
+          </a>
+        </div>
+      </div>
+
       {/* Quick Stats */}
       <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
         <h4 className="text-sm font-semibold text-gray-800 mb-2">📊 Quick Info</h4>
@@ -266,6 +345,7 @@ export default function AdminSidebar() {
           <div>💡 Album suggestions system active</div>
           <div>🎧 Audio recognition ready</div>
           <div>💎 Inner Circle voting live</div>
+          <div>🔗 External tools integrated</div>
           <div>💸 Venmo: @deadwaxdialogues</div>
         </div>
       </div>
