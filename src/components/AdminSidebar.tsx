@@ -239,6 +239,17 @@ export default function AdminSidebar() {
         <h4 className="text-sm font-semibold text-yellow-800 mb-2">👥 User Features</h4>
         <div className="space-y-2">
           <a 
+            href="/staff-voting"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block w-full text-center bg-orange-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-orange-700 transition-colors relative"
+          >
+            🗳️ Staff Voting
+            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+              NEW
+            </span>
+          </a>
+          <a 
             href="/staff-picks"
             target="_blank"
             rel="noopener noreferrer"
@@ -364,7 +375,7 @@ export default function AdminSidebar() {
         <div className="space-y-1 text-xs text-gray-600">
           <div>🎧 DJ Sets system active</div>
           <div>💡 Album suggestions system active</div>
-          <div>🎵 Staff picks system active</div>
+          <div>🗳️ Staff voting system active</div>
           <div>🎧 Audio recognition ready</div>
           <div>💎 Inner Circle voting live</div>
           <div>🔗 External tools integrated</div>
