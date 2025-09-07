@@ -1,5 +1,4 @@
-// Updated Admin Sidebar with Album Suggestions test page
-// Replace: src/components/AdminSidebar.tsx
+// Updated src/components/AdminSidebar.tsx - Add DJ Sets management
 
 "use client";
 
@@ -26,6 +25,7 @@ export default function AdminSidebar() {
     
     // Event Management
     { label: "Manage Events", path: "/admin/manage-events" },
+    { label: "Manage DJ Sets", path: "/admin/manage-dj-sets", isNew: true }, // NEW
     { label: "Manage Queues", path: "/admin/edit-queue" },
     
     // Collection Management
@@ -57,6 +57,7 @@ export default function AdminSidebar() {
           const isAudioRecognition = item.path.includes('/audio-recognition') || item.path.includes('/audio-debug');
           const isContentManagement = item.path.includes('/edit-about') || item.path.includes('/most-wanted') || item.path.includes('/socials') || item.path.includes('/playlists');
           const isCollectionManagement = item.path.includes('/edit-collection') || item.path.includes('/add-album') || item.path.includes('/inner-circle') || item.path.includes('/album-suggestions') || item.path.includes('/import-discogs') || item.path.includes('/test-album-suggestions');
+          const isEventManagement = item.path.includes('/manage-events') || item.path.includes('/manage-dj-sets') || item.path.includes('/edit-queue'); // NEW
           
           return (
             <li key={item.path}>
@@ -72,6 +73,8 @@ export default function AdminSidebar() {
                     ? "text-green-700 hover:bg-green-50 hover:text-green-800 pl-4"
                     : isCollectionManagement
                     ? "text-indigo-700 hover:bg-indigo-50 hover:text-indigo-800 pl-4"
+                    : isEventManagement
+                    ? "text-orange-700 hover:bg-orange-50 hover:text-orange-800 pl-4"
                     : "text-gray-700 hover:bg-gray-200 hover:text-blue-600"
                   }
                 `}
@@ -116,6 +119,34 @@ export default function AdminSidebar() {
           >
             📺 TV Display
           </a>
+        </div>
+      </div>
+
+      {/* NEW: Event & DJ Sets Management */}
+      <div className="mt-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+        <h4 className="text-sm font-semibold text-orange-800 mb-2">🎧 Events & DJ Sets</h4>
+        <div className="space-y-2">
+          <Link 
+            href="/admin/manage-events"
+            className="block w-full text-center bg-orange-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-orange-700 transition-colors"
+          >
+            📅 Manage Events
+          </Link>
+          <Link 
+            href="/admin/manage-dj-sets"
+            className="block w-full text-center bg-red-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-red-700 transition-colors relative"
+          >
+            🎧 DJ Sets
+            <span className="absolute -top-1 -right-1 bg-green-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+              NEW
+            </span>
+          </Link>
+          <Link 
+            href="/admin/edit-queue"
+            className="block w-full text-center bg-orange-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-orange-700 transition-colors"
+          >
+            🎵 Edit Queues
+          </Link>
         </div>
       </div>
 
@@ -213,6 +244,17 @@ export default function AdminSidebar() {
           >
             📚 Browse Collection
           </a>
+          <a 
+            href="/dj-sets"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block w-full text-center bg-red-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-red-700 transition-colors relative"
+          >
+            🎧 DJ Sets
+            <span className="absolute -top-1 -right-1 bg-green-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+              NEW
+            </span>
+          </a>
         </div>
       </div>
 
@@ -220,6 +262,7 @@ export default function AdminSidebar() {
       <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
         <h4 className="text-sm font-semibold text-gray-800 mb-2">📊 Quick Info</h4>
         <div className="space-y-1 text-xs text-gray-600">
+          <div>🎧 DJ Sets system active</div>
           <div>💡 Album suggestions system active</div>
           <div>🎧 Audio recognition ready</div>
           <div>💎 Inner Circle voting live</div>

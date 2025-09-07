@@ -11,6 +11,7 @@ import 'styles/internal.css';
 import 'styles/events.css';
 import Image from 'next/image';
 import QueueSection from 'components/QueueSection';
+import EventDJSets from 'components/EventDJSets';
 // import Footer from 'components/Footer';
 
 export default function Page() {
@@ -119,6 +120,10 @@ export default function Page() {
                 )}
               </div>
             )}
+
+            {/* DJ Sets Section - NEW ADDITION */}
+            <EventDJSets eventId={event.id} />
+
             {has_queue && (
               <>
                 <QueueSection eventId={event.id} />
