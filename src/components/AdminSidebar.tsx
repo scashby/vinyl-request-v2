@@ -1,4 +1,4 @@
-// Updated src/components/AdminSidebar.tsx - Add external admin tools
+// Updated src/components/AdminSidebar.tsx - Complete version with staff picks
 
 "use client";
 
@@ -25,7 +25,7 @@ export default function AdminSidebar() {
     
     // Event Management
     { label: "Manage Events", path: "/admin/manage-events" },
-    { label: "Manage DJ Sets", path: "/admin/manage-dj-sets", isNew: true }, // NEW
+    { label: "Manage DJ Sets", path: "/admin/manage-dj-sets", isNew: true },
     { label: "Manage Queues", path: "/admin/edit-queue" },
     
     // Collection Management
@@ -34,6 +34,7 @@ export default function AdminSidebar() {
     { label: "Add Album", path: "/admin/add-album" },
     { label: "Add Customer Vinyl", path: "/admin/add-customer-vinyl" },
     { label: "Inner Circle Results", path: "/admin/inner-circle-results" },
+    { label: "Staff Picks", path: "/admin/staff-picks", isNew: true },
     { label: "Album Suggestions", path: "/admin/album-suggestions", isNew: true },
     { label: "Test Album Suggestions", path: "/admin/test-album-suggestions", isNew: true },
     
@@ -56,8 +57,8 @@ export default function AdminSidebar() {
           const isActive = pathname === item.path;
           const isAudioRecognition = item.path.includes('/audio-recognition') || item.path.includes('/audio-debug');
           const isContentManagement = item.path.includes('/edit-about') || item.path.includes('/most-wanted') || item.path.includes('/socials') || item.path.includes('/playlists');
-          const isCollectionManagement = item.path.includes('/edit-collection') || item.path.includes('/add-album') || item.path.includes('/inner-circle') || item.path.includes('/album-suggestions') || item.path.includes('/import-discogs') || item.path.includes('/test-album-suggestions');
-          const isEventManagement = item.path.includes('/manage-events') || item.path.includes('/manage-dj-sets') || item.path.includes('/edit-queue'); // NEW
+          const isCollectionManagement = item.path.includes('/edit-collection') || item.path.includes('/add-album') || item.path.includes('/inner-circle') || item.path.includes('/album-suggestions') || item.path.includes('/import-discogs') || item.path.includes('/test-album-suggestions') || item.path.includes('/staff-picks');
+          const isEventManagement = item.path.includes('/manage-events') || item.path.includes('/manage-dj-sets') || item.path.includes('/edit-queue');
           
           return (
             <li key={item.path}>
@@ -122,7 +123,7 @@ export default function AdminSidebar() {
         </div>
       </div>
 
-      {/* NEW: Event & DJ Sets Management */}
+      {/* Event & DJ Sets Management */}
       <div className="mt-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
         <h4 className="text-sm font-semibold text-orange-800 mb-2">🎧 Events & DJ Sets</h4>
         <div className="space-y-2">
@@ -165,6 +166,15 @@ export default function AdminSidebar() {
             className="block w-full text-center bg-indigo-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-indigo-700 transition-colors"
           >
             ➕ Add Album
+          </Link>
+          <Link 
+            href="/admin/staff-picks"
+            className="block w-full text-center bg-purple-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-purple-700 transition-colors relative"
+          >
+            🎵 Staff Picks
+            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+              NEW
+            </span>
           </Link>
           <Link 
             href="/admin/album-suggestions"
@@ -229,6 +239,17 @@ export default function AdminSidebar() {
         <h4 className="text-sm font-semibold text-yellow-800 mb-2">👥 User Features</h4>
         <div className="space-y-2">
           <a 
+            href="/staff-picks"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block w-full text-center bg-purple-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-purple-700 transition-colors relative"
+          >
+            🎵 Staff Picks
+            <span className="absolute -top-1 -right-1 bg-green-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+              NEW
+            </span>
+          </a>
+          <a 
             href="/inner-circle-voting"
             target="_blank"
             rel="noopener noreferrer"
@@ -258,7 +279,7 @@ export default function AdminSidebar() {
         </div>
       </div>
 
-      {/* NEW: External Admin Tools */}
+      {/* External Admin Tools */}
       <div className="mt-4 p-3 bg-slate-50 border border-slate-200 rounded-lg">
         <h4 className="text-sm font-semibold text-slate-800 mb-2">🔗 External Tools</h4>
         <div className="space-y-1.5">
@@ -343,6 +364,7 @@ export default function AdminSidebar() {
         <div className="space-y-1 text-xs text-gray-600">
           <div>🎧 DJ Sets system active</div>
           <div>💡 Album suggestions system active</div>
+          <div>🎵 Staff picks system active</div>
           <div>🎧 Audio recognition ready</div>
           <div>💎 Inner Circle voting live</div>
           <div>🔗 External tools integrated</div>
