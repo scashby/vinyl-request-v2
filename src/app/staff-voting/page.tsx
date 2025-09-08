@@ -30,6 +30,12 @@ interface StaffInfo {
   photoUrl: string;
 }
 
+interface SuggestionRequest {
+  artist: string;
+  album: string;
+  reason: string;
+}
+
 export default function StaffVotingPage() {
   const [albums, setAlbums] = useState<Album[]>([]);
   const [selectedPicks, setSelectedPicks] = useState<Map<number, StaffPick>>(new Map());
@@ -40,11 +46,17 @@ export default function StaffVotingPage() {
     bio: '',
     photoUrl: ''
   });
+  const [suggestionRequest, setSuggestionRequest] = useState<SuggestionRequest>({
+    artist: '',
+    album: '',
+    reason: ''
+  });
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showSuggestion, setShowSuggestion] = useState(false);
   
   const MAX_PICKS = 5;
   const submitFormRef = useRef<HTMLDivElement>(null);
@@ -59,7 +71,7 @@ export default function StaffVotingPage() {
       const { data, error } = await supabase
         .from('collection')
         .select('id, artist, title, year, image_url, folder')
-        .eq('folder', 'Vinyl')
+        .in('folder', ['Vinyl', 'Cassettes'])
         .or('blocked.is.null,blocked.eq.false')
         .order('artist', { ascending: true })
         .order('title', { ascending: true });
@@ -67,7 +79,7 @@ export default function StaffVotingPage() {
       if (error) throw error;
       setAlbums(data || []);
     } catch (error) {
-      console.error('Error loading vinyl collection:', error);
+      console.error('Error loading vinyl and cassette collection:', error);
       setError('Failed to load collection. Please refresh the page.');
     } finally {
       setLoading(false);
@@ -220,6 +232,22 @@ export default function StaffVotingPage() {
 
       if (submitError) throw submitError;
 
+      // Submit suggestion if provided
+      if (suggestionRequest.artist.trim() && suggestionRequest.album.trim()) {
+        await fetch('/api/album-suggestions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            artist: suggestionRequest.artist.trim(),
+            album: suggestionRequest.album.trim(),
+            reason: suggestionRequest.reason.trim() || 'Staff suggestion for collection',
+            contributor_name: staffInfo.name.trim(),
+            contributor_email: staffInfo.email.trim(),
+            context: 'staff_picks'
+          })
+        });
+      }
+
       setSubmitted(true);
     } catch (error) {
       console.error('Error submitting picks:', error);
@@ -280,6 +308,9 @@ export default function StaffVotingPage() {
           </p>
           <p style={{ fontSize: 16, opacity: 0.7, marginBottom: 30 }}>
             You selected {selectedPicks.size} album{selectedPicks.size !== 1 ? 's' : ''} for your top picks.
+            {suggestionRequest.artist && suggestionRequest.album && (
+              <><br/>Plus you suggested: {suggestionRequest.artist} - {suggestionRequest.album}</>
+            )}
           </p>
           <div style={{ marginTop: 30, fontSize: 14, opacity: 0.6 }}>
             Your picks will be visible on the Staff Picks page soon.
@@ -312,7 +343,7 @@ export default function StaffVotingPage() {
             🎵 Staff Picks Selection
           </h1>
           <p style={{ fontSize: 18, margin: '0 0 20px 0', opacity: 0.9 }}>
-            Choose your top 5 favorite albums from our collection
+            Choose your top 5 favorite albums from our vinyl and cassette collection
           </p>
           <p style={{ fontSize: 16, opacity: 0.8 }}>
             Select up to <strong>{MAX_PICKS} albums</strong> and tell us why you love them
@@ -342,7 +373,7 @@ export default function StaffVotingPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
             <div style={{ fontSize: 20 }}>🔍</div>
             <h3 style={{ fontSize: 20, margin: 0, fontWeight: 'bold' }}>
-              Search Albums
+              Search Albums (Vinyl & Cassettes)
             </h3>
           </div>
 
@@ -363,6 +394,10 @@ export default function StaffVotingPage() {
             }}
             placeholder="Search by artist name, album title, or year..."
           />
+          
+          <div style={{ marginTop: 12, fontSize: 14, opacity: 0.8 }}>
+            📀 Showing {albums.filter(a => a.folder === 'Vinyl').length} vinyl records and {albums.filter(a => a.folder === 'Cassettes').length} cassettes
+          </div>
         </div>
 
         {/* Selected Picks Summary */}
@@ -420,6 +455,9 @@ export default function StaffVotingPage() {
                     
                     <div style={{ flex: 1, fontSize: 14 }}>
                       <strong>{album.artist}</strong> - {album.title}
+                      <div style={{ fontSize: 12, opacity: 0.8 }}>
+                        {album.folder} • {album.year}
+                      </div>
                     </div>
                     
                     <div style={{ display: 'flex', gap: 4 }}>
@@ -553,6 +591,21 @@ export default function StaffVotingPage() {
                   </div>
                 )}
 
+                {/* Format Badge */}
+                <div style={{
+                  position: 'absolute',
+                  bottom: 8,
+                  left: 8,
+                  background: album.folder === 'Vinyl' ? '#8b5cf6' : '#06b6d4',
+                  color: 'white',
+                  padding: '2px 6px',
+                  borderRadius: 4,
+                  fontSize: 10,
+                  fontWeight: 'bold'
+                }}>
+                  {album.folder === 'Vinyl' ? '💿 VINYL' : '📼 CASSETTE'}
+                </div>
+
                 {/* Album Cover */}
                 <div style={{
                   width: '100%',
@@ -612,7 +665,7 @@ export default function StaffVotingPage() {
                     fontSize: 11,
                     opacity: 0.6
                   }}>
-                    {album.year} • {album.folder}
+                    {album.year}
                   </div>
                 </div>
               </div>
@@ -761,6 +814,112 @@ export default function StaffVotingPage() {
             </div>
           </div>
 
+          {/* Suggestion Section */}
+          <div style={{ marginBottom: 32 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+              <h4 style={{ fontSize: 18, margin: 0, fontWeight: 'bold' }}>
+                💡 Suggest Something for the Collection
+              </h4>
+              <button
+                onClick={() => setShowSuggestion(!showSuggestion)}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 6,
+                  padding: '4px 8px',
+                  fontSize: 12,
+                  cursor: 'pointer'
+                }}
+              >
+                {showSuggestion ? 'Hide' : 'Show'}
+              </button>
+            </div>
+            
+            {showSuggestion && (
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.1)',
+                borderRadius: 12,
+                padding: 20
+              }}>
+                <p style={{ fontSize: 14, opacity: 0.9, marginBottom: 16 }}>
+                  Is there an album you&apos;d love to see added to our collection? Let us know!
+                </p>
+                
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: 16,
+                  marginBottom: 16
+                }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: 8, fontWeight: 'bold' }}>
+                      Artist Name
+                    </label>
+                    <input
+                      type="text"
+                      value={suggestionRequest.artist}
+                      onChange={e => setSuggestionRequest(prev => ({ ...prev, artist: e.target.value }))}
+                      style={{
+                        width: '100%',
+                        padding: '12px 16px',
+                        borderRadius: 8,
+                        border: 'none',
+                        fontSize: 16,
+                        background: 'rgba(255, 255, 255, 0.9)',
+                        color: '#333'
+                      }}
+                      placeholder="e.g., Pink Floyd"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label style={{ display: 'block', marginBottom: 8, fontWeight: 'bold' }}>
+                      Album Title
+                    </label>
+                    <input
+                      type="text"
+                      value={suggestionRequest.album}
+                      onChange={e => setSuggestionRequest(prev => ({ ...prev, album: e.target.value }))}
+                      style={{
+                        width: '100%',
+                        padding: '12px 16px',
+                        borderRadius: 8,
+                        border: 'none',
+                        fontSize: 16,
+                        background: 'rgba(255, 255, 255, 0.9)',
+                        color: '#333'
+                      }}
+                      placeholder="e.g., Dark Side of the Moon"
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <label style={{ display: 'block', marginBottom: 8, fontWeight: 'bold' }}>
+                    Why should we add this? (Optional)
+                  </label>
+                  <textarea
+                    value={suggestionRequest.reason}
+                    onChange={e => setSuggestionRequest(prev => ({ ...prev, reason: e.target.value }))}
+                    rows={2}
+                    style={{
+                      width: '100%',
+                      padding: '12px 16px',
+                      borderRadius: 8,
+                      border: 'none',
+                      fontSize: 16,
+                      background: 'rgba(255, 255, 255, 0.9)',
+                      color: '#333',
+                      resize: 'vertical'
+                    }}
+                    placeholder="Tell us why this album would be a great addition..."
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Pick Details */}
           {selectedCount > 0 && (
             <div style={{ marginBottom: 32 }}>
@@ -816,7 +975,7 @@ export default function StaffVotingPage() {
                           {album.title}
                         </div>
                         <div style={{ fontSize: 14, opacity: 0.8 }}>
-                          {album.artist} • {album.year}
+                          {album.artist} • {album.year} • {album.folder}
                         </div>
                       </div>
                     </div>
@@ -935,6 +1094,9 @@ export default function StaffVotingPage() {
 
           <div style={{ fontSize: 12, opacity: 0.7, textAlign: 'center', marginTop: 16 }}>
             Each staff member can only submit picks once. Your selections will be featured on the Staff Picks page.
+            {suggestionRequest.artist && suggestionRequest.album && (
+              <><br/>+ Your suggestion will be sent to the admin for consideration.</>
+            )}
           </div>
         </div>
       </div>

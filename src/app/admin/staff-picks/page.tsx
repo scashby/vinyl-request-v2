@@ -35,16 +35,31 @@ interface StaffSummary {
   isApproved: boolean;
 }
 
+interface FolderSettings {
+  [folder: string]: boolean;
+}
+
 export default function AdminStaffPicksPage() {
   const [submissions, setSubmissions] = useState<StaffSubmission[]>([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<number | null>(null);
   const [status, setStatus] = useState('');
   const [selectedStaff, setSelectedStaff] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'summary' | 'detailed'>('summary');
+  const [viewMode, setViewMode] = useState<'summary' | 'detailed' | 'settings'>('summary');
+  const [folderSettings, setFolderSettings] = useState<FolderSettings>({
+    'Vinyl': true,
+    'Cassettes': true,
+    'CDs': false,
+    '45s': false,
+    'Digital': false,
+    'Test Pressings': false,
+    'Bootlegs': false
+  });
+  const [savingSettings, setSavingSettings] = useState(false);
 
   useEffect(() => {
     loadStaffSubmissions();
+    loadFolderSettings();
   }, []);
 
   const loadStaffSubmissions = async () => {
@@ -82,6 +97,48 @@ export default function AdminStaffPicksPage() {
       setStatus(`Error loading submissions: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadFolderSettings = async () => {
+    try {
+      // Try to load from a settings table, or use defaults
+      const { data } = await supabase
+        .from('admin_settings')
+        .select('value')
+        .eq('key', 'staff_picks_folders')
+        .single();
+
+      if (data?.value) {
+        setFolderSettings(JSON.parse(data.value));
+      }
+    } catch {
+      // If no settings exist, use defaults
+      console.log('Using default folder settings');
+    }
+  };
+
+  const saveFolderSettings = async () => {
+    setSavingSettings(true);
+    try {
+      // Save to admin_settings table (create if doesn't exist)
+      const { error } = await supabase
+        .from('admin_settings')
+        .upsert({
+          key: 'staff_picks_folders',
+          value: JSON.stringify(folderSettings),
+          updated_at: new Date().toISOString()
+        });
+
+      if (error) throw error;
+
+      setStatus('✅ Folder settings saved! These will be used for future staff picks selections.');
+      setTimeout(() => setStatus(''), 5000);
+    } catch (error) {
+      console.error('Error saving folder settings:', error);
+      setStatus(`❌ Error saving settings: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setSavingSettings(false);
     }
   };
 
@@ -175,6 +232,10 @@ export default function AdminStaffPicksPage() {
     isApproved: picks.every(p => p.is_active)
   }));
 
+  const enabledFolders = Object.entries(folderSettings)
+    .filter(([, enabled]) => enabled)
+    .map(([folder]) => folder);
+
   if (loading) {
     return (
       <div style={{ padding: 24, textAlign: 'center' }}>
@@ -266,6 +327,21 @@ export default function AdminStaffPicksPage() {
             >
               📝 Detailed
             </button>
+            <button
+              onClick={() => setViewMode('settings')}
+              style={{
+                background: viewMode === 'settings' ? '#2563eb' : 'transparent',
+                color: viewMode === 'settings' ? 'white' : '#6b7280',
+                border: 'none',
+                borderRadius: 6,
+                padding: '6px 12px',
+                fontSize: 12,
+                fontWeight: 'bold',
+                cursor: 'pointer'
+              }}
+            >
+              ⚙️ Settings
+            </button>
           </div>
 
           <div style={{
@@ -292,6 +368,116 @@ export default function AdminStaffPicksPage() {
           fontWeight: 'bold'
         }}>
           {status}
+        </div>
+      )}
+
+      {/* Settings View */}
+      {viewMode === 'settings' && (
+        <div style={{
+          background: '#fff',
+          border: '1px solid #e5e7eb',
+          borderRadius: 12,
+          overflow: 'hidden',
+          marginBottom: 32
+        }}>
+          <div style={{
+            background: '#f8fafc',
+            padding: 20,
+            borderBottom: '1px solid #e5e7eb'
+          }}>
+            <h3 style={{ margin: '0 0 8px 0', fontSize: 20, fontWeight: 'bold' }}>
+              ⚙️ Collection Folder Settings
+            </h3>
+            <p style={{ margin: 0, fontSize: 14, color: '#6b7280' }}>
+              Choose which folders staff can select from when making their picks. 
+              Currently enabled: <strong>{enabledFolders.join(', ')}</strong>
+            </p>
+          </div>
+
+          <div style={{ padding: 24 }}>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: 16,
+              marginBottom: 24
+            }}>
+              {Object.entries(folderSettings).map(([folder, enabled]) => (
+                <label key={folder} style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  padding: 16,
+                  background: enabled ? '#f0fdf4' : '#f9fafb',
+                  border: `2px solid ${enabled ? '#22c55e' : '#e5e7eb'}`,
+                  borderRadius: 8,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={enabled}
+                    onChange={e => setFolderSettings(prev => ({
+                      ...prev,
+                      [folder]: e.target.checked
+                    }))}
+                    style={{
+                      transform: 'scale(1.2)',
+                      marginRight: 4
+                    }}
+                  />
+                  <div>
+                    <div style={{ fontWeight: 'bold', fontSize: 16 }}>
+                      {folder}
+                    </div>
+                    <div style={{ fontSize: 12, color: '#6b7280' }}>
+                      {enabled ? 'Available for staff picks' : 'Hidden from staff picks'}
+                    </div>
+                  </div>
+                </label>
+              ))}
+            </div>
+
+            <div style={{
+              background: '#fef3c7',
+              border: '1px solid #f59e0b',
+              borderRadius: 8,
+              padding: 16,
+              marginBottom: 20
+            }}>
+              <h4 style={{ margin: '0 0 8px 0', fontSize: 14, fontWeight: 'bold', color: '#92400e' }}>
+                💡 How This Works:
+              </h4>
+              <ul style={{ margin: 0, paddingLeft: 20, fontSize: 14, color: '#92400e', lineHeight: 1.5 }}>
+                <li>Staff will only see albums from enabled folders when making their picks</li>
+                <li>Default is Vinyl + Cassettes (most popular physical formats)</li>
+                <li>Enable CDs, 45s, or other folders as needed for your collection</li>
+                <li>Changes only affect new staff pick submissions</li>
+              </ul>
+            </div>
+
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+              <button
+                onClick={saveFolderSettings}
+                disabled={savingSettings}
+                style={{
+                  background: savingSettings ? '#9ca3af' : '#2563eb',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 8,
+                  padding: '12px 24px',
+                  fontSize: 16,
+                  fontWeight: 'bold',
+                  cursor: savingSettings ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {savingSettings ? '⏳ Saving...' : '💾 Save Folder Settings'}
+              </button>
+
+              <div style={{ fontSize: 14, color: '#6b7280' }}>
+                {enabledFolders.length} of {Object.keys(folderSettings).length} folders enabled
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -595,7 +781,7 @@ export default function AdminStaffPicksPage() {
                             </div>
                             <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}>
                               {pick.year} • {pick.folder}
-                              {pick.favorite_track && ` • Favorite: &ldquo;${pick.favorite_track}&rdquo;`}
+                              {pick.favorite_track && ` • Favorite: ${pick.favorite_track}`}
                             </div>
                             <div style={{
                               fontSize: 14,
@@ -607,7 +793,7 @@ export default function AdminStaffPicksPage() {
                               borderRadius: 6
                             }}>
                               <strong>Why they chose this:</strong><br />
-                              &ldquo;{pick.reason}&rdquo;
+                              {pick.reason}
                             </div>
                             {pick.listening_context && (
                               <div style={{ fontSize: 13, color: '#6b7280', fontStyle: 'italic' }}>
@@ -662,7 +848,7 @@ export default function AdminStaffPicksPage() {
       )}
 
       {/* No submissions message */}
-      {Object.keys(staffGroups).length === 0 && (
+      {Object.keys(staffGroups).length === 0 && viewMode !== 'settings' && (
         <div style={{
           textAlign: 'center',
           padding: 60,
@@ -675,7 +861,7 @@ export default function AdminStaffPicksPage() {
             No Staff Submissions Yet
           </h3>
           <p style={{ color: '#6b7280', marginBottom: 20 }}>
-            Staff haven&apos;t submitted any picks yet. Share the voting link with your team to get started.
+            Staff have not submitted any picks yet. Share the voting link with your team to get started.
           </p>
           <Link
             href="/staff-voting"
