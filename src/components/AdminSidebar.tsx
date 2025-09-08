@@ -1,4 +1,4 @@
-// Updated src/components/AdminSidebar.tsx - Complete version with staff picks
+// Updated src/components/AdminSidebar.tsx - Clean organization without NEW badges
 
 "use client";
 
@@ -11,40 +11,12 @@ export default function AdminSidebar() {
   type NavItem = {
     label: string;
     path: string;
-    isNew?: boolean;
     isExternal?: boolean;
     description?: string;
   };
 
   const navItems: NavItem[] = [
     { label: "Dashboard", path: "/admin/admin-dashboard" },
-    
-    // Audio Recognition Section
-    { label: "Audio Recognition", path: "/admin/audio-recognition", isNew: true },
-    { label: "Audio Debug", path: "/admin/audio-debug", isNew: true },
-    
-    // Event Management
-    { label: "Manage Events", path: "/admin/manage-events" },
-    { label: "Manage DJ Sets", path: "/admin/manage-dj-sets", isNew: true },
-    { label: "Manage Queues", path: "/admin/edit-queue" },
-    
-    // Collection Management
-    { label: "Import from Discogs", path: "/admin/import-discogs" },
-    { label: "Edit Collection", path: "/admin/edit-collection" },
-    { label: "Add Album", path: "/admin/add-album" },
-    { label: "Add Customer Vinyl", path: "/admin/add-customer-vinyl" },
-    { label: "Inner Circle Results", path: "/admin/inner-circle-results" },
-    { label: "Staff Picks", path: "/admin/staff-picks", isNew: true },
-    { label: "Album Suggestions", path: "/admin/album-suggestions", isNew: true },
-    { label: "Test Album Suggestions", path: "/admin/test-album-suggestions", isNew: true },
-    
-    // Content Management
-    { label: "Edit About Page", path: "/admin/edit-about", isNew: true },
-    { label: "Most Wanted", path: "/admin/most-wanted" },
-    { label: "Playlists", path: "/admin/playlists" },
-    { label: "Social Embeds", path: "/admin/socials" },
-    
-    // Quick Links
     { label: "Logout", path: "/" },
   ];
 
@@ -52,70 +24,59 @@ export default function AdminSidebar() {
     <div className="w-48 bg-gray-100 h-screen p-4 border-r fixed overflow-y-auto">
       <h2 className="text-lg font-bold mb-6 text-gray-800">Admin Panel</h2>
       
-      <ul className="space-y-2">
-        {navItems.map((item) => {
-          const isActive = pathname === item.path;
-          const isAudioRecognition = item.path.includes('/audio-recognition') || item.path.includes('/audio-debug');
-          const isContentManagement = item.path.includes('/edit-about') || item.path.includes('/most-wanted') || item.path.includes('/socials') || item.path.includes('/playlists');
-          const isCollectionManagement = item.path.includes('/edit-collection') || item.path.includes('/add-album') || item.path.includes('/inner-circle') || item.path.includes('/album-suggestions') || item.path.includes('/import-discogs') || item.path.includes('/test-album-suggestions') || item.path.includes('/staff-picks');
-          const isEventManagement = item.path.includes('/manage-events') || item.path.includes('/manage-dj-sets') || item.path.includes('/edit-queue');
-          
-          return (
-            <li key={item.path}>
-              <Link
-                href={item.path}
-                className={`
-                  flex items-center justify-between p-2 rounded-md text-sm transition-colors
-                  ${isActive 
-                    ? "bg-blue-100 text-blue-700 font-semibold border-l-4 border-blue-500" 
-                    : isAudioRecognition
-                    ? "text-purple-700 hover:bg-purple-50 hover:text-purple-800 pl-4"
-                    : isContentManagement
-                    ? "text-green-700 hover:bg-green-50 hover:text-green-800 pl-4"
-                    : isCollectionManagement
-                    ? "text-indigo-700 hover:bg-indigo-50 hover:text-indigo-800 pl-4"
-                    : isEventManagement
-                    ? "text-orange-700 hover:bg-orange-50 hover:text-orange-800 pl-4"
-                    : "text-gray-700 hover:bg-gray-200 hover:text-blue-600"
-                  }
-                `}
-              >
-                <span className="flex-1">{item.label}</span>
-                {item.isNew && (
-                  <span className="text-xs bg-green-500 text-white px-2 py-1 rounded-full">
-                    NEW
-                  </span>
-                )}
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
+      {/* Core Navigation */}
+      <div className="mb-6">
+        <ul className="space-y-2">
+          {navItems.map((item) => {
+            const isActive = pathname === item.path;
+            return (
+              <li key={item.path}>
+                <Link
+                  href={item.path}
+                  className={`
+                    block p-2 rounded-md text-sm transition-colors
+                    ${isActive 
+                      ? "bg-blue-100 text-blue-700 font-semibold border-l-4 border-blue-500" 
+                      : "text-gray-700 hover:bg-gray-200 hover:text-blue-600"
+                    }
+                  `}
+                >
+                  {item.label}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
 
-      {/* Audio Recognition Quick Actions */}
-      <div className="mt-6 p-3 bg-purple-50 border border-purple-200 rounded-lg">
-        <h4 className="text-sm font-semibold text-purple-800 mb-2">🎵 Audio Recognition</h4>
+      {/* Audio & Live Features */}
+      <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+        <h4 className="text-sm font-semibold text-purple-800 mb-2">🎵 Audio & Live</h4>
         <div className="space-y-2">
           <Link 
             href="/admin/audio-recognition"
-            className="block w-full text-center bg-purple-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-purple-700 transition-colors"
+            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+              pathname === "/admin/audio-recognition" 
+                ? "bg-purple-700 text-white" 
+                : "bg-purple-600 text-white hover:bg-purple-700"
+            }`}
           >
-            🎧 Control Panel
+            🎧 Audio Recognition
           </Link>
           <Link 
             href="/admin/audio-debug"
-            className="block w-full text-center bg-orange-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-orange-700 transition-colors"
+            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+              pathname === "/admin/audio-debug" 
+                ? "bg-orange-700 text-white" 
+                : "bg-orange-600 text-white hover:bg-orange-700"
+            }`}
           >
-            🔧 Debug Tool
+            🔧 Audio Debug
           </Link>
           <a 
             href="/tv-display"
             target="_blank"
             rel="noopener noreferrer"
-            onClick={() => {
-              console.log('Sidebar TV Display clicked, URL:', '/tv-display');
-              console.log('Current location:', window.location.href);
-            }}
             className="block w-full text-center bg-gray-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-gray-700 transition-colors"
           >
             📺 TV Display
@@ -123,142 +84,203 @@ export default function AdminSidebar() {
         </div>
       </div>
 
-      {/* Event & DJ Sets Management */}
-      <div className="mt-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
-        <h4 className="text-sm font-semibold text-orange-800 mb-2">🎧 Events & DJ Sets</h4>
+      {/* Event Management */}
+      <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+        <h4 className="text-sm font-semibold text-orange-800 mb-2">📅 Event Management</h4>
         <div className="space-y-2">
           <Link 
             href="/admin/manage-events"
-            className="block w-full text-center bg-orange-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-orange-700 transition-colors"
+            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+              pathname === "/admin/manage-events" 
+                ? "bg-orange-700 text-white" 
+                : "bg-orange-600 text-white hover:bg-orange-700"
+            }`}
           >
             📅 Manage Events
           </Link>
           <Link 
             href="/admin/manage-dj-sets"
-            className="block w-full text-center bg-red-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-red-700 transition-colors relative"
+            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+              pathname === "/admin/manage-dj-sets" 
+                ? "bg-red-700 text-white" 
+                : "bg-red-600 text-white hover:bg-red-700"
+            }`}
           >
-            🎧 DJ Sets
-            <span className="absolute -top-1 -right-1 bg-green-500 text-white text-xs px-1.5 py-0.5 rounded-full">
-              NEW
-            </span>
+            🎧 Manage DJ Sets
           </Link>
           <Link 
             href="/admin/edit-queue"
-            className="block w-full text-center bg-orange-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-orange-700 transition-colors"
+            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+              pathname === "/admin/edit-queue" 
+                ? "bg-orange-700 text-white" 
+                : "bg-orange-600 text-white hover:bg-orange-700"
+            }`}
           >
-            🎵 Edit Queues
+            🎵 Manage Queues
           </Link>
         </div>
       </div>
 
-      {/* Collection Management Quick Actions */}
-      <div className="mt-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
-        <h4 className="text-sm font-semibold text-indigo-800 mb-2">📚 Collection Management</h4>
+      {/* Collection Management */}
+      <div className="mb-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+        <h4 className="text-sm font-semibold text-indigo-800 mb-2">📚 Collection</h4>
         <div className="space-y-2">
           <Link 
             href="/admin/edit-collection"
-            className="block w-full text-center bg-indigo-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-indigo-700 transition-colors"
+            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+              pathname === "/admin/edit-collection" 
+                ? "bg-indigo-700 text-white" 
+                : "bg-indigo-600 text-white hover:bg-indigo-700"
+            }`}
           >
             📚 Edit Collection
           </Link>
           <Link 
             href="/admin/add-album"
-            className="block w-full text-center bg-indigo-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-indigo-700 transition-colors"
+            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+              pathname === "/admin/add-album" 
+                ? "bg-indigo-700 text-white" 
+                : "bg-indigo-600 text-white hover:bg-indigo-700"
+            }`}
           >
             ➕ Add Album
           </Link>
           <Link 
+            href="/admin/add-customer-vinyl"
+            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+              pathname === "/admin/add-customer-vinyl" 
+                ? "bg-indigo-700 text-white" 
+                : "bg-indigo-600 text-white hover:bg-indigo-700"
+            }`}
+          >
+            💿 Add Customer Vinyl
+          </Link>
+          <Link 
+            href="/admin/import-discogs"
+            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+              pathname === "/admin/import-discogs" 
+                ? "bg-green-700 text-white" 
+                : "bg-green-600 text-white hover:bg-green-700"
+            }`}
+          >
+            📥 Import Discogs
+          </Link>
+        </div>
+      </div>
+
+      {/* Staff & Suggestions */}
+      <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+        <h4 className="text-sm font-semibold text-purple-800 mb-2">⭐ Staff & Suggestions</h4>
+        <div className="space-y-2">
+          <Link 
             href="/admin/staff-picks"
-            className="block w-full text-center bg-purple-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-purple-700 transition-colors relative"
+            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+              pathname === "/admin/staff-picks" 
+                ? "bg-purple-700 text-white" 
+                : "bg-purple-600 text-white hover:bg-purple-700"
+            }`}
           >
             🎵 Staff Picks
-            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
-              NEW
-            </span>
           </Link>
           <Link 
             href="/admin/album-suggestions"
-            className="block w-full text-center bg-blue-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-blue-700 transition-colors relative"
+            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+              pathname === "/admin/album-suggestions" 
+                ? "bg-blue-700 text-white" 
+                : "bg-blue-600 text-white hover:bg-blue-700"
+            }`}
           >
             💡 Album Suggestions
-            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
-              NEW
-            </span>
           </Link>
           <Link 
             href="/admin/test-album-suggestions"
-            className="block w-full text-center bg-yellow-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-yellow-700 transition-colors relative"
+            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+              pathname === "/admin/test-album-suggestions" 
+                ? "bg-yellow-700 text-white" 
+                : "bg-yellow-600 text-white hover:bg-yellow-700"
+            }`}
           >
             🧪 Test Suggestions
-            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
-              NEW
-            </span>
           </Link>
           <Link 
             href="/admin/inner-circle-results"
-            className="block w-full text-center bg-purple-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-purple-700 transition-colors"
+            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+              pathname === "/admin/inner-circle-results" 
+                ? "bg-purple-700 text-white" 
+                : "bg-purple-600 text-white hover:bg-purple-700"
+            }`}
           >
             💎 Inner Circle Results
           </Link>
         </div>
       </div>
 
-      {/* Content Management Quick Actions */}
-      <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-        <h4 className="text-sm font-semibold text-green-800 mb-2">📝 Content Management</h4>
+      {/* Content Management */}
+      <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+        <h4 className="text-sm font-semibold text-green-800 mb-2">📝 Content</h4>
         <div className="space-y-2">
           <Link 
             href="/admin/edit-about"
-            className="block w-full text-center bg-green-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-green-700 transition-colors"
+            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+              pathname === "/admin/edit-about" 
+                ? "bg-green-700 text-white" 
+                : "bg-green-600 text-white hover:bg-green-700"
+            }`}
           >
             📄 Edit About Page
           </Link>
           <Link 
             href="/admin/most-wanted"
-            className="block w-full text-center bg-blue-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-blue-700 transition-colors"
+            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+              pathname === "/admin/most-wanted" 
+                ? "bg-blue-700 text-white" 
+                : "bg-blue-600 text-white hover:bg-blue-700"
+            }`}
           >
-            ⭐ Most Wanted List
+            ⭐ Most Wanted
           </Link>
           <Link 
             href="/admin/playlists"
-            className="block w-full text-center bg-green-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-green-700 transition-colors"
+            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+              pathname === "/admin/playlists" 
+                ? "bg-green-700 text-white" 
+                : "bg-green-600 text-white hover:bg-green-700"
+            }`}
           >
             🎵 Playlists
           </Link>
           <Link 
             href="/admin/socials"
-            className="block w-full text-center bg-blue-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-blue-700 transition-colors"
+            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+              pathname === "/admin/socials" 
+                ? "bg-blue-700 text-white" 
+                : "bg-blue-600 text-white hover:bg-blue-700"
+            }`}
           >
             📱 Social Embeds
           </Link>
         </div>
       </div>
 
-      {/* User Engagement Section */}
-      <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-        <h4 className="text-sm font-semibold text-yellow-800 mb-2">👥 User Features</h4>
+      {/* Public Pages */}
+      <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+        <h4 className="text-sm font-semibold text-yellow-800 mb-2">👥 Public Pages</h4>
         <div className="space-y-2">
           <a 
             href="/staff-voting"
             target="_blank"
             rel="noopener noreferrer"
-            className="block w-full text-center bg-orange-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-orange-700 transition-colors relative"
+            className="block w-full text-center bg-orange-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-orange-700 transition-colors"
           >
             🗳️ Staff Voting
-            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
-              NEW
-            </span>
           </a>
           <a 
             href="/staff-picks"
             target="_blank"
             rel="noopener noreferrer"
-            className="block w-full text-center bg-purple-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-purple-700 transition-colors relative"
+            className="block w-full text-center bg-purple-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-purple-700 transition-colors"
           >
             🎵 Staff Picks
-            <span className="absolute -top-1 -right-1 bg-green-500 text-white text-xs px-1.5 py-0.5 rounded-full">
-              NEW
-            </span>
           </a>
           <a 
             href="/inner-circle-voting"
@@ -272,7 +294,7 @@ export default function AdminSidebar() {
             href="/browse/browse-albums"
             target="_blank"
             rel="noopener noreferrer"
-            className="block w-full text-center bg-yellow-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-yellow-700 transition-colors"
+            className="block w-full text-center bg-indigo-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-indigo-700 transition-colors"
           >
             📚 Browse Collection
           </a>
@@ -280,49 +302,46 @@ export default function AdminSidebar() {
             href="/dj-sets"
             target="_blank"
             rel="noopener noreferrer"
-            className="block w-full text-center bg-red-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-red-700 transition-colors relative"
+            className="block w-full text-center bg-red-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-red-700 transition-colors"
           >
             🎧 DJ Sets
-            <span className="absolute -top-1 -right-1 bg-green-500 text-white text-xs px-1.5 py-0.5 rounded-full">
-              NEW
-            </span>
           </a>
         </div>
       </div>
 
-      {/* External Admin Tools */}
-      <div className="mt-4 p-3 bg-slate-50 border border-slate-200 rounded-lg">
+      {/* External Tools */}
+      <div className="mb-4 p-3 bg-slate-50 border border-slate-200 rounded-lg">
         <h4 className="text-sm font-semibold text-slate-800 mb-2">🔗 External Tools</h4>
-        <div className="space-y-1.5">
+        <div className="grid grid-cols-2 gap-1 text-xs">
           <a 
             href="https://blog.deadwaxdialogues.com/wp-admin/"
             target="_blank"
             rel="noopener noreferrer"
-            className="block w-full text-center bg-slate-600 text-white py-1 px-2 rounded text-xs font-medium hover:bg-slate-700 transition-colors"
+            className="text-center bg-slate-600 text-white py-1 px-1 rounded font-medium hover:bg-slate-700 transition-colors"
           >
-            📝 WordPress
+            📝 WP
           </a>
           <a 
             href="https://console.hetzner.com/projects"
             target="_blank"
             rel="noopener noreferrer"
-            className="block w-full text-center bg-red-600 text-white py-1 px-2 rounded text-xs font-medium hover:bg-red-700 transition-colors"
+            className="text-center bg-red-600 text-white py-1 px-1 rounded font-medium hover:bg-red-700 transition-colors"
           >
-            🖥️ Hetzner
+            🖥️ Server
           </a>
           <a 
             href="https://business.facebook.com/"
             target="_blank"
             rel="noopener noreferrer"
-            className="block w-full text-center bg-blue-600 text-white py-1 px-2 rounded text-xs font-medium hover:bg-blue-700 transition-colors"
+            className="text-center bg-blue-600 text-white py-1 px-1 rounded font-medium hover:bg-blue-700 transition-colors"
           >
-            📘 Facebook
+            📘 FB
           </a>
           <a 
             href="https://login.buffer.com/login?plan=free&cycle=year&cta=bufferSite-globalNav-login-1"
             target="_blank"
             rel="noopener noreferrer"
-            className="block w-full text-center bg-gray-600 text-white py-1 px-2 rounded text-xs font-medium hover:bg-gray-700 transition-colors"
+            className="text-center bg-gray-600 text-white py-1 px-1 rounded font-medium hover:bg-gray-700 transition-colors"
           >
             📱 Buffer
           </a>
@@ -330,55 +349,44 @@ export default function AdminSidebar() {
             href="https://supabase.com/"
             target="_blank"
             rel="noopener noreferrer"
-            className="block w-full text-center bg-green-600 text-white py-1 px-2 rounded text-xs font-medium hover:bg-green-700 transition-colors"
+            className="text-center bg-green-600 text-white py-1 px-1 rounded font-medium hover:bg-green-700 transition-colors"
           >
-            🗄️ Supabase
+            🗄️ DB
           </a>
           <a 
             href="https://vercel.com/scashbys-projects/vinyl-request-v2"
             target="_blank"
             rel="noopener noreferrer"
-            className="block w-full text-center bg-black text-white py-1 px-2 rounded text-xs font-medium hover:bg-gray-800 transition-colors"
+            className="text-center bg-black text-white py-1 px-1 rounded font-medium hover:bg-gray-800 transition-colors"
           >
-            ▲ Vercel
+            ▲ Deploy
           </a>
           <a 
             href="https://admin.google.com/"
             target="_blank"
             rel="noopener noreferrer"
-            className="block w-full text-center bg-red-500 text-white py-1 px-2 rounded text-xs font-medium hover:bg-red-600 transition-colors"
+            className="text-center bg-red-500 text-white py-1 px-1 rounded font-medium hover:bg-red-600 transition-colors"
           >
             🔍 Google
-          </a>
-          <a 
-            href="https://login.squarespace.com/api/1/login/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block w-full text-center bg-gray-800 text-white py-1 px-2 rounded text-xs font-medium hover:bg-gray-900 transition-colors"
-          >
-            ⬛ Squarespace
           </a>
           <a 
             href="https://app.dub.co/login"
             target="_blank"
             rel="noopener noreferrer"
-            className="block w-full text-center bg-purple-600 text-white py-1 px-2 rounded text-xs font-medium hover:bg-purple-700 transition-colors"
+            className="text-center bg-purple-600 text-white py-1 px-1 rounded font-medium hover:bg-purple-700 transition-colors"
           >
-            🔗 Dub.co
+            🔗 Links
           </a>
         </div>
       </div>
 
       {/* Quick Stats */}
-      <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
-        <h4 className="text-sm font-semibold text-gray-800 mb-2">📊 Quick Info</h4>
+      <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+        <h4 className="text-sm font-semibold text-gray-800 mb-2">📊 Status</h4>
         <div className="space-y-1 text-xs text-gray-600">
-          <div>🎧 DJ Sets system active</div>
-          <div>💡 Album suggestions system active</div>
-          <div>🗳️ Staff voting system active</div>
-          <div>🎧 Audio recognition ready</div>
-          <div>💎 Inner Circle voting live</div>
-          <div>🔗 External tools integrated</div>
+          <div>🎧 Audio system: Active</div>
+          <div>🗳️ Voting systems: Live</div>
+          <div>💡 Suggestions: Active</div>
           <div>💸 Venmo: @deadwaxdialogues</div>
         </div>
       </div>
