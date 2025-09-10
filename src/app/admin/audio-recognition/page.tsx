@@ -624,6 +624,18 @@ export default function AudioRecognitionPage() {
             </span>
           </div>
 
+          <div style={{
+            fontSize: 12,
+            color: '#6b7280',
+            marginBottom: 16,
+            padding: '8px 12px',
+            background: '#f9fafb',
+            borderRadius: 6,
+            border: '1px solid #e5e7eb'
+          }}>
+            💡 <strong>Tip:</strong> Use &ldquo;Release Microphone&rdquo; to fully stop audio capture and free up your microphone without refreshing the page.
+          </div>
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 24 }}>
             <div>
               <label style={{ display: 'block', fontSize: 14, fontWeight: 600, marginBottom: 8 }}>
