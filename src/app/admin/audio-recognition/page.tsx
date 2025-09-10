@@ -1,4 +1,4 @@
-// src/app/admin/audio-recognition/page.tsx - UPDATED WITH ALBUM SUPPORT
+// src/app/admin/audio-recognition/page.tsx - UPDATED WITH RELEASE BUTTON & API PROTECTION
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from 'react';
@@ -55,6 +55,12 @@ export default function AudioRecognitionPage() {
   const [backgroundNoiseProfile, setBackgroundNoiseProfile] = useState<number | null>(null);
   const [isCalibratingBackground, setIsCalibratingBackground] = useState(false);
   const [debugUpdateInterval, setDebugUpdateInterval] = useState<number | null>(null);
+  
+  // NEW: API Conservation Features
+  const [lastRecognitionTime, setLastRecognitionTime] = useState<number>(0);
+  const [recognitionCooldown, setRecognitionCooldown] = useState<number>(180); // 3 minutes default
+  const [lastRecognizedTrack, setLastRecognizedTrack] = useState<string | null>(null);
+  const [apiCallsToday, setApiCallsToday] = useState<number>(0);
 
   const streamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -74,7 +80,7 @@ export default function AudioRecognitionPage() {
 
   const calibrateBackgroundNoise = useCallback(async () => {
     if (!analyserRef.current) {
-      addLogEntry('❌ Cannot calibrate - microphone not active', 'error');
+      addLogEntry('Cannot calibrate - microphone not active', 'error');
       return;
     }
 
@@ -184,6 +190,12 @@ export default function AudioRecognitionPage() {
     
     const clampedLevel = Math.max(0, Math.min(100, calibratedLevel));
     
+    // Calculate cooldown info
+    const now = Date.now();
+    const timeSinceLastRecognition = (now - lastRecognitionTime) / 1000;
+    const cooldownRemaining = Math.max(0, recognitionCooldown - timeSinceLastRecognition);
+    const canRecognize = cooldownRemaining === 0;
+    
     setDebugInfo([
       `Raw level: ${Math.round(rawLevel)}`,
       `Calibrated dB: ${Math.round(clampedLevel)}`,
@@ -192,16 +204,33 @@ export default function AudioRecognitionPage() {
       `Above music? ${clampedLevel > musicLevel}`,
       `Below silence? ${clampedLevel < silenceLevel}`,
       `Is in silence: ${isInSilence}`,
-      `Silence counter: ${silenceCounter}s`
+      `Silence counter: ${silenceCounter}s`,
+      `API cooldown: ${canRecognize ? 'READY' : `${Math.ceil(cooldownRemaining)}s left`}`,
+      `API calls today: ${apiCallsToday}`
     ]);
     
     return Math.round(clampedLevel);
-  }, [musicLevel, silenceLevel, isInSilence, silenceCounter]);
+  }, [musicLevel, silenceLevel, isInSilence, silenceCounter, lastRecognitionTime, recognitionCooldown, apiCallsToday]);
 
   const processAudioBuffer = useCallback(async (audioBuffer: AudioBuffer, reason: string) => {
     try {
+      // Check cooldown period
+      const now = Date.now();
+      const timeSinceLastRecognition = (now - lastRecognitionTime) / 1000;
+      
+      if (timeSinceLastRecognition < recognitionCooldown) {
+        const remainingCooldown = Math.ceil(recognitionCooldown - timeSinceLastRecognition);
+        addLogEntry(`🛡️ API Protection: Cooldown active (${remainingCooldown}s remaining)`, 'warning');
+        setStatus(`API Cooldown: ${remainingCooldown}s remaining`);
+        return;
+      }
+
       setStatus(`Processing audio for ${reason}...`);
-      addLogEntry(`Processing audio for: ${reason}`, 'info');
+      addLogEntry(`Processing audio for: ${reason} (last API call: ${Math.round(timeSinceLastRecognition)}s ago)`, 'info');
+      
+      // Update last recognition time immediately to prevent overlapping calls
+      setLastRecognitionTime(now);
+      setApiCallsToday(prev => prev + 1);
       
       const rawPCMAudio = await convertAudioBufferToRawPCM(audioBuffer);
       const response = await fetch('/api/audio-recognition', {
@@ -229,8 +258,20 @@ export default function AudioRecognitionPage() {
       } = await response.json();
 
       if (result.success && result.track) {
+        const trackKey = `${result.track.artist?.toLowerCase()}-${result.track.title?.toLowerCase()}`;
+        
+        // Check if this is the same track as last recognition
+        if (lastRecognizedTrack === trackKey) {
+          addLogEntry(`Duplicate track detected: ${result.track.artist} - ${result.track.title} (skipping database update)`, 'warning');
+          setStatus(`Same track still playing: ${result.track.artist} - ${result.track.title}`);
+          return;
+        }
+        
+        // Set the new track as last recognized
+        setLastRecognizedTrack(trackKey);
+        
         const albumText = result.track.album ? ` (${result.track.album})` : '';
-        addLogEntry(`Track recognized: ${result.track.artist} - ${result.track.title}${albumText}`, 'success');
+        addLogEntry(`NEW track recognized: ${result.track.artist} - ${result.track.title}${albumText}`, 'success');
         setStatus(`Recognized: ${result.track.artist} - ${result.track.title}${albumText}`);
         
         const newHistoryEntry: RecognitionResult = {
@@ -246,45 +287,40 @@ export default function AudioRecognitionPage() {
         };
         setRecognitionHistory(prev => [newHistoryEntry, ...prev.slice(0, 19)]);
 
-        const isNewTrack = !currentTrack ||
-          currentTrack.artist?.toLowerCase() !== result.track.artist?.toLowerCase() ||
-          currentTrack.title?.toLowerCase() !== result.track.title?.toLowerCase();
-
-        if (isNewTrack) {
-          try {
-            await supabase.from('now_playing').delete().neq('id', 0);
-            const insertResp = await supabase
-              .from('now_playing')
-              .insert({
-                artist: result.track.artist,
-                title: result.track.title,
-                album_title: result.track.album ?? null,
-                started_at: new Date().toISOString(),
-                recognition_confidence: result.track.confidence ?? 0.7,
-                service_used: result.track.service.toLowerCase(),
-                recognition_image_url: result.track.image_url ?? null,
-                created_at: new Date().toISOString()
-              })
-              .select()
-              .single();
-            if (insertResp.data) setCurrentTrack(insertResp.data);
-
-            await supabase.from('audio_recognition_logs').insert({
+        // Always update database for new tracks
+        try {
+          await supabase.from('now_playing').delete().neq('id', 0);
+          const insertResp = await supabase
+            .from('now_playing')
+            .insert({
               artist: result.track.artist,
               title: result.track.title,
-              album: result.track.album ?? null,
-              source: 'microphone',
-              service: result.track.service.toLowerCase(),
-              confidence: result.track.confidence ?? 0.7,
-              confirmed: true,
+              album_title: result.track.album ?? null,
+              started_at: new Date().toISOString(),
+              recognition_confidence: result.track.confidence ?? 0.7,
+              service_used: result.track.service.toLowerCase(),
+              recognition_image_url: result.track.image_url ?? null,
               created_at: new Date().toISOString()
-            });
-            
-            addLogEntry(`Database updated with album info: ${result.track.album || 'No album'}`, 'info');
-          } catch (dbError) {
-            console.error('Database error:', dbError);
-            addLogEntry(`Database error: ${dbError}`, 'error');
-          }
+            })
+            .select()
+            .single();
+          if (insertResp.data) setCurrentTrack(insertResp.data);
+
+          await supabase.from('audio_recognition_logs').insert({
+            artist: result.track.artist,
+            title: result.track.title,
+            album: result.track.album ?? null,
+            source: 'microphone',
+            service: result.track.service.toLowerCase(),
+            confidence: result.track.confidence ?? 0.7,
+            confirmed: true,
+            created_at: new Date().toISOString()
+          });
+          
+          addLogEntry(`Database updated with new track and album info: ${result.track.album || 'No album'}`, 'success');
+        } catch (dbError) {
+          console.error('Database error:', dbError);
+          addLogEntry(`Database error: ${dbError}`, 'error');
         }
       } else {
         addLogEntry(`No match found: ${result.error || 'Unknown error'}`, 'warning');
@@ -294,10 +330,12 @@ export default function AudioRecognitionPage() {
       const msg = error instanceof Error ? error.message : String(error);
       addLogEntry(`Processing error: ${msg}`, 'error');
       setStatus(`Error: ${msg}`);
+      // Reset lastRecognitionTime on error so we can try again sooner
+      setLastRecognitionTime(0);
     } finally {
       setIsProcessing(false);
     }
-  }, [convertAudioBufferToRawPCM, currentTrack, addLogEntry]);
+  }, [convertAudioBufferToRawPCM, lastRecognitionTime, recognitionCooldown, lastRecognizedTrack, addLogEntry]);
 
   const captureAudio = useCallback(async (reason: string) => {
     if (isProcessing || !audioContextRef.current || !streamRef.current) {
@@ -397,9 +435,12 @@ export default function AudioRecognitionPage() {
     } else if (isInSilence) {
       setStatus(`Silence: ${silenceCounter}s / ${currentSilenceThreshold}s (Level: ${level})`);
     } else {
-      setStatus(`Monitoring (Level: ${level} | Music: ${musicLevel} | Silence: ${currentSilenceLevel})`);
+      const timeSinceLastRecognition = (Date.now() - lastRecognitionTime) / 1000;
+      const cooldownRemaining = Math.max(0, recognitionCooldown - timeSinceLastRecognition);
+      const cooldownStatus = cooldownRemaining > 0 ? ` | API Cooldown: ${Math.ceil(cooldownRemaining)}s` : ' | API Ready';
+      setStatus(`Monitoring (Level: ${level} | Music: ${musicLevel} | Silence: ${currentSilenceLevel}${cooldownStatus})`);
     }
-  }, [getCurrentAudioLevel, isInSilence, isProcessing, musicLevel, silenceLevel, silenceThreshold, silenceCounter, captureAudio, addLogEntry]);
+  }, [getCurrentAudioLevel, isInSilence, isProcessing, musicLevel, silenceLevel, silenceThreshold, silenceCounter, captureAudio, addLogEntry, lastRecognitionTime, recognitionCooldown]);
 
   const setupMicrophone = useCallback(async () => {
     try {
@@ -448,13 +489,13 @@ export default function AudioRecognitionPage() {
       return;
     }
 
-    addLogEntry(`Starting monitoring - Music: ${musicLevel}dB, Silence: ${silenceLevel}dB, Duration: ${silenceThreshold}s`, 'success');
+    addLogEntry(`Starting monitoring - Music: ${musicLevel}dB, Silence: ${silenceLevel}dB, Duration: ${silenceThreshold}s, API Cooldown: ${recognitionCooldown}s`, 'success');
     isRunningRef.current = true;
     setIsListening(true);
 
     setTimeout(() => captureAudio('Initial recognition'), 1000);
     monitoringIntervalRef.current = window.setInterval(runMonitoring, 250);
-  }, [musicLevel, silenceLevel, silenceThreshold, captureAudio, runMonitoring, addLogEntry]);
+  }, [musicLevel, silenceLevel, silenceThreshold, recognitionCooldown, captureAudio, runMonitoring, addLogEntry]);
 
   const stopMonitoring = useCallback(() => {
     addLogEntry('Stopping monitoring system', 'info');
@@ -471,13 +512,58 @@ export default function AudioRecognitionPage() {
     setStatus('Monitoring stopped - microphone still active');
   }, [addLogEntry]);
 
-  const cleanup = useCallback(() => {
+  // NEW: Release Microphone Function
+  const releaseMicrophone = useCallback(() => {
+    addLogEntry('Releasing microphone and cleaning up audio system...', 'info');
+    
+    // Stop monitoring first
     stopMonitoring();
+    
+    // Stop all audio tracks
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => {
+        track.stop();
+        addLogEntry(`Stopped audio track: ${track.kind}`, 'info');
+      });
+      streamRef.current = null;
+    }
+    
+    // Close audio context
+    if (audioContextRef.current) {
+      audioContextRef.current.close().then(() => {
+        addLogEntry('Audio context closed successfully', 'success');
+      }).catch((error) => {
+        addLogEntry(`Error closing audio context: ${error}`, 'error');
+      });
+      audioContextRef.current = null;
+    }
+    
+    // Clear analyser reference
+    analyserRef.current = null;
+    
+    // Clear debug update interval
     if (debugUpdateInterval) {
       clearInterval(debugUpdateInterval);
       setDebugUpdateInterval(null);
     }
-  }, [stopMonitoring, debugUpdateInterval]);
+    
+    // Reset all states to initial values
+    setCurrentLevel(0);
+    setIsInSilence(false);
+    setSilenceCounter(0);
+    setDebugInfo([]);
+    setBackgroundNoiseProfile(null);
+    setIsCalibratingBackground(false);
+    setLastRecognitionTime(0);
+    setLastRecognizedTrack(null);
+    setStatus('Microphone released - click "Enable Microphone" to restart');
+    
+    addLogEntry('Microphone and audio system fully released', 'success');
+  }, [stopMonitoring, debugUpdateInterval, addLogEntry]);
+
+  const cleanup = useCallback(() => {
+    releaseMicrophone();
+  }, [releaseMicrophone]);
 
   const loadCurrentTrack = useCallback(async () => {
     try {
@@ -516,9 +602,9 @@ export default function AudioRecognitionPage() {
     if (isListening && monitoringIntervalRef.current) {
       clearInterval(monitoringIntervalRef.current);
       monitoringIntervalRef.current = window.setInterval(runMonitoring, 250);
-      addLogEntry(`Thresholds updated - Music: ${musicLevel}dB, Silence: ${silenceLevel}dB, Duration: ${silenceThreshold}s`, 'info');
+      addLogEntry(`Thresholds updated - Music: ${musicLevel}dB, Silence: ${silenceLevel}dB, Duration: ${silenceThreshold}s, API Cooldown: ${recognitionCooldown}s`, 'info');
     }
-  }, [musicLevel, silenceLevel, silenceThreshold, isListening, runMonitoring, addLogEntry]);
+  }, [musicLevel, silenceLevel, silenceThreshold, recognitionCooldown, isListening, runMonitoring, addLogEntry]);
 
   const VUMeter = ({ level }: { level: number }) => {
     const boxes = [];
@@ -557,8 +643,8 @@ export default function AudioRecognitionPage() {
   return (
     <div style={{ padding: 24, background: '#fff', color: '#222', minHeight: '100vh', maxWidth: 1200, margin: '0 auto' }}>
       <div style={{ marginBottom: 32 }}>
-        <h1 style={{ fontSize: 32, fontWeight: 'bold', marginBottom: 8 }}>Audio Recognition Control</h1>
-        <p style={{ color: '#666', fontSize: 16 }}>Enhanced system with album recognition</p>
+        <h1 style={{ fontSize: 32, fontWeight: 'bold', marginBottom: 8 }}>🛡️ Audio Recognition Control</h1>
+        <p style={{ color: '#666', fontSize: 16 }}>Enhanced system with album recognition, API conservation, and microphone control</p>
       </div>
 
       {!audioContextRef.current && (
@@ -607,7 +693,7 @@ export default function AudioRecognitionPage() {
               opacity: isCalibratingBackground ? 0.6 : 1
             }}
           >
-            {isCalibratingBackground ? 'Sampling Environment...' : 'Calibrate Background Noise'}
+            {isCalibratingBackground ? 'Sampling Environment...' : 'Calibrate Background'}
           </button>
         </div>
       )}
@@ -624,19 +710,29 @@ export default function AudioRecognitionPage() {
             </span>
           </div>
 
+          {/* API Conservation Alert */}
           <div style={{
-            fontSize: 12,
-            color: '#6b7280',
-            marginBottom: 16,
-            padding: '8px 12px',
-            background: '#f9fafb',
-            borderRadius: 6,
-            border: '1px solid #e5e7eb'
+            background: 'linear-gradient(135deg, #dcfce7, #bbf7d0)',
+            border: '2px solid #059669',
+            borderRadius: 8,
+            padding: 16,
+            marginBottom: 24,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12
           }}>
-            💡 <strong>Tip:</strong> Use &ldquo;Release Microphone&rdquo; to fully stop audio capture and free up your microphone without refreshing the page.
+            <div style={{ fontSize: 24 }}>🛡️</div>
+            <div>
+              <div style={{ fontWeight: 600, color: '#059669', marginBottom: 4 }}>
+                API Protection Active - API Calls Today: {apiCallsToday}
+              </div>
+              <div style={{ fontSize: 14, color: '#047857' }}>
+                Cooldown prevents duplicate calls. Set to 3+ minutes for DJ sets to maximize API efficiency.
+              </div>
+            </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 24 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 16, marginBottom: 24 }}>
             <div>
               <label style={{ display: 'block', fontSize: 14, fontWeight: 600, marginBottom: 8 }}>
                 Music Level (75-85dB range):
@@ -700,9 +796,31 @@ export default function AudioRecognitionPage() {
                 }}
               />
             </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 14, fontWeight: 600, marginBottom: 8 }}>
+                🛡️ API Cooldown (seconds):
+              </label>
+              <input
+                type="number"
+                min="30"
+                max="600"
+                value={recognitionCooldown}
+                onChange={(e) => setRecognitionCooldown(parseInt(e.target.value) || 180)}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '2px solid #f59e0b',
+                  borderRadius: 6,
+                  fontSize: 16,
+                  fontWeight: 600,
+                  textAlign: 'center',
+                  backgroundColor: recognitionCooldown < 120 ? '#fef3c7' : '#fff'
+                }}
+              />
+            </div>
           </div>
 
-          <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
+          <div style={{ display: 'flex', gap: 16, marginBottom: 16, flexWrap: 'wrap' }}>
             <button
               onClick={isListening ? stopMonitoring : startMonitoring}
               disabled={isProcessing}
@@ -757,6 +875,25 @@ export default function AudioRecognitionPage() {
               {isCalibratingBackground ? 'Sampling...' : 'Calibrate Background'}
             </button>
 
+            {/* NEW: Release Microphone Button */}
+            <button
+              onClick={releaseMicrophone}
+              disabled={!audioContextRef.current}
+              style={{
+                background: '#dc2626',
+                color: 'white',
+                border: 'none',
+                borderRadius: 8,
+                padding: '12px 24px',
+                fontSize: 16,
+                fontWeight: 600,
+                cursor: !audioContextRef.current ? 'not-allowed' : 'pointer',
+                opacity: !audioContextRef.current ? 0.6 : 1
+              }}
+            >
+              🔧 Release Microphone
+            </button>
+
             <a href="/tv-display" target="_blank" rel="noopener noreferrer" style={{ 
               background: '#2563eb', 
               color: 'white', 
@@ -770,6 +907,23 @@ export default function AudioRecognitionPage() {
             }}>
               TV Display
             </a>
+          </div>
+
+          {/* Enhanced Tips */}
+          <div style={{
+            fontSize: 12,
+            color: '#6b7280',
+            marginBottom: 16,
+            padding: '12px 16px',
+            background: '#f0f9ff',
+            borderRadius: 6,
+            border: '1px solid #0284c7'
+          }}>
+            🛡️ <strong>API Protection:</strong> Cooldown prevents duplicate API calls for the same song. Set to 3+ minutes for DJ sets to save credits.
+            <br />
+            🎙️ <strong>Microphone Control:</strong> Use &ldquo;Release Microphone&rdquo; to fully stop audio capture and free up your microphone without refreshing the page.
+            <br />
+            🔄 <strong>Smart Detection:</strong> System automatically skips recognition if the same song is still playing.
           </div>
 
           {backgroundNoiseProfile && (
