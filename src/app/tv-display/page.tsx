@@ -305,18 +305,6 @@ export default function TVDisplayPage() {
             Track ID: {currentTrack?.id || 'None'}
           </div>
         )}
-
-        {/* CSS animations */}
-        <style jsx>{`
-          @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.7; }
-          }
-          
-          .connection-dot {
-            animation: pulse 2s infinite;
-          }
-        `}</style>
       </div>
     </>
   );
