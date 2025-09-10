@@ -95,6 +95,38 @@ export async function POST(request: NextRequest) {
   }
 }
 
+function extractAlbumFromShazam(shazamData: ShazamResponse): string | null {
+  // Look for album information in sections metadata
+  if (shazamData.track?.sections) {
+    for (const section of shazamData.track.sections) {
+      if (section.type === 'SONG' && section.metadata) {
+        for (const meta of section.metadata) {
+          if (meta.title?.toLowerCase().includes('album') || 
+              meta.title?.toLowerCase() === 'from') {
+            return meta.text;
+          }
+        }
+      }
+    }
+  }
+  
+  // Fallback: sometimes album info might be in other sections
+  if (shazamData.track?.sections) {
+    for (const section of shazamData.track.sections) {
+      if (section.metadata) {
+        for (const meta of section.metadata) {
+          // Look for patterns that might indicate album names
+          if (meta.title === 'Album' || meta.title === 'Release') {
+            return meta.text;
+          }
+        }
+      }
+    }
+  }
+  
+  return null;
+}
+
 async function processWithShazam(base64Audio: string, originalSize: number, startTime: number) {
   if (!process.env.SHAZAM_RAPID_API_KEY) {
     console.error('SHAZAM_RAPID_API_KEY environment variable not set');
@@ -169,7 +201,8 @@ async function processWithShazam(base64Audio: string, originalSize: number, star
       matchesCount: shazamData.matches?.length || 0,
       trackTitle: shazamData.track?.title,
       trackArtist: shazamData.track?.subtitle,
-      responseKeys: Object.keys(shazamData)
+      responseKeys: Object.keys(shazamData),
+      sections: shazamData.track?.sections?.length || 0
     });
   } catch (parseError) {
     console.error('Failed to parse Shazam response as JSON:', parseError);
@@ -212,20 +245,23 @@ async function processWithShazam(base64Audio: string, originalSize: number, star
   const track = shazamData.track;
   const artist = track.subtitle || 'Unknown Artist';
   const title = track.title || 'Unknown Title';
+  const album = extractAlbumFromShazam(shazamData); // Extract album info
   const imageUrl = track.images?.coverarthq || track.images?.coverart || track.images?.background;
 
   console.log('Track identified:', {
     artist,
     title,
+    album,
     shazamKey: track.key,
     hasImage: !!imageUrl,
-    matchesCount: shazamData.matches?.length || 0
+    matchesCount: shazamData.matches?.length || 0,
+    extractedAlbum: !!album
   });
 
   await supabase.from('audio_recognition_logs').insert({
     artist,
     title,
-    album: null,
+    album,
     source: 'microphone',
     service: 'shazam',
     confidence: shazamData.matches?.length > 0 ? 0.9 : 0.7,
@@ -240,7 +276,7 @@ async function processWithShazam(base64Audio: string, originalSize: number, star
     await supabase.from('now_playing').insert({
       artist,
       title,
-      album_title: null,
+      album_title: album, // Save the extracted album
       album_id: null,
       started_at: new Date().toISOString(),
       recognition_confidence: shazamData.matches?.length > 0 ? 0.9 : 0.7,
@@ -250,20 +286,20 @@ async function processWithShazam(base64Audio: string, originalSize: number, star
       created_at: new Date().toISOString()
     });
 
-    console.log('Updated now_playing table');
+    console.log('Updated now_playing table with album info');
   } catch (dbError) {
     console.error('Database update failed:', dbError);
   }
 
   const processingTime = Date.now() - startTime;
-  console.log(`Recognition complete in ${processingTime}ms: ${artist} - ${title}`);
+  console.log(`Recognition complete in ${processingTime}ms: ${artist} - ${title}${album ? ` (${album})` : ''}`);
 
   return NextResponse.json({
     success: true,
     track: {
       artist,
       title,
-      album: null,
+      album,
       image_url: imageUrl,
       confidence: shazamData.matches?.length > 0 ? 0.9 : 0.7,
       service: 'shazam',
@@ -275,6 +311,7 @@ async function processWithShazam(base64Audio: string, originalSize: number, star
       audioFileSize: originalSize,
       base64Length: base64Audio.length,
       matchesCount: shazamData.matches?.length || 0,
+      albumExtracted: !!album,
       timingData: {
         offset: shazamData.matches?.[0]?.offset || null,
         hasMatches: shazamData.matches?.length > 0,

@@ -1,4 +1,4 @@
-// src/app/admin/audio-recognition/page.tsx - SIMPLE WORKING SYSTEM
+// src/app/admin/audio-recognition/page.tsx - UPDATED WITH ALBUM SUPPORT
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from 'react';
@@ -126,9 +126,8 @@ export default function AudioRecognitionPage() {
         setBackgroundNoiseProfile(backgroundProfile);
         addLogEntry(`Background noise profile set to ${backgroundProfile}dB (avg: ${Math.round(average)}dB + 5dB buffer)`, 'success');
         
-        // Auto-adjust both silence and music levels based on ambient noise
         const newSilenceLevel = backgroundProfile + 10;
-        const newMusicLevel = backgroundProfile + 25; // Music should be significantly above ambient
+        const newMusicLevel = backgroundProfile + 25;
         
         setSilenceLevel(newSilenceLevel);
         setMusicLevel(newMusicLevel);
@@ -230,8 +229,9 @@ export default function AudioRecognitionPage() {
       } = await response.json();
 
       if (result.success && result.track) {
-        addLogEntry(`Track recognized: ${result.track.artist} - ${result.track.title}`, 'success');
-        setStatus(`Recognized: ${result.track.artist} - ${result.track.title}`);
+        const albumText = result.track.album ? ` (${result.track.album})` : '';
+        addLogEntry(`Track recognized: ${result.track.artist} - ${result.track.title}${albumText}`, 'success');
+        setStatus(`Recognized: ${result.track.artist} - ${result.track.title}${albumText}`);
         
         const newHistoryEntry: RecognitionResult = {
           id: Date.now(),
@@ -279,6 +279,8 @@ export default function AudioRecognitionPage() {
               confirmed: true,
               created_at: new Date().toISOString()
             });
+            
+            addLogEntry(`Database updated with album info: ${result.track.album || 'No album'}`, 'info');
           } catch (dbError) {
             console.error('Database error:', dbError);
             addLogEntry(`Database error: ${dbError}`, 'error');
@@ -428,7 +430,6 @@ export default function AudioRecognitionPage() {
       addLogEntry('Microphone setup complete', 'success');
       setStatus('Microphone ready - adjust levels and start monitoring');
       
-      // Start continuous debug updates
       const debugInterval = window.setInterval(() => {
         getCurrentAudioLevel();
       }, 250);
@@ -557,7 +558,7 @@ export default function AudioRecognitionPage() {
     <div style={{ padding: 24, background: '#fff', color: '#222', minHeight: '100vh', maxWidth: 1200, margin: '0 auto' }}>
       <div style={{ marginBottom: 32 }}>
         <h1 style={{ fontSize: 32, fontWeight: 'bold', marginBottom: 8 }}>Audio Recognition Control</h1>
-        <p style={{ color: '#666', fontSize: 16 }}>Simple, working audio monitoring system</p>
+        <p style={{ color: '#666', fontSize: 16 }}>Enhanced system with album recognition</p>
       </div>
 
       {!audioContextRef.current && (
@@ -883,7 +884,11 @@ export default function AudioRecognitionPage() {
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 8 }}>{currentTrack.title}</div>
             <div style={{ fontSize: 18, opacity: 0.9, marginBottom: 4 }}>{currentTrack.artist}</div>
-            {currentTrack.album_title && (<div style={{ fontSize: 16, opacity: 0.7, marginBottom: 8 }}>{currentTrack.album_title}</div>)}
+            {currentTrack.album_title && (
+              <div style={{ fontSize: 16, opacity: 0.7, marginBottom: 8, fontStyle: 'italic' }}>
+                Album: {currentTrack.album_title}
+              </div>
+            )}
             <div style={{ fontSize: 14, opacity: 0.8 }}>
               Confidence: {Math.round(currentTrack.recognition_confidence * 100)}% • Started: {new Date(currentTrack.started_at).toLocaleTimeString()}
             </div>
@@ -903,7 +908,11 @@ export default function AudioRecognitionPage() {
               <div key={track.id || i} style={{ padding: '16px 24px', borderBottom: i < recognitionHistory.length - 1 ? '1px solid #f3f4f6' : 'none', display: 'flex', alignItems: 'center', gap: 16 }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 600, marginBottom: 4 }}>{track.artist || 'Unknown Artist'} - {track.title || 'Unknown Title'}</div>
-                  {track.album && (<div style={{ fontSize: 14, color: '#6b7280', marginBottom: 4 }}>{track.album}</div>)}
+                  {track.album && (
+                    <div style={{ fontSize: 14, color: '#2563eb', marginBottom: 4, fontStyle: 'italic' }}>
+                      Album: {track.album}
+                    </div>
+                  )}
                   <div style={{ fontSize: 12, color: '#9ca3af' }}>{Math.round((track.confidence || 0) * 100)}% confidence • {track.service || 'unknown'}</div>
                 </div>
                 <div style={{ fontSize: 12, color: '#9ca3af' }}>{track.created_at ? new Date(track.created_at).toLocaleString() : 'Unknown time'}</div>
