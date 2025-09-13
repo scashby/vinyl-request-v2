@@ -333,10 +333,6 @@ export default function ImportDiscogsPage() {
           }
 
           // Store sync data for enrichAndImport function
-          const syncData: SyncDataStorage = {
-            updateOperations,
-            recordsToRemove
-          };
           (window as Window & SyncDataStorage).updateOperations = updateOperations;
           (window as Window & SyncDataStorage).recordsToRemove = recordsToRemove;
 
