@@ -413,8 +413,7 @@ export default function ImportDiscogsPage() {
                   media_condition: csvRow.media_condition,
                   date_added: csvRow.date_added,
                   image_url: image_url,
-                  tracklists: tracklists,
-                  notes: csvRow.notes
+                  tracklists: tracklists
                 })
                 .eq('id', dbRow.id);
 
