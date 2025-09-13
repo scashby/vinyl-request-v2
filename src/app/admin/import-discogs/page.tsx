@@ -750,7 +750,7 @@ export default function ImportDiscogsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {syncPreview.recordsToRemove.slice(0, 20).map((record, i) => (
+                  {syncPreview.recordsToRemove.map((record, i) => (
                     <tr key={i} style={{ backgroundColor: i % 2 === 0 ? '#ffffff' : '#f8f9fa' }}>
                       <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>{record.artist || '—'}</td>
                       <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>{record.title || '—'}</td>
@@ -760,9 +760,6 @@ export default function ImportDiscogsPage() {
                       <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>{record.date_added ? new Date(record.date_added).toLocaleDateString() : '—'}</td>
                     </tr>
                   ))}
-                  {syncPreview.recordsToRemove.length > 20 && (
-                    <tr><td colSpan={6} style={{ padding: '8px', textAlign: 'center', fontStyle: 'italic', color: '#6c757d' }}>... and {syncPreview.recordsToRemove.length - 20} more deletions</td></tr>
-                  )}
                 </tbody>
               </table>
             </div>
