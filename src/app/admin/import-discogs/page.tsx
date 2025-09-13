@@ -592,7 +592,7 @@ export default function ImportDiscogsPage() {
 
       {syncPreview && (
         <div>
-          <h2>Sync Preview - All Changes</h2>
+          <h2 style={{ color: '#495057', marginBottom: '1.5rem', marginTop: '2rem' }}>Sync Preview - All Changes</h2>
           
           {/* New Items Section */}
           {syncPreview.newItems.length > 0 && (
