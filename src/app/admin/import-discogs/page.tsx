@@ -1,6 +1,6 @@
 // src/app/admin/import-discogs/page.tsx
 // Enhanced Discogs CSV import with full synchronization capabilities
-// Handles new items, updates to existing records, and removal detection
+// Handles new items, updates to existing records, and permanent deletion of removed items
 
 'use client';
 
