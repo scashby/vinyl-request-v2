@@ -41,26 +41,27 @@ type EnrichedRow = ProcessedRow & {
   tracklists: string | null;
 };
 
-type UpdateItem = {
-  csvRow: ProcessedRow;
-  existingRow: {
-    discogs_release_id: string;
-    date_added: string | null;
-    folder: string | null;
-    media_condition: string | null;
-    image_url: string | null;
-    id: number;
-  };
-};
-
-type RemovalItem = {
+// Type for existing database records
+type ExistingRecord = {
+  id: number;
   discogs_release_id: string;
   date_added: string | null;
   folder: string | null;
   media_condition: string | null;
   image_url: string | null;
-  id: number;
 };
+
+// Type for update operations
+type UpdateOperation = {
+  csvRow: ProcessedRow;
+  existingRecord: ExistingRecord;
+};
+
+// Type for sync data storage
+interface SyncDataStorage {
+  updateOperations?: UpdateOperation[];
+  recordsToRemove?: ExistingRecord[];
+}
 
 function parseDiscogsDate(dateString: string): string {
   if (!dateString || dateString.trim() === '') {
@@ -166,16 +167,41 @@ export default function ImportDiscogsPage() {
         dynamicTyping: true, // This will convert numbers properly
         complete: async (results: { data: DiscogsCSVRow[], meta: { fields?: string[] } }) => {
           console.log('CSV Headers:', results.meta.fields);
+          console.log('Sample row:', results.data[0]);
+          console.log('Sample release_id value:', results.data[0]?.release_id);
+          console.log('Sample release_id type:', typeof results.data[0]?.release_id);
+          
           setDebugInfo(`CSV Headers: ${results.meta.fields?.join(', ')}`);
           
-          // Filter out rows without Release ID
-          const validRows = results.data.filter((row) => {
+          // Filter out rows without Release ID and log issues
+          const validRows = results.data.filter((row, index) => {
             const releaseId = row.release_id;
+            // Check for missing, null, undefined, empty string, or zero values
             if (!releaseId || releaseId === 0 || releaseId === '' || releaseId === null || releaseId === undefined) {
+              if (index < 10) { // Only log first 10 for brevity
+                console.log(`Row ${index} missing/invalid release_id:`, { 
+                  catalog: row['Catalog#'], 
+                  artist: row.Artist, 
+                  title: row.Title,
+                  release_id: releaseId,
+                  release_id_type: typeof releaseId 
+                });
+              }
               return false;
             }
+            // Also filter out non-numeric strings (we'll convert valid numbers to strings later)
             const numericValue = Number(releaseId);
             if (isNaN(numericValue) || numericValue <= 0) {
+              if (index < 10) {
+                console.log(`Row ${index} invalid release_id (not a positive number):`, { 
+                  catalog: row['Catalog#'], 
+                  artist: row.Artist, 
+                  title: row.Title,
+                  release_id: releaseId,
+                  release_id_type: typeof releaseId,
+                  numeric_value: numericValue
+                });
+              }
               return false;
             }
             return true;
@@ -199,17 +225,24 @@ export default function ImportDiscogsPage() {
 
           const releaseIds = processedRows.map(r => r.discogs_release_id);
           
+          console.log('Release IDs to check (converted to strings):', releaseIds.slice(0, 5)); // Log first 5 for debugging
+          
           setStatus(`Checking Supabase for existing entries among ${releaseIds.length} items...`);
           
-          // Use pagination to get ALL existing entries with folder and media_condition for change detection
-          let allExisting: Array<{ 
-            discogs_release_id: string; 
-            date_added: string | null; 
-            folder: string | null; 
-            media_condition: string | null; 
-            image_url: string | null; 
-            id: number 
-          }> = [];
+          // First, get a count of all records with discogs_release_id
+          const { count: totalCount, error: countError } = await supabase
+            .from('collection')
+            .select('*', { count: 'exact', head: true })
+            .not('discogs_release_id', 'is', null);
+
+          if (countError) {
+            console.warn('Count query failed:', countError);
+          } else {
+            console.log('Total records with discogs_release_id in database:', totalCount);
+          }
+          
+          // Use pagination to get ALL existing release IDs with additional fields for change detection
+          let allExisting: ExistingRecord[] = [];
           let start = 0;
           const pageSize = 1000;
           let hasMore = true;
@@ -226,71 +259,88 @@ export default function ImportDiscogsPage() {
             }
 
             if (pageData && pageData.length > 0) {
-              allExisting = allExisting.concat(pageData);
+              allExisting = allExisting.concat(pageData as ExistingRecord[]);
               start += pageSize;
               hasMore = pageData.length === pageSize; // Continue if we got a full page
+              console.log(`Fetched page: ${pageData.length} records, total so far: ${allExisting.length}`);
             } else {
               hasMore = false;
             }
           }
 
-          console.log('Total existing entries fetched from database:', allExisting.length);
+          console.log('Total existing entries fetched from database via pagination:', allExisting.length);
           
-          // Create maps for lookups
-          const existingMap = new Map(
-            allExisting.map(item => [item.discogs_release_id, item])
+          // Create lookup maps
+          const allExistingIds = new Set(
+            allExisting.map(r => r.discogs_release_id).filter(id => id)
           );
-          const csvMap = new Map(
+          const existingRecordsMap = new Map(
+            allExisting.map(record => [record.discogs_release_id, record])
+          );
+          const csvRecordsMap = new Map(
             processedRows.map(row => [row.discogs_release_id, row])
           );
+
+          console.log('All existing release IDs count:', allExistingIds.size);
           
           // Categorize items
-          const newRows = processedRows.filter(row => !existingMap.has(row.discogs_release_id));
-          
-          const updateItems: UpdateItem[] = processedRows.filter(row => {
-            const existing = existingMap.get(row.discogs_release_id);
-            if (!existing) return false;
-            
-            // Check for changes in folder or media condition
-            const folderChanged = row.folder !== existing.folder;
-            const conditionChanged = row.media_condition !== existing.media_condition;
-            const needsImage = !existing.image_url;
-            
-            return folderChanged || conditionChanged || needsImage;
-          }).map(row => {
-            const existing = existingMap.get(row.discogs_release_id)!;
-            const folderChanged = row.folder !== existing.folder;
-            const conditionChanged = row.media_condition !== existing.media_condition;
-            
-            if (folderChanged || conditionChanged) {
-              console.log(`Change detected for ${row.artist} - ${row.title}:`, {
-                folderChange: folderChanged ? `${existing.folder} → ${row.folder}` : 'no change',
-                conditionChange: conditionChanged ? `${existing.media_condition} → ${row.media_condition}` : 'no change',
-                needsImage: !existing.image_url
-              });
+          const existingInCsv = releaseIds.filter(id => allExistingIds.has(id));
+          const newRows = processedRows.filter(row => !allExistingIds.has(row.discogs_release_id));
+
+          // Find items that need updates (folder/condition changes or missing images)
+          const updateOperations: UpdateOperation[] = [];
+          for (const csvRow of processedRows) {
+            const existingRecord = existingRecordsMap.get(csvRow.discogs_release_id);
+            if (existingRecord) {
+              const folderChanged = csvRow.folder !== existingRecord.folder;
+              const conditionChanged = csvRow.media_condition !== existingRecord.media_condition;
+              const needsImage = !existingRecord.image_url;
+              
+              if (folderChanged || conditionChanged || needsImage) {
+                updateOperations.push({ csvRow, existingRecord });
+                
+                if (folderChanged || conditionChanged) {
+                  console.log('Change detected:', {
+                    releaseId: csvRow.discogs_release_id,
+                    artist: csvRow.artist,
+                    title: csvRow.title,
+                    folderChange: folderChanged ? `${existingRecord.folder} → ${csvRow.folder}` : 'no change',
+                    conditionChange: conditionChanged ? `${existingRecord.media_condition} → ${csvRow.media_condition}` : 'no change',
+                    needsImage: needsImage
+                  });
+                }
+              }
             }
-            
-            return { csvRow: row, existingRow: existing };
-          });
+          }
           
-          // Find items to remove (in database but not in CSV)
-          const itemsToRemove: RemovalItem[] = allExisting.filter(existing => !csvMap.has(existing.discogs_release_id));
+          // Find items to remove (in database but not in current CSV)
+          const recordsToRemove: ExistingRecord[] = allExisting.filter(
+            existingRecord => !csvRecordsMap.has(existingRecord.discogs_release_id)
+          );
+
+          console.log(`CSV analysis: ${existingInCsv.length} already exist, ${newRows.length} are new, ${updateOperations.length} need updates, ${recordsToRemove.length} to remove`);
+          console.log('Sample existing in CSV:', existingInCsv.slice(0, 5));
+          console.log('Sample new release IDs:', newRows.slice(0, 5).map(r => r.discogs_release_id));
           
-          setStatus(`Found ${newRows.length} new items, ${updateItems.length} items to update, ${itemsToRemove.length} items to remove`);
-          setDebugInfo(prev => prev + `\nNew: ${newRows.length}, Updates: ${updateItems.length}, Removals: ${itemsToRemove.length}`);
+          setStatus(`Found ${newRows.length} new items, ${updateOperations.length} items to update, ${recordsToRemove.length} items to remove`);
+          setDebugInfo(prev => prev + `\nTotal CSV rows: ${results.data.length}, Valid rows with release_id: ${validRows.length}, New items: ${newRows.length}, Updates: ${updateOperations.length}, Removals: ${recordsToRemove.length}\nTotal existing items in database: ${allExistingIds.size}\nNote: Converting release IDs to strings to match database schema`);
           
           if (validRows.length === 0) {
-            setDebugInfo(prev => prev + `\nPROBLEM: No rows have valid release_id values!`);
+            setDebugInfo(prev => prev + `\nPROBLEM: No rows have valid release_id values! This suggests the Discogs export may be missing release IDs.`);
             setStatus('No rows with valid Release IDs found. Please check your Discogs CSV export includes Release IDs.');
             setIsProcessing(false);
             return;
           }
 
-          // Store the update and removal data for later use
-          (window as { updateItems?: UpdateItem[]; itemsToRemove?: RemovalItem[] }).updateItems = updateItems;
-          (window as { updateItems?: UpdateItem[]; itemsToRemove?: RemovalItem[] }).itemsToRemove = itemsToRemove;
-          
-          // Show preview of new items (keeping your original preview behavior)
+          // Store sync data for enrichAndImport function
+          const syncData: SyncDataStorage = {
+            updateOperations,
+            recordsToRemove
+          };
+          (window as Window & SyncDataStorage).updateOperations = updateOperations;
+          (window as Window & SyncDataStorage).recordsToRemove = recordsToRemove;
+
+          // Show preview without enriching first
           setCsvPreview(newRows);
           setStatus(`Preview of ${newRows.length} new items ready. Click "Enrich with Discogs Data" to continue.`);
           setIsProcessing(false);
@@ -311,75 +361,130 @@ export default function ImportDiscogsPage() {
     if (csvPreview.length === 0) return;
     
     setIsProcessing(true);
-    const BATCH_SIZE = 50;
+    const BATCH_SIZE = 50; // Process 50 items at a time
     const totalItems = csvPreview.length;
-    const updateItems = (window as { updateItems?: UpdateItem[] }).updateItems || [];
-    const itemsToRemove = (window as { itemsToRemove?: RemovalItem[] }).itemsToRemove || [];
     let allEnriched: EnrichedRow[] = [];
     
-    setStatus(`Starting import process: ${totalItems} new items, ${updateItems.length} updates, ${itemsToRemove.length} removals`);
+    // Get stored sync data
+    const updateOperations = (window as Window & SyncDataStorage).updateOperations || [];
+    const recordsToRemove = (window as Window & SyncDataStorage).recordsToRemove || [];
+    
+    setStatus(`Starting enrichment process for ${totalItems} new items, ${updateOperations.length} updates, ${recordsToRemove.length} removals`);
 
     try {
-      // Process new items (your original logic)
+      // Process new items in batches (your original logic)
       for (let batchStart = 0; batchStart < totalItems; batchStart += BATCH_SIZE) {
         const batchEnd = Math.min(batchStart + BATCH_SIZE, totalItems);
         const currentBatch = csvPreview.slice(batchStart, batchEnd);
         const batchNumber = Math.floor(batchStart / BATCH_SIZE) + 1;
         const totalBatches = Math.ceil(totalItems / BATCH_SIZE);
         
-        setStatus(`Processing new items batch ${batchNumber}/${totalBatches}...`);
+        setStatus(`Processing batch ${batchNumber}/${totalBatches} (items ${batchStart + 1}-${batchEnd})...`);
         
         // Enrich current batch
         const batchEnriched: EnrichedRow[] = [];
         for (let i = 0; i < currentBatch.length; i++) {
           const row = currentBatch[i];
           const globalIndex = batchStart + i + 1;
-          setStatus(`Batch ${batchNumber}: Enriching ${globalIndex}/${totalItems}: ${row.artist} - ${row.title}`);
+          setStatus(`Batch ${batchNumber}/${totalBatches}: Enriching ${globalIndex}/${totalItems}: ${row.artist} - ${row.title}`);
           
           try {
             const { image_url, tracklists } = await fetchDiscogsData(row.discogs_release_id);
             batchEnriched.push({ ...row, image_url, tracklists });
           } catch (error) {
             console.warn(`Failed to enrich ${row.discogs_release_id}:`, error);
+            // Add the row without enrichment if Discogs API fails
             batchEnriched.push({ ...row, image_url: null, tracklists: null });
           }
           
+          // Rate limiting: wait 2 seconds between requests
           if (i < currentBatch.length - 1) {
             await delay(2000);
           }
         }
         
-        // Insert new items
-        if (batchEnriched.length > 0) {
-          const { error: insertError } = await supabase
-            .from('collection')
-            .insert(batchEnriched);
+        // Save this batch to database immediately
+        setStatus(`Batch ${batchNumber}: Saving ${batchEnriched.length} items to database...`);
+        
+        // Check for existing items in this batch
+        const { data: existingItems, error: existingError } = await supabase
+          .from('collection')
+          .select('discogs_release_id, date_added')
+          .in('discogs_release_id', batchEnriched.map(r => r.discogs_release_id));
+        
+        if (existingError) {
+          console.warn(`Failed to check existing items in batch ${batchNumber}:`, existingError);
+        } else {
+          const existingMap = new Map(
+            (existingItems || []).map(item => [item.discogs_release_id, item.date_added])
+          );
+          
+          const newItems = batchEnriched.filter(row => !existingMap.has(row.discogs_release_id));
+          const updateItems = batchEnriched.filter(row => {
+            const dateAdded = existingMap.get(row.discogs_release_id);
+            return existingMap.has(row.discogs_release_id) && !dateAdded;
+          });
+          
+          let batchInsertCount = 0;
+          let batchUpdateCount = 0;
+          
+          // Insert new items from this batch
+          if (newItems.length > 0) {
+            const { error: insertError } = await supabase
+              .from('collection')
+              .insert(newItems);
 
-          if (insertError) {
-            console.warn(`Insert failed for batch ${batchNumber}:`, insertError);
+            if (insertError) {
+              console.warn(`Database insert failed for batch ${batchNumber}:`, insertError);
+            } else {
+              batchInsertCount = newItems.length;
+            }
           }
+          
+          // Update existing items from this batch
+          for (const item of updateItems) {
+            const { error: updateError } = await supabase
+              .from('collection')
+              .update({ 
+                date_added: item.date_added,
+                image_url: item.image_url,
+                tracklists: item.tracklists
+              })
+              .eq('discogs_release_id', item.discogs_release_id);
+            
+            if (updateError) {
+              console.warn(`Failed to update ${item.discogs_release_id} in batch ${batchNumber}:`, updateError);
+            } else {
+              batchUpdateCount++;
+            }
+          }
+          
+          setStatus(`Batch ${batchNumber} complete: ${batchInsertCount} inserted, ${batchUpdateCount} updated`);
         }
         
+        // Add this batch to preview
         allEnriched = allEnriched.concat(batchEnriched);
-        setCsvPreview(allEnriched);
+        setCsvPreview(allEnriched); // Update preview after each batch
         
+        // Longer delay between batches to avoid rate limiting
         if (batchEnd < totalItems) {
+          setStatus(`Batch ${batchNumber} saved. Waiting 10 seconds before next batch...`);
           await delay(10000);
         }
       }
       
       // Process updates
-      if (updateItems.length > 0) {
-        setStatus(`Processing ${updateItems.length} updates...`);
+      if (updateOperations.length > 0) {
+        setStatus(`Processing ${updateOperations.length} update operations...`);
         
-        for (let i = 0; i < updateItems.length; i++) {
-          const { csvRow, existingRow } = updateItems[i];
-          setStatus(`Updating ${i + 1}/${updateItems.length}: ${csvRow.artist} - ${csvRow.title}`);
+        for (let i = 0; i < updateOperations.length; i++) {
+          const { csvRow, existingRecord } = updateOperations[i];
+          setStatus(`Update ${i + 1}/${updateOperations.length}: ${csvRow.artist} - ${csvRow.title}`);
           
-          let image_url = existingRow.image_url;
+          let image_url = existingRecord.image_url;
           let tracklists = null;
           
-          // Fetch missing image if needed
+          // Fetch missing image/tracklist data if needed
           if (!image_url) {
             try {
               const discogsData = await fetchDiscogsData(csvRow.discogs_release_id);
@@ -396,10 +501,11 @@ export default function ImportDiscogsPage() {
             .update({
               folder: csvRow.folder,
               media_condition: csvRow.media_condition,
+              date_added: csvRow.date_added,
               image_url: image_url,
               tracklists: tracklists
             })
-            .eq('id', existingRow.id);
+            .eq('id', existingRecord.id);
 
           if (updateError) {
             console.warn(`Failed to update ${csvRow.discogs_release_id}:`, updateError);
@@ -408,25 +514,25 @@ export default function ImportDiscogsPage() {
       }
       
       // Process removals
-      if (itemsToRemove.length > 0) {
-        setStatus(`Removing ${itemsToRemove.length} deleted items...`);
+      if (recordsToRemove.length > 0) {
+        setStatus(`Removing ${recordsToRemove.length} records no longer in collection...`);
         
-        const idsToDelete = itemsToRemove.map(item => item.id);
+        const idsToDelete = recordsToRemove.map(record => record.id);
         const { error: deleteError } = await supabase
           .from('collection')
           .delete()
           .in('id', idsToDelete);
 
         if (deleteError) {
-          console.warn('Failed to delete items:', deleteError);
+          console.warn('Failed to delete records:', deleteError);
         }
       }
       
-      const totalChanges = allEnriched.length + updateItems.length + itemsToRemove.length;
-      setStatus(`✅ All processing complete! ${allEnriched.length} new items, ${updateItems.length} updates, ${itemsToRemove.length} removals. Total: ${totalChanges} changes.`);
+      const totalChanges = allEnriched.length + updateOperations.length + recordsToRemove.length;
+      setStatus(`✅ All processing complete! Total: ${totalChanges} changes (${allEnriched.length} new, ${updateOperations.length} updated, ${recordsToRemove.length} removed).`);
     } catch (error) {
       console.error('Processing error:', error);
-      setStatus(`❌ Processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setStatus(`❌ Processing failed after ${allEnriched.length} items: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsProcessing(false);
     }
@@ -512,6 +618,7 @@ export default function ImportDiscogsPage() {
                         height={50}
                         style={{ objectFit: 'cover' }}
                         onError={(e) => {
+                          // Hide broken images
                           e.currentTarget.style.display = 'none';
                         }}
                       />
