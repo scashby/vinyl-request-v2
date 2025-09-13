@@ -22,7 +22,6 @@ type DiscogsCSVRow = {
   'Date Added': string;
   'Collection Media Condition': string;
   'Collection Sleeve Condition': string;
-  'Collection Notes': string | null;
 };
 
 // Type for the processed row that will go to Supabase
@@ -37,7 +36,6 @@ type ProcessedRow = {
   date_added: string;
   image_url: string | null;
   tracklists: string | null;
-  notes: string | null;
 };
 
 // Type for database records
@@ -52,7 +50,6 @@ type DatabaseRow = {
   discogs_release_id: string | null;
   date_added: string | null;
   image_url: string | null;
-  notes: string | null;
   blocked: boolean | null;
 };
 
@@ -95,7 +92,6 @@ function hasChanges(csvRow: ProcessedRow, dbRow: DatabaseRow): boolean {
     csvRow.format !== dbRow.format ||
     csvRow.folder !== dbRow.folder ||
     csvRow.media_condition !== dbRow.media_condition ||
-    csvRow.notes !== dbRow.notes ||
     csvRow.date_added !== dbRow.date_added
   );
 }
@@ -224,8 +220,7 @@ export default function ImportDiscogsPage() {
             discogs_release_id: String(row.release_id),
             date_added: parseDiscogsDate(row['Date Added']),
             image_url: null,
-            tracklists: null,
-            notes: row['Collection Notes'] || null
+            tracklists: null
           }));
           
           setStatus('Fetching current database records...');
@@ -239,7 +234,7 @@ export default function ImportDiscogsPage() {
           while (hasMore) {
             const { data: pageData, error: queryError } = await supabase
               .from('collection')
-              .select('id, artist, title, year, format, folder, media_condition, discogs_release_id, date_added, image_url, notes, blocked')
+              .select('id, artist, title, year, format, folder, media_condition, discogs_release_id, date_added, image_url, blocked')
               .not('discogs_release_id', 'is', null)
               .range(start, start + pageSize - 1);
 
@@ -368,8 +363,7 @@ export default function ImportDiscogsPage() {
               discogs_release_id: row.discogs_release_id,
               date_added: row.date_added,
               image_url: row.image_url,
-              tracklists: row.tracklists,
-              notes: row.notes
+              tracklists: row.tracklists
             })));
 
           if (insertError) {
@@ -431,18 +425,18 @@ export default function ImportDiscogsPage() {
         }
       }
       
-      // 3. Process removed items (mark as blocked rather than delete)
+      // 3. Process removed items (delete permanently)
       if (syncMode === 'full-sync' && previewData.removedItems.length > 0) {
-        setStatus(`Marking ${previewData.removedItems.length} removed items as blocked...`);
+        setStatus(`Deleting ${previewData.removedItems.length} removed items permanently...`);
         
         const removedIds = previewData.removedItems.map(item => item.id);
-        const { error: blockError } = await supabase
+        const { error: deleteError } = await supabase
           .from('collection')
-          .update({ blocked: true })
+          .delete()
           .in('id', removedIds);
 
-        if (blockError) {
-          console.error('Block error:', blockError);
+        if (deleteError) {
+          console.error('Delete error:', deleteError);
           setSyncStats(prev => ({ ...prev, errors: prev.errors + previewData.removedItems.length }));
         }
       }
@@ -482,7 +476,7 @@ export default function ImportDiscogsPage() {
             onChange={(e) => setSyncMode(e.target.value as SyncMode)}
             disabled={isProcessing}
           />
-          Full Sync (updates existing records and marks removed items)
+          Full Sync (updates existing records and deletes removed items)
         </label>
       </div>
       
@@ -615,7 +609,7 @@ export default function ImportDiscogsPage() {
           {/* Removed Items Preview */}
           {previewData.removedItems.length > 0 && (
             <div style={{ marginBottom: '2rem' }}>
-              <h3>Removed Items ({previewData.removedItems.length}) - Will be marked as blocked</h3>
+              <h3>Removed Items ({previewData.removedItems.length}) - Will be deleted permanently</h3>
               <table border={1} cellPadding={4} style={{ width: '100%', fontSize: '0.9em' }}>
                 <thead>
                   <tr>
