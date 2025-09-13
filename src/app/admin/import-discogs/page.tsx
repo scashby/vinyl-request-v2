@@ -488,7 +488,14 @@ export default function ImportDiscogsPage() {
   };
 
   return (
-    <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+    <div style={{ 
+      padding: '2rem', 
+      maxWidth: '1200px', 
+      margin: '0 auto', 
+      fontFamily: 'system-ui, -apple-system, sans-serif',
+      backgroundColor: 'white',
+      color: '#333'
+    }}>
       <h1 style={{ fontSize: '2rem', marginBottom: '2rem', color: '#1a1a1a' }}>Import & Sync Discogs Collection</h1>
       
       {/* Sync Mode Selection */}
@@ -499,7 +506,7 @@ export default function ImportDiscogsPage() {
         borderRadius: '8px', 
         backgroundColor: '#f8f9fa' 
       }}>
-        <h3 style={{ marginTop: 0, marginBottom: '1rem', fontSize: '1.3rem' }}>Sync Mode</h3>
+        <h3 style={{ marginTop: 0, marginBottom: '1rem', fontSize: '1.3rem', color: '#333' }}>Sync Mode</h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           <label style={{ 
             display: 'flex', 
@@ -507,7 +514,8 @@ export default function ImportDiscogsPage() {
             gap: '0.5rem', 
             fontSize: '1.1rem',
             cursor: 'pointer',
-            padding: '0.5rem'
+            padding: '0.5rem',
+            color: '#333'
           }}>
             <input
               type="radio"
@@ -525,7 +533,8 @@ export default function ImportDiscogsPage() {
             gap: '0.5rem', 
             fontSize: '1.1rem',
             cursor: 'pointer',
-            padding: '0.5rem'
+            padding: '0.5rem',
+            color: '#333'
           }}>
             <input
               type="radio"
@@ -552,7 +561,8 @@ export default function ImportDiscogsPage() {
             padding: '0.75rem', 
             border: '2px solid #ddd', 
             borderRadius: '6px',
-            backgroundColor: 'white'
+            backgroundColor: 'white',
+            color: '#333'
           }}
         />
         
@@ -660,18 +670,19 @@ export default function ImportDiscogsPage() {
         border: '1px solid #ddd',
         fontWeight: status.includes('complete') ? 'bold' : 'normal'
       }}>
-        {status}
+        {status || 'Ready to import CSV file...'}
       </div>
 
       {debugInfo && (
         <details style={{ marginBottom: '2rem', fontSize: '1rem', color: '#666' }}>
-          <summary style={{ cursor: 'pointer', fontSize: '1.1rem', fontWeight: 'bold' }}>Debug Info</summary>
+          <summary style={{ cursor: 'pointer', fontSize: '1.1rem', fontWeight: 'bold', color: '#333' }}>Debug Info</summary>
           <pre style={{ 
             marginTop: '1rem', 
             padding: '1rem', 
             backgroundColor: '#f8f9fa', 
             borderRadius: '4px',
-            overflow: 'auto'
+            overflow: 'auto',
+            color: '#333'
           }}>{debugInfo}</pre>
         </details>
       )}
@@ -683,7 +694,7 @@ export default function ImportDiscogsPage() {
           {previewData.newItems.length > 0 && (
             <div style={{ marginBottom: '3rem' }}>
               <h3 style={{ fontSize: '1.5rem', marginBottom: '1rem', color: '#28a745' }}>
-                ✨ New Items ({previewData.newItems.length})
+                New Items ({previewData.newItems.length})
               </h3>
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ 
@@ -710,12 +721,12 @@ export default function ImportDiscogsPage() {
                         backgroundColor: i % 2 === 0 ? '#f8f9fa' : 'white',
                         borderBottom: '1px solid #e0e0e0'
                       }}>
-                        <td style={{ padding: '0.75rem', fontSize: '1rem' }}>{row.artist}</td>
-                        <td style={{ padding: '0.75rem', fontSize: '1rem' }}>{row.title}</td>
-                        <td style={{ padding: '0.75rem', fontSize: '1rem' }}>{row.year}</td>
-                        <td style={{ padding: '0.75rem', fontSize: '1rem' }}>{row.format}</td>
-                        <td style={{ padding: '0.75rem', fontSize: '1rem' }}>{row.folder}</td>
-                        <td style={{ padding: '0.75rem', fontSize: '1rem' }}>{row.media_condition}</td>
+                        <td style={{ padding: '0.75rem', fontSize: '1rem', color: '#333' }}>{row.artist}</td>
+                        <td style={{ padding: '0.75rem', fontSize: '1rem', color: '#333' }}>{row.title}</td>
+                        <td style={{ padding: '0.75rem', fontSize: '1rem', color: '#333' }}>{row.year}</td>
+                        <td style={{ padding: '0.75rem', fontSize: '1rem', color: '#333' }}>{row.format}</td>
+                        <td style={{ padding: '0.75rem', fontSize: '1rem', color: '#333' }}>{row.folder}</td>
+                        <td style={{ padding: '0.75rem', fontSize: '1rem', color: '#333' }}>{row.media_condition}</td>
                       </tr>
                     ))}
                     {previewData.newItems.length > 10 && (
@@ -724,7 +735,8 @@ export default function ImportDiscogsPage() {
                           padding: '1rem', 
                           textAlign: 'center', 
                           fontSize: '1.1rem', 
-                          fontStyle: 'italic' 
+                          fontStyle: 'italic',
+                          color: '#666'
                         }}>
                           ... and {previewData.newItems.length - 10} more items
                         </td>
@@ -740,7 +752,7 @@ export default function ImportDiscogsPage() {
           {previewData.updatedItems.length > 0 && (
             <div style={{ marginBottom: '3rem' }}>
               <h3 style={{ fontSize: '1.5rem', marginBottom: '1rem', color: '#ffc107' }}>
-                🔄 Updated Items ({previewData.updatedItems.length})
+                Updated Items ({previewData.updatedItems.length})
               </h3>
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ 
@@ -770,9 +782,9 @@ export default function ImportDiscogsPage() {
                           backgroundColor: i % 2 === 0 ? '#f8f9fa' : 'white',
                           borderBottom: '1px solid #e0e0e0'
                         }}>
-                          <td style={{ padding: '0.75rem', fontSize: '1rem' }}>{csv.artist}</td>
-                          <td style={{ padding: '0.75rem', fontSize: '1rem' }}>{csv.title}</td>
-                          <td style={{ padding: '0.75rem', fontSize: '1rem', fontFamily: 'monospace' }}>{changes.join('; ')}</td>
+                          <td style={{ padding: '0.75rem', fontSize: '1rem', color: '#333' }}>{csv.artist}</td>
+                          <td style={{ padding: '0.75rem', fontSize: '1rem', color: '#333' }}>{csv.title}</td>
+                          <td style={{ padding: '0.75rem', fontSize: '1rem', fontFamily: 'monospace', color: '#333' }}>{changes.join('; ')}</td>
                         </tr>
                       );
                     })}
@@ -782,7 +794,8 @@ export default function ImportDiscogsPage() {
                           padding: '1rem', 
                           textAlign: 'center', 
                           fontSize: '1.1rem', 
-                          fontStyle: 'italic' 
+                          fontStyle: 'italic',
+                          color: '#666'
                         }}>
                           ... and {previewData.updatedItems.length - 10} more items
                         </td>
@@ -798,7 +811,7 @@ export default function ImportDiscogsPage() {
           {previewData.removedItems.length > 0 && (
             <div style={{ marginBottom: '3rem' }}>
               <h3 style={{ fontSize: '1.5rem', marginBottom: '1rem', color: '#dc3545' }}>
-                ⚠️ Removed Items ({previewData.removedItems.length}) - Will be deleted permanently
+                Removed Items ({previewData.removedItems.length}) - Will be deleted permanently
               </h3>
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ 
@@ -823,10 +836,10 @@ export default function ImportDiscogsPage() {
                         backgroundColor: i % 2 === 0 ? '#f8f9fa' : 'white',
                         borderBottom: '1px solid #e0e0e0'
                       }}>
-                        <td style={{ padding: '0.75rem', fontSize: '1rem' }}>{row.artist}</td>
-                        <td style={{ padding: '0.75rem', fontSize: '1rem' }}>{row.title}</td>
-                        <td style={{ padding: '0.75rem', fontSize: '1rem' }}>{row.year}</td>
-                        <td style={{ padding: '0.75rem', fontSize: '1rem' }}>{row.folder}</td>
+                        <td style={{ padding: '0.75rem', fontSize: '1rem', color: '#333' }}>{row.artist}</td>
+                        <td style={{ padding: '0.75rem', fontSize: '1rem', color: '#333' }}>{row.title}</td>
+                        <td style={{ padding: '0.75rem', fontSize: '1rem', color: '#333' }}>{row.year}</td>
+                        <td style={{ padding: '0.75rem', fontSize: '1rem', color: '#333' }}>{row.folder}</td>
                       </tr>
                     ))}
                     {previewData.removedItems.length > 10 && (
@@ -835,7 +848,8 @@ export default function ImportDiscogsPage() {
                           padding: '1rem', 
                           textAlign: 'center', 
                           fontSize: '1.1rem', 
-                          fontStyle: 'italic' 
+                          fontStyle: 'italic',
+                          color: '#666'
                         }}>
                           ... and {previewData.removedItems.length - 10} more items
                         </td>
