@@ -36,10 +36,7 @@ type ProcessedRow = {
   tracklists: string | null;
 };
 
-type EnrichedRow = ProcessedRow & {
-  image_url: string | null;
-  tracklists: string | null;
-};
+type EnrichedRow = ProcessedRow;
 
 // Type for existing database records
 type ExistingRecord = {
@@ -55,6 +52,13 @@ type ExistingRecord = {
 type UpdateOperation = {
   csvRow: ProcessedRow;
   existingRecord: ExistingRecord;
+};
+
+// Type for complete sync preview
+type SyncPreview = {
+  newItems: EnrichedRow[];
+  updateOperations: UpdateOperation[];
+  recordsToRemove: ExistingRecord[];
 };
 
 // Type for sync data storage
@@ -81,7 +85,7 @@ function parseDiscogsDate(dateString: string): string {
 }
 
 export default function ImportDiscogsPage() {
-  const [csvPreview, setCsvPreview] = useState<EnrichedRow[]>([]);
+  const [syncPreview, setSyncPreview] = useState<SyncPreview | null>(null);
   const [status, setStatus] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [debugInfo, setDebugInfo] = useState<string>('');
@@ -336,9 +340,13 @@ export default function ImportDiscogsPage() {
           (window as Window & SyncDataStorage).updateOperations = updateOperations;
           (window as Window & SyncDataStorage).recordsToRemove = recordsToRemove;
 
-          // Show preview without enriching first
-          setCsvPreview(newRows);
-          setStatus(`Preview of ${newRows.length} new items ready. Click "Enrich with Discogs Data" to continue.`);
+          // Show comprehensive preview of ALL changes
+          setSyncPreview({
+            newItems: newRows,
+            updateOperations,
+            recordsToRemove
+          });
+          setStatus(`Preview ready: ${newRows.length} new items, ${updateOperations.length} updates, ${recordsToRemove.length} removals. Review all changes below.`);
           setIsProcessing(false);
         },
         error: (error: Error) => {
@@ -354,11 +362,11 @@ export default function ImportDiscogsPage() {
   };
 
   const enrichAndImport = async () => {
-    if (csvPreview.length === 0) return;
+    if (!syncPreview || syncPreview.newItems.length === 0) return;
     
     setIsProcessing(true);
     const BATCH_SIZE = 50; // Process 50 items at a time
-    const totalItems = csvPreview.length;
+    const totalItems = syncPreview.newItems.length;
     let allEnriched: EnrichedRow[] = [];
     
     // Get stored sync data
@@ -368,10 +376,10 @@ export default function ImportDiscogsPage() {
     setStatus(`Starting enrichment process for ${totalItems} new items, ${updateOperations.length} updates, ${recordsToRemove.length} removals`);
 
     try {
-      // Process new items in batches (your original logic)
+      // Process new items in batches
       for (let batchStart = 0; batchStart < totalItems; batchStart += BATCH_SIZE) {
         const batchEnd = Math.min(batchStart + BATCH_SIZE, totalItems);
-        const currentBatch = csvPreview.slice(batchStart, batchEnd);
+        const currentBatch = syncPreview.newItems.slice(batchStart, batchEnd);
         const batchNumber = Math.floor(batchStart / BATCH_SIZE) + 1;
         const totalBatches = Math.ceil(totalItems / BATCH_SIZE);
         
@@ -460,7 +468,12 @@ export default function ImportDiscogsPage() {
         
         // Add this batch to preview
         allEnriched = allEnriched.concat(batchEnriched);
-        setCsvPreview(allEnriched); // Update preview after each batch
+        if (syncPreview) {
+          setSyncPreview({
+            ...syncPreview,
+            newItems: allEnriched
+          });
+        }
         
         // Longer delay between batches to avoid rate limiting
         if (batchEnd < totalItems) {
@@ -544,7 +557,7 @@ export default function ImportDiscogsPage() {
         disabled={isProcessing}
       />
       
-      {csvPreview.length > 0 && (
+      {syncPreview && (
         <button 
           onClick={enrichAndImport}
           disabled={isProcessing}
@@ -577,62 +590,141 @@ export default function ImportDiscogsPage() {
         </details>
       )}
 
-      {csvPreview.length > 0 && (
+      {syncPreview && (
         <div>
-          <h2>Preview ({csvPreview.length} items)</h2>
-          <table border={1} cellPadding={4} style={{ marginTop: '1rem' }}>
-            <thead>
-              <tr>
-                <th>Artist</th>
-                <th>Title</th>
-                <th>Year</th>
-                <th>Format</th>
-                <th>Folder</th>
-                <th>Media Condition</th>
-                <th>Release ID</th>
-                <th>Image</th>
-                <th>Tracklist Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {csvPreview.map((row, i) => (
-                <tr key={i}>
-                  <td>{row.artist}</td>
-                  <td>{row.title}</td>
-                  <td>{row.year}</td>
-                  <td>{row.format}</td>
-                  <td>{row.folder}</td>
-                  <td>{row.media_condition}</td>
-                  <td>{row.discogs_release_id}</td>
-                  <td>
-                    {row.image_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={row.image_url}
-                        alt={`${row.artist} - ${row.title}`}
-                        width={50}
-                        height={50}
-                        style={{ objectFit: 'cover' }}
-                        onError={(e) => {
-                          // Hide broken images
-                          e.currentTarget.style.display = 'none';
-                        }}
-                      />
-                    ) : (
-                      '—'
-                    )}
-                  </td>
-                  <td>
-                    {row.tracklists ? (
-                      `${JSON.parse(row.tracklists).length} tracks`
-                    ) : (
-                      '—'
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <h2>Sync Preview - All Changes</h2>
+          
+          {/* New Items Section */}
+          {syncPreview.newItems.length > 0 && (
+            <div style={{ marginBottom: '2rem' }}>
+              <h3 style={{ color: 'green' }}>✅ Items to Add ({syncPreview.newItems.length})</h3>
+              <table border={1} cellPadding={4} style={{ marginTop: '0.5rem', width: '100%' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#e8f5e8' }}>
+                    <th>Artist</th>
+                    <th>Title</th>
+                    <th>Year</th>
+                    <th>Format</th>
+                    <th>Folder</th>
+                    <th>Condition</th>
+                    <th>Release ID</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {syncPreview.newItems.slice(0, 20).map((row, i) => (
+                    <tr key={i}>
+                      <td>{row.artist}</td>
+                      <td>{row.title}</td>
+                      <td>{row.year}</td>
+                      <td>{row.format}</td>
+                      <td>{row.folder}</td>
+                      <td>{row.media_condition}</td>
+                      <td>{row.discogs_release_id}</td>
+                    </tr>
+                  ))}
+                  {syncPreview.newItems.length > 20 && (
+                    <tr><td colSpan={7}><em>... and {syncPreview.newItems.length - 20} more items</em></td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Update Items Section */}
+          {syncPreview.updateOperations.length > 0 && (
+            <div style={{ marginBottom: '2rem' }}>
+              <h3 style={{ color: 'orange' }}>⚠️ Items to Update ({syncPreview.updateOperations.length})</h3>
+              <table border={1} cellPadding={4} style={{ marginTop: '0.5rem', width: '100%' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#fff8e1' }}>
+                    <th>Artist</th>
+                    <th>Title</th>
+                    <th>Release ID</th>
+                    <th>Folder Change</th>
+                    <th>Condition Change</th>
+                    <th>Will Fetch Image</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {syncPreview.updateOperations.slice(0, 20).map((op, i) => {
+                    const folderChanged = op.csvRow.folder !== op.existingRecord.folder;
+                    const conditionChanged = op.csvRow.media_condition !== op.existingRecord.media_condition;
+                    const needsImage = !op.existingRecord.image_url;
+                    return (
+                      <tr key={i}>
+                        <td>{op.csvRow.artist}</td>
+                        <td>{op.csvRow.title}</td>
+                        <td>{op.csvRow.discogs_release_id}</td>
+                        <td>
+                          {folderChanged ? (
+                            <span style={{ color: 'orange' }}>
+                              {op.existingRecord.folder || '(none)'} → {op.csvRow.folder}
+                            </span>
+                          ) : '—'}
+                        </td>
+                        <td>
+                          {conditionChanged ? (
+                            <span style={{ color: 'orange' }}>
+                              {op.existingRecord.media_condition || '(none)'} → {op.csvRow.media_condition}
+                            </span>
+                          ) : '—'}
+                        </td>
+                        <td>{needsImage ? '✓' : '—'}</td>
+                      </tr>
+                    );
+                  })}
+                  {syncPreview.updateOperations.length > 20 && (
+                    <tr><td colSpan={6}><em>... and {syncPreview.updateOperations.length - 20} more updates</em></td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Remove Items Section */}
+          {syncPreview.recordsToRemove.length > 0 && (
+            <div style={{ marginBottom: '2rem' }}>
+              <h3 style={{ color: 'red' }}>🗑️ Items to Remove ({syncPreview.recordsToRemove.length})</h3>
+              <p style={{ color: 'red', fontWeight: 'bold' }}>
+                ⚠️ WARNING: These records exist in your database but are NOT in the current CSV. They will be PERMANENTLY DELETED.
+              </p>
+              <table border={1} cellPadding={4} style={{ marginTop: '0.5rem', width: '100%' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#ffebee' }}>
+                    <th>Release ID</th>
+                    <th>Folder</th>
+                    <th>Condition</th>
+                    <th>Date Added</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {syncPreview.recordsToRemove.slice(0, 20).map((record, i) => (
+                    <tr key={i} style={{ backgroundColor: '#ffeaea' }}>
+                      <td>{record.discogs_release_id}</td>
+                      <td>{record.folder || '—'}</td>
+                      <td>{record.media_condition || '—'}</td>
+                      <td>{record.date_added ? new Date(record.date_added).toLocaleDateString() : '—'}</td>
+                    </tr>
+                  ))}
+                  {syncPreview.recordsToRemove.length > 20 && (
+                    <tr><td colSpan={4}><em>... and {syncPreview.recordsToRemove.length - 20} more deletions</em></td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+          
+          <div style={{ 
+            padding: '1rem', 
+            backgroundColor: '#f8f9fa', 
+            border: '1px solid #dee2e6', 
+            borderRadius: '4px',
+            marginTop: '1rem'
+          }}>
+            <strong>Summary:</strong> This operation will make {
+              syncPreview.newItems.length + syncPreview.updateOperations.length + syncPreview.recordsToRemove.length
+            } total changes to your collection.
+          </div>
         </div>
       )}
     </div>
