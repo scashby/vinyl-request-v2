@@ -622,7 +622,7 @@ export default function ImportDiscogsPage() {
         <div style={{ backgroundColor: '#ffffff', color: '#212529' }}>
           <h2 style={{ color: '#212529', marginBottom: '1.5rem', marginTop: '2rem' }}>Sync Preview - All Changes</h2>
           
-          {/* New Items Section */}
+          {/* New Items Section - SHOW ALL ITEMS */}
           {syncPreview.newItems.length > 0 && (
             <div style={{ marginBottom: '2rem' }}>
               <h3 style={{ color: '#28a745' }}>✅ Items to Add ({syncPreview.newItems.length})</h3>
@@ -644,7 +644,7 @@ export default function ImportDiscogsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {syncPreview.newItems.slice(0, 20).map((row, i) => (
+                  {syncPreview.newItems.map((row, i) => (
                     <tr key={i} style={{ backgroundColor: i % 2 === 0 ? '#ffffff' : '#f8f9fa' }}>
                       <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>{row.artist}</td>
                       <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>{row.title}</td>
@@ -655,15 +655,12 @@ export default function ImportDiscogsPage() {
                       <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>{row.discogs_release_id}</td>
                     </tr>
                   ))}
-                  {syncPreview.newItems.length > 20 && (
-                    <tr><td colSpan={7} style={{ padding: '8px', textAlign: 'center', fontStyle: 'italic', color: '#6c757d' }}>... and {syncPreview.newItems.length - 20} more items</td></tr>
-                  )}
                 </tbody>
               </table>
             </div>
           )}
 
-          {/* Update Items Section */}
+          {/* Update Items Section - SHOW ALL UPDATES */}
           {syncPreview.updateOperations.length > 0 && (
             <div style={{ marginBottom: '2rem' }}>
               <h3 style={{ color: '#fd7e14' }}>⚠️ Items to Update ({syncPreview.updateOperations.length})</h3>
@@ -684,7 +681,7 @@ export default function ImportDiscogsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {syncPreview.updateOperations.slice(0, 20).map((op, i) => {
+                  {syncPreview.updateOperations.map((op, i) => {
                     const folderChanged = op.csvRow.folder !== op.existingRecord.folder;
                     const conditionChanged = op.csvRow.media_condition !== op.existingRecord.media_condition;
                     const needsImage = !op.existingRecord.image_url;
@@ -711,15 +708,12 @@ export default function ImportDiscogsPage() {
                       </tr>
                     );
                   })}
-                  {syncPreview.updateOperations.length > 20 && (
-                    <tr><td colSpan={6} style={{ padding: '8px', textAlign: 'center', fontStyle: 'italic', color: '#6c757d' }}>... and {syncPreview.updateOperations.length - 20} more updates</td></tr>
-                  )}
                 </tbody>
               </table>
             </div>
           )}
 
-          {/* Remove Items Section */}
+          {/* Remove Items Section - SHOW ALL DELETIONS */}
           {syncPreview.recordsToRemove.length > 0 && (
             <div style={{ marginBottom: '2rem' }}>
               <h3 style={{ color: '#dc3545' }}>🗑️ Items to Remove ({syncPreview.recordsToRemove.length})</h3>
