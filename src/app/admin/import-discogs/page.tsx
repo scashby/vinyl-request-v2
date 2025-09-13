@@ -42,6 +42,8 @@ type EnrichedRow = ProcessedRow;
 type ExistingRecord = {
   id: number;
   discogs_release_id: string;
+  artist: string;
+  title: string;
   date_added: string | null;
   folder: string | null;
   media_condition: string | null;
@@ -254,7 +256,7 @@ export default function ImportDiscogsPage() {
           while (hasMore) {
             const { data: pageData, error: queryError } = await supabase
               .from('collection')
-              .select('id, discogs_release_id, date_added, folder, media_condition, image_url')
+              .select('id, discogs_release_id, artist, title, date_added, folder, media_condition, image_url')
               .not('discogs_release_id', 'is', null)
               .range(start, start + pageSize - 1);
 
@@ -548,13 +550,26 @@ export default function ImportDiscogsPage() {
   };
 
   return (
-    <div style={{ padding: '1rem' }}>
-      <h1>Import Discogs CSV</h1>
+    <div style={{ 
+      padding: '2rem', 
+      backgroundColor: '#ffffff', 
+      minHeight: '100vh',
+      color: '#212529'
+    }}>
+      <h1 style={{ color: '#212529', marginBottom: '1.5rem' }}>Import Discogs CSV</h1>
       <input 
         type="file" 
         accept=".csv" 
         onChange={handleFileUpload} 
         disabled={isProcessing}
+        style={{
+          padding: '8px 12px',
+          border: '1px solid #ced4da',
+          borderRadius: '6px',
+          fontSize: '16px',
+          backgroundColor: '#ffffff',
+          color: '#212529'
+        }}
       />
       
       {syncPreview && (
@@ -563,13 +578,15 @@ export default function ImportDiscogsPage() {
           disabled={isProcessing}
           style={{ 
             marginLeft: '1rem', 
-            padding: '0.5rem 1rem',
+            padding: '12px 24px',
             backgroundColor: isProcessing ? '#6c757d' : '#007bff',
             color: 'white',
             border: 'none',
-            borderRadius: '4px',
+            borderRadius: '6px',
             cursor: isProcessing ? 'not-allowed' : 'pointer',
-            opacity: isProcessing ? 0.6 : 1
+            opacity: isProcessing ? 0.6 : 1,
+            fontSize: '16px',
+            fontWeight: '500'
           }}
         >
           {isProcessing ? 'Processing...' : 'Enrich with Discogs Data & Import'}
@@ -577,53 +594,69 @@ export default function ImportDiscogsPage() {
       )}
       
       <p style={{ 
-        color: status.includes('error') || status.includes('failed') ? 'red' : 'black',
-        fontWeight: status.includes('Successfully') ? 'bold' : 'normal'
+        color: status.includes('error') || status.includes('failed') ? '#dc3545' : '#212529',
+        fontWeight: status.includes('Successfully') ? 'bold' : 'normal',
+        marginTop: '1rem',
+        fontSize: '16px'
       }}>
         {status}
       </p>
 
       {debugInfo && (
-        <details style={{ marginTop: '1rem', fontSize: '0.9em', color: '#666' }}>
-          <summary>Debug Info</summary>
-          <pre>{debugInfo}</pre>
+        <details style={{ marginTop: '1.5rem', fontSize: '14px', color: '#6c757d' }}>
+          <summary style={{ cursor: 'pointer', padding: '8px 0', color: '#212529' }}>Debug Info</summary>
+          <pre style={{ 
+            backgroundColor: '#f8f9fa', 
+            color: '#212529',
+            padding: '12px', 
+            border: '1px solid #dee2e6', 
+            borderRadius: '4px',
+            marginTop: '8px',
+            fontSize: '12px',
+            overflow: 'auto'
+          }}>{debugInfo}</pre>
         </details>
       )}
 
       {syncPreview && (
-        <div>
-          <h2 style={{ color: '#495057', marginBottom: '1.5rem', marginTop: '2rem' }}>Sync Preview - All Changes</h2>
+        <div style={{ backgroundColor: '#ffffff', color: '#212529' }}>
+          <h2 style={{ color: '#212529', marginBottom: '1.5rem', marginTop: '2rem' }}>Sync Preview - All Changes</h2>
           
           {/* New Items Section */}
           {syncPreview.newItems.length > 0 && (
             <div style={{ marginBottom: '2rem' }}>
-              <h3 style={{ color: 'green' }}>✅ Items to Add ({syncPreview.newItems.length})</h3>
-              <table border={1} cellPadding={4} style={{ marginTop: '0.5rem', width: '100%' }}>
+              <h3 style={{ color: '#28a745' }}>✅ Items to Add ({syncPreview.newItems.length})</h3>
+              <table style={{ 
+                marginTop: '0.5rem', 
+                width: '100%', 
+                borderCollapse: 'collapse',
+                backgroundColor: '#ffffff'
+              }}>
                 <thead>
-                  <tr style={{ backgroundColor: '#e8f5e8' }}>
-                    <th>Artist</th>
-                    <th>Title</th>
-                    <th>Year</th>
-                    <th>Format</th>
-                    <th>Folder</th>
-                    <th>Condition</th>
-                    <th>Release ID</th>
+                  <tr style={{ backgroundColor: '#d4edda' }}>
+                    <th style={{ textAlign: 'left', padding: '12px', border: '1px solid #c3e6cb', color: '#155724' }}>Artist</th>
+                    <th style={{ textAlign: 'left', padding: '12px', border: '1px solid #c3e6cb', color: '#155724' }}>Title</th>
+                    <th style={{ textAlign: 'left', padding: '12px', border: '1px solid #c3e6cb', color: '#155724' }}>Year</th>
+                    <th style={{ textAlign: 'left', padding: '12px', border: '1px solid #c3e6cb', color: '#155724' }}>Format</th>
+                    <th style={{ textAlign: 'left', padding: '12px', border: '1px solid #c3e6cb', color: '#155724' }}>Folder</th>
+                    <th style={{ textAlign: 'left', padding: '12px', border: '1px solid #c3e6cb', color: '#155724' }}>Condition</th>
+                    <th style={{ textAlign: 'left', padding: '12px', border: '1px solid #c3e6cb', color: '#155724' }}>Release ID</th>
                   </tr>
                 </thead>
                 <tbody>
                   {syncPreview.newItems.slice(0, 20).map((row, i) => (
-                    <tr key={i}>
-                      <td>{row.artist}</td>
-                      <td>{row.title}</td>
-                      <td>{row.year}</td>
-                      <td>{row.format}</td>
-                      <td>{row.folder}</td>
-                      <td>{row.media_condition}</td>
-                      <td>{row.discogs_release_id}</td>
+                    <tr key={i} style={{ backgroundColor: i % 2 === 0 ? '#ffffff' : '#f8f9fa' }}>
+                      <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>{row.artist}</td>
+                      <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>{row.title}</td>
+                      <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>{row.year}</td>
+                      <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>{row.format}</td>
+                      <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>{row.folder}</td>
+                      <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>{row.media_condition}</td>
+                      <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>{row.discogs_release_id}</td>
                     </tr>
                   ))}
                   {syncPreview.newItems.length > 20 && (
-                    <tr><td colSpan={7}><em>... and {syncPreview.newItems.length - 20} more items</em></td></tr>
+                    <tr><td colSpan={7} style={{ padding: '8px', textAlign: 'center', fontStyle: 'italic', color: '#6c757d' }}>... and {syncPreview.newItems.length - 20} more items</td></tr>
                   )}
                 </tbody>
               </table>
@@ -633,16 +666,21 @@ export default function ImportDiscogsPage() {
           {/* Update Items Section */}
           {syncPreview.updateOperations.length > 0 && (
             <div style={{ marginBottom: '2rem' }}>
-              <h3 style={{ color: 'orange' }}>⚠️ Items to Update ({syncPreview.updateOperations.length})</h3>
-              <table border={1} cellPadding={4} style={{ marginTop: '0.5rem', width: '100%' }}>
+              <h3 style={{ color: '#fd7e14' }}>⚠️ Items to Update ({syncPreview.updateOperations.length})</h3>
+              <table style={{ 
+                marginTop: '0.5rem', 
+                width: '100%', 
+                borderCollapse: 'collapse',
+                backgroundColor: '#ffffff'
+              }}>
                 <thead>
-                  <tr style={{ backgroundColor: '#fff8e1' }}>
-                    <th>Artist</th>
-                    <th>Title</th>
-                    <th>Release ID</th>
-                    <th>Folder Change</th>
-                    <th>Condition Change</th>
-                    <th>Will Fetch Image</th>
+                  <tr style={{ backgroundColor: '#fff3cd' }}>
+                    <th style={{ textAlign: 'left', padding: '12px', border: '1px solid #ffeaa7', color: '#856404' }}>Artist</th>
+                    <th style={{ textAlign: 'left', padding: '12px', border: '1px solid #ffeaa7', color: '#856404' }}>Title</th>
+                    <th style={{ textAlign: 'left', padding: '12px', border: '1px solid #ffeaa7', color: '#856404' }}>Release ID</th>
+                    <th style={{ textAlign: 'left', padding: '12px', border: '1px solid #ffeaa7', color: '#856404' }}>Folder Change</th>
+                    <th style={{ textAlign: 'left', padding: '12px', border: '1px solid #ffeaa7', color: '#856404' }}>Condition Change</th>
+                    <th style={{ textAlign: 'left', padding: '12px', border: '1px solid #ffeaa7', color: '#856404' }}>Will Fetch Image</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -651,30 +689,30 @@ export default function ImportDiscogsPage() {
                     const conditionChanged = op.csvRow.media_condition !== op.existingRecord.media_condition;
                     const needsImage = !op.existingRecord.image_url;
                     return (
-                      <tr key={i}>
-                        <td>{op.csvRow.artist}</td>
-                        <td>{op.csvRow.title}</td>
-                        <td>{op.csvRow.discogs_release_id}</td>
-                        <td>
+                      <tr key={i} style={{ backgroundColor: i % 2 === 0 ? '#ffffff' : '#f8f9fa' }}>
+                        <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>{op.csvRow.artist}</td>
+                        <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>{op.csvRow.title}</td>
+                        <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>{op.csvRow.discogs_release_id}</td>
+                        <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>
                           {folderChanged ? (
-                            <span style={{ color: 'orange' }}>
+                            <span style={{ color: '#fd7e14', fontWeight: 'bold' }}>
                               {op.existingRecord.folder || '(none)'} → {op.csvRow.folder}
                             </span>
                           ) : '—'}
                         </td>
-                        <td>
+                        <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>
                           {conditionChanged ? (
-                            <span style={{ color: 'orange' }}>
+                            <span style={{ color: '#fd7e14', fontWeight: 'bold' }}>
                               {op.existingRecord.media_condition || '(none)'} → {op.csvRow.media_condition}
                             </span>
                           ) : '—'}
                         </td>
-                        <td>{needsImage ? '✓' : '—'}</td>
+                        <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>{needsImage ? '✓' : '—'}</td>
                       </tr>
                     );
                   })}
                   {syncPreview.updateOperations.length > 20 && (
-                    <tr><td colSpan={6}><em>... and {syncPreview.updateOperations.length - 20} more updates</em></td></tr>
+                    <tr><td colSpan={6} style={{ padding: '8px', textAlign: 'center', fontStyle: 'italic', color: '#6c757d' }}>... and {syncPreview.updateOperations.length - 20} more updates</td></tr>
                   )}
                 </tbody>
               </table>
@@ -684,30 +722,46 @@ export default function ImportDiscogsPage() {
           {/* Remove Items Section */}
           {syncPreview.recordsToRemove.length > 0 && (
             <div style={{ marginBottom: '2rem' }}>
-              <h3 style={{ color: 'red' }}>🗑️ Items to Remove ({syncPreview.recordsToRemove.length})</h3>
-              <p style={{ color: 'red', fontWeight: 'bold' }}>
-                ⚠️ WARNING: These records exist in your database but are NOT in the current CSV. They will be PERMANENTLY DELETED.
-              </p>
-              <table border={1} cellPadding={4} style={{ marginTop: '0.5rem', width: '100%' }}>
+              <h3 style={{ color: '#dc3545' }}>🗑️ Items to Remove ({syncPreview.recordsToRemove.length})</h3>
+              <div style={{ 
+                backgroundColor: '#f8d7da', 
+                color: '#721c24', 
+                padding: '12px', 
+                marginBottom: '12px', 
+                border: '1px solid #f5c6cb', 
+                borderRadius: '4px' 
+              }}>
+                <strong>⚠️ WARNING:</strong> These records exist in your database but are NOT in the current CSV. They will be PERMANENTLY DELETED.
+              </div>
+              <table style={{ 
+                marginTop: '0.5rem', 
+                width: '100%', 
+                borderCollapse: 'collapse',
+                backgroundColor: '#ffffff'
+              }}>
                 <thead>
-                  <tr style={{ backgroundColor: '#ffebee' }}>
-                    <th>Release ID</th>
-                    <th>Folder</th>
-                    <th>Condition</th>
-                    <th>Date Added</th>
+                  <tr style={{ backgroundColor: '#f8d7da' }}>
+                    <th style={{ textAlign: 'left', padding: '12px', border: '1px solid #f5c6cb', color: '#721c24' }}>Artist</th>
+                    <th style={{ textAlign: 'left', padding: '12px', border: '1px solid #f5c6cb', color: '#721c24' }}>Title</th>
+                    <th style={{ textAlign: 'left', padding: '12px', border: '1px solid #f5c6cb', color: '#721c24' }}>Release ID</th>
+                    <th style={{ textAlign: 'left', padding: '12px', border: '1px solid #f5c6cb', color: '#721c24' }}>Folder</th>
+                    <th style={{ textAlign: 'left', padding: '12px', border: '1px solid #f5c6cb', color: '#721c24' }}>Condition</th>
+                    <th style={{ textAlign: 'left', padding: '12px', border: '1px solid #f5c6cb', color: '#721c24' }}>Date Added</th>
                   </tr>
                 </thead>
                 <tbody>
                   {syncPreview.recordsToRemove.slice(0, 20).map((record, i) => (
-                    <tr key={i} style={{ backgroundColor: '#ffeaea' }}>
-                      <td>{record.discogs_release_id}</td>
-                      <td>{record.folder || '—'}</td>
-                      <td>{record.media_condition || '—'}</td>
-                      <td>{record.date_added ? new Date(record.date_added).toLocaleDateString() : '—'}</td>
+                    <tr key={i} style={{ backgroundColor: i % 2 === 0 ? '#ffffff' : '#f8f9fa' }}>
+                      <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>{record.artist || '—'}</td>
+                      <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>{record.title || '—'}</td>
+                      <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>{record.discogs_release_id}</td>
+                      <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>{record.folder || '—'}</td>
+                      <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>{record.media_condition || '—'}</td>
+                      <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>{record.date_added ? new Date(record.date_added).toLocaleDateString() : '—'}</td>
                     </tr>
                   ))}
                   {syncPreview.recordsToRemove.length > 20 && (
-                    <tr><td colSpan={4}><em>... and {syncPreview.recordsToRemove.length - 20} more deletions</em></td></tr>
+                    <tr><td colSpan={6} style={{ padding: '8px', textAlign: 'center', fontStyle: 'italic', color: '#6c757d' }}>... and {syncPreview.recordsToRemove.length - 20} more deletions</td></tr>
                   )}
                 </tbody>
               </table>
@@ -715,11 +769,12 @@ export default function ImportDiscogsPage() {
           )}
           
           <div style={{ 
-            padding: '1rem', 
+            padding: '16px', 
             backgroundColor: '#f8f9fa', 
+            color: '#495057',
             border: '1px solid #dee2e6', 
-            borderRadius: '4px',
-            marginTop: '1rem'
+            borderRadius: '6px',
+            marginTop: '2rem'
           }}>
             <strong>Summary:</strong> This operation will make {
               syncPreview.newItems.length + syncPreview.updateOperations.length + syncPreview.recordsToRemove.length
