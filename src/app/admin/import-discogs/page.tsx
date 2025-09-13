@@ -82,18 +82,54 @@ function parseDiscogsDate(dateString: string): string {
 
 // Compare two records to see if they have meaningful differences
 function hasChanges(csvRow: ProcessedRow, dbRow: DatabaseRow): boolean {
-  const csvYear = csvRow.year?.toString() || null;
-  const dbYear = dbRow.year;
+  // Normalize data for comparison
+  const csvYear = csvRow.year?.toString().trim() || '';
+  const dbYear = dbRow.year?.toString().trim() || '';
   
-  return (
-    csvRow.artist !== dbRow.artist ||
-    csvRow.title !== dbRow.title ||
+  const csvArtist = csvRow.artist?.trim() || '';
+  const dbArtist = dbRow.artist?.trim() || '';
+  
+  const csvTitle = csvRow.title?.trim() || '';
+  const dbTitle = dbRow.title?.trim() || '';
+  
+  const csvFormat = csvRow.format?.trim() || '';
+  const dbFormat = dbRow.format?.trim() || '';
+  
+  const csvFolder = csvRow.folder?.trim() || '';
+  const dbFolder = dbRow.folder?.trim() || '';
+  
+  const csvCondition = csvRow.media_condition?.trim() || '';
+  const dbCondition = dbRow.media_condition?.trim() || '';
+  
+  // For dates, just compare the date part (ignore time)
+  const csvDatePart = csvRow.date_added ? csvRow.date_added.split('T')[0] : '';
+  const dbDatePart = dbRow.date_added ? dbRow.date_added.split('T')[0] : '';
+  
+  const hasChange = (
+    csvArtist !== dbArtist ||
+    csvTitle !== dbTitle ||
     csvYear !== dbYear ||
-    csvRow.format !== dbRow.format ||
-    csvRow.folder !== dbRow.folder ||
-    csvRow.media_condition !== dbRow.media_condition ||
-    csvRow.date_added !== dbRow.date_added
+    csvFormat !== dbFormat ||
+    csvFolder !== dbFolder ||
+    csvCondition !== dbCondition ||
+    csvDatePart !== dbDatePart
   );
+  
+  // Debug logging for first few comparisons
+  if (hasChange) {
+    console.log('CHANGE DETECTED:', {
+      releaseId: csvRow.discogs_release_id,
+      artist: { csv: csvArtist, db: dbArtist, same: csvArtist === dbArtist },
+      title: { csv: csvTitle, db: dbTitle, same: csvTitle === dbTitle },
+      year: { csv: csvYear, db: dbYear, same: csvYear === dbYear },
+      format: { csv: csvFormat, db: dbFormat, same: csvFormat === dbFormat },
+      folder: { csv: csvFolder, db: dbFolder, same: csvFolder === dbFolder },
+      condition: { csv: csvCondition, db: dbCondition, same: csvCondition === dbCondition },
+      dateAdded: { csv: csvDatePart, db: dbDatePart, same: csvDatePart === dbDatePart }
+    });
+  }
+  
+  return hasChange;
 }
 
 export default function ImportDiscogsPage() {
@@ -452,85 +488,191 @@ export default function ImportDiscogsPage() {
   };
 
   return (
-    <div style={{ padding: '1rem' }}>
-      <h1>Import & Sync Discogs Collection</h1>
+    <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+      <h1 style={{ fontSize: '2rem', marginBottom: '2rem', color: '#1a1a1a' }}>Import & Sync Discogs Collection</h1>
       
       {/* Sync Mode Selection */}
-      <div style={{ marginBottom: '1rem', padding: '1rem', border: '1px solid #ddd', borderRadius: '4px' }}>
-        <h3>Sync Mode</h3>
-        <label style={{ marginRight: '1rem' }}>
-          <input
-            type="radio"
-            value="import-only"
-            checked={syncMode === 'import-only'}
-            onChange={(e) => setSyncMode(e.target.value as SyncMode)}
-            disabled={isProcessing}
-          />
-          Import New Only (safe - doesn&apos;t modify existing records)
-        </label>
-        <label>
-          <input
-            type="radio"
-            value="full-sync"
-            checked={syncMode === 'full-sync'}
-            onChange={(e) => setSyncMode(e.target.value as SyncMode)}
-            disabled={isProcessing}
-          />
-          Full Sync (updates existing records and deletes removed items)
-        </label>
+      <div style={{ 
+        marginBottom: '2rem', 
+        padding: '1.5rem', 
+        border: '2px solid #e1e5e9', 
+        borderRadius: '8px', 
+        backgroundColor: '#f8f9fa' 
+      }}>
+        <h3 style={{ marginTop: 0, marginBottom: '1rem', fontSize: '1.3rem' }}>Sync Mode</h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <label style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '0.5rem', 
+            fontSize: '1.1rem',
+            cursor: 'pointer',
+            padding: '0.5rem'
+          }}>
+            <input
+              type="radio"
+              value="import-only"
+              checked={syncMode === 'import-only'}
+              onChange={(e) => setSyncMode(e.target.value as SyncMode)}
+              disabled={isProcessing}
+              style={{ transform: 'scale(1.2)' }}
+            />
+            <span><strong>Import New Only</strong> - Safe, doesn&apos;t modify existing records</span>
+          </label>
+          <label style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '0.5rem', 
+            fontSize: '1.1rem',
+            cursor: 'pointer',
+            padding: '0.5rem'
+          }}>
+            <input
+              type="radio"
+              value="full-sync"
+              checked={syncMode === 'full-sync'}
+              onChange={(e) => setSyncMode(e.target.value as SyncMode)}
+              disabled={isProcessing}
+              style={{ transform: 'scale(1.2)' }}
+            />
+            <span><strong>Full Sync</strong> - Updates existing records and deletes removed items</span>
+          </label>
+        </div>
       </div>
       
-      <input 
-        type="file" 
-        accept=".csv" 
-        onChange={handleFileUpload} 
-        disabled={isProcessing}
-      />
-      
-      {previewData && (
-        <button 
-          onClick={executeSync}
+      {/* File Upload */}
+      <div style={{ marginBottom: '2rem' }}>
+        <input 
+          type="file" 
+          accept=".csv" 
+          onChange={handleFileUpload} 
           disabled={isProcessing}
           style={{ 
-            marginLeft: '1rem', 
-            padding: '0.5rem 1rem',
-            backgroundColor: isProcessing ? '#6c757d' : '#007bff',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: isProcessing ? 'not-allowed' : 'pointer',
-            opacity: isProcessing ? 0.6 : 1
+            fontSize: '1.1rem', 
+            padding: '0.75rem', 
+            border: '2px solid #ddd', 
+            borderRadius: '6px',
+            backgroundColor: 'white'
           }}
-        >
-          {isProcessing ? 'Syncing...' : `Execute Sync (${syncStats.newItems + syncStats.updatedItems + syncStats.removedItems} changes)`}
-        </button>
-      )}
+        />
+        
+        {previewData && (
+          <button 
+            onClick={executeSync}
+            disabled={isProcessing}
+            style={{ 
+              marginLeft: '1rem', 
+              padding: '0.75rem 1.5rem',
+              fontSize: '1.1rem',
+              backgroundColor: isProcessing ? '#6c757d' : '#28a745',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: isProcessing ? 'not-allowed' : 'pointer',
+              opacity: isProcessing ? 0.6 : 1,
+              fontWeight: 'bold'
+            }}
+          >
+            {isProcessing ? 'Syncing...' : `Execute Sync (${syncStats.newItems + syncStats.updatedItems + syncStats.removedItems} changes)`}
+          </button>
+        )}
+      </div>
       
       {/* Stats Display */}
       {(syncStats.newItems > 0 || syncStats.updatedItems > 0 || syncStats.removedItems > 0) && (
-        <div style={{ margin: '1rem 0', padding: '1rem', backgroundColor: '#f8f9fa', borderRadius: '4px' }}>
-          <h3>Sync Statistics</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem' }}>
-            <div><strong>New Items:</strong> {syncStats.newItems}</div>
-            <div><strong>Updated Items:</strong> {syncStats.updatedItems}</div>
-            <div><strong>Removed Items:</strong> {syncStats.removedItems}</div>
-            <div><strong>Unchanged:</strong> {syncStats.unchangedItems}</div>
-            {syncStats.errors > 0 && <div style={{ color: 'red' }}><strong>Errors:</strong> {syncStats.errors}</div>}
+        <div style={{ 
+          margin: '2rem 0', 
+          padding: '2rem', 
+          backgroundColor: '#e3f2fd', 
+          borderRadius: '8px',
+          border: '1px solid #bbdefb'
+        }}>
+          <h3 style={{ marginTop: 0, marginBottom: '1.5rem', fontSize: '1.5rem', color: '#0d47a1' }}>Sync Statistics</h3>
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+            gap: '1.5rem' 
+          }}>
+            <div style={{ 
+              padding: '1rem', 
+              backgroundColor: 'white', 
+              borderRadius: '6px', 
+              textAlign: 'center',
+              border: '1px solid #e0e0e0'
+            }}>
+              <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#28a745' }}>{syncStats.newItems}</div>
+              <div style={{ fontSize: '1.1rem', color: '#666' }}>New Items</div>
+            </div>
+            <div style={{ 
+              padding: '1rem', 
+              backgroundColor: 'white', 
+              borderRadius: '6px', 
+              textAlign: 'center',
+              border: '1px solid #e0e0e0'
+            }}>
+              <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#ffc107' }}>{syncStats.updatedItems}</div>
+              <div style={{ fontSize: '1.1rem', color: '#666' }}>Updated Items</div>
+            </div>
+            <div style={{ 
+              padding: '1rem', 
+              backgroundColor: 'white', 
+              borderRadius: '6px', 
+              textAlign: 'center',
+              border: '1px solid #e0e0e0'
+            }}>
+              <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#dc3545' }}>{syncStats.removedItems}</div>
+              <div style={{ fontSize: '1.1rem', color: '#666' }}>Removed Items</div>
+            </div>
+            <div style={{ 
+              padding: '1rem', 
+              backgroundColor: 'white', 
+              borderRadius: '6px', 
+              textAlign: 'center',
+              border: '1px solid #e0e0e0'
+            }}>
+              <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#6c757d' }}>{syncStats.unchangedItems}</div>
+              <div style={{ fontSize: '1.1rem', color: '#666' }}>Unchanged</div>
+            </div>
+            {syncStats.errors > 0 && (
+              <div style={{ 
+                padding: '1rem', 
+                backgroundColor: '#ffebee', 
+                borderRadius: '6px', 
+                textAlign: 'center',
+                border: '1px solid #ffcdd2'
+              }}>
+                <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#d32f2f' }}>{syncStats.errors}</div>
+                <div style={{ fontSize: '1.1rem', color: '#666' }}>Errors</div>
+              </div>
+            )}
           </div>
         </div>
       )}
       
-      <p style={{ 
-        color: status.includes('error') || status.includes('failed') ? 'red' : 'black',
+      {/* Status Message */}
+      <div style={{ 
+        fontSize: '1.2rem',
+        padding: '1rem',
+        marginBottom: '2rem',
+        backgroundColor: status.includes('error') || status.includes('failed') ? '#ffebee' : '#f5f5f5',
+        color: status.includes('error') || status.includes('failed') ? '#d32f2f' : '#333',
+        borderRadius: '6px',
+        border: '1px solid #ddd',
         fontWeight: status.includes('complete') ? 'bold' : 'normal'
       }}>
         {status}
-      </p>
+      </div>
 
       {debugInfo && (
-        <details style={{ marginTop: '1rem', fontSize: '0.9em', color: '#666' }}>
-          <summary>Debug Info</summary>
-          <pre>{debugInfo}</pre>
+        <details style={{ marginBottom: '2rem', fontSize: '1rem', color: '#666' }}>
+          <summary style={{ cursor: 'pointer', fontSize: '1.1rem', fontWeight: 'bold' }}>Debug Info</summary>
+          <pre style={{ 
+            marginTop: '1rem', 
+            padding: '1rem', 
+            backgroundColor: '#f8f9fa', 
+            borderRadius: '4px',
+            overflow: 'auto'
+          }}>{debugInfo}</pre>
         </details>
       )}
 
@@ -539,100 +681,169 @@ export default function ImportDiscogsPage() {
         <div style={{ marginTop: '2rem' }}>
           {/* New Items Preview */}
           {previewData.newItems.length > 0 && (
-            <div style={{ marginBottom: '2rem' }}>
-              <h3>New Items ({previewData.newItems.length})</h3>
-              <table border={1} cellPadding={4} style={{ width: '100%', fontSize: '0.9em' }}>
-                <thead>
-                  <tr>
-                    <th>Artist</th>
-                    <th>Title</th>
-                    <th>Year</th>
-                    <th>Format</th>
-                    <th>Folder</th>
-                    <th>Condition</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {previewData.newItems.slice(0, 10).map((row, i) => (
-                    <tr key={i}>
-                      <td>{row.artist}</td>
-                      <td>{row.title}</td>
-                      <td>{row.year}</td>
-                      <td>{row.format}</td>
-                      <td>{row.folder}</td>
-                      <td>{row.media_condition}</td>
+            <div style={{ marginBottom: '3rem' }}>
+              <h3 style={{ fontSize: '1.5rem', marginBottom: '1rem', color: '#28a745' }}>
+                ✨ New Items ({previewData.newItems.length})
+              </h3>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ 
+                  width: '100%', 
+                  borderCollapse: 'collapse',
+                  backgroundColor: 'white',
+                  borderRadius: '8px',
+                  overflow: 'hidden',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#28a745', color: 'white' }}>
+                      <th style={{ padding: '1rem', textAlign: 'left', fontSize: '1.1rem' }}>Artist</th>
+                      <th style={{ padding: '1rem', textAlign: 'left', fontSize: '1.1rem' }}>Title</th>
+                      <th style={{ padding: '1rem', textAlign: 'left', fontSize: '1.1rem' }}>Year</th>
+                      <th style={{ padding: '1rem', textAlign: 'left', fontSize: '1.1rem' }}>Format</th>
+                      <th style={{ padding: '1rem', textAlign: 'left', fontSize: '1.1rem' }}>Folder</th>
+                      <th style={{ padding: '1rem', textAlign: 'left', fontSize: '1.1rem' }}>Condition</th>
                     </tr>
-                  ))}
-                  {previewData.newItems.length > 10 && (
-                    <tr><td colSpan={6}>... and {previewData.newItems.length - 10} more</td></tr>
-                  )}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {previewData.newItems.slice(0, 10).map((row, i) => (
+                      <tr key={i} style={{ 
+                        backgroundColor: i % 2 === 0 ? '#f8f9fa' : 'white',
+                        borderBottom: '1px solid #e0e0e0'
+                      }}>
+                        <td style={{ padding: '0.75rem', fontSize: '1rem' }}>{row.artist}</td>
+                        <td style={{ padding: '0.75rem', fontSize: '1rem' }}>{row.title}</td>
+                        <td style={{ padding: '0.75rem', fontSize: '1rem' }}>{row.year}</td>
+                        <td style={{ padding: '0.75rem', fontSize: '1rem' }}>{row.format}</td>
+                        <td style={{ padding: '0.75rem', fontSize: '1rem' }}>{row.folder}</td>
+                        <td style={{ padding: '0.75rem', fontSize: '1rem' }}>{row.media_condition}</td>
+                      </tr>
+                    ))}
+                    {previewData.newItems.length > 10 && (
+                      <tr style={{ backgroundColor: '#f0f0f0' }}>
+                        <td colSpan={6} style={{ 
+                          padding: '1rem', 
+                          textAlign: 'center', 
+                          fontSize: '1.1rem', 
+                          fontStyle: 'italic' 
+                        }}>
+                          ... and {previewData.newItems.length - 10} more items
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
 
           {/* Updated Items Preview */}
           {previewData.updatedItems.length > 0 && (
-            <div style={{ marginBottom: '2rem' }}>
-              <h3>Updated Items ({previewData.updatedItems.length})</h3>
-              <table border={1} cellPadding={4} style={{ width: '100%', fontSize: '0.9em' }}>
-                <thead>
-                  <tr>
-                    <th>Artist</th>
-                    <th>Title</th>
-                    <th>Changes</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {previewData.updatedItems.slice(0, 10).map(({ csv, db }, i) => {
-                    const changes = [];
-                    if (csv.folder !== db.folder) changes.push(`Folder: ${db.folder} → ${csv.folder}`);
-                    if (csv.media_condition !== db.media_condition) changes.push(`Condition: ${db.media_condition} → ${csv.media_condition}`);
-                    if (csv.format !== db.format) changes.push(`Format: ${db.format} → ${csv.format}`);
-                    
-                    return (
-                      <tr key={i}>
-                        <td>{csv.artist}</td>
-                        <td>{csv.title}</td>
-                        <td>{changes.join('; ')}</td>
+            <div style={{ marginBottom: '3rem' }}>
+              <h3 style={{ fontSize: '1.5rem', marginBottom: '1rem', color: '#ffc107' }}>
+                🔄 Updated Items ({previewData.updatedItems.length})
+              </h3>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ 
+                  width: '100%', 
+                  borderCollapse: 'collapse',
+                  backgroundColor: 'white',
+                  borderRadius: '8px',
+                  overflow: 'hidden',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#ffc107', color: 'black' }}>
+                      <th style={{ padding: '1rem', textAlign: 'left', fontSize: '1.1rem' }}>Artist</th>
+                      <th style={{ padding: '1rem', textAlign: 'left', fontSize: '1.1rem' }}>Title</th>
+                      <th style={{ padding: '1rem', textAlign: 'left', fontSize: '1.1rem' }}>Changes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {previewData.updatedItems.slice(0, 10).map(({ csv, db }, i) => {
+                      const changes = [];
+                      if (csv.folder !== db.folder) changes.push(`Folder: ${db.folder} → ${csv.folder}`);
+                      if (csv.media_condition !== db.media_condition) changes.push(`Condition: ${db.media_condition} → ${csv.media_condition}`);
+                      if (csv.format !== db.format) changes.push(`Format: ${db.format} → ${csv.format}`);
+                      
+                      return (
+                        <tr key={i} style={{ 
+                          backgroundColor: i % 2 === 0 ? '#f8f9fa' : 'white',
+                          borderBottom: '1px solid #e0e0e0'
+                        }}>
+                          <td style={{ padding: '0.75rem', fontSize: '1rem' }}>{csv.artist}</td>
+                          <td style={{ padding: '0.75rem', fontSize: '1rem' }}>{csv.title}</td>
+                          <td style={{ padding: '0.75rem', fontSize: '1rem', fontFamily: 'monospace' }}>{changes.join('; ')}</td>
+                        </tr>
+                      );
+                    })}
+                    {previewData.updatedItems.length > 10 && (
+                      <tr style={{ backgroundColor: '#f0f0f0' }}>
+                        <td colSpan={3} style={{ 
+                          padding: '1rem', 
+                          textAlign: 'center', 
+                          fontSize: '1.1rem', 
+                          fontStyle: 'italic' 
+                        }}>
+                          ... and {previewData.updatedItems.length - 10} more items
+                        </td>
                       </tr>
-                    );
-                  })}
-                  {previewData.updatedItems.length > 10 && (
-                    <tr><td colSpan={3}>... and {previewData.updatedItems.length - 10} more</td></tr>
-                  )}
-                </tbody>
-              </table>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
 
           {/* Removed Items Preview */}
           {previewData.removedItems.length > 0 && (
-            <div style={{ marginBottom: '2rem' }}>
-              <h3>Removed Items ({previewData.removedItems.length}) - Will be deleted permanently</h3>
-              <table border={1} cellPadding={4} style={{ width: '100%', fontSize: '0.9em' }}>
-                <thead>
-                  <tr>
-                    <th>Artist</th>
-                    <th>Title</th>
-                    <th>Year</th>
-                    <th>Folder</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {previewData.removedItems.slice(0, 10).map((row, i) => (
-                    <tr key={i}>
-                      <td>{row.artist}</td>
-                      <td>{row.title}</td>
-                      <td>{row.year}</td>
-                      <td>{row.folder}</td>
+            <div style={{ marginBottom: '3rem' }}>
+              <h3 style={{ fontSize: '1.5rem', marginBottom: '1rem', color: '#dc3545' }}>
+                ⚠️ Removed Items ({previewData.removedItems.length}) - Will be deleted permanently
+              </h3>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ 
+                  width: '100%', 
+                  borderCollapse: 'collapse',
+                  backgroundColor: 'white',
+                  borderRadius: '8px',
+                  overflow: 'hidden',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#dc3545', color: 'white' }}>
+                      <th style={{ padding: '1rem', textAlign: 'left', fontSize: '1.1rem' }}>Artist</th>
+                      <th style={{ padding: '1rem', textAlign: 'left', fontSize: '1.1rem' }}>Title</th>
+                      <th style={{ padding: '1rem', textAlign: 'left', fontSize: '1.1rem' }}>Year</th>
+                      <th style={{ padding: '1rem', textAlign: 'left', fontSize: '1.1rem' }}>Folder</th>
                     </tr>
-                  ))}
-                  {previewData.removedItems.length > 10 && (
-                    <tr><td colSpan={4}>... and {previewData.removedItems.length - 10} more</td></tr>
-                  )}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {previewData.removedItems.slice(0, 10).map((row, i) => (
+                      <tr key={i} style={{ 
+                        backgroundColor: i % 2 === 0 ? '#f8f9fa' : 'white',
+                        borderBottom: '1px solid #e0e0e0'
+                      }}>
+                        <td style={{ padding: '0.75rem', fontSize: '1rem' }}>{row.artist}</td>
+                        <td style={{ padding: '0.75rem', fontSize: '1rem' }}>{row.title}</td>
+                        <td style={{ padding: '0.75rem', fontSize: '1rem' }}>{row.year}</td>
+                        <td style={{ padding: '0.75rem', fontSize: '1rem' }}>{row.folder}</td>
+                      </tr>
+                    ))}
+                    {previewData.removedItems.length > 10 && (
+                      <tr style={{ backgroundColor: '#f0f0f0' }}>
+                        <td colSpan={4} style={{ 
+                          padding: '1rem', 
+                          textAlign: 'center', 
+                          fontSize: '1.1rem', 
+                          fontStyle: 'italic' 
+                        }}>
+                          ... and {previewData.removedItems.length - 10} more items
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>
