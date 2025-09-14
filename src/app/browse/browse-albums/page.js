@@ -83,7 +83,7 @@ function BrowseAlbumsContent() {
           .from('collection')
           .select('*')
           .or('blocked.is.null,blocked.eq.false')
-          .neq('folder', 'Sales')
+          .neq('folder', 'Sale')
           .range(from, from + batchSize - 1);
           
         if (error) {
