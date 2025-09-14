@@ -1,4 +1,5 @@
 // Fixed Browse Albums page with compact search controls and all filter options
+// Excludes "Sales" folder items from the collection
 // Replace: src/app/browse/browse-albums/page.js
 
 "use client";
@@ -82,6 +83,7 @@ function BrowseAlbumsContent() {
           .from('collection')
           .select('*')
           .or('blocked.is.null,blocked.eq.false')
+          .neq('folder', 'Sales')
           .range(from, from + batchSize - 1);
           
         if (error) {
