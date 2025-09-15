@@ -1,6 +1,5 @@
 // API route: /api/discogsProxy?releaseId=xxxx
-// Proxies requests to Discogs API using VITE_DISCOGS_TOKEN from env.
-// Fixes 500 error caused by missing token reference.
+// Fixed to use the same token as import-discogs page
 
 export async function GET(req) {
   const { searchParams } = new URL(req.url);
@@ -9,7 +8,7 @@ export async function GET(req) {
     return new Response("Missing releaseId parameter", { status: 400 });
   }
 
-  const token = process.env.VITE_DISCOGS_TOKEN;
+  const token = process.env.NEXT_PUBLIC_DISCOGS_TOKEN;
   if (!token) {
     return new Response("Missing Discogs token", { status: 500 });
   }
@@ -20,7 +19,7 @@ export async function GET(req) {
     const res = await fetch(url, {
       headers: {
         "Authorization": `Discogs token=${token}`,
-        "User-Agent": "DeadWaxDialogues/1.0 +https://deadwaxdialogues.com",
+        "User-Agent": "DeadwaxDialogues/1.0 +https://yourwebsite.com",
       },
     });
 
