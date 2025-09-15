@@ -48,6 +48,7 @@ type ExistingRecord = {
   folder: string | null;
   media_condition: string | null;
   image_url: string | null;
+  tracklists: string | null;
 };
 
 // Type for update operations
@@ -256,7 +257,7 @@ export default function ImportDiscogsPage() {
           while (hasMore) {
             const { data: pageData, error: queryError } = await supabase
               .from('collection')
-              .select('id, discogs_release_id, artist, title, date_added, folder, media_condition, image_url')
+              .select('id, discogs_release_id, artist, title, date_added, folder, media_condition, image_url, tracklists')
               .not('discogs_release_id', 'is', null)
               .range(start, start + pageSize - 1);
 
@@ -293,7 +294,7 @@ export default function ImportDiscogsPage() {
           const existingInCsv = releaseIds.filter(id => allExistingIds.has(id));
           const newRows = processedRows.filter(row => !allExistingIds.has(row.discogs_release_id));
 
-          // Find items that need updates (folder/condition changes or missing images)
+          // Find items that need updates (folder/condition changes or missing images/tracklists)
           const updateOperations: UpdateOperation[] = [];
           for (const csvRow of processedRows) {
             const existingRecord = existingRecordsMap.get(csvRow.discogs_release_id);
@@ -301,8 +302,9 @@ export default function ImportDiscogsPage() {
               const folderChanged = csvRow.folder !== existingRecord.folder;
               const conditionChanged = csvRow.media_condition !== existingRecord.media_condition;
               const needsImage = !existingRecord.image_url;
+              const needsTracklists = !existingRecord.tracklists || existingRecord.tracklists === '' || existingRecord.tracklists === 'null';
               
-              if (folderChanged || conditionChanged || needsImage) {
+              if (folderChanged || conditionChanged || needsImage || needsTracklists) {
                 updateOperations.push({ csvRow, existingRecord });
                 
                 if (folderChanged || conditionChanged) {
@@ -312,7 +314,8 @@ export default function ImportDiscogsPage() {
                     title: csvRow.title,
                     folderChange: folderChanged ? `${existingRecord.folder} → ${csvRow.folder}` : 'no change',
                     conditionChange: conditionChanged ? `${existingRecord.media_condition} → ${csvRow.media_condition}` : 'no change',
-                    needsImage: needsImage
+                    needsImage: needsImage,
+                    needsTracklists: needsTracklists
                   });
                 }
               }
@@ -484,7 +487,7 @@ export default function ImportDiscogsPage() {
         }
       }
       
-      // Process updates
+      // Process updates with improved tracklist handling
       if (updateOperations.length > 0) {
         setStatus(`Processing ${updateOperations.length} update operations...`);
         
@@ -493,29 +496,45 @@ export default function ImportDiscogsPage() {
           setStatus(`Update ${i + 1}/${updateOperations.length}: ${csvRow.artist} - ${csvRow.title}`);
           
           let image_url = existingRecord.image_url;
-          let tracklists = null;
+          let tracklists = existingRecord.tracklists;
+          
+          // Check if we need to fetch missing data
+          const needsImage = !image_url;
+          const needsTracklists = !tracklists || tracklists === '' || tracklists === 'null';
           
           // Fetch missing image/tracklist data if needed
-          if (!image_url) {
+          if (needsImage || needsTracklists) {
             try {
               const discogsData = await fetchDiscogsData(csvRow.discogs_release_id);
-              image_url = discogsData.image_url;
-              tracklists = discogsData.tracklists;
+              
+              // Only update image_url if it was missing
+              if (needsImage && discogsData.image_url) {
+                image_url = discogsData.image_url;
+              }
+              
+              // Only update tracklists if they were missing/invalid
+              if (needsTracklists && discogsData.tracklists) {
+                tracklists = discogsData.tracklists;
+              }
+              
               await delay(2000);
             } catch (error) {
               console.warn(`Failed to enrich ${csvRow.discogs_release_id}:`, error);
             }
           }
           
+          // Build update object
+          const updateData = {
+            folder: csvRow.folder,
+            media_condition: csvRow.media_condition,
+            date_added: csvRow.date_added,
+            image_url: image_url,
+            tracklists: tracklists
+          };
+          
           const { error: updateError } = await supabase
             .from('collection')
-            .update({
-              folder: csvRow.folder,
-              media_condition: csvRow.media_condition,
-              date_added: csvRow.date_added,
-              image_url: image_url,
-              tracklists: tracklists
-            })
+            .update(updateData)
             .eq('id', existingRecord.id);
 
           if (updateError) {
@@ -544,6 +563,91 @@ export default function ImportDiscogsPage() {
     } catch (error) {
       console.error('Processing error:', error);
       setStatus(`❌ Processing failed after ${allEnriched.length} items: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const recoverMissingTracklists = async () => {
+    setIsProcessing(true);
+    setStatus('Finding items with missing tracklists...');
+    
+    try {
+      // Find all items with discogs_release_id but missing/invalid tracklists
+      const { data: itemsNeedingTracklists, error: queryError } = await supabase
+        .from('collection')
+        .select('id, discogs_release_id, artist, title, tracklists')
+        .not('discogs_release_id', 'is', null)
+        .neq('discogs_release_id', '');
+      
+      if (queryError) {
+        setStatus(`Error querying database: ${queryError.message}`);
+        return;
+      }
+      
+      // Filter items that actually need tracklists
+      const itemsToFix = itemsNeedingTracklists.filter(item => {
+        if (!item.tracklists || item.tracklists === '' || item.tracklists === 'null') {
+          return true;
+        }
+        
+        try {
+          const parsed = JSON.parse(item.tracklists);
+          return !Array.isArray(parsed) || parsed.length === 0;
+        } catch {
+          return true; // Invalid JSON
+        }
+      });
+      
+      if (itemsToFix.length === 0) {
+        setStatus('✅ No items found that need tracklist recovery!');
+        setIsProcessing(false);
+        return;
+      }
+      
+      setStatus(`Found ${itemsToFix.length} items missing tracklists. Starting recovery...`);
+      
+      let successCount = 0;
+      let errorCount = 0;
+      
+      for (let i = 0; i < itemsToFix.length; i++) {
+        const item = itemsToFix[i];
+        setStatus(`Recovering ${i + 1}/${itemsToFix.length}: ${item.artist} - ${item.title}`);
+        
+        try {
+          const { tracklists } = await fetchDiscogsData(item.discogs_release_id);
+          
+          if (tracklists) {
+            const { error: updateError } = await supabase
+              .from('collection')
+              .update({ tracklists })
+              .eq('id', item.id);
+            
+            if (updateError) {
+              console.warn(`Failed to update tracklists for ID ${item.id}:`, updateError);
+              errorCount++;
+            } else {
+              successCount++;
+            }
+          } else {
+            console.warn(`No tracklists found for ${item.discogs_release_id}`);
+            errorCount++;
+          }
+          
+          // Rate limiting
+          await delay(2000);
+          
+        } catch (error) {
+          console.warn(`Error processing item ID ${item.id}:`, error);
+          errorCount++;
+        }
+      }
+      
+      setStatus(`✅ Tracklist recovery complete! ${successCount} recovered, ${errorCount} failed.`);
+      
+    } catch (error) {
+      console.error('Tracklist recovery error:', error);
+      setStatus(`❌ Recovery failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsProcessing(false);
     }
@@ -592,6 +696,25 @@ export default function ImportDiscogsPage() {
           {isProcessing ? 'Processing...' : 'Enrich with Discogs Data & Import'}
         </button>
       )}
+
+      <button 
+        onClick={recoverMissingTracklists}
+        disabled={isProcessing}
+        style={{ 
+          marginLeft: '1rem', 
+          padding: '12px 24px',
+          backgroundColor: isProcessing ? '#6c757d' : '#28a745',
+          color: 'white',
+          border: 'none',
+          borderRadius: '6px',
+          cursor: isProcessing ? 'not-allowed' : 'pointer',
+          opacity: isProcessing ? 0.6 : 1,
+          fontSize: '16px',
+          fontWeight: '500'
+        }}
+      >
+        {isProcessing ? 'Processing...' : 'Fix Missing Tracklists'}
+      </button>
       
       <p style={{ 
         color: status.includes('error') || status.includes('failed') ? '#dc3545' : '#212529',
@@ -678,6 +801,7 @@ export default function ImportDiscogsPage() {
                     <th style={{ textAlign: 'left', padding: '12px', border: '1px solid #ffeaa7', color: '#856404' }}>Folder Change</th>
                     <th style={{ textAlign: 'left', padding: '12px', border: '1px solid #ffeaa7', color: '#856404' }}>Condition Change</th>
                     <th style={{ textAlign: 'left', padding: '12px', border: '1px solid #ffeaa7', color: '#856404' }}>Will Fetch Image</th>
+                    <th style={{ textAlign: 'left', padding: '12px', border: '1px solid #ffeaa7', color: '#856404' }}>Will Fetch Tracklists</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -685,6 +809,7 @@ export default function ImportDiscogsPage() {
                     const folderChanged = op.csvRow.folder !== op.existingRecord.folder;
                     const conditionChanged = op.csvRow.media_condition !== op.existingRecord.media_condition;
                     const needsImage = !op.existingRecord.image_url;
+                    const needsTracklists = !op.existingRecord.tracklists || op.existingRecord.tracklists === '' || op.existingRecord.tracklists === 'null';
                     return (
                       <tr key={i} style={{ backgroundColor: i % 2 === 0 ? '#ffffff' : '#f8f9fa' }}>
                         <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>{op.csvRow.artist}</td>
@@ -705,6 +830,7 @@ export default function ImportDiscogsPage() {
                           ) : '—'}
                         </td>
                         <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>{needsImage ? '✓' : '—'}</td>
+                        <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>{needsTracklists ? '✓' : '—'}</td>
                       </tr>
                     );
                   })}
