@@ -396,6 +396,10 @@ export default function EditCollectionPage() {
     updateSellPrice(rowId, tempPrice);
   };
 
+  const clearPrice = (rowId: number) => {
+    updateSellPrice(rowId, '');
+  };
+
   // Print/Export function
   const exportToPrint = () => {
     const printContent = `
@@ -685,39 +689,49 @@ export default function EditCollectionPage() {
                         }}
                         autoFocus
                       />
-                      <button
-                        onClick={() => savePrice(row.id)}
-                        disabled={updatingRow === row.id}
-                        style={{ padding: '2px 4px', fontSize: 10, background: '#059669', color: 'white', border: 'none', borderRadius: 2, cursor: 'pointer' }}
-                      >
-                        ✓
-                      </button>
-                      <button
-                        onClick={cancelEditingPrice}
-                        style={{ padding: '2px 4px', fontSize: 10, background: '#6b7280', color: 'white', border: 'none', borderRadius: 2, cursor: 'pointer' }}
-                      >
-                        ✕
-                      </button>
                     </div>
                   ) : (
-                    <div
-                      onClick={() => startEditingPrice(row.id, row.sell_price)}
-                      style={{
-                        cursor: 'pointer',
-                        padding: '2px 4px',
-                        borderRadius: 2,
-                        background: row.sell_price ? (row.sell_price === 'NFS' ? '#fef3c7' : '#dcfce7') : '#f9fafb',
-                        border: '1px solid ' + (row.sell_price ? (row.sell_price === 'NFS' ? '#f59e0b' : '#22c55e') : '#e5e7eb'),
-                        minHeight: 20,
-                        display: 'flex',
-                        alignItems: 'center',
-                        fontSize: 12,
-                        fontWeight: row.sell_price ? 'bold' : 'normal',
-                        color: row.sell_price ? '#000' : '#999'
-                      }}
-                      title="Click to edit price"
-                    >
-                      {updatingRow === row.id ? '...' : (row.sell_price || 'Click to set')}
+                    <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                      <div
+                        onClick={() => startEditingPrice(row.id, row.sell_price)}
+                        style={{
+                          cursor: 'pointer',
+                          padding: '2px 4px',
+                          borderRadius: 2,
+                          background: row.sell_price ? (row.sell_price === 'NFS' ? '#fef3c7' : '#dcfce7') : '#f9fafb',
+                          border: '1px solid ' + (row.sell_price ? (row.sell_price === 'NFS' ? '#f59e0b' : '#22c55e') : '#e5e7eb'),
+                          minHeight: 20,
+                          display: 'flex',
+                          alignItems: 'center',
+                          fontSize: 12,
+                          fontWeight: row.sell_price ? 'bold' : 'normal',
+                          color: row.sell_price ? '#000' : '#999',
+                          flex: 1
+                        }}
+                        title="Click to edit price"
+                      >
+                        {updatingRow === row.id ? '...' : (row.sell_price || 'Click to set')}
+                      </div>
+                      {row.sell_price && (
+                        <button
+                          onClick={() => clearPrice(row.id)}
+                          disabled={updatingRow === row.id}
+                          style={{ 
+                            padding: '2px 4px', 
+                            fontSize: 10, 
+                            background: '#dc2626', 
+                            color: 'white', 
+                            border: 'none', 
+                            borderRadius: 2, 
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center'
+                          }}
+                          title="Clear price"
+                        >
+                          ✕
+                        </button>
+                      )}
                     </div>
                   )}
                 </td>
@@ -806,7 +820,7 @@ export default function EditCollectionPage() {
           {showInnerCircleOnly && ` (${innerCircleCount} inner circle)`}
         </div>
         <div style={{ fontSize: 12, color: '#666' }}>
-          💡 Click price field to edit • Check boxes to toggle badges • Delete button available for all items<br/>
+          💡 Click price field to edit (Enter to save, Esc to cancel) • ✕ button to clear prices • Check boxes to toggle badges<br/>
           📊 Badges: ⭐{top200Count} • 🔥{top10Count} • 💎{innerCircleCount} • Total: {badgedCount}<br/>
           📄 Export current filtered view to PDF/Print with title, artist, format/folder, and price
         </div>
