@@ -1,39 +1,48 @@
 /* src/styles/media-grading.css */
-/* Scoped readability + form sizing for the grading tool only */
-.admin-media-grading {
-  --dw-text: #1f2937;
-  --dw-muted: #374151;
-  --dw-input-bg: #ffffff;
-  --dw-input-fg: #111827;
-  --dw-border: #cbd5e1;
+/* Lightweight, scoped styles - no global overrides */
+.grading-shell {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  min-height: 100vh;
+  padding: 20px;
 }
-.admin-media-grading h1,
-.admin-media-grading h2,
-.admin-media-grading h3,
-.admin-media-grading .sectionTitle { color: var(--dw-text); }
-.admin-media-grading label,
-.admin-media-grading p,
-.admin-media-grading li,
-.admin-media-grading span { color: var(--dw-text); }
-.admin-media-grading input[type="text"],
-.admin-media-grading input[type="number"],
-.admin-media-grading textarea,
-.admin-media-grading select {
-  background: var(--dw-input-bg) !important;
-  color: var(--dw-input-fg) !important;
-  border: 1px solid var(--dw-border);
+.frame {
+  max-width: 1400px;
+  margin: 0 auto;
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 12px 24px rgba(0,0,0,.2);
 }
-.admin-media-grading ::placeholder {
-  color: var(--dw-muted);
-  opacity: 1;
+.header {
+  display:flex; align-items:flex-end; justify-content:space-between;
+  background: rgba(0,0,0,.35); color:#fff; padding: 26px 30px 20px;
 }
-.admin-media-grading .notes-textarea {
-  width: 100%;
-  min-height: 160px;
-  line-height: 1.4;
+.header .btn-back {
+  background: rgba(255,255,255,.2); color:#fff; padding:8px 12px; border-radius:8px; text-decoration:none; font-weight:600;
 }
-.admin-media-grading .skipPanel input[type="number"] {
-  width: 88px;
-  height: 36px;
-  padding: 6px 8px;
-}
+.header .titleWrap h1 { margin:0 0 6px 0; text-shadow: 2px 2px 4px rgba(0,0,0,.3); }
+.header .titleWrap p { margin:0; opacity:.9; }
+.selector { display:flex; gap:14px; justify-content:center; padding: 18px; }
+.missing { background: #fff3cd; border:1px solid #ffeeba; border-radius:14px; margin:0 24px 20px; padding:16px; display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+.missing .left, .missing .right { background:#fff; padding:12px; border-radius:8px; }
+.card-title { font-weight:800; margin-bottom: 8px; }
+.admin-media-grading { padding: 24px; }
+.chk { display:flex; align-items:center; gap:10px; }
+.chk-inline { display:inline-flex; align-items:center; gap:6px; margin-right:12px; }
+.radio { display:flex; align-items:center; gap:8px; margin:4px 0; }
+.lbl { font-size: .9rem; color:#374151; margin-bottom:4px; }
+.skipPanel { display:grid; grid-template-columns:1fr 1fr; gap:10px; background: #fff7e6; padding: 12px; border-radius: 8px; margin-top: 8px; }
+.skipPanel input[type="number"] { width: 88px; height:36px; padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px; }
+.btn-success { background:#28a745; color:#fff; border:none; padding:10px 14px; border-radius:8px; cursor:pointer; }
+.btn-danger-ghost { background:transparent; border:1px solid #dc3545; color:#dc3545; padding:6px 10px; border-radius:8px; cursor:pointer; }
+.btn-primary { background: linear-gradient(135deg,#2ecc71,#27ae60); color:#fff; border:none; padding:12px 20px; border-radius:999px; font-weight:700; cursor:pointer; box-shadow:0 10px 20px rgba(39,174,96,.35); }
+.notesCard { background:#f8f9fa; border-radius:15px; padding: 18px 24px; margin: 8px 24px 10px; }
+.notesCard textarea { width:100%; min-height:140px; padding:12px; border-radius:8px; border:1px solid #ced4da; background:white; color:#111827; }
+.notesCard ::placeholder { color:#6b7280; opacity:1; }
+.results { padding: 0 24px 28px; }
+.grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; margin-top:10px; }
+.tile { background:#fff; border-radius:12px; padding:18px; text-align:center; box-shadow:0 2px 6px rgba(0,0,0,.05); }
+.tile .lbl { font-size:.9rem; color:#555; margin-bottom:6px; }
+.tile .val { font-size:2rem; font-weight:800; color:#1b5e20; }
+.explain { background:#fff; border-radius:12px; padding: 16px; margin-top: 14px; }
+.explain .hdr { font-weight:700; margin-bottom:6px; }
