@@ -1,130 +1,175 @@
 
-/* Scope all rules to this page only by default.
-   If your page root doesn't have #media-grading, these rules
-   still apply under a relaxed scope via .media-grading-page as a fallback. */
+/* ---------------------------------------------
+   Media Grading – hard UX fix (scoped)
+   Scope to #media-grading or .media-grading-page only
+----------------------------------------------*/
 #media-grading, .media-grading-page {
-  --mg-bg: #f6f7fb;
+  --mg-bg: #f6f8fb;
   --mg-card-bg: #ffffff;
-  --mg-text: #222;
+  --mg-text: #1f2937;
   --mg-muted: #6b7280;
   --mg-border: #e5e7eb;
-  --mg-accent: #2563eb;
-  --mg-shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.06);
-}
-
-/* Page background should never be black on this screen */
-#media-grading, .media-grading-page {
+  --mg-shadow: 0 1px 2px rgba(0,0,0,.06), 0 6px 16px rgba(0,0,0,.06);
+  position: relative;
+  min-height: 100vh;
   background: var(--mg-bg) !important;
   color: var(--mg-text) !important;
 }
 
-/* Cards / panels */
-#media-grading .card, .media-grading-page .card,
-#media-grading .panel, .media-grading-page .panel,
-#media-grading .box, .media-grading-page .box {
+/* defeat any global dark scheme that flips colors */
+@media (prefers-color-scheme: dark) {
+  #media-grading, .media-grading-page {
+    color-scheme: light;
+    background: var(--mg-bg) !important;
+  }
+}
+
+/* Region backgrounds (cards/panels/boxes) */
+#media-grading .card,
+.media-grading-page .card,
+#media-grading .panel,
+.media-grading-page .panel,
+#media-grading .box,
+.media-grading-page .box,
+#media-grading .grading-section,
+.media-grading-page .grading-section {
   background: var(--mg-card-bg) !important;
+  color: var(--mg-text) !important;
   border: 1px solid var(--mg-border) !important;
-  border-radius: 10px !important;
+  border-radius: 10px;
   box-shadow: var(--mg-shadow);
 }
 
-/* Ensure titles are visible */
-#media-grading h1, #media-grading h2, #media-grading h3, #media-grading h4,
-.media-grading-page h1, .media-grading-page h2, .media-grading-page h3, .media-grading-page h4 {
+/* Headings inside grading page */
+#media-grading h1, #media-grading h2, #media-grading h3,
+.media-grading-page h1, .media-grading-page h2, .media-grading-page h3 {
   color: var(--mg-text) !important;
+  margin: 0 0 .5rem;
+  font-weight: 700;
 }
 
-/* Checkbox / radio rows — restore text visibility and alignment */
-#media-grading .form-check, .media-grading-page .form-check,
-#media-grading .check-row, .media-grading-page .check-row,
-#media-grading li, .media-grading-page li {
+/* Reset lists – some themes render bullets or numeric markers that overlap inputs */
+#media-grading ul, #media-grading ol,
+.media-grading-page ul, .media-grading-page ol {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+}
+
+/* Each checkbox/radio row */
+#media-grading .form-check,
+.media-grading-page .form-check,
+#media-grading .checkbox,
+.media-grading-page .checkbox,
+#media-grading li,
+.media-grading-page li {
   display: flex;
   align-items: center;
-  gap: .55rem;
-  color: var(--mg-text) !important;
-  font-size: 0.95rem;
-  line-height: 1.2;
-  padding: .25rem 0;
+  gap: .6rem;
+  padding: .35rem 0;
+  line-height: 1.35;
 }
 
-/* Some prior CSS hid labels — undo it */
-#media-grading label, .media-grading-page label {
-  display: inline-block;
-  color: var(--mg-text) !important;
-  font-weight: 500;
+/* Inputs */
+#media-grading .form-check-input,
+.media-grading-page .form-check-input,
+#media-grading input[type="checkbox"],
+.media-grading-page input[type="checkbox"],
+#media-grading input[type="radio"],
+.media-grading-page input[type="radio"] {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
   margin: 0;
+  accent-color: #2563eb; /* safe modern browsers */
+}
+
+/* Labels – bring text back from any global overrides */
+#media-grading label,
+.media-grading-page label,
+#media-grading .form-check-label,
+.media-grading-page .form-check-label,
+#media-grading .checkbox label,
+.media-grading-page .checkbox label {
+  color: var(--mg-text) !important;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
   opacity: 1 !important;
   visibility: visible !important;
-  pointer-events: auto !important;
+  text-indent: 0 !important;
+  white-space: normal;
+  flex: 1 1 auto;
 }
 
-/* Inputs size & spacing */
-#media-grading input[type="checkbox"],
-#media-grading input[type="radio"],
-.media-grading-page input[type="checkbox"],
-.media-grading-page input[type="radio"] {
-  width: 18px; height: 18px;
-  min-width: 18px; min-height: 18px;
-  margin: 0 .4rem 0 0;
-}
-
-/* Left/Right columns should stay readable; prevent super tall, cramped lists */
-#media-grading .columns, .media-grading-page .columns {
+/* Group containers for the two main columns */
+#media-grading .grading-columns,
+.media-grading-page .grading-columns {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1.25rem;
+  gap: 24px;
 }
 
-/* Textarea (Custom Condition Notes) — ensure visible and usable */
-#media-grading textarea, .media-grading-page textarea {
-  background: var(--mg-card-bg) !important;
-  color: var(--mg-text) !important;
-  border: 1px solid var(--mg-border) !important;
-  border-radius: 10px !important;
-  min-height: 140px;
-  width: 100%;
-  padding: .75rem .85rem;
-}
-
-/* Buttons */
-#media-grading .btn, .media-grading-page .btn,
-#media-grading button, .media-grading-page button {
-  border-radius: 999px;
-  padding: .5rem 1rem;
-}
-
-/* Pills (Vinyl / Cassette / CD) */
-#media-grading .pill, .media-grading-page .pill {
-  border-radius: 999px;
-  font-weight: 600;
-}
-
-/* Grade result cards */
-#media-grading .grade-card, .media-grading-page .grade-card {
-  background: var(--mg-card-bg);
-  border: 1px solid var(--mg-border);
-  border-radius: 12px;
-  box-shadow: var(--mg-shadow);
-  text-align: center;
-  padding: 1rem;
-}
-
-/* Guard against any global dark-mode that flips text to white on white */
-#media-grading *, .media-grading-page * {
-  color-scheme: light !important;
-}
-
-/* Make sure long lists scroll inside the card instead of blowing the layout */
-#media-grading .scroll-area, .media-grading-page .scroll-area {
-  max-height: 58vh;
+/* Inner scroll for long lists so page remains usable */
+#media-grading .scroll-panel,
+.media-grading-page .scroll-panel {
+  max-height: 520px;
   overflow: auto;
-  padding-right: .25rem;
+  padding-right: 6px;
 }
 
-/* Safety net: if a card ever goes black again, force it back to white */
-#media-grading .card, .media-grading-page .card,
-#media-grading .panel, .media-grading-page .panel,
-#media-grading .box, .media-grading-page .box,
-#media-grading .card *:not(svg), .media-grading-page .card *:not(svg) {
-  background-color: var(--mg-card-bg);
+/* Textareas / inputs */
+#media-grading textarea,
+.media-grading-page textarea,
+#media-grading input[type="text"],
+.media-grading-page input[type="text"],
+#media-grading input[type="number"],
+.media-grading-page input[type="number"],
+#media-grading select,
+.media-grading-page select {
+  border: 1px solid var(--mg-border) !important;
+  background: #fff !important;
+  color: var(--mg-text) !important;
+  box-shadow: none !important;
+}
+
+#media-grading textarea,
+.media-grading-page textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+/* Results cards */
+#media-grading .grade-card,
+.media-grading-page .grade-card {
+  background: var(--mg-card-bg) !important;
+  border: 1px solid var(--mg-border) !important;
+  border-radius: 12px;
+  padding: 16px;
+  text-align: center;
+  box-shadow: var(--mg-shadow);
+}
+
+/* Buttons in this page */
+#media-grading .btn,
+.media-grading-page .btn {
+  box-shadow: 0 1px 1px rgba(0,0,0,.05);
+}
+
+/* Hard override for any descendant that inherited white text */
+#media-grading * {
+  color: inherit;
+}
+
+/* Prevent white-on-white in nested headings/paragraphs created by theme */
+#media-grading .card *,
+.media-grading-page .card * {
+  color: var(--mg-text);
+}
+
+/* Optional: slightly larger hit area for inputs */
+#media-grading .form-check-input + label,
+.media-grading-page .form-check-input + label {
+  cursor: pointer;
 }
