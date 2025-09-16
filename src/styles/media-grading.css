@@ -1,56 +1,263 @@
+/* src/styles/media-grading.css */
+
+/* Scope all styles to the page container */
 #media-grading {
-  --mg-bg: #f7f7f9;
-  --mg-panel: #ffffff;
-  --mg-text: #1a1a1a;
-  --mg-muted: #6b7280;
-  --mg-border: #e5e7eb;
-  --mg-ring: rgba(59, 130, 246, 0.4);
+  --mg-bg: #0f1115;
+  --mg-panel: #171a21;
+  --mg-text: #eef2ff;
+  --mg-muted: #9aa3b2;
+  --mg-border: #2a2f3a;
+
   background: var(--mg-bg);
   color: var(--mg-text);
+  min-height: 100vh;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  line-height: 1.4;
 }
-#media-grading .card,
-#media-grading .panel,
-#media-grading .box,
-#media-grading .form-section {
-  background: var(--mg-panel) !important;
-  color: var(--mg-text) !important;
-  border: 1px solid var(--mg-border) !important;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.04) !important;
+
+/* Layout wrappers */
+#media-grading .mg-wrap {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px;
 }
-#media-grading label {
-  color: var(--mg-text) !important;
-  display: inline-flex;
+
+#media-grading .mg-header {
+  margin-bottom: 16px;
+}
+#media-grading .mg-back {
+  text-decoration: none;
+  color: var(--mg-text);
+  border-bottom: 1px dotted var(--mg-muted);
+}
+#media-grading .mg-back:focus {
+  outline: 2px solid #6ea8fe;
+  outline-offset: 2px;
+  border-bottom: none;
+}
+#media-grading .mg-sub {
+  margin-top: 8px;
+  color: var(--mg-muted);
+}
+
+/* Pills */
+#media-grading .mg-pills {
+  display: flex;
+  gap: 8px;
+  margin: 16px 0 12px;
+  flex-wrap: wrap;
+}
+#media-grading .mg-pill {
+  background: transparent;
+  color: var(--mg-text);
+  border: 1px solid var(--mg-border);
+  border-radius: 999px;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+#media-grading .mg-pill:hover {
+  border-color: #5b6474;
+}
+#media-grading .mg-pill.selected {
+  background: #263046;
+  border-color: #5b79ff;
+}
+#media-grading .mg-pill:focus {
+  outline: 2px solid #6ea8fe;
+  outline-offset: 2px;
+}
+
+/* Scope toggles */
+#media-grading .mg-scope {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0 16px;
+}
+#media-grading .mg-scope-option {
+  display: flex;
   align-items: center;
-  line-height: 1.3;
+  gap: 10px;
 }
 #media-grading input[type="checkbox"],
 #media-grading input[type="radio"] {
-  margin-right: .5rem;
+  transform: translateY(1px);
 }
-#media-grading ul {
-  list-style: none !important;
-  padding-left: 0 !important;
+#media-grading label {
+  font-size: 14px;
+  cursor: pointer;
 }
-#media-grading textarea,
-#media-grading input[type="text"],
-#media-grading input[type="number"] {
-  background: #fff !important;
-  color: var(--mg-text) !important;
-  border: 1px solid var(--mg-border) !important;
+
+/* Cards & grid */
+#media-grading .mg-card {
+  background: var(--mg-panel);
+  border: 1px solid var(--mg-border);
+  border-radius: 12px;
+  padding: 16px;
 }
-#media-grading textarea:focus,
-#media-grading input[type="text"]:focus,
-#media-grading input[type="number"]:focus {
-  box-shadow: 0 0 0 3px var(--mg-ring) !important;
-  border-color: #93c5fd !important;
+
+#media-grading .mg-grid {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: 1fr;
+  margin-bottom: 16px;
 }
-#media-grading .alert {
-  background: #fff7ed !important;
-  border: 1px solid #fed7aa !important;
-  color: #7c2d12 !important;
+@media (min-width: 1024px) {
+  #media-grading .mg-grid {
+    grid-template-columns: 1fr 1fr;
+  }
 }
-#media-grading .grade-card {
-  background: #fff !important;
-  color: #064e3b !important;
-  border: 1px solid var(--mg-border) !important;
+
+#media-grading h2 {
+  margin: 0 0 10px;
+  font-size: 18px;
+}
+
+/* Disabled panel */
+#media-grading .mg-disabled {
+  opacity: 0.5;
+  filter: grayscale(0.2);
+  pointer-events: none;
+}
+
+/* Fieldsets */
+#media-grading .mg-fieldset {
+  border: 1px solid var(--mg-border);
+  border-radius: 10px;
+  padding: 12px;
+  margin-top: 12px;
+}
+#media-grading .mg-fieldset legend {
+  padding: 0 6px;
+  color: var(--mg-muted);
+  font-size: 13px;
+}
+
+/* Checks */
+#media-grading .mg-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 2px;
+}
+#media-grading .mg-inline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+/* Sides & tracks */
+#media-grading .mg-sides {
+  margin-top: 8px;
+}
+#media-grading .mg-sides-title {
+  color: var(--mg-muted);
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+#media-grading .mg-sides-grid {
+  display: grid;
+  gap: 6px 16px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+@media (max-width: 480px) {
+  #media-grading .mg-sides-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+#media-grading .mg-number {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+}
+#media-grading .mg-number input[type="number"] {
+  width: 120px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--mg-border);
+  background: #141821;
+  color: var(--mg-text);
+}
+#media-grading .mg-help {
+  font-size: 12px;
+  color: var(--mg-muted);
+}
+
+/* Notes */
+#media-grading .mg-notes {
+  margin-top: 12px;
+}
+#media-grading textarea {
+  margin-top: 6px;
+  width: 100%;
+  background: #141821;
+  color: var(--mg-text);
+  border: 1px solid var(--mg-border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  resize: vertical;
+}
+
+/* Results */
+#media-grading .mg-results {
+  display: grid;
+  gap: 16px;
+  margin: 16px 0;
+  grid-template-columns: 1fr;
+}
+@media (min-width: 840px) {
+  #media-grading .mg-results {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+#media-grading .mg-result {
+  display: grid;
+  gap: 8px;
+  align-content: center;
+  text-align: center;
+}
+#media-grading .mg-result-title {
+  color: var(--mg-muted);
+  font-size: 12px;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+#media-grading .mg-result-grade {
+  font-size: 36px;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+#media-grading .mg-result-score {
+  color: var(--mg-muted);
+}
+
+/* Grade color tiers */
+#media-grading .mg-grade-m .mg-result-grade { color: #2bd66b; }     /* Mint */
+#media-grading .mg-grade-nm .mg-result-grade { color: #5ad1ff; }   /* NM / M- */
+#media-grading .mg-grade-vg .mg-result-grade { color: #6aa9ff; }   /* VG / VG+ */
+#media-grading .mg-grade-g .mg-result-grade { color: #ffbf53; }    /* G / G+ */
+#media-grading .mg-grade-fp .mg-result-grade { color: #ff5d5d; }   /* F/P */
+
+/* Explanation */
+#media-grading .mg-explanation .mg-expl-title {
+  font-weight: 700;
+  margin-bottom: 6px;
+  font-size: 15px;
+}
+#media-grading .mg-explanation p {
+  margin: 0;
+  color: #e4e7f1;
+}
+
+/* Focus ring for inputs */
+#media-grading input:focus,
+#media-grading textarea:focus {
+  outline: 2px solid #6ea8fe;
+  outline-offset: 2px;
+}
+
+/* Clickable labels sizing */
+#media-grading label {
+  line-height: 1.3;
 }
