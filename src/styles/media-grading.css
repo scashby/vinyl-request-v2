@@ -1,104 +1,39 @@
-/* Minimal, scoped readability fixes — keep site theme intact */
-.admin-media-grading h1 { text-align: center; }
-
-/* Ensure text is visible in labels and headings */
-.admin-media-grading :is(label, p, li, h1, h2, h3, h4, h5, .sectionTitle) {
-  color: #2c3e50;
-}
-
-/* Inputs/Textareas should show dark text on white */
-.admin-media-grading input[type="text"],
-.admin-media-grading input[type="number"],
-.admin-media-grading textarea {
-  color: #111827;
-  background: #ffffff;
-}
-
-/* Placeholder visibility */
-.admin-media-grading ::placeholder {
-  color: #6b7280;
-  opacity: 1;
-}
-
-/* Notes area width/height */
-.admin-media-grading .notes-textarea {
-  width: 100%;
-  min-height: 120px;
-}
-
-/* Skip panel alignment only (no color changes) */
-.admin-media-grading .skipPanel {
-  align-items: center;
-  row-gap: 8px;
-}
-
-
-/* v4.4: make everything readable without touching theme outside this tool */
+/* src/styles/media-grading.css */
+/* Scoped readability + form sizing for the grading tool only */
 .admin-media-grading {
-  --dw-text: #1f2937;      /* slate-800 */
-  --dw-muted: #374151;     /* slate-700 */
+  --dw-text: #1f2937;
+  --dw-muted: #374151;
   --dw-input-bg: #ffffff;
-  --dw-input-fg: #111827;  /* slate-900 */
-  --dw-border: #cbd5e1;    /* slate-300 */
+  --dw-input-fg: #111827;
+  --dw-border: #cbd5e1;
 }
-
 .admin-media-grading h1,
 .admin-media-grading h2,
 .admin-media-grading h3,
-.admin-media-grading h4,
-.admin-media-grading .sectionTitle {
-  color: var(--dw-text);
-}
-
+.admin-media-grading .sectionTitle { color: var(--dw-text); }
 .admin-media-grading label,
-.admin-media-grading .form-label,
-.admin-media-grading .checkbox label,
-.admin-media-grading .radio label,
-.admin-media-grading .helper-text,
 .admin-media-grading p,
 .admin-media-grading li,
-.admin-media-grading span {
-  color: var(--dw-text);
-}
-
+.admin-media-grading span { color: var(--dw-text); }
 .admin-media-grading input[type="text"],
 .admin-media-grading input[type="number"],
-.admin-media-grading input[type="search"],
 .admin-media-grading textarea,
 .admin-media-grading select {
   background: var(--dw-input-bg) !important;
   color: var(--dw-input-fg) !important;
   border: 1px solid var(--dw-border);
 }
-
-.admin-media-grading input[type="text"]::placeholder,
-.admin-media-grading input[type="number"]::placeholder,
-.admin-media-grading textarea::placeholder {
+.admin-media-grading ::placeholder {
   color: var(--dw-muted);
   opacity: 1;
 }
-
-/* Notes block must be obvious and spacious */
 .admin-media-grading .notes-textarea {
   width: 100%;
   min-height: 160px;
   line-height: 1.4;
-  font-size: 0.95rem;
-}
-
-/* Skip panel text color & spacing */
-.admin-media-grading .skipPanel {
-  color: var(--dw-text);
-  row-gap: 10px;
 }
 .admin-media-grading .skipPanel input[type="number"] {
   width: 88px;
   height: 36px;
   padding: 6px 8px;
-}
-
-/* Ensure checkbox/radio labels never render white-on-white */
-.admin-media-grading input[type="checkbox"] + *,
-.admin-media-grading input[type="radio"] + * {
-  color: var(--dw-text);
 }
