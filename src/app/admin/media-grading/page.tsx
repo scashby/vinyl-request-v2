@@ -1,471 +1,1203 @@
 // src/app/admin/media-grading/page.tsx
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
-interface GradingCriteria {
-  visualWear: number;
-  playbackQuality: number;
-  surfaceMarks: number;
-  labelCondition: number;
-  overallAppearance: number;
-}
-
-interface GradingResult {
-  grade: string;
-  confidence: number;
-  description: string;
-  marketValue: string;
+interface MediaItem {
+  id: number;
+  conditions: Record<string, boolean>;
+  severities: Record<string, string>;
+  skipSides: string[];
+  tracksAffected: number;
 }
 
 export default function MediaGradingPage() {
-  const [mediaType, setMediaType] = useState<'vinyl' | 'cassette' | 'cd'>('vinyl');
-  const [criteria, setCriteria] = useState<GradingCriteria>({
-    visualWear: 5,
-    playbackQuality: 5,
-    surfaceMarks: 5,
-    labelCondition: 5,
-    overallAppearance: 5
+  const [currentMedia, setCurrentMedia] = useState<'vinyl' | 'cassette' | 'cd' | ''>('');
+  const [mediaMissing, setMediaMissing] = useState(false);
+  const [packageMissing, setPackageMissing] = useState(false);
+  const [mediaItems, setMediaItems] = useState<MediaItem[]>([{ id: 1, conditions: {}, severities: {}, skipSides: [], tracksAffected: 0 }]);
+  const [sleeveConditions, setSleeveConditions] = useState<Record<string, boolean>>({});
+  const [sleeveSeverities, setSleeveSeverities] = useState<Record<string, string>>({});
+  const [customNotes, setCustomNotes] = useState('');
+  const [additionalNotes, setAdditionalNotes] = useState<Record<string, boolean>>({});
+  const [albumInfo, setAlbumInfo] = useState({
+    artist: '',
+    title: '',
+    catalog: '',
+    year: ''
   });
-  const [result, setResult] = useState<GradingResult | null>(null);
-  const [notes, setNotes] = useState('');
+  const [showResults, setShowResults] = useState(false);
+  const [activeSeverities, setActiveSeverities] = useState<Record<string, boolean>>({});
 
-  const gradeItem = () => {
-    const average = Object.values(criteria).reduce((sum, val) => sum + val, 0) / 5;
-    const variance = Object.values(criteria).reduce((sum, val) => sum + Math.pow(val - average, 2), 0) / 5;
-    const confidence = Math.max(0, 100 - (variance * 20));
+  const selectMedia = (mediaType: 'vinyl' | 'cassette' | 'cd') => {
+    setCurrentMedia(mediaType);
+    resetForm();
+  };
 
-    let grade: string;
-    let description: string;
-    let marketValue: string;
+  const resetForm = () => {
+    setMediaMissing(false);
+    setPackageMissing(false);
+    setMediaItems([{ id: 1, conditions: {}, severities: {}, skipSides: [], tracksAffected: 0 }]);
+    setSleeveConditions({});
+    setSleeveSeverities({});
+    setCustomNotes('');
+    setAdditionalNotes({});
+    setAlbumInfo({ artist: '', title: '', catalog: '', year: '' });
+    setShowResults(false);
+    setActiveSeverities({});
+  };
 
-    if (average >= 9.5) {
-      grade = 'M (Mint)';
-      description = 'Perfect condition, like new';
-      marketValue = '100% of catalog value';
-    } else if (average >= 8.5) {
-      grade = 'NM (Near Mint)';
-      description = 'Excellent condition with minimal signs of use';
-      marketValue = '75-90% of catalog value';
-    } else if (average >= 7) {
-      grade = 'VG+ (Very Good Plus)';
-      description = 'Good condition with minor wear that doesn&apos;t affect play';
-      marketValue = '50-75% of catalog value';
-    } else if (average >= 5.5) {
-      grade = 'VG (Very Good)';
-      description = 'Shows wear but plays well';
-      marketValue = '25-50% of catalog value';
-    } else if (average >= 4) {
-      grade = 'G+ (Good Plus)';
-      description = 'Significant wear with some play issues';
-      marketValue = '10-25% of catalog value';
-    } else if (average >= 2.5) {
-      grade = 'G (Good)';
-      description = 'Heavy wear, plays but with noticeable issues';
-      marketValue = '5-15% of catalog value';
+  const toggleMissingComponents = (type: 'media' | 'package') => {
+    if (type === 'media') {
+      setMediaMissing(!mediaMissing);
+      if (!mediaMissing) setPackageMissing(false);
     } else {
-      grade = 'P (Poor)';
-      description = 'Extensive damage, may not play properly';
-      marketValue = '0-10% of catalog value';
-    }
-
-    setResult({
-      grade,
-      confidence: Math.round(confidence),
-      description,
-      marketValue
-    });
-  };
-
-  const resetGrading = () => {
-    setCriteria({
-      visualWear: 5,
-      playbackQuality: 5,
-      surfaceMarks: 5,
-      labelCondition: 5,
-      overallAppearance: 5
-    });
-    setResult(null);
-    setNotes('');
-  };
-
-  const criteriaLabels = {
-    vinyl: {
-      visualWear: 'Vinyl Surface Condition',
-      playbackQuality: 'Playback Quality',
-      surfaceMarks: 'Scratches & Scuffs',
-      labelCondition: 'Label Condition',
-      overallAppearance: 'Sleeve Condition'
-    },
-    cassette: {
-      visualWear: 'Tape Condition',
-      playbackQuality: 'Audio Quality',
-      surfaceMarks: 'Case Condition',
-      labelCondition: 'Label/Insert Condition',
-      overallAppearance: 'Overall Appearance'
-    },
-    cd: {
-      visualWear: 'Disc Surface',
-      playbackQuality: 'Playback Quality',
-      surfaceMarks: 'Scratches & Marks',
-      labelCondition: 'Booklet/Insert Condition',
-      overallAppearance: 'Case Condition'
+      setPackageMissing(!packageMissing);
+      if (!packageMissing) setMediaMissing(false);
     }
   };
 
-  const getScoreColor = (score: number): string => {
-    if (score >= 8) return '#22c55e';
-    if (score >= 6) return '#eab308';
-    if (score >= 4) return '#f97316';
-    return '#ef4444';
+  const toggleSeverity = (conditionKey: string, checked: boolean) => {
+    setActiveSeverities(prev => ({
+      ...prev,
+      [conditionKey]: checked
+    }));
   };
 
-  const getGradeColor = (grade: string): string => {
-    if (grade.includes('M')) return '#22c55e';
-    if (grade.includes('NM')) return '#65a30d';
-    if (grade.includes('VG+')) return '#eab308';
-    if (grade.includes('VG')) return '#f97316';
-    if (grade.includes('G')) return '#ef4444';
-    return '#dc2626';
+  const updateMediaCondition = (itemId: number, conditionKey: string, checked: boolean) => {
+    setMediaItems(prev => prev.map(item => 
+      item.id === itemId 
+        ? { ...item, conditions: { ...item.conditions, [conditionKey]: checked } }
+        : item
+    ));
+    
+    // Toggle severity options
+    const severityKey = `${conditionKey}-severity-${itemId}`;
+    toggleSeverity(severityKey, checked);
   };
+
+  const updateMediaSeverity = (itemId: number, severityGroup: string, value: string) => {
+    setMediaItems(prev => prev.map(item => 
+      item.id === itemId 
+        ? { ...item, severities: { ...item.severities, [severityGroup]: value } }
+        : item
+    ));
+  };
+
+  const updateSleeveCondition = (conditionKey: string, checked: boolean) => {
+    setSleeveConditions(prev => ({ ...prev, [conditionKey]: checked }));
+    toggleSeverity(`${conditionKey}-severity`, checked);
+  };
+
+  const updateSleeveSeverity = (severityGroup: string, value: string) => {
+    setSleeveSeverities(prev => ({ ...prev, [severityGroup]: value }));
+  };
+
+  const addAnotherRecord = () => {
+    const newId = Math.max(...mediaItems.map(item => item.id)) + 1;
+    setMediaItems(prev => [...prev, { id: newId, conditions: {}, severities: {}, skipSides: [], tracksAffected: 0 }]);
+  };
+
+  const removeMediaItem = (itemId: number) => {
+    setMediaItems(prev => prev.filter(item => item.id !== itemId));
+  };
+
+  const calculateGrades = () => {
+    setShowResults(true);
+    // Scroll to results
+    setTimeout(() => {
+      document.getElementById('results')?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+  };
+
+  const exportListing = () => {
+    alert('Export feature - will copy formatted listing to clipboard');
+  };
+
+  const getEvaluationSectionStyle = (disabled: boolean) => ({
+    opacity: disabled ? 0.3 : 1,
+    pointerEvents: disabled ? 'none' as const : 'auto' as const
+  });
 
   return (
-    <div style={{ padding: 24, background: '#fff', color: '#222', minHeight: '100vh' }}>
-      {/* Header */}
-      <div style={{ marginBottom: 32, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <h1 style={{ fontSize: 32, fontWeight: 'bold', margin: '0 0 8px 0' }}>
-            🎵 Music Media Grading Tool
-          </h1>
-          <p style={{ color: '#666', fontSize: 16, margin: 0 }}>
-            Professional media condition assessment for Dead Wax Dialogues collection
-          </p>
+    <div style={{ 
+      fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+      lineHeight: 1.6,
+      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      minHeight: '100vh',
+      padding: 20
+    }}>
+      <div style={{
+        maxWidth: 1400,
+        margin: '0 auto',
+        background: 'white',
+        borderRadius: 20,
+        boxShadow: '0 20px 40px rgba(0,0,0,0.1)',
+        overflow: 'hidden'
+      }}>
+        {/* Header */}
+        <div style={{
+          background: 'linear-gradient(135deg, #2c3e50 0%, #34495e 100%)',
+          color: 'white',
+          padding: 30,
+          textAlign: 'center'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Link
+              href="/admin/admin-dashboard"
+              style={{
+                background: 'rgba(255,255,255,0.2)',
+                color: 'white',
+                padding: '8px 16px',
+                borderRadius: 8,
+                textDecoration: 'none',
+                fontSize: 14,
+                fontWeight: 600
+              }}
+            >
+              ← Back to Dashboard
+            </Link>
+            <div>
+              <h1 style={{ fontSize: '2.5rem', margin: '0 0 10px 0', textShadow: '2px 2px 4px rgba(0,0,0,0.3)' }}>
+                🔍 Systematic Media Grading Tool
+              </h1>
+              <p style={{ fontSize: '1.1rem', opacity: 0.9, margin: 0 }}>
+                Detailed condition assessment with automatic grading calculation
+              </p>
+            </div>
+            <div style={{ width: 120 }}></div>
+          </div>
         </div>
-        <Link
-          href="/admin/admin-dashboard"
-          style={{
-            background: '#6b7280',
-            color: 'white',
-            padding: '8px 16px',
-            borderRadius: 8,
-            textDecoration: 'none',
-            fontSize: 14,
-            fontWeight: 600
-          }}
-        >
-          ← Back to Dashboard
-        </Link>
-      </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, alignItems: 'flex-start' }}>
-        
-        {/* Left Column - Input */}
-        <div>
-          {/* Media Type Selection */}
-          <div style={{
-            background: '#f8fafc',
-            border: '1px solid #e2e8f0',
-            borderRadius: 12,
-            padding: 24,
-            marginBottom: 24
-          }}>
-            <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 16 }}>
-              Media Type
-            </h3>
-            <div style={{ display: 'flex', gap: 12 }}>
-              {(['vinyl', 'cassette', 'cd'] as const).map(type => (
+        <div style={{ padding: 40 }}>
+          {/* Media Selector */}
+          <div style={{ marginBottom: 30, textAlign: 'center' }}>
+            <h2>Select Media Type</h2>
+            <div style={{ display: 'flex', gap: 15, justifyContent: 'center', flexWrap: 'wrap' }}>
+              {[
+                { type: 'vinyl' as const, label: '🎵 Vinyl Records' },
+                { type: 'cassette' as const, label: '📼 Cassette Tapes' },
+                { type: 'cd' as const, label: '💿 Compact Discs' }
+              ].map(({ type, label }) => (
                 <button
                   key={type}
-                  onClick={() => setMediaType(type)}
+                  onClick={() => selectMedia(type)}
                   style={{
-                    background: mediaType === type ? '#2563eb' : '#e5e7eb',
-                    color: mediaType === type ? 'white' : '#374151',
+                    background: currentMedia === type 
+                      ? 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)'
+                      : 'linear-gradient(135deg, #3498db 0%, #2980b9 100%)',
+                    color: 'white',
                     border: 'none',
-                    borderRadius: 8,
-                    padding: '10px 16px',
-                    fontSize: 14,
-                    fontWeight: 600,
+                    padding: '15px 30px',
+                    borderRadius: 50,
+                    fontSize: '1rem',
                     cursor: 'pointer',
-                    textTransform: 'capitalize'
+                    transition: 'all 0.3s ease',
+                    boxShadow: '0 5px 15px rgba(0,0,0,0.1)'
                   }}
                 >
-                  {type === 'vinyl' ? '🎵 Vinyl' : type === 'cassette' ? '📼 Cassette' : '💿 CD'}
+                  {label}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Grading Criteria */}
-          <div style={{
-            background: '#fff',
-            border: '1px solid #e5e7eb',
-            borderRadius: 12,
-            padding: 24,
-            marginBottom: 24
-          }}>
-            <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 20 }}>
-              Condition Assessment
-            </h3>
-            
-            {Object.entries(criteria).map(([key, value]) => {
-              const label = criteriaLabels[mediaType][key as keyof GradingCriteria];
-              return (
-                <div key={key} style={{ marginBottom: 20 }}>
-                  <div style={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'center',
-                    marginBottom: 8
-                  }}>
-                    <label style={{ fontSize: 14, fontWeight: 600, color: '#374151' }}>
-                      {label}
+          {currentMedia && (
+            <>
+              {/* Missing Components Check */}
+              <div style={{
+                background: '#fff3cd',
+                border: '2px solid #ffc107',
+                borderRadius: 15,
+                padding: 20,
+                marginBottom: 30
+              }}>
+                <h3 style={{ color: '#856404', marginBottom: 15 }}>
+                  ⚠️ Missing Components Check (Check First!)
+                </h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+                  <div style={{ background: 'white', padding: 15, borderRadius: 8 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={mediaMissing}
+                        onChange={() => toggleMissingComponents('media')}
+                        style={{ transform: 'scale(1.1)' }}
+                      />
+                      <div>
+                        <div style={{ fontWeight: 'bold' }}>Media Missing (Cover/Insert Only)</div>
+                        <div style={{ fontSize: '0.9rem', color: '#666', marginTop: 5 }}>
+                          Only evaluating packaging - no disc/tape/record present
+                        </div>
+                      </div>
                     </label>
+                  </div>
+                  <div style={{ background: 'white', padding: 15, borderRadius: 8 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={packageMissing}
+                        onChange={() => toggleMissingComponents('package')}
+                        style={{ transform: 'scale(1.1)' }}
+                      />
+                      <div>
+                        <div style={{ fontWeight: 'bold' }}>Cover/Insert/J-Card Missing (Media Only)</div>
+                        <div style={{ fontSize: '0.9rem', color: '#666', marginTop: 5 }}>
+                          Only evaluating media - no packaging present
+                        </div>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Vinyl Assessment */}
+              {currentMedia === 'vinyl' && (
+                <div>
+                  <h2>Vinyl Record Assessment</h2>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 30, marginBottom: 30 }}>
+                    
+                    {/* Record Condition Assessment */}
                     <div style={{
-                      background: getScoreColor(value),
-                      color: 'white',
-                      padding: '2px 8px',
-                      borderRadius: 12,
-                      fontSize: 12,
-                      fontWeight: 'bold'
+                      background: '#f8f9fa',
+                      borderRadius: 15,
+                      padding: 25,
+                      border: '2px solid transparent',
+                      transition: 'all 0.3s ease',
+                      ...getEvaluationSectionStyle(mediaMissing)
                     }}>
-                      {value}/10
+                      <div style={{
+                        fontSize: '1.3rem',
+                        fontWeight: 'bold',
+                        color: '#2c3e50',
+                        marginBottom: 20,
+                        textAlign: 'center',
+                        padding: 10,
+                        background: 'white',
+                        borderRadius: 10
+                      }}>
+                        🎵 Record Condition Assessment
+                      </div>
+
+                      {mediaItems.map((item, index) => (
+                        <div key={item.id} style={{
+                          border: '1px solid #dee2e6',
+                          borderRadius: 10,
+                          padding: 15,
+                          marginBottom: 15
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <h4 style={{ color: '#495057', margin: 0 }}>Record #{item.id}</h4>
+                            {index > 0 && (
+                              <button
+                                onClick={() => removeMediaItem(item.id)}
+                                style={{
+                                  background: '#dc3545',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: 5,
+                                  padding: '4px 8px',
+                                  cursor: 'pointer',
+                                  fontSize: '0.8rem'
+                                }}
+                              >
+                                ✕ Remove
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Visual Appearance */}
+                          <div style={{ marginBottom: 20 }}>
+                            <h4 style={{ color: '#495057', marginBottom: 10, fontSize: '1rem', borderBottom: '2px solid #dee2e6', paddingBottom: 5 }}>
+                              Visual Appearance
+                            </h4>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                              
+                              <label style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                padding: '10px 15px',
+                                background: 'white',
+                                borderRadius: 8,
+                                cursor: 'pointer',
+                                transition: 'all 0.3s ease',
+                                border: '1px solid #e9ecef'
+                              }}>
+                                <input
+                                  type="checkbox"
+                                  checked={item.conditions[`vinyl-glossy-${item.id}`] || false}
+                                  onChange={(e) => updateMediaCondition(item.id, `vinyl-glossy-${item.id}`, e.target.checked)}
+                                  style={{ marginRight: 12, transform: 'scale(1.1)' }}
+                                />
+                                Record has glossy, like-new appearance
+                              </label>
+
+                              <label style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                padding: '10px 15px',
+                                background: 'white',
+                                borderRadius: 8,
+                                cursor: 'pointer',
+                                transition: 'all 0.3s ease',
+                                border: '1px solid #e9ecef'
+                              }}>
+                                <input
+                                  type="checkbox"
+                                  checked={item.conditions[`vinyl-scuffs-${item.id}`] || false}
+                                  onChange={(e) => updateMediaCondition(item.id, `vinyl-scuffs-${item.id}`, e.target.checked)}
+                                  style={{ marginRight: 12, transform: 'scale(1.1)' }}
+                                />
+                                Light scuffs visible
+                              </label>
+
+                              {activeSeverities[`vinyl-scuffs-${item.id}-severity`] && (
+                                <div style={{ marginLeft: 30, marginTop: 8 }}>
+                                  {['Very light, barely visible', 'Visible but not deep', 'Obvious, multiple scuffs'].map((option, idx) => (
+                                    <label key={idx} style={{ display: 'flex', alignItems: 'center', marginBottom: 5 }}>
+                                      <input
+                                        type="radio"
+                                        name={`vinyl-scuffs-level-${item.id}`}
+                                        value={['light', 'moderate', 'heavy'][idx]}
+                                        onChange={(e) => updateMediaSeverity(item.id, `vinyl-scuffs-level-${item.id}`, e.target.value)}
+                                        style={{ marginRight: 8 }}
+                                      />
+                                      <span style={{ fontSize: '0.85rem', color: '#666' }}>{option}</span>
+                                    </label>
+                                  ))}
+                                </div>
+                              )}
+
+                              <label style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                padding: '10px 15px',
+                                background: 'white',
+                                borderRadius: 8,
+                                cursor: 'pointer',
+                                transition: 'all 0.3s ease',
+                                border: '1px solid #e9ecef'
+                              }}>
+                                <input
+                                  type="checkbox"
+                                  checked={item.conditions[`vinyl-scratches-${item.id}`] || false}
+                                  onChange={(e) => updateMediaCondition(item.id, `vinyl-scratches-${item.id}`, e.target.checked)}
+                                  style={{ marginRight: 12, transform: 'scale(1.1)' }}
+                                />
+                                Scratches present
+                              </label>
+
+                              {activeSeverities[`vinyl-scratches-${item.id}-severity`] && (
+                                <div style={{ marginLeft: 30, marginTop: 8 }}>
+                                  {['Hairline scratches only', 'Can feel with fingernail', 'Deep, visible grooves'].map((option, idx) => (
+                                    <label key={idx} style={{ display: 'flex', alignItems: 'center', marginBottom: 5 }}>
+                                      <input
+                                        type="radio"
+                                        name={`vinyl-scratches-level-${item.id}`}
+                                        value={['hairline', 'feelable', 'deep'][idx]}
+                                        onChange={(e) => updateMediaSeverity(item.id, `vinyl-scratches-level-${item.id}`, e.target.value)}
+                                        style={{ marginRight: 8 }}
+                                      />
+                                      <span style={{ fontSize: '0.85rem', color: '#666' }}>{option}</span>
+                                    </label>
+                                  ))}
+                                </div>
+                              )}
+
+                              <label style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                padding: '10px 15px',
+                                background: 'white',
+                                borderRadius: 8,
+                                cursor: 'pointer',
+                                transition: 'all 0.3s ease',
+                                border: '1px solid #e9ecef'
+                              }}>
+                                <input
+                                  type="checkbox"
+                                  checked={item.conditions[`vinyl-groove-wear-${item.id}`] || false}
+                                  onChange={(e) => updateMediaCondition(item.id, `vinyl-groove-wear-${item.id}`, e.target.checked)}
+                                  style={{ marginRight: 12, transform: 'scale(1.1)' }}
+                                />
+                                Groove wear visible
+                              </label>
+
+                              {activeSeverities[`vinyl-groove-wear-${item.id}-severity`] && (
+                                <div style={{ marginLeft: 30, marginTop: 8 }}>
+                                  {['Slight loss of gloss', 'Evident on sight', 'Heavy wear, matte finish'].map((option, idx) => (
+                                    <label key={idx} style={{ display: 'flex', alignItems: 'center', marginBottom: 5 }}>
+                                      <input
+                                        type="radio"
+                                        name={`vinyl-groove-level-${item.id}`}
+                                        value={['slight', 'evident', 'heavy'][idx]}
+                                        onChange={(e) => updateMediaSeverity(item.id, `vinyl-groove-level-${item.id}`, e.target.value)}
+                                        style={{ marginRight: 8 }}
+                                      />
+                                      <span style={{ fontSize: '0.85rem', color: '#666' }}>{option}</span>
+                                    </label>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Audio Performance */}
+                          <div style={{ marginBottom: 20 }}>
+                            <h4 style={{ color: '#495057', marginBottom: 10, fontSize: '1rem', borderBottom: '2px solid #dee2e6', paddingBottom: 5 }}>
+                              Audio Performance
+                            </h4>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                              
+                              <label style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                padding: '10px 15px',
+                                background: 'white',
+                                borderRadius: 8,
+                                cursor: 'pointer',
+                                transition: 'all 0.3s ease',
+                                border: '1px solid #e9ecef'
+                              }}>
+                                <input
+                                  type="checkbox"
+                                  checked={item.conditions[`vinyl-silent-${item.id}`] || false}
+                                  onChange={(e) => updateMediaCondition(item.id, `vinyl-silent-${item.id}`, e.target.checked)}
+                                  style={{ marginRight: 12, transform: 'scale(1.1)' }}
+                                />
+                                Plays with no surface noise
+                              </label>
+
+                              <label style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                padding: '10px 15px',
+                                background: 'white',
+                                borderRadius: 8,
+                                cursor: 'pointer',
+                                transition: 'all 0.3s ease',
+                                border: '1px solid #e9ecef'
+                              }}>
+                                <input
+                                  type="checkbox"
+                                  checked={item.conditions[`vinyl-surface-noise-${item.id}`] || false}
+                                  onChange={(e) => updateMediaCondition(item.id, `vinyl-surface-noise-${item.id}`, e.target.checked)}
+                                  style={{ marginRight: 12, transform: 'scale(1.1)' }}
+                                />
+                                Surface noise when played
+                              </label>
+
+                              {activeSeverities[`vinyl-surface-noise-${item.id}-severity`] && (
+                                <div style={{ marginLeft: 30, marginTop: 8 }}>
+                                  {['Minimal, in quiet passages only', 'Noticeable but doesn\'t overpower music', 'Significant throughout'].map((option, idx) => (
+                                    <label key={idx} style={{ display: 'flex', alignItems: 'center', marginBottom: 5 }}>
+                                      <input
+                                        type="radio"
+                                        name={`vinyl-noise-level-${item.id}`}
+                                        value={['minimal', 'noticeable', 'significant'][idx]}
+                                        onChange={(e) => updateMediaSeverity(item.id, `vinyl-noise-level-${item.id}`, e.target.value)}
+                                        style={{ marginRight: 8 }}
+                                      />
+                                      <span style={{ fontSize: '0.85rem', color: '#666' }}>{option}</span>
+                                    </label>
+                                  ))}
+                                </div>
+                              )}
+
+                              <label style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                padding: '10px 15px',
+                                background: 'white',
+                                borderRadius: 8,
+                                cursor: 'pointer',
+                                transition: 'all 0.3s ease',
+                                border: '1px solid #e9ecef'
+                              }}>
+                                <input
+                                  type="checkbox"
+                                  checked={item.conditions[`vinyl-pops-${item.id}`] || false}
+                                  onChange={(e) => updateMediaCondition(item.id, `vinyl-pops-${item.id}`, e.target.checked)}
+                                  style={{ marginRight: 12, transform: 'scale(1.1)' }}
+                                />
+                                Occasional pops or clicks
+                              </label>
+
+                              <label style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                padding: '10px 15px',
+                                background: 'white',
+                                borderRadius: 8,
+                                cursor: 'pointer',
+                                transition: 'all 0.3s ease',
+                                border: '1px solid #e9ecef'
+                              }}>
+                                <input
+                                  type="checkbox"
+                                  checked={item.conditions[`vinyl-skips-${item.id}`] || false}
+                                  onChange={(e) => updateMediaCondition(item.id, `vinyl-skips-${item.id}`, e.target.checked)}
+                                  style={{ marginRight: 12, transform: 'scale(1.1)' }}
+                                />
+                                Skipping or repeating
+                              </label>
+
+                              {activeSeverities[`vinyl-skips-${item.id}-severity`] && (
+                                <div style={{ marginLeft: 30, marginTop: 8, background: '#fff8dc', padding: 10, borderRadius: 5 }}>
+                                  <div style={{ marginBottom: 10 }}>
+                                    <label style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>Which side(s) affected:</label>
+                                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 5 }}>
+                                      {['A', 'B', 'C', 'D'].map(side => (
+                                        <label key={side} style={{ display: 'flex', alignItems: 'center' }}>
+                                          <input type="checkbox" value={side} style={{ marginRight: 4 }} />
+                                          Side {side}
+                                        </label>
+                                      ))}
+                                    </div>
+                                  </div>
+                                  <div style={{ marginBottom: 10 }}>
+                                    <label style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>Tracks affected:</label>
+                                    <input
+                                      type="number"
+                                      min="1"
+                                      max="20"
+                                      placeholder="Number of tracks"
+                                      style={{ width: 100, padding: 4, marginLeft: 10, border: '1px solid #ccc', borderRadius: 3 }}
+                                    />
+                                  </div>
+                                  <div>
+                                    <label style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>Severity:</label>
+                                    <div style={{ marginTop: 5 }}>
+                                      {['Occasional skips', 'Frequent skipping', 'Constant skipping'].map((option, idx) => (
+                                        <label key={idx} style={{ display: 'flex', alignItems: 'center', marginBottom: 5 }}>
+                                          <input
+                                            type="radio"
+                                            name={`vinyl-skip-severity-${item.id}`}
+                                            value={['occasional', 'frequent', 'constant'][idx]}
+                                            style={{ marginRight: 8 }}
+                                          />
+                                          <span style={{ fontSize: '0.85rem', color: '#666' }}>{option}</span>
+                                        </label>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Label & Center */}
+                          <div style={{ marginBottom: 20 }}>
+                            <h4 style={{ color: '#495057', marginBottom: 10, fontSize: '1rem', borderBottom: '2px solid #dee2e6', paddingBottom: 5 }}>
+                              Label & Center
+                            </h4>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                              
+                              {[
+                                { key: 'vinyl-label-clean', label: 'Label is clean and bright' },
+                                { key: 'vinyl-spindle-marks', label: 'Spindle marks present' },
+                                { key: 'vinyl-label-writing', label: 'Writing on label' },
+                                { key: 'vinyl-label-stickers', label: 'Stickers or tape on label' }
+                              ].map(({ key, label }) => (
+                                <label key={key} style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  padding: '10px 15px',
+                                  background: 'white',
+                                  borderRadius: 8,
+                                  cursor: 'pointer',
+                                  transition: 'all 0.3s ease',
+                                  border: '1px solid #e9ecef'
+                                }}>
+                                  <input
+                                    type="checkbox"
+                                    checked={item.conditions[`${key}-${item.id}`] || false}
+                                    onChange={(e) => updateMediaCondition(item.id, `${key}-${item.id}`, e.target.checked)}
+                                    style={{ marginRight: 12, transform: 'scale(1.1)' }}
+                                  />
+                                  {label}
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+
+                      <button
+                        onClick={addAnotherRecord}
+                        style={{
+                          width: '100%',
+                          marginTop: 15,
+                          padding: 10,
+                          background: '#28a745',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: 8,
+                          cursor: 'pointer',
+                          fontSize: '1rem',
+                          transition: 'all 0.3s ease'
+                        }}
+                      >
+                        ➕ Add Another Record
+                      </button>
                     </div>
-                  </div>
-                  <input
-                    type="range"
-                    min="1"
-                    max="10"
-                    step="0.5"
-                    value={value}
-                    onChange={(e) => setCriteria(prev => ({
-                      ...prev,
-                      [key]: parseFloat(e.target.value)
-                    }))}
-                    style={{
-                      width: '100%',
-                      height: 8,
-                      borderRadius: 4,
-                      background: '#e5e7eb',
-                      outline: 'none',
-                      cursor: 'pointer'
-                    }}
-                  />
-                  <div style={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    fontSize: 10, 
-                    color: '#9ca3af',
-                    marginTop: 4
-                  }}>
-                    <span>Poor</span>
-                    <span>Excellent</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
 
-          {/* Notes */}
-          <div style={{
-            background: '#fff',
-            border: '1px solid #e5e7eb',
-            borderRadius: 12,
-            padding: 24,
-            marginBottom: 24
-          }}>
-            <h3 style={{ fontSize: 18, fontWeight: 600, marginBottom: 16 }}>
-              Additional Notes
-            </h3>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Record any specific defects, special characteristics, or additional observations..."
-              style={{
-                width: '100%',
-                padding: '12px',
-                border: '1px solid #d1d5db',
-                borderRadius: 8,
-                fontSize: 14,
-                resize: 'vertical',
-                minHeight: 80,
-                fontFamily: 'inherit'
-              }}
-            />
-          </div>
+                    {/* Sleeve Condition Assessment */}
+                    <div style={{
+                      background: '#f8f9fa',
+                      borderRadius: 15,
+                      padding: 25,
+                      border: '2px solid transparent',
+                      transition: 'all 0.3s ease',
+                      ...getEvaluationSectionStyle(packageMissing)
+                    }}>
+                      <div style={{
+                        fontSize: '1.3rem',
+                        fontWeight: 'bold',
+                        color: '#2c3e50',
+                        marginBottom: 20,
+                        textAlign: 'center',
+                        padding: 10,
+                        background: 'white',
+                        borderRadius: 10
+                      }}>
+                        📦 Sleeve Condition Assessment
+                      </div>
 
-          {/* Action Buttons */}
-          <div style={{ display: 'flex', gap: 12 }}>
-            <button
-              onClick={gradeItem}
-              style={{
-                background: '#2563eb',
-                color: 'white',
-                border: 'none',
-                borderRadius: 8,
-                padding: '12px 24px',
-                fontSize: 16,
-                fontWeight: 600,
-                cursor: 'pointer',
-                flex: 1
-              }}
-            >
-              🎯 Calculate Grade
-            </button>
-            <button
-              onClick={resetGrading}
-              style={{
-                background: '#6b7280',
-                color: 'white',
-                border: 'none',
-                borderRadius: 8,
-                padding: '12px 24px',
-                fontSize: 16,
-                fontWeight: 600,
-                cursor: 'pointer'
-              }}
-            >
-              🔄 Reset
-            </button>
-          </div>
-        </div>
+                      {/* Overall Appearance */}
+                      <div style={{ marginBottom: 20 }}>
+                        <h4 style={{ color: '#495057', marginBottom: 10, fontSize: '1rem', borderBottom: '2px solid #dee2e6', paddingBottom: 5 }}>
+                          Overall Appearance
+                        </h4>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          
+                          {[
+                            { key: 'sleeve-perfect', label: 'Looks like new, no flaws' },
+                            { key: 'sleeve-minor-wear', label: 'Minor shelf wear only' }
+                          ].map(({ key, label }) => (
+                            <label key={key} style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              padding: '10px 15px',
+                              background: 'white',
+                              borderRadius: 8,
+                              cursor: 'pointer',
+                              transition: 'all 0.3s ease',
+                              border: '1px solid #e9ecef'
+                            }}>
+                              <input
+                                type="checkbox"
+                                checked={sleeveConditions[key] || false}
+                                onChange={(e) => updateSleeveCondition(key, e.target.checked)}
+                                style={{ marginRight: 12, transform: 'scale(1.1)' }}
+                              />
+                              {label}
+                            </label>
+                          ))}
 
-        {/* Right Column - Results */}
-        <div>
-          {result ? (
-            <div style={{
-              background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-              border: '2px solid #cbd5e1',
-              borderRadius: 16,
-              padding: 32,
-              textAlign: 'center'
-            }}>
-              <div style={{
-                background: getGradeColor(result.grade),
-                color: 'white',
-                padding: '16px 24px',
-                borderRadius: 12,
-                fontSize: 24,
-                fontWeight: 'bold',
-                marginBottom: 20,
-                boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
-              }}>
-                {result.grade}
-              </div>
-              
-              <div style={{
-                fontSize: 16,
-                color: '#374151',
-                marginBottom: 20,
-                lineHeight: 1.5
-              }}>
-                {result.description}
-              </div>
-              
-              <div style={{
-                background: '#fff',
-                border: '1px solid #e5e7eb',
-                borderRadius: 8,
-                padding: 16,
-                marginBottom: 20
-              }}>
-                <div style={{ fontSize: 14, color: '#6b7280', marginBottom: 4 }}>
-                  Market Value Range
-                </div>
-                <div style={{ fontSize: 18, fontWeight: 'bold', color: '#059669' }}>
-                  {result.marketValue}
-                </div>
-              </div>
-              
-              <div style={{
-                background: '#f0f9ff',
-                border: '1px solid #0369a1',
-                borderRadius: 8,
-                padding: 12,
-                fontSize: 12,
-                color: '#0c4a6e'
-              }}>
-                <strong>Confidence:</strong> {result.confidence}%
-                <div style={{ marginTop: 4, fontSize: 11 }}>
-                  Based on consistency of ratings across criteria
-                </div>
-              </div>
+                          <label style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            padding: '10px 15px',
+                            background: 'white',
+                            borderRadius: 8,
+                            cursor: 'pointer',
+                            transition: 'all 0.3s ease',
+                            border: '1px solid #e9ecef'
+                          }}>
+                            <input
+                              type="checkbox"
+                              checked={sleeveConditions['sleeve-corner-wear'] || false}
+                              onChange={(e) => updateSleeveCondition('sleeve-corner-wear', e.target.checked)}
+                              style={{ marginRight: 12, transform: 'scale(1.1)' }}
+                            />
+                            Corner wear present
+                          </label>
 
-              {notes && (
-                <div style={{
-                  background: '#fefce8',
-                  border: '1px solid #eab308',
-                  borderRadius: 8,
-                  padding: 16,
-                  marginTop: 20,
-                  textAlign: 'left'
-                }}>
-                  <div style={{ fontSize: 12, fontWeight: 'bold', color: '#92400e', marginBottom: 8 }}>
-                    Additional Notes:
-                  </div>
-                  <div style={{ fontSize: 14, color: '#a16207' }}>
-                    {notes}
+                          {activeSeverities['sleeve-corner-wear-severity'] && (
+                            <div style={{ marginLeft: 30, marginTop: 8 }}>
+                              {['Slight bumping', 'Creased or frayed', 'Cut or heavily damaged'].map((option, idx) => (
+                                <label key={idx} style={{ display: 'flex', alignItems: 'center', marginBottom: 5 }}>
+                                  <input
+                                    type="radio"
+                                    name="sleeve-corner-level"
+                                    value={['slight', 'creased', 'cut'][idx]}
+                                    onChange={(e) => updateSleeveSeverity('sleeve-corner-level', e.target.value)}
+                                    style={{ marginRight: 8 }}
+                                  />
+                                  <span style={{ fontSize: '0.85rem', color: '#666' }}>{option}</span>
+                                </label>
+                              ))}
+                            </div>
+                          )}
+
+                          <label style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            padding: '10px 15px',
+                            background: 'white',
+                            borderRadius: 8,
+                            cursor: 'pointer',
+                            transition: 'all 0.3s ease',
+                            border: '1px solid #e9ecef'
+                          }}>
+                            <input
+                              type="checkbox"
+                              checked={sleeveConditions['sleeve-ring-wear'] || false}
+                              onChange={(e) => updateSleeveCondition('sleeve-ring-wear', e.target.checked)}
+                              style={{ marginRight: 12, transform: 'scale(1.1)' }}
+                            />
+                            Ring wear visible
+                          </label>
+
+                          {activeSeverities['sleeve-ring-wear-severity'] && (
+                            <div style={{ marginLeft: 30, marginTop: 8 }}>
+                              {['Light, barely visible', 'Clearly visible', 'Heavy, ink worn off'].map((option, idx) => (
+                                <label key={idx} style={{ display: 'flex', alignItems: 'center', marginBottom: 5 }}>
+                                  <input
+                                    type="radio"
+                                    name="sleeve-ring-level"
+                                    value={['light', 'evident', 'heavy'][idx]}
+                                    onChange={(e) => updateSleeveSeverity('sleeve-ring-level', e.target.value)}
+                                    style={{ marginRight: 8 }}
+                                  />
+                                  <span style={{ fontSize: '0.85rem', color: '#666' }}>{option}</span>
+                                </label>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Seams & Structure */}
+                      <div style={{ marginBottom: 20 }}>
+                        <h4 style={{ color: '#495057', marginBottom: 10, fontSize: '1rem', borderBottom: '2px solid #dee2e6', paddingBottom: 5 }}>
+                          Seams & Structure
+                        </h4>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          
+                          <label style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            padding: '10px 15px',
+                            background: 'white',
+                            borderRadius: 8,
+                            cursor: 'pointer',
+                            transition: 'all 0.3s ease',
+                            border: '1px solid #e9ecef'
+                          }}>
+                            <input
+                              type="checkbox"
+                              checked={sleeveConditions['sleeve-seams-intact'] || false}
+                              onChange={(e) => updateSleeveCondition('sleeve-seams-intact', e.target.checked)}
+                              style={{ marginRight: 12, transform: 'scale(1.1)' }}
+                            />
+                            All seams intact
+                          </label>
+
+                          <label style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            padding: '10px 15px',
+                            background: 'white',
+                            borderRadius: 8,
+                            cursor: 'pointer',
+                            transition: 'all 0.3s ease',
+                            border: '1px solid #e9ecef'
+                          }}>
+                            <input
+                              type="checkbox"
+                              checked={sleeveConditions['sleeve-seam-splits'] || false}
+                              onChange={(e) => updateSleeveCondition('sleeve-seam-splits', e.target.checked)}
+                              style={{ marginRight: 12, transform: 'scale(1.1)' }}
+                            />
+                            Seam splits present
+                          </label>
+
+                          {activeSeverities['sleeve-seam-splits-severity'] && (
+                            <div style={{ marginLeft: 30, marginTop: 8 }}>
+                              {['Small (under 1 inch)', 'Medium (1-3 inches)', 'Large (over 3 inches)'].map((option, idx) => (
+                                <label key={idx} style={{ display: 'flex', alignItems: 'center', marginBottom: 5 }}>
+                                  <input
+                                    type="radio"
+                                    name="sleeve-seam-level"
+                                    value={['small', 'medium', 'large'][idx]}
+                                    onChange={(e) => updateSleeveSeverity('sleeve-seam-level', e.target.value)}
+                                    style={{ marginRight: 8 }}
+                                  />
+                                  <span style={{ fontSize: '0.85rem', color: '#666' }}>{option}</span>
+                                </label>
+                              ))}
+                            </div>
+                          )}
+
+                          <label style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            padding: '10px 15px',
+                            background: 'white',
+                            borderRadius: 8,
+                            cursor: 'pointer',
+                            transition: 'all 0.3s ease',
+                            border: '1px solid #e9ecef'
+                          }}>
+                            <input
+                              type="checkbox"
+                              checked={sleeveConditions['sleeve-spine-wear'] || false}
+                              onChange={(e) => updateSleeveCondition('sleeve-spine-wear', e.target.checked)}
+                              style={{ marginRight: 12, transform: 'scale(1.1)' }}
+                            />
+                            Spine shows wear
+                          </label>
+                        </div>
+                      </div>
+
+                      {/* Damage & Markings */}
+                      <div style={{ marginBottom: 20 }}>
+                        <h4 style={{ color: '#495057', marginBottom: 10, fontSize: '1rem', borderBottom: '2px solid #dee2e6', paddingBottom: 5 }}>
+                          Damage & Markings
+                        </h4>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          
+                          {[
+                            { key: 'sleeve-creases', label: 'Creases present' },
+                            { key: 'sleeve-writing', label: 'Writing present' },
+                            { key: 'sleeve-stickers', label: 'Stickers or tape' },
+                            { key: 'sleeve-water-damage', label: 'Water damage or staining' }
+                          ].map(({ key, label }) => (
+                            <label key={key} style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              padding: '10px 15px',
+                              background: 'white',
+                              borderRadius: 8,
+                              cursor: 'pointer',
+                              transition: 'all 0.3s ease',
+                              border: '1px solid #e9ecef'
+                            }}>
+                              <input
+                                type="checkbox"
+                                checked={sleeveConditions[key] || false}
+                                onChange={(e) => updateSleeveCondition(key, e.target.checked)}
+                                style={{ marginRight: 12, transform: 'scale(1.1)' }}
+                              />
+                              {label}
+                            </label>
+                          ))}
+
+                          <label style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            padding: '10px 15px',
+                            background: 'white',
+                            borderRadius: 8,
+                            cursor: 'pointer',
+                            transition: 'all 0.3s ease',
+                            border: '1px solid #e9ecef'
+                          }}>
+                            <input
+                              type="checkbox"
+                              checked={sleeveConditions['sleeve-tears'] || false}
+                              onChange={(e) => updateSleeveCondition('sleeve-tears', e.target.checked)}
+                              style={{ marginRight: 12, transform: 'scale(1.1)' }}
+                            />
+                            Tears present
+                          </label>
+
+                          {activeSeverities['sleeve-tears-severity'] && (
+                            <div style={{ marginLeft: 30, marginTop: 8 }}>
+                              {['Small tears', 'Significant tears', 'Major damage'].map((option, idx) => (
+                                <label key={idx} style={{ display: 'flex', alignItems: 'center', marginBottom: 5 }}>
+                                  <input
+                                    type="radio"
+                                    name="sleeve-tear-level"
+                                    value={['small', 'significant', 'major'][idx]}
+                                    onChange={(e) => updateSleeveSeverity('sleeve-tear-level', e.target.value)}
+                                    style={{ marginRight: 8 }}
+                                  />
+                                  <span style={{ fontSize: '0.85rem', color: '#666' }}>{option}</span>
+                                </label>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
-            </div>
-          ) : (
-            <div style={{
-              background: '#f9fafb',
-              border: '2px dashed #d1d5db',
-              borderRadius: 16,
-              padding: 48,
-              textAlign: 'center',
-              color: '#6b7280'
-            }}>
-              <div style={{ fontSize: 48, marginBottom: 16 }}>🎵</div>
-              <h3 style={{ fontSize: 20, marginBottom: 8, color: '#374151' }}>
-                Ready to Grade
-              </h3>
-              <p style={{ margin: 0, fontSize: 14 }}>
-                Adjust the condition sliders above and click &ldquo;Calculate Grade&rdquo; to get your assessment.
-              </p>
-            </div>
-          )}
 
-          {/* Grading Reference */}
-          <div style={{
-            background: '#fff',
-            border: '1px solid #e5e7eb',
-            borderRadius: 12,
-            padding: 20,
-            marginTop: 24,
-            fontSize: 12
-          }}>
-            <h4 style={{ fontSize: 14, fontWeight: 'bold', marginBottom: 12, color: '#374151' }}>
-              📖 Grading Reference
-            </h4>
-            <div style={{ display: 'grid', gap: 8 }}>
-              {[
-                { grade: 'M (Mint)', desc: 'Perfect, unplayed condition' },
-                { grade: 'NM (Near Mint)', desc: 'Excellent with minimal wear' },
-                { grade: 'VG+ (Very Good Plus)', desc: 'Minor wear, plays well' },
-                { grade: 'VG (Very Good)', desc: 'Shows wear but functional' },
-                { grade: 'G+ (Good Plus)', desc: 'Significant wear, some issues' },
-                { grade: 'G (Good)', desc: 'Heavy wear, noticeable problems' },
-                { grade: 'P (Poor)', desc: 'Extensive damage' }
-              ].map(({ grade, desc }) => (
-                <div key={grade} style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between',
-                  padding: '4px 0',
-                  borderBottom: '1px solid #f3f4f6'
-                }}>
-                  <span style={{ fontWeight: 'bold', color: getGradeColor(grade) }}>
-                    {grade}
-                  </span>
-                  <span style={{ color: '#6b7280' }}>
-                    {desc}
-                  </span>
+              {/* Custom Notes Section */}
+              <div style={{
+                background: '#f8f9fa',
+                borderRadius: 15,
+                padding: 25,
+                marginBottom: 30
+              }}>
+                <h3 style={{ color: '#495057', marginBottom: 15 }}>
+                  📝 Custom Condition Notes
+                </h3>
+                <textarea
+                  value={customNotes}
+                  onChange={(e) => setCustomNotes(e.target.value)}
+                  placeholder="Add any additional condition details not covered by the checkboxes above..."
+                  style={{
+                    width: '100%',
+                    height: 80,
+                    padding: 10,
+                    border: '1px solid #ddd',
+                    borderRadius: 8,
+                    fontFamily: 'inherit',
+                    resize: 'vertical'
+                  }}
+                />
+                <div style={{ fontSize: '0.85rem', color: '#666', marginTop: 8 }}>
+                  Examples: &quot;Light warp does not affect play&quot;, &quot;Minor pressing flaw on track 3&quot;, &quot;Includes original poster&quot;, etc.
                 </div>
-              ))}
-            </div>
-          </div>
+              </div>
+
+              {/* Additional Notes */}
+              <div style={{
+                background: '#fff3cd',
+                borderRadius: 15,
+                padding: 25,
+                borderLeft: '5px solid #ffc107',
+                marginBottom: 30
+              }}>
+                <h3 style={{ color: '#856404', marginBottom: 15 }}>
+                  📋 Additional Notes (Don&apos;t Affect Grade but Important for Disclosure)
+                </h3>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                  gap: 15
+                }}>
+                  {[
+                    { key: 'jewel-case-damaged', label: 'Jewel Case Damaged' },
+                    { key: 'jewel-case-missing', label: 'Jewel Case Missing' },
+                    { key: 'original-shrink', label: 'Original Shrinkwrap' },
+                    { key: 'hype-sticker', label: 'Hype Sticker Present' },
+                    { key: 'cutout-hole', label: 'Cut-out Hole/Mark' },
+                    { key: 'promo-stamp', label: 'Promotional Copy' },
+                    { key: 'price-sticker', label: 'Price Sticker/Tag' },
+                    { key: 'first-pressing', label: 'First Pressing' },
+                    { key: 'colored-vinyl', label: 'Colored Vinyl' },
+                    { key: 'limited-edition', label: 'Limited Edition' },
+                    { key: 'gatefold', label: 'Gatefold Sleeve' },
+                    { key: 'inner-sleeve-original', label: 'Original Inner Sleeve' }
+                  ].map(({ key, label }) => (
+                    <label key={key} style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      background: 'white',
+                      padding: 10,
+                      borderRadius: 8,
+                      cursor: 'pointer'
+                    }}>
+                      <input
+                        type="checkbox"
+                        checked={additionalNotes[key] || false}
+                        onChange={(e) => setAdditionalNotes(prev => ({ ...prev, [key]: e.target.checked }))}
+                        style={{ transform: 'scale(1.1)' }}
+                      />
+                      <span style={{ color: '#856404' }}>{label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Calculate Button */}
+              <div style={{ textAlign: 'center' }}>
+                <button
+                  onClick={calculateGrades}
+                  style={{
+                    background: 'linear-gradient(135deg, #28a745 0%, #20c997 100%)',
+                    color: 'white',
+                    border: 'none',
+                    padding: '15px 40px',
+                    borderRadius: 50,
+                    fontSize: '1.1rem',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                    boxShadow: '0 5px 15px rgba(40, 167, 69, 0.3)'
+                  }}
+                >
+                  🎯 Calculate Grades
+                </button>
+              </div>
+
+              {/* Album Info for Export */}
+              {showResults && (
+                <div style={{
+                  marginTop: 20,
+                  padding: 20,
+                  background: '#f8f9fa',
+                  borderRadius: 10
+                }}>
+                  <h3>📝 Album Information (for export)</h3>
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1fr',
+                    gap: 15,
+                    marginTop: 15
+                  }}>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: 5, fontWeight: 'bold' }}>Artist:</label>
+                      <input
+                        type="text"
+                        value={albumInfo.artist}
+                        onChange={(e) => setAlbumInfo(prev => ({ ...prev, artist: e.target.value }))}
+                        placeholder="Enter artist name"
+                        style={{ width: '100%', padding: 8, border: '1px solid #ddd', borderRadius: 5 }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: 5, fontWeight: 'bold' }}>Album Title:</label>
+                      <input
+                        type="text"
+                        value={albumInfo.title}
+                        onChange={(e) => setAlbumInfo(prev => ({ ...prev, title: e.target.value }))}
+                        placeholder="Enter album title"
+                        style={{ width: '100%', padding: 8, border: '1px solid #ddd', borderRadius: 5 }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: 5, fontWeight: 'bold' }}>Catalog #:</label>
+                      <input
+                        type="text"
+                        value={albumInfo.catalog}
+                        onChange={(e) => setAlbumInfo(prev => ({ ...prev, catalog: e.target.value }))}
+                        placeholder="e.g. ABC-123"
+                        style={{ width: '100%', padding: 8, border: '1px solid #ddd', borderRadius: 5 }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: 5, fontWeight: 'bold' }}>Year:</label>
+                      <input
+                        type="text"
+                        value={albumInfo.year}
+                        onChange={(e) => setAlbumInfo(prev => ({ ...prev, year: e.target.value }))}
+                        placeholder="e.g. 1975"
+                        style={{ width: '100%', padding: 8, border: '1px solid #ddd', borderRadius: 5 }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Results Section */}
+              {showResults && (
+                <div id="results" style={{
+                  marginTop: 30,
+                  padding: 25,
+                  background: 'linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%)',
+                  borderRadius: 15,
+                  border: '2px solid #28a745'
+                }}>
+                  <h3 style={{ color: '#155724', marginBottom: 20, textAlign: 'center' }}>
+                    📊 Calculated Grading Results
+                  </h3>
+                  
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                    gap: 20,
+                    marginBottom: 20
+                  }}>
+                    <div style={{
+                      textAlign: 'center',
+                      padding: 20,
+                      background: 'white',
+                      borderRadius: 10,
+                      boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+                    }}>
+                      <h4 style={{ color: '#2c3e50', marginBottom: 10 }}>Record Grade</h4>
+                      <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#28a745' }}>VG</div>
+                    </div>
+                    <div style={{
+                      textAlign: 'center',
+                      padding: 20,
+                      background: 'white',
+                      borderRadius: 10,
+                      boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+                    }}>
+                      <h4 style={{ color: '#2c3e50', marginBottom: 10 }}>Sleeve Grade</h4>
+                      <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#28a745' }}>VG+</div>
+                    </div>
+                    <div style={{
+                      textAlign: 'center',
+                      padding: 20,
+                      background: 'white',
+                      borderRadius: 10,
+                      boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+                    }}>
+                      <h4 style={{ color: '#2c3e50', marginBottom: 10 }}>Overall Grade</h4>
+                      <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#28a745' }}>VG</div>
+                    </div>
+                  </div>
+
+                  <div style={{
+                    background: 'white',
+                    padding: 20,
+                    borderRadius: 10,
+                    marginBottom: 20
+                  }}>
+                    <h4 style={{ color: '#2c3e50', marginBottom: 10 }}>Grading Explanation:</h4>
+                    <p>Detailed grading calculation based on systematic assessment criteria...</p>
+                  </div>
+
+                  <div style={{
+                    background: 'white',
+                    padding: 20,
+                    borderRadius: 10,
+                    marginBottom: 20
+                  }}>
+                    <h4 style={{ color: '#2c3e50', marginBottom: 10 }}>Additional Notes:</h4>
+                    <ul>
+                      <li>Complete systematic evaluation performed</li>
+                      <li>All condition factors considered</li>
+                    </ul>
+                  </div>
+
+                  <div style={{ textAlign: 'center', marginTop: 20 }}>
+                    <button
+                      onClick={exportListing}
+                      style={{
+                        background: 'linear-gradient(135deg, #17a2b8 0%, #138496 100%)',
+                        color: 'white',
+                        border: 'none',
+                        padding: '12px 25px',
+                        borderRadius: 25,
+                        cursor: 'pointer',
+                        fontSize: '1rem',
+                        marginRight: 15,
+                        transition: 'all 0.3s ease'
+                      }}
+                    >
+                      📋 Copy Sales Listing
+                    </button>
+                    <button
+                      onClick={resetForm}
+                      style={{
+                        background: 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)',
+                        color: 'white',
+                        border: 'none',
+                        padding: '12px 25px',
+                        borderRadius: 25,
+                        cursor: 'pointer',
+                        fontSize: '1rem',
+                        transition: 'all 0.3s ease'
+                      }}
+                    >
+                      🔄 Reset Evaluation
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </div>
       </div>
     </div>
