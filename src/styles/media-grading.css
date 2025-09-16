@@ -1,11 +1,33 @@
-/* Minimal scoped fixes: do not alter site theme */
+/* Minimal, scoped readability fixes — keep site theme intact */
 .admin-media-grading h1 { text-align: center; }
-.admin-media-grading .notes-textarea { width: 100%; min-height: 120px; }
-.admin-media-grading .skipPanel { align-items: center; }
-.admin-media-grading label, 
-.admin-media-grading p, 
-.admin-media-grading li, 
-.admin-media-grading h1, 
-.admin-media-grading h2, 
-.admin-media-grading h3, 
-.admin-media-grading h4 { color: inherit; } /* keep theme colors */
+
+/* Ensure text is visible in labels and headings */
+.admin-media-grading :is(label, p, li, h1, h2, h3, h4, h5, .sectionTitle) {
+  color: #2c3e50;
+}
+
+/* Inputs/Textareas should show dark text on white */
+.admin-media-grading input[type="text"],
+.admin-media-grading input[type="number"],
+.admin-media-grading textarea {
+  color: #111827;
+  background: #ffffff;
+}
+
+/* Placeholder visibility */
+.admin-media-grading ::placeholder {
+  color: #6b7280;
+  opacity: 1;
+}
+
+/* Notes area width/height */
+.admin-media-grading .notes-textarea {
+  width: 100%;
+  min-height: 120px;
+}
+
+/* Skip panel alignment only (no color changes) */
+.admin-media-grading .skipPanel {
+  align-items: center;
+  row-gap: 8px;
+}
