@@ -1,149 +1,130 @@
 
-/* ==========================================================================
-   Media Grading — UX hot‑fixes (scoped)
-   Scope: any page whose pathname contains /admin/media-grading
-   ========================================================================== */
-
-:root {
-  --mg-text: #1f2937;        /* slate-800 */
-  --mg-muted: #6b7280;       /* gray-500 */
-  --mg-border: #e5e7eb;      /* gray-200 */
-  --mg-bg: #ffffff;          /* white cards */
-  --mg-note: #111827;        /* slate-900 for inputs */
-  --mg-placeholder: #9ca3af; /* gray-400 */
-  --mg-section-bg: #f9fafb;  /* gray-50 */
+/* Scope all rules to this page only by default.
+   If your page root doesn't have #media-grading, these rules
+   still apply under a relaxed scope via .media-grading-page as a fallback. */
+#media-grading, .media-grading-page {
+  --mg-bg: #f6f7fb;
+  --mg-card-bg: #ffffff;
+  --mg-text: #222;
+  --mg-muted: #6b7280;
+  --mg-border: #e5e7eb;
+  --mg-accent: #2563eb;
+  --mg-shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.06);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --mg-text: #e5e7eb;
-    --mg-muted: #9ca3af;
-    --mg-border: #374151;
-    --mg-bg: #111827;
-    --mg-note: #f9fafb;
-    --mg-placeholder: #6b7280;
-    --mg-section-bg: #0b1220;
-  }
+/* Page background should never be black on this screen */
+#media-grading, .media-grading-page {
+  background: var(--mg-bg) !important;
+  color: var(--mg-text) !important;
 }
 
-/* ---- SCOPING ---- */
-body[data-route*="/admin/media-grading"] .mg-scope,
-[data-route*="/admin/media-grading"] .mg-scope {
-  color: var(--mg-text);
+/* Cards / panels */
+#media-grading .card, .media-grading-page .card,
+#media-grading .panel, .media-grading-page .panel,
+#media-grading .box, .media-grading-page .box {
+  background: var(--mg-card-bg) !important;
+  border: 1px solid var(--mg-border) !important;
+  border-radius: 10px !important;
+  box-shadow: var(--mg-shadow);
 }
 
-/* Ensure no container uses opacity that greys out ALL children */
-[data-route*="/admin/media-grading"] .mg-avoid-opacity,
-body[data-route*="/admin/media-grading"] header[style*="opacity"],
-body[data-route*="/admin/media-grading"] .header[style*="opacity"] {
-  opacity: 1 !important;
+/* Ensure titles are visible */
+#media-grading h1, #media-grading h2, #media-grading h3, #media-grading h4,
+.media-grading-page h1, .media-grading-page h2, .media-grading-page h3, .media-grading-page h4 {
+  color: var(--mg-text) !important;
 }
 
-/* If you need a translucent banner, use background with alpha, not element opacity */
-[data-route*="/admin/media-grading"] .mg-translucent {
-  background: rgba(30, 41, 59, .08) !important;
-}
-
-/* ---- CARDS / PANELS ---- */
-[data-route*="/admin/media-grading"] .card,
-[data-route*="/admin/media-grading"] .panel,
-[data-route*="/admin/media-grading"] .box {
-  background: var(--mg-bg);
-  border: 1px solid var(--mg-border);
-  border-radius: 12px;
-}
-
-/* ---- LISTS / BULLETS ---- */
-[data-route*="/admin/media-grading"] .card ul,
-[data-route*="/admin/media-grading"] .panel ul,
-[data-route*="/admin/media-grading"] .box ul {
-  list-style: none;
-  padding-left: 0;
-  margin-left: 0;
-}
-
-/* Some screenshots show lone "•" bullets—force them off in the left/right columns */
-[data-route*="/admin/media-grading"] .assessment-left ul li::marker,
-[data-route*="/admin/media-grading"] .assessment-right ul li::marker {
-  content: "" !important;
-}
-
-/* ---- CHECKBOX / RADIO ROWS ---- */
-[data-route*="/admin/media-grading"] .form-row,
-[data-route*="/admin/media-grading"] .form-check {
+/* Checkbox / radio rows — restore text visibility and alignment */
+#media-grading .form-check, .media-grading-page .form-check,
+#media-grading .check-row, .media-grading-page .check-row,
+#media-grading li, .media-grading-page li {
   display: flex;
   align-items: center;
-  gap: .5rem;
-  margin: .375rem 0;
+  gap: .55rem;
+  color: var(--mg-text) !important;
+  font-size: 0.95rem;
+  line-height: 1.2;
+  padding: .25rem 0;
 }
 
-[data-route*="/admin/media-grading"] .form-check input[type="checkbox"],
-[data-route*="/admin/media-grading"] .form-check input[type="radio"] {
-  transform: translateY(0); /* normalize vertical align */
-}
-
-[data-route*="/admin/media-grading"] .form-check label,
-[data-route*="/admin/media-grading"] label {
-  color: var(--mg-text);
+/* Some prior CSS hid labels — undo it */
+#media-grading label, .media-grading-page label {
+  display: inline-block;
+  color: var(--mg-text) !important;
   font-weight: 500;
-  line-height: 1.3;
+  margin: 0;
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
 }
 
-/* ---- SECTIONS ---- */
-[data-route*="/admin/media-grading"] .section-title {
-  font-weight: 700;
-  color: var(--mg-text);
-  margin-bottom: .5rem;
+/* Inputs size & spacing */
+#media-grading input[type="checkbox"],
+#media-grading input[type="radio"],
+.media-grading-page input[type="checkbox"],
+.media-grading-page input[type="radio"] {
+  width: 18px; height: 18px;
+  min-width: 18px; min-height: 18px;
+  margin: 0 .4rem 0 0;
 }
 
-[data-route*="/admin/media-grading"] .section-subtle {
-  color: var(--mg-muted);
+/* Left/Right columns should stay readable; prevent super tall, cramped lists */
+#media-grading .columns, .media-grading-page .columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
 }
 
-/* ---- TEXT INPUTS / TEXTAREA ---- */
-[data-route*="/admin/media-grading"] input[type="text"],
-[data-route*="/admin/media-grading"] input[type="number"],
-[data-route*="/admin/media-grading"] textarea,
-[data-route*="/admin/media-grading"] select {
-  color: var(--mg-note);
-  background: var(--mg-bg);
-  border: 1px solid var(--mg-border);
-  border-radius: 10px;
+/* Textarea (Custom Condition Notes) — ensure visible and usable */
+#media-grading textarea, .media-grading-page textarea {
+  background: var(--mg-card-bg) !important;
+  color: var(--mg-text) !important;
+  border: 1px solid var(--mg-border) !important;
+  border-radius: 10px !important;
+  min-height: 140px;
+  width: 100%;
+  padding: .75rem .85rem;
 }
 
-[data-route*="/admin/media-grading"] input::placeholder,
-[data-route*="/admin/media-grading"] textarea::placeholder {
-  color: var(--mg-placeholder);
-  opacity: 1;
+/* Buttons */
+#media-grading .btn, .media-grading-page .btn,
+#media-grading button, .media-grading-page button {
+  border-radius: 999px;
+  padding: .5rem 1rem;
 }
 
-/* The "Custom Condition Notes" box was washed out—raise contrast */
-[data-route*="/admin/media-grading"] .notes textarea {
-  min-height: 120px;
-}
-
-/* ---- BUTTONS ---- */
-[data-route*="/admin/media-grading"] .btn {
+/* Pills (Vinyl / Cassette / CD) */
+#media-grading .pill, .media-grading-page .pill {
+  border-radius: 999px;
   font-weight: 600;
-  border-radius: 9999px;
 }
 
-/* ---- RESPONSIVE SPACING ---- */
-@media (min-width: 1024px) {
-  [data-route*="/admin/media-grading"] .two-col {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1.25rem;
-  }
+/* Grade result cards */
+#media-grading .grade-card, .media-grading-page .grade-card {
+  background: var(--mg-card-bg);
+  border: 1px solid var(--mg-border);
+  border-radius: 12px;
+  box-shadow: var(--mg-shadow);
+  text-align: center;
+  padding: 1rem;
 }
 
-/* ---- SAFETY RESETS (last) ---- */
-/* Never let any inherited color turn text invisible on white cards */
-[data-route*="/admin/media-grading"] .card,
-[data-route*="/admin/media-grading"] .panel,
-[data-route*="/admin/media-grading"] .box,
-[data-route*="/admin/media-grading"] .card *,
-[data-route*="/admin/media-grading"] .panel *,
-[data-route*="/admin/media-grading"] .box * {
-  color: inherit;
+/* Guard against any global dark-mode that flips text to white on white */
+#media-grading *, .media-grading-page * {
+  color-scheme: light !important;
+}
+
+/* Make sure long lists scroll inside the card instead of blowing the layout */
+#media-grading .scroll-area, .media-grading-page .scroll-area {
+  max-height: 58vh;
+  overflow: auto;
+  padding-right: .25rem;
+}
+
+/* Safety net: if a card ever goes black again, force it back to white */
+#media-grading .card, .media-grading-page .card,
+#media-grading .panel, .media-grading-page .panel,
+#media-grading .box, .media-grading-page .box,
+#media-grading .card *:not(svg), .media-grading-page .card *:not(svg) {
+  background-color: var(--mg-card-bg);
 }
