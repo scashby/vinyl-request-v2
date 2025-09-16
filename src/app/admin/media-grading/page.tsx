@@ -1,7 +1,7 @@
 // src/app/admin/media-grading/page.tsx
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 
 interface MediaItem {
@@ -360,6 +360,7 @@ export default function MediaGradingPage() {
                                         type="radio"
                                         name={`vinyl-scuffs-level-${item.id}`}
                                         value={['light', 'moderate', 'heavy'][idx]}
+                                        checked={item.severities[`vinyl-scuffs-level-${item.id}`] === ['light', 'moderate', 'heavy'][idx]}
                                         onChange={(e) => updateMediaSeverity(item.id, `vinyl-scuffs-level-${item.id}`, e.target.value)}
                                         style={{ marginRight: 8 }}
                                       />
@@ -396,6 +397,7 @@ export default function MediaGradingPage() {
                                         type="radio"
                                         name={`vinyl-scratches-level-${item.id}`}
                                         value={['hairline', 'feelable', 'deep'][idx]}
+                                        checked={item.severities[`vinyl-scratches-level-${item.id}`] === ['hairline', 'feelable', 'deep'][idx]}
                                         onChange={(e) => updateMediaSeverity(item.id, `vinyl-scratches-level-${item.id}`, e.target.value)}
                                         style={{ marginRight: 8 }}
                                       />
@@ -432,12 +434,73 @@ export default function MediaGradingPage() {
                                         type="radio"
                                         name={`vinyl-groove-level-${item.id}`}
                                         value={['slight', 'evident', 'heavy'][idx]}
+                                        checked={item.severities[`vinyl-groove-level-${item.id}`] === ['slight', 'evident', 'heavy'][idx]}
                                         onChange={(e) => updateMediaSeverity(item.id, `vinyl-groove-level-${item.id}`, e.target.value)}
                                         style={{ marginRight: 8 }}
                                       />
                                       <span style={{ fontSize: '0.85rem', color: '#666' }}>{option}</span>
                                     </label>
                                   ))}
+                                </div>
+                              )}
+
+                              <label style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                padding: '10px 15px',
+                                background: 'white',
+                                borderRadius: 8,
+                                cursor: 'pointer',
+                                transition: 'all 0.3s ease',
+                                border: '1px solid #e9ecef'
+                              }}>
+                                <input
+                                  type="checkbox"
+                                  checked={item.conditions[`vinyl-warping-${item.id}`] || false}
+                                  onChange={(e) => updateMediaCondition(item.id, `vinyl-warping-${item.id}`, e.target.checked)}
+                                  style={{ marginRight: 12, transform: 'scale(1.1)' }}
+                                />
+                                Warping present
+                              </label>
+
+                              {activeSeverities[`vinyl-warping-${item.id}-severity`] && (
+                                <div style={{ marginLeft: 30, marginTop: 8, background: '#fff8dc', padding: 10, borderRadius: 5 }}>
+                                  <div style={{ marginBottom: 10 }}>
+                                    <label style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>Warp severity:</label>
+                                    <div style={{ marginTop: 5 }}>
+                                      {['Slight warp, does not affect play', 'Moderate warp, may cause tracking issues', 'Severe warp, significantly affects play'].map((option, idx) => (
+                                        <label key={idx} style={{ display: 'flex', alignItems: 'center', marginBottom: 5 }}>
+                                          <input
+                                            type="radio"
+                                            name={`vinyl-warp-level-${item.id}`}
+                                            value={['slight', 'moderate', 'severe'][idx]}
+                                            checked={item.severities[`vinyl-warp-level-${item.id}`] === ['slight', 'moderate', 'severe'][idx]}
+                                            onChange={(e) => updateMediaSeverity(item.id, `vinyl-warp-level-${item.id}`, e.target.value)}
+                                            style={{ marginRight: 8 }}
+                                          />
+                                          <span style={{ fontSize: '0.85rem', color: '#666' }}>{option}</span>
+                                        </label>
+                                      ))}
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <label style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>Warp type:</label>
+                                    <div style={{ marginTop: 5 }}>
+                                      {['Dish warp (concave/convex)', 'Edge warp (rim warping)', 'Saddle warp (two-way bend)'].map((option, idx) => (
+                                        <label key={idx} style={{ display: 'flex', alignItems: 'center', marginBottom: 5 }}>
+                                          <input
+                                            type="radio"
+                                            name={`vinyl-warp-type-${item.id}`}
+                                            value={['dish', 'edge', 'saddle'][idx]}
+                                            checked={item.severities[`vinyl-warp-type-${item.id}`] === ['dish', 'edge', 'saddle'][idx]}
+                                            onChange={(e) => updateMediaSeverity(item.id, `vinyl-warp-type-${item.id}`, e.target.value)}
+                                            style={{ marginRight: 8 }}
+                                          />
+                                          <span style={{ fontSize: '0.85rem', color: '#666' }}>{option}</span>
+                                        </label>
+                                      ))}
+                                    </div>
+                                  </div>
                                 </div>
                               )}
                             </div>
@@ -496,6 +559,7 @@ export default function MediaGradingPage() {
                                         type="radio"
                                         name={`vinyl-noise-level-${item.id}`}
                                         value={['minimal', 'noticeable', 'significant'][idx]}
+                                        checked={item.severities[`vinyl-noise-level-${item.id}`] === ['minimal', 'noticeable', 'significant'][idx]}
                                         onChange={(e) => updateMediaSeverity(item.id, `vinyl-noise-level-${item.id}`, e.target.value)}
                                         style={{ marginRight: 8 }}
                                       />
@@ -575,6 +639,8 @@ export default function MediaGradingPage() {
                                             type="radio"
                                             name={`vinyl-skip-severity-${item.id}`}
                                             value={['occasional', 'frequent', 'constant'][idx]}
+                                            checked={item.severities[`vinyl-skip-severity-${item.id}`] === ['occasional', 'frequent', 'constant'][idx]}
+                                            onChange={(e) => updateMediaSeverity(item.id, `vinyl-skip-severity-${item.id}`, e.target.value)}
                                             style={{ marginRight: 8 }}
                                           />
                                           <span style={{ fontSize: '0.85rem', color: '#666' }}>{option}</span>
@@ -723,6 +789,7 @@ export default function MediaGradingPage() {
                                     type="radio"
                                     name="sleeve-corner-level"
                                     value={['slight', 'creased', 'cut'][idx]}
+                                    checked={sleeveSeverities['sleeve-corner-level'] === ['slight', 'creased', 'cut'][idx]}
                                     onChange={(e) => updateSleeveSeverity('sleeve-corner-level', e.target.value)}
                                     style={{ marginRight: 8 }}
                                   />
@@ -759,6 +826,7 @@ export default function MediaGradingPage() {
                                     type="radio"
                                     name="sleeve-ring-level"
                                     value={['light', 'evident', 'heavy'][idx]}
+                                    checked={sleeveSeverities['sleeve-ring-level'] === ['light', 'evident', 'heavy'][idx]}
                                     onChange={(e) => updateSleeveSeverity('sleeve-ring-level', e.target.value)}
                                     style={{ marginRight: 8 }}
                                   />
@@ -823,6 +891,7 @@ export default function MediaGradingPage() {
                                     type="radio"
                                     name="sleeve-seam-level"
                                     value={['small', 'medium', 'large'][idx]}
+                                    checked={sleeveSeverities['sleeve-seam-level'] === ['small', 'medium', 'large'][idx]}
                                     onChange={(e) => updateSleeveSeverity('sleeve-seam-level', e.target.value)}
                                     style={{ marginRight: 8 }}
                                   />
@@ -913,6 +982,7 @@ export default function MediaGradingPage() {
                                     type="radio"
                                     name="sleeve-tear-level"
                                     value={['small', 'significant', 'major'][idx]}
+                                    checked={sleeveSeverities['sleeve-tear-level'] === ['small', 'significant', 'major'][idx]}
                                     onChange={(e) => updateSleeveSeverity('sleeve-tear-level', e.target.value)}
                                     style={{ marginRight: 8 }}
                                   />
