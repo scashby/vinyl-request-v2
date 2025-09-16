@@ -1,6 +1,8 @@
 // src/app/admin/media-grading/page.tsx
 "use client";
 
+import "src/styles/media-grading.css";
+
 import { useState } from 'react';
 import Link from 'next/link';
 
@@ -94,7 +96,7 @@ export default function MediaGradingPage() {
   };
   const updateSkipSides = (itemId: number, side: string, checked: boolean) => {
     setMediaItems(prev => prev.map(it => {
-      if (it.id !== itemId) return it;
+      if (it.id != itemId) return it;
       const curr = it.skipSides || [];
       const next = checked ? Array.from(new Set([...curr, side])) : curr.filter(s => s !== side);
       return { ...it, skipSides: next };
@@ -119,38 +121,9 @@ export default function MediaGradingPage() {
     setMediaItems(prev => prev.filter(item => item.id !== itemId));
   };
 
-  const calculateGrades = () => {
-    const { mediaScore, sleeveScore } = computeScores();
-
-    const mediaGrade = mediaMissing ? '—' : scoreToGrade(mediaScore, sealed);
-    const sleeveGradeVal = packageMissing ? '—' : scoreToGrade(sleeveScore, sealed);
-
-    let combined: string;
-    if (sealed) {
-      if (mediaScore === 0 && sleeveScore === 0) combined = 'M (Sealed)';
-      else combined = 'NM (Sealed)';
-    } else if (mediaMissing) {
-      combined = sleeveGradeVal;
-    } else if (packageMissing) {
-      combined = mediaGrade;
-    } else {
-      const overallScore = Math.round(mediaScore*0.7 + sleeveScore*0.3);
-      combined = scoreToGrade(overallScore, false);
-    }
-
-    setRecordGrade(mediaGrade);
-    setSleeveGrade(sleeveGradeVal);
-    setOverallGrade(combined);
-
-    setShowResults(true);
-    setTimeout(() => {
-      document.getElementById('results')?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
-  };
-
   
-  // --- Grading (Goldmine-inspired, Mint only if Sealed) ---
-  const sealed = !!sleeveConditions['sleeve-sealed'];
+  // --- Goldmine-inspired scoring; Mint only if Sealed ---
+  const sealed = sleeveConditions['sleeve-sealed'] || false;
 
   const scoreToGrade = (score: number, canMint: boolean) => {
     if (canMint && score === 0) return 'M';
@@ -164,21 +137,19 @@ export default function MediaGradingPage() {
 
   const computeScores = () => {
     let mediaScore = 0;
-
     for (const it of mediaItems) {
       const id = it.id;
       const has = (k: string) => !!it.conditions[`${k}-${id}`];
       const sev = (k: string) => (it.severities[`${k}-${id}`] || '');
 
-      // Media deductions (ignore most when sealed, except warp)
       if (!sealed) {
-        if (has('vinyl-scuffs'))       mediaScore += ({light:5,moderate:9,heavy:14}[sev('vinyl-scuffs-level')] ?? 6);
-        if (has('vinyl-scratches'))    mediaScore += ({hairline:8,feelable:16,deep:26}[sev('vinyl-scratches-level')] ?? 12);
-        if (has('vinyl-groove-wear'))  mediaScore += ({slight:8,evident:14,heavy:22}[sev('vinyl-groove-level')] ?? 10);
-        if (has('vinyl-surface-noise'))mediaScore += ({minimal:6,noticeable:12,significant:18}[sev('vinyl-noise-level')] ?? 8);
-        if (has('vinyl-pops-clicks'))  mediaScore += 6;
+        if (has('vinyl-scuffs'))        mediaScore += ({light:5,moderate:9,heavy:14}[sev('vinyl-scuffs-level')] ?? 6);
+        if (has('vinyl-scratches'))     mediaScore += ({hairline:8,feelable:16,deep:26}[sev('vinyl-scratches-level')] ?? 12);
+        if (has('vinyl-groove-wear'))   mediaScore += ({slight:8,evident:14,heavy:22}[sev('vinyl-groove-level')] ?? 10);
+        if (has('vinyl-surface-noise')) mediaScore += ({minimal:6,noticeable:12,significant:18}[sev('vinyl-noise-level')] ?? 8);
+        if (has('vinyl-pops-clicks'))   mediaScore += 6;
         if (has('vinyl-skips')) {
-          const base = ({occasional:20,frequent:34,constant:48}[sev('vinyl-skip-severity')] ?? 24);
+          const base = ({occasional:20,frequent:34,constant:48}[sev('vinyl-skips-severity')] ?? 24);
           const sides = (it.skipSides||[]).length;
           const tracks = it.tracksAffected || 0;
           mediaScore += base + Math.max(0, sides-1)*3 + Math.min(tracks, 12);
@@ -187,7 +158,6 @@ export default function MediaGradingPage() {
       if (has('vinyl-warping')) mediaScore += ({slight:12,moderate:22,severe:36}[sev('vinyl-warp-level')] ?? 20);
     }
 
-    // Sleeve
     let sleeveScore = 0;
     const sHas = (k: string) => !!sleeveConditions[k];
     const sSev = (k: string) => (sleeveSeverities[`${k}`] || '');
@@ -204,9 +174,35 @@ export default function MediaGradingPage() {
       if (sHas('sleeve-writing'))     sleeveScore += ({small:6,noticeable:10,heavy:16}[sSev('sleeve-writing-severity')] ?? 8);
       if (sHas('sleeve-stickers-tape')) sleeveScore += ({residue:4,partial:8,heavy:12}[sSev('sleeve-stickers-tape-severity')] ?? 6);
     }
-
     return { mediaScore, sleeveScore };
   };
+
+  const calculateGrades = () => {
+    const { mediaScore, sleeveScore } = computeScores();
+    const mediaGrade = mediaMissing ? '—' : scoreToGrade(mediaScore, sealed);
+    const sleeveGradeVal = packageMissing ? '—' : scoreToGrade(sleeveScore, sealed);
+
+    let combined: string;
+    if (sealed) {
+      combined = (mediaScore === 0 && sleeveScore === 0) ? 'M (Sealed)' : 'NM (Sealed)';
+    } else if (mediaMissing) {
+      combined = sleeveGradeVal;
+    } else if (packageMissing) {
+      combined = mediaGrade;
+    } else {
+      const overallScore = Math.round(mediaScore*0.7 + sleeveScore*0.3);
+      combined = scoreToGrade(overallScore, false);
+    }
+
+    setRecordGrade(mediaGrade);
+    setSleeveGrade(sleeveGradeVal);
+    setOverallGrade(combined);
+    setShowResults(true);
+    setTimeout(() => {
+      document.getElementById('results')?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+  };
+
 
   const exportListing = () => {
     alert('Export feature - will copy formatted listing to clipboard');
@@ -719,10 +715,7 @@ export default function MediaGradingPage() {
                                   </div>
                                   <div style={{ marginBottom: 10 }}>
                                     <label style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>Tracks affected:</label>
-                                    <input type="number" min="1"
-                                      max="20"
-                                      placeholder="Number of tracks"
-                                      style={{ width: 100, padding: 4, marginLeft: 10, border: '1px solid #ccc', borderRadius: 3 }} value={item.tracksAffected || 0} onChange={(e)=>updateTracksAffected(item.id, Number(e.target.value || 0))} />
+                                    <input type="number" value={item.tracksAffected || 0} onChange={(e)=>updateTracksAffected(item.id, Number(e.target.value || 0))} style={{ width: 80, padding: 6, border: "1px solid #cbd5e1", borderRadius: 6 }} />
                                   </div>
                                   <div>
                                     <label style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>Severity:</label>
@@ -856,27 +849,7 @@ export default function MediaGradingPage() {
                             </label>
                           ))}
 
-                          
                           <label style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            padding: '10px 15px',
-                            background: 'white',
-                            borderRadius: 8,
-                            cursor: 'pointer',
-                            transition: 'all 0.3s ease',
-                            border: '1px solid #e9ecef',
-                            marginBottom: 10
-                          }}>
-                            <input
-                              type="checkbox"
-                              checked={sleeveConditions['sleeve-sealed'] || false}
-                              onChange={(e) => updateSleeveCondition('sleeve-sealed', e.target.checked)}
-                              style={{ marginRight: 12, transform: 'scale(1.1)' }}
-                            />
-                            Sealed (factory shrink intact)
-                          </label>
-<label style={{
                             display: 'flex',
                             alignItems: 'center',
                             padding: '10px 15px',
@@ -1122,7 +1095,7 @@ export default function MediaGradingPage() {
                 <h3 style={{ color: '#495057', marginBottom: 15 }}>
                   📝 Custom Condition Notes
                 </h3>
-                <textarea
+                <textarea className="notes-textarea"
                   value={customNotes}
                   onChange={(e) => setCustomNotes(e.target.value)}
                   placeholder="Add any additional condition details not covered by the checkboxes above..."
