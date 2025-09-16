@@ -1,48 +1,45 @@
-/* src/styles/media-grading.css */
-/* Lightweight, scoped styles - no global overrides */
-.grading-shell {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  min-height: 100vh;
-  padding: 20px;
+/* Visibility & legibility fixes for Media Grading page (no redesign) */
+:root{
+  --mg-text:#222;
+  --mg-sub:#444;
+  --mg-muted:#666;
+  --mg-bg:#fff;
+  --mg-soft:#fafbfc;
+  --mg-border:#e1e4ea;
 }
-.frame {
-  max-width: 1400px;
-  margin: 0 auto;
-  background: white;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 12px 24px rgba(0,0,0,.2);
+
+.media-grading-root, .grading-shell, .admin-media-grading, .notesCard, .results {
+  color: var(--mg-text);
 }
-.header {
-  display:flex; align-items:flex-end; justify-content:space-between;
-  background: rgba(0,0,0,.35); color:#fff; padding: 26px 30px 20px;
+
+/* Headings */
+h1,h2,h3,h4,.card-title,.section-title{ color: var(--mg-text) !important; text-shadow:none !important; }
+
+/* Labels */
+label, .chk span, .radio span, .helper, .lbl { color: var(--mg-text) !important; }
+
+/* Inputs */
+input[type="text"], input[type="number"], input[type="search"], textarea, select {
+  background: var(--mg-bg) !important;
+  color: var(--mg-text) !important;
+  border: 1px solid var(--mg-border) !important;
+  box-shadow: none !important;
 }
-.header .btn-back {
-  background: rgba(255,255,255,.2); color:#fff; padding:8px 12px; border-radius:8px; text-decoration:none; font-weight:600;
+input::placeholder, textarea::placeholder { color: var(--mg-muted) !important; }
+
+/* Cards/sections */
+.card, .criteria-section, .skipPanel {
+  background: var(--mg-soft);
+  border: 1px solid var(--mg-border);
+  border-radius: 10px;
 }
-.header .titleWrap h1 { margin:0 0 6px 0; text-shadow: 2px 2px 4px rgba(0,0,0,.3); }
-.header .titleWrap p { margin:0; opacity:.9; }
-.selector { display:flex; gap:14px; justify-content:center; padding: 18px; }
-.missing { background: #fff3cd; border:1px solid #ffeeba; border-radius:14px; margin:0 24px 20px; padding:16px; display:grid; grid-template-columns:1fr 1fr; gap:18px; }
-.missing .left, .missing .right { background:#fff; padding:12px; border-radius:8px; }
-.card-title { font-weight:800; margin-bottom: 8px; }
-.admin-media-grading { padding: 24px; }
-.chk { display:flex; align-items:center; gap:10px; }
-.chk-inline { display:inline-flex; align-items:center; gap:6px; margin-right:12px; }
-.radio { display:flex; align-items:center; gap:8px; margin:4px 0; }
-.lbl { font-size: .9rem; color:#374151; margin-bottom:4px; }
-.skipPanel { display:grid; grid-template-columns:1fr 1fr; gap:10px; background: #fff7e6; padding: 12px; border-radius: 8px; margin-top: 8px; }
-.skipPanel input[type="number"] { width: 88px; height:36px; padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px; }
-.btn-success { background:#28a745; color:#fff; border:none; padding:10px 14px; border-radius:8px; cursor:pointer; }
-.btn-danger-ghost { background:transparent; border:1px solid #dc3545; color:#dc3545; padding:6px 10px; border-radius:8px; cursor:pointer; }
-.btn-primary { background: linear-gradient(135deg,#2ecc71,#27ae60); color:#fff; border:none; padding:12px 20px; border-radius:999px; font-weight:700; cursor:pointer; box-shadow:0 10px 20px rgba(39,174,96,.35); }
-.notesCard { background:#f8f9fa; border-radius:15px; padding: 18px 24px; margin: 8px 24px 10px; }
-.notesCard textarea { width:100%; min-height:140px; padding:12px; border-radius:8px; border:1px solid #ced4da; background:white; color:#111827; }
-.notesCard ::placeholder { color:#6b7280; opacity:1; }
-.results { padding: 0 24px 28px; }
-.grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; margin-top:10px; }
-.tile { background:#fff; border-radius:12px; padding:18px; text-align:center; box-shadow:0 2px 6px rgba(0,0,0,.05); }
-.tile .lbl { font-size:.9rem; color:#555; margin-bottom:6px; }
-.tile .val { font-size:2rem; font-weight:800; color:#1b5e20; }
-.explain { background:#fff; border-radius:12px; padding: 16px; margin-top: 14px; }
-.explain .hdr { font-weight:700; margin-bottom:6px; }
+
+/* Check/radio alignment */
+.chk, .radio, .form-check { display:flex; align-items:center; gap:.5rem; margin:.4rem 0; }
+.chk-inline { display:inline-flex; align-items:center; gap:.4rem; }
+
+/* Grid spacing */
+.admin-media-grading { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+
+/* Buttons readable */
+button, .btn { color:#fff !important; }
