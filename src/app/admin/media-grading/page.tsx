@@ -73,7 +73,7 @@ export default function MediaGradingPage() {
     ));
     
     // Toggle severity options
-    const severityKey = `${conditionKey}-severity-${itemId}`;
+    const severityKey = `${conditionKey}-severity`;
     toggleSeverity(severityKey, checked);
   };
 
@@ -84,6 +84,20 @@ export default function MediaGradingPage() {
         : item
     ));
   };
+
+  const updateSkipSides = (itemId: number, side: string, checked: boolean) => {
+    setMediaItems(prev => prev.map(item => {
+      if (item.id !== itemId) return item;
+      const cur = item.skipSides || [];
+      const next = checked ? Array.from(new Set([...cur, side])) : cur.filter(s => s !== side);
+      return { ...item, skipSides: next };
+    }));
+  };
+
+  const updateTracksAffected = (itemId: number, count: number) => {
+    setMediaItems(prev => prev.map(item => item.id === itemId ? { ...item, tracksAffected: count } : item));
+  };
+
 
   const updateSleeveCondition = (conditionKey: string, checked: boolean) => {
     setSleeveConditions(prev => ({ ...prev, [conditionKey]: checked }));
@@ -614,7 +628,7 @@ export default function MediaGradingPage() {
                                     <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 5 }}>
                                       {['A', 'B', 'C', 'D'].map(side => (
                                         <label key={side} style={{ display: 'flex', alignItems: 'center' }}>
-                                          <input type="checkbox" value={side} style={{ marginRight: 4 }} />
+                                          <input type="checkbox" value={side} checked={(mediaItems.find(mi => mi.id === item.id)?.skipSides || []).includes(side)} onChange={(e)=>updateSkipSides(item.id, side, e.target.checked)} style={{ marginRight: 4 }} />
                                           Side {side}
                                         </label>
                                       ))}
@@ -627,6 +641,8 @@ export default function MediaGradingPage() {
                                       min="1"
                                       max="20"
                                       placeholder="Number of tracks"
+                                      value={mediaItems.find(mi => mi.id === item.id)?.tracksAffected || 0}
+                                      onChange={(e)=>updateTracksAffected(item.id, Math.max(0, Number(e.target.value)))}
                                       style={{ width: 100, padding: 4, marginLeft: 10, border: '1px solid #ccc', borderRadius: 3 }}
                                     />
                                   </div>
