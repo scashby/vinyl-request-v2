@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import "@/styles/media-grading.css";
+import "styles/media-grading.css";
 
 /**
  * This file restores:
