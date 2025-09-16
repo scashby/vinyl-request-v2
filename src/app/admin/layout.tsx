@@ -1,17 +1,40 @@
-// src/app/layout.tsx
-// Minimal RootLayout with NO global import of "styles/media-grading.css"
-// and no extra body class injection. Keep your site-wide global.css if you have one.
-import type { Metadata } from "next";
+// /src/app/admin/layout.tsx
+"use client";
 
-export const metadata: Metadata = {
-  title: "Dead Wax Dialogues",
-  description: "Admin",
-};
+import { ReactNode, useEffect } from "react";
+import { AuthProvider, useSession } from "components/AuthProvider";
+import { useRouter } from "next/navigation";
+import AdminSidebar from "components/AdminSidebar";
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+function RequireAuth({ children }: { children: ReactNode }) {
+  const { session } = useSession();
+  const router = useRouter();
+
+  useEffect(() => {
+    const isLoginPage = window.location.pathname === "/admin/login";
+    if (!isLoginPage && session === null) {
+      router.push("/admin/login");
+    }
+  }, [session, router]);
+
+  const isLoginPage = typeof window !== "undefined" && window.location.pathname === "/admin/login";
+  if (!isLoginPage && session === null) return null;
+
+  return <>{children}</>;
+}
+
+
+export default function AdminLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
-      <body>{children}</body>
-    </html>
+    <AuthProvider>
+      <RequireAuth>
+        <div className="flex">
+          <AdminSidebar />
+          <div className="ml-48 w-full p-4">
+            {children}
+          </div>
+        </div>
+      </RequireAuth>
+    </AuthProvider>
   );
 }
