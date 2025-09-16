@@ -1,175 +1,56 @@
-
-/* ---------------------------------------------
-   Media Grading – hard UX fix (scoped)
-   Scope to #media-grading or .media-grading-page only
-----------------------------------------------*/
-#media-grading, .media-grading-page {
-  --mg-bg: #f6f8fb;
-  --mg-card-bg: #ffffff;
-  --mg-text: #1f2937;
+#media-grading {
+  --mg-bg: #f7f7f9;
+  --mg-panel: #ffffff;
+  --mg-text: #1a1a1a;
   --mg-muted: #6b7280;
   --mg-border: #e5e7eb;
-  --mg-shadow: 0 1px 2px rgba(0,0,0,.06), 0 6px 16px rgba(0,0,0,.06);
-  position: relative;
-  min-height: 100vh;
-  background: var(--mg-bg) !important;
-  color: var(--mg-text) !important;
-}
-
-/* defeat any global dark scheme that flips colors */
-@media (prefers-color-scheme: dark) {
-  #media-grading, .media-grading-page {
-    color-scheme: light;
-    background: var(--mg-bg) !important;
-  }
-}
-
-/* Region backgrounds (cards/panels/boxes) */
-#media-grading .card,
-.media-grading-page .card,
-#media-grading .panel,
-.media-grading-page .panel,
-#media-grading .box,
-.media-grading-page .box,
-#media-grading .grading-section,
-.media-grading-page .grading-section {
-  background: var(--mg-card-bg) !important;
-  color: var(--mg-text) !important;
-  border: 1px solid var(--mg-border) !important;
-  border-radius: 10px;
-  box-shadow: var(--mg-shadow);
-}
-
-/* Headings inside grading page */
-#media-grading h1, #media-grading h2, #media-grading h3,
-.media-grading-page h1, .media-grading-page h2, .media-grading-page h3 {
-  color: var(--mg-text) !important;
-  margin: 0 0 .5rem;
-  font-weight: 700;
-}
-
-/* Reset lists – some themes render bullets or numeric markers that overlap inputs */
-#media-grading ul, #media-grading ol,
-.media-grading-page ul, .media-grading-page ol {
-  list-style: none;
-  padding-left: 0;
-  margin: 0;
-}
-
-/* Each checkbox/radio row */
-#media-grading .form-check,
-.media-grading-page .form-check,
-#media-grading .checkbox,
-.media-grading-page .checkbox,
-#media-grading li,
-.media-grading-page li {
-  display: flex;
-  align-items: center;
-  gap: .6rem;
-  padding: .35rem 0;
-  line-height: 1.35;
-}
-
-/* Inputs */
-#media-grading .form-check-input,
-.media-grading-page .form-check-input,
-#media-grading input[type="checkbox"],
-.media-grading-page input[type="checkbox"],
-#media-grading input[type="radio"],
-.media-grading-page input[type="radio"] {
-  width: 16px;
-  height: 16px;
-  flex: 0 0 auto;
-  margin: 0;
-  accent-color: #2563eb; /* safe modern browsers */
-}
-
-/* Labels – bring text back from any global overrides */
-#media-grading label,
-.media-grading-page label,
-#media-grading .form-check-label,
-.media-grading-page .form-check-label,
-#media-grading .checkbox label,
-.media-grading-page .checkbox label {
-  color: var(--mg-text) !important;
-  font-size: 14px;
-  font-weight: 500;
-  letter-spacing: 0;
-  text-transform: none;
-  opacity: 1 !important;
-  visibility: visible !important;
-  text-indent: 0 !important;
-  white-space: normal;
-  flex: 1 1 auto;
-}
-
-/* Group containers for the two main columns */
-#media-grading .grading-columns,
-.media-grading-page .grading-columns {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
-}
-
-/* Inner scroll for long lists so page remains usable */
-#media-grading .scroll-panel,
-.media-grading-page .scroll-panel {
-  max-height: 520px;
-  overflow: auto;
-  padding-right: 6px;
-}
-
-/* Textareas / inputs */
-#media-grading textarea,
-.media-grading-page textarea,
-#media-grading input[type="text"],
-.media-grading-page input[type="text"],
-#media-grading input[type="number"],
-.media-grading-page input[type="number"],
-#media-grading select,
-.media-grading-page select {
-  border: 1px solid var(--mg-border) !important;
-  background: #fff !important;
-  color: var(--mg-text) !important;
-  box-shadow: none !important;
-}
-
-#media-grading textarea,
-.media-grading-page textarea {
-  min-height: 120px;
-  resize: vertical;
-}
-
-/* Results cards */
-#media-grading .grade-card,
-.media-grading-page .grade-card {
-  background: var(--mg-card-bg) !important;
-  border: 1px solid var(--mg-border) !important;
-  border-radius: 12px;
-  padding: 16px;
-  text-align: center;
-  box-shadow: var(--mg-shadow);
-}
-
-/* Buttons in this page */
-#media-grading .btn,
-.media-grading-page .btn {
-  box-shadow: 0 1px 1px rgba(0,0,0,.05);
-}
-
-/* Hard override for any descendant that inherited white text */
-#media-grading * {
-  color: inherit;
-}
-
-/* Prevent white-on-white in nested headings/paragraphs created by theme */
-#media-grading .card *,
-.media-grading-page .card * {
+  --mg-ring: rgba(59, 130, 246, 0.4);
+  background: var(--mg-bg);
   color: var(--mg-text);
 }
-
-/* Optional: slightly larger hit area for inputs */
-#media-grading .form-check-input + label,
-.media-grading-page .form-check-input + label {
-  cursor: pointer;
+#media-grading .card,
+#media-grading .panel,
+#media-grading .box,
+#media-grading .form-section {
+  background: var(--mg-panel) !important;
+  color: var(--mg-text) !important;
+  border: 1px solid var(--mg-border) !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04) !important;
+}
+#media-grading label {
+  color: var(--mg-text) !important;
+  display: inline-flex;
+  align-items: center;
+  line-height: 1.3;
+}
+#media-grading input[type="checkbox"],
+#media-grading input[type="radio"] {
+  margin-right: .5rem;
+}
+#media-grading ul {
+  list-style: none !important;
+  padding-left: 0 !important;
+}
+#media-grading textarea,
+#media-grading input[type="text"],
+#media-grading input[type="number"] {
+  background: #fff !important;
+  color: var(--mg-text) !important;
+  border: 1px solid var(--mg-border) !important;
+}
+#media-grading textarea:focus,
+#media-grading input[type="text"]:focus,
+#media-grading input[type="number"]:focus {
+  box-shadow: 0 0 0 3px var(--mg-ring) !important;
+  border-color: #93c5fd !important;
+}
+#media-grading .alert {
+  background: #fff7ed !important;
+  border: 1px solid #fed7aa !important;
+  color: #7c2d12 !important;
+}
+#media-grading .grade-card {
+  background: #fff !important;
+  color: #064e3b !important;
+  border: 1px solid var(--mg-border) !important;
 }
