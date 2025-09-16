@@ -1,45 +1,149 @@
-/* Visibility & legibility fixes for Media Grading page (no redesign) */
-:root{
-  --mg-text:#222;
-  --mg-sub:#444;
-  --mg-muted:#666;
-  --mg-bg:#fff;
-  --mg-soft:#fafbfc;
-  --mg-border:#e1e4ea;
+
+/* ==========================================================================
+   Media Grading — UX hot‑fixes (scoped)
+   Scope: any page whose pathname contains /admin/media-grading
+   ========================================================================== */
+
+:root {
+  --mg-text: #1f2937;        /* slate-800 */
+  --mg-muted: #6b7280;       /* gray-500 */
+  --mg-border: #e5e7eb;      /* gray-200 */
+  --mg-bg: #ffffff;          /* white cards */
+  --mg-note: #111827;        /* slate-900 for inputs */
+  --mg-placeholder: #9ca3af; /* gray-400 */
+  --mg-section-bg: #f9fafb;  /* gray-50 */
 }
 
-.media-grading-root, .grading-shell, .admin-media-grading, .notesCard, .results {
+@media (prefers-color-scheme: dark) {
+  :root {
+    --mg-text: #e5e7eb;
+    --mg-muted: #9ca3af;
+    --mg-border: #374151;
+    --mg-bg: #111827;
+    --mg-note: #f9fafb;
+    --mg-placeholder: #6b7280;
+    --mg-section-bg: #0b1220;
+  }
+}
+
+/* ---- SCOPING ---- */
+body[data-route*="/admin/media-grading"] .mg-scope,
+[data-route*="/admin/media-grading"] .mg-scope {
   color: var(--mg-text);
 }
 
-/* Headings */
-h1,h2,h3,h4,.card-title,.section-title{ color: var(--mg-text) !important; text-shadow:none !important; }
-
-/* Labels */
-label, .chk span, .radio span, .helper, .lbl { color: var(--mg-text) !important; }
-
-/* Inputs */
-input[type="text"], input[type="number"], input[type="search"], textarea, select {
-  background: var(--mg-bg) !important;
-  color: var(--mg-text) !important;
-  border: 1px solid var(--mg-border) !important;
-  box-shadow: none !important;
+/* Ensure no container uses opacity that greys out ALL children */
+[data-route*="/admin/media-grading"] .mg-avoid-opacity,
+body[data-route*="/admin/media-grading"] header[style*="opacity"],
+body[data-route*="/admin/media-grading"] .header[style*="opacity"] {
+  opacity: 1 !important;
 }
-input::placeholder, textarea::placeholder { color: var(--mg-muted) !important; }
 
-/* Cards/sections */
-.card, .criteria-section, .skipPanel {
-  background: var(--mg-soft);
+/* If you need a translucent banner, use background with alpha, not element opacity */
+[data-route*="/admin/media-grading"] .mg-translucent {
+  background: rgba(30, 41, 59, .08) !important;
+}
+
+/* ---- CARDS / PANELS ---- */
+[data-route*="/admin/media-grading"] .card,
+[data-route*="/admin/media-grading"] .panel,
+[data-route*="/admin/media-grading"] .box {
+  background: var(--mg-bg);
+  border: 1px solid var(--mg-border);
+  border-radius: 12px;
+}
+
+/* ---- LISTS / BULLETS ---- */
+[data-route*="/admin/media-grading"] .card ul,
+[data-route*="/admin/media-grading"] .panel ul,
+[data-route*="/admin/media-grading"] .box ul {
+  list-style: none;
+  padding-left: 0;
+  margin-left: 0;
+}
+
+/* Some screenshots show lone "•" bullets—force them off in the left/right columns */
+[data-route*="/admin/media-grading"] .assessment-left ul li::marker,
+[data-route*="/admin/media-grading"] .assessment-right ul li::marker {
+  content: "" !important;
+}
+
+/* ---- CHECKBOX / RADIO ROWS ---- */
+[data-route*="/admin/media-grading"] .form-row,
+[data-route*="/admin/media-grading"] .form-check {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  margin: .375rem 0;
+}
+
+[data-route*="/admin/media-grading"] .form-check input[type="checkbox"],
+[data-route*="/admin/media-grading"] .form-check input[type="radio"] {
+  transform: translateY(0); /* normalize vertical align */
+}
+
+[data-route*="/admin/media-grading"] .form-check label,
+[data-route*="/admin/media-grading"] label {
+  color: var(--mg-text);
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+/* ---- SECTIONS ---- */
+[data-route*="/admin/media-grading"] .section-title {
+  font-weight: 700;
+  color: var(--mg-text);
+  margin-bottom: .5rem;
+}
+
+[data-route*="/admin/media-grading"] .section-subtle {
+  color: var(--mg-muted);
+}
+
+/* ---- TEXT INPUTS / TEXTAREA ---- */
+[data-route*="/admin/media-grading"] input[type="text"],
+[data-route*="/admin/media-grading"] input[type="number"],
+[data-route*="/admin/media-grading"] textarea,
+[data-route*="/admin/media-grading"] select {
+  color: var(--mg-note);
+  background: var(--mg-bg);
   border: 1px solid var(--mg-border);
   border-radius: 10px;
 }
 
-/* Check/radio alignment */
-.chk, .radio, .form-check { display:flex; align-items:center; gap:.5rem; margin:.4rem 0; }
-.chk-inline { display:inline-flex; align-items:center; gap:.4rem; }
+[data-route*="/admin/media-grading"] input::placeholder,
+[data-route*="/admin/media-grading"] textarea::placeholder {
+  color: var(--mg-placeholder);
+  opacity: 1;
+}
 
-/* Grid spacing */
-.admin-media-grading { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+/* The "Custom Condition Notes" box was washed out—raise contrast */
+[data-route*="/admin/media-grading"] .notes textarea {
+  min-height: 120px;
+}
 
-/* Buttons readable */
-button, .btn { color:#fff !important; }
+/* ---- BUTTONS ---- */
+[data-route*="/admin/media-grading"] .btn {
+  font-weight: 600;
+  border-radius: 9999px;
+}
+
+/* ---- RESPONSIVE SPACING ---- */
+@media (min-width: 1024px) {
+  [data-route*="/admin/media-grading"] .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+  }
+}
+
+/* ---- SAFETY RESETS (last) ---- */
+/* Never let any inherited color turn text invisible on white cards */
+[data-route*="/admin/media-grading"] .card,
+[data-route*="/admin/media-grading"] .panel,
+[data-route*="/admin/media-grading"] .box,
+[data-route*="/admin/media-grading"] .card *,
+[data-route*="/admin/media-grading"] .panel *,
+[data-route*="/admin/media-grading"] .box * {
+  color: inherit;
+}
