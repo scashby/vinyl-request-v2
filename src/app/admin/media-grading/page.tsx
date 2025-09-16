@@ -3,6 +3,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import 'styles/media-grading.css';
 
 interface MediaItem {
   id: number;
@@ -85,20 +86,6 @@ export default function MediaGradingPage() {
     ));
   };
 
-  const updateSkipSides = (itemId: number, side: string, checked: boolean) => {
-    setMediaItems(prev => prev.map(item => {
-      if (item.id !== itemId) return item;
-      const cur = item.skipSides || [];
-      const next = checked ? Array.from(new Set([...cur, side])) : cur.filter(s => s !== side);
-      return { ...item, skipSides: next };
-    }));
-  };
-
-  const updateTracksAffected = (itemId: number, count: number) => {
-    setMediaItems(prev => prev.map(item => item.id === itemId ? { ...item, tracksAffected: count } : item));
-  };
-
-
   const updateSleeveCondition = (conditionKey: string, checked: boolean) => {
     setSleeveConditions(prev => ({ ...prev, [conditionKey]: checked }));
     toggleSeverity(`${conditionKey}-severity`, checked);
@@ -115,6 +102,19 @@ export default function MediaGradingPage() {
 
   const removeMediaItem = (itemId: number) => {
     setMediaItems(prev => prev.filter(item => item.id !== itemId));
+  };
+
+  const updateSkipSides = (itemId: number, side: string, checked: boolean) => {
+    setMediaItems(prev => prev.map(item => {
+      if (item.id !== itemId) return item;
+      const current = item.skipSides || [];
+      const next = checked ? Array.from(new Set([...current, side])) : current.filter(s => s !== side);
+      return { ...item, skipSides: next };
+    }));
+  };
+
+  const updateTracksAffected = (itemId: number, count: number) => {
+    setMediaItems(prev => prev.map(item => item.id === itemId ? { ...item, tracksAffected: count } : item));
   };
 
   const calculateGrades = () => {
@@ -135,7 +135,7 @@ export default function MediaGradingPage() {
   });
 
   return (
-    <div style={{ 
+    <div className="mediaGradingRoot" style={{ 
       fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
       lineHeight: 1.6,
       background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -628,7 +628,7 @@ export default function MediaGradingPage() {
                                     <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 5 }}>
                                       {['A', 'B', 'C', 'D'].map(side => (
                                         <label key={side} style={{ display: 'flex', alignItems: 'center' }}>
-                                          <input type="checkbox" value={side} checked={(mediaItems.find(mi => mi.id === item.id)?.skipSides || []).includes(side)} onChange={(e)=>updateSkipSides(item.id, side, e.target.checked)} style={{ marginRight: 4 }} />
+                                          <input type="checkbox" checked={(mediaItems.find(mi=>mi.id===item.id)?.skipSides||[]).includes(side)} onChange={(e)=>updateSkipSides(item.id, side, e.target.checked)} style={{ marginRight: 4 }} />
                                           Side {side}
                                         </label>
                                       ))}
@@ -640,9 +640,8 @@ export default function MediaGradingPage() {
                                       type="number"
                                       min="1"
                                       max="20"
-                                      placeholder="Number of tracks"
-                                      value={mediaItems.find(mi => mi.id === item.id)?.tracksAffected || 0}
-                                      onChange={(e)=>updateTracksAffected(item.id, Math.max(0, Number(e.target.value)))}
+                                      value={mediaItems.find(mi=>mi.id===item.id)?.tracksAffected || 0}
+                                      onChange={(e)=>updateTracksAffected(item.id, Number(e.target.value))}
                                       style={{ width: 100, padding: 4, marginLeft: 10, border: '1px solid #ccc', borderRadius: 3 }}
                                     />
                                   </div>
