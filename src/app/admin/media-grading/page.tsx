@@ -1,1289 +1,522 @@
-// src/app/admin/media-grading/page.tsx
 "use client";
 
-import { useState } from 'react';
-import Link from 'next/link';
-import 'styles/media-grading.css';
+import React, { useMemo, useState } from "react";
+import "src/styles/media-grading.css";
+type MediaType = "vinyl" | "cassette" | "cd";
 
-interface MediaItem {
+type MediaItem = {
   id: number;
-  conditions: Record<string, boolean>;
-  severities: Record<string, string>;
-  skipSides: string[];
-  tracksAffected: number;
-}
+  skipSides?: string[];
+  tracksAffected?: number;
+};
+
+type Conditions = Record<string, boolean>;
+type Severities = Record<string, string>;
+type ActiveSeverities = Record<string, boolean>;
 
 export default function MediaGradingPage() {
-  const [currentMedia, setCurrentMedia] = useState<'vinyl' | 'cassette' | 'cd' | ''>('');
-  const [mediaMissing, setMediaMissing] = useState(false);
-  const [packageMissing, setPackageMissing] = useState(false);
-  const [mediaItems, setMediaItems] = useState<MediaItem[]>([{ id: 1, conditions: {}, severities: {}, skipSides: [], tracksAffected: 0 }]);
-  const [sleeveConditions, setSleeveConditions] = useState<Record<string, boolean>>({});
-  const [sleeveSeverities, setSleeveSeverities] = useState<Record<string, string>>({});
-  const [customNotes, setCustomNotes] = useState('');
-  const [additionalNotes, setAdditionalNotes] = useState<Record<string, boolean>>({});
-  const [albumInfo, setAlbumInfo] = useState({
-    artist: '',
-    title: '',
-    catalog: '',
-    year: ''
-  });
+  const [mediaType, setMediaType] = useState<MediaType>("vinyl");
+  const [mediaItems, setMediaItems] = useState<MediaItem[]>([{ id: 1 }]);
+  const [conditions, setConditions] = useState<Conditions>({});
+  const [severities, setSeverities] = useState<Severities>({});
+  const [activeSeverities, setActiveSeverities] = useState<ActiveSeverities>({});
+  const [customNotes, setCustomNotes] = useState<string>("");
   const [showResults, setShowResults] = useState(false);
-  const [activeSeverities, setActiveSeverities] = useState<Record<string, boolean>>({});
+  const [recordGrade, setRecordGrade] = useState<string>("—");
+  const [sleeveGrade, setSleeveGrade] = useState<string>("—");
+  const [overallGrade, setOverallGrade] = useState<string>("—");
 
-  const selectMedia = (mediaType: 'vinyl' | 'cassette' | 'cd') => {
-    setCurrentMedia(mediaType);
-    resetForm();
+  // convenience aliases for your existing "missing" flags if present later
+  const mediaMissing = !!conditions["media-missing"];
+  const packageMissing = !!conditions["package-missing"];
+  const sealed = !!conditions["sleeve-sealed"];
+
+  const setCondition = (key: string, value: boolean) => {
+    setConditions(prev => ({ ...prev, [key]: value }));
+    const sevKey = `${key}-severity`; // fix: UI expects this shape
+    setActiveSeverities(prev => ({ ...prev, [sevKey]: value }));
   };
 
-  const resetForm = () => {
-    setMediaMissing(false);
-    setPackageMissing(false);
-    setMediaItems([{ id: 1, conditions: {}, severities: {}, skipSides: [], tracksAffected: 0 }]);
-    setSleeveConditions({});
-    setSleeveSeverities({});
-    setCustomNotes('');
-    setAdditionalNotes({});
-    setAlbumInfo({ artist: '', title: '', catalog: '', year: '' });
-    setShowResults(false);
-    setActiveSeverities({});
+  const setSeverity = (key: string, value: string) => {
+    setSeverities(prev => ({ ...prev, [key]: value }));
   };
 
-  const toggleMissingComponents = (type: 'media' | 'package') => {
-    if (type === 'media') {
-      setMediaMissing(!mediaMissing);
-      if (!mediaMissing) setPackageMissing(false);
-    } else {
-      setPackageMissing(!packageMissing);
-      if (!packageMissing) setMediaMissing(false);
-    }
-  };
-
-  const toggleSeverity = (conditionKey: string, checked: boolean) => {
-    setActiveSeverities(prev => ({
-      ...prev,
-      [conditionKey]: checked
-    }));
-  };
-
-  const updateMediaCondition = (itemId: number, conditionKey: string, checked: boolean) => {
-    setMediaItems(prev => prev.map(item => 
-      item.id === itemId 
-        ? { ...item, conditions: { ...item.conditions, [conditionKey]: checked } }
-        : item
-    ));
-    
-    // Toggle severity options
-    const severityKey = `${conditionKey}-severity`;
-    toggleSeverity(severityKey, checked);
-  };
-
-  const updateMediaSeverity = (itemId: number, severityGroup: string, value: string) => {
-    setMediaItems(prev => prev.map(item => 
-      item.id === itemId 
-        ? { ...item, severities: { ...item.severities, [severityGroup]: value } }
-        : item
-    ));
-  };
-
-  const updateSleeveCondition = (conditionKey: string, checked: boolean) => {
-    setSleeveConditions(prev => ({ ...prev, [conditionKey]: checked }));
-    toggleSeverity(`${conditionKey}-severity`, checked);
-  };
-
-  const updateSleeveSeverity = (severityGroup: string, value: string) => {
-    setSleeveSeverities(prev => ({ ...prev, [severityGroup]: value }));
-  };
-
-  const addAnotherRecord = () => {
-    const newId = Math.max(...mediaItems.map(item => item.id)) + 1;
-    setMediaItems(prev => [...prev, { id: newId, conditions: {}, severities: {}, skipSides: [], tracksAffected: 0 }]);
-  };
-
-  const removeMediaItem = (itemId: number) => {
-    setMediaItems(prev => prev.filter(item => item.id !== itemId));
+  const addItem = () => {
+    setMediaItems(prev => [...prev, { id: (prev.at(-1)?.id ?? 0) + 1 }]);
   };
 
   const updateSkipSides = (itemId: number, side: string, checked: boolean) => {
-    setMediaItems(prev => prev.map(item => {
-      if (item.id !== itemId) return item;
-      const current = item.skipSides || [];
-      const next = checked ? Array.from(new Set([...current, side])) : current.filter(s => s !== side);
-      return { ...item, skipSides: next };
+    setMediaItems(prev => prev.map(it => {
+      if (it.id !== itemId) return it;
+      const curr = it.skipSides || [];
+      const next = checked ? Array.from(new Set([...curr, side])) : curr.filter(s => s !== side);
+      return { ...it, skipSides: next };
     }));
   };
 
   const updateTracksAffected = (itemId: number, count: number) => {
-    setMediaItems(prev => prev.map(item => item.id === itemId ? { ...item, tracksAffected: count } : item));
+    setMediaItems(prev => prev.map(it => it.id === itemId ? { ...it, tracksAffected: count } : it));
   };
 
-  const calculateGrades = () => {
+  // ---------------- Grading (Goldmine-inspired) ----------------
+  // Philosophy per user: M only if sealed. Without sealed, highest is NM and should be rare.
+  // Deductions are intentionally strong so most items land VG / G+.
+  type Weight = { base: number; sev?: Record<string, number> };
+  const WEIGHTS: Record<string, Weight> = useMemo(() => ({
+    // Vinyl media
+    "vinyl-scuffs":     { base: 6,  sev: { light: 5, moderate: 9, heavy: 14 } },
+    "vinyl-scratches":  { base: 12, sev: { hairline: 8, feelable: 16, deep: 26 } },
+    "vinyl-groove":     { base: 10, sev: { slight: 8, evident: 14, heavy: 22 } },
+    "vinyl-warp":       { base: 20, sev: { slight: 12, moderate: 22, severe: 36 } },
+    "vinyl-noise":      { base: 8,  sev: { minimal: 6, noticeable: 12, significant: 18 } },
+    "vinyl-pops":       { base: 6 },
+    "vinyl-skips":      { base: 24, sev: { occasional: 20, frequent: 34, constant: 48 } },
+
+    // Sleeve (outer)
+    "sleeve-corner":    { base: 6,  sev: { slight: 4, creased: 9, cut: 14 } },
+    "sleeve-ring":      { base: 8,  sev: { light: 6, evident: 12, heavy: 18 } },
+    "sleeve-seam":      { base: 10, sev: { small: 8, medium: 14, large: 22 } },
+    "sleeve-tears":     { base: 12, sev: { small: 8, significant: 16, major: 26 } },
+    "sleeve-spine":     { base: 6 },
+    "sleeve-writing":   { base: 8,  sev: { small: 6, noticeable: 10, heavy: 16 } },
+    "sleeve-stickers":  { base: 6,  sev: { residue: 4, partial: 8, heavy: 12 } },
+  }), []);
+
+  // Grade thresholds: sealed can reach Mint; otherwise NM is the ceiling.
+  function scoreToGrade(s: number, canMint: boolean): string {
+    if (canMint && s === 0) return "M";
+    if (s <= 5)   return "NM";
+    if (s <= 15)  return "VG+";
+    if (s <= 28)  return "VG";
+    if (s <= 40)  return "G+";
+    if (s <= 55)  return "G";
+    return "P";
+  }
+
+  function computeScores() {
+    // Gather booleans by expected keys
+    let mediaScore = 0;
+    for (const it of mediaItems) {
+      const id = it.id;
+      const has = (k:string) => !!conditions[`${k}-record-${id}`];
+      const sev = (k:string) => (severities[`${k}-severity`] || "");
+
+      // If sealed: media deductions are ignored EXCEPT warping
+      if (!sealed) {
+        if (has("vinyl-scuffs"))        mediaScore += (WEIGHTS["vinyl-scuffs"].sev?.[sev("vinyl-scuffs")] ?? WEIGHTS["vinyl-scuffs"].base);
+        if (has("vinyl-scratches"))     mediaScore += (WEIGHTS["vinyl-scratches"].sev?.[sev("vinyl-scratches")] ?? WEIGHTS["vinyl-scratches"].base);
+        if (has("vinyl-groove-wear"))   mediaScore += (WEIGHTS["vinyl-groove"].sev?.[sev("vinyl-groove-wear")] ?? WEIGHTS["vinyl-groove"].base);
+        if (has("vinyl-surface-noise")) mediaScore += (WEIGHTS["vinyl-noise"].sev?.[sev("vinyl-surface-noise")] ?? WEIGHTS["vinyl-noise"].base);
+        if (has("vinyl-pops-clicks"))   mediaScore += WEIGHTS["vinyl-pops"].base;
+      } else {
+        // sealed: intentionally ignore most media issues (they shouldn't exist); warn via score only for warp
+      }
+
+      // warping counts even if sealed
+      if (has("vinyl-warping")) mediaScore += (WEIGHTS["vinyl-warp"].sev?.[sev("vinyl-warping")] ?? WEIGHTS["vinyl-warp"].base);
+
+      // skips (shouldn't happen sealed, but if marked, we count it hard)
+      if (has("vinyl-skips")) {
+        const base = (WEIGHTS["vinyl-skips"].sev?.[sev("vinyl-skips")] ?? WEIGHTS["vinyl-skips"].base);
+        const sides = (it.skipSides || []).length;
+        const tracks = it.tracksAffected || 0;
+        mediaScore += base + Math.max(0, sides-1)*3 + Math.min(tracks, 12)
+  
+      }
+    }
+
+    // Sleeve score
+    let sleeveScore = 0;
+    const sHas = (k:string) => !!conditions[k];
+    const sSev = (k:string) => (severities[`${k}-severity`] || "");
+
+    // If sealed: allow only storage wear (corner/ring); ignore splits/tears/writing/stickers
+    if (sealed) {
+      if (sHas("sleeve-corner-wear")) sleeveScore += (WEIGHTS["sleeve-corner"].sev?.[sSev("sleeve-corner-wear")] ?? WEIGHTS["sleeve-corner"].base);
+      if (sHas("sleeve-ring-wear"))   sleeveScore += (WEIGHTS["sleeve-ring"].sev?.[sSev("sleeve-ring-wear")] ?? WEIGHTS["sleeve-ring"].base);
+    } else {
+      if (sHas("sleeve-corner-wear")) sleeveScore += (WEIGHTS["sleeve-corner"].sev?.[sSev("sleeve-corner-wear")] ?? WEIGHTS["sleeve-corner"].base);
+      if (sHas("sleeve-ring-wear"))   sleeveScore += (WEIGHTS["sleeve-ring"].sev?.[sSev("sleeve-ring-wear")] ?? WEIGHTS["sleeve-ring"].base);
+      if (sHas("sleeve-seam-splits")) sleeveScore += (WEIGHTS["sleeve-seam"].sev?.[sSev("sleeve-seam-splits")] ?? WEIGHTS["sleeve-seam"].base);
+      if (sHas("sleeve-tears"))       sleeveScore += (WEIGHTS["sleeve-tears"].sev?.[sSev("sleeve-tears")] ?? WEIGHTS["sleeve-tears"].base);
+      if (sHas("sleeve-spine-wear"))  sleeveScore += WEIGHTS["sleeve-spine"].base;
+      if (sHas("sleeve-writing"))     sleeveScore += (WEIGHTS["sleeve-writing"].sev?.[sSev("sleeve-writing")] ?? WEIGHTS["sleeve-writing"].base);
+      if (sHas("sleeve-stickers-tape")) sleeveScore += (WEIGHTS["sleeve-stickers"].sev?.[sSev("sleeve-stickers-tape")] ?? WEIGHTS["sleeve-stickers"].base);
+    }
+
+    return { mediaScore, sleeveScore };
+  }
+
+  function calculateGrades() {
+    const { mediaScore, sleeveScore } = computeScores();
+
+    const mediaGrade = mediaMissing ? "—" : scoreToGrade(mediaScore, sealed);
+    const sleeveGradeVal = packageMissing ? "—" : scoreToGrade(sleeveScore, sealed);
+
+    let combined: string;
+    if (sealed) {
+      // If sealed AND both scores are zero -> Mint (Sealed). Otherwise, NM is the cap.
+      if (mediaScore === 0 && sleeveScore === 0) combined = "M (Sealed)";
+      else combined = "NM (Sealed)";
+    } else if (mediaMissing) {
+      combined = sleeveGradeVal;
+    } else if (packageMissing) {
+      combined = mediaGrade;
+    } else {
+      const overallScore = Math.round(mediaScore*0.7 + sleeveScore*0.3);
+      combined = scoreToGrade(overallScore, false);
+    }
+
+    setRecordGrade(mediaGrade);
+    setSleeveGrade(sleeveGradeVal);
+    setOverallGrade(combined);
     setShowResults(true);
-    // Scroll to results
-    setTimeout(() => {
-      document.getElementById('results')?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
-  };
+    setTimeout(()=>document.getElementById("results")?.scrollIntoView({behavior:"smooth"}),100);
+  }
 
-  const exportListing = () => {
-    alert('Export feature - will copy formatted listing to clipboard');
-  };
+  // ---------------- UI ----------------
 
-  const getEvaluationSectionStyle = (disabled: boolean) => ({
-    opacity: disabled ? 0.3 : 1,
-    pointerEvents: disabled ? 'none' as const : 'auto' as const
-  });
+  const renderMediaItem = (item: MediaItem) => (
+    <div key={item.id} className="card">
+      <div className="sectionTitle">Record #{item.id}</div>
 
-  return (
-    <div className="mediaGradingRoot" style={{ 
-      fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
-      lineHeight: 1.6,
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      minHeight: '100vh',
-      padding: 20
-    }}>
-      <div style={{
-        maxWidth: 1400,
-        margin: '0 auto',
-        background: 'white',
-        borderRadius: 20,
-        boxShadow: '0 20px 40px rgba(0,0,0,0.1)',
-        overflow: 'hidden'
-      }}>
-        {/* Header */}
-        <div style={{
-          background: 'linear-gradient(135deg, #2c3e50 0%, #34495e 100%)',
-          color: 'white',
-          padding: 30,
-          textAlign: 'center'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Link
-              href="/admin/admin-dashboard"
-              style={{
-                background: 'rgba(255,255,255,0.2)',
-                color: 'white',
-                padding: '8px 16px',
-                borderRadius: 8,
-                textDecoration: 'none',
-                fontSize: 14,
-                fontWeight: 600
-              }}
-            >
-              ← Back to Dashboard
-            </Link>
-            <div>
-              <h1 style={{ fontSize: '2.5rem', margin: '0 0 10px 0', textShadow: '2px 2px 4px rgba(0,0,0,0.3)' }}>
-                🔍 Systematic Media Grading Tool
-              </h1>
-              <p style={{ fontSize: '1.1rem', opacity: 0.9, margin: 0 }}>
-                Detailed condition assessment with automatic grading calculation
-              </p>
-            </div>
-            <div style={{ width: 120 }}></div>
+      <div className="group">
+        <div className="sectionTitle">Visual Appearance</div>
+
+        <label>
+          <input
+            type="checkbox"
+            checked={!!conditions[`vinyl-scuffs-record-${item.id}`]}
+            onChange={(e)=>setCondition(`vinyl-scuffs-record-${item.id}`, e.target.checked)}
+          />
+          Light scuffs visible
+        </label>
+        {activeSeverities["vinyl-scuffs-record-"+item.id+"-severity"] || activeSeverities["vinyl-scuffs-severity"] ? (
+          <div className="severity">
+            <div>Severity:</div>
+            {["light","moderate","heavy"].map(s => (
+              <label key={s}>
+                <input type="radio"
+                  name={`vinyl-scuffs-${item.id}`}
+                  checked={severities["vinyl-scuffs-severity"] === s}
+                  onChange={()=>setSeverity("vinyl-scuffs-severity", s)}
+                /> {s}
+              </label>
+            ))}
           </div>
-        </div>
+        ) : null}
 
-        <div style={{ padding: 40 }}>
-          {/* Media Selector */}
-          <div style={{ marginBottom: 30, textAlign: 'center' }}>
-            <h2>Select Media Type</h2>
-            <div style={{ display: 'flex', gap: 15, justifyContent: 'center', flexWrap: 'wrap' }}>
-              {[
-                { type: 'vinyl' as const, label: '🎵 Vinyl Records' },
-                { type: 'cassette' as const, label: '📼 Cassette Tapes' },
-                { type: 'cd' as const, label: '💿 Compact Discs' }
-              ].map(({ type, label }) => (
-                <button
-                  key={type}
-                  onClick={() => selectMedia(type)}
-                  style={{
-                    background: currentMedia === type 
-                      ? 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)'
-                      : 'linear-gradient(135deg, #3498db 0%, #2980b9 100%)',
-                    color: 'white',
-                    border: 'none',
-                    padding: '15px 30px',
-                    borderRadius: 50,
-                    fontSize: '1rem',
-                    cursor: 'pointer',
-                    transition: 'all 0.3s ease',
-                    boxShadow: '0 5px 15px rgba(0,0,0,0.1)'
-                  }}
-                >
-                  {label}
-                </button>
+        <label>
+          <input
+            type="checkbox"
+            checked={!!conditions[`vinyl-scratches-record-${item.id}`]}
+            onChange={(e)=>setCondition(`vinyl-scratches-record-${item.id}`, e.target.checked)}
+          />
+          Scratches present
+        </label>
+        {activeSeverities["vinyl-scratches-severity"] && (
+          <div className="severity">
+            <div>Severity:</div>
+            {["hairline","feelable","deep"].map(s => (
+              <label key={s}>
+                <input type="radio"
+                  name={`vinyl-scratches-${item.id}`}
+                  checked={severities["vinyl-scratches-severity"] === s}
+                  onChange={()=>setSeverity("vinyl-scratches-severity", s)}
+                /> {s}
+              </label>
+            ))}
+          </div>
+        )}
+
+        <label>
+          <input
+            type="checkbox"
+            checked={!!conditions[`vinyl-groove-wear-record-${item.id}`]}
+            onChange={(e)=>setCondition(`vinyl-groove-wear-record-${item.id}`, e.target.checked)}
+          />
+          Groove wear visible
+        </label>
+        {activeSeverities["vinyl-groove-wear-severity"] && (
+          <div className="severity">
+            <div>Severity:</div>
+            {["slight","evident","heavy"].map(s => (
+              <label key={s}>
+                <input type="radio"
+                  name={`vinyl-groove-${item.id}`}
+                  checked={severities["vinyl-groove-wear-severity"] === s}
+                  onChange={()=>setSeverity("vinyl-groove-wear-severity", s)}
+                /> {s}
+              </label>
+            ))}
+          </div>
+        )}
+
+        <label>
+          <input
+            type="checkbox"
+            checked={!!conditions[`vinyl-warping-record-${item.id}`]}
+            onChange={(e)=>setCondition(`vinyl-warping-record-${item.id}`, e.target.checked)}
+          />
+          Warping present
+        </label>
+        {activeSeverities["vinyl-warping-severity"] && (
+          <div className="severity">
+            <div>Warp severity:</div>
+            {["slight","moderate","severe"].map(s => (
+              <label key={s}>
+                <input type="radio"
+                  name={`vinyl-warp-${item.id}`}
+                  checked={severities["vinyl-warping-severity"] === s}
+                  onChange={()=>setSeverity("vinyl-warping-severity", s)}
+                /> {s}
+              </label>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="group">
+        <div className="sectionTitle">Audio Performance</div>
+
+        <label>
+          <input
+            type="checkbox"
+            checked={!!conditions[`vinyl-surface-noise-record-${item.id}`]}
+            onChange={(e)=>setCondition(`vinyl-surface-noise-record-${item.id}`, e.target.checked)}
+          />
+          Surface noise when played
+        </label>
+        {activeSeverities["vinyl-surface-noise-severity"] && (
+          <div className="severity">
+            <div>Severity:</div>
+            {["minimal","noticeable","significant"].map(s => (
+              <label key={s}>
+                <input type="radio"
+                  name={`vinyl-noise-${item.id}`}
+                  checked={severities["vinyl-surface-noise-severity"] === s}
+                  onChange={()=>setSeverity("vinyl-surface-noise-severity", s)}
+                /> {s}
+              </label>
+            ))}
+          </div>
+        )}
+
+        <label>
+          <input
+            type="checkbox"
+            checked={!!conditions[`vinyl-pops-clicks-record-${item.id}`]}
+            onChange={(e)=>setCondition(`vinyl-pops-clicks-record-${item.id}`, e.target.checked)}
+          />
+          Occasional pops or clicks
+        </label>
+
+        <label>
+          <input
+            type="checkbox"
+            checked={!!conditions[`vinyl-skips-record-${item.id}`]}
+            onChange={(e)=>setCondition(`vinyl-skips-record-${item.id}`, e.target.checked)}
+          />
+          Skipping or repeating
+        </label>
+        {activeSeverities["vinyl-skips-severity"] && (
+          <div className="severity skipPanel">
+            <div><strong>Which side(s) affected:</strong></div>
+            <div className="sides">
+              {["A","B","C","D"].map(side => (
+                <label key={side}>
+                  <input
+                    type="checkbox"
+                    checked={!!(mediaItems.find(mi => mi.id === item.id)?.skipSides || []).includes(side)}
+                    onChange={(e)=>updateSkipSides(item.id, side, e.target.checked)}
+                  /> Side {side}
+                </label>
               ))}
             </div>
+            <div><strong>Tracks affected:</strong></div>
+            <input
+              type="number"
+              value={mediaItems.find(mi => mi.id === item.id)?.tracksAffected ?? 0}
+              onChange={(e)=>updateTracksAffected(item.id, Number(e.target.value || 0))}
+              style={{ width: 80, padding: 6, border: "1px solid #cbd5e1", borderRadius: 8 }}
+            />
+            <div style={{ gridColumn:"1 / -1" }}><strong>Severity:</strong></div>
+            {["occasional","frequent","constant"].map(s => (
+              <label key={s}>
+                <input
+                  type="radio"
+                  name={`vinyl-skips-${item.id}`}
+                  checked={severities["vinyl-skips-severity"] === s}
+                  onChange={()=>setSeverity("vinyl-skips-severity", s)}
+                /> {s}
+              </label>
+            ))}
           </div>
+        )}
+      </div>
+    </div>
+  );
 
-          {currentMedia && (
-            <>
-              {/* Missing Components Check */}
-              <div style={{
-                background: '#fff3cd',
-                border: '2px solid #ffc107',
-                borderRadius: 15,
-                padding: 20,
-                marginBottom: 30
-              }}>
-                <h3 style={{ color: '#856404', marginBottom: 15 }}>
-                  ⚠️ Missing Components Check (Check First!)
-                </h3>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-                  <div style={{ background: 'white', padding: 15, borderRadius: 8 }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                      <input
-                        type="checkbox"
-                        checked={mediaMissing}
-                        onChange={() => toggleMissingComponents('media')}
-                        style={{ transform: 'scale(1.1)' }}
-                      />
-                      <div>
-                        <div style={{ fontWeight: 'bold' }}>Media Missing (Cover/Insert Only)</div>
-                        <div style={{ fontSize: '0.9rem', color: '#666', marginTop: 5 }}>
-                          Only evaluating packaging - no disc/tape/record present
-                        </div>
-                      </div>
-                    </label>
-                  </div>
-                  <div style={{ background: 'white', padding: 15, borderRadius: 8 }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                      <input
-                        type="checkbox"
-                        checked={packageMissing}
-                        onChange={() => toggleMissingComponents('package')}
-                        style={{ transform: 'scale(1.1)' }}
-                      />
-                      <div>
-                        <div style={{ fontWeight: 'bold' }}>Cover/Insert/J-Card Missing (Media Only)</div>
-                        <div style={{ fontSize: '0.9rem', color: '#666', marginTop: 5 }}>
-                          Only evaluating media - no packaging present
-                        </div>
-                      </div>
-                    </label>
-                  </div>
-                </div>
-              </div>
+  const renderSleeve = () => (
+    <div className="card">
+      <div className="sectionTitle">Sleeve Condition Assessment</div>
 
-              {/* Vinyl Assessment */}
-              {currentMedia === 'vinyl' && (
-                <div>
-                  <h2>Vinyl Record Assessment</h2>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 30, marginBottom: 30 }}>
-                    
-                    {/* Record Condition Assessment */}
-                    <div style={{
-                      background: '#f8f9fa',
-                      borderRadius: 15,
-                      padding: 25,
-                      border: '2px solid transparent',
-                      transition: 'all 0.3s ease',
-                      ...getEvaluationSectionStyle(mediaMissing)
-                    }}>
-                      <div style={{
-                        fontSize: '1.3rem',
-                        fontWeight: 'bold',
-                        color: '#2c3e50',
-                        marginBottom: 20,
-                        textAlign: 'center',
-                        padding: 10,
-                        background: 'white',
-                        borderRadius: 10
-                      }}>
-                        🎵 Record Condition Assessment
-                      </div>
+      <label>
+        <input
+          type="checkbox"
+          checked={!!conditions["sleeve-sealed"]}
+          onChange={(e)=>setCondition("sleeve-sealed", e.target.checked)}
+        />
+        Sealed (factory shrink intact)
+      </label>
 
-                      {mediaItems.map((item, index) => (
-                        <div key={item.id} style={{
-                          border: '1px solid #dee2e6',
-                          borderRadius: 10,
-                          padding: 15,
-                          marginBottom: 15
-                        }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <h4 style={{ color: '#495057', margin: 0 }}>Record #{item.id}</h4>
-                            {index > 0 && (
-                              <button
-                                onClick={() => removeMediaItem(item.id)}
-                                style={{
-                                  background: '#dc3545',
-                                  color: 'white',
-                                  border: 'none',
-                                  borderRadius: 5,
-                                  padding: '4px 8px',
-                                  cursor: 'pointer',
-                                  fontSize: '0.8rem'
-                                }}
-                              >
-                                ✕ Remove
-                              </button>
-                            )}
-                          </div>
-
-                          {/* Visual Appearance */}
-                          <div style={{ marginBottom: 20 }}>
-                            <h4 style={{ color: '#495057', marginBottom: 10, fontSize: '1rem', borderBottom: '2px solid #dee2e6', paddingBottom: 5 }}>
-                              Visual Appearance
-                            </h4>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                              
-                              <label style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                padding: '10px 15px',
-                                background: 'white',
-                                borderRadius: 8,
-                                cursor: 'pointer',
-                                transition: 'all 0.3s ease',
-                                border: '1px solid #e9ecef'
-                              }}>
-                                <input
-                                  type="checkbox"
-                                  checked={item.conditions[`vinyl-glossy-${item.id}`] || false}
-                                  onChange={(e) => updateMediaCondition(item.id, `vinyl-glossy-${item.id}`, e.target.checked)}
-                                  style={{ marginRight: 12, transform: 'scale(1.1)' }}
-                                />
-                                Record has glossy, like-new appearance
-                              </label>
-
-                              <label style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                padding: '10px 15px',
-                                background: 'white',
-                                borderRadius: 8,
-                                cursor: 'pointer',
-                                transition: 'all 0.3s ease',
-                                border: '1px solid #e9ecef'
-                              }}>
-                                <input
-                                  type="checkbox"
-                                  checked={item.conditions[`vinyl-scuffs-${item.id}`] || false}
-                                  onChange={(e) => updateMediaCondition(item.id, `vinyl-scuffs-${item.id}`, e.target.checked)}
-                                  style={{ marginRight: 12, transform: 'scale(1.1)' }}
-                                />
-                                Light scuffs visible
-                              </label>
-
-                              {activeSeverities[`vinyl-scuffs-${item.id}-severity`] && (
-                                <div style={{ marginLeft: 30, marginTop: 8 }}>
-                                  {['Very light, barely visible', 'Visible but not deep', 'Obvious, multiple scuffs'].map((option, idx) => (
-                                    <label key={idx} style={{ display: 'flex', alignItems: 'center', marginBottom: 5 }}>
-                                      <input
-                                        type="radio"
-                                        name={`vinyl-scuffs-level-${item.id}`}
-                                        value={['light', 'moderate', 'heavy'][idx]}
-                                        checked={item.severities[`vinyl-scuffs-level-${item.id}`] === ['light', 'moderate', 'heavy'][idx]}
-                                        onChange={(e) => updateMediaSeverity(item.id, `vinyl-scuffs-level-${item.id}`, e.target.value)}
-                                        style={{ marginRight: 8 }}
-                                      />
-                                      <span style={{ fontSize: '0.85rem', color: '#666' }}>{option}</span>
-                                    </label>
-                                  ))}
-                                </div>
-                              )}
-
-                              <label style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                padding: '10px 15px',
-                                background: 'white',
-                                borderRadius: 8,
-                                cursor: 'pointer',
-                                transition: 'all 0.3s ease',
-                                border: '1px solid #e9ecef'
-                              }}>
-                                <input
-                                  type="checkbox"
-                                  checked={item.conditions[`vinyl-scratches-${item.id}`] || false}
-                                  onChange={(e) => updateMediaCondition(item.id, `vinyl-scratches-${item.id}`, e.target.checked)}
-                                  style={{ marginRight: 12, transform: 'scale(1.1)' }}
-                                />
-                                Scratches present
-                              </label>
-
-                              {activeSeverities[`vinyl-scratches-${item.id}-severity`] && (
-                                <div style={{ marginLeft: 30, marginTop: 8 }}>
-                                  {['Hairline scratches only', 'Can feel with fingernail', 'Deep, visible grooves'].map((option, idx) => (
-                                    <label key={idx} style={{ display: 'flex', alignItems: 'center', marginBottom: 5 }}>
-                                      <input
-                                        type="radio"
-                                        name={`vinyl-scratches-level-${item.id}`}
-                                        value={['hairline', 'feelable', 'deep'][idx]}
-                                        checked={item.severities[`vinyl-scratches-level-${item.id}`] === ['hairline', 'feelable', 'deep'][idx]}
-                                        onChange={(e) => updateMediaSeverity(item.id, `vinyl-scratches-level-${item.id}`, e.target.value)}
-                                        style={{ marginRight: 8 }}
-                                      />
-                                      <span style={{ fontSize: '0.85rem', color: '#666' }}>{option}</span>
-                                    </label>
-                                  ))}
-                                </div>
-                              )}
-
-                              <label style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                padding: '10px 15px',
-                                background: 'white',
-                                borderRadius: 8,
-                                cursor: 'pointer',
-                                transition: 'all 0.3s ease',
-                                border: '1px solid #e9ecef'
-                              }}>
-                                <input
-                                  type="checkbox"
-                                  checked={item.conditions[`vinyl-groove-wear-${item.id}`] || false}
-                                  onChange={(e) => updateMediaCondition(item.id, `vinyl-groove-wear-${item.id}`, e.target.checked)}
-                                  style={{ marginRight: 12, transform: 'scale(1.1)' }}
-                                />
-                                Groove wear visible
-                              </label>
-
-                              {activeSeverities[`vinyl-groove-wear-${item.id}-severity`] && (
-                                <div style={{ marginLeft: 30, marginTop: 8 }}>
-                                  {['Slight loss of gloss', 'Evident on sight', 'Heavy wear, matte finish'].map((option, idx) => (
-                                    <label key={idx} style={{ display: 'flex', alignItems: 'center', marginBottom: 5 }}>
-                                      <input
-                                        type="radio"
-                                        name={`vinyl-groove-level-${item.id}`}
-                                        value={['slight', 'evident', 'heavy'][idx]}
-                                        checked={item.severities[`vinyl-groove-level-${item.id}`] === ['slight', 'evident', 'heavy'][idx]}
-                                        onChange={(e) => updateMediaSeverity(item.id, `vinyl-groove-level-${item.id}`, e.target.value)}
-                                        style={{ marginRight: 8 }}
-                                      />
-                                      <span style={{ fontSize: '0.85rem', color: '#666' }}>{option}</span>
-                                    </label>
-                                  ))}
-                                </div>
-                              )}
-
-                              <label style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                padding: '10px 15px',
-                                background: 'white',
-                                borderRadius: 8,
-                                cursor: 'pointer',
-                                transition: 'all 0.3s ease',
-                                border: '1px solid #e9ecef'
-                              }}>
-                                <input
-                                  type="checkbox"
-                                  checked={item.conditions[`vinyl-warping-${item.id}`] || false}
-                                  onChange={(e) => updateMediaCondition(item.id, `vinyl-warping-${item.id}`, e.target.checked)}
-                                  style={{ marginRight: 12, transform: 'scale(1.1)' }}
-                                />
-                                Warping present
-                              </label>
-
-                              {activeSeverities[`vinyl-warping-${item.id}-severity`] && (
-                                <div style={{ marginLeft: 30, marginTop: 8, background: '#fff8dc', padding: 10, borderRadius: 5 }}>
-                                  <div style={{ marginBottom: 10 }}>
-                                    <label style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>Warp severity:</label>
-                                    <div style={{ marginTop: 5 }}>
-                                      {['Slight warp, does not affect play', 'Moderate warp, may cause tracking issues', 'Severe warp, significantly affects play'].map((option, idx) => (
-                                        <label key={idx} style={{ display: 'flex', alignItems: 'center', marginBottom: 5 }}>
-                                          <input
-                                            type="radio"
-                                            name={`vinyl-warp-level-${item.id}`}
-                                            value={['slight', 'moderate', 'severe'][idx]}
-                                            checked={item.severities[`vinyl-warp-level-${item.id}`] === ['slight', 'moderate', 'severe'][idx]}
-                                            onChange={(e) => updateMediaSeverity(item.id, `vinyl-warp-level-${item.id}`, e.target.value)}
-                                            style={{ marginRight: 8 }}
-                                          />
-                                          <span style={{ fontSize: '0.85rem', color: '#666' }}>{option}</span>
-                                        </label>
-                                      ))}
-                                    </div>
-                                  </div>
-                                  <div>
-                                    <label style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>Warp type:</label>
-                                    <div style={{ marginTop: 5 }}>
-                                      {['Dish warp (concave/convex)', 'Edge warp (rim warping)', 'Saddle warp (two-way bend)'].map((option, idx) => (
-                                        <label key={idx} style={{ display: 'flex', alignItems: 'center', marginBottom: 5 }}>
-                                          <input
-                                            type="radio"
-                                            name={`vinyl-warp-type-${item.id}`}
-                                            value={['dish', 'edge', 'saddle'][idx]}
-                                            checked={item.severities[`vinyl-warp-type-${item.id}`] === ['dish', 'edge', 'saddle'][idx]}
-                                            onChange={(e) => updateMediaSeverity(item.id, `vinyl-warp-type-${item.id}`, e.target.value)}
-                                            style={{ marginRight: 8 }}
-                                          />
-                                          <span style={{ fontSize: '0.85rem', color: '#666' }}>{option}</span>
-                                        </label>
-                                      ))}
-                                    </div>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Audio Performance */}
-                          <div style={{ marginBottom: 20 }}>
-                            <h4 style={{ color: '#495057', marginBottom: 10, fontSize: '1rem', borderBottom: '2px solid #dee2e6', paddingBottom: 5 }}>
-                              Audio Performance
-                            </h4>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                              
-                              <label style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                padding: '10px 15px',
-                                background: 'white',
-                                borderRadius: 8,
-                                cursor: 'pointer',
-                                transition: 'all 0.3s ease',
-                                border: '1px solid #e9ecef'
-                              }}>
-                                <input
-                                  type="checkbox"
-                                  checked={item.conditions[`vinyl-silent-${item.id}`] || false}
-                                  onChange={(e) => updateMediaCondition(item.id, `vinyl-silent-${item.id}`, e.target.checked)}
-                                  style={{ marginRight: 12, transform: 'scale(1.1)' }}
-                                />
-                                Plays with no surface noise
-                              </label>
-
-                              <label style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                padding: '10px 15px',
-                                background: 'white',
-                                borderRadius: 8,
-                                cursor: 'pointer',
-                                transition: 'all 0.3s ease',
-                                border: '1px solid #e9ecef'
-                              }}>
-                                <input
-                                  type="checkbox"
-                                  checked={item.conditions[`vinyl-surface-noise-${item.id}`] || false}
-                                  onChange={(e) => updateMediaCondition(item.id, `vinyl-surface-noise-${item.id}`, e.target.checked)}
-                                  style={{ marginRight: 12, transform: 'scale(1.1)' }}
-                                />
-                                Surface noise when played
-                              </label>
-
-                              {activeSeverities[`vinyl-surface-noise-${item.id}-severity`] && (
-                                <div style={{ marginLeft: 30, marginTop: 8 }}>
-                                  {['Minimal, in quiet passages only', 'Noticeable but doesn\'t overpower music', 'Significant throughout'].map((option, idx) => (
-                                    <label key={idx} style={{ display: 'flex', alignItems: 'center', marginBottom: 5 }}>
-                                      <input
-                                        type="radio"
-                                        name={`vinyl-noise-level-${item.id}`}
-                                        value={['minimal', 'noticeable', 'significant'][idx]}
-                                        checked={item.severities[`vinyl-noise-level-${item.id}`] === ['minimal', 'noticeable', 'significant'][idx]}
-                                        onChange={(e) => updateMediaSeverity(item.id, `vinyl-noise-level-${item.id}`, e.target.value)}
-                                        style={{ marginRight: 8 }}
-                                      />
-                                      <span style={{ fontSize: '0.85rem', color: '#666' }}>{option}</span>
-                                    </label>
-                                  ))}
-                                </div>
-                              )}
-
-                              <label style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                padding: '10px 15px',
-                                background: 'white',
-                                borderRadius: 8,
-                                cursor: 'pointer',
-                                transition: 'all 0.3s ease',
-                                border: '1px solid #e9ecef'
-                              }}>
-                                <input
-                                  type="checkbox"
-                                  checked={item.conditions[`vinyl-pops-${item.id}`] || false}
-                                  onChange={(e) => updateMediaCondition(item.id, `vinyl-pops-${item.id}`, e.target.checked)}
-                                  style={{ marginRight: 12, transform: 'scale(1.1)' }}
-                                />
-                                Occasional pops or clicks
-                              </label>
-
-                              <label style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                padding: '10px 15px',
-                                background: 'white',
-                                borderRadius: 8,
-                                cursor: 'pointer',
-                                transition: 'all 0.3s ease',
-                                border: '1px solid #e9ecef'
-                              }}>
-                                <input
-                                  type="checkbox"
-                                  checked={item.conditions[`vinyl-skips-${item.id}`] || false}
-                                  onChange={(e) => updateMediaCondition(item.id, `vinyl-skips-${item.id}`, e.target.checked)}
-                                  style={{ marginRight: 12, transform: 'scale(1.1)' }}
-                                />
-                                Skipping or repeating
-                              </label>
-
-                              {activeSeverities[`vinyl-skips-${item.id}-severity`] && (
-                                <div style={{ marginLeft: 30, marginTop: 8, background: '#fff8dc', padding: 10, borderRadius: 5 }}>
-                                  <div style={{ marginBottom: 10 }}>
-                                    <label style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>Which side(s) affected:</label>
-                                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 5 }}>
-                                      {['A', 'B', 'C', 'D'].map(side => (
-                                        <label key={side} style={{ display: 'flex', alignItems: 'center' }}>
-                                          <input type="checkbox" checked={(mediaItems.find(mi=>mi.id===item.id)?.skipSides||[]).includes(side)} onChange={(e)=>updateSkipSides(item.id, side, e.target.checked)} style={{ marginRight: 4 }} />
-                                          Side {side}
-                                        </label>
-                                      ))}
-                                    </div>
-                                  </div>
-                                  <div style={{ marginBottom: 10 }}>
-                                    <label style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>Tracks affected:</label>
-                                    <input
-                                      type="number"
-                                      min="1"
-                                      max="20"
-                                      value={mediaItems.find(mi=>mi.id===item.id)?.tracksAffected || 0}
-                                      onChange={(e)=>updateTracksAffected(item.id, Number(e.target.value))}
-                                      style={{ width: 100, padding: 4, marginLeft: 10, border: '1px solid #ccc', borderRadius: 3 }}
-                                    />
-                                  </div>
-                                  <div>
-                                    <label style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>Severity:</label>
-                                    <div style={{ marginTop: 5 }}>
-                                      {['Occasional skips', 'Frequent skipping', 'Constant skipping'].map((option, idx) => (
-                                        <label key={idx} style={{ display: 'flex', alignItems: 'center', marginBottom: 5 }}>
-                                          <input
-                                            type="radio"
-                                            name={`vinyl-skip-severity-${item.id}`}
-                                            value={['occasional', 'frequent', 'constant'][idx]}
-                                            checked={item.severities[`vinyl-skip-severity-${item.id}`] === ['occasional', 'frequent', 'constant'][idx]}
-                                            onChange={(e) => updateMediaSeverity(item.id, `vinyl-skip-severity-${item.id}`, e.target.value)}
-                                            style={{ marginRight: 8 }}
-                                          />
-                                          <span style={{ fontSize: '0.85rem', color: '#666' }}>{option}</span>
-                                        </label>
-                                      ))}
-                                    </div>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Label & Center */}
-                          <div style={{ marginBottom: 20 }}>
-                            <h4 style={{ color: '#495057', marginBottom: 10, fontSize: '1rem', borderBottom: '2px solid #dee2e6', paddingBottom: 5 }}>
-                              Label & Center
-                            </h4>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                              
-                              {[
-                                { key: 'vinyl-label-clean', label: 'Label is clean and bright' },
-                                { key: 'vinyl-spindle-marks', label: 'Spindle marks present' },
-                                { key: 'vinyl-label-writing', label: 'Writing on label' },
-                                { key: 'vinyl-label-stickers', label: 'Stickers or tape on label' }
-                              ].map(({ key, label }) => (
-                                <label key={key} style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  padding: '10px 15px',
-                                  background: 'white',
-                                  borderRadius: 8,
-                                  cursor: 'pointer',
-                                  transition: 'all 0.3s ease',
-                                  border: '1px solid #e9ecef'
-                                }}>
-                                  <input
-                                    type="checkbox"
-                                    checked={item.conditions[`${key}-${item.id}`] || false}
-                                    onChange={(e) => updateMediaCondition(item.id, `${key}-${item.id}`, e.target.checked)}
-                                    style={{ marginRight: 12, transform: 'scale(1.1)' }}
-                                  />
-                                  {label}
-                                </label>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-
-                      <button
-                        onClick={addAnotherRecord}
-                        style={{
-                          width: '100%',
-                          marginTop: 15,
-                          padding: 10,
-                          background: '#28a745',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: 8,
-                          cursor: 'pointer',
-                          fontSize: '1rem',
-                          transition: 'all 0.3s ease'
-                        }}
-                      >
-                        ➕ Add Another Record
-                      </button>
-                    </div>
-
-                    {/* Sleeve Condition Assessment */}
-                    <div style={{
-                      background: '#f8f9fa',
-                      borderRadius: 15,
-                      padding: 25,
-                      border: '2px solid transparent',
-                      transition: 'all 0.3s ease',
-                      ...getEvaluationSectionStyle(packageMissing)
-                    }}>
-                      <div style={{
-                        fontSize: '1.3rem',
-                        fontWeight: 'bold',
-                        color: '#2c3e50',
-                        marginBottom: 20,
-                        textAlign: 'center',
-                        padding: 10,
-                        background: 'white',
-                        borderRadius: 10
-                      }}>
-                        📦 Sleeve Condition Assessment
-                      </div>
-
-                      {/* Overall Appearance */}
-                      <div style={{ marginBottom: 20 }}>
-                        <h4 style={{ color: '#495057', marginBottom: 10, fontSize: '1rem', borderBottom: '2px solid #dee2e6', paddingBottom: 5 }}>
-                          Overall Appearance
-                        </h4>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                          
-                          {[
-                            { key: 'sleeve-perfect', label: 'Looks like new, no flaws' },
-                            { key: 'sleeve-minor-wear', label: 'Minor shelf wear only' }
-                          ].map(({ key, label }) => (
-                            <label key={key} style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              padding: '10px 15px',
-                              background: 'white',
-                              borderRadius: 8,
-                              cursor: 'pointer',
-                              transition: 'all 0.3s ease',
-                              border: '1px solid #e9ecef'
-                            }}>
-                              <input
-                                type="checkbox"
-                                checked={sleeveConditions[key] || false}
-                                onChange={(e) => updateSleeveCondition(key, e.target.checked)}
-                                style={{ marginRight: 12, transform: 'scale(1.1)' }}
-                              />
-                              {label}
-                            </label>
-                          ))}
-
-                          <label style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            padding: '10px 15px',
-                            background: 'white',
-                            borderRadius: 8,
-                            cursor: 'pointer',
-                            transition: 'all 0.3s ease',
-                            border: '1px solid #e9ecef'
-                          }}>
-                            <input
-                              type="checkbox"
-                              checked={sleeveConditions['sleeve-corner-wear'] || false}
-                              onChange={(e) => updateSleeveCondition('sleeve-corner-wear', e.target.checked)}
-                              style={{ marginRight: 12, transform: 'scale(1.1)' }}
-                            />
-                            Corner wear present
-                          </label>
-
-                          {activeSeverities['sleeve-corner-wear-severity'] && (
-                            <div style={{ marginLeft: 30, marginTop: 8 }}>
-                              {['Slight bumping', 'Creased or frayed', 'Cut or heavily damaged'].map((option, idx) => (
-                                <label key={idx} style={{ display: 'flex', alignItems: 'center', marginBottom: 5 }}>
-                                  <input
-                                    type="radio"
-                                    name="sleeve-corner-level"
-                                    value={['slight', 'creased', 'cut'][idx]}
-                                    checked={sleeveSeverities['sleeve-corner-level'] === ['slight', 'creased', 'cut'][idx]}
-                                    onChange={(e) => updateSleeveSeverity('sleeve-corner-level', e.target.value)}
-                                    style={{ marginRight: 8 }}
-                                  />
-                                  <span style={{ fontSize: '0.85rem', color: '#666' }}>{option}</span>
-                                </label>
-                              ))}
-                            </div>
-                          )}
-
-                          <label style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            padding: '10px 15px',
-                            background: 'white',
-                            borderRadius: 8,
-                            cursor: 'pointer',
-                            transition: 'all 0.3s ease',
-                            border: '1px solid #e9ecef'
-                          }}>
-                            <input
-                              type="checkbox"
-                              checked={sleeveConditions['sleeve-ring-wear'] || false}
-                              onChange={(e) => updateSleeveCondition('sleeve-ring-wear', e.target.checked)}
-                              style={{ marginRight: 12, transform: 'scale(1.1)' }}
-                            />
-                            Ring wear visible
-                          </label>
-
-                          {activeSeverities['sleeve-ring-wear-severity'] && (
-                            <div style={{ marginLeft: 30, marginTop: 8 }}>
-                              {['Light, barely visible', 'Clearly visible', 'Heavy, ink worn off'].map((option, idx) => (
-                                <label key={idx} style={{ display: 'flex', alignItems: 'center', marginBottom: 5 }}>
-                                  <input
-                                    type="radio"
-                                    name="sleeve-ring-level"
-                                    value={['light', 'evident', 'heavy'][idx]}
-                                    checked={sleeveSeverities['sleeve-ring-level'] === ['light', 'evident', 'heavy'][idx]}
-                                    onChange={(e) => updateSleeveSeverity('sleeve-ring-level', e.target.value)}
-                                    style={{ marginRight: 8 }}
-                                  />
-                                  <span style={{ fontSize: '0.85rem', color: '#666' }}>{option}</span>
-                                </label>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Seams & Structure */}
-                      <div style={{ marginBottom: 20 }}>
-                        <h4 style={{ color: '#495057', marginBottom: 10, fontSize: '1rem', borderBottom: '2px solid #dee2e6', paddingBottom: 5 }}>
-                          Seams & Structure
-                        </h4>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                          
-                          <label style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            padding: '10px 15px',
-                            background: 'white',
-                            borderRadius: 8,
-                            cursor: 'pointer',
-                            transition: 'all 0.3s ease',
-                            border: '1px solid #e9ecef'
-                          }}>
-                            <input
-                              type="checkbox"
-                              checked={sleeveConditions['sleeve-seams-intact'] || false}
-                              onChange={(e) => updateSleeveCondition('sleeve-seams-intact', e.target.checked)}
-                              style={{ marginRight: 12, transform: 'scale(1.1)' }}
-                            />
-                            All seams intact
-                          </label>
-
-                          <label style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            padding: '10px 15px',
-                            background: 'white',
-                            borderRadius: 8,
-                            cursor: 'pointer',
-                            transition: 'all 0.3s ease',
-                            border: '1px solid #e9ecef'
-                          }}>
-                            <input
-                              type="checkbox"
-                              checked={sleeveConditions['sleeve-seam-splits'] || false}
-                              onChange={(e) => updateSleeveCondition('sleeve-seam-splits', e.target.checked)}
-                              style={{ marginRight: 12, transform: 'scale(1.1)' }}
-                            />
-                            Seam splits present
-                          </label>
-
-                          {activeSeverities['sleeve-seam-splits-severity'] && (
-                            <div style={{ marginLeft: 30, marginTop: 8 }}>
-                              {['Small (under 1 inch)', 'Medium (1-3 inches)', 'Large (over 3 inches)'].map((option, idx) => (
-                                <label key={idx} style={{ display: 'flex', alignItems: 'center', marginBottom: 5 }}>
-                                  <input
-                                    type="radio"
-                                    name="sleeve-seam-level"
-                                    value={['small', 'medium', 'large'][idx]}
-                                    checked={sleeveSeverities['sleeve-seam-level'] === ['small', 'medium', 'large'][idx]}
-                                    onChange={(e) => updateSleeveSeverity('sleeve-seam-level', e.target.value)}
-                                    style={{ marginRight: 8 }}
-                                  />
-                                  <span style={{ fontSize: '0.85rem', color: '#666' }}>{option}</span>
-                                </label>
-                              ))}
-                            </div>
-                          )}
-
-                          <label style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            padding: '10px 15px',
-                            background: 'white',
-                            borderRadius: 8,
-                            cursor: 'pointer',
-                            transition: 'all 0.3s ease',
-                            border: '1px solid #e9ecef'
-                          }}>
-                            <input
-                              type="checkbox"
-                              checked={sleeveConditions['sleeve-spine-wear'] || false}
-                              onChange={(e) => updateSleeveCondition('sleeve-spine-wear', e.target.checked)}
-                              style={{ marginRight: 12, transform: 'scale(1.1)' }}
-                            />
-                            Spine shows wear
-                          </label>
-                        </div>
-                      </div>
-
-                      {/* Damage & Markings */}
-                      <div style={{ marginBottom: 20 }}>
-                        <h4 style={{ color: '#495057', marginBottom: 10, fontSize: '1rem', borderBottom: '2px solid #dee2e6', paddingBottom: 5 }}>
-                          Damage & Markings
-                        </h4>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                          
-                          {[
-                            { key: 'sleeve-creases', label: 'Creases present' },
-                            { key: 'sleeve-writing', label: 'Writing present' },
-                            { key: 'sleeve-stickers', label: 'Stickers or tape' },
-                            { key: 'sleeve-water-damage', label: 'Water damage or staining' }
-                          ].map(({ key, label }) => (
-                            <label key={key} style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              padding: '10px 15px',
-                              background: 'white',
-                              borderRadius: 8,
-                              cursor: 'pointer',
-                              transition: 'all 0.3s ease',
-                              border: '1px solid #e9ecef'
-                            }}>
-                              <input
-                                type="checkbox"
-                                checked={sleeveConditions[key] || false}
-                                onChange={(e) => updateSleeveCondition(key, e.target.checked)}
-                                style={{ marginRight: 12, transform: 'scale(1.1)' }}
-                              />
-                              {label}
-                            </label>
-                          ))}
-
-                          <label style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            padding: '10px 15px',
-                            background: 'white',
-                            borderRadius: 8,
-                            cursor: 'pointer',
-                            transition: 'all 0.3s ease',
-                            border: '1px solid #e9ecef'
-                          }}>
-                            <input
-                              type="checkbox"
-                              checked={sleeveConditions['sleeve-tears'] || false}
-                              onChange={(e) => updateSleeveCondition('sleeve-tears', e.target.checked)}
-                              style={{ marginRight: 12, transform: 'scale(1.1)' }}
-                            />
-                            Tears present
-                          </label>
-
-                          {activeSeverities['sleeve-tears-severity'] && (
-                            <div style={{ marginLeft: 30, marginTop: 8 }}>
-                              {['Small tears', 'Significant tears', 'Major damage'].map((option, idx) => (
-                                <label key={idx} style={{ display: 'flex', alignItems: 'center', marginBottom: 5 }}>
-                                  <input
-                                    type="radio"
-                                    name="sleeve-tear-level"
-                                    value={['small', 'significant', 'major'][idx]}
-                                    checked={sleeveSeverities['sleeve-tear-level'] === ['small', 'significant', 'major'][idx]}
-                                    onChange={(e) => updateSleeveSeverity('sleeve-tear-level', e.target.value)}
-                                    style={{ marginRight: 8 }}
-                                  />
-                                  <span style={{ fontSize: '0.85rem', color: '#666' }}>{option}</span>
-                                </label>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Custom Notes Section */}
-              <div style={{
-                background: '#f8f9fa',
-                borderRadius: 15,
-                padding: 25,
-                marginBottom: 30
-              }}>
-                <h3 style={{ color: '#495057', marginBottom: 15 }}>
-                  📝 Custom Condition Notes
-                </h3>
-                <textarea
-                  value={customNotes}
-                  onChange={(e) => setCustomNotes(e.target.value)}
-                  placeholder="Add any additional condition details not covered by the checkboxes above..."
-                  style={{
-                    width: '100%',
-                    height: 80,
-                    padding: 10,
-                    border: '1px solid #ddd',
-                    borderRadius: 8,
-                    fontFamily: 'inherit',
-                    resize: 'vertical'
-                  }}
-                />
-                <div style={{ fontSize: '0.85rem', color: '#666', marginTop: 8 }}>
-                  Examples: &quot;Light warp does not affect play&quot;, &quot;Minor pressing flaw on track 3&quot;, &quot;Includes original poster&quot;, etc.
-                </div>
-              </div>
-
-              {/* Additional Notes */}
-              <div style={{
-                background: '#fff3cd',
-                borderRadius: 15,
-                padding: 25,
-                borderLeft: '5px solid #ffc107',
-                marginBottom: 30
-              }}>
-                <h3 style={{ color: '#856404', marginBottom: 15 }}>
-                  📋 Additional Notes (Don&apos;t Affect Grade but Important for Disclosure)
-                </h3>
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                  gap: 15
-                }}>
-                  {[
-                    { key: 'jewel-case-damaged', label: 'Jewel Case Damaged' },
-                    { key: 'jewel-case-missing', label: 'Jewel Case Missing' },
-                    { key: 'original-shrink', label: 'Original Shrinkwrap' },
-                    { key: 'hype-sticker', label: 'Hype Sticker Present' },
-                    { key: 'cutout-hole', label: 'Cut-out Hole/Mark' },
-                    { key: 'promo-stamp', label: 'Promotional Copy' },
-                    { key: 'price-sticker', label: 'Price Sticker/Tag' },
-                    { key: 'first-pressing', label: 'First Pressing' },
-                    { key: 'colored-vinyl', label: 'Colored Vinyl' },
-                    { key: 'limited-edition', label: 'Limited Edition' },
-                    { key: 'gatefold', label: 'Gatefold Sleeve' },
-                    { key: 'inner-sleeve-original', label: 'Original Inner Sleeve' }
-                  ].map(({ key, label }) => (
-                    <label key={key} style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 10,
-                      background: 'white',
-                      padding: 10,
-                      borderRadius: 8,
-                      cursor: 'pointer'
-                    }}>
-                      <input
-                        type="checkbox"
-                        checked={additionalNotes[key] || false}
-                        onChange={(e) => setAdditionalNotes(prev => ({ ...prev, [key]: e.target.checked }))}
-                        style={{ transform: 'scale(1.1)' }}
-                      />
-                      <span style={{ color: '#856404' }}>{label}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* Calculate Button */}
-              <div style={{ textAlign: 'center' }}>
-                <button
-                  onClick={calculateGrades}
-                  style={{
-                    background: 'linear-gradient(135deg, #28a745 0%, #20c997 100%)',
-                    color: 'white',
-                    border: 'none',
-                    padding: '15px 40px',
-                    borderRadius: 50,
-                    fontSize: '1.1rem',
-                    cursor: 'pointer',
-                    transition: 'all 0.3s ease',
-                    boxShadow: '0 5px 15px rgba(40, 167, 69, 0.3)'
-                  }}
-                >
-                  🎯 Calculate Grades
-                </button>
-              </div>
-
-              {/* Album Info for Export */}
-              {showResults && (
-                <div style={{
-                  marginTop: 20,
-                  padding: 20,
-                  background: '#f8f9fa',
-                  borderRadius: 10
-                }}>
-                  <h3>📝 Album Information (for export)</h3>
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 1fr',
-                    gap: 15,
-                    marginTop: 15
-                  }}>
-                    <div>
-                      <label style={{ display: 'block', marginBottom: 5, fontWeight: 'bold' }}>Artist:</label>
-                      <input
-                        type="text"
-                        value={albumInfo.artist}
-                        onChange={(e) => setAlbumInfo(prev => ({ ...prev, artist: e.target.value }))}
-                        placeholder="Enter artist name"
-                        style={{ width: '100%', padding: 8, border: '1px solid #ddd', borderRadius: 5 }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', marginBottom: 5, fontWeight: 'bold' }}>Album Title:</label>
-                      <input
-                        type="text"
-                        value={albumInfo.title}
-                        onChange={(e) => setAlbumInfo(prev => ({ ...prev, title: e.target.value }))}
-                        placeholder="Enter album title"
-                        style={{ width: '100%', padding: 8, border: '1px solid #ddd', borderRadius: 5 }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', marginBottom: 5, fontWeight: 'bold' }}>Catalog #:</label>
-                      <input
-                        type="text"
-                        value={albumInfo.catalog}
-                        onChange={(e) => setAlbumInfo(prev => ({ ...prev, catalog: e.target.value }))}
-                        placeholder="e.g. ABC-123"
-                        style={{ width: '100%', padding: 8, border: '1px solid #ddd', borderRadius: 5 }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', marginBottom: 5, fontWeight: 'bold' }}>Year:</label>
-                      <input
-                        type="text"
-                        value={albumInfo.year}
-                        onChange={(e) => setAlbumInfo(prev => ({ ...prev, year: e.target.value }))}
-                        placeholder="e.g. 1975"
-                        style={{ width: '100%', padding: 8, border: '1px solid #ddd', borderRadius: 5 }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Results Section */}
-              {showResults && (
-                <div id="results" style={{
-                  marginTop: 30,
-                  padding: 25,
-                  background: 'linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%)',
-                  borderRadius: 15,
-                  border: '2px solid #28a745'
-                }}>
-                  <h3 style={{ color: '#155724', marginBottom: 20, textAlign: 'center' }}>
-                    📊 Calculated Grading Results
-                  </h3>
-                  
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                    gap: 20,
-                    marginBottom: 20
-                  }}>
-                    <div style={{
-                      textAlign: 'center',
-                      padding: 20,
-                      background: 'white',
-                      borderRadius: 10,
-                      boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-                    }}>
-                      <h4 style={{ color: '#2c3e50', marginBottom: 10 }}>Record Grade</h4>
-                      <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#28a745' }}>VG</div>
-                    </div>
-                    <div style={{
-                      textAlign: 'center',
-                      padding: 20,
-                      background: 'white',
-                      borderRadius: 10,
-                      boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-                    }}>
-                      <h4 style={{ color: '#2c3e50', marginBottom: 10 }}>Sleeve Grade</h4>
-                      <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#28a745' }}>VG+</div>
-                    </div>
-                    <div style={{
-                      textAlign: 'center',
-                      padding: 20,
-                      background: 'white',
-                      borderRadius: 10,
-                      boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-                    }}>
-                      <h4 style={{ color: '#2c3e50', marginBottom: 10 }}>Overall Grade</h4>
-                      <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#28a745' }}>VG</div>
-                    </div>
-                  </div>
-
-                  <div style={{
-                    background: 'white',
-                    padding: 20,
-                    borderRadius: 10,
-                    marginBottom: 20
-                  }}>
-                    <h4 style={{ color: '#2c3e50', marginBottom: 10 }}>Grading Explanation:</h4>
-                    <p>Detailed grading calculation based on systematic assessment criteria...</p>
-                  </div>
-
-                  <div style={{
-                    background: 'white',
-                    padding: 20,
-                    borderRadius: 10,
-                    marginBottom: 20
-                  }}>
-                    <h4 style={{ color: '#2c3e50', marginBottom: 10 }}>Additional Notes:</h4>
-                    <ul>
-                      <li>Complete systematic evaluation performed</li>
-                      <li>All condition factors considered</li>
-                    </ul>
-                  </div>
-
-                  <div style={{ textAlign: 'center', marginTop: 20 }}>
-                    <button
-                      onClick={exportListing}
-                      style={{
-                        background: 'linear-gradient(135deg, #17a2b8 0%, #138496 100%)',
-                        color: 'white',
-                        border: 'none',
-                        padding: '12px 25px',
-                        borderRadius: 25,
-                        cursor: 'pointer',
-                        fontSize: '1rem',
-                        marginRight: 15,
-                        transition: 'all 0.3s ease'
-                      }}
-                    >
-                      📋 Copy Sales Listing
-                    </button>
-                    <button
-                      onClick={resetForm}
-                      style={{
-                        background: 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)',
-                        color: 'white',
-                        border: 'none',
-                        padding: '12px 25px',
-                        borderRadius: 25,
-                        cursor: 'pointer',
-                        fontSize: '1rem',
-                        transition: 'all 0.3s ease'
-                      }}
-                    >
-                      🔄 Reset Evaluation
-                    </button>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
+      <label>
+        <input
+          type="checkbox"
+          checked={!!conditions["sleeve-corner-wear"]}
+          onChange={(e)=>setCondition("sleeve-corner-wear", e.target.checked)}
+        />
+        Corner wear / corner crush present
+      </label>
+      {activeSeverities["sleeve-corner-wear-severity"] && (
+        <div className="severity">
+          <div>Severity:</div>
+          {["slight","creased","cut"].map(s => (
+            <label key={s}>
+              <input
+                type="radio"
+                name="sleeve-corner"
+                checked={severities["sleeve-corner-wear-severity"] === s}
+                onChange={()=>setSeverity("sleeve-corner-wear-severity", s)}
+              /> {s}
+            </label>
+          ))}
         </div>
+      )}
+
+      <label>
+        <input
+          type="checkbox"
+          checked={!!conditions["sleeve-ring-wear"]}
+          onChange={(e)=>setCondition("sleeve-ring-wear", e.target.checked)}
+        />
+        Ring wear visible (shelf wear)
+      </label>
+      {activeSeverities["sleeve-ring-wear-severity"] && (
+        <div className="severity">
+          <div>Severity:</div>
+          {["light","evident","heavy"].map(s => (
+            <label key={s}>
+              <input
+                type="radio"
+                name="sleeve-ring"
+                checked={severities["sleeve-ring-wear-severity"] === s}
+                onChange={()=>setSeverity("sleeve-ring-wear-severity", s)}
+              /> {s}
+            </label>
+          ))}
+        </div>
+      )}
+
+      <label>
+        <input
+          type="checkbox"
+          checked={!!conditions["sleeve-seam-splits"]}
+          onChange={(e)=>setCondition("sleeve-seam-splits", e.target.checked)}
+        />
+        Seam splits present
+      </label>
+      {activeSeverities["sleeve-seam-splits-severity"] && (
+        <div className="severity">
+          <div>Severity:</div>
+          {["small","medium","large"].map(s => (
+            <label key={s}>
+              <input
+                type="radio"
+                name="sleeve-seam"
+                checked={severities["sleeve-seam-splits-severity"] === s}
+                onChange={()=>setSeverity("sleeve-seam-splits-severity", s)}
+              /> {s}
+            </label>
+          ))}
+        </div>
+      )}
+
+      <label>
+        <input
+          type="checkbox"
+          checked={!!conditions["sleeve-tears"]}
+          onChange={(e)=>setCondition("sleeve-tears", e.target.checked)}
+        />
+        Tears present
+      </label>
+      {activeSeverities["sleeve-tears-severity"] && (
+        <div className="severity">
+          <div>Severity:</div>
+          {["small","significant","major"].map(s => (
+            <label key={s}>
+              <input
+                type="radio"
+                name="sleeve-tears"
+                checked={severities["sleeve-tears-severity"] === s}
+                onChange={()=>setSeverity("sleeve-tears-severity", s)}
+              /> {s}
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <div className="mediaGradingRoot" style={{ padding: 16 }}>
+      <div className="grading-header">
+        <h1>Systematic Media Grading Tool</h1>
+      </div>
+
+      {showResults && (
+        <div id="results" className="result">
+          <strong>Record Grade:</strong> {recordGrade} &nbsp;|&nbsp;
+          <strong>Sleeve Grade:</strong> {sleeveGrade} &nbsp;|&nbsp;
+          <strong>Overall:</strong> {overallGrade}
+        </div>
+      )}
+
+      <div className="controlsRow" style={{ margin: "12px 0" }}>
+        <label>
+          Media Type:&nbsp;
+          <select value={mediaType} onChange={(e)=>setMediaType(e.target.value as MediaType)}>
+            <option value="vinyl">Vinyl</option>
+            <option value="cassette">Cassette</option>
+            <option value="cd">CD</option>
+          </select>
+        </label>
+        <button type="button" className="btn primary" onClick={addItem}>Add Another Record</button>
+      </div>
+
+      <div className="twoCol">
+        <div>
+          <h2>🎵 Record Condition Assessment</h2>
+          {mediaItems.map(renderMediaItem)}
+        </div>
+        <div>
+          <h2>📦 Sleeve Condition Assessment</h2>
+          {renderSleeve()}
+        </div>
+      </div>
+
+      <div className="card" style={{ marginTop: 12 }}>
+        <div className="sectionTitle">📝 Custom Condition Notes</div>
+        <textarea
+          className="notes-textarea"
+          value={customNotes}
+          onChange={(e)=>setCustomNotes(e.target.value)}
+          placeholder='Examples: "Light warp, does not affect play", "Minor pressing flaw on track 3", "Includes original poster"…'
+        />
+      </div>
+
+      <div className="controlsRow" style={{ justifyContent:"flex-end", marginTop: 16 }}>
+        <button className="btn primary" onClick={calculateGrades}>Calculate Grades</button>
       </div>
     </div>
   );

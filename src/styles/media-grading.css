@@ -1,2 +1,22 @@
-/* Minimal display fix: enforce readable text color on labels/headings inside the grading page */
-.mediaGradingRoot :is(label, p, li, h1, h2, h3, h4, h5) { color:#2c3e50; }
+/* src/styles/media-grading.css (v2) – scoped, minimal layout fixes */
+.mediaGradingRoot { color:#1f2937; }
+.mediaGradingRoot .grading-header {
+  text-align:center; padding:18px 8px; margin-bottom:10px;
+}
+.mediaGradingRoot .grading-header h1 {
+  font-size: 1.6rem; font-weight:800; margin:0; letter-spacing:.2px;
+}
+.mediaGradingRoot .twoCol { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+@media (max-width: 900px){ .mediaGradingRoot .twoCol { grid-template-columns:1fr; } }
+.mediaGradingRoot .card { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:14px; }
+.mediaGradingRoot .sectionTitle { font-weight:700; margin:8px 0 10px; }
+.mediaGradingRoot .group { border:2px solid #f1f5f9; border-radius:12px; padding:12px; margin-bottom:12px; }
+.mediaGradingRoot label { color:#1f2937; display:flex; align-items:center; gap:8px; }
+.mediaGradingRoot .controlsRow { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+.mediaGradingRoot .severity { background:#fff7ed; border:1px dashed #fdba74; padding:10px; border-radius:10px; margin-top:8px; }
+.mediaGradingRoot .skipPanel { display:grid; grid-template-columns: repeat(6, max-content); column-gap:12px; row-gap:8px; align-items:center; }
+.mediaGradingRoot .skipPanel .sides { display:flex; gap:12px; }
+.mediaGradingRoot .notes-textarea { width:100%; min-height:120px; padding:10px; border:1px solid #cbd5e1; border-radius:10px; }
+.mediaGradingRoot .result { background:#ecfeff; border:1px solid #a5f3fc; border-radius:12px; padding:12px; margin-top:12px; }
+.mediaGradingRoot .btn { background:#10b981; color:#fff; border:none; padding:10px 14px; border-radius:10px; font-weight:700; cursor:pointer; }
+.mediaGradingRoot .btn.primary { background:#2563eb; }
