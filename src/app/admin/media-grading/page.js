@@ -507,10 +507,19 @@ export default function MediaGradingPage() {
   const usingMedia = !state.items.every((it) => it.missing);
   const usingSleeve = !state.sleeve.missing;
 
-  const mediaGrade = scoreToGrade(aggregated.score);
-  const sleeveGrade = scoreToGrade(sleeveCalc.score, { sealedOK: sleeveCalc.sealed, zeroDeductions: sleeveCalc.zeroDeductions });
+  // ✅ FIX: respect Mint for sealed media (vinyl only if no warping selected)
+  const mediaGrade = scoreToGrade(aggregated.score, {
+    sealedOK: state.sealedGlobal,
+    zeroDeductions: aggregated.zeroDeductions,
+  });
 
-  const mintEligible = usingMedia && usingSleeve && state.sealedGlobal && aggregated.zeroDeductions && sleeveCalc.zeroDeductions;
+  const sleeveGrade = scoreToGrade(sleeveCalc.score, {
+    sealedOK: sleeveCalc.sealed,
+    zeroDeductions: sleeveCalc.zeroDeductions,
+  });
+
+  const mintEligible =
+    usingMedia && usingSleeve && state.sealedGlobal && aggregated.zeroDeductions && sleeveCalc.zeroDeductions;
 
   let overallScoreRaw;
   if (mintEligible) {
@@ -530,12 +539,17 @@ export default function MediaGradingPage() {
   if (mintEligible) {
     whyOverall = "Overall = M because the item is sealed and both media and packaging have zero deductions.";
   } else if (usingMedia && usingSleeve) {
-    whyOverall = `Overall = average of Media and Packaging: (${aggregated.score} + ${sleeveCalc.score}) / 2 = ${((aggregated.score + sleeveCalc.score) / 2).toFixed(1)} → ${overallGrade}.`;
+    whyOverall = `Overall = average of Media and Packaging: (${aggregated.score} + ${sleeveCalc.score}) / 2 = ${(
+      (aggregated.score + sleeveCalc.score) / 2
+    ).toFixed(1)} → ${overallGrade}.`;
   } else {
-    whyOverall = `Overall = (Media + Packaging) / 4 due to missing component(s): (${aggregated.score} + ${sleeveCalc.score}) / 4 = ${((aggregated.score + sleeveCalc.score) / 4).toFixed(1)} → ${overallGrade}.`;
+    whyOverall = `Overall = (Media + Packaging) / 4 due to missing component(s): (${aggregated.score} + ${
+      sleeveCalc.score
+    }) / 4 = ${((aggregated.score + sleeveCalc.score) / 4).toFixed(1)} → ${overallGrade}.`;
   }
 
-  const addLabel = mediaType === "vinyl" ? "Add Another Record" : mediaType === "cassette" ? "Add Another Tape" : "Add Another Disc";
+  const addLabel =
+    mediaType === "vinyl" ? "Add Another Record" : mediaType === "cassette" ? "Add Another Tape" : "Add Another Disc";
 
   // --- Sealed UI filtering rules ---
   const sealed = state.sealedGlobal;
@@ -571,17 +585,14 @@ export default function MediaGradingPage() {
       {/* Global Sealed Toggle */}
       <section className="mg-card mg-sealed">
         <label className="mg-check">
-          <input
-            type="checkbox"
-            checked={state.sealedGlobal}
-            onChange={(e) => setSealedGlobal(e.target.checked)}
-          />
+          <input type="checkbox" checked={state.sealedGlobal} onChange={(e) => setSealedGlobal(e.target.checked)} />
           <span>Sealed (factory shrink intact)</span>
         </label>
         <div className="mg-help">
-          When <strong>Sealed</strong> is on: Vinyl allows evaluating only <em>Warping present</em> (media) and sleeve <em>Minor shelf wear</em>,
-          <em> Corner wear</em>, <em>Creases/crushing</em>. Cassettes/CDs default to Mint unless such exterior wear is observed.
-          Sealed adds +5 to packaging (capped at 100). Mint (M) is only allowed if sealed & flawless (zero deductions on both sides).
+          When <strong>Sealed</strong> is on: Vinyl allows evaluating only <em>Warping present</em> (media) and sleeve{" "}
+          <em>Minor shelf wear</em>,<em> Corner wear</em>, <em>Creases/crushing</em>. Cassettes/CDs default to Mint
+          unless such exterior wear is observed. Sealed adds +5 to packaging (capped at 100). Mint (M) is only allowed
+          if sealed & flawless (zero deductions on both sides).
         </div>
       </section>
 
@@ -598,13 +609,17 @@ export default function MediaGradingPage() {
             </h2>
             {!hideMediaEntirely && (
               <div className="mg-item-actions">
-                <button className="mg-btn ghost" onClick={addItem}>{addLabel}</button>
+                <button className="mg-btn ghost" onClick={addItem}>
+                  {addLabel}
+                </button>
               </div>
             )}
           </div>
 
           {hideMediaEntirely ? (
-            <div className="mg-help">Sealed {MEDIA_TYPES[mediaType]}: media evaluation is not required unless the seal is compromised.</div>
+            <div className="mg-help">
+              Sealed {MEDIA_TYPES[mediaType]}: media evaluation is not required unless the seal is compromised.
+            </div>
           ) : (
             state.items.map((it, idx) => (
               <fieldset key={idx} className="mg-fieldset">
@@ -691,7 +706,9 @@ export default function MediaGradingPage() {
                                       }
                                     />
                                   </div>
-                                  <div className="mg-help">Visual track counts are disclosure only; −1/track applies to audio defects.</div>
+                                  <div className="mg-help">
+                                    Visual track counts are disclosure only; −1/track applies to audio defects.
+                                  </div>
                                 </>
                               )}
                             </div>
@@ -785,7 +802,11 @@ export default function MediaGradingPage() {
                 {!sealed && (
                   <fieldset className={`mg-fieldset mg-fieldset-inner ${it.missing ? "mg-disabled" : ""}`}>
                     <legend>
-                      {mediaType === "vinyl" ? "Label / Center" : mediaType === "cassette" ? "Shell / Label" : "Hub / Face"}
+                      {mediaType === "vinyl"
+                        ? "Label / Center"
+                        : mediaType === "cassette"
+                        ? "Shell / Label"
+                        : "Hub / Face"}
                     </legend>
                     {dict.labelArea.map((l) => (
                       <label key={l.key} className="mg-check">
@@ -803,15 +824,24 @@ export default function MediaGradingPage() {
 
                 <div className="mg-item-controls">
                   {state.items.length > 1 && !sealed && (
-                    <button className="mg-btn" onClick={() => removeItem(idx)}>Remove</button>
+                    <button className="mg-btn" onClick={() => removeItem(idx)}>
+                      Remove
+                    </button>
                   )}
                 </div>
 
                 <div className="mg-per-item-result">
                   {(() => {
                     const calc = computeMediaItemScore(it, dict);
-                    const g = scoreToGrade(calc.score);
-                    return <span className="mg-chip">Item #{idx + 1}: {g} ({calc.score})</span>;
+                    const g = scoreToGrade(calc.score, {
+                      sealedOK: state.sealedGlobal,
+                      zeroDeductions: calc.zeroDeductions,
+                    });
+                    return (
+                      <span className="mg-chip">
+                        Item #{idx + 1}: {g} ({calc.score})
+                      </span>
+                    );
                   })()}
                 </div>
               </fieldset>
@@ -873,7 +903,8 @@ export default function MediaGradingPage() {
               ))}
               {dict.showCaseIsNote && (
                 <div className="mg-help">
-                  Standard plastic cases (jewel/Norelco) are replaceable and not graded; note case issues in <em>Additional notes</em>.
+                  Standard plastic cases (jewel/Norelco) are replaceable and not graded; note case issues in{" "}
+                  <em>Additional notes</em>.
                 </div>
               )}
             </fieldset>
@@ -901,11 +932,7 @@ export default function MediaGradingPage() {
             <div className="mg-notes-grid">
               {dict.notes.map((n) => (
                 <label key={n} className="mg-check">
-                  <input
-                    type="checkbox"
-                    checked={!!state.sleeve.notes[n]}
-                    onChange={() => toggleNote(n)}
-                  />
+                  <input type="checkbox" checked={!!state.sleeve.notes[n]} onChange={() => toggleNote(n)} />
                   <span>{n}</span>
                 </label>
               ))}
@@ -955,7 +982,9 @@ export default function MediaGradingPage() {
           {topMedia.length ? (
             <ul>
               {topMedia.map((p, i) => (
-                <li key={i}>{p.label} ({p.value})</li>
+                <li key={i}>
+                  {p.label} ({p.value})
+                </li>
               ))}
             </ul>
           ) : (
@@ -967,7 +996,9 @@ export default function MediaGradingPage() {
           {topSleeve.length ? (
             <ul>
               {topSleeve.map((p, i) => (
-                <li key={i}>{p.label} ({p.value})</li>
+                <li key={i}>
+                  {p.label} ({p.value})
+                </li>
               ))}
             </ul>
           ) : (
@@ -977,7 +1008,7 @@ export default function MediaGradingPage() {
         <div style={{ marginTop: 8 }}>{whyOverall}</div>
         <div style={{ marginTop: 8 }}>
           {aggregated.perItem.map((r, i) => {
-            const g = scoreToGrade(r.score);
+            const g = scoreToGrade(r.score, { sealedOK: state.sealedGlobal, zeroDeductions: r.zeroDeductions });
             return (
               <span key={i} className="mg-chip" style={{ marginRight: 6 }}>
                 Item #{i + 1}: {g} ({r.score})
