@@ -1,4 +1,4 @@
-/* Scope everything to this page */
+/* Scope all styles */
 #media-grading {
   --mg-bg: #0b1020;
   --mg-panel: #ffffff;
@@ -69,7 +69,7 @@
 #media-grading .mg-sealed .checkbox-row { font-weight: 600; }
 #media-grading .mg-sealed .help {
   margin: 6px 0 0 0;
-  font-size: 12px; /* keep informational copy small */
+  font-size: 12px; /* informational text smaller */
   color: #4a5568;
 }
 
@@ -100,15 +100,24 @@
 }
 #media-grading .title-actions { display: flex; gap: 12px; }
 
+#media-grading .btn {
+  border: none; border-radius: 10px; padding: 8px 12px; font-weight: 700; cursor: pointer;
+}
+#media-grading .btn.add { background: #0ea5e9; color: #fff; }
+#media-grading .btn.add:disabled { opacity: 0.5; cursor: not-allowed; }
+#media-grading .btn.danger { background: #e11d48; color: #fff; }
+#media-grading .btn:focus { outline: 3px solid #a7d8ff; }
+
 #media-grading .checkbox-row,
 #media-grading .radio-row {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 8px;
   cursor: pointer;
   user-select: none;
   font-size: 14px;
   color: var(--mg-text);
+  margin: 4px 0;
 }
 #media-grading input[type="checkbox"],
 #media-grading input[type="radio"] {
@@ -151,7 +160,7 @@
 #media-grading .sides .side { font-size: 13px; }
 
 #media-grading .tracks {
-  display: flex; align-items: center; gap: 8px;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   margin: 6px 0 0 24px;
 }
 #media-grading .tracks input[type="number"] {
@@ -165,20 +174,7 @@
   font-size: 12px; color: var(--mg-muted);
 }
 
-#media-grading .add-row {
-  margin-top: 8px;
-}
-#media-grading .btn.add {
-  background: #0ea5e9;
-  color: #fff;
-  border: none;
-  border-radius: 10px;
-  padding: 8px 12px;
-  font-weight: 700;
-  cursor: pointer;
-}
-#media-grading .btn.add:disabled { opacity: 0.5; cursor: not-allowed; }
-#media-grading .btn.add:focus { outline: 3px solid #a7d8ff; }
+#media-grading .add-row { margin-top: 8px; }
 
 #media-grading textarea {
   width: 100%;
@@ -216,21 +212,30 @@
   font-size: 12px; color: var(--mg-muted);
 }
 
-/* Color map for grade cards */
-#media-grading .card.grade.M .value { color: #0ea05a; }    /* deep green */
+/* Grade colors */
+#media-grading .card.grade.M .value { color: #0ea05a; }
 #media-grading .card.grade.NM .value { color: #19b36b; }
-#media-grading .card.grade.VG\+ .value { color: #2563eb; } /* blue */
+#media-grading .card.grade.VG\+ .value { color: #2563eb; }
 #media-grading .card.grade.VG .value { color: #3b82f6; }
-#media-grading .card.grade.G\+ .value { color: #b56a00; }  /* amber */
+#media-grading .card.grade.G\+ .value { color: #b56a00; }
 #media-grading .card.grade.G .value { color: #c47a00; }
-#media-grading .card.grade.F\/P .value { color: #dc2626; } /* red */
+#media-grading .card.grade.F\/P .value { color: #dc2626; }
+
+/* Notes grid */
+#media-grading .notes-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 16px;
+}
+@media (min-width: 800px) {
+  #media-grading .notes-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
 
 #media-grading .panel.explanation h4 {
   margin: 10px 0 4px 0;
 }
 
-/* Links & focus */
-#media-grading a { color: #2563eb; }
+/* Focus visibility */
 #media-grading a:focus, #media-grading button:focus, #media-grading input:focus, #media-grading textarea:focus {
   outline: 3px solid #a7b6ea;
   outline-offset: 1px;

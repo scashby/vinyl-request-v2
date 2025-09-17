@@ -4,40 +4,33 @@ import React, { useState, useMemo, useCallback } from "react";
 import "styles/media-grading.css";
 
 /**
- * Systematic Media Grading Tool (Admin)
- * - Next.js App Router client page
- * - Single-file vanilla React + a single global CSS import
+ * Systematic Media Grading Tool — Admin
+ * Next.js App Router (client component), plain JS/JSX + one global CSS.
  *
- * Key rules implemented:
- *  • Only 8 grades: M, NM, VG+, VG, G+, G, F/P
- *  • M is only achievable when the item is Sealed (and flawless in the allowed scope)
- *  • NM is the ceiling when not sealed
- *  • Scores start at 100; fixed penalties per spec; sealed adds +5 to packaging (cap 100)
- *  • Media grade for multi-disc = average of each disc/tape/CD (missing item counts as 0 / P)
- *  • Overall score = (mediaAvg + packagingScore)/2 normally
- *      - If media or packaging is completely missing, overall = (mediaAvg + packagingScore)/4
- *  • Overall letter comes from the averaged numeric score, but M is only assigned
- *    when Sealed rules permit it.
+ * Grades: M, NM, VG+, VG, G+, G, F/P
+ * - M only when Sealed & flawless within allowed scope.
+ * - NM ceiling if not sealed.
  *
- *  Per-format logic:
- *   - Vinyl: Media side shows vinyl-specific copy; when Sealed, only “Warping present” is evaluable;
- *            packaging allows only external wear (minor shelf, corner wear, creases/crushing).
- *   - Cassette: Media uses cassette mechanics/audio; no spindle marks; no “scratches” on tape media.
- *               Sealed cassette => Media is M unless "Missing" is checked.
- *   - CD: Media uses CD surface issues (scuffs/scratches), label-side/bronzing/pinholes,
- *         “read errors corrected” and “unreadable sectors”; Sealed CD => Media is M unless missing.
+ * Scores:
+ * - Media and Packaging start at 100; deduct per fixed rule set.
+ * - Media (multi-disc): average across items; missing item = 0.
+ * - Overall:
+ *    • Normal: (MediaAvg + Packaging) / 2
+ *    • If ALL media missing OR packaging missing: (MediaAvg + Packaging) / 4
  *
- *  Side/track annotations:
- *   - Vinyl & Cassette: For most media defects (except warping/wobble), each item can be annotated
- *     with Side A and/or Side B; audio defects can also carry a per-defect “tracks affected” integer (>=0).
- *   - CD: no sides; audio defects can mark “tracks affected”.
+ * Per-format:
+ *  - VINYL: side-aware defects with per-side track counts; visual+audio (warping not sideable).
+ *  - CASSETTE: side-aware audio defects; mechanics/label (no spindle marks; no “record scratches”).
+ *  - CD: no sides; audio defects include corrected read errors & unreadable sectors; laser-rot/top coat.
  *
- *  Explanation:
- *   - Lists the top 3 deductions for media (across all discs) and packaging.
- *   - Explains overall formula, including sealed gates and missing-component logic.
+ * UI specifics:
+ *  - Per-side "Tracks affected" (A/B, C/D, E/F…) for sideable defects.
+ *  - Auto side-letter labels per item index.
+ *  - Remove media item button.
+ *  - Packaging entries show sub-severity radios (text markers; same penalty).
+ *  - OBI and other notes included.
  */
 
-// Numeric thresholds for NM→F/P (M handled by sealed gate)
 function numericToBaseGrade(score) {
   if (score >= 97) return "NM";
   if (score >= 85) return "VG+";
@@ -47,29 +40,28 @@ function numericToBaseGrade(score) {
   return "F/P";
 }
 
-// Penalty catalog (exact defaults requested)
 const MEDIA_PENALTIES = {
-  lightScuffs: 3, // −3
-  scratches: 8, // −8
-  grooveWearOrAlt: 12, // −12 (vinyl groove wear; cassette shell scuffs; CD laser-rot/pinholes)
-  warpingOrWobble: 10, // −10 (vinyl warping; CD wobble)
-  surfaceNoise: 6, // −6 (tape hiss / surface noise)
-  popsClicksOrReadErrors: 4, // −4 (pops/clicks; CD corrected read errors)
-  skippingOrUnreadable: 30, // −30 (skipping/repeating; CD unreadable sectors)
-  labelShellHubMinor: 3, // −3 each (label writing/stickers/spindle for vinyl; shell/hub label for others)
-  perTrack: 1, // −1 per track affected (only when an audio defect is selected)
+  lightScuffs: 3,
+  scratches: 8,
+  grooveWearOrAlt: 12,
+  warpingOrWobble: 10,
+  surfaceNoise: 6,
+  popsClicksOrReadErrors: 4,
+  skippingOrUnreadable: 30,
+  labelShellHubMinor: 3,
+  perTrack: 1,
 };
 
 const SLEEVE_PENALTIES = {
-  minorShelfWear: 3, // −3
-  cornerWear: 4, // −4
-  ringWearOrBookletRing: 5, // −5
-  spineWear: 3, // −3
-  seamSplitOrCaseCracked: 12, // −12
-  tears: 8, // −8
-  writing: 4, // −4
-  stickers: 3, // −3
-  sealedBonus: 5, // +5 bonus (cap at 100)
+  minorShelfWear: 3,
+  cornerWear: 4,
+  ringWearOrBookletRing: 5,
+  spineWear: 3,
+  seamSplitOrCaseCracked: 12,
+  tears: 8,
+  writing: 4,
+  stickers: 3,
+  sealedBonus: 5,
 };
 
 const MEDIA_TYPES = [
@@ -78,13 +70,21 @@ const MEDIA_TYPES = [
   { key: "cd", label: "Compact Discs", icon: "💿" },
 ];
 
-// -------- Helpers to build per-format label sets --------
+// Side-letter helpers (A/B, C/D, E/F...)
+function sideLettersForIndex(idx) {
+  const base = "A".charCodeAt(0) + idx * 2;
+  const s1 = String.fromCharCode(base);
+  const s2 = String.fromCharCode(base + 1);
+  return [s1, s2];
+}
+
+// -------- Label builders per media type --------
 function getMediaLabels(mediaType) {
   if (mediaType === "vinyl") {
     return {
       mediaHeading: "Vinyl Record Condition Assessment",
       itemWord: "Record",
-      sidesWord: "Side",
+      sideable: true,
       mediaVisual: [
         {
           key: "glossy",
@@ -93,7 +93,6 @@ function getMediaLabels(mediaType) {
           penalty: 0,
           sideable: false,
           tracks: false,
-          hint: "Shiny, no visible defects under strong light.",
         },
         {
           key: "lightScuffs",
@@ -102,7 +101,7 @@ function getMediaLabels(mediaType) {
           sub: ["Very light, barely visible", "Visible but not deep", "Obvious, multiple scuffs"],
           penalty: MEDIA_PENALTIES.lightScuffs,
           sideable: true,
-          tracks: false,
+          tracks: true,
         },
         {
           key: "scratches",
@@ -111,7 +110,7 @@ function getMediaLabels(mediaType) {
           sub: ["Hairline scratches only", "Can feel with fingernail", "Deep, visible grooves"],
           penalty: MEDIA_PENALTIES.scratches,
           sideable: true,
-          tracks: false,
+          tracks: true,
         },
         {
           key: "grooveWear",
@@ -120,7 +119,7 @@ function getMediaLabels(mediaType) {
           sub: ["Light", "Moderate", "Heavy"],
           penalty: MEDIA_PENALTIES.grooveWearOrAlt,
           sideable: true,
-          tracks: false,
+          tracks: true,
         },
         {
           key: "warping",
@@ -213,15 +212,14 @@ function getMediaLabels(mediaType) {
     return {
       mediaHeading: "Cassette Condition Assessment",
       itemWord: "Tape",
-      sidesWord: "Side",
+      sideable: true,
       mediaVisual: [
-        // No "scratches" on tape media; use shell scuffs instead.
         {
           key: "shellScuffs",
           label: "Shell scuffs present",
           type: "check+sub",
           sub: ["Light", "Moderate", "Heavy"],
-          penalty: MEDIA_PENALTIES.grooveWearOrAlt, // −12 bucket
+          penalty: MEDIA_PENALTIES.grooveWearOrAlt,
           sideable: false,
           tracks: false,
         },
@@ -279,7 +277,6 @@ function getMediaLabels(mediaType) {
         },
       ],
       mediaLabelArea: [
-        // No spindle marks for cassette
         {
           key: "labelClean",
           label: "Shell/label clean and bright",
@@ -308,7 +305,7 @@ function getMediaLabels(mediaType) {
           key: "pressurePad",
           label: "Pressure pad missing or degraded",
           type: "check",
-          penalty: MEDIA_PENALTIES.scratches, // reasonable mid penalty bucket
+          penalty: MEDIA_PENALTIES.scratches,
           sideable: false,
           tracks: false,
         },
@@ -320,7 +317,7 @@ function getMediaLabels(mediaType) {
   return {
     mediaHeading: "Compact Disc Condition Assessment",
     itemWord: "Disc",
-    sidesWord: "Side", // not shown for CD
+    sideable: false,
     mediaVisual: [
       {
         key: "lightScuffs",
@@ -420,20 +417,64 @@ function getPackagingLabels(mediaType) {
       title: "Jacket & Packaging Condition Assessment",
       overall: [
         { key: "looksNew", label: "Looks like new, no flaws", penalty: 0 },
-        { key: "minorShelfWear", label: "Minor shelf wear only", penalty: SLEEVE_PENALTIES.minorShelfWear },
-        { key: "cornerWear", label: "Corner wear present", penalty: SLEEVE_PENALTIES.cornerWear },
-        { key: "ringWear", label: "Ring wear visible", penalty: SLEEVE_PENALTIES.ringWearOrBookletRing },
+        {
+          key: "minorShelfWear",
+          label: "Minor shelf wear only",
+          penalty: SLEEVE_PENALTIES.minorShelfWear,
+        },
+        {
+          key: "cornerWear",
+          label: "Corner wear present",
+          penalty: SLEEVE_PENALTIES.cornerWear,
+          sub: ["Slight bumping", "Creased/frayed", "Cut/heavily damaged"],
+        },
+        {
+          key: "ringWear",
+          label: "Ring wear visible",
+          penalty: SLEEVE_PENALTIES.ringWearOrBookletRing,
+          sub: ["Light", "Moderate", "Heavy"],
+        },
       ],
       seams: [
         { key: "allSeamsIntact", label: "All seams intact", penalty: 0 },
-        { key: "seamSplits", label: "Seam splits present", penalty: SLEEVE_PENALTIES.seamSplitOrCaseCracked },
-        { key: "spineWear", label: "Spine shows wear", penalty: SLEEVE_PENALTIES.spineWear },
+        {
+          key: "seamSplits",
+          label: "Seam splits present",
+          penalty: SLEEVE_PENALTIES.seamSplitOrCaseCracked,
+          sub: ["Small", "Medium", "Large / multiple"],
+        },
+        {
+          key: "spineWear",
+          label: "Spine shows wear",
+          penalty: SLEEVE_PENALTIES.spineWear,
+          sub: ["Light", "Moderate", "Heavy"],
+        },
       ],
       damage: [
-        { key: "creases", label: "Creases / crushing present", penalty: SLEEVE_PENALTIES.cornerWear },
-        { key: "tears", label: "Tears present", penalty: SLEEVE_PENALTIES.tears },
-        { key: "writing", label: "Writing present", penalty: SLEEVE_PENALTIES.writing },
-        { key: "stickers", label: "Stickers or tape", penalty: SLEEVE_PENALTIES.stickers },
+        {
+          key: "creases",
+          label: "Creases / crushing present",
+          penalty: SLEEVE_PENALTIES.cornerWear,
+          sub: ["Small", "Moderate", "Large/through"],
+        },
+        {
+          key: "tears",
+          label: "Tears present",
+          penalty: SLEEVE_PENALTIES.tears,
+          sub: ["Small", "Medium", "Large / across"],
+        },
+        {
+          key: "writing",
+          label: "Writing present",
+          penalty: SLEEVE_PENALTIES.writing,
+          sub: ["Initials/small", "Notes", "Large/covering"],
+        },
+        {
+          key: "stickers",
+          label: "Stickers or tape",
+          penalty: SLEEVE_PENALTIES.stickers,
+          sub: ["Price", "Hype", "Residue"],
+        },
       ],
       notes: [
         { key: "originalShrinkOpened", label: "Original shrinkwrap (opened)" },
@@ -445,6 +486,7 @@ function getPackagingLabels(mediaType) {
         { key: "priceSticker", label: "Price sticker/tag" },
         { key: "genericSleeve", label: "Generic/company sleeve" },
         { key: "firstPressing", label: "First pressing" },
+        { key: "obi", label: "OBI present" },
       ],
     };
   }
@@ -454,17 +496,46 @@ function getPackagingLabels(mediaType) {
       title: "J-Card & Packaging Condition Assessment",
       overall: [
         { key: "looksNew", label: "Looks like new, no flaws", penalty: 0 },
-        { key: "minorShelfWear", label: "Minor shelf wear only", penalty: SLEEVE_PENALTIES.minorShelfWear },
-        { key: "cornerWear", label: "Corner wear present", penalty: SLEEVE_PENALTIES.cornerWear },
+        {
+          key: "minorShelfWear",
+          label: "Minor shelf wear only",
+          penalty: SLEEVE_PENALTIES.minorShelfWear,
+        },
+        {
+          key: "cornerWear",
+          label: "Corner wear present",
+          penalty: SLEEVE_PENALTIES.cornerWear,
+          sub: ["Slight bumping", "Creased/frayed", "Cut/damaged"],
+        },
       ],
       seams: [
         { key: "allIntact", label: "J-card intact", penalty: 0 },
-        { key: "foldTears", label: "J-card creases/tears", penalty: SLEEVE_PENALTIES.tears },
+        {
+          key: "foldTears",
+          label: "J-card creases/tears",
+          penalty: SLEEVE_PENALTIES.tears,
+          sub: ["Small", "Medium", "Large"],
+        },
       ],
       damage: [
-        { key: "creases", label: "Creases / crushing present", penalty: SLEEVE_PENALTIES.cornerWear },
-        { key: "writing", label: "Writing present", penalty: SLEEVE_PENALTIES.writing },
-        { key: "stickers", label: "Stickers or tape", penalty: SLEEVE_PENALTIES.stickers },
+        {
+          key: "creases",
+          label: "Creases / crushing present",
+          penalty: SLEEVE_PENALTIES.cornerWear,
+          sub: ["Small", "Moderate", "Large"],
+        },
+        {
+          key: "writing",
+          label: "Writing present",
+          penalty: SLEEVE_PENALTIES.writing,
+          sub: ["Initials", "Notes", "Large/covering"],
+        },
+        {
+          key: "stickers",
+          label: "Stickers or tape",
+          penalty: SLEEVE_PENALTIES.stickers,
+          sub: ["Small", "Multiple", "Residue"],
+        },
       ],
       notes: [
         { key: "standardCaseCracked", label: "Standard Norelco case cracked (replaceable)" },
@@ -484,17 +555,46 @@ function getPackagingLabels(mediaType) {
     title: "Inlay/Booklet & Packaging Condition Assessment",
     overall: [
       { key: "looksNew", label: "Looks like new, no flaws", penalty: 0 },
-      { key: "minorShelfWear", label: "Minor shelf wear only", penalty: SLEEVE_PENALTIES.minorShelfWear },
-      { key: "cornerWear", label: "Corner wear present (insert/digipak)", penalty: SLEEVE_PENALTIES.cornerWear },
+      {
+        key: "minorShelfWear",
+        label: "Minor shelf wear only",
+        penalty: SLEEVE_PENALTIES.minorShelfWear,
+      },
+      {
+        key: "cornerWear",
+        label: "Corner wear present (insert/digipak)",
+        penalty: SLEEVE_PENALTIES.cornerWear,
+        sub: ["Slight bumping", "Creased/frayed", "Cut/damaged"],
+      },
+      {
+        key: "ringWear",
+        label: "Booklet ring wear visible",
+        penalty: SLEEVE_PENALTIES.ringWearOrBookletRing,
+        sub: ["Light", "Moderate", "Heavy"],
+      },
     ],
     seams: [
       { key: "allIntact", label: "Booklet/tray insert intact", penalty: 0 },
-      { key: "trayTeethBroken", label: "Tray teeth broken/missing (replaceable)", penalty: 0 },
     ],
     damage: [
-      { key: "creases", label: "Creases / crushing present", penalty: SLEEVE_PENALTIES.cornerWear },
-      { key: "writing", label: "Writing present", penalty: SLEEVE_PENALTIES.writing },
-      { key: "stickers", label: "Stickers or tape", penalty: SLEEVE_PENALTIES.stickers },
+      {
+        key: "creases",
+        label: "Creases / crushing present",
+        penalty: SLEEVE_PENALTIES.cornerWear,
+        sub: ["Small", "Moderate", "Large/through"],
+      },
+      {
+        key: "writing",
+        label: "Writing present",
+        penalty: SLEEVE_PENALTIES.writing,
+        sub: ["Initials", "Notes", "Large/covering"],
+      },
+      {
+        key: "stickers",
+        label: "Stickers or tape",
+        penalty: SLEEVE_PENALTIES.stickers,
+        sub: ["Price", "Hype", "Residue"],
+      },
     ],
     notes: [
       { key: "stdJewelCracked", label: "Standard jewel case cracked (replaceable)" },
@@ -508,7 +608,7 @@ function getPackagingLabels(mediaType) {
   };
 }
 
-// Disc/tape/disc initial state for media defects
+// Create initial per-item state; sideable entries get S1/S2 sides & tracks
 function makeInitialMediaState(mediaType) {
   const labels = getMediaLabels(mediaType);
   const fold = (arr) =>
@@ -516,8 +616,11 @@ function makeInitialMediaState(mediaType) {
       key: cfg.key,
       checked: false,
       sub: cfg.sub ? 0 : null,
-      sides: cfg.sideable ? { A: false, B: false } : null,
-      tracks: cfg.tracks ? 0 : null,
+      sides: cfg.sideable ? { S1: false, S2: false } : null,
+      tracks:
+        cfg.tracks
+          ? (labels.sideable ? { S1: 0, S2: 0 } : 0)
+          : null,
       penalty: cfg.penalty || 0,
       label: cfg.label,
     }));
@@ -537,27 +640,24 @@ export default function MediaGradingPage() {
   const [mediaType, setMediaType] = useState("vinyl");
   const [sealed, setSealed] = useState(false);
 
-  // Media (multi-disc) array
   const [items, setItems] = useState([makeInitialMediaState("vinyl")]);
 
-  // Packaging
   const [packagingMissing, setPackagingMissing] = useState(false);
   const [packagingChecks, setPackagingChecks] = useState({});
+  const [packagingSubs, setPackagingSubs] = useState({});
   const [additionalNotes, setAdditionalNotes] = useState({});
   const [customNotes, setCustomNotes] = useState("");
 
-  // When mediaType changes, regenerate structures while attempting to keep item count
   const labels = useMemo(() => getMediaLabels(mediaType), [mediaType]);
   const pkgLabels = useMemo(() => getPackagingLabels(mediaType), [mediaType]);
 
-  // Reset/transform when type toggles
   function onSelectType(next) {
     setMediaType(next);
     setItems((prev) => prev.map(() => makeInitialMediaState(next)));
     setPackagingMissing(false);
     setPackagingChecks({});
+    setPackagingSubs({});
     setAdditionalNotes({});
-    // Keep sealed as user choice
   }
 
   function addAnotherItem() {
@@ -565,64 +665,75 @@ export default function MediaGradingPage() {
     setItems((prev) => [...prev, makeInitialMediaState(mediaType)]);
   }
 
+  function removeItem(index) {
+    setItems((prev) => prev.filter((_, i) => i !== index));
+  }
+
   function updateItem(idx, updater) {
     setItems((prev) => prev.map((it, i) => (i === idx ? updater(it) : it)));
   }
 
-  // ----- Calculation helpers (wrapped in useCallback for stable identity) -----
   const computeMediaScoreForItem = useCallback(
     (item) => {
       if (item.missing) return { score: 0, deductions: [{ label: "Item missing", amount: 100 }] };
 
-      // Sealed rules
-      const deductions = [];
       let score = 100;
+      const deductions = [];
 
-      const evaluateRow = (row) => {
+      const evalRow = (row, isAudio) => {
         row.forEach((entry) => {
           if (!entry.checked) return;
-          // In sealed mode, vinyl media only allows warping; cassette/CD media auto M unless missing
+
+          // Sealed gating
           if (sealed) {
-            if (mediaType === "vinyl" && entry.key !== "warping") return; // ignore other vinyl media defects when sealed
-            if (mediaType !== "vinyl") return; // cassette/CD sealed media: ignore all defects (media = M)
+            if (mediaType === "vinyl") {
+              if (entry.key !== "warping") {
+                // In sealed mode for vinyl media, only warping is evaluable
+                return;
+              }
+            } else {
+              // cassette/CD sealed media => ignore all defects (media M unless missing)
+              return;
+            }
           }
+
           const p = entry.penalty || 0;
           if (p > 0) {
             score -= p;
             deductions.push({ label: entry.label, amount: p });
           }
-          // Per-defect tracks penalty only for audio defects and when relevant
-          if (
-            entry.tracks &&
-            (entry.key === "surfaceNoise" ||
-              entry.key === "popsClicks" ||
-              entry.key === "tapeHiss" ||
-              entry.key === "dropouts" ||
-              entry.key === "squealFlutter" ||
-              entry.key === "unplayableJam" ||
-              entry.key === "correctedErrors" ||
-              entry.key === "unreadable")
-          ) {
-            const t = Math.max(0, parseInt(entry.tracks || 0, 10));
-            if (t > 0) {
-              score -= t * MEDIA_PENALTIES.perTrack;
-              deductions.push({
-                label: `Tracks affected (${entry.label})`,
-                amount: t * MEDIA_PENALTIES.perTrack,
-              });
+
+          // Per-track penalty: AUDIO defects only
+          if (isAudio && entry.tracks !== null) {
+            if (labels.sideable && entry.tracks && typeof entry.tracks === "object") {
+              const countS1 = entry.sides?.S1 ? Math.max(0, parseInt(entry.tracks.S1 || 0, 10)) : 0;
+              const countS2 = entry.sides?.S2 ? Math.max(0, parseInt(entry.tracks.S2 || 0, 10)) : 0;
+              const total = countS1 + countS2;
+              if (total > 0) {
+                const amt = total * MEDIA_PENALTIES.perTrack;
+                score -= amt;
+                deductions.push({ label: `Tracks affected (${entry.label})`, amount: amt });
+              }
+            } else if (!labels.sideable && typeof entry.tracks === "number") {
+              const t = Math.max(0, parseInt(entry.tracks || 0, 10));
+              if (t > 0) {
+                const amt = t * MEDIA_PENALTIES.perTrack;
+                score -= amt;
+                deductions.push({ label: `Tracks affected (${entry.label})`, amount: amt });
+              }
             }
           }
         });
       };
 
-      evaluateRow(item.sections.visual);
-      evaluateRow(item.sections.audio);
-      evaluateRow(item.sections.labelArea);
+      evalRow(item.sections.visual, false);
+      evalRow(item.sections.audio, true);
+      evalRow(item.sections.labelArea, false);
 
       score = Math.max(0, Math.min(100, score));
       return { score, deductions };
     },
-    [sealed, mediaType]
+    [sealed, mediaType, labels.sideable]
   );
 
   const computePackagingScore = useCallback(() => {
@@ -633,20 +744,13 @@ export default function MediaGradingPage() {
     const deductions = [];
     let totalDeduction = 0;
 
-    // When sealed, only exterior wear should be evaluated:
-    // Vinyl: minor shelf wear, corner wear, creases/crushing
-    // Cassette: minor shelf wear, corner wear, j-card creases
-    // CD: minor shelf wear, corner wear, creases/crushing (digipak/inlay)
     const allowedWhenSealed = new Set(["minorShelfWear", "cornerWear", "creases"]);
 
     const applyBlock = (blockArr) => {
       blockArr.forEach((cfg) => {
         const on = !!packagingChecks[cfg.key];
         if (!on) return;
-        if (sealed) {
-          // Ignore disallowed keys while sealed
-          if (!allowedWhenSealed.has(cfg.key)) return;
-        }
+        if (sealed && !allowedWhenSealed.has(cfg.key)) return;
         if (cfg.penalty && cfg.penalty > 0) {
           totalDeduction += cfg.penalty;
           deductions.push({ label: cfg.label, amount: cfg.penalty });
@@ -658,7 +762,6 @@ export default function MediaGradingPage() {
     applyBlock(pkgLabels.seams);
     applyBlock(pkgLabels.damage);
 
-    // Sealed bonus (+5) with cap at 100
     if (sealed) {
       score = Math.min(100, score - totalDeduction + SLEEVE_PENALTIES.sealedBonus);
     } else {
@@ -667,29 +770,24 @@ export default function MediaGradingPage() {
     return { score, deductions, sealedM: sealed && totalDeduction === 0 };
   }, [packagingChecks, packagingMissing, sealed, pkgLabels]);
 
-  // Media aggregate across discs
   const mediaAgg = useMemo(() => {
     let total = 0;
     let allDeductions = [];
-
     const perItem = items.map((it) => computeMediaScoreForItem(it));
     perItem.forEach((r) => {
       total += r.score;
       allDeductions = allDeductions.concat(r.deductions);
     });
 
-    // Determine if media can be M under sealed rules:
     let mediaAllM = false;
     if (sealed) {
       if (mediaType === "vinyl") {
-        // Media is M only if NO warping selected on any item AND no item is missing
         const anyWarp = items.some((it) =>
           it.sections.visual.some((e) => e.key === "warping" && e.checked)
         );
         const anyMissing = items.some((it) => it.missing);
         mediaAllM = !anyWarp && !anyMissing;
       } else {
-        // Cassette/CD: sealed => media M if none missing
         mediaAllM = !items.some((it) => it.missing);
       }
     }
@@ -700,7 +798,6 @@ export default function MediaGradingPage() {
 
   const packagingAgg = useMemo(() => computePackagingScore(), [computePackagingScore]);
 
-  // Base grade from numeric (NM..F/P), with M gate handling
   function scoreToGrade(score, opts) {
     const { isMedia, mediaSealedAllM, packagingSealedM, isSealed } = opts;
     if (isSealed) {
@@ -710,7 +807,6 @@ export default function MediaGradingPage() {
     return numericToBaseGrade(score);
   }
 
-  // Overall
   const overall = useMemo(() => {
     const mediaScore = mediaAgg.avg;
     const mediaGrade = scoreToGrade(mediaScore, {
@@ -728,12 +824,10 @@ export default function MediaGradingPage() {
       isSealed: sealed,
     });
 
-    // If either component is completely missing → divide by 4 (as requested)
     const componentMissing = packagingMissing || items.every((it) => it.missing);
     const denom = componentMissing ? 4 : 2;
     const overallScore = Math.max(0, Math.min(100, (mediaScore + pkgScore) / denom));
 
-    // If both truly Mint under sealed rules and denom===2 => overall M
     let overallGrade;
     if (sealed) {
       const bothMint = mediaGrade === "M" && pkgGrade === "M";
@@ -742,21 +836,24 @@ export default function MediaGradingPage() {
       overallGrade = numericToBaseGrade(overallScore);
     }
 
-    // Explanation (top 3 deductions on each side)
     const mediaTop = [...mediaAgg.deductions].sort((a, b) => b.amount - a.amount).slice(0, 3);
     const pkgTop = [...packagingAgg.deductions].sort((a, b) => b.amount - a.amount).slice(0, 3);
 
     const details = [];
-    if (mediaTop.length === 0) details.push("Media: No deductions.");
-    else details.push(`Media deductions: ${mediaTop.map((d) => `${d.label} (−${d.amount})`).join("; ")}.`);
+    details.push(
+      mediaTop.length
+        ? `Media deductions: ${mediaTop.map((d) => `${d.label} (−${d.amount})`).join("; ")}.`
+        : "Media: No deductions."
+    );
+    details.push(
+      pkgTop.length
+        ? `Packaging deductions: ${pkgTop.map((d) => `${d.label} (−${d.amount})`).join("; ")}.`
+        : "Packaging: No deductions."
+    );
 
-    if (pkgTop.length === 0) details.push("Packaging: No deductions.");
-    else details.push(`Packaging deductions: ${pkgTop.map((d) => `${d.label} (−${d.amount})`).join("; ")}.`);
-
-    const formula =
-      componentMissing
-        ? "Overall = (Media + Packaging) ÷ 4 because a core component is missing."
-        : "Overall = (Media + Packaging) ÷ 2.";
+    const formula = componentMissing
+      ? "Overall = (Media + Packaging) ÷ 4 because a core component is missing."
+      : "Overall = (Media + Packaging) ÷ 2.";
 
     return {
       mediaScore,
@@ -769,9 +866,11 @@ export default function MediaGradingPage() {
     };
   }, [mediaAgg, packagingAgg, sealed, packagingMissing, items]);
 
-  // ---- UI helpers ----
   function togglePackaging(key) {
     setPackagingChecks((p) => ({ ...p, [key]: !p[key] }));
+  }
+  function setPackagingSub(key, idx) {
+    setPackagingSubs((p) => ({ ...p, [key]: idx }));
   }
   function toggleNote(key) {
     setAdditionalNotes((p) => ({ ...p, [key]: !p[key] }));
@@ -806,8 +905,8 @@ export default function MediaGradingPage() {
         <span>Sealed (factory shrink intact)</span>
       </label>
       <p className="help">
-        When <strong>Sealed</strong> is on: Vinyl allows evaluating only <em>Warping present</em> for media, and packaging
-        exterior wear (<em>Minor shelf wear</em>, <em>Corner wear</em>, <em>Creases/crushing</em>). Cassettes/CDs default to <strong>Mint</strong> for media unless missing.
+        When <strong>Sealed</strong> is on: Vinyl allows evaluating only <em>Warping present</em> for media, and
+        packaging exterior wear (<em>Minor shelf wear</em>, <em>Corner wear</em>, <em>Creases/crushing</em>). Cassettes/CDs default to <strong>Mint</strong> for media unless missing.
         Packaging gets a +5 bonus (capped at 100). <strong>Mint (M)</strong> is only assigned when sealed and flawless in the allowed scope.
       </p>
     </div>
@@ -822,8 +921,8 @@ export default function MediaGradingPage() {
     </header>
   );
 
-  // Render one media item card
   function MediaItemCard({ item, index }) {
+    const [L1, L2] = sideLettersForIndex(index);
     const idxLabel = `${labels.itemWord} #${index + 1}`;
 
     const setEntry = (sectionKey, entryKey, updates) => {
@@ -839,28 +938,16 @@ export default function MediaGradingPage() {
 
     const setMissing = (val) => updateItem(index, (it) => ({ ...it, missing: val }));
 
+    // NOTE: removed unused isAudio param to satisfy ESLint
     const sectionBlock = (title, keyName, arr) => {
-      // In Sealed+Vinyl media, show only Warping row in visual
-      const filtered = arr.filter((row) => {
-        if (!sealed) return true;
-        if (mediaType !== "vinyl") return true;
-        if (title.toLowerCase().includes("visual")) {
-          return row.key === "warping";
-        }
-        if (title.toLowerCase().includes("audio")) {
-          return false;
-        }
-        return true;
-      });
-
-      if (
-        sealed &&
-        (mediaType === "cassette" || mediaType === "cd") &&
-        (title.toLowerCase().includes("visual") || title.toLowerCase().includes("audio"))
-      ) {
-        // Hide entire media sections for cassette/CD when sealed
-        return null;
+      // Sealed media gating
+      if (sealed && mediaType !== "vinyl" && (title.toLowerCase().includes("visual") || title.toLowerCase().includes("audio") || title.toLowerCase().includes("playback"))) {
+        return null; // cassette/CD: hide media details when sealed
       }
+      const filtered =
+        sealed && mediaType === "vinyl" && title.toLowerCase().includes("visual")
+          ? arr.filter((row) => row.key === "warping")
+          : arr;
 
       if (filtered.length === 0) return null;
 
@@ -870,6 +957,7 @@ export default function MediaGradingPage() {
           {filtered.map((entry) => {
             const id = `${keyName}-${entry.key}-${index}`;
             const onToggle = (checked) => setEntry(keyName, entry.key, { checked });
+
             return (
               <div key={entry.key} className={`row ${entry.checked ? "active" : ""}`}>
                 <label htmlFor={id} className="checkbox-row">
@@ -882,7 +970,7 @@ export default function MediaGradingPage() {
                   <span>{entry.label}</span>
                 </label>
 
-                {/* Sub-gradation radios (descriptive) */}
+                {/* Sub-severity radios */}
                 {entry.checked && entry.sub && (
                   <div className="subradios" role="group" aria-label={`${entry.label} severity`}>
                     {entry.sub.map((slabel, i) => {
@@ -903,47 +991,90 @@ export default function MediaGradingPage() {
                   </div>
                 )}
 
-                {/* Side selectors for Vinyl/Cassette where applicable */}
-                {entry.checked && entry.sides && (mediaType === "vinyl" || mediaType === "cassette") && (
-                  <div className="sides" role="group" aria-label="Which sides affected">
+                {/* Side selectors + per-side tracks (vinyl/cassette) */}
+                {entry.checked && entry.sides && (
+                  <div className="sides" role="group" aria-label="Which side(s) affected">
                     <span className="sides-label">Which side(s) affected</span>
-                    {["A", "B"].map((s) => {
-                      const sid = `${id}-side-${s}`;
+                    {[
+                      { key: "S1", label: L1 },
+                      { key: "S2", label: L2 },
+                    ].map((s) => {
+                      const sid = `${id}-side-${s.key}`;
                       return (
                         <label key={sid} htmlFor={sid} className="checkbox-row side">
                           <input
                             id={sid}
                             type="checkbox"
-                            checked={!!entry.sides[s]}
+                            checked={!!entry.sides[s.key]}
                             onChange={(e) =>
                               setEntry(keyName, entry.key, {
-                                sides: { ...entry.sides, [s]: e.target.checked },
+                                sides: { ...entry.sides, [s.key]: e.target.checked },
                               })
                             }
                           />
-                          <span>{labels.sidesWord} {s}</span>
+                          <span>Side {s.label}</span>
                         </label>
                       );
                     })}
                   </div>
                 )}
 
-                {/* Tracks affected (for audio defects or when defined) */}
-                {entry.checked && typeof entry.tracks === "number" && (
+                {/* Tracks affected (per-side for sideable defects; single for CD) */}
+                {entry.checked && entry.tracks !== null && (
                   <div className="tracks">
-                    <label htmlFor={`${id}-tracks`}>Tracks affected</label>
-                    <input
-                      id={`${id}-tracks`}
-                      type="number"
-                      min="0"
-                      value={entry.tracks}
-                      onChange={(e) =>
-                        setEntry(keyName, entry.key, {
-                          tracks: Math.max(0, parseInt(e.target.value || "0", 10)),
-                        })
-                      }
-                    />
-                    <span className="hint">−1 per track, only for audio defects.</span>
+                    {labels.sideable && typeof entry.tracks === "object" ? (
+                      <>
+                        <label htmlFor={`${id}-tracks-S1`}>Tracks affected — Side {L1}</label>
+                        <input
+                          id={`${id}-tracks-S1`}
+                          type="number"
+                          min="0"
+                          value={entry.tracks.S1}
+                          onChange={(e) =>
+                            setEntry(keyName, entry.key, {
+                              tracks: {
+                                ...entry.tracks,
+                                S1: Math.max(0, parseInt(e.target.value || "0", 10)),
+                              },
+                            })
+                          }
+                        />
+                        <label htmlFor={`${id}-tracks-S2`}>Side {L2}</label>
+                        <input
+                          id={`${id}-tracks-S2`}
+                          type="number"
+                          min="0"
+                          value={entry.tracks.S2}
+                          onChange={(e) =>
+                            setEntry(keyName, entry.key, {
+                              tracks: {
+                                ...entry.tracks,
+                                S2: Math.max(0, parseInt(e.target.value || "0", 10)),
+                              },
+                            })
+                          }
+                        />
+                        <span className="hint">
+                          −1 per track applies only to <em>audio</em> defects; for visual, track counts are informational.
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <label htmlFor={`${id}-tracks`}>Tracks affected</label>
+                        <input
+                          id={`${id}-tracks`}
+                          type="number"
+                          min="0"
+                          value={entry.tracks}
+                          onChange={(e) =>
+                            setEntry(keyName, entry.key, {
+                              tracks: Math.max(0, parseInt(e.target.value || "0", 10)),
+                            })
+                          }
+                        />
+                        <span className="hint">−1 per track applies only to audio defects.</span>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -967,13 +1098,28 @@ export default function MediaGradingPage() {
               />
               <span>Mark this media as Missing (auto P)</span>
             </label>
+            <button
+              type="button"
+              className="btn danger"
+              onClick={() => removeItem(index)}
+              aria-label={`Remove ${labels.itemWord}`}
+            >
+              Remove {labels.itemWord}
+            </button>
           </div>
         </div>
 
-        {/* Visual / Audio / Label */}
         {sectionBlock("Visual Appearance", "visual", item.sections.visual)}
-        {sectionBlock(mediaType === "cassette" ? "Playback & Transport" : "Audio Performance", "audio", item.sections.audio)}
-        {sectionBlock(mediaType === "vinyl" ? "Label / Center" : mediaType === "cd" ? "Hub / Face" : "Shell / Label", "labelArea", item.sections.labelArea)}
+        {sectionBlock(
+          mediaType === "cassette" ? "Playback & Transport" : "Audio Performance",
+          "audio",
+          item.sections.audio
+        )}
+        {sectionBlock(
+          mediaType === "vinyl" ? "Label / Center" : mediaType === "cd" ? "Hub / Face" : "Shell / Label",
+          "labelArea",
+          item.sections.labelArea
+        )}
       </section>
     );
   }
@@ -998,21 +1144,49 @@ export default function MediaGradingPage() {
       {/* Overall Appearance */}
       <fieldset className="mg-fieldset">
         <legend>Overall Appearance</legend>
-        {pkgLabels.overall.map((cfg) => (
-          <label key={cfg.key} htmlFor={`pkg-${cfg.key}`} className="checkbox-row">
-            <input
-              id={`pkg-${cfg.key}`}
-              type="checkbox"
-              checked={!!packagingChecks[cfg.key]}
-              onChange={() => togglePackaging(cfg.key)}
-              disabled={sealed && !["minorShelfWear", "cornerWear"].includes(cfg.key)}
-            />
-            <span>{cfg.label}</span>
-          </label>
-        ))}
+        {pkgLabels.overall.map((cfg) => {
+          const id = `pkg-${cfg.key}`;
+          const checked = !!packagingChecks[cfg.key];
+          const disabled = sealed && !["minorShelfWear", "cornerWear", "creases"].includes(cfg.key);
+          return (
+            <div key={cfg.key} className={`row ${checked ? "active" : ""}`}>
+              <label htmlFor={id} className="checkbox-row">
+                <input
+                  id={id}
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => togglePackaging(cfg.key)}
+                  disabled={disabled}
+                />
+                <span>{cfg.label}</span>
+              </label>
+              {checked && cfg.sub && (
+                <div className="subradios">
+                  {cfg.sub.map((txt, i) => {
+                    const rid = `${id}-sub-${i}`;
+                    return (
+                      <label key={rid} htmlFor={rid} className="radio-row">
+                        <input
+                          id={rid}
+                          type="radio"
+                          name={`${id}-sub`}
+                          checked={packagingSubs[cfg.key] === i}
+                          onChange={() => setPackagingSub(cfg.key, i)}
+                          disabled={disabled}
+                        />
+                        <span>{txt}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
         {mediaType !== "vinyl" && (
           <p className="help">
-            Standard plastic cases are <strong>not graded</strong> as they are replaceable. Evaluate the J-card/inlay/booklet/digipak.
+            Standard plastic cases are <strong>not graded</strong>; evaluate the J-card/inlay/booklet/digipak. Use
+            Additional Notes for replaceable case issues.
           </p>
         )}
         {sealed && (
@@ -1024,36 +1198,92 @@ export default function MediaGradingPage() {
 
       {/* Structure */}
       <fieldset className="mg-fieldset">
-        <legend>{mediaType === "vinyl" ? "Seams & Structure" : mediaType === "cassette" ? "J-card Structure" : "Insert/Tray Structure"}</legend>
-        {pkgLabels.seams.map((cfg) => (
-          <label key={cfg.key} htmlFor={`pkg-${cfg.key}`} className="checkbox-row">
-            <input
-              id={`pkg-${cfg.key}`}
-              type="checkbox"
-              checked={!!packagingChecks[cfg.key]}
-              onChange={() => togglePackaging(cfg.key)}
-              disabled={sealed && cfg.key !== "allIntact"} /* when sealed, ignore structure issues except allowing "intact" */
-            />
-            <span>{cfg.label}</span>
-          </label>
-        ))}
+        <legend>
+          {mediaType === "vinyl" ? "Seams & Structure" : mediaType === "cassette" ? "J-card Structure" : "Insert/Tray Structure"}
+        </legend>
+        {pkgLabels.seams.map((cfg) => {
+          const id = `pkg-${cfg.key}`;
+          const checked = !!packagingChecks[cfg.key];
+          const disabled = sealed && cfg.key !== "allSeamsIntact" && cfg.key !== "allIntact";
+          return (
+            <div key={cfg.key} className={`row ${checked ? "active" : ""}`}>
+              <label htmlFor={id} className="checkbox-row">
+                <input
+                  id={id}
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => togglePackaging(cfg.key)}
+                  disabled={disabled}
+                />
+                <span>{cfg.label}</span>
+              </label>
+              {checked && cfg.sub && (
+                <div className="subradios">
+                  {cfg.sub.map((txt, i) => {
+                    const rid = `${id}-sub-${i}`;
+                    return (
+                      <label key={rid} htmlFor={rid} className="radio-row">
+                        <input
+                          id={rid}
+                          type="radio"
+                          name={`${id}-sub`}
+                          checked={packagingSubs[cfg.key] === i}
+                          onChange={() => setPackagingSub(cfg.key, i)}
+                          disabled={disabled}
+                        />
+                        <span>{txt}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </fieldset>
 
       {/* Damage */}
       <fieldset className="mg-fieldset">
         <legend>Damage &amp; Markings</legend>
-        {pkgLabels.damage.map((cfg) => (
-          <label key={cfg.key} htmlFor={`pkg-${cfg.key}`} className="checkbox-row">
-            <input
-              id={`pkg-${cfg.key}`}
-              type="checkbox"
-              checked={!!packagingChecks[cfg.key]}
-              onChange={() => togglePackaging(cfg.key)}
-              disabled={sealed && cfg.key !== "creases"} /* sealed: permit only creases/crushing from exterior */
-            />
-            <span>{cfg.label}</span>
-          </label>
-        ))}
+        {pkgLabels.damage.map((cfg) => {
+          const id = `pkg-${cfg.key}`;
+          const checked = !!packagingChecks[cfg.key];
+          const disabled = sealed && cfg.key !== "creases";
+          return (
+            <div key={cfg.key} className={`row ${checked ? "active" : ""}`}>
+              <label htmlFor={id} className="checkbox-row">
+                <input
+                  id={id}
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => togglePackaging(cfg.key)}
+                  disabled={disabled}
+                />
+                <span>{cfg.label}</span>
+              </label>
+              {checked && cfg.sub && (
+                <div className="subradios">
+                  {cfg.sub.map((txt, i) => {
+                    const rid = `${id}-sub-${i}`;
+                    return (
+                      <label key={rid} htmlFor={rid} className="radio-row">
+                        <input
+                          id={rid}
+                          type="radio"
+                          name={`${id}-sub`}
+                          checked={packagingSubs[cfg.key] === i}
+                          onChange={() => setPackagingSub(cfg.key, i)}
+                          disabled={disabled}
+                        />
+                        <span>{txt}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </fieldset>
 
       {/* Additional notes */}
@@ -1072,9 +1302,6 @@ export default function MediaGradingPage() {
             </label>
           ))}
         </div>
-        {mediaType !== "vinyl" && (
-          <p className="help">Standard jewel/Norelco cases are replaceable; track them here if needed.</p>
-        )}
       </fieldset>
     </section>
   );
@@ -1109,19 +1336,16 @@ export default function MediaGradingPage() {
         </div>
       </div>
 
-      {/* Custom notes */}
       <section className="panel">
         <h3>📝 Custom Condition Notes</h3>
         <textarea
           rows={4}
           value={customNotes}
           onChange={(e) => setCustomNotes(e.target.value)}
-          placeholder=""
           aria-label="Custom condition notes"
         />
       </section>
 
-      {/* Results */}
       <section className="results">
         <div className={`card grade ${overall.mediaGrade}`}>
           <div className="label">{mediaType === "vinyl" ? "Record Grade" : mediaType === "cassette" ? "Tape Grade" : "Disc Grade"}</div>
