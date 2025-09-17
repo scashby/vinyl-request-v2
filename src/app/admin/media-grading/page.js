@@ -1,16 +1,16 @@
 // src/app/admin/media-grading/page.js
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import "styles/media-grading.css";
 
 /**
- * Systematic Media Grading Tool (App Router client page)
+ * Systematic Media Grading Tool (Next.js App Router, client page)
  * JavaScript only, React hooks, no external state libs.
  *
  * Grades (exactly 8): M, NM, VG+, VG, G+, G, F, P
  * - M is reachable ONLY if packaging is Sealed AND has zero deductions AND media has zero deductions.
- * - Otherwise NM is the highest possible.
+ * - Otherwise NM is the ceiling.
  *
  * Scores start at 100 and deduct via the default weights below (EXACT as requested).
  * Sleeve "Sealed" adds +5 (cap at 100) and appears first.
@@ -24,8 +24,14 @@ import "styles/media-grading.css";
  *   35–49:  F
  *   <35:    P
  *
- * Overall = lower (worse) of Media vs Sleeve unless one side is missing.
- * Multi-item sets: grade each item, average the media scores. Missing item = P (score 0).
+ * Overall formula (per your revision):
+ *   - Compute Media score. For multi-disc sets, average all discs/tapes (missing item = score 0).
+ *   - If BOTH Media and Packaging are present: OverallScore = (MediaScore + PackagingScore) / 2.
+ *   - If EITHER side is missing: OverallScore = (MediaScore + PackagingScore) / 4  (punishes missing components).
+ *   - Overall grade = grade(overallScore) except when Mint gate is satisfied (see below).
+ *
+ * Mint gate:
+ *   - Overall = M only if: Packaging "Sealed" is checked AND Packaging has zero deductions AND Media has zero deductions.
  *
  * Penalties (defaults EXACTLY as specified):
  * Media:
@@ -48,14 +54,18 @@ import "styles/media-grading.css";
  *  - Tears: −8
  *  - Writing: −4
  *  - Stickers/tape: −3
- *  - Creases/crushing: −3   (mapped to the same light-wear bucket)
+ *  - Creases/crushing: −3
  *  - Sealed intact: +5 (cap 100)
  *
  * Notes (CD/cassette): Standard plastic cases (jewel/Norelco) are NOT graded (replaceable).
- * Use Additional Notes to record case condition or custom packaging.
+ * Record any case issues in Additional Notes.
  */
 
-/* ---------------- Helpers ---------------- */
+const PILL_LABELS = {
+  vinyl: "🎵 Vinyl Records",
+  cassette: "📼 Cassette Tapes",
+  cd: "💿 Compact Discs",
+};
 
 function scoreToGrade(score, opts = { sealedOK: false, zeroDeductions: false }) {
   if (opts.sealedOK && opts.zeroDeductions) return "M";
@@ -77,8 +87,6 @@ function topDeductions(penalties, topN = 3) {
   return arr.slice(0, topN);
 }
 
-/* ---------------- Media-type dictionaries ---------------- */
-
 const MEDIA_TYPES = {
   vinyl: "Vinyl",
   cassette: "Cassette",
@@ -86,275 +94,259 @@ const MEDIA_TYPES = {
 };
 
 function useMediaDictionaries(mediaType) {
-  // All labels/criteria dynamically change per media type.
-  // Some defects include "severity" radios; penalties remain the fixed weights.
-  return useMemo(() => {
-    const isVinyl = mediaType === "vinyl";
-    const isCass = mediaType === "cassette";
-    const isCD = mediaType === "cd";
+  const isVinyl = mediaType === "vinyl";
+  const isCass = mediaType === "cassette";
+  const isCD = mediaType === "cd";
 
-    // ----- MEDIA: Visual -----
-    const visual = isVinyl
-      ? [
-          { key: "glossyLikeNew", label: "Record has glossy, like-new appearance", penalty: 0, infoOnly: true },
-          {
-            key: "lightScuffs",
-            label: "Light scuffs visible",
-            penalty: -3,
-            allowSides: true,
-            allowTracks: true, // disclosure only
-            severity: ["Very light, barely visible", "Visible but not deep", "Obvious, multiple scuffs"],
-          },
-          {
-            key: "scratches",
-            label: "Scratches present",
-            penalty: -8,
-            allowSides: true,
-            allowTracks: true,
-            severity: ["Hairline scratches only", "Can feel with fingernail", "Deep, visible grooves"],
-          },
-          {
-            key: "grooveWear",
-            label: "Groove wear visible",
-            penalty: -12,
-            allowSides: true,
-            allowTracks: true,
-            severity: ["Light", "Moderate", "Heavy"],
-          },
-          {
-            key: "warping",
-            label: "Warping present",
-            penalty: -10,
-            allowSides: false,
-            allowTracks: false,
-          },
-        ]
-      : isCass
-      ? [
-          { key: "shellLooksNew", label: "Shell looks like new", penalty: 0, infoOnly: true },
-          {
-            key: "shellScuffs",
-            label: "Shell scuffs present",
-            penalty: -12, // maps to "groove wear / shell scuffs"
-            allowSides: true,
-            allowTracks: true, // disclosure only
-            severity: ["Light rubs", "Noticeable scuffs", "Deep gouges"],
-          },
-          {
-            key: "tapeWrinkle",
-            label: "Tape wrinkles/creases visible in window",
-            penalty: -8, // maps to "scratches"
-            allowSides: true,
-            allowTracks: true,
-            severity: ["Minor wrinkle", "Local crease", "Multiple wrinkles/edge damage"],
-          },
-          // warping not applicable to tape media
-        ]
-      : [
-          { key: "discLooksNew", label: "Disc playing surface looks like new", penalty: 0, infoOnly: true },
-          {
-            key: "lightScuffs",
-            label: "Light scuffs visible",
-            penalty: -3,
-            allowSides: false,
-            allowTracks: true, // disclosure only
-            severity: ["Hairlines", "Light swirls", "Multiple light scuffs"],
-          },
-          {
-            key: "scratches",
-            label: "Scratches present",
-            penalty: -8,
-            allowSides: false,
-            allowTracks: true,
-            severity: ["Light", "Moderate", "Deep"],
-          },
-          {
-            key: "rotPinholes",
-            label: "Laser-rot / pinholes visible (label/top side)",
-            penalty: -12,
-            allowSides: false,
-            allowTracks: true,
-            severity: ["Few", "Several", "Widespread"],
-          },
-          { key: "discWobble", label: "Disc wobble present", penalty: -10, allowSides: false, allowTracks: false },
-        ];
+  const visual = isVinyl
+    ? [
+        { key: "glossyLikeNew", label: "Record has glossy, like-new appearance", penalty: 0, infoOnly: true },
+        {
+          key: "lightScuffs",
+          label: "Light scuffs visible",
+          penalty: -3,
+          allowSides: true,
+          allowTracks: true, // disclosure only (not counted in -1/track)
+          severity: ["Very light, barely visible", "Visible but not deep", "Obvious, multiple scuffs"],
+        },
+        {
+          key: "scratches",
+          label: "Scratches present",
+          penalty: -8,
+          allowSides: true,
+          allowTracks: true,
+          severity: ["Hairline scratches only", "Can feel with fingernail", "Deep, visible grooves"],
+        },
+        {
+          key: "grooveWear",
+          label: "Groove wear visible",
+          penalty: -12,
+          allowSides: true,
+          allowTracks: true,
+          severity: ["Light", "Moderate", "Heavy"],
+        },
+        {
+          key: "warping",
+          label: "Warping present",
+          penalty: -10,
+          allowSides: false,
+          allowTracks: false,
+        },
+      ]
+    : isCass
+    ? [
+        { key: "shellLooksNew", label: "Shell looks like new", penalty: 0, infoOnly: true },
+        {
+          key: "shellScuffs",
+          label: "Shell scuffs present",
+          penalty: -12, // maps to "groove wear / shell scuffs"
+          allowSides: true,
+          allowTracks: true, // disclosure only
+          severity: ["Light rubs", "Noticeable scuffs", "Deep gouges"],
+        },
+        {
+          key: "tapeWrinkle",
+          label: "Tape wrinkles/creases visible in window",
+          penalty: -8, // maps to "scratches"
+          allowSides: true,
+          allowTracks: true,
+          severity: ["Minor wrinkle", "Local crease", "Multiple wrinkles/edge damage"],
+        },
+        // no warping for tape media
+      ]
+    : [
+        { key: "discLooksNew", label: "Disc playing surface looks like new", penalty: 0, infoOnly: true },
+        {
+          key: "lightScuffs",
+          label: "Light scuffs visible",
+          penalty: -3,
+          allowSides: false,
+          allowTracks: true, // disclosure only
+          severity: ["Hairlines", "Light swirls", "Multiple light scuffs"],
+        },
+        {
+          key: "scratches",
+          label: "Scratches present",
+          penalty: -8,
+          allowSides: false,
+          allowTracks: true,
+          severity: ["Light", "Moderate", "Deep"],
+        },
+        {
+          key: "rotPinholes",
+          label: "Laser-rot / pinholes visible (label/top side)",
+          penalty: -12,
+          allowSides: false,
+          allowTracks: true,
+          severity: ["Few", "Several", "Widespread"],
+        },
+        { key: "discWobble", label: "Disc wobble present", penalty: -10, allowSides: false, allowTracks: false },
+      ];
 
-    // ----- MEDIA: Audio -----
-    const audio = isVinyl
-      ? [
-          { key: "playsClean", label: "Plays with no surface noise", penalty: 0, infoOnly: true },
-          { key: "surfaceNoise", label: "Surface noise when played", penalty: -6, allowSides: true, allowTracks: true },
-          { key: "popsClicks", label: "Occasional pops or clicks", penalty: -4, allowSides: true, allowTracks: true },
-          { key: "skipping", label: "Skipping or repeating", penalty: -30, allowSides: true, allowTracks: true },
-        ]
-      : isCass
-      ? [
-          { key: "playsClean", label: "Plays with no audible issues", penalty: 0, infoOnly: true },
-          { key: "surfaceNoise", label: "Surface noise when played", penalty: -6, allowSides: true, allowTracks: true },
-          { key: "wowFlutter", label: "Squeal / wow–flutter audible", penalty: -6, allowSides: true, allowTracks: true },
-          { key: "dropouts", label: "Dropouts/jams preventing play", penalty: -30, allowSides: true, allowTracks: true },
-        ]
-      : [
-          { key: "playsClean", label: "Plays with no read errors", penalty: 0, infoOnly: true },
-          { key: "correctedErrors", label: "Occasional read errors corrected", penalty: -4, allowSides: false, allowTracks: true },
-          { key: "unreadable", label: "Unreadable sectors / skipping", penalty: -30, allowSides: false, allowTracks: true },
-        ];
+  const audio = isVinyl
+    ? [
+        { key: "playsClean", label: "Plays with no surface noise", penalty: 0, infoOnly: true },
+        { key: "surfaceNoise", label: "Surface noise when played", penalty: -6, allowSides: true, allowTracks: true },
+        { key: "popsClicks", label: "Occasional pops or clicks", penalty: -4, allowSides: true, allowTracks: true },
+        { key: "skipping", label: "Skipping or repeating", penalty: -30, allowSides: true, allowTracks: true },
+      ]
+    : isCass
+    ? [
+        { key: "playsClean", label: "Plays with no audible issues", penalty: 0, infoOnly: true },
+        { key: "surfaceNoise", label: "Surface noise when played", penalty: -6, allowSides: true, allowTracks: true },
+        { key: "wowFlutter", label: "Squeal / wow–flutter audible", penalty: -6, allowSides: true, allowTracks: true },
+        { key: "dropouts", label: "Dropouts/jams preventing play", penalty: -30, allowSides: true, allowTracks: true },
+      ]
+    : [
+        { key: "playsClean", label: "Plays with no read errors", penalty: 0, infoOnly: true },
+        { key: "correctedErrors", label: "Occasional read errors corrected", penalty: -4, allowSides: false, allowTracks: true },
+        { key: "unreadable", label: "Unreadable sectors / skipping", penalty: -30, allowSides: false, allowTracks: true },
+      ];
 
-    // ----- MEDIA: Label area / hub / shell -----
-    const labelArea = isVinyl
-      ? [
-          { key: "labelClean", label: "Label is clean and bright", penalty: 0, infoOnly: true },
-          { key: "spindleMarks", label: "Spindle marks present", penalty: -3 },
-          { key: "labelWriting", label: "Writing on label", penalty: -3 },
-          { key: "labelStickers", label: "Stickers or tape on label", penalty: -3 },
-        ]
-      : isCass
-      ? [
-          { key: "labelClean", label: "Shell/label is clean and bright", penalty: 0, infoOnly: true },
-          { key: "labelWriting", label: "Writing on shell/label", penalty: -3 },
-          { key: "labelStickers", label: "Stickers or tape on shell", penalty: -3 },
-          { key: "shellCracked", label: "Shell cracked / hinge damage", penalty: -12 },
-          { key: "pressurePadBad", label: "Pressure pad rusted / degraded", penalty: -6 },
-          { key: "pressurePadMissing", label: "Pressure pad missing", penalty: -30 },
-        ]
-      : [
-          { key: "labelClean", label: "Hub/face is clean and bright", penalty: 0, infoOnly: true },
-          { key: "labelWriting", label: "Writing on hub/face", penalty: -3 },
-          { key: "labelStickers", label: "Stickers or tape on hub/face", penalty: -3 },
-        ];
+  const labelArea = isVinyl
+    ? [
+        { key: "labelClean", label: "Label is clean and bright", penalty: 0, infoOnly: true },
+        { key: "spindleMarks", label: "Spindle marks present", penalty: -3 },
+        { key: "labelWriting", label: "Writing on label", penalty: -3 },
+        { key: "labelStickers", label: "Stickers or tape on label", penalty: -3 },
+      ]
+    : isCass
+    ? [
+        { key: "labelClean", label: "Shell/label is clean and bright", penalty: 0, infoOnly: true },
+        { key: "labelWriting", label: "Writing on shell/label", penalty: -3 },
+        { key: "labelStickers", label: "Stickers or tape on shell", penalty: -3 },
+        { key: "shellCracked", label: "Shell cracked / hinge damage", penalty: -12 },
+        { key: "pressurePadBad", label: "Pressure pad rusted / degraded", penalty: -6 },
+        { key: "pressurePadMissing", label: "Pressure pad missing", penalty: -30 },
+      ]
+    : [
+        { key: "labelClean", label: "Hub/face is clean and bright", penalty: 0, infoOnly: true },
+        { key: "labelWriting", label: "Writing on hub/face", penalty: -3 },
+        { key: "labelStickers", label: "Stickers or tape on hub/face", penalty: -3 },
+      ];
 
-    // ----- SLEEVE / PACKAGING -----
-    // Sealed comes FIRST. When sealed is checked, M is possible if no other deductions exist.
-    const sleeveOverall = isCass
-      ? [
-          { key: "sealed", label: "Sealed (factory shrink intact)", bonus: +5 },
-          { key: "looksNew", label: "Looks like new, no flaws", penalty: 0, infoOnly: true },
-          { key: "minorShelf", label: "Minor shelf wear only", penalty: -3 },
-          { key: "cornerWear", label: "Corner wear present (inlay/case edges)", penalty: -4 },
-          // No ring wear for cassette packaging.
-        ]
-      : isCD
-      ? [
-          { key: "sealed", label: "Sealed (factory shrink intact)", bonus: +5 },
-          { key: "looksNew", label: "Looks like new, no flaws", penalty: 0, infoOnly: true },
-          { key: "minorShelf", label: "Minor shelf wear only", penalty: -3 },
-          { key: "cornerWear", label: "Corner wear present (insert/digipak)", penalty: -4 },
-          { key: "ringWear", label: "Booklet ring wear visible", penalty: -5 },
-        ]
-      : [
-          { key: "sealed", label: "Sealed (factory shrink intact)", bonus: +5 },
-          { key: "looksNew", label: "Looks like new, no flaws", penalty: 0, infoOnly: true },
-          { key: "minorShelf", label: "Minor shelf wear only", penalty: -3 },
-          { key: "cornerWear", label: "Corner wear present", penalty: -4 },
-          { key: "ringWear", label: "Ring wear visible", penalty: -5 },
-        ];
+  const sleeveOverall = isCass
+    ? [
+        { key: "sealed", label: "Sealed (factory shrink intact)", bonus: +5 },
+        { key: "looksNew", label: "Looks like new, no flaws", penalty: 0, infoOnly: true },
+        { key: "minorShelf", label: "Minor shelf wear only", penalty: -3 },
+        { key: "cornerWear", label: "Corner wear present (inlay/case edges)", penalty: -4 },
+        // no ring wear on cassette packaging
+      ]
+    : isCD
+    ? [
+        { key: "sealed", label: "Sealed (factory shrink intact)", bonus: +5 },
+        { key: "looksNew", label: "Looks like new, no flaws", penalty: 0, infoOnly: true },
+        { key: "minorShelf", label: "Minor shelf wear only", penalty: -3 },
+        { key: "cornerWear", label: "Corner wear present (insert/digipak)", penalty: -4 },
+        { key: "ringWear", label: "Booklet ring wear visible", penalty: -5 },
+      ]
+    : [
+        { key: "sealed", label: "Sealed (factory shrink intact)", bonus: +5 },
+        { key: "looksNew", label: "Looks like new, no flaws", penalty: 0, infoOnly: true },
+        { key: "minorShelf", label: "Minor shelf wear only", penalty: -3 },
+        { key: "cornerWear", label: "Corner wear present", penalty: -4 },
+        { key: "ringWear", label: "Ring wear visible", penalty: -5 },
+      ];
 
-    // Structure: for cassettes/CDs we DO NOT grade standard cases (replaceable).
-    // Focus on J-card (cassette) and booklet/insert/digipak (CD).
-    const sleeveStructure = isCD
-      ? [
-          { key: "bookletSpineWear", label: "Insert/booklet spine wear or fold wear", penalty: -3 }, // maps to spine wear
-          { key: "digipakPanelWear", label: "Digipak/box panel wear", penalty: -3 }, // optional light wear bucket
-          // no penalties for case cracked / tray teeth (handled as notes below)
-        ]
-      : isCass
-      ? [
-          { key: "inlayFoldWear", label: "J-card fold wear / creases", penalty: -3 }, // maps to spine wear
-          // no penalties for standard Norelco case (handled as notes below)
-        ]
-      : [
-          { key: "seamsIntact", label: "All seams intact", penalty: 0, infoOnly: true },
-          { key: "seamSplit", label: "Seam splits present", penalty: -12 },
-          { key: "spineWear", label: "Spine shows wear", penalty: -3 },
-        ];
+  const sleeveStructure = isCD
+    ? [
+        { key: "bookletSpineWear", label: "Insert/booklet spine wear or fold wear", penalty: -3 },
+        { key: "digipakPanelWear", label: "Digipak/box panel wear", penalty: -3 },
+        // case cracked / tray teeth are notes only
+      ]
+    : isCass
+    ? [
+        { key: "inlayFoldWear", label: "J-card fold wear / creases", penalty: -3 },
+        // standard Norelco case is notes only
+      ]
+    : [
+        { key: "seamsIntact", label: "All seams intact", penalty: 0, infoOnly: true },
+        { key: "seamSplit", label: "Seam splits present", penalty: -12 },
+        { key: "spineWear", label: "Spine shows wear", penalty: -3 },
+      ];
 
-    // Damage & Markings (shared)
-    const sleeveDamage = [
-      { key: "creases", label: "Creases / crushing present", penalty: -3 }, // reintroduced
-      { key: "tears", label: "Tears present", penalty: -8 },
-      { key: "writing", label: "Writing present", penalty: -4 },
-      { key: "stickers", label: "Stickers or tape", penalty: -3 },
-    ];
+  const sleeveDamage = [
+    { key: "creases", label: "Creases / crushing present", penalty: -3 },
+    { key: "tears", label: "Tears present", penalty: -8 },
+    { key: "writing", label: "Writing present", penalty: -4 },
+    { key: "stickers", label: "Stickers or tape", penalty: -3 },
+  ];
 
-    // Additional notes (do not affect score)
-    const notes = isCD
-      ? [
-          "Standard jewel case cracked (note — case is replaceable)",
-          "Tray teeth broken (note — case is replaceable)",
-          "Custom case / box / digipak (note)",
-          "OBI present",
-          "Promotional copy",
-          "Slipcase included",
-          "Special/limited edition",
-        ]
-      : isCass
-      ? [
-          "Standard Norelco case cracked (note — case is replaceable)",
-          "Stickered case (note)",
-          "Custom/collectible case (note)",
-          "Original shrinkwrap (opened)",
-          "OBI present",
-          "Promotional copy",
-          "Shell color variant",
-          "Limited edition",
-        ]
-      : [
-          "Original shrinkwrap (opened)",
-          "Hype sticker present",
-          "Cut-out hole/notch/corner cut",
-          "Promotional copy",
-          "Price sticker/tag",
-          "First pressing",
-          "Gatefold sleeve",
-          "Original inner sleeve",
-          "Generic/company sleeve",
-        ];
+  const notes = isCD
+    ? [
+        "Standard jewel case cracked (note — case is replaceable)",
+        "Tray teeth broken (note — case is replaceable)",
+        "Custom case / box / digipak (note)",
+        "OBI present",
+        "Promotional copy",
+        "Slipcase included",
+        "Special/limited edition",
+      ]
+    : isCass
+    ? [
+        "Standard Norelco case cracked (note — case is replaceable)",
+        "Stickered case (note)",
+        "Custom/collectible case (note)",
+        "Original shrinkwrap (opened)",
+        "OBI present",
+        "Promotional copy",
+        "Shell color variant",
+        "Limited edition",
+      ]
+    : [
+        "Original shrinkwrap (opened)",
+        "Hype sticker present",
+        "Cut-out hole/notch/corner cut",
+        "Promotional copy",
+        "Price sticker/tag",
+        "First pressing",
+        "Gatefold sleeve",
+        "Original inner sleeve",
+        "Generic/company sleeve",
+      ];
 
-    // Dynamic titles
-    const mediaTitle = isVinyl
-      ? "🎶 Vinyl Record Condition Assessment"
-      : isCass
-      ? "🎶 Cassette Condition Assessment"
-      : "🎶 Compact Disc Condition Assessment";
+  const mediaTitle = isVinyl
+    ? "🎶 Vinyl Record Condition Assessment"
+    : isCass
+    ? "🎶 Cassette Condition Assessment"
+    : "🎶 Compact Disc Condition Assessment";
 
-    const itemLegendLabel = isVinyl ? "Record" : isCass ? "Tape" : "Disc";
+  const itemLegendLabel = isVinyl ? "Record" : isCass ? "Tape" : "Disc";
 
-    const packagingTitle = isVinyl
-      ? "📦 Jacket & Packaging Condition Assessment"
-      : isCass
-      ? "📦 J-Card & Case Packaging Condition Assessment"
-      : "📦 Booklet / Digipak / Packaging Condition Assessment";
+  const packagingTitle = isVinyl
+    ? "📦 Jacket & Packaging Condition Assessment"
+    : isCass
+    ? "📦 J-Card & Case Packaging Condition Assessment"
+    : "📦 Booklet / Digipak / Packaging Condition Assessment";
 
-    const packagingStructureLegend = isVinyl ? "Seams & Structure" : isCass ? "J-Card & Inlay" : "Insert / Digipak";
+  const packagingStructureLegend = isVinyl ? "Seams & Structure" : isCass ? "J-Card & Inlay" : "Insert / Digipak";
 
-    return {
-      visual,
-      audio,
-      labelArea,
-      sleeveOverall,
-      sleeveStructure,
-      sleeveDamage,
-      notes,
-      mediaTitle,
-      itemLegendLabel,
-      packagingTitle,
-      packagingStructureLegend,
-      sidesEnabled: !isCD,
-      showCaseIsNote: isCass || isCD,
-    };
-  }, [mediaType]);
+  return {
+    visual,
+    audio,
+    labelArea,
+    sleeveOverall,
+    sleeveStructure,
+    sleeveDamage,
+    notes,
+    mediaTitle,
+    itemLegendLabel,
+    packagingTitle,
+    packagingStructureLegend,
+    sidesEnabled: !isCD,
+    showCaseIsNote: isCass || isCD,
+  };
 }
-
-/* ---------------- State shapes ---------------- */
 
 function newMediaItem() {
   return {
     missing: false,
-    multiDiscSides: false, // show C/D when true (2x media)
+    multiDiscSides: false, // show C/D when true
     visual: {},
     audio: {},
     labelArea: {},
-    meta: {}, // { [defKey]: { severity: string, tracks: number, sides: {A,B,C,D} } }
+    meta: {}, // { [defKey]: { severity, tracks, sides: {A,B,C,D} } }
   };
 }
 
@@ -372,8 +364,6 @@ function initialState(mediaType) {
     },
   };
 }
-
-/* ---------------- Computation ---------------- */
 
 function ensureMetaFor(item, defKey, sidesEnabled) {
   const existing = item.meta?.[defKey];
@@ -398,7 +388,6 @@ function computeMediaItemScore(item, dict) {
   const penalties = [];
   let totalAudioTracks = 0;
 
-  // Visual
   dict.visual.forEach((v) => {
     const isOn = !!item.visual[v.key];
     if (!isOn || v.infoOnly) return;
@@ -419,7 +408,6 @@ function computeMediaItemScore(item, dict) {
     if (v.penalty) penalties.push({ label: `${v.label}${extra}`, value: v.penalty });
   });
 
-  // Audio
   dict.audio.forEach((a) => {
     const isOn = !!item.audio[a.key];
     if (!isOn || a.infoOnly) return;
@@ -441,7 +429,6 @@ function computeMediaItemScore(item, dict) {
     if (a.penalty) penalties.push({ label: `${a.label}${extra}`, value: a.penalty });
   });
 
-  // Label / hub / shell
   Object.entries(item.labelArea || {}).forEach(([key, on]) => {
     if (!on) return;
     const def = dict.labelArea.find((d) => d.key === key);
@@ -451,7 +438,6 @@ function computeMediaItemScore(item, dict) {
     if (pen) penalties.push({ label: def.label, value: pen });
   });
 
-  // Per-track penalty: ONLY for audio tracks
   if (totalAudioTracks > 0) {
     const perTrack = -1 * totalAudioTracks;
     score += perTrack;
@@ -487,7 +473,6 @@ function computeSleeveScore(sleeve, dict) {
   const penalties = [];
   let sealed = false;
 
-  // Overall — Sealed first
   dict.sleeveOverall.forEach((o) => {
     if (!sleeve.overall[o.key]) return;
     if (o.bonus) {
@@ -501,14 +486,12 @@ function computeSleeveScore(sleeve, dict) {
     }
   });
 
-  // Structure (CD/cass: J-card/insert only; cases are notes only)
   dict.sleeveStructure.forEach((s) => {
     if (!sleeve.structure[s.key] || s.infoOnly) return;
     score += s.penalty || 0;
     if (s.penalty) penalties.push({ label: s.label, value: s.penalty });
   });
 
-  // Damage
   dict.sleeveDamage.forEach((d) => {
     if (!sleeve.damage[d.key]) return;
     score += d.penalty || 0;
@@ -523,8 +506,6 @@ function computeSleeveScore(sleeve, dict) {
   };
 }
 
-/* ---------------- Component ---------------- */
-
 export default function MediaGradingPage() {
   const [mediaType, setMediaType] = useState("vinyl");
   const dict = useMediaDictionaries(mediaType);
@@ -532,10 +513,9 @@ export default function MediaGradingPage() {
 
   function changeMediaType(next) {
     setMediaType(next);
-    setState(initialState(next)); // fresh session on switch
+    setState(initialState(next));
   }
 
-  // --- Item mutators ---
   function updateItem(idx, patch) {
     setState((s) => {
       const items = s.items.map((it, i) => (i === idx ? { ...it, ...patch } : it));
@@ -548,8 +528,6 @@ export default function MediaGradingPage() {
       const items = s.items.map((it, i) => {
         if (i !== idx) return it;
         const nextGroup = { ...(it[group] || {}), [key]: !it[group]?.[key] };
-
-        // Ensure meta scaffold exists if enabling
         let meta = it.meta || {};
         if (nextGroup[key] && !meta[key]) {
           meta = { ...meta, [key]: ensureMetaFor(it, key, dict.sidesEnabled) };
@@ -594,7 +572,6 @@ export default function MediaGradingPage() {
     });
   }
 
-  // --- Sleeve mutators ---
   function toggleSleeve(group, key) {
     setState((s) => {
       const g = s.sleeve[group] || {};
@@ -609,7 +586,6 @@ export default function MediaGradingPage() {
     setState((s) => ({ ...s, sleeve: { ...s.sleeve, customNotes: val } }));
   }
 
-  // --- Calculations ---
   const aggregated = computeAggregatedMedia(state.items, dict);
   const sleeveCalc = computeSleeveScore(state.sleeve, dict);
 
@@ -619,54 +595,49 @@ export default function MediaGradingPage() {
   const usingMedia = !state.items.every((it) => it.missing);
   const usingSleeve = !state.sleeve.missing;
 
-  let overallScore = 0;
-  let overallGrade = "P";
+  // ---- Overall score per your rule set ----
+  const mintEligible = usingMedia && usingSleeve && sleeveCalc.sealed && sleeveCalc.zeroDeductions && aggregated.zeroDeductions;
 
-  if (usingMedia && usingSleeve) {
-    // Sealed gate for M: for cassettes/CDs "sealed = mint unless damage observed";
-    // for vinyl, sealed gate still allows warping/shelf/corner/creases deductions to block M.
-    const mintEligible = sleeveCalc.sealed && sleeveCalc.zeroDeductions && aggregated.zeroDeductions;
-    if (mintEligible) {
-      overallScore = 100;
-      overallGrade = "M";
-    } else {
-      overallScore = Math.min(aggregated.score, sleeveCalc.score);
-      overallGrade = scoreToGrade(overallScore, { sealedOK: false, zeroDeductions: false });
-    }
-  } else if (usingMedia) {
-    overallScore = aggregated.score;
-    overallGrade = mediaGrade;
-  } else if (usingSleeve) {
-    overallScore = sleeveCalc.score;
-    overallGrade = sleeveGrade;
+  let overallScoreRaw = 0;
+  if (mintEligible) {
+    overallScoreRaw = 100;
+  } else if (usingMedia && usingSleeve) {
+    overallScoreRaw = (aggregated.score + sleeveCalc.score) / 2; // both present
+  } else {
+    // one or both missing → divide by 4
+    overallScoreRaw = (aggregated.score + sleeveCalc.score) / 4;
   }
+
+  const overallScore = Math.round(overallScoreRaw);
+  const overallGrade = mintEligible
+    ? "M"
+    : scoreToGrade(overallScore, { sealedOK: false, zeroDeductions: false });
 
   // Explanation
   const topMedia = topDeductions(aggregated.perItem.flatMap((r) => r.penalties));
   const topSleeve = topDeductions(sleeveCalc.penalties);
-  const whyOverall =
-    usingMedia && usingSleeve
-      ? overallGrade === "M"
-        ? "Overall = M because packaging is sealed & flawless and media has no deductions."
-        : `Overall = ${overallGrade} due to the lower of Media (${mediaGrade}) vs Sleeve (${sleeveGrade}).`
-      : usingMedia
-      ? `Overall = ${overallGrade} (media only).`
-      : `Overall = ${overallGrade} (packaging only).`;
+
+  let whyOverall = "";
+  if (mintEligible) {
+    whyOverall = "Overall = M because packaging is sealed & flawless and media has no deductions.";
+  } else if (usingMedia && usingSleeve) {
+    whyOverall = `Overall = average of Media and Packaging: (${aggregated.score} + ${sleeveCalc.score}) / 2 = ${((aggregated.score + sleeveCalc.score) / 2).toFixed(1)} → ${overallGrade}.`;
+  } else {
+    whyOverall = `Overall = (Media + Packaging) / 4 due to missing component(s): (${aggregated.score} + ${sleeveCalc.score}) / 4 = ${((aggregated.score + sleeveCalc.score) / 4).toFixed(1)} → ${overallGrade}.`;
+  }
 
   const addLabel =
     mediaType === "vinyl" ? "Add Another Record" : mediaType === "cassette" ? "Add Another Tape" : "Add Another Disc";
 
   return (
     <div id="media-grading" className="mg-wrap">
-      {/* Header */}
       <div className="mg-header">
         <div className="mg-title">🔍 Systematic Media Grading Tool</div>
         <div className="mg-sub">Detailed condition assessment with automatic grading calculation</div>
       </div>
 
-      {/* Media type selector */}
       <div className="mg-pills" role="tablist" aria-label="Select media type">
-        {Object.entries(MEDIA_TYPES).map(([key, label]) => (
+        {Object.keys(MEDIA_TYPES).map((key) => (
           <button
             key={key}
             role="tab"
@@ -674,15 +645,12 @@ export default function MediaGradingPage() {
             className={`mg-pill ${mediaType === key ? "selected" : ""}`}
             onClick={() => changeMediaType(key)}
           >
-            {key === "vinyl" ? "🎵 " : key === "cassette" ? "📼 " : "💿 "}
-            {label}s
+            {PILL_LABELS[key]}
           </button>
         ))}
       </div>
 
-      {/* Two-column layout */}
       <div className="mg-grid">
-        {/* LEFT: Media Assessment */}
         <section className="mg-card mg-item">
           <div className="mg-item-header">
             <h2>{dict.mediaTitle}</h2>
@@ -715,7 +683,6 @@ export default function MediaGradingPage() {
                 </label>
               )}
 
-              {/* Visual Appearance */}
               <fieldset className={`mg-fieldset mg-fieldset-inner ${it.missing ? "mg-disabled" : ""}`}>
                 <legend>Visual Appearance</legend>
                 {dict.visual.map((v) => {
@@ -791,7 +758,6 @@ export default function MediaGradingPage() {
                 })}
               </fieldset>
 
-              {/* Audio Performance */}
               <fieldset className={`mg-fieldset mg-fieldset-inner ${it.missing ? "mg-disabled" : ""}`}>
                 <legend>Audio Performance</legend>
                 {dict.audio.map((a) => {
@@ -867,7 +833,6 @@ export default function MediaGradingPage() {
                 })}
               </fieldset>
 
-              {/* Label / Center / Hub / Shell */}
               <fieldset className={`mg-fieldset mg-fieldset-inner ${it.missing ? "mg-disabled" : ""}`}>
                 <legend>{mediaType === "vinyl" ? "Label / Center" : mediaType === "cassette" ? "Shell / Label" : "Hub / Face"}</legend>
                 {dict.labelArea.map((l) => (
@@ -887,7 +852,6 @@ export default function MediaGradingPage() {
                 {state.items.length > 1 && <button className="mg-btn" onClick={() => removeItem(idx)}>Remove</button>}
               </div>
 
-              {/* Per-item summary */}
               <div className="mg-per-item-result">
                 {(() => {
                   const calc = computeMediaItemScore(it, dict);
@@ -899,7 +863,6 @@ export default function MediaGradingPage() {
           ))}
         </section>
 
-        {/* RIGHT: Packaging */}
         <section className="mg-card">
           <div className="mg-item-header">
             <h2>{dict.packagingTitle}</h2>
@@ -931,7 +894,8 @@ export default function MediaGradingPage() {
               </label>
             ))}
             <div className="mg-help">
-              Sealed adds +5 (cap 100). If sealed and flawless: Mint (M) is allowed. For cassettes/CDs, standard plastic cases are not graded.
+              Sealed adds +5 (cap 100). If sealed and flawless: Mint (M) is allowed.
+              For cassettes/CDs, standard plastic cases are not graded.
             </div>
           </fieldset>
 
@@ -950,7 +914,7 @@ export default function MediaGradingPage() {
             ))}
             {dict.showCaseIsNote && (
               <div className="mg-help">
-                Standard cases (jewel/Norelco) are <em>replaceable</em> and not graded. Record any case issues in Additional notes.
+                Standard cases (jewel/Norelco) are <em>replaceable</em> and not graded. Record case issues in Additional notes.
               </div>
             )}
           </fieldset>
@@ -969,32 +933,9 @@ export default function MediaGradingPage() {
               </label>
             ))}
           </fieldset>
-
-          <fieldset className={`mg-fieldset mg-fieldset-inner ${state.sleeve.missing ? "mg-disabled" : ""}`}>
-            <legend>Additional notes (don’t affect score)</legend>
-            <div className="mg-notes-grid">
-              {dict.notes.map((n) => (
-                <label key={n} className="mg-check">
-                  <input
-                    type="checkbox"
-                    disabled={state.sleeve.missing}
-                    checked={!!state.sleeve.notes[n]}
-                    onChange={() =>
-                      setState((s) => ({
-                        ...s,
-                        sleeve: { ...s.sleeve, notes: { ...s.sleeve.notes, [n]: !s.sleeve.notes[n] } },
-                      }))
-                    }
-                  />
-                  <span>{n}</span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
         </section>
       </div>
 
-      {/* Custom Notes */}
       <section className="mg-card mg-notes">
         <h3>📝 Custom Condition Notes</h3>
         <textarea
@@ -1004,7 +945,6 @@ export default function MediaGradingPage() {
         />
       </section>
 
-      {/* Results */}
       <section className="mg-results">
         <div className={`mg-card mg-result ${mediaGrade === "M" || mediaGrade === "NM" ? "mg-grade-nm" : mediaGrade.startsWith("VG") ? "mg-grade-vg" : mediaGrade.startsWith("G") ? "mg-grade-g" : "mg-grade-fp"}`}>
           <div className="mg-result-title">
@@ -1020,14 +960,13 @@ export default function MediaGradingPage() {
           <div className="mg-result-score">{sleeveCalc.score}/100</div>
         </div>
 
-        <div className={`mg-card mg-result ${overallGrade === "M" || overallGrade === "NM" ? "mg-grade-nm" : overallGrade.startsWith("VG") ? "mg-grade-vg" : overallGrade.startsWith("G") ? "mg-grade-g" : "mg-grade-fp"}`}>
+        <div className={`mg-card mg-result ${overallGrade === "M" || overallGrade === "NM" ? "mg-grade-nm" : overallGrade.startsWith("VG") ? "mg-grade-vg" : "mg-grade-g" ? "mg-grade-g" : "mg-grade-fp"}`}>
           <div className="mg-result-title">Overall Grade</div>
           <div className="mg-result-grade">{overallGrade}</div>
           <div className="mg-result-score">{overallScore}/100</div>
         </div>
       </section>
 
-      {/* Explanation */}
       <section className="mg-card">
         <div className="mg-expl-title">Grading Explanation</div>
         <div>
@@ -1065,21 +1004,6 @@ export default function MediaGradingPage() {
             );
           })}
         </div>
-
-        {/* Notes */}
-        {Object.keys(state.sleeve.notes).some((k) => state.sleeve.notes[k]) && (
-          <div style={{ marginTop: 8 }}>
-            <strong>Additional notes:</strong>{" "}
-            {Object.keys(state.sleeve.notes)
-              .filter((k) => state.sleeve.notes[k])
-              .join(", ")}
-          </div>
-        )}
-        {state.sleeve.customNotes?.trim() && (
-          <div style={{ marginTop: 8 }}>
-            <strong>Custom notes:</strong> {state.sleeve.customNotes}
-          </div>
-        )}
       </section>
     </div>
   );
