@@ -1,2142 +1,1381 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import "styles/media-grading.css";
 
 /**
- * Systematic Media Grading Tool (App Router - Client Component, JS only)
- * - Media types: vinyl, cassette, cd
- * - Grades: M, NM, VG+, VG, G+, G, F/P  (M only when sealed & flawless)
- * - Scoring:
- *    - Each disc/tape/record starts at 100, deduct penalties; clamp [0,100].
- *    - MediaScore = average of item scores (missing item = 0).
- *    - PackagingScore = scored from 100; missing packaging = 0.
- *    - Overall:
- *        normal: (MediaScore + PackagingScore) / 2
- *        if media OR packaging is missing: (MediaScore + PackagingScore) / 4
- * - Sealed mode:
- *    * Vinyl: media shows only “Warping present” (with severity). Packaging shows exterior wear only.
- *    * Cassettes/CDs: media is assumed Mint (100) and hidden; packaging shows exterior wear only.
- * - Vinyl sides:
- *    * Audio defects render per-side toggles (A/B, then C/D, E/F… per item index) + per-side track counts.
- *    * Visual (scuffs/scratches/groove wear) have side toggles; warping is whole-disc.
- * - Additional notes never affect score.
+ * Systematic Media Grading Tool — Admin
+ * Next.js App Router (client component), plain JS/JSX + one global CSS.
+ *
+ * Grades: M, NM, VG+, VG, G+, G, F/P
+ * - M only when Sealed & flawless within allowed scope.
+ * - NM ceiling if not sealed.
+ *
+ * Scores:
+ * - Media and Packaging start at 100; deduct per fixed rule set.
+ * - Media (multi-disc): average across items; missing item = 0.
+ * - Overall:
+ *    • Normal: (MediaAvg + Packaging) / 2
+ *    • If ALL media missing OR packaging missing: (MediaAvg + Packaging) / 4
+ *
+ * Per-format:
+ *  - VINYL: side-aware defects with per-side track counts; visual+audio (warping not sideable).
+ *  - CASSETTE: side-aware audio defects; mechanics/label (no spindle marks; no “record scratches”).
+ *  - CD: no sides; audio defects include corrected read errors & unreadable sectors; laser-rot/top coat.
+ *
+ * UI specifics:
+ *  - Per-side "Tracks affected" (A/B, C/D, E/F…) for sideable defects.
+ *  - Auto side-letter labels per item index.
+ *  - Remove media item button.
+ *  - Packaging entries show sub-severity radios (text markers; same penalty).
+ *  - OBI and other notes included.
  */
 
-/** Grade thresholds (non-sealed NM ceiling; M allowed only if sealed & flawless) */
-const GRADE_THRESHOLDS = [
-  { band: "NM", min: 97, max: 100 },
-  { band: "VG+", min: 85, max: 96 },
-  { band: "VG", min: 75, max: 84 },
-  { band: "G+", min: 65, max: 74 },
-  { band: "G", min: 50, max: 64 },
-  { band: "F/P", min: 0, max: 49 },
-];
-
-/** Utility */
-const clamp = (n, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, n));
-
-/** Map numeric score to one of the 8 grades (M only if sealed & flawlessAllowed) */
-function toGrade(score, opts) {
-  const { sealed, flawlessAllowed } = opts || {};
-  if (sealed && flawlessAllowed && Math.round(score) === 100) return "M";
-  for (const t of GRADE_THRESHOLDS) {
-    if (score >= t.min && score <= t.max) return t.band;
-  }
+function numericToBaseGrade(score) {
+  if (score >= 97) return "NM";
+  if (score >= 85) return "VG+";
+  if (score >= 75) return "VG";
+  if (score >= 65) return "G+";
+  if (score >= 50) return "G";
   return "F/P";
 }
 
-/** Presentation helpers */
-const MEDIA_TYPES = {
-  vinyl: { key: "vinyl", label: "Vinyl Records", short: "Record", icon: "🎵" },
-  cassette: { key: "cassette", label: "Cassette Tapes", short: "Tape", icon: "📼" },
-  cd: { key: "cd", label: "Compact Discs", short: "Disc", icon: "💿" },
+const MEDIA_PENALTIES = {
+  lightScuffs: 3,
+  scratches: 8,
+  grooveWearOrAlt: 12,
+  warpingOrWobble: 10,
+  surfaceNoise: 6,
+  popsClicksOrReadErrors: 4,
+  skippingOrUnreadable: 30,
+  labelShellHubMinor: 3,
+  perTrack: 1,
 };
 
-function sidesForIndex(idx) {
-  // 0 -> A/B, 1 -> C/D, 2 -> E/F, ...
-  const start = idx * 2;
-  const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
-  const a = letters[start] || "A";
-  const b = letters[start + 1] || "B";
-  return [a, b];
-}
-
-/** Default penalties (base; some have severities below) */
-const PENALTIES = {
-  // media (vinyl/cassette/cd)
-  lightScuffs: -3,
-  scratches: -8,
-  grooveWear: -12,
-  warping: { slight: -4, moderate: -10, severe: -18 },
-  surfaceNoise: -6,
-  popsClicks: -4,
-  skipping: -30,
-  labelDefect: -3, // spindle marks / writing / stickers on label/hub/shell
-
-  // cassette specifics
-  padMissingOrDegraded: -20,
-  tapeWrinkled: -10,
-  unevenPack: -6,
-  rollerWear: -6,
-  hissDropouts: -6,
-  wowFlutter: -8,
-  channelLoss: -15,
-
-  // cd specifics
-  laserRot: -12,
-  discWobble: -10,
-  hubCrack: -8,
-
-  // per-track penalty (vinyl audio only, per selected audio defect)
-  perTrack: -1,
-
-  // packaging
-  minorShelfWear: -3,
-  cornerWear: { slight: -2, moderate: -4, heavy: -6 },
-  ringWear: { light: -3, visible: -5, strong: -7 },
-  spineWear: { slight: -2, moderate: -3, heavy: -5 },
-  seamSplit: { small: -6, medium: -12, large: -18 },
-  tears: { small: -4, medium: -8, large: -14 },
-  writing: -4,
-  stickersTape: -3,
-  creases: { light: -3, pronounced: -6, crushing: -10 },
-
-  sealedBonus: +5, // cap at 100
+const SLEEVE_PENALTIES = {
+  minorShelfWear: 3,
+  cornerWear: 4,
+  ringWearOrBookletRing: 5,
+  spineWear: 3,
+  seamSplitOrCaseCracked: 12,
+  tears: 8,
+  writing: 4,
+  stickers: 3,
+  sealedBonus: 5,
 };
 
-/** Additional notes per media type (non-scoring) */
-const NOTES = {
-  vinyl: [
-    "Original shrinkwrap (opened)",
-    "Promotional copy",
-    "Hype sticker present",
-    "Price sticker/tag",
-    "Gatefold sleeve",
-    "Original inner sleeve",
-    "Generic/company sleeve",
-    "Cut-out hole/notch/corner cut",
-    "First pressing",
-  ],
-  cassette: [
-    "Standard Norelco case cracked (replaceable)",
-    "Stickered case",
-    "Custom/collectible case",
-    "Original shrinkwrap (opened)",
-    "OBI present",
-    "Promotional copy",
-    "Shell color variant",
-    "Limited edition",
-  ],
-  cd: [
-    "Standard jewel case cracked (replaceable)",
-    "Tray teeth broken (replaceable)",
-    "Custom case / box / digipak",
-    "OBI present",
-    "Promotional copy",
-    "Slipcase included",
-    "Special/limited edition",
-  ],
-};
+const MEDIA_TYPES = [
+  { key: "vinyl", label: "Vinyl Records", icon: "🎵" },
+  { key: "cassette", label: "Cassette Tapes", icon: "📼" },
+  { key: "cd", label: "Compact Discs", icon: "💿" },
+];
 
-/** Initial media item factories */
-function makeVinylItem(index) {
-  const [sideA, sideB] = sidesForIndex(index);
-  return {
-    missing: false,
-    visual: {
-      glossy: false,
-      scuffs: { checked: false, sides: { [sideA]: false, [sideB]: false } },
-      scratches: { checked: false, sides: { [sideA]: false, [sideB]: false } },
-      grooveWear: { checked: false, sides: { [sideA]: false, [sideB]: false } },
-      warping: { checked: false, severity: "moderate" },
-    },
-    audio: {
-      playsClean: false,
-      surfaceNoise: {
-        checked: false,
-        sides: { [sideA]: false, [sideB]: false },
-        tracks: { [sideA]: 0, [sideB]: 0 },
-      },
-      popsClicks: {
-        checked: false,
-        sides: { [sideA]: false, [sideB]: false },
-        tracks: { [sideA]: 0, [sideB]: 0 },
-      },
-      skipping: {
-        checked: false,
-        sides: { [sideA]: false, [sideB]: false },
-        tracks: { [sideA]: 0, [sideB]: 0 },
-      },
-    },
-    label: {
-      clean: false,
-      spindle: false,
-      writing: false,
-      stickers: false,
-    },
-  };
+// Side-letter helpers (A/B, C/D, E/F...)
+function sideLettersForIndex(idx) {
+  const base = "A".charCodeAt(0) + idx * 2;
+  const s1 = String.fromCharCode(base);
+  const s2 = String.fromCharCode(base + 1);
+  return [s1, s2];
 }
 
-function makeCassetteItem() {
-  return {
-    missing: false,
-    shell: {
-      clean: false,
-      writing: false,
-      stickers: false,
-      padMissing: false, // missing or degraded
-    },
-    mechanics: {
-      wrinkled: false,
-      unevenPack: false,
-      rollerWear: false,
-    },
-    audio: {
-      playsClean: false,
-      hissDropouts: false,
-      wowFlutter: false,
-      channelLoss: false,
-    },
-  };
-}
-
-function makeCDItem() {
-  return {
-    missing: false,
-    visual: {
-      scuffs: false,
-      scratches: false,
-      laserRot: false,
-      wobble: false,
-    },
-    audio: {
-      playsClean: false,
-      errorsCorrected: false,
-      unreadable: false,
-    },
-    hubFace: {
-      clean: false,
-      writing: false,
-      stickers: false,
-      hubCrack: false,
-    },
-  };
-}
-
-/** Packaging state per media type */
-function makePackagingState(type) {
-  if (type === "vinyl") {
+// -------- Label builders per media type --------
+function getMediaLabels(mediaType) {
+  if (mediaType === "vinyl") {
     return {
-      missing: false,
-      overall: { looksNew: false, minorShelf: false, cornerWear: null, ringWear: null },
-      seams: { allIntact: false, seamSplit: null, spineWear: null },
-      damage: { creases: null, tears: null, writing: false, stickers: false },
-      notes: {},
+      mediaHeading: "Vinyl Record Condition Assessment",
+      itemWord: "Record",
+      sideable: true,
+      mediaVisual: [
+        {
+          key: "glossy",
+          label: "Record has glossy, like-new appearance",
+          type: "check",
+          penalty: 0,
+          sideable: false,
+          tracks: false,
+        },
+        {
+          key: "lightScuffs",
+          label: "Light scuffs visible",
+          type: "check+sub",
+          sub: ["Very light, barely visible", "Visible but not deep", "Obvious, multiple scuffs"],
+          penalty: MEDIA_PENALTIES.lightScuffs,
+          sideable: true,
+          tracks: true,
+        },
+        {
+          key: "scratches",
+          label: "Scratches present",
+          type: "check+sub",
+          sub: ["Hairline scratches only", "Can feel with fingernail", "Deep, visible grooves"],
+          penalty: MEDIA_PENALTIES.scratches,
+          sideable: true,
+          tracks: true,
+        },
+        {
+          key: "grooveWear",
+          label: "Groove wear visible",
+          type: "check+sub",
+          sub: ["Light", "Moderate", "Heavy"],
+          penalty: MEDIA_PENALTIES.grooveWearOrAlt,
+          sideable: true,
+          tracks: true,
+        },
+        {
+          key: "warping",
+          label: "Warping present",
+          type: "check+sub",
+          sub: [
+            "Slight dish/edge warp (plays fine)",
+            "Moderate warp (minor tracking issues)",
+            "Severe warp (affects play)",
+          ],
+          penalty: MEDIA_PENALTIES.warpingOrWobble,
+          sideable: false,
+          tracks: false,
+        },
+      ],
+      mediaAudio: [
+        {
+          key: "playsClean",
+          label: "Plays with no surface noise",
+          type: "check",
+          penalty: 0,
+          sideable: false,
+          tracks: false,
+        },
+        {
+          key: "surfaceNoise",
+          label: "Surface noise when played",
+          type: "check+sub",
+          sub: ["Minimal", "Noticeable", "Significant"],
+          penalty: MEDIA_PENALTIES.surfaceNoise,
+          sideable: true,
+          tracks: true,
+        },
+        {
+          key: "popsClicks",
+          label: "Occasional pops or clicks",
+          type: "check+sub",
+          sub: ["Occasional", "Frequent"],
+          penalty: MEDIA_PENALTIES.popsClicksOrReadErrors,
+          sideable: true,
+          tracks: true,
+        },
+        {
+          key: "skipping",
+          label: "Skipping or repeating",
+          type: "check",
+          penalty: MEDIA_PENALTIES.skippingOrUnreadable,
+          sideable: true,
+          tracks: true,
+        },
+      ],
+      mediaLabelArea: [
+        {
+          key: "labelClean",
+          label: "Label is clean and bright",
+          type: "check",
+          penalty: 0,
+          sideable: false,
+          tracks: false,
+        },
+        {
+          key: "spindleMarks",
+          label: "Spindle marks present",
+          type: "check",
+          penalty: MEDIA_PENALTIES.labelShellHubMinor,
+          sideable: false,
+          tracks: false,
+        },
+        {
+          key: "writingOnLabel",
+          label: "Writing on label",
+          type: "check",
+          penalty: MEDIA_PENALTIES.labelShellHubMinor,
+          sideable: false,
+          tracks: false,
+        },
+        {
+          key: "stickersOnLabel",
+          label: "Stickers or tape on label",
+          type: "check",
+          penalty: MEDIA_PENALTIES.labelShellHubMinor,
+          sideable: false,
+          tracks: false,
+        },
+      ],
     };
   }
-  if (type === "cassette") {
+
+  if (mediaType === "cassette") {
     return {
-      missing: false,
-      overall: { looksNew: false, minorShelf: false, cornerWear: null },
-      jcard: { allIntact: false, jcardTears: null },
-      damage: { creases: null, writing: false, stickers: false },
-      notes: {},
+      mediaHeading: "Cassette Condition Assessment",
+      itemWord: "Tape",
+      sideable: true,
+      mediaVisual: [
+        {
+          key: "shellScuffs",
+          label: "Shell scuffs present",
+          type: "check+sub",
+          sub: ["Light", "Moderate", "Heavy"],
+          penalty: MEDIA_PENALTIES.grooveWearOrAlt,
+          sideable: false,
+          tracks: false,
+        },
+        {
+          key: "windowHaze",
+          label: "Window/clouding or discoloration",
+          type: "check",
+          penalty: MEDIA_PENALTIES.lightScuffs,
+          sideable: false,
+          tracks: false,
+        },
+      ],
+      mediaAudio: [
+        {
+          key: "playsClean",
+          label: "Plays with no audible issues",
+          type: "check",
+          penalty: 0,
+          sideable: false,
+          tracks: false,
+        },
+        {
+          key: "tapeHiss",
+          label: "Hiss/noise when played",
+          type: "check+sub",
+          sub: ["Minimal", "Noticeable", "Significant"],
+          penalty: MEDIA_PENALTIES.surfaceNoise,
+          sideable: true,
+          tracks: true,
+        },
+        {
+          key: "dropouts",
+          label: "Dropouts/clicks",
+          type: "check+sub",
+          sub: ["Occasional", "Frequent"],
+          penalty: MEDIA_PENALTIES.popsClicksOrReadErrors,
+          sideable: true,
+          tracks: true,
+        },
+        {
+          key: "squealFlutter",
+          label: "Squeal / wow–flutter audible",
+          type: "check",
+          penalty: MEDIA_PENALTIES.surfaceNoise,
+          sideable: true,
+          tracks: true,
+        },
+        {
+          key: "unplayableJam",
+          label: "Jams/unplayable sections",
+          type: "check",
+          penalty: MEDIA_PENALTIES.skippingOrUnreadable,
+          sideable: true,
+          tracks: true,
+        },
+      ],
+      mediaLabelArea: [
+        {
+          key: "labelClean",
+          label: "Shell/label clean and bright",
+          type: "check",
+          penalty: 0,
+          sideable: false,
+          tracks: false,
+        },
+        {
+          key: "writingOnShell",
+          label: "Writing on shell/label",
+          type: "check",
+          penalty: MEDIA_PENALTIES.labelShellHubMinor,
+          sideable: false,
+          tracks: false,
+        },
+        {
+          key: "stickersOnShell",
+          label: "Stickers or tape on shell",
+          type: "check",
+          penalty: MEDIA_PENALTIES.labelShellHubMinor,
+          sideable: false,
+          tracks: false,
+        },
+        {
+          key: "pressurePad",
+          label: "Pressure pad missing or degraded",
+          type: "check",
+          penalty: MEDIA_PENALTIES.scratches,
+          sideable: false,
+          tracks: false,
+        },
+      ],
     };
   }
-  // cd
+
+  // CD
+  return {
+    mediaHeading: "Compact Disc Condition Assessment",
+    itemWord: "Disc",
+    sideable: false,
+    mediaVisual: [
+      {
+        key: "lightScuffs",
+        label: "Light scuffs visible",
+        type: "check+sub",
+        sub: ["Very light", "Visible, minor", "Multiple light scuffs"],
+        penalty: MEDIA_PENALTIES.lightScuffs,
+        sideable: false,
+        tracks: false,
+      },
+      {
+        key: "scratches",
+        label: "Scratches present",
+        type: "check+sub",
+        sub: ["Few light", "Some deeper", "Many/deep"],
+        penalty: MEDIA_PENALTIES.scratches,
+        sideable: false,
+        tracks: false,
+      },
+      {
+        key: "laserRot",
+        label: "Laser-rot / pinholes visible (label/top coat)",
+        type: "check+sub",
+        sub: ["Minimal", "Noticeable", "Significant"],
+        penalty: MEDIA_PENALTIES.grooveWearOrAlt,
+        sideable: false,
+        tracks: false,
+      },
+      {
+        key: "wobble",
+        label: "Disc wobble present",
+        type: "check+sub",
+        sub: ["Slight", "Moderate", "Severe"],
+        penalty: MEDIA_PENALTIES.warpingOrWobble,
+        sideable: false,
+        tracks: false,
+      },
+    ],
+    mediaAudio: [
+      {
+        key: "playsClean",
+        label: "Plays with no read errors",
+        type: "check",
+        penalty: 0,
+        sideable: false,
+        tracks: false,
+      },
+      {
+        key: "correctedErrors",
+        label: "Occasional read errors corrected",
+        type: "check",
+        penalty: MEDIA_PENALTIES.popsClicksOrReadErrors,
+        sideable: false,
+        tracks: true,
+      },
+      {
+        key: "unreadable",
+        label: "Unreadable sectors / skipping",
+        type: "check",
+        penalty: MEDIA_PENALTIES.skippingOrUnreadable,
+        sideable: false,
+        tracks: true,
+      },
+    ],
+    mediaLabelArea: [
+      {
+        key: "hubClean",
+        label: "Hub/face clean and bright",
+        type: "check",
+        penalty: 0,
+        sideable: false,
+        tracks: false,
+      },
+      {
+        key: "writingOnFace",
+        label: "Writing on disc face",
+        type: "check",
+        penalty: MEDIA_PENALTIES.labelShellHubMinor,
+        sideable: false,
+        tracks: false,
+      },
+      {
+        key: "stickersOnFace",
+        label: "Stickers or tape on disc face",
+        type: "check",
+        penalty: MEDIA_PENALTIES.labelShellHubMinor,
+        sideable: false,
+        tracks: false,
+      },
+    ],
+  };
+}
+
+function getPackagingLabels(mediaType) {
+  if (mediaType === "vinyl") {
+    return {
+      title: "Jacket & Packaging Condition Assessment",
+      overall: [
+        { key: "looksNew", label: "Looks like new, no flaws", penalty: 0 },
+        {
+          key: "minorShelfWear",
+          label: "Minor shelf wear only",
+          penalty: SLEEVE_PENALTIES.minorShelfWear,
+        },
+        {
+          key: "cornerWear",
+          label: "Corner wear present",
+          penalty: SLEEVE_PENALTIES.cornerWear,
+          sub: ["Slight bumping", "Creased/frayed", "Cut/heavily damaged"],
+        },
+        {
+          key: "ringWear",
+          label: "Ring wear visible",
+          penalty: SLEEVE_PENALTIES.ringWearOrBookletRing,
+          sub: ["Light", "Moderate", "Heavy"],
+        },
+      ],
+      seams: [
+        { key: "allSeamsIntact", label: "All seams intact", penalty: 0 },
+        {
+          key: "seamSplits",
+          label: "Seam splits present",
+          penalty: SLEEVE_PENALTIES.seamSplitOrCaseCracked,
+          sub: ["Small", "Medium", "Large / multiple"],
+        },
+        {
+          key: "spineWear",
+          label: "Spine shows wear",
+          penalty: SLEEVE_PENALTIES.spineWear,
+          sub: ["Light", "Moderate", "Heavy"],
+        },
+      ],
+      damage: [
+        {
+          key: "creases",
+          label: "Creases / crushing present",
+          penalty: SLEEVE_PENALTIES.cornerWear,
+          sub: ["Small", "Moderate", "Large/through"],
+        },
+        {
+          key: "tears",
+          label: "Tears present",
+          penalty: SLEEVE_PENALTIES.tears,
+          sub: ["Small", "Medium", "Large / across"],
+        },
+        {
+          key: "writing",
+          label: "Writing present",
+          penalty: SLEEVE_PENALTIES.writing,
+          sub: ["Initials/small", "Notes", "Large/covering"],
+        },
+        {
+          key: "stickers",
+          label: "Stickers or tape",
+          penalty: SLEEVE_PENALTIES.stickers,
+          sub: ["Price", "Hype", "Residue"],
+        },
+      ],
+      notes: [
+        { key: "originalShrinkOpened", label: "Original shrinkwrap (opened)" },
+        { key: "promoCopy", label: "Promotional copy" },
+        { key: "gatefold", label: "Gatefold sleeve" },
+        { key: "innerSleeve", label: "Original inner sleeve" },
+        { key: "cutOut", label: "Cut-out hole/notch/corner cut" },
+        { key: "hypeSticker", label: "Hype sticker present" },
+        { key: "priceSticker", label: "Price sticker/tag" },
+        { key: "genericSleeve", label: "Generic/company sleeve" },
+        { key: "firstPressing", label: "First pressing" },
+        { key: "obi", label: "OBI present" },
+      ],
+    };
+  }
+
+  if (mediaType === "cassette") {
+    return {
+      title: "J-Card & Packaging Condition Assessment",
+      overall: [
+        { key: "looksNew", label: "Looks like new, no flaws", penalty: 0 },
+        {
+          key: "minorShelfWear",
+          label: "Minor shelf wear only",
+          penalty: SLEEVE_PENALTIES.minorShelfWear,
+        },
+        {
+          key: "cornerWear",
+          label: "Corner wear present",
+          penalty: SLEEVE_PENALTIES.cornerWear,
+          sub: ["Slight bumping", "Creased/frayed", "Cut/damaged"],
+        },
+      ],
+      seams: [
+        { key: "allIntact", label: "J-card intact", penalty: 0 },
+        {
+          key: "foldTears",
+          label: "J-card creases/tears",
+          penalty: SLEEVE_PENALTIES.tears,
+          sub: ["Small", "Medium", "Large"],
+        },
+      ],
+      damage: [
+        {
+          key: "creases",
+          label: "Creases / crushing present",
+          penalty: SLEEVE_PENALTIES.cornerWear,
+          sub: ["Small", "Moderate", "Large"],
+        },
+        {
+          key: "writing",
+          label: "Writing present",
+          penalty: SLEEVE_PENALTIES.writing,
+          sub: ["Initials", "Notes", "Large/covering"],
+        },
+        {
+          key: "stickers",
+          label: "Stickers or tape",
+          penalty: SLEEVE_PENALTIES.stickers,
+          sub: ["Small", "Multiple", "Residue"],
+        },
+      ],
+      notes: [
+        { key: "standardCaseCracked", label: "Standard Norelco case cracked (replaceable)" },
+        { key: "originalShrinkOpened", label: "Original shrinkwrap (opened)" },
+        { key: "obi", label: "OBI present" },
+        { key: "promoCopy", label: "Promotional copy" },
+        { key: "shellColor", label: "Shell color variant" },
+        { key: "limited", label: "Limited edition" },
+        { key: "customCase", label: "Custom/collectible case" },
+        { key: "stickeredCase", label: "Stickered case" },
+      ],
+    };
+  }
+
+  // CD
+  return {
+    title: "Inlay/Booklet & Packaging Condition Assessment",
+    overall: [
+      { key: "looksNew", label: "Looks like new, no flaws", penalty: 0 },
+      {
+        key: "minorShelfWear",
+        label: "Minor shelf wear only",
+        penalty: SLEEVE_PENALTIES.minorShelfWear,
+      },
+      {
+        key: "cornerWear",
+        label: "Corner wear present (insert/digipak)",
+        penalty: SLEEVE_PENALTIES.cornerWear,
+        sub: ["Slight bumping", "Creased/frayed", "Cut/damaged"],
+      },
+      {
+        key: "ringWear",
+        label: "Booklet ring wear visible",
+        penalty: SLEEVE_PENALTIES.ringWearOrBookletRing,
+        sub: ["Light", "Moderate", "Heavy"],
+      },
+    ],
+    seams: [
+      { key: "allIntact", label: "Booklet/tray insert intact", penalty: 0 },
+    ],
+    damage: [
+      {
+        key: "creases",
+        label: "Creases / crushing present",
+        penalty: SLEEVE_PENALTIES.cornerWear,
+        sub: ["Small", "Moderate", "Large/through"],
+      },
+      {
+        key: "writing",
+        label: "Writing present",
+        penalty: SLEEVE_PENALTIES.writing,
+        sub: ["Initials", "Notes", "Large/covering"],
+      },
+      {
+        key: "stickers",
+        label: "Stickers or tape",
+        penalty: SLEEVE_PENALTIES.stickers,
+        sub: ["Price", "Hype", "Residue"],
+      },
+    ],
+    notes: [
+      { key: "stdJewelCracked", label: "Standard jewel case cracked (replaceable)" },
+      { key: "trayTeethBrokenNote", label: "Tray teeth broken (replaceable)" },
+      { key: "customCase", label: "Custom case / box / digipak" },
+      { key: "obi", label: "OBI present" },
+      { key: "promoCopy", label: "Promotional copy" },
+      { key: "slipcase", label: "Slipcase included" },
+      { key: "specialLimited", label: "Special/limited edition" },
+    ],
+  };
+}
+
+// Create initial per-item state; sideable entries get S1/S2 sides & tracks
+function makeInitialMediaState(mediaType) {
+  const labels = getMediaLabels(mediaType);
+  const fold = (arr) =>
+    arr.map((cfg) => ({
+      key: cfg.key,
+      checked: false,
+      sub: cfg.sub ? 0 : null,
+      sides: cfg.sideable ? { S1: false, S2: false } : null,
+      tracks:
+        cfg.tracks
+          ? (labels.sideable ? { S1: 0, S2: 0 } : 0)
+          : null,
+      penalty: cfg.penalty || 0,
+      label: cfg.label,
+    }));
   return {
     missing: false,
-    overall: { looksNew: false, minorShelf: false, cornerWear: null, bookletRing: null },
-    insertTray: { insertIntact: true }, // structure of printed contents, not the replaceable case
-    damage: { creases: null, tears: null, writing: false, stickers: false },
-    notes: {},
+    sections: {
+      visual: fold(labels.mediaVisual),
+      audio: fold(labels.mediaAudio),
+      labelArea: fold(labels.mediaLabelArea),
+    },
   };
 }
 
-/** Compute media score for ONE item */
-function scoreMediaItem(item, type, sealed) {
-  let score = 100;
-  const deductions = [];
-
-  // In sealed mode:
-  // - Vinyl: only warping is allowed to be evaluated.
-  // - Cassette/CD: media is Mint and hidden (100, no deductions).
-  if (sealed) {
-    if (type === "vinyl") {
-      if (item.missing) {
-        score = 0;
-        deductions.push({ label: "Record missing (auto P)", points: 100 });
-        return { score: 0, deductions };
-      }
-      if (item.visual?.warping?.checked) {
-        const sev = item.visual.warping.severity || "moderate";
-        const pts = Math.abs(PENALTIES.warping[sev] || 0);
-        score = clamp(score + PENALTIES.warping[sev]);
-        deductions.push({ label: `Warping present (${sev})`, points: pts });
-      }
-      return { score, deductions };
-    }
-    // cassette/cd sealed => 100, unless item marked missing
-    if (item.missing) {
-      return { score: 0, deductions: [{ label: "Media missing (auto P)", points: 100 }] };
-    }
-    return { score: 100, deductions: [] };
-  }
-
-  if (item.missing) {
-    return { score: 0, deductions: [{ label: "Media missing (auto P)", points: 100 }] };
-  }
-
-  if (type === "vinyl") {
-    // Visual (except glossy which is a positive descriptor)
-    if (item.visual?.scuffs?.checked) {
-      score = clamp(score + PENALTIES.lightScuffs);
-      deductions.push({ label: "Light scuffs visible", points: Math.abs(PENALTIES.lightScuffs) });
-    }
-    if (item.visual?.scratches?.checked) {
-      score = clamp(score + PENALTIES.scratches);
-      deductions.push({ label: "Scratches present", points: Math.abs(PENALTIES.scratches) });
-    }
-    if (item.visual?.grooveWear?.checked) {
-      score = clamp(score + PENALTIES.grooveWear);
-      deductions.push({ label: "Groove wear visible", points: Math.abs(PENALTIES.grooveWear) });
-    }
-    if (item.visual?.warping?.checked) {
-      const sev = item.visual.warping.severity || "moderate";
-      score = clamp(score + PENALTIES.warping[sev]);
-      deductions.push({ label: `Warping present (${sev})`, points: Math.abs(PENALTIES.warping[sev]) });
-    }
-
-    // Audio
-    const audio = item.audio || {};
-    const trackHit = (tracksObj, sidesObj) => {
-      let t = 0;
-      Object.keys(tracksObj || {}).forEach((s) => {
-        if (sidesObj?.[s]) t += Number(tracksObj[s] || 0);
-      });
-      return t;
-    };
-
-    if (audio.surfaceNoise?.checked) {
-      score = clamp(score + PENALTIES.surfaceNoise);
-      deductions.push({ label: "Surface noise when played", points: Math.abs(PENALTIES.surfaceNoise) });
-      const t = trackHit(audio.surfaceNoise.tracks, audio.surfaceNoise.sides);
-      if (t > 0) {
-        const pts = Math.abs(PENALTIES.perTrack) * t;
-        score = clamp(score + PENALTIES.perTrack * t);
-        deductions.push({ label: `Per-track penalty (surface noise) ×${t}`, points: pts });
-      }
-    }
-    if (audio.popsClicks?.checked) {
-      score = clamp(score + PENALTIES.popsClicks);
-      deductions.push({ label: "Occasional pops or clicks", points: Math.abs(PENALTIES.popsClicks) });
-      const t = trackHit(audio.popsClicks.tracks, audio.popsClicks.sides);
-      if (t > 0) {
-        const pts = Math.abs(PENALTIES.perTrack) * t;
-        score = clamp(score + PENALTIES.perTrack * t);
-        deductions.push({ label: `Per-track penalty (pops/clicks) ×${t}`, points: pts });
-      }
-    }
-    if (audio.skipping?.checked) {
-      score = clamp(score + PENALTIES.skipping);
-      deductions.push({ label: "Skipping or repeating", points: Math.abs(PENALTIES.skipping) });
-      const t = trackHit(audio.skipping.tracks, audio.skipping.sides);
-      if (t > 0) {
-        const pts = Math.abs(PENALTIES.perTrack) * t;
-        score = clamp(score + PENALTIES.perTrack * t);
-        deductions.push({ label: `Per-track penalty (skipping) ×${t}`, points: pts });
-      }
-    }
-
-    // Label/Center
-    if (item.label?.spindle) {
-      score = clamp(score + PENALTIES.labelDefect);
-      deductions.push({ label: "Spindle marks present", points: Math.abs(PENALTIES.labelDefect) });
-    }
-    if (item.label?.writing) {
-      score = clamp(score + PENALTIES.labelDefect);
-      deductions.push({ label: "Writing on label", points: Math.abs(PENALTIES.labelDefect) });
-    }
-    if (item.label?.stickers) {
-      score = clamp(score + PENALTIES.labelDefect);
-      deductions.push({ label: "Stickers or tape on label", points: Math.abs(PENALTIES.labelDefect) });
-    }
-
-    return { score, deductions };
-  }
-
-  if (type === "cassette") {
-    if (item.shell?.padMissing) {
-      score = clamp(score + PENALTIES.padMissingOrDegraded);
-      deductions.push({ label: "Pressure pad missing/degraded", points: Math.abs(PENALTIES.padMissingOrDegraded) });
-    }
-    if (item.mechanics?.wrinkled) {
-      score = clamp(score + PENALTIES.tapeWrinkled);
-      deductions.push({ label: "Tape wrinkled/stretched", points: Math.abs(PENALTIES.tapeWrinkled) });
-    }
-    if (item.mechanics?.unevenPack) {
-      score = clamp(score + PENALTIES.unevenPack);
-      deductions.push({ label: "Uneven tape pack", points: Math.abs(PENALTIES.unevenPack) });
-    }
-    if (item.mechanics?.rollerWear) {
-      score = clamp(score + PENALTIES.rollerWear);
-      deductions.push({ label: "Roller/capstan wear", points: Math.abs(PENALTIES.rollerWear) });
-    }
-    if (item.audio?.hissDropouts) {
-      score = clamp(score + PENALTIES.hissDropouts);
-      deductions.push({ label: "Hiss/dropouts", points: Math.abs(PENALTIES.hissDropouts) });
-    }
-    if (item.audio?.wowFlutter) {
-      score = clamp(score + PENALTIES.wowFlutter);
-      deductions.push({ label: "Wow/flutter audible", points: Math.abs(PENALTIES.wowFlutter) });
-    }
-    if (item.audio?.channelLoss) {
-      score = clamp(score + PENALTIES.channelLoss);
-      deductions.push({ label: "Channel loss/drop", points: Math.abs(PENALTIES.channelLoss) });
-    }
-    return { score, deductions };
-  }
-
-  // cd
-  if (item.visual?.scuffs) {
-    score = clamp(score + PENALTIES.lightScuffs);
-    deductions.push({ label: "Light scuffs visible", points: Math.abs(PENALTIES.lightScuffs) });
-  }
-  if (item.visual?.scratches) {
-    score = clamp(score + PENALTIES.scratches);
-    deductions.push({ label: "Scratches present", points: Math.abs(PENALTIES.scratches) });
-  }
-  if (item.visual?.laserRot) {
-    score = clamp(score + PENALTIES.laserRot);
-    deductions.push({ label: "Laser-rot/pinholes visible", points: Math.abs(PENALTIES.laserRot) });
-  }
-  if (item.visual?.wobble) {
-    score = clamp(score + PENALTIES.discWobble);
-    deductions.push({ label: "Disc wobble present", points: Math.abs(PENALTIES.discWobble) });
-  }
-  if (item.audio?.errorsCorrected) {
-    score = clamp(score + PENALTIES.popsClicks); // treat like corrected read errors
-    deductions.push({ label: "Occasional read errors corrected", points: Math.abs(PENALTIES.popsClicks) });
-  }
-  if (item.audio?.unreadable) {
-    score = clamp(score + PENALTIES.skipping);
-    deductions.push({ label: "Unreadable sectors / skipping", points: Math.abs(PENALTIES.skipping) });
-  }
-  if (item.hubFace?.writing) {
-    score = clamp(score + PENALTIES.labelDefect);
-    deductions.push({ label: "Writing on disc face", points: Math.abs(PENALTIES.labelDefect) });
-  }
-  if (item.hubFace?.stickers) {
-    score = clamp(score + PENALTIES.labelDefect);
-    deductions.push({ label: "Stickers or tape on disc face", points: Math.abs(PENALTIES.labelDefect) });
-  }
-  if (item.hubFace?.hubCrack) {
-    score = clamp(score + PENALTIES.hubCrack);
-    deductions.push({ label: "Hub crack", points: Math.abs(PENALTIES.hubCrack) });
-  }
-  return { score, deductions };
-}
-
-/** Compute packaging score */
-function scorePackaging(state, type, sealed) {
-  if (!state) return { score: 100, deductions: [] };
-  if (state.missing) {
-    return { score: 0, deductions: [{ label: "Packaging missing (auto P)", points: 100 }] };
-  }
-  let score = 100;
-  const deds = [];
-  const add = (label, pts) => {
-    score = clamp(score + pts);
-    deds.push({ label, points: Math.abs(pts) });
-  };
-
-  // Sealed bonus (allowed across types). UI prevents disallowed fields when sealed.
-  if (sealed) score = clamp(score + PENALTIES.sealedBonus);
-
-  // VINYL
-  if (type === "vinyl") {
-    const { overall, seams, damage } = state;
-
-    if (overall?.minorShelf) add("Minor shelf wear", PENALTIES.minorShelfWear);
-    if (overall?.cornerWear)
-      add(`Corner wear (${overall.cornerWear})`, PENALTIES.cornerWear[overall.cornerWear]);
-    if (overall?.ringWear)
-      add(`Ring wear (${overall.ringWear})`, PENALTIES.ringWear[overall.ringWear]);
-
-    if (!sealed) {
-      if (seams?.seamSplit)
-        add(`Seam splits (${seams.seamSplit})`, PENALTIES.seamSplit[seams.seamSplit]);
-      if (seams?.spineWear)
-        add(`Spine shows wear (${seams.spineWear})`, PENALTIES.spineWear[seams.spineWear]);
-    }
-
-    if (damage?.creases)
-      add(`Creases/crushing (${damage.creases})`, PENALTIES.creases[damage.creases]);
-
-    if (!sealed) {
-      if (damage?.tears) add(`Tears present (${damage.tears})`, PENALTIES.tears[damage.tears]);
-      if (damage?.writing) add("Writing present", PENALTIES.writing);
-      if (damage?.stickers) add("Stickers or tape", PENALTIES.stickersTape);
-    }
-
-    return { score, deductions: deds };
-  }
-
-  // CASSETTE (J-card only; cases are replaceable -> handled as notes)
-  if (type === "cassette") {
-    const { overall, jcard, damage } = state;
-
-    if (overall?.minorShelf) add("Minor shelf wear", PENALTIES.minorShelfWear);
-    if (overall?.cornerWear)
-      add(`Corner wear (${overall.cornerWear})`, PENALTIES.cornerWear[overall.cornerWear]);
-
-    if (!sealed) {
-      if (jcard?.jcardTears)
-        add(`J-card tears (${jcard.jcardTears})`, PENALTIES.tears[jcard.jcardTears]);
-    }
-
-    if (damage?.creases)
-      add(`J-card creases/crushing (${damage.creases})`, PENALTIES.creases[damage.creases]);
-
-    if (!sealed) {
-      if (damage?.writing) add("Writing present", PENALTIES.writing);
-      if (damage?.stickers) add("Stickers or tape", PENALTIES.stickersTape);
-    }
-
-    return { score, deductions: deds };
-  }
-
-  // CD (inlay/booklet/digipak only; jewel cases are replaceable -> notes)
-  const { overall, insertTray, damage } = state;
-
-  if (overall?.minorShelf) add("Minor shelf wear", PENALTIES.minorShelfWear);
-  if (overall?.cornerWear)
-    add(`Corner wear (${overall.cornerWear})`, PENALTIES.cornerWear[overall.cornerWear]);
-  if (overall?.bookletRing)
-    add(`Booklet ring wear (${overall.bookletRing})`, PENALTIES.ringWear[overall.bookletRing] || -5);
-
-  if (!sealed && insertTray && insertTray.insertIntact === false) {
-    add("Insert/tray damage", PENALTIES.seamSplit.medium);
-  }
-
-  if (damage?.creases)
-    add(`Creases/crushing (${damage.creases})`, PENALTIES.creases[damage.creases]);
-
-  if (!sealed) {
-    if (damage?.tears) add(`Tears present (${damage.tears})`, PENALTIES.tears[damage.tears]);
-    if (damage?.writing) add("Writing present", PENALTIES.writing);
-    if (damage?.stickers) add("Stickers or tape", PENALTIES.stickersTape);
-  }
-
-  return { score, deductions: deds };
-}
-
-/** Explain: top 3 deductions per side (media vs packaging) */
-function buildExplanation(mediaDeds, packDeds, overallText, itemSummaries) {
-  const top3 = (arr) => arr.slice().sort((a, b) => b.points - a.points).slice(0, 3);
-  const mediaTop = top3(mediaDeds);
-  const packTop = top3(packDeds);
-  const bullet = (d) => `• ${d.label} (−${d.points})`;
-
-  return [
-    "Grading Explanation:",
-    mediaTop.length
-      ? `Media (top factors):\n${mediaTop.map(bullet).join("\n")}`
-      : "Media: No deductions.",
-    packTop.length
-      ? `Packaging (top factors):\n${packTop.map(bullet).join("\n")}`
-      : "Packaging: No deductions.",
-    overallText,
-    itemSummaries && itemSummaries.length ? itemSummaries.join(" ") : "",
-  ]
-    .filter(Boolean)
-    .join("\n\n");
-}
+const MAX_ITEMS = 6;
 
 export default function MediaGradingPage() {
-  const [mediaType, setMediaType] = useState("vinyl"); // 'vinyl' | 'cassette' | 'cd'
+  const [mediaType, setMediaType] = useState("vinyl");
   const [sealed, setSealed] = useState(false);
 
-  // Media items
-  const [records, setRecords] = useState([makeVinylItem(0)]);
-  const [tapes, setTapes] = useState([makeCassetteItem()]);
-  const [discs, setDiscs] = useState([makeCDItem()]);
+  const [items, setItems] = useState([makeInitialMediaState("vinyl")]);
 
-  // Packaging
-  const [packVinyl, setPackVinyl] = useState(makePackagingState("vinyl"));
-  const [packCassette, setPackCassette] = useState(makePackagingState("cassette"));
-  const [packCD, setPackCD] = useState(makePackagingState("cd"));
+  const [packagingMissing, setPackagingMissing] = useState(false);
+  const [packagingChecks, setPackagingChecks] = useState({});
+  const [packagingSubs, setPackagingSubs] = useState({});
+  const [additionalNotes, setAdditionalNotes] = useState({});
+  const [customNotes, setCustomNotes] = useState("");
 
-  // Notes
-  const [notes, setNotes] = useState("");
+  const labels = useMemo(() => getMediaLabels(mediaType), [mediaType]);
+  const pkgLabels = useMemo(() => getPackagingLabels(mediaType), [mediaType]);
 
-  const items = mediaType === "vinyl" ? records : mediaType === "cassette" ? tapes : discs;
-  const setItems = mediaType === "vinyl" ? setRecords : mediaType === "cassette" ? setTapes : setDiscs;
-  const packaging = mediaType === "vinyl" ? packVinyl : mediaType === "cassette" ? packCassette : packCD;
-  const setPackaging = mediaType === "vinyl" ? setPackVinyl : mediaType === "cassette" ? setPackCassette : setPackCD;
+  function onSelectType(next) {
+    setMediaType(next);
+    setItems((prev) => prev.map(() => makeInitialMediaState(next)));
+    setPackagingMissing(false);
+    setPackagingChecks({});
+    setPackagingSubs({});
+    setAdditionalNotes({});
+  }
 
-  /** Add / remove media item */
-  const addItem = () => {
-    if (mediaType === "vinyl") {
-      setRecords((prev) => [...prev, makeVinylItem(prev.length)]);
-    } else if (mediaType === "cassette") {
-      setTapes((prev) => [...prev, makeCassetteItem()]);
-    } else {
-      setDiscs((prev) => [...prev, makeCDItem()]);
+  function addAnotherItem() {
+    if (items.length >= MAX_ITEMS) return;
+    setItems((prev) => [...prev, makeInitialMediaState(mediaType)]);
+  }
+
+  function removeItem(index) {
+    setItems((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function updateItem(idx, updater) {
+    setItems((prev) => prev.map((it, i) => (i === idx ? updater(it) : it)));
+  }
+
+  const computeMediaScoreForItem = useCallback(
+    (item) => {
+      if (item.missing) return { score: 0, deductions: [{ label: "Item missing", amount: 100 }] };
+
+      let score = 100;
+      const deductions = [];
+
+      const evalRow = (row, isAudio) => {
+        row.forEach((entry) => {
+          if (!entry.checked) return;
+
+          // Sealed gating
+          if (sealed) {
+            if (mediaType === "vinyl") {
+              if (entry.key !== "warping") {
+                // In sealed mode for vinyl media, only warping is evaluable
+                return;
+              }
+            } else {
+              // cassette/CD sealed media => ignore all defects (media M unless missing)
+              return;
+            }
+          }
+
+          const p = entry.penalty || 0;
+          if (p > 0) {
+            score -= p;
+            deductions.push({ label: entry.label, amount: p });
+          }
+
+          // Per-track penalty: AUDIO defects only
+          if (isAudio && entry.tracks !== null) {
+            if (labels.sideable && entry.tracks && typeof entry.tracks === "object") {
+              const countS1 = entry.sides?.S1 ? Math.max(0, parseInt(entry.tracks.S1 || 0, 10)) : 0;
+              const countS2 = entry.sides?.S2 ? Math.max(0, parseInt(entry.tracks.S2 || 0, 10)) : 0;
+              const total = countS1 + countS2;
+              if (total > 0) {
+                const amt = total * MEDIA_PENALTIES.perTrack;
+                score -= amt;
+                deductions.push({ label: `Tracks affected (${entry.label})`, amount: amt });
+              }
+            } else if (!labels.sideable && typeof entry.tracks === "number") {
+              const t = Math.max(0, parseInt(entry.tracks || 0, 10));
+              if (t > 0) {
+                const amt = t * MEDIA_PENALTIES.perTrack;
+                score -= amt;
+                deductions.push({ label: `Tracks affected (${entry.label})`, amount: amt });
+              }
+            }
+          }
+        });
+      };
+
+      evalRow(item.sections.visual, false);
+      evalRow(item.sections.audio, true);
+      evalRow(item.sections.labelArea, false);
+
+      score = Math.max(0, Math.min(100, score));
+      return { score, deductions };
+    },
+    [sealed, mediaType, labels.sideable]
+  );
+
+  const computePackagingScore = useCallback(() => {
+    if (packagingMissing) {
+      return { score: 0, deductions: [{ label: "Packaging missing", amount: 100 }], sealedM: false };
     }
-  };
-  const removeItem = (idx) => {
-    setItems((prev) => prev.filter((_, i) => i !== idx));
-  };
+    let score = 100;
+    const deductions = [];
+    let totalDeduction = 0;
 
-  /** Compute media, packaging, overall */
-  const computed = useMemo(() => {
-    // Media
-    const itemScores = items.map((it) => scoreMediaItem(it, mediaType, sealed));
-    const mediaDeds = itemScores.flatMap((r) => r.deductions);
-    const mediaScore =
-      items.length > 0
-        ? itemScores.reduce((acc, r) => acc + clamp(r.score), 0) / items.length
-        : 0;
+    const allowedWhenSealed = new Set(["minorShelfWear", "cornerWear", "creases"]);
 
-    // Packaging
-    const pack = scorePackaging(packaging, mediaType, sealed);
-    const packScore = clamp(pack.score);
-    const packDeds = pack.deductions;
+    const applyBlock = (blockArr) => {
+      blockArr.forEach((cfg) => {
+        const on = !!packagingChecks[cfg.key];
+        if (!on) return;
+        if (sealed && !allowedWhenSealed.has(cfg.key)) return;
+        if (cfg.penalty && cfg.penalty > 0) {
+          totalDeduction += cfg.penalty;
+          deductions.push({ label: cfg.label, amount: cfg.penalty });
+        }
+      });
+    };
 
-    // Missing logic for overall divider
-    const mediaMissingAll = items.length === 0 || items.every((i) => i.missing);
-    const packagingMissing = packaging?.missing === true;
+    applyBlock(pkgLabels.overall);
+    applyBlock(pkgLabels.seams);
+    applyBlock(pkgLabels.damage);
 
-    const divider = mediaMissingAll || packagingMissing ? 4 : 2;
-    const overallScore = (mediaScore + (packagingMissing ? 0 : packScore)) / divider;
+    if (sealed) {
+      score = Math.min(100, score - totalDeduction + SLEEVE_PENALTIES.sealedBonus);
+    } else {
+      score = Math.max(0, 100 - totalDeduction);
+    }
+    return { score, deductions, sealedM: sealed && totalDeduction === 0 };
+  }, [packagingChecks, packagingMissing, sealed, pkgLabels]);
 
-    // Grade mapping (M only when sealed & flawless in allowed sealed scope)
-    const flawlessAllowed = sealed; // sealed gating
-    const mediaGrade = toGrade(mediaScore, { sealed, flawlessAllowed });
-    const packagingGrade = toGrade(packScore, { sealed, flawlessAllowed });
-    const overallGrade = toGrade(overallScore, { sealed, flawlessAllowed });
-
-    // Item badges
-    const itemBadges = itemScores.map((r, i) => {
-      const grade = toGrade(r.score, { sealed, flawlessAllowed });
-      return `Item #${i + 1}: ${grade} (${Math.round(r.score)}/100)`;
+  const mediaAgg = useMemo(() => {
+    let total = 0;
+    let allDeductions = [];
+    const perItem = items.map((it) => computeMediaScoreForItem(it));
+    perItem.forEach((r) => {
+      total += r.score;
+      allDeductions = allDeductions.concat(r.deductions);
     });
 
-    const overallWhy =
-      divider === 2
-        ? `Overall is the average of Media (${Math.round(mediaScore)}) and Packaging (${Math.round(
-            packScore
-          )}).`
-        : `Overall is penalized for a missing component: (Media ${Math.round(
-            mediaScore
-          )} + Packaging ${packagingMissing ? 0 : Math.round(packScore)}) ÷ 4.`;
+    let mediaAllM = false;
+    if (sealed) {
+      if (mediaType === "vinyl") {
+        const anyWarp = items.some((it) =>
+          it.sections.visual.some((e) => e.key === "warping" && e.checked)
+        );
+        const anyMissing = items.some((it) => it.missing);
+        mediaAllM = !anyWarp && !anyMissing;
+      } else {
+        mediaAllM = !items.some((it) => it.missing);
+      }
+    }
 
-    const explanation = buildExplanation(mediaDeds, packDeds, overallWhy, itemBadges);
+    const avg = items.length ? total / items.length : 0;
+    return { avg: Math.max(0, Math.min(100, avg)), deductions: allDeductions, sealedAllM: mediaAllM };
+  }, [items, sealed, mediaType, computeMediaScoreForItem]);
+
+  const packagingAgg = useMemo(() => computePackagingScore(), [computePackagingScore]);
+
+  function scoreToGrade(score, opts) {
+    const { isMedia, mediaSealedAllM, packagingSealedM, isSealed } = opts;
+    if (isSealed) {
+      if (isMedia && mediaSealedAllM) return "M";
+      if (!isMedia && packagingSealedM) return "M";
+    }
+    return numericToBaseGrade(score);
+  }
+
+  const overall = useMemo(() => {
+    const mediaScore = mediaAgg.avg;
+    const mediaGrade = scoreToGrade(mediaScore, {
+      isMedia: true,
+      mediaSealedAllM: mediaAgg.sealedAllM,
+      packagingSealedM: false,
+      isSealed: sealed,
+    });
+
+    const pkgScore = packagingAgg.score;
+    const pkgGrade = scoreToGrade(pkgScore, {
+      isMedia: false,
+      mediaSealedAllM: false,
+      packagingSealedM: packagingAgg.sealedM,
+      isSealed: sealed,
+    });
+
+    const componentMissing = packagingMissing || items.every((it) => it.missing);
+    const denom = componentMissing ? 4 : 2;
+    const overallScore = Math.max(0, Math.min(100, (mediaScore + pkgScore) / denom));
+
+    let overallGrade;
+    if (sealed) {
+      const bothMint = mediaGrade === "M" && pkgGrade === "M";
+      overallGrade = bothMint ? "M" : numericToBaseGrade(overallScore);
+    } else {
+      overallGrade = numericToBaseGrade(overallScore);
+    }
+
+    const mediaTop = [...mediaAgg.deductions].sort((a, b) => b.amount - a.amount).slice(0, 3);
+    const pkgTop = [...packagingAgg.deductions].sort((a, b) => b.amount - a.amount).slice(0, 3);
+
+    const details = [];
+    details.push(
+      mediaTop.length
+        ? `Media deductions: ${mediaTop.map((d) => `${d.label} (−${d.amount})`).join("; ")}.`
+        : "Media: No deductions."
+    );
+    details.push(
+      pkgTop.length
+        ? `Packaging deductions: ${pkgTop.map((d) => `${d.label} (−${d.amount})`).join("; ")}.`
+        : "Packaging: No deductions."
+    );
+
+    const formula = componentMissing
+      ? "Overall = (Media + Packaging) ÷ 4 because a core component is missing."
+      : "Overall = (Media + Packaging) ÷ 2.";
 
     return {
       mediaScore,
       mediaGrade,
-      packScore,
-      packagingGrade,
+      pkgScore,
+      pkgGrade,
       overallScore,
       overallGrade,
-      explanation,
+      explanation: `${formula} ${details.join(" ")}`,
     };
-  }, [items, mediaType, sealed, packaging]);
+  }, [mediaAgg, packagingAgg, sealed, packagingMissing, items]);
 
-  /** UI helpers */
-  const pill = (key, label, icon) => (
-    <button
-      key={key}
-      className={`mg-pill ${mediaType === key ? "selected" : ""}`}
-      type="button"
-      onClick={() => {
-        setMediaType(key);
-      }}
-      aria-pressed={mediaType === key}
-    >
-      <span className="mg-pill-emoji">{icon}</span> {label}
-    </button>
-  );
+  function togglePackaging(key) {
+    setPackagingChecks((p) => ({ ...p, [key]: !p[key] }));
+  }
+  function setPackagingSub(key, idx) {
+    setPackagingSubs((p) => ({ ...p, [key]: idx }));
+  }
+  function toggleNote(key) {
+    setAdditionalNotes((p) => ({ ...p, [key]: !p[key] }));
+  }
 
-  const GradeCard = ({ title, score, grade }) => (
-    <div className={`mg-result-card grade-${grade.replace("/", "").replace("+", "p")}`}>
-      <div className="mg-result-title">{title}</div>
-      <div className="mg-result-grade">{grade}</div>
-      <div className="mg-result-score">{Math.round(score)}/100</div>
+  const typeTabs = (
+    <div className="mg-type-tabs" role="tablist" aria-label="Media type">
+      {MEDIA_TYPES.map((t) => (
+        <button
+          key={t.key}
+          role="tab"
+          aria-selected={mediaType === t.key}
+          className={`pill ${mediaType === t.key ? "selected" : ""}`}
+          onClick={() => onSelectType(t.key)}
+          type="button"
+        >
+          <span className="icon">{t.icon}</span> {t.label}
+        </button>
+      ))}
     </div>
   );
 
-  /** Header + Sealed strip */
-  const renderHeader = () => (
-    <div className="mg-header">
-      <div className="mg-title">Systematic Media Grading Tool</div>
-      <div className="mg-subtitle">Detailed condition assessment with automatic grading calculation</div>
-      <div className="mg-pill-row">
-        {pill("vinyl", MEDIA_TYPES.vinyl.label, MEDIA_TYPES.vinyl.icon)}
-        {pill("cassette", MEDIA_TYPES.cassette.label, MEDIA_TYPES.cassette.icon)}
-        {pill("cd", MEDIA_TYPES.cd.label, MEDIA_TYPES.cd.icon)}
-      </div>
-
-      <div className="mg-sealed">
-        <label className="mg-check">
-          <input type="checkbox" checked={sealed} onChange={(e) => setSealed(e.target.checked)} />
-          <span>Sealed (factory shrink intact)</span>
-        </label>
-        <div className="mg-help tight">
-          {mediaType === "vinyl" ? (
-            <>
-              When Sealed is on: Vinyl allows evaluating only <em>Warping present</em> for media, and packaging
-              exterior wear (<em>Minor shelf wear</em>, <em>Corner wear</em>, <em>Ring wear</em>, <em>Creases/crushing</em>).
-              Packaging gets a +5 bonus (capped at 100). Mint (M) is allowed <em>only</em> when sealed and flawless.
-            </>
-          ) : (
-            <>
-              When Sealed is on: Cassettes/CDs default to <strong>Mint</strong> for media unless missing. Packaging may
-              only show exterior wear (<em>Minor shelf wear</em>, <em>Corner wear</em>{mediaType === "cd" ? ", <em>Booklet ring wear</em>" : ""}, <em>Creases/crushing</em>).
-              Packaging gets a +5 bonus (capped at 100). Mint (M) is allowed <em>only</em> when sealed and flawless.
-            </>
-          )}
-        </div>
-      </div>
+  const sealedBanner = (
+    <div className="mg-sealed">
+      <label htmlFor="sealedToggle" className="checkbox-row">
+        <input
+          id="sealedToggle"
+          type="checkbox"
+          checked={sealed}
+          onChange={(e) => setSealed(e.target.checked)}
+        />
+        <span>Sealed (factory shrink intact)</span>
+      </label>
+      <p className="help">
+        When <strong>Sealed</strong> is on: Vinyl allows evaluating only <em>Warping present</em> for media, and
+        packaging exterior wear (<em>Minor shelf wear</em>, <em>Corner wear</em>, <em>Creases/crushing</em>). Cassettes/CDs default to <strong>Mint</strong> for media unless missing.
+        Packaging gets a +5 bonus (capped at 100). <strong>Mint (M)</strong> is only assigned when sealed and flawless in the allowed scope.
+      </p>
     </div>
   );
 
-  /** Render blocks per media type */
-  const renderVinylItem = (it, idx) => {
-    const [sideA, sideB] = sidesForIndex(idx);
+  const Header = (
+    <header className="mg-header">
+      <h1>🔍 Systematic Media Grading Tool</h1>
+      <p className="subtitle">Detailed condition assessment with automatic grading calculation</p>
+      {typeTabs}
+      {sealedBanner}
+    </header>
+  );
+
+  function MediaItemCard({ item, index }) {
+    const [L1, L2] = sideLettersForIndex(index);
+    const idxLabel = `${labels.itemWord} #${index + 1}`;
+
+    const setEntry = (sectionKey, entryKey, updates) => {
+      updateItem(index, (it) => {
+        const next = { ...it, sections: { ...it.sections } };
+        const arr = next.sections[sectionKey].map((e) =>
+          e.key === entryKey ? { ...e, ...updates } : e
+        );
+        next.sections[sectionKey] = arr;
+        return next;
+      });
+    };
+
+    const setMissing = (val) => updateItem(index, (it) => ({ ...it, missing: val }));
+
+    // NOTE: removed unused isAudio param to satisfy ESLint
+    const sectionBlock = (title, keyName, arr) => {
+      // Sealed media gating
+      if (sealed && mediaType !== "vinyl" && (title.toLowerCase().includes("visual") || title.toLowerCase().includes("audio") || title.toLowerCase().includes("playback"))) {
+        return null; // cassette/CD: hide media details when sealed
+      }
+      const filtered =
+        sealed && mediaType === "vinyl" && title.toLowerCase().includes("visual")
+          ? arr.filter((row) => row.key === "warping")
+          : arr;
+
+      if (filtered.length === 0) return null;
+
+      return (
+        <fieldset className="mg-fieldset">
+          <legend>{title}</legend>
+          {filtered.map((entry) => {
+            const id = `${keyName}-${entry.key}-${index}`;
+            const onToggle = (checked) => setEntry(keyName, entry.key, { checked });
+
+            return (
+              <div key={entry.key} className={`row ${entry.checked ? "active" : ""}`}>
+                <label htmlFor={id} className="checkbox-row">
+                  <input
+                    id={id}
+                    type="checkbox"
+                    checked={entry.checked}
+                    onChange={(e) => onToggle(e.target.checked)}
+                  />
+                  <span>{entry.label}</span>
+                </label>
+
+                {/* Sub-severity radios */}
+                {entry.checked && entry.sub && (
+                  <div className="subradios" role="group" aria-label={`${entry.label} severity`}>
+                    {entry.sub.map((slabel, i) => {
+                      const rid = `${id}-sub-${i}`;
+                      return (
+                        <label key={rid} htmlFor={rid} className="radio-row">
+                          <input
+                            id={rid}
+                            type="radio"
+                            name={`${id}-sub`}
+                            checked={entry.sub !== null && entry.sub === i}
+                            onChange={() => setEntry(keyName, entry.key, { sub: i })}
+                          />
+                          <span>{slabel}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Side selectors + per-side tracks (vinyl/cassette) */}
+                {entry.checked && entry.sides && (
+                  <div className="sides" role="group" aria-label="Which side(s) affected">
+                    <span className="sides-label">Which side(s) affected</span>
+                    {[
+                      { key: "S1", label: L1 },
+                      { key: "S2", label: L2 },
+                    ].map((s) => {
+                      const sid = `${id}-side-${s.key}`;
+                      return (
+                        <label key={sid} htmlFor={sid} className="checkbox-row side">
+                          <input
+                            id={sid}
+                            type="checkbox"
+                            checked={!!entry.sides[s.key]}
+                            onChange={(e) =>
+                              setEntry(keyName, entry.key, {
+                                sides: { ...entry.sides, [s.key]: e.target.checked },
+                              })
+                            }
+                          />
+                          <span>Side {s.label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Tracks affected (per-side for sideable defects; single for CD) */}
+                {entry.checked && entry.tracks !== null && (
+                  <div className="tracks">
+                    {labels.sideable && typeof entry.tracks === "object" ? (
+                      <>
+                        <label htmlFor={`${id}-tracks-S1`}>Tracks affected — Side {L1}</label>
+                        <input
+                          id={`${id}-tracks-S1`}
+                          type="number"
+                          min="0"
+                          value={entry.tracks.S1}
+                          onChange={(e) =>
+                            setEntry(keyName, entry.key, {
+                              tracks: {
+                                ...entry.tracks,
+                                S1: Math.max(0, parseInt(e.target.value || "0", 10)),
+                              },
+                            })
+                          }
+                        />
+                        <label htmlFor={`${id}-tracks-S2`}>Side {L2}</label>
+                        <input
+                          id={`${id}-tracks-S2`}
+                          type="number"
+                          min="0"
+                          value={entry.tracks.S2}
+                          onChange={(e) =>
+                            setEntry(keyName, entry.key, {
+                              tracks: {
+                                ...entry.tracks,
+                                S2: Math.max(0, parseInt(e.target.value || "0", 10)),
+                              },
+                            })
+                          }
+                        />
+                        <span className="hint">
+                          −1 per track applies only to <em>audio</em> defects; for visual, track counts are informational.
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <label htmlFor={`${id}-tracks`}>Tracks affected</label>
+                        <input
+                          id={`${id}-tracks`}
+                          type="number"
+                          min="0"
+                          value={entry.tracks}
+                          onChange={(e) =>
+                            setEntry(keyName, entry.key, {
+                              tracks: Math.max(0, parseInt(e.target.value || "0", 10)),
+                            })
+                          }
+                        />
+                        <span className="hint">−1 per track applies only to audio defects.</span>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </fieldset>
+      );
+    };
+
     return (
-      <div key={idx} className="mg-panel">
-        <div className="mg-panel-row between">
-          <div className="mg-subtle">Record #{idx + 1}</div>
-          <div className="mg-inline-actions">
-            <label className="mg-check">
+      <section className="panel">
+        <div className="panel-title">
+          <h3>{idxLabel}</h3>
+          <div className="title-actions">
+            <label htmlFor={`missing-${index}`} className="checkbox-row">
               <input
+                id={`missing-${index}`}
                 type="checkbox"
-                checked={it.missing}
-                onChange={(e) =>
-                  setRecords((prev) => {
-                    const clone = [...prev];
-                    clone[idx] = { ...clone[idx], missing: e.target.checked };
-                    return clone;
-                  })
-                }
+                checked={item.missing}
+                onChange={(e) => setMissing(e.target.checked)}
               />
               <span>Mark this media as Missing (auto P)</span>
             </label>
-            <button className="mg-danger sm" type="button" onClick={() => removeItem(idx)}>
-              Remove Record
+            <button
+              type="button"
+              className="btn danger"
+              onClick={() => removeItem(index)}
+              aria-label={`Remove ${labels.itemWord}`}
+            >
+              Remove {labels.itemWord}
             </button>
           </div>
         </div>
 
-        {/* Visual */}
-        <fieldset className="mg-fieldset">
-          <legend>Visual Appearance</legend>
-
-          {!sealed && (
-            <>
-              <label className="mg-check">
-                <input
-                  type="checkbox"
-                  checked={it.visual.glossy}
-                  onChange={(e) =>
-                    setRecords((prev) => {
-                      const clone = [...prev];
-                      clone[idx] = {
-                        ...clone[idx],
-                        visual: { ...clone[idx].visual, glossy: e.target.checked },
-                      };
-                      return clone;
-                    })
-                  }
-                />
-                <span>Record has glossy, like-new appearance</span>
-              </label>
-
-              {["scuffs", "scratches", "grooveWear"].map((k) => (
-                <div key={k} className="mg-check-with-sides">
-                  <label className="mg-check">
-                    <input
-                      type="checkbox"
-                      checked={it.visual[k].checked}
-                      onChange={(e) =>
-                        setRecords((prev) => {
-                          const clone = [...prev];
-                          clone[idx] = {
-                            ...clone[idx],
-                            visual: {
-                              ...clone[idx].visual,
-                              [k]: { ...clone[idx].visual[k], checked: e.target.checked },
-                            },
-                          };
-                          return clone;
-                        })
-                      }
-                    />
-                    <span>
-                      {k === "scuffs"
-                        ? "Light scuffs visible"
-                        : k === "scratches"
-                        ? "Scratches present"
-                        : "Groove wear visible"}
-                    </span>
-                  </label>
-                  {it.visual[k].checked && (
-                    <div className="mg-sides">
-                      <label className="mg-check sm">
-                        <input
-                          type="checkbox"
-                          checked={it.visual[k].sides[sideA]}
-                          onChange={(e) =>
-                            setRecords((prev) => {
-                              const clone = [...prev];
-                              const obj = { ...clone[idx].visual[k] };
-                              obj.sides = { ...obj.sides, [sideA]: e.target.checked };
-                              clone[idx].visual[k] = obj;
-                              return clone;
-                            })
-                          }
-                        />
-                        <span>Side {sideA}</span>
-                      </label>
-                      <label className="mg-check sm">
-                        <input
-                          type="checkbox"
-                          checked={it.visual[k].sides[sideB]}
-                          onChange={(e) =>
-                            setRecords((prev) => {
-                              const clone = [...prev];
-                              const obj = { ...clone[idx].visual[k] };
-                              obj.sides = { ...obj.sides, [sideB]: e.target.checked };
-                              clone[idx].visual[k] = obj;
-                              return clone;
-                            })
-                          }
-                        />
-                        <span>Side {sideB}</span>
-                      </label>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </>
-          )}
-
-          {/* Warping visible always (sealed vinyl can judge warps) */}
-          <div className="mg-warping">
-            <label className="mg-check">
-              <input
-                type="checkbox"
-                checked={it.visual.warping.checked}
-                onChange={(e) =>
-                  setRecords((prev) => {
-                    const clone = [...prev];
-                    clone[idx] = {
-                      ...clone[idx],
-                      visual: {
-                        ...clone[idx].visual,
-                        warping: { ...clone[idx].visual.warping, checked: e.target.checked },
-                      },
-                    };
-                    return clone;
-                  })
-                }
-              />
-              <span>Warping present</span>
-            </label>
-            {it.visual.warping.checked && (
-              <div className="mg-radio-row">
-                {["slight", "moderate", "severe"].map((sev) => (
-                  <label className="mg-radio sm" key={sev}>
-                    <input
-                      type="radio"
-                      name={`warp-${idx}`}
-                      checked={it.visual.warping.severity === sev}
-                      onChange={() =>
-                        setRecords((prev) => {
-                          const clone = [...prev];
-                          clone[idx].visual.warping = { checked: true, severity: sev };
-                          return clone;
-                        })
-                      }
-                    />
-                    <span>{sev === "slight" ? "Slight" : sev === "moderate" ? "Moderate" : "Severe"}</span>
-                  </label>
-                ))}
-              </div>
-            )}
-          </div>
-        </fieldset>
-
-        {/* Audio */}
-        {!sealed && (
-          <fieldset className="mg-fieldset">
-            <legend>Audio Performance</legend>
-
-            {["surfaceNoise", "popsClicks", "skipping"].map((k) => (
-              <div key={k} className="mg-audio-block">
-                <label className="mg-check">
-                  <input
-                    type="checkbox"
-                    checked={it.audio[k].checked}
-                    onChange={(e) =>
-                      setRecords((prev) => {
-                        const clone = [...prev];
-                        clone[idx].audio[k] = { ...clone[idx].audio[k], checked: e.target.checked };
-                        return clone;
-                      })
-                    }
-                  />
-                  <span>
-                    {k === "surfaceNoise"
-                      ? "Surface noise when played"
-                      : k === "popsClicks"
-                      ? "Occasional pops or clicks"
-                      : "Skipping or repeating"}
-                  </span>
-                </label>
-                {it.audio[k].checked && (
-                  <div className="mg-sides mg-audio-sides">
-                    <div className="mg-side-line">
-                      <label className="mg-check sm">
-                        <input
-                          type="checkbox"
-                          checked={it.audio[k].sides[sideA]}
-                          onChange={(e) =>
-                            setRecords((prev) => {
-                              const clone = [...prev];
-                              const obj = { ...clone[idx].audio[k] };
-                              obj.sides = { ...obj.sides, [sideA]: e.target.checked };
-                              clone[idx].audio[k] = obj;
-                              return clone;
-                            })
-                          }
-                        />
-                        <span>Side {sideA}</span>
-                      </label>
-                      <div className="mg-inline-number">
-                        <label htmlFor={`tracks-${k}-${idx}-${sideA}`} className="mg-number-label">
-                          Tracks affected (Side {sideA})
-                        </label>
-                        <input
-                          id={`tracks-${k}-${idx}-${sideA}`}
-                          type="number"
-                          min="0"
-                          inputMode="numeric"
-                          value={it.audio[k].tracks[sideA]}
-                          onChange={(e) =>
-                            setRecords((prev) => {
-                              const clone = [...prev];
-                              const obj = { ...clone[idx].audio[k] };
-                              obj.tracks = {
-                                ...obj.tracks,
-                                [sideA]: Math.max(0, Number(e.target.value || 0)),
-                              };
-                              clone[idx].audio[k] = obj;
-                              return clone;
-                            })
-                          }
-                        />
-                      </div>
-                    </div>
-                    <div className="mg-side-line">
-                      <label className="mg-check sm">
-                        <input
-                          type="checkbox"
-                          checked={it.audio[k].sides[sideB]}
-                          onChange={(e) =>
-                            setRecords((prev) => {
-                              const clone = [...prev];
-                              const obj = { ...clone[idx].audio[k] };
-                              obj.sides = { ...obj.sides, [sideB]: e.target.checked };
-                              clone[idx].audio[k] = obj;
-                              return clone;
-                            })
-                          }
-                        />
-                        <span>Side {sideB}</span>
-                      </label>
-                      <div className="mg-inline-number">
-                        <label htmlFor={`tracks-${k}-${idx}-${sideB}`} className="mg-number-label">
-                          Tracks affected (Side {sideB})
-                        </label>
-                        <input
-                          id={`tracks-${k}-${idx}-${sideB}`}
-                          type="number"
-                          min="0"
-                          inputMode="numeric"
-                          value={it.audio[k].tracks[sideB]}
-                          onChange={(e) =>
-                            setRecords((prev) => {
-                              const clone = [...prev];
-                              const obj = { ...clone[idx].audio[k] };
-                              obj.tracks = {
-                                ...obj.tracks,
-                                [sideB]: Math.max(0, Number(e.target.value || 0)),
-                              };
-                              clone[idx].audio[k] = obj;
-                              return clone;
-                            })
-                          }
-                        />
-                      </div>
-                    </div>
-                    <div className="mg-help">Per-track penalty applies only when an audio defect is selected.</div>
-                  </div>
-                )}
-              </div>
-            ))}
-
-            <div className="mg-help dim">Select sides and track counts for each audio defect as observed.</div>
-          </fieldset>
+        {sectionBlock("Visual Appearance", "visual", item.sections.visual)}
+        {sectionBlock(
+          mediaType === "cassette" ? "Playback & Transport" : "Audio Performance",
+          "audio",
+          item.sections.audio
         )}
-
-        {/* Label / Center */}
-        {!sealed && (
-          <fieldset className="mg-fieldset">
-            <legend>Label / Center</legend>
-            <label className="mg-check">
-              <input
-                type="checkbox"
-                checked={it.label.clean}
-                onChange={(e) =>
-                  setRecords((prev) => {
-                    const clone = [...prev];
-                    clone[idx].label = { ...clone[idx].label, clean: e.target.checked };
-                    return clone;
-                  })
-                }
-              />
-              <span>Label is clean and bright</span>
-            </label>
-            <label className="mg-check">
-              <input
-                type="checkbox"
-                checked={it.label.spindle}
-                onChange={(e) =>
-                  setRecords((prev) => {
-                    const clone = [...prev];
-                    clone[idx].label = { ...clone[idx].label, spindle: e.target.checked };
-                    return clone;
-                  })
-                }
-              />
-              <span>Spindle marks present</span>
-            </label>
-            <label className="mg-check">
-              <input
-                type="checkbox"
-                checked={it.label.writing}
-                onChange={(e) =>
-                  setRecords((prev) => {
-                    const clone = [...prev];
-                    clone[idx].label = { ...clone[idx].label, writing: e.target.checked };
-                    return clone;
-                  })
-                }
-              />
-              <span>Writing on label</span>
-            </label>
-            <label className="mg-check">
-              <input
-                type="checkbox"
-                checked={it.label.stickers}
-                onChange={(e) =>
-                  setRecords((prev) => {
-                    const clone = [...prev];
-                    clone[idx].label = { ...clone[idx].label, stickers: e.target.checked };
-                    return clone;
-                  })
-                }
-              />
-              <span>Stickers or tape on label</span>
-            </label>
-          </fieldset>
+        {sectionBlock(
+          mediaType === "vinyl" ? "Label / Center" : mediaType === "cd" ? "Hub / Face" : "Shell / Label",
+          "labelArea",
+          item.sections.labelArea
         )}
-      </div>
+      </section>
     );
-  };
+  }
 
-  const renderCassetteItem = (it, idx) => (
-    <div key={idx} className="mg-panel">
-      <div className="mg-panel-row between">
-        <div className="mg-subtle">Tape #{idx + 1}</div>
-        <div className="mg-inline-actions">
-          <label className="mg-check">
+  const PackagingPanel = (
+    <section className="panel">
+      <div className="panel-title">
+        <h3>{pkgLabels.title}</h3>
+        <div className="title-actions">
+          <label htmlFor="pkg-missing" className="checkbox-row">
             <input
+              id="pkg-missing"
               type="checkbox"
-              checked={it.missing}
-              onChange={(e) =>
-                setTapes((prev) => {
-                  const clone = [...prev];
-                  clone[idx] = { ...clone[idx], missing: e.target.checked };
-                  return clone;
-                })
-              }
-            />
-            <span>Mark this media as Missing (auto P)</span>
-          </label>
-          <button className="mg-danger sm" type="button" onClick={() => removeItem(idx)}>
-            Remove Tape
-          </button>
-        </div>
-      </div>
-
-      {/* Shell/Label, Mechanics, Audio — all hidden when sealed */}
-      {!sealed && (
-        <>
-          <fieldset className="mg-fieldset">
-            <legend>Shell / Label</legend>
-            <label className="mg-check">
-              <input
-                type="checkbox"
-                checked={it.shell.clean}
-                onChange={(e) =>
-                  setTapes((prev) => {
-                    const clone = [...prev];
-                    clone[idx].shell = { ...clone[idx].shell, clean: e.target.checked };
-                    return clone;
-                  })
-                }
-              />
-              <span>Shell/label clean and bright</span>
-            </label>
-            <label className="mg-check">
-              <input
-                type="checkbox"
-                checked={it.shell.writing}
-                onChange={(e) =>
-                  setTapes((prev) => {
-                    const clone = [...prev];
-                    clone[idx].shell = { ...clone[idx].shell, writing: e.target.checked };
-                    return clone;
-                  })
-                }
-              />
-              <span>Writing on shell/label</span>
-            </label>
-            <label className="mg-check">
-              <input
-                type="checkbox"
-                checked={it.shell.stickers}
-                onChange={(e) =>
-                  setTapes((prev) => {
-                    const clone = [...prev];
-                    clone[idx].shell = { ...clone[idx].shell, stickers: e.target.checked };
-                    return clone;
-                  })
-                }
-              />
-              <span>Stickers or tape on shell</span>
-            </label>
-            <label className="mg-check">
-              <input
-                type="checkbox"
-                checked={it.shell.padMissing}
-                onChange={(e) =>
-                  setTapes((prev) => {
-                    const clone = [...prev];
-                    clone[idx].shell = { ...clone[idx].shell, padMissing: e.target.checked };
-                    return clone;
-                  })
-                }
-              />
-              <span>Pressure pad missing or degraded</span>
-            </label>
-          </fieldset>
-
-          <fieldset className="mg-fieldset">
-            <legend>Mechanics</legend>
-            <label className="mg-check">
-              <input
-                type="checkbox"
-                checked={it.mechanics.wrinkled}
-                onChange={(e) =>
-                  setTapes((prev) => {
-                    const clone = [...prev];
-                    clone[idx].mechanics = { ...clone[idx].mechanics, wrinkled: e.target.checked };
-                    return clone;
-                  })
-                }
-              />
-              <span>Tape wrinkled or stretched</span>
-            </label>
-            <label className="mg-check">
-              <input
-                type="checkbox"
-                checked={it.mechanics.unevenPack}
-                onChange={(e) =>
-                  setTapes((prev) => {
-                    const clone = [...prev];
-                    clone[idx].mechanics = { ...clone[idx].mechanics, unevenPack: e.target.checked };
-                    return clone;
-                  })
-                }
-              />
-              <span>Uneven tape pack</span>
-            </label>
-            <label className="mg-check">
-              <input
-                type="checkbox"
-                checked={it.mechanics.rollerWear}
-                onChange={(e) =>
-                  setTapes((prev) => {
-                    const clone = [...prev];
-                    clone[idx].mechanics = { ...clone[idx].mechanics, rollerWear: e.target.checked };
-                    return clone;
-                  })
-                }
-              />
-              <span>Roller/capstan wear</span>
-            </label>
-          </fieldset>
-
-          <fieldset className="mg-fieldset">
-            <legend>Audio Performance</legend>
-            <label className="mg-check">
-              <input
-                type="checkbox"
-                checked={it.audio.playsClean}
-                onChange={(e) =>
-                  setTapes((prev) => {
-                    const clone = [...prev];
-                    clone[idx].audio = { ...clone[idx].audio, playsClean: e.target.checked };
-                    return clone;
-                  })
-                }
-              />
-              <span>Plays cleanly (no notable issues)</span>
-            </label>
-            <label className="mg-check">
-              <input
-                type="checkbox"
-                checked={it.audio.hissDropouts}
-                onChange={(e) =>
-                  setTapes((prev) => {
-                    const clone = [...prev];
-                    clone[idx].audio = { ...clone[idx].audio, hissDropouts: e.target.checked };
-                    return clone;
-                  })
-                }
-              />
-              <span>Hiss/dropouts</span>
-            </label>
-            <label className="mg-check">
-              <input
-                type="checkbox"
-                checked={it.audio.wowFlutter}
-                onChange={(e) =>
-                  setTapes((prev) => {
-                    const clone = [...prev];
-                    clone[idx].audio = { ...clone[idx].audio, wowFlutter: e.target.checked };
-                    return clone;
-                  })
-                }
-              />
-              <span>Wow/flutter audible</span>
-            </label>
-            <label className="mg-check">
-              <input
-                type="checkbox"
-                checked={it.audio.channelLoss}
-                onChange={(e) =>
-                  setTapes((prev) => {
-                    const clone = [...prev];
-                    clone[idx].audio = { ...clone[idx].audio, channelLoss: e.target.checked };
-                    return clone;
-                  })
-                }
-              />
-              <span>Channel loss / drop</span>
-            </label>
-          </fieldset>
-        </>
-      )}
-    </div>
-  );
-
-  const renderCDItem = (it, idx) => (
-    <div key={idx} className="mg-panel">
-      <div className="mg-panel-row between">
-        <div className="mg-subtle">Disc #{idx + 1}</div>
-        <div className="mg-inline-actions">
-          <label className="mg-check">
-            <input
-              type="checkbox"
-              checked={it.missing}
-              onChange={(e) =>
-                setDiscs((prev) => {
-                  const clone = [...prev];
-                  clone[idx] = { ...clone[idx], missing: e.target.checked };
-                  return clone;
-                })
-              }
-            />
-            <span>Mark this media as Missing (auto P)</span>
-          </label>
-          <button className="mg-danger sm" type="button" onClick={() => removeItem(idx)}>
-            Remove Disc
-          </button>
-        </div>
-      </div>
-
-      {!sealed && (
-        <>
-          <fieldset className="mg-fieldset">
-            <legend>Visual Appearance</legend>
-            <label className="mg-check">
-              <input
-                type="checkbox"
-                checked={it.visual.scuffs}
-                onChange={(e) =>
-                  setDiscs((prev) => {
-                    const clone = [...prev];
-                    clone[idx].visual = { ...clone[idx].visual, scuffs: e.target.checked };
-                    return clone;
-                  })
-                }
-              />
-              <span>Light scuffs visible</span>
-            </label>
-            <label className="mg-check">
-              <input
-                type="checkbox"
-                checked={it.visual.scratches}
-                onChange={(e) =>
-                  setDiscs((prev) => {
-                    const clone = [...prev];
-                    clone[idx].visual = { ...clone[idx].visual, scratches: e.target.checked };
-                    return clone;
-                  })
-                }
-              />
-              <span>Scratches present</span>
-            </label>
-            <label className="mg-check">
-              <input
-                type="checkbox"
-                checked={it.visual.laserRot}
-                onChange={(e) =>
-                  setDiscs((prev) => {
-                    const clone = [...prev];
-                    clone[idx].visual = { ...clone[idx].visual, laserRot: e.target.checked };
-                    return clone;
-                  })
-                }
-              />
-              <span>Laser-rot/pinholes visible</span>
-            </label>
-            <label className="mg-check">
-              <input
-                type="checkbox"
-                checked={it.visual.wobble}
-                onChange={(e) =>
-                  setDiscs((prev) => {
-                    const clone = [...prev];
-                    clone[idx].visual = { ...clone[idx].visual, wobble: e.target.checked };
-                    return clone;
-                  })
-                }
-              />
-              <span>Disc wobble present</span>
-            </label>
-          </fieldset>
-
-          <fieldset className="mg-fieldset">
-            <legend>Audio Performance</legend>
-            <label className="mg-check">
-              <input
-                type="checkbox"
-                checked={it.audio.playsClean}
-                onChange={(e) =>
-                  setDiscs((prev) => {
-                    const clone = [...prev];
-                    clone[idx].audio = { ...clone[idx].audio, playsClean: e.target.checked };
-                    return clone;
-                  })
-                }
-              />
-              <span>Plays with no read errors</span>
-            </label>
-            <label className="mg-check">
-              <input
-                type="checkbox"
-                checked={it.audio.errorsCorrected}
-                onChange={(e) =>
-                  setDiscs((prev) => {
-                    const clone = [...prev];
-                    clone[idx].audio = { ...clone[idx].audio, errorsCorrected: e.target.checked };
-                    return clone;
-                  })
-                }
-              />
-              <span>Occasional read errors corrected</span>
-            </label>
-            <label className="mg-check">
-              <input
-                type="checkbox"
-                checked={it.audio.unreadable}
-                onChange={(e) =>
-                  setDiscs((prev) => {
-                    const clone = [...prev];
-                    clone[idx].audio = { ...clone[idx].audio, unreadable: e.target.checked };
-                    return clone;
-                  })
-                }
-              />
-              <span>Unreadable sectors / skipping</span>
-            </label>
-          </fieldset>
-
-          <fieldset className="mg-fieldset">
-            <legend>Hub / Face</legend>
-            <label className="mg-check">
-              <input
-                type="checkbox"
-                checked={it.hubFace.clean}
-                onChange={(e) =>
-                  setDiscs((prev) => {
-                    const clone = [...prev];
-                    clone[idx].hubFace = { ...clone[idx].hubFace, clean: e.target.checked };
-                    return clone;
-                  })
-                }
-              />
-              <span>Hub/face clean and bright</span>
-            </label>
-            <label className="mg-check">
-              <input
-                type="checkbox"
-                checked={it.hubFace.writing}
-                onChange={(e) =>
-                  setDiscs((prev) => {
-                    const clone = [...prev];
-                    clone[idx].hubFace = { ...clone[idx].hubFace, writing: e.target.checked };
-                    return clone;
-                  })
-                }
-              />
-              <span>Writing on disc face</span>
-            </label>
-            <label className="mg-check">
-              <input
-                type="checkbox"
-                checked={it.hubFace.stickers}
-                onChange={(e) =>
-                  setDiscs((prev) => {
-                    const clone = [...prev];
-                    clone[idx].hubFace = { ...clone[idx].hubFace, stickers: e.target.checked };
-                    return clone;
-                  })
-                }
-              />
-              <span>Stickers or tape on disc face</span>
-            </label>
-            <label className="mg-check">
-              <input
-                type="checkbox"
-                checked={it.hubFace.hubCrack}
-                onChange={(e) =>
-                  setDiscs((prev) => {
-                    const clone = [...prev];
-                    clone[idx].hubFace = { ...clone[idx].hubFace, hubCrack: e.target.checked };
-                    return clone;
-                  })
-                }
-              />
-              <span>Hub crack</span>
-            </label>
-          </fieldset>
-        </>
-      )}
-    </div>
-  );
-
-  /** Packaging forms (media-aware) */
-  const renderPackaging = () => {
-    if (mediaType === "vinyl") {
-      const s = packaging;
-      return (
-        <div className="mg-panel">
-          <div className="mg-panel-row between">
-            <div className="mg-subtle">Jacket & Packaging Condition Assessment</div>
-            <label className="mg-check">
-              <input
-                type="checkbox"
-                checked={s.missing}
-                onChange={(e) => setPackaging({ ...s, missing: e.target.checked })}
-              />
-              <span>Mark packaging as Missing (auto P)</span>
-            </label>
-          </div>
-
-          {/* Overall Appearance */}
-          <fieldset className="mg-fieldset">
-            <legend>Overall Appearance</legend>
-            {!sealed && (
-              <label className="mg-check">
-                <input
-                  type="checkbox"
-                  checked={s.overall.looksNew}
-                  onChange={(e) => setPackaging({ ...s, overall: { ...s.overall, looksNew: e.target.checked } })}
-                />
-                <span>Looks like new, no flaws</span>
-              </label>
-            )}
-
-            <label className="mg-check">
-              <input
-                type="checkbox"
-                checked={s.overall.minorShelf}
-                onChange={(e) => setPackaging({ ...s, overall: { ...s.overall, minorShelf: e.target.checked } })}
-              />
-              <span>Minor shelf wear only</span>
-            </label>
-
-            <div className="mg-subselect">
-              <div className="mg-subtle">Corner wear present</div>
-              <div className="mg-radio-row wrap">
-                {["slight", "moderate", "heavy"].map((lv) => (
-                  <label className="mg-radio sm" key={lv}>
-                    <input
-                      type="radio"
-                      name="vn-corner"
-                      checked={s.overall.cornerWear === lv}
-                      onChange={() => setPackaging({ ...s, overall: { ...s.overall, cornerWear: lv } })}
-                    />
-                    <span>{lv}</span>
-                  </label>
-                ))}
-                <button
-                  type="button"
-                  className="mg-link sm"
-                  onClick={() => setPackaging({ ...s, overall: { ...s.overall, cornerWear: null } })}
-                >
-                  Clear
-                </button>
-              </div>
-            </div>
-
-            <div className="mg-subselect">
-              <div className="mg-subtle">Ring wear visible</div>
-              <div className="mg-radio-row wrap">
-                {["light", "visible", "strong"].map((lv) => (
-                  <label className="mg-radio sm" key={lv}>
-                    <input
-                      type="radio"
-                      name="vn-ring"
-                      checked={s.overall.ringWear === lv}
-                      onChange={() => setPackaging({ ...s, overall: { ...s.overall, ringWear: lv } })}
-                    />
-                    <span>{lv}</span>
-                  </label>
-                ))}
-                <button
-                  type="button"
-                  className="mg-link sm"
-                  onClick={() => setPackaging({ ...s, overall: { ...s.overall, ringWear: null } })}
-                >
-                  Clear
-                </button>
-              </div>
-            </div>
-
-            <div className="mg-help">Sealed adds +5 (cap 100). Mint (M) only when sealed & flawless.</div>
-          </fieldset>
-
-          {/* Seams & Structure — hidden when sealed */}
-          {!sealed && (
-            <fieldset className="mg-fieldset">
-              <legend>Seams & Structure</legend>
-              <label className="mg-check">
-                <input
-                  type="checkbox"
-                  checked={s.seams.allIntact}
-                  onChange={(e) => setPackaging({ ...s, seams: { ...s.seams, allIntact: e.target.checked } })}
-                />
-                <span>All seams intact</span>
-              </label>
-
-              <div className="mg-subselect">
-                <div className="mg-subtle">Seam splits present</div>
-                <div className="mg-radio-row wrap">
-                  {["small", "medium", "large"].map((lv) => (
-                    <label className="mg-radio sm" key={lv}>
-                      <input
-                        type="radio"
-                        name="vn-seam"
-                        checked={s.seams.seamSplit === lv}
-                        onChange={() => setPackaging({ ...s, seams: { ...s.seams, seamSplit: lv } })}
-                      />
-                      <span>{lv}</span>
-                    </label>
-                  ))}
-                  <button
-                    type="button"
-                    className="mg-link sm"
-                    onClick={() => setPackaging({ ...s, seams: { ...s.seams, seamSplit: null } })}
-                  >
-                    Clear
-                  </button>
-                </div>
-              </div>
-
-              <div className="mg-subselect">
-                <div className="mg-subtle">Spine shows wear</div>
-                <div className="mg-radio-row wrap">
-                  {["slight", "moderate", "heavy"].map((lv) => (
-                    <label className="mg-radio sm" key={lv}>
-                      <input
-                        type="radio"
-                        name="vn-spine"
-                        checked={s.seams.spineWear === lv}
-                        onChange={() => setPackaging({ ...s, seams: { ...s.seams, spineWear: lv } })}
-                      />
-                      <span>{lv}</span>
-                    </label>
-                  ))}
-                  <button
-                    type="button"
-                    className="mg-link sm"
-                    onClick={() => setPackaging({ ...s, seams: { ...s.seams, spineWear: null } })}
-                  >
-                    Clear
-                  </button>
-                </div>
-              </div>
-            </fieldset>
-          )}
-
-          {/* Damage & Markings */}
-          <fieldset className="mg-fieldset">
-            <legend>Damage & Markings</legend>
-
-            <div className="mg-subselect">
-              <div className="mg-subtle">Creases / crushing present</div>
-              <div className="mg-radio-row wrap">
-                {["light", "pronounced", "crushing"].map((lv) => (
-                  <label className="mg-radio sm" key={lv}>
-                    <input
-                      type="radio"
-                      name="vn-crease"
-                      checked={s.damage.creases === lv}
-                      onChange={() => setPackaging({ ...s, damage: { ...s.damage, creases: lv } })}
-                    />
-                    <span>{lv}</span>
-                  </label>
-                ))}
-                <button
-                  type="button"
-                  className="mg-link sm"
-                  onClick={() => setPackaging({ ...s, damage: { ...s.damage, creases: null } })}
-                >
-                  Clear
-                </button>
-              </div>
-            </div>
-
-            {!sealed && (
-              <>
-                <div className="mg-subselect">
-                  <div className="mg-subtle">Tears present</div>
-                  <div className="mg-radio-row wrap">
-                    {["small", "medium", "large"].map((lv) => (
-                      <label className="mg-radio sm" key={lv}>
-                        <input
-                          type="radio"
-                          name="vn-tear"
-                          checked={s.damage.tears === lv}
-                          onChange={() => setPackaging({ ...s, damage: { ...s.damage, tears: lv } })}
-                        />
-                        <span>{lv}</span>
-                      </label>
-                    ))}
-                    <button
-                      type="button"
-                      className="mg-link sm"
-                      onClick={() => setPackaging({ ...s, damage: { ...s.damage, tears: null } })}
-                    >
-                      Clear
-                    </button>
-                  </div>
-                </div>
-
-                <label className="mg-check">
-                  <input
-                    type="checkbox"
-                    checked={s.damage.writing}
-                    onChange={(e) => setPackaging({ ...s, damage: { ...s.damage, writing: e.target.checked } })}
-                  />
-                  <span>Writing present</span>
-                </label>
-                <label className="mg-check">
-                  <input
-                    type="checkbox"
-                    checked={s.damage.stickers}
-                    onChange={(e) => setPackaging({ ...s, damage: { ...s.damage, stickers: e.target.checked } })}
-                  />
-                  <span>Stickers or tape</span>
-                </label>
-              </>
-            )}
-          </fieldset>
-
-          {/* Additional notes (vinyl) */}
-          <fieldset className="mg-fieldset">
-            <legend>Additional notes (don’t affect score)</legend>
-            <div className="mg-notes-grid">
-              {NOTES.vinyl.map((lbl) => (
-                <label className="mg-check sm" key={lbl}>
-                  <input
-                    type="checkbox"
-                    checked={!!s.notes[lbl]}
-                    onChange={(e) =>
-                      setPackaging({
-                        ...s,
-                        notes: { ...s.notes, [lbl]: e.target.checked },
-                      })
-                    }
-                  />
-                  <span>{lbl}</span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
-        </div>
-      );
-    }
-
-    if (mediaType === "cassette") {
-      const s = packaging;
-      return (
-        <div className="mg-panel">
-          <div className="mg-panel-row between">
-            <div className="mg-subtle">J-Card & Packaging Condition Assessment</div>
-            <label className="mg-check">
-              <input
-                type="checkbox"
-                checked={s.missing}
-                onChange={(e) => setPackaging({ ...s, missing: e.target.checked })}
-              />
-              <span>Mark packaging as Missing (auto P)</span>
-            </label>
-          </div>
-
-          <fieldset className="mg-fieldset">
-            <legend>Overall Appearance</legend>
-            {!sealed && (
-              <label className="mg-check">
-                <input
-                  type="checkbox"
-                  checked={s.overall.looksNew}
-                  onChange={(e) => setPackaging({ ...s, overall: { ...s.overall, looksNew: e.target.checked } })}
-                />
-                <span>Looks like new, no flaws</span>
-              </label>
-            )}
-            <label className="mg-check">
-              <input
-                type="checkbox"
-                checked={s.overall.minorShelf}
-                onChange={(e) => setPackaging({ ...s, overall: { ...s.overall, minorShelf: e.target.checked } })}
-              />
-              <span>Minor shelf wear only</span>
-            </label>
-            <div className="mg-subselect">
-              <div className="mg-subtle">Corner wear present</div>
-              <div className="mg-radio-row wrap">
-                {["slight", "moderate", "heavy"].map((lv) => (
-                  <label className="mg-radio sm" key={lv}>
-                    <input
-                      type="radio"
-                      name="tc-corner"
-                      checked={s.overall.cornerWear === lv}
-                      onChange={() => setPackaging({ ...s, overall: { ...s.overall, cornerWear: lv } })}
-                    />
-                    <span>{lv}</span>
-                  </label>
-                ))}
-                <button
-                  type="button"
-                  className="mg-link sm"
-                  onClick={() => setPackaging({ ...s, overall: { ...s.overall, cornerWear: null } })}
-                >
-                  Clear
-                </button>
-              </div>
-            </div>
-            <div className="mg-help">
-              Standard plastic cases are <strong>not graded</strong>; evaluate only the J-card. Sealed adds +5 (cap 100).
-              M only if sealed & flawless.
-            </div>
-          </fieldset>
-
-          {/* J-card structure hidden when sealed */}
-          {!sealed && (
-            <fieldset className="mg-fieldset">
-              <legend>J-Card Structure</legend>
-              <label className="mg-check">
-                <input
-                  type="checkbox"
-                  checked={s.jcard.allIntact}
-                  onChange={(e) => setPackaging({ ...s, jcard: { ...s.jcard, allIntact: e.target.checked } })}
-                />
-                <span>J-card intact</span>
-              </label>
-              <div className="mg-subselect">
-                <div className="mg-subtle">J-card tears</div>
-                <div className="mg-radio-row wrap">
-                  {["small", "medium", "large"].map((lv) => (
-                    <label className="mg-radio sm" key={lv}>
-                      <input
-                        type="radio"
-                        name="tc-tear"
-                        checked={s.jcard.jcardTears === lv}
-                        onChange={() => setPackaging({ ...s, jcard: { ...s.jcard, jcardTears: lv } })}
-                      />
-                      <span>{lv}</span>
-                    </label>
-                  ))}
-                  <button
-                    type="button"
-                    className="mg-link sm"
-                    onClick={() => setPackaging({ ...s, jcard: { ...s.jcard, jcardTears: null } })}
-                  >
-                    Clear
-                  </button>
-                </div>
-              </div>
-            </fieldset>
-          )}
-
-          <fieldset className="mg-fieldset">
-            <legend>Damage & Markings</legend>
-            <div className="mg-subselect">
-              <div className="mg-subtle">Creases / crushing present</div>
-              <div className="mg-radio-row wrap">
-                {["light", "pronounced", "crushing"].map((lv) => (
-                  <label className="mg-radio sm" key={lv}>
-                    <input
-                      type="radio"
-                      name="tc-crease"
-                      checked={s.damage.creases === lv}
-                      onChange={() => setPackaging({ ...s, damage: { ...s.damage, creases: lv } })}
-                    />
-                    <span>{lv}</span>
-                  </label>
-                ))}
-                <button
-                  type="button"
-                  className="mg-link sm"
-                  onClick={() => setPackaging({ ...s, damage: { ...s.damage, creases: null } })}
-                >
-                  Clear
-                </button>
-              </div>
-            </div>
-
-            {!sealed && (
-              <>
-                <label className="mg-check">
-                  <input
-                    type="checkbox"
-                    checked={s.damage.writing}
-                    onChange={(e) => setPackaging({ ...s, damage: { ...s.damage, writing: e.target.checked } })}
-                  />
-                  <span>Writing present</span>
-                </label>
-                <label className="mg-check">
-                  <input
-                    type="checkbox"
-                    checked={s.damage.stickers}
-                    onChange={(e) => setPackaging({ ...s, damage: { ...s.damage, stickers: e.target.checked } })}
-                  />
-                  <span>Stickers or tape</span>
-                </label>
-              </>
-            )}
-          </fieldset>
-
-          <fieldset className="mg-fieldset">
-            <legend>Additional notes (don’t affect score)</legend>
-            <div className="mg-notes-grid">
-              {NOTES.cassette.map((lbl) => (
-                <label className="mg-check sm" key={lbl}>
-                  <input
-                    type="checkbox"
-                    checked={!!s.notes[lbl]}
-                    onChange={(e) =>
-                      setPackaging({
-                        ...s,
-                        notes: { ...s.notes, [lbl]: e.target.checked },
-                      })
-                    }
-                  />
-                  <span>{lbl}</span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
-        </div>
-      );
-    }
-
-    // CD packaging
-    const s = packaging;
-    return (
-      <div className="mg-panel">
-        <div className="mg-panel-row between">
-          <div className="mg-subtle">Inlay/Booklet & Packaging Condition Assessment</div>
-          <label className="mg-check">
-            <input
-              type="checkbox"
-              checked={s.missing}
-              onChange={(e) => setPackaging({ ...s, missing: e.target.checked })}
+              checked={packagingMissing}
+              onChange={(e) => setPackagingMissing(e.target.checked)}
             />
             <span>Mark packaging as Missing (auto P)</span>
           </label>
         </div>
-
-        <fieldset className="mg-fieldset">
-          <legend>Overall Appearance</legend>
-          {!sealed && (
-            <label className="mg-check">
-              <input
-                type="checkbox"
-                checked={s.overall.looksNew}
-                onChange={(e) => setPackaging({ ...s, overall: { ...s.overall, looksNew: e.target.checked } })}
-              />
-              <span>Looks like new, no flaws</span>
-            </label>
-          )}
-
-          <label className="mg-check">
-            <input
-              type="checkbox"
-              checked={s.overall.minorShelf}
-              onChange={(e) => setPackaging({ ...s, overall: { ...s.overall, minorShelf: e.target.checked } })}
-            />
-            <span>Minor shelf wear only</span>
-          </label>
-
-          <div className="mg-subselect">
-            <div className="mg-subtle">Corner wear present (inlay/digipak)</div>
-            <div className="mg-radio-row wrap">
-              {["slight", "moderate", "heavy"].map((lv) => (
-                <label className="mg-radio sm" key={lv}>
-                  <input
-                    type="radio"
-                    name="cd-corner"
-                    checked={s.overall.cornerWear === lv}
-                    onChange={() => setPackaging({ ...s, overall: { ...s.overall, cornerWear: lv } })}
-                  />
-                  <span>{lv}</span>
-                </label>
-              ))}
-              <button
-                type="button"
-                className="mg-link sm"
-                onClick={() => setPackaging({ ...s, overall: { ...s.overall, cornerWear: null } })}
-              >
-                Clear
-              </button>
-            </div>
-          </div>
-
-          <div className="mg-subselect">
-            <div className="mg-subtle">Booklet ring wear visible</div>
-            <div className="mg-radio-row wrap">
-              {["light", "visible", "strong"].map((lv) => (
-                <label className="mg-radio sm" key={lv}>
-                  <input
-                    type="radio"
-                    name="cd-ring"
-                    checked={s.overall.bookletRing === lv}
-                    onChange={() => setPackaging({ ...s, overall: { ...s.overall, bookletRing: lv } })}
-                  />
-                  <span>{lv}</span>
-                </label>
-              ))}
-              <button
-                type="button"
-                className="mg-link sm"
-                onClick={() => setPackaging({ ...s, overall: { ...s.overall, bookletRing: null } })}
-              >
-                Clear
-              </button>
-            </div>
-          </div>
-
-          <div className="mg-help">
-            Standard jewel cases are <strong>not graded</strong>; evaluate the inlay/booklet/digipak. Sealed adds +5
-            (cap 100). M only if sealed & flawless.
-          </div>
-        </fieldset>
-
-        {/* Insert/Tray hidden when sealed */}
-        {!sealed && (
-          <fieldset className="mg-fieldset">
-            <legend>Insert/Tray Structure</legend>
-            <label className="mg-check">
-              <input
-                type="checkbox"
-                checked={s.insertTray.insertIntact}
-                onChange={(e) =>
-                  setPackaging({ ...s, insertTray: { ...s.insertTray, insertIntact: e.target.checked } })
-                }
-              />
-              <span>Booklet/tray insert intact</span>
-            </label>
-          </fieldset>
-        )}
-
-        <fieldset className="mg-fieldset">
-          <legend>Damage & Markings</legend>
-          <div className="mg-subselect">
-            <div className="mg-subtle">Creases / crushing present</div>
-            <div className="mg-radio-row wrap">
-              {["light", "pronounced", "crushing"].map((lv) => (
-                <label className="mg-radio sm" key={lv}>
-                  <input
-                    type="radio"
-                    name="cd-crease"
-                    checked={s.damage.creases === lv}
-                    onChange={() => setPackaging({ ...s, damage: { ...s.damage, creases: lv } })}
-                  />
-                  <span>{lv}</span>
-                </label>
-              ))}
-              <button
-                type="button"
-                className="mg-link sm"
-                onClick={() => setPackaging({ ...s, damage: { ...s.damage, creases: null } })}
-              >
-                Clear
-              </button>
-            </div>
-          </div>
-
-          {!sealed && (
-            <>
-              <div className="mg-subselect">
-                <div className="mg-subtle">Tears present</div>
-                <div className="mg-radio-row wrap">
-                  {["small", "medium", "large"].map((lv) => (
-                    <label className="mg-radio sm" key={lv}>
-                      <input
-                        type="radio"
-                        name="cd-tear"
-                        checked={s.damage.tears === lv}
-                        onChange={() => setPackaging({ ...s, damage: { ...s.damage, tears: lv } })}
-                      />
-                      <span>{lv}</span>
-                    </label>
-                  ))}
-                  <button
-                    type="button"
-                    className="mg-link sm"
-                    onClick={() => setPackaging({ ...s, damage: { ...s.damage, tears: null } })}
-                  >
-                    Clear
-                  </button>
-                </div>
-              </div>
-
-              <label className="mg-check">
-                <input
-                  type="checkbox"
-                  checked={s.damage.writing}
-                  onChange={(e) => setPackaging({ ...s, damage: { ...s.damage, writing: e.target.checked } })}
-                />
-                <span>Writing present</span>
-              </label>
-              <label className="mg-check">
-                <input
-                  type="checkbox"
-                  checked={s.damage.stickers}
-                  onChange={(e) => setPackaging({ ...s, damage: { ...s.damage, stickers: e.target.checked } })}
-                />
-                <span>Stickers or tape</span>
-              </label>
-            </>
-          )}
-        </fieldset>
-
-        <fieldset className="mg-fieldset">
-          <legend>Additional notes (don’t affect score)</legend>
-          <div className="mg-notes-grid">
-            {NOTES.cd.map((lbl) => (
-              <label className="mg-check sm" key={lbl}>
-                <input
-                  type="checkbox"
-                  checked={!!s.notes[lbl]}
-                  onChange={(e) =>
-                    setPackaging({
-                      ...s,
-                      notes: { ...s.notes, [lbl]: e.target.checked },
-                    })
-                  }
-                />
-                <span>{lbl}</span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
       </div>
-    );
-  };
+
+      {/* Overall Appearance */}
+      <fieldset className="mg-fieldset">
+        <legend>Overall Appearance</legend>
+        {pkgLabels.overall.map((cfg) => {
+          const id = `pkg-${cfg.key}`;
+          const checked = !!packagingChecks[cfg.key];
+          const disabled = sealed && !["minorShelfWear", "cornerWear", "creases"].includes(cfg.key);
+          return (
+            <div key={cfg.key} className={`row ${checked ? "active" : ""}`}>
+              <label htmlFor={id} className="checkbox-row">
+                <input
+                  id={id}
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => togglePackaging(cfg.key)}
+                  disabled={disabled}
+                />
+                <span>{cfg.label}</span>
+              </label>
+              {checked && cfg.sub && (
+                <div className="subradios">
+                  {cfg.sub.map((txt, i) => {
+                    const rid = `${id}-sub-${i}`;
+                    return (
+                      <label key={rid} htmlFor={rid} className="radio-row">
+                        <input
+                          id={rid}
+                          type="radio"
+                          name={`${id}-sub`}
+                          checked={packagingSubs[cfg.key] === i}
+                          onChange={() => setPackagingSub(cfg.key, i)}
+                          disabled={disabled}
+                        />
+                        <span>{txt}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {mediaType !== "vinyl" && (
+          <p className="help">
+            Standard plastic cases are <strong>not graded</strong>; evaluate the J-card/inlay/booklet/digipak. Use
+            Additional Notes for replaceable case issues.
+          </p>
+        )}
+        {sealed && (
+          <p className="help">
+            Sealed adds +5 (cap 100). <strong>M</strong> only if sealed &amp; flawless (no allowed deductions).
+          </p>
+        )}
+      </fieldset>
+
+      {/* Structure */}
+      <fieldset className="mg-fieldset">
+        <legend>
+          {mediaType === "vinyl" ? "Seams & Structure" : mediaType === "cassette" ? "J-card Structure" : "Insert/Tray Structure"}
+        </legend>
+        {pkgLabels.seams.map((cfg) => {
+          const id = `pkg-${cfg.key}`;
+          const checked = !!packagingChecks[cfg.key];
+          const disabled = sealed && cfg.key !== "allSeamsIntact" && cfg.key !== "allIntact";
+          return (
+            <div key={cfg.key} className={`row ${checked ? "active" : ""}`}>
+              <label htmlFor={id} className="checkbox-row">
+                <input
+                  id={id}
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => togglePackaging(cfg.key)}
+                  disabled={disabled}
+                />
+                <span>{cfg.label}</span>
+              </label>
+              {checked && cfg.sub && (
+                <div className="subradios">
+                  {cfg.sub.map((txt, i) => {
+                    const rid = `${id}-sub-${i}`;
+                    return (
+                      <label key={rid} htmlFor={rid} className="radio-row">
+                        <input
+                          id={rid}
+                          type="radio"
+                          name={`${id}-sub`}
+                          checked={packagingSubs[cfg.key] === i}
+                          onChange={() => setPackagingSub(cfg.key, i)}
+                          disabled={disabled}
+                        />
+                        <span>{txt}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </fieldset>
+
+      {/* Damage */}
+      <fieldset className="mg-fieldset">
+        <legend>Damage &amp; Markings</legend>
+        {pkgLabels.damage.map((cfg) => {
+          const id = `pkg-${cfg.key}`;
+          const checked = !!packagingChecks[cfg.key];
+          const disabled = sealed && cfg.key !== "creases";
+          return (
+            <div key={cfg.key} className={`row ${checked ? "active" : ""}`}>
+              <label htmlFor={id} className="checkbox-row">
+                <input
+                  id={id}
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => togglePackaging(cfg.key)}
+                  disabled={disabled}
+                />
+                <span>{cfg.label}</span>
+              </label>
+              {checked && cfg.sub && (
+                <div className="subradios">
+                  {cfg.sub.map((txt, i) => {
+                    const rid = `${id}-sub-${i}`;
+                    return (
+                      <label key={rid} htmlFor={rid} className="radio-row">
+                        <input
+                          id={rid}
+                          type="radio"
+                          name={`${id}-sub`}
+                          checked={packagingSubs[cfg.key] === i}
+                          onChange={() => setPackagingSub(cfg.key, i)}
+                          disabled={disabled}
+                        />
+                        <span>{txt}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </fieldset>
+
+      {/* Additional notes */}
+      <fieldset className="mg-fieldset">
+        <legend>Additional notes (don’t affect score)</legend>
+        <div className="notes-grid">
+          {pkgLabels.notes.map((n) => (
+            <label key={n.key} htmlFor={`note-${n.key}`} className="checkbox-row note">
+              <input
+                id={`note-${n.key}`}
+                type="checkbox"
+                checked={!!additionalNotes[n.key]}
+                onChange={() => toggleNote(n.key)}
+              />
+              <span>{n.label}</span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+    </section>
+  );
 
   return (
-    <div className="mg-root mg-dark">
-      {renderHeader()}
-
-      {/* Dynamic headings per media type */}
-      <h3 className="mg-section-title">
-        {mediaType === "vinyl" && "Vinyl Record Condition Assessment"}
-        {mediaType === "cassette" && "Cassette Condition Assessment"}
-        {mediaType === "cd" && "Compact Disc Condition Assessment"}
-      </h3>
+    <main id="media-grading">
+      <a className="back-link" href="/admin">← Back to Dashboard</a>
+      {Header}
 
       <div className="mg-grid">
-        <div className="mg-col">
-          {items.map((it, idx) =>
-            mediaType === "vinyl" ? renderVinylItem(it, idx) : mediaType === "cassette" ? renderCassetteItem(it, idx) : renderCDItem(it, idx)
-          )}
+        <div className="col">
+          <h2 className="col-title">
+            {mediaType === "vinyl" ? "🎶 Vinyl Record" : mediaType === "cassette" ? "📼 Cassette" : "💿 Compact Disc"} Condition Assessment
+          </h2>
 
-          <div className="mg-actions">
-            <button type="button" className="mg-primary" onClick={addItem}>
-              {mediaType === "vinyl" ? "Add Another Record" : mediaType === "cassette" ? "Add Another Tape" : "Add Another Disc"}
+          {items.map((item, i) => (
+            <MediaItemCard key={i} item={item} index={i} />
+          ))}
+
+          <div className="add-row">
+            <button type="button" className="btn add" onClick={addAnotherItem} disabled={items.length >= MAX_ITEMS}>
+              Add Another {labels.itemWord}
             </button>
           </div>
-
-          <fieldset className="mg-fieldset">
-            <legend>Custom Condition Notes</legend>
-            <textarea
-              placeholder="Add clarifying condition notes (does not affect score)."
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-            />
-          </fieldset>
         </div>
 
-        <div className="mg-col">{renderPackaging()}</div>
+        <div className="col">
+          <h2 className="col-title">
+            {mediaType === "vinyl" ? "📦 Jacket & Packaging" : mediaType === "cassette" ? "📦 J-Card & Packaging" : "📦 Inlay/Booklet & Packaging"} Condition Assessment
+          </h2>
+          {PackagingPanel}
+        </div>
       </div>
 
-      {/* Results */}
-      <div className="mg-results-row">
-        <GradeCard
-          title={mediaType === "vinyl" ? "Record Grade" : mediaType === "cassette" ? "Tape Grade" : "Disc Grade"}
-          score={computed.mediaScore}
-          grade={computed.mediaGrade}
+      <section className="panel">
+        <h3>📝 Custom Condition Notes</h3>
+        <textarea
+          rows={4}
+          value={customNotes}
+          onChange={(e) => setCustomNotes(e.target.value)}
+          aria-label="Custom condition notes"
         />
-        <GradeCard title="Sleeve/Packaging Grade" score={computed.packScore} grade={computed.packagingGrade} />
-        <GradeCard title="Overall Grade" score={computed.overallScore} grade={computed.overallGrade} />
-      </div>
+      </section>
 
-      <pre className="mg-explanation">{computed.explanation}</pre>
-    </div>
+      <section className="results">
+        <div className={`card grade ${overall.mediaGrade}`}>
+          <div className="label">{mediaType === "vinyl" ? "Record Grade" : mediaType === "cassette" ? "Tape Grade" : "Disc Grade"}</div>
+          <div className="value">{overall.mediaGrade}</div>
+          <div className="score">{Math.round(overall.mediaScore)}/100</div>
+        </div>
+
+        <div className={`card grade ${overall.pkgGrade}`}>
+          <div className="label">Sleeve/Packaging Grade</div>
+          <div className="value">{overall.pkgGrade}</div>
+          <div className="score">{Math.round(overall.pkgScore)}/100</div>
+        </div>
+
+        <div className={`card grade ${overall.overallGrade}`}>
+          <div className="label">Overall Grade</div>
+          <div className="value">{overall.overallGrade}</div>
+          <div className="score">{Math.round(overall.overallScore)}/100</div>
+        </div>
+      </section>
+
+      <section className="panel explanation">
+        <h3>Grading Explanation</h3>
+        <p>{overall.explanation}</p>
+        {customNotes.trim() && (
+          <>
+            <h4>Additional Notes</h4>
+            <p>{customNotes}</p>
+          </>
+        )}
+      </section>
+    </main>
   );
 }
