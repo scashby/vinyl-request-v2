@@ -9,11 +9,11 @@
   /* Palette */
   --mg-bg: #f7f8fb;
   --mg-panel: #ffffff;
-  --mg-text: #0f172a;   /* slate-900 */
-  --mg-muted: #6b7280;  /* gray-500 */
-  --mg-border: #e5e7eb; /* gray-200 */
+  --mg-text: #0f172a;
+  --mg-muted: #6b7280;
+  --mg-border: #e5e7eb;
 
-  --mg-accent: #2563eb;    /* blue-600 */
+  --mg-accent: #2563eb;
   --mg-accent-ghost: #eff6ff;
   --mg-accent-dark: #1e40af;
 
@@ -76,7 +76,7 @@
   color: var(--mg-muted);
 }
 
-/* ---------------- Pills (media selector) ---------------- */
+/* ---------------- Pills ---------------- */
 
 #media-grading .mg-pills {
   display: flex;
@@ -118,7 +118,7 @@
 
 #media-grading .mg-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr; /* exactly two columns on desktop */
+  grid-template-columns: 1fr 1fr;
   gap: 24px;
 }
 
@@ -128,7 +128,7 @@
   }
 }
 
-/* ---------------- Cards & panels ---------------- */
+/* ---------------- Cards ---------------- */
 
 #media-grading .mg-card {
   background: var(--mg-panel);
@@ -182,7 +182,7 @@
 
 #media-grading .mg-check span,
 #media-grading .mg-radio span {
-  font-size: 14px; /* readable labels ≥14px */
+  font-size: 14px;
   line-height: 1.3;
 }
 
@@ -196,16 +196,16 @@
   border-radius: 6px;
 }
 
-/* Helper / hint text under controls (same or slightly smaller than labels) */
+/* Helper / hint text */
 #media-grading .mg-help {
   display: block;
-  font-size: 13px;
+  font-size: 13px;      /* slightly smaller than labels */
   line-height: 1.4;
   color: var(--mg-muted);
   margin: 4px 0 0 28px;
 }
 
-/* Sub-groups for severities, sides, etc. */
+/* Subgroups and expanded rows */
 #media-grading .mg-subgroup {
   display: flex;
   flex-wrap: wrap;
@@ -221,8 +221,14 @@
 
 #media-grading .mg-sides-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 140px));
-  gap: 8px 16px;
+  grid-template-columns: repeat(4, minmax(0, 100px));
+  gap: 6px 16px;
+}
+
+@media (max-width: 520px) {
+  #media-grading .mg-sides-grid {
+    grid-template-columns: repeat(2, minmax(0, 120px));
+  }
 }
 
 #media-grading .mg-number {
@@ -292,12 +298,11 @@
   border-bottom: 1px dashed var(--mg-border);
 }
 
-/* Add item control */
 #media-grading .mg-item-controls {
   margin-top: 8px;
 }
 
-/* Additional notes check grid */
+/* Notes grid */
 #media-grading .mg-notes-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -311,7 +316,7 @@
   }
 }
 
-/* Freeform notes */
+/* Textarea */
 #media-grading .mg-notes textarea {
   width: 100%;
   min-height: 110px;
@@ -325,7 +330,7 @@
   margin-top: 6px;
 }
 
-/* Per-item chip summary */
+/* Per-item chip */
 #media-grading .mg-per-item-result {
   margin-top: 8px;
 }
@@ -339,7 +344,7 @@
   background: #f8fafc;
 }
 
-/* ---------------- Results cards ---------------- */
+/* ---------------- Results ---------------- */
 
 #media-grading .mg-results {
   display: grid;
@@ -378,59 +383,41 @@
   color: var(--mg-muted);
 }
 
-/* Result color themes */
-#media-grading .mg-grade-m {
-  border-color: #10b981;
-  background: var(--mg-green-bg);
-  color: var(--mg-green);
-}
-
+/* Grade themes */
 #media-grading .mg-grade-nm {
   border-color: #22c55e;
   background: var(--mg-green-bg);
   color: var(--mg-green);
 }
-
 #media-grading .mg-grade-vg {
   border-color: #38bdf8;
   background: var(--mg-blue-bg);
   color: var(--mg-blue);
 }
-
 #media-grading .mg-grade-g {
   border-color: #f59e0b;
   background: var(--mg-amber-bg);
   color: var(--mg-amber);
 }
-
 #media-grading .mg-grade-fp {
   border-color: #ef4444;
   background: var(--mg-red-bg);
   color: var(--mg-red);
 }
 
-/* ---------------- Explanation ---------------- */
-
+/* Explanation */
 #media-grading .mg-expl-title {
   font-weight: 700;
   font-size: 16px;
   margin-bottom: 6px;
 }
 
-/* ---------------- Utilities ---------------- */
-
-#media-grading .mg-item legend,
-#media-grading legend {
-  text-transform: none;
-}
-
-/* Tighter stacked lists */
+/* Misc */
 #media-grading .mg-fieldset .mg-check + .mg-check,
 #media-grading .mg-fieldset .mg-radio + .mg-radio {
   margin-top: -2px;
 }
 
-/* Ensure form elements use border-box */
 #media-grading *, #media-grading *::before, #media-grading *::after {
   box-sizing: border-box;
 }
