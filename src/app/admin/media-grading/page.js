@@ -6,14 +6,17 @@ import "styles/media-grading.css";
 /**
  * Systematic Media Grading Tool — Admin
  *
- * Latest tweak:
- * - Added "Start Next Album (Reset)" to clear current grading and move to the next item.
- *   Keeps the current media type; resets sealed, selections, notes, and sleeve appearance.
+ * New: NM gating
+ * - Media (Vinyl only): NM allowed only if "Record has glossy, like-new appearance" is the ONLY checked media item (across visual/audio/label/center)
+ *   for all records (and none missing). Otherwise the media grade is capped to VG+.
+ * - Packaging (all types): NM allowed only if "Looks like new, no flaws" is the ONLY checked packaging item (and not missing).
+ *   Otherwise the packaging grade is capped to VG+.
+ * - Overall NM requires both component grades to be NM (M logic for sealed unchanged).
  *
  * Prior updates intact:
  * - Shelf wear severity (Light/Moderate/Heavy) with tuned penalties (2/8/12).
  * - Sleeve Appearance nudge (Vinyl covers only): ±2 ONLY when the packaging score is on a grade cusp.
- * - Sealed logic and prior UX fixes unchanged.
+ * - Sealed logic/visibility and Reset button.
  */
 
 function numericToBaseGrade(score) {
@@ -670,7 +673,7 @@ export default function MediaGradingPage() {
     setItems((prev) => prev.map((it, i) => (i === idx ? updater(it) : it)));
   }
 
-  // NEW: Reset/Clear for next album (preserve mediaType)
+  // Reset/Clear for next album (preserve mediaType)
   function resetForNextAlbum() {
     setItems([makeInitialMediaState(mediaType)]);
     setSealed(false);
@@ -862,6 +865,45 @@ export default function MediaGradingPage() {
 
   const packagingAgg = useMemo(() => computePackagingScore(), [computePackagingScore]);
 
+  // ----- NM gate helpers -----
+  const isVinylMediaNMEligible = useMemo(() => {
+    if (mediaType !== "vinyl") return true; // NM gate applies only to vinyl media per request
+    if (!items.length) return false;
+    for (const item of items) {
+      if (item.missing) return false;
+      let glossyChecked = false;
+      let anyOtherChecked = false;
+
+      const scan = (arr) => {
+        for (const e of arr) {
+          if (e.checked) {
+            if (e.key === "glossy") glossyChecked = true;
+            else anyOtherChecked = true;
+          }
+        }
+      };
+      scan(item.sections.visual);
+      scan(item.sections.audio);
+      scan(item.sections.labelArea);
+
+      if (!glossyChecked) return false;
+      if (anyOtherChecked) return false;
+    }
+    return true;
+  }, [items, mediaType]);
+
+  const isPackagingNMEligible = useMemo(() => {
+    if (packagingMissing) return false;
+    const looksNewOn = !!packagingChecks["looksNew"];
+    if (!looksNewOn) return false;
+    // nothing else in packaging should be checked
+    for (const [k, v] of Object.entries(packagingChecks)) {
+      if (!v) continue;
+      if (k !== "looksNew") return false;
+    }
+    return true;
+  }, [packagingChecks, packagingMissing]);
+
   function scoreToGrade(score, opts) {
     const { isMedia, mediaSealedAllM, packagingSealedM, isSealed } = opts;
     if (isSealed) {
@@ -873,7 +915,7 @@ export default function MediaGradingPage() {
 
   const overall = useMemo(() => {
     const mediaScore = mediaAgg.avg;
-    const mediaGrade = scoreToGrade(mediaScore, {
+    let mediaGrade = scoreToGrade(mediaScore, {
       isMedia: true,
       mediaSealedAllM: mediaAgg.sealedAllM,
       packagingSealedM: false,
@@ -881,12 +923,20 @@ export default function MediaGradingPage() {
     });
 
     const pkgScore = packagingAgg.score;
-    const pkgGrade = scoreToGrade(pkgScore, {
+    let pkgGrade = scoreToGrade(pkgScore, {
       isMedia: false,
       mediaSealedAllM: false,
       packagingSealedM: packagingAgg.sealedM,
       isSealed: sealed,
     });
+
+    // --- Apply NM caps per rules ---
+    if (mediaGrade === "NM" && mediaType === "vinyl" && !isVinylMediaNMEligible) {
+      mediaGrade = "VG+";
+    }
+    if (pkgGrade === "NM" && !isPackagingNMEligible) {
+      pkgGrade = "VG+";
+    }
 
     const componentMissing = packagingMissing || items.every((it) => it.missing);
     const denom = componentMissing ? 4 : 2;
@@ -898,6 +948,11 @@ export default function MediaGradingPage() {
       overallGrade = bothMint ? "M" : numericToBaseGrade(overallScore);
     } else {
       overallGrade = numericToBaseGrade(overallScore);
+    }
+
+    // Ensure overall NM only when both parts are NM
+    if (overallGrade === "NM" && !(mediaGrade === "NM" && pkgGrade === "NM")) {
+      overallGrade = "VG+";
     }
 
     const mediaTop = [...mediaAgg.deductions].sort((a, b) => b.amount - a.amount).slice(0, 3);
@@ -937,7 +992,16 @@ export default function MediaGradingPage() {
       overallGrade,
       explanation: `${formula} ${details.join(" ")}`,
     };
-  }, [mediaAgg, packagingAgg, sealed, packagingMissing, items]);
+  }, [
+    mediaAgg,
+    packagingAgg,
+    sealed,
+    packagingMissing,
+    items,
+    mediaType,
+    isVinylMediaNMEligible,
+    isPackagingNMEligible,
+  ]);
 
   function togglePackaging(key) {
     setPackagingChecks((p) => ({ ...p, [key]: !p[key] }));
@@ -979,7 +1043,7 @@ export default function MediaGradingPage() {
           <span>Sealed (factory shrink intact)</span>
         </label>
 
-        {/* NEW: Reset/clear action */}
+        {/* Reset/clear action */}
         <button type="button" className="btn reset" onClick={resetForNextAlbum} aria-label="Start next album">
           Start Next Album (Reset)
         </button>
