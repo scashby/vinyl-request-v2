@@ -5,17 +5,15 @@ import "styles/media-grading.css";
 
 /**
  * Systematic Media Grading Tool — Admin
+ * 
+ * Updates in this revision:
+ * - Packaging > Minor Shelf Wear now has severity: Light / Moderate / Heavy with tuned penalties (2/8/12).
+ *   Light keeps NM if all else is clean; Moderate lands ~VG+; Heavy firmly VG+.
+ * - Vinyl-only Packaging > Appearance (well-preserved / gently handled / well-worn):
+ *   Applies a small ±2 bump ONLY when the packaging score is within 2 points of a grade boundary (97, 85, 75, 65, 50).
+ *   Never exceeds 100. No effect if not on a cusp. Doesn’t apply to cassette/CD.
  *
- * UX fixes in this revision:
- * - Sealed logic (VINYL): only show "Visual Appearance" with **Warping present**; hide all other media criteria (incl. Audio & Label/Center).
- * - Sealed logic (CASSETTE/CD): hide ALL media criteria (visual/audio/label-face/shell).
- * - Packaging (VINYL + Sealed): show only **wear/marking/damage** criteria
- *   (Minor shelf wear, Corner wear, Ring wear, Creases, Tears, Writing, Stickers). Hide seams/structure and notes blocks.
- * - "Zero under checkboxes" bug fixed by separating severity options from selected index
- *   (no more rendering a stray `0`; severity radios now show properly).
- * - Warping severity radios appear correctly for Vinyl.
- *
- * Grades: M, NM, VG+, VG, G+, G, F/P
+ * All prior sealed logic and other behavior unchanged.
  */
 
 function numericToBaseGrade(score) {
@@ -40,7 +38,7 @@ const MEDIA_PENALTIES = {
 };
 
 const SLEEVE_PENALTIES = {
-  minorShelfWear: 3,
+  minorShelfWear: 3, // base (overridden by severity where applicable)
   cornerWear: 4,
   ringWearOrBookletRing: 5,
   spineWear: 3,
@@ -57,7 +55,6 @@ const MEDIA_TYPES = [
   { key: "cd", label: "Compact Discs", icon: "💿" },
 ];
 
-// Side-letter helpers (A/B, C/D, E/F…)
 function sideLettersForIndex(idx) {
   const base = "A".charCodeAt(0) + idx * 2;
   const s1 = String.fromCharCode(base);
@@ -406,8 +403,9 @@ function getPackagingLabels(mediaType) {
         { key: "looksNew", label: "Looks like new, no flaws", penalty: 0 },
         {
           key: "minorShelfWear",
-          label: "Minor shelf wear only",
+          label: "Shelf wear present",
           penalty: SLEEVE_PENALTIES.minorShelfWear,
+          sub: ["Light", "Moderate", "Heavy"], // NEW: severity
         },
         {
           key: "cornerWear",
@@ -463,6 +461,16 @@ function getPackagingLabels(mediaType) {
           sub: ["Price", "Hype", "Residue"],
         },
       ],
+      // NEW: Vinyl-only appearance nudge (separate control in UI)
+      appearance: {
+        key: "appearance",
+        label: "Appearance (Vinyl only; tiny bump on the cusp)",
+        options: [
+          { key: "wellPreserved", label: "Well-preserved (+2 on cusp)" },
+          { key: "gentlyHandled", label: "Gently handled (no change)" },
+          { key: "wellWorn", label: "Well-worn (−2 on cusp)" },
+        ],
+      },
       notes: [
         { key: "originalShrinkOpened", label: "Original shrinkwrap (opened)" },
         { key: "promoCopy", label: "Promotional copy" },
@@ -593,16 +601,15 @@ function getPackagingLabels(mediaType) {
   };
 }
 
-// Create initial per-item state; sideable entries get S1/S2 sides & tracks
+// Create initial per-item state
 function makeInitialMediaState(mediaType) {
   const labels = getMediaLabels(mediaType);
   const fold = (arr) =>
     arr.map((cfg) => ({
       key: cfg.key,
       checked: false,
-      // FIX: keep severity options separate from selected index (avoid stray "0" renders)
       subOptions: Array.isArray(cfg.sub) ? cfg.sub : null,
-      subIndex: null, // user chooses later
+      subIndex: null,
       sides: cfg.sideable ? { S1: false, S2: false } : null,
       tracks: cfg.tracks ? (labels.sideable ? { S1: 0, S2: 0 } : 0) : null,
       penalty: cfg.penalty || 0,
@@ -632,6 +639,9 @@ export default function MediaGradingPage() {
   const [additionalNotes, setAdditionalNotes] = useState({});
   const [customNotes, setCustomNotes] = useState("");
 
+  // NEW: Vinyl-only appearance nudge state
+  const [packagingAppearance, setPackagingAppearance] = useState("gentlyHandled"); // 'wellPreserved' | 'gentlyHandled' | 'wellWorn'
+
   const labels = useMemo(() => getMediaLabels(mediaType), [mediaType]);
   const pkgLabels = useMemo(() => getPackagingLabels(mediaType), [mediaType]);
 
@@ -642,6 +652,8 @@ export default function MediaGradingPage() {
     setPackagingChecks({});
     setPackagingSubs({});
     setAdditionalNotes({});
+    // reset appearance on type switch
+    setPackagingAppearance("gentlyHandled");
   }
 
   function addAnotherItem() {
@@ -671,13 +683,9 @@ export default function MediaGradingPage() {
           // Sealed gating
           if (sealed) {
             if (mediaType === "vinyl") {
-              if (entry.key !== "warping") {
-                // In sealed mode for vinyl media, only warping is evaluable
-                return;
-              }
+              if (entry.key !== "warping") return; // only warping evaluable
             } else {
-              // cassette/CD sealed media => ignore all defects (media M unless missing)
-              return;
+              return; // cassette/CD: all media assumed perfect when sealed
             }
           }
 
@@ -687,7 +695,7 @@ export default function MediaGradingPage() {
             deductions.push({ label: entry.label, amount: p });
           }
 
-          // Per-track penalty: AUDIO defects only
+          // per-track (audio-only)
           if (isAudio && entry.tracks !== null) {
             if (labels.sideable && entry.tracks && typeof entry.tracks === "object") {
               const countS1 = entry.sides?.S1 ? Math.max(0, parseInt(entry.tracks.S1 || 0, 10)) : 0;
@@ -720,6 +728,13 @@ export default function MediaGradingPage() {
     [sealed, mediaType, labels.sideable]
   );
 
+  // helper: severity penalty just for Minor Shelf Wear (vinyl & cd/cassette when present)
+  const shelfWearPenalty = (idx /* 0=Light,1=Moderate,2=Heavy */) => {
+    if (idx === 0) return 2;  // Light: keep NM
+    if (idx === 1) return 8;  // Moderate: strong VG+
+    return 12;                // Heavy: firmly VG+
+  };
+
   const computePackagingScore = useCallback(() => {
     if (packagingMissing) {
       return { score: 0, deductions: [{ label: "Packaging missing", amount: 100 }], sealedM: false };
@@ -728,7 +743,7 @@ export default function MediaGradingPage() {
     const deductions = [];
     let totalDeduction = 0;
 
-    // When sealed+vinyl: allow only the explicit wear/mark/ damage keys
+    // Sealed gating for packaging
     const sealedVinylAllowed = new Set([
       "minorShelfWear",
       "cornerWear",
@@ -738,13 +753,11 @@ export default function MediaGradingPage() {
       "writing",
       "stickers",
     ]);
-
     const allowedWhenSealedNonVinyl = new Set(["minorShelfWear", "cornerWear", "creases"]);
 
     const allowKey = (key) => {
       if (!sealed) return true;
       if (mediaType === "vinyl") return sealedVinylAllowed.has(key);
-      // cassette/cd: keep prior limited exterior wear set
       return allowedWhenSealedNonVinyl.has(key) || key === "allIntact" || key === "allSeamsIntact";
     };
 
@@ -753,9 +766,22 @@ export default function MediaGradingPage() {
         if (!allowKey(cfg.key)) return;
         const on = !!packagingChecks[cfg.key];
         if (!on) return;
-        if (cfg.penalty && cfg.penalty > 0) {
-          totalDeduction += cfg.penalty;
-          deductions.push({ label: cfg.label, amount: cfg.penalty });
+
+        // Use custom severity for Minor Shelf Wear when available
+        let p = cfg.penalty || 0;
+        if (cfg.key === "minorShelfWear" && Array.isArray(cfg.sub)) {
+          const idx = packagingSubs[cfg.key];
+          if (idx !== undefined && idx !== null) {
+            p = shelfWearPenalty(idx);
+          } else {
+            // default to Light if user checked it but didn't pick severity
+            p = shelfWearPenalty(0);
+          }
+        }
+
+        if (p > 0) {
+          totalDeduction += p;
+          deductions.push({ label: cfg.label, amount: p });
         }
       });
     };
@@ -765,13 +791,40 @@ export default function MediaGradingPage() {
     applyBlock(pkgLabels.seams);
     applyBlock(pkgLabels.damage);
 
+    // Sealed bonus still applies (cap at 100)
     if (sealed) {
       score = Math.min(100, score - totalDeduction + SLEEVE_PENALTIES.sealedBonus);
     } else {
       score = Math.max(0, 100 - totalDeduction);
     }
-    return { score, deductions, sealedM: sealed && totalDeduction === 0 };
-  }, [packagingChecks, packagingMissing, sealed, pkgLabels, mediaType]);
+
+    // VINYL-ONLY: Appearance nudge (±2) only when on a cusp (within 2 points of boundaries)
+    let appearanceApplied = null;
+    if (mediaType === "vinyl" && pkgLabels.appearance) {
+      const boundaries = [97, 85, 75, 65, 50];
+      const isOnCusp = boundaries.some((b) => Math.abs(score - b) <= 2);
+      if (isOnCusp) {
+        let bump = 0;
+        if (packagingAppearance === "wellPreserved") bump = 2;
+        if (packagingAppearance === "wellWorn") bump = -2;
+        if (bump !== 0) {
+          const before = score;
+          score = Math.max(0, Math.min(100, score + bump));
+          appearanceApplied = { before, after: score, bump };
+        }
+      }
+    }
+
+    return { score, deductions, sealedM: sealed && totalDeduction === 0, appearanceApplied };
+  }, [
+    packagingChecks,
+    packagingMissing,
+    sealed,
+    pkgLabels,
+    mediaType,
+    packagingSubs,
+    packagingAppearance,
+  ]);
 
   const mediaAgg = useMemo(() => {
     let total = 0;
@@ -853,6 +906,15 @@ export default function MediaGradingPage() {
         ? `Packaging deductions: ${pkgTop.map((d) => `${d.label} (−${d.amount})`).join("; ")}.`
         : "Packaging: No deductions."
     );
+
+    if (packagingAgg.appearanceApplied) {
+      const { before, after, bump } = packagingAgg.appearanceApplied;
+      details.push(
+        `Vinyl appearance nudge applied: ${bump > 0 ? "+" : ""}${bump} (from ${Math.round(
+          before
+        )} to ${Math.round(after)}), on cusp.`
+      );
+    }
 
     const formula = componentMissing
       ? "Overall = (Media + Packaging) ÷ 4 because a core component is missing."
@@ -987,7 +1049,7 @@ export default function MediaGradingPage() {
                   <span>{entry.label}</span>
                 </label>
 
-                {/* Sub-severity radios (use subOptions/subIndex; never render the number "0") */}
+                {/* Sub-severity radios */}
                 {entry.checked && Array.isArray(entry.subOptions) && (
                   <div className="subradios" role="group" aria-label={`${entry.label} severity`}>
                     {entry.subOptions.map((slabel, i) => {
@@ -1008,7 +1070,7 @@ export default function MediaGradingPage() {
                   </div>
                 )}
 
-                {/* Side selectors + per-side tracks (vinyl/cassette) */}
+                {/* Side selectors */}
                 {entry.checked && entry.sides && (
                   <div className="sides" role="group" aria-label="Which side(s) affected">
                     <span className="sides-label">Which side(s) affected</span>
@@ -1036,7 +1098,7 @@ export default function MediaGradingPage() {
                   </div>
                 )}
 
-                {/* Tracks affected (per-side for sideable defects; single for CD) */}
+                {/* Tracks affected */}
                 {entry.checked && entry.tracks !== null && (
                   <div className="tracks">
                     {labels.sideable && typeof entry.tracks === "object" ? (
@@ -1178,7 +1240,6 @@ export default function MediaGradingPage() {
         {filterAllowed(pkgLabels.overall).map((cfg) => {
           const id = `pkg-${cfg.key}`;
           const checked = !!packagingChecks[cfg.key];
-          // For sealed non-vinyl we still keep a conservative limit; sealed+vinyl narrowed by filterAllowed
           const disabled =
             sealed &&
             mediaType !== "vinyl" &&
@@ -1327,7 +1388,35 @@ export default function MediaGradingPage() {
         })}
       </fieldset>
 
-      {/* Additional notes — hidden in sealed+vinyl mode per “only wear/damage/marking” */}
+      {/* NEW: Vinyl-only Appearance nudge */}
+      {mediaType === "vinyl" && pkgLabels.appearance && (
+        <fieldset className="mg-fieldset">
+          <legend>{pkgLabels.appearance.label}</legend>
+          <div className="subradios">
+            {pkgLabels.appearance.options.map((opt) => {
+              const id = `pkg-appearance-${opt.key}`;
+              return (
+                <label key={id} htmlFor={id} className="radio-row">
+                  <input
+                    id={id}
+                    type="radio"
+                    name="pkg-appearance"
+                    checked={packagingAppearance === opt.key}
+                    onChange={() => setPackagingAppearance(opt.key)}
+                  />
+                  <span>{opt.label}</span>
+                </label>
+              );
+            })}
+          </div>
+          <p className="help">
+            This is <em>not</em> a direct deduction. It gives a tiny ±2 nudge <strong>only</strong> when the packaging
+            score is on the cusp of a grade boundary.
+          </p>
+        </fieldset>
+      )}
+
+      {/* Additional notes — hidden in sealed+vinyl mode per earlier rules */}
       {!isSealedVinyl && (
         <fieldset className="mg-fieldset">
           <legend>Additional notes (don’t affect score)</legend>
