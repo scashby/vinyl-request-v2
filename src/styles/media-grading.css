@@ -69,8 +69,15 @@
 #media-grading .mg-sealed .checkbox-row { font-weight: 600; }
 #media-grading .mg-sealed .help {
   margin: 6px 0 0 0;
-  font-size: 12px; /* informational text smaller */
+  font-size: 12px;
   color: #4a5568;
+}
+#media-grading .mg-sealed .sealed-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 #media-grading .mg-grid {
@@ -106,6 +113,8 @@
 #media-grading .btn.add { background: #0ea5e9; color: #fff; }
 #media-grading .btn.add:disabled { opacity: 0.5; cursor: not-allowed; }
 #media-grading .btn.danger { background: #e11d48; color: #fff; }
+/* NEW: reset button */
+#media-grading .btn.reset { background: #475569; color: #fff; }
 #media-grading .btn:focus { outline: 3px solid #a7d8ff; }
 
 #media-grading .checkbox-row,
