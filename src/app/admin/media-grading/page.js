@@ -6,17 +6,17 @@ import "styles/media-grading.css";
 /**
  * Systematic Media Grading Tool — Admin
  *
- * New: NM gating
- * - Media (Vinyl only): NM allowed only if "Record has glossy, like-new appearance" is the ONLY checked media item (across visual/audio/label/center)
- *   for all records (and none missing). Otherwise the media grade is capped to VG+.
- * - Packaging (all types): NM allowed only if "Looks like new, no flaws" is the ONLY checked packaging item (and not missing).
- *   Otherwise the packaging grade is capped to VG+.
- * - Overall NM requires both component grades to be NM (M logic for sealed unchanged).
+ * Update (CD packaging depth):
+ * - Added CD booklet/insert grading for: Torn pages (with severity), Missing pages (high impact),
+ *   and Water damage (with severity). Lives under Damage & Markings.
  *
- * Prior updates intact:
- * - Shelf wear severity (Light/Moderate/Heavy) with tuned penalties (2/8/12).
- * - Sleeve Appearance nudge (Vinyl covers only): ±2 ONLY when the packaging score is on a grade cusp.
- * - Sealed logic/visibility and Reset button.
+ * Prior features intact:
+ * - NM gating:
+ *   • Media (Vinyl): NM only if “Record has glossy…” is the ONLY checked item across media sections.
+ *   • Packaging (all types): NM only if “Looks like new, no flaws” is the ONLY checked packaging item.
+ * - Shelf wear severity (Light/Moderate/Heavy) penalties (2/8/12).
+ * - Sleeve Appearance nudge (Vinyl covers only): ±2 on grade cusps.
+ * - Sealed logic + “Start Next Album (Reset)” button.
  */
 
 function numericToBaseGrade(score) {
@@ -41,7 +41,7 @@ const MEDIA_PENALTIES = {
 };
 
 const SLEEVE_PENALTIES = {
-  minorShelfWear: 3, // base (overridden by severity where applicable)
+  minorShelfWear: 3,
   cornerWear: 4,
   ringWearOrBookletRing: 5,
   spineWear: 3,
@@ -73,124 +73,23 @@ function getMediaLabels(mediaType) {
       itemWord: "Record",
       sideable: true,
       mediaVisual: [
-        {
-          key: "glossy",
-          label: "Record has glossy, like-new appearance",
-          type: "check",
-          penalty: 0,
-          sideable: false,
-          tracks: false,
-        },
-        {
-          key: "lightScuffs",
-          label: "Light scuffs visible",
-          type: "check+sub",
-          sub: ["Very light, barely visible", "Visible but not deep", "Obvious, multiple scuffs"],
-          penalty: MEDIA_PENALTIES.lightScuffs,
-          sideable: true,
-          tracks: true,
-        },
-        {
-          key: "scratches",
-          label: "Scratches present",
-          type: "check+sub",
-          sub: ["Hairline scratches only", "Can feel with fingernail", "Deep, visible grooves"],
-          penalty: MEDIA_PENALTIES.scratches,
-          sideable: true,
-          tracks: true,
-        },
-        {
-          key: "grooveWear",
-          label: "Groove wear visible",
-          type: "check+sub",
-          sub: ["Light", "Moderate", "Heavy"],
-          penalty: MEDIA_PENALTIES.grooveWearOrAlt,
-          sideable: true,
-          tracks: true,
-        },
-        {
-          key: "warping",
-          label: "Warping present",
-          type: "check+sub",
-          sub: [
-            "Slight dish/edge warp (plays fine)",
-            "Moderate warp (minor tracking issues)",
-            "Severe warp (affects play)",
-          ],
-          penalty: MEDIA_PENALTIES.warpingOrWobble,
-          sideable: false,
-          tracks: false,
-        },
+        { key: "glossy", label: "Record has glossy, like-new appearance", type: "check", penalty: 0, sideable: false, tracks: false },
+        { key: "lightScuffs", label: "Light scuffs visible", type: "check+sub", sub: ["Very light, barely visible","Visible but not deep","Obvious, multiple scuffs"], penalty: MEDIA_PENALTIES.lightScuffs, sideable: true, tracks: true },
+        { key: "scratches", label: "Scratches present", type: "check+sub", sub: ["Hairline scratches only","Can feel with fingernail","Deep, visible grooves"], penalty: MEDIA_PENALTIES.scratches, sideable: true, tracks: true },
+        { key: "grooveWear", label: "Groove wear visible", type: "check+sub", sub: ["Light","Moderate","Heavy"], penalty: MEDIA_PENALTIES.grooveWearOrAlt, sideable: true, tracks: true },
+        { key: "warping", label: "Warping present", type: "check+sub", sub: ["Slight dish/edge warp (plays fine)","Moderate warp (minor tracking issues)","Severe warp (affects play)"], penalty: MEDIA_PENALTIES.warpingOrWobble, sideable: false, tracks: false },
       ],
       mediaAudio: [
-        {
-          key: "playsClean",
-          label: "Plays with no surface noise",
-          type: "check",
-          penalty: 0,
-          sideable: false,
-          tracks: false,
-        },
-        {
-          key: "surfaceNoise",
-          label: "Surface noise when played",
-          type: "check+sub",
-          sub: ["Minimal", "Noticeable", "Significant"],
-          penalty: MEDIA_PENALTIES.surfaceNoise,
-          sideable: true,
-          tracks: true,
-        },
-        {
-          key: "popsClicks",
-          label: "Occasional pops or clicks",
-          type: "check+sub",
-          sub: ["Occasional", "Frequent"],
-          penalty: MEDIA_PENALTIES.popsClicksOrReadErrors,
-          sideable: true,
-          tracks: true,
-        },
-        {
-          key: "skipping",
-          label: "Skipping or repeating",
-          type: "check",
-          penalty: MEDIA_PENALTIES.skippingOrUnreadable,
-          sideable: true,
-          tracks: true,
-        },
+        { key: "playsClean", label: "Plays with no surface noise", type: "check", penalty: 0, sideable: false, tracks: false },
+        { key: "surfaceNoise", label: "Surface noise when played", type: "check+sub", sub: ["Minimal","Noticeable","Significant"], penalty: MEDIA_PENALTIES.surfaceNoise, sideable: true, tracks: true },
+        { key: "popsClicks", label: "Occasional pops or clicks", type: "check+sub", sub: ["Occasional","Frequent"], penalty: MEDIA_PENALTIES.popsClicksOrReadErrors, sideable: true, tracks: true },
+        { key: "skipping", label: "Skipping or repeating", type: "check", penalty: MEDIA_PENALTIES.skippingOrUnreadable, sideable: true, tracks: true },
       ],
       mediaLabelArea: [
-        {
-          key: "labelClean",
-          label: "Label is clean and bright",
-          type: "check",
-          penalty: 0,
-          sideable: false,
-          tracks: false,
-        },
-        {
-          key: "spindleMarks",
-          label: "Spindle marks present",
-          type: "check",
-          penalty: MEDIA_PENALTIES.labelShellHubMinor,
-          sideable: false,
-          tracks: false,
-        },
-        {
-          key: "writingOnLabel",
-          label: "Writing on label",
-          type: "check",
-          penalty: MEDIA_PENALTIES.labelShellHubMinor,
-          sideable: false,
-          tracks: false,
-        },
-        {
-          key: "stickersOnLabel",
-          label: "Stickers or tape on label",
-          type: "check",
-          penalty: MEDIA_PENALTIES.labelShellHubMinor,
-          sideable: false,
-          tracks: false,
-        },
+        { key: "labelClean", label: "Label is clean and bright", type: "check", penalty: 0, sideable: false, tracks: false },
+        { key: "spindleMarks", label: "Spindle marks present", type: "check", penalty: MEDIA_PENALTIES.labelShellHubMinor, sideable: false, tracks: false },
+        { key: "writingOnLabel", label: "Writing on label", type: "check", penalty: MEDIA_PENALTIES.labelShellHubMinor, sideable: false, tracks: false },
+        { key: "stickersOnLabel", label: "Stickers or tape on label", type: "check", penalty: MEDIA_PENALTIES.labelShellHubMinor, sideable: false, tracks: false },
       ],
     };
   }
@@ -201,101 +100,21 @@ function getMediaLabels(mediaType) {
       itemWord: "Tape",
       sideable: true,
       mediaVisual: [
-        {
-          key: "shellScuffs",
-          label: "Shell scuffs present",
-          type: "check+sub",
-          sub: ["Light", "Moderate", "Heavy"],
-          penalty: MEDIA_PENALTIES.grooveWearOrAlt,
-          sideable: false,
-          tracks: false,
-        },
-        {
-          key: "windowHaze",
-          label: "Window/clouding or discoloration",
-          type: "check",
-          penalty: MEDIA_PENALTIES.lightScuffs,
-          sideable: false,
-          tracks: false,
-        },
+        { key: "shellScuffs", label: "Shell scuffs present", type: "check+sub", sub: ["Light","Moderate","Heavy"], penalty: MEDIA_PENALTIES.grooveWearOrAlt, sideable: false, tracks: false },
+        { key: "windowHaze", label: "Window/clouding or discoloration", type: "check", penalty: MEDIA_PENALTIES.lightScuffs, sideable: false, tracks: false },
       ],
       mediaAudio: [
-        {
-          key: "playsClean",
-          label: "Plays with no audible issues",
-          type: "check",
-          penalty: 0,
-          sideable: false,
-          tracks: false,
-        },
-        {
-          key: "tapeHiss",
-          label: "Hiss/noise when played",
-          type: "check+sub",
-          sub: ["Minimal", "Noticeable", "Significant"],
-          penalty: MEDIA_PENALTIES.surfaceNoise,
-          sideable: true,
-          tracks: true,
-        },
-        {
-          key: "dropouts",
-          label: "Dropouts/clicks",
-          type: "check+sub",
-          sub: ["Occasional", "Frequent"],
-          penalty: MEDIA_PENALTIES.popsClicksOrReadErrors,
-          sideable: true,
-          tracks: true,
-        },
-        {
-          key: "squealFlutter",
-          label: "Squeal / wow–flutter audible",
-          type: "check",
-          penalty: MEDIA_PENALTIES.surfaceNoise,
-          sideable: true,
-          tracks: true,
-        },
-        {
-          key: "unplayableJam",
-          label: "Jams/unplayable sections",
-          type: "check",
-          penalty: MEDIA_PENALTIES.skippingOrUnreadable,
-          sideable: true,
-          tracks: true,
-        },
+        { key: "playsClean", label: "Plays with no audible issues", type: "check", penalty: 0, sideable: false, tracks: false },
+        { key: "tapeHiss", label: "Hiss/noise when played", type: "check+sub", sub: ["Minimal","Noticeable","Significant"], penalty: MEDIA_PENALTIES.surfaceNoise, sideable: true, tracks: true },
+        { key: "dropouts", label: "Dropouts/clicks", type: "check+sub", sub: ["Occasional","Frequent"], penalty: MEDIA_PENALTIES.popsClicksOrReadErrors, sideable: true, tracks: true },
+        { key: "squealFlutter", label: "Squeal / wow–flutter audible", type: "check", penalty: MEDIA_PENALTIES.surfaceNoise, sideable: true, tracks: true },
+        { key: "unplayableJam", label: "Jams/unplayable sections", type: "check", penalty: MEDIA_PENALTIES.skippingOrUnreadable, sideable: true, tracks: true },
       ],
       mediaLabelArea: [
-        {
-          key: "labelClean",
-          label: "Shell/label clean and bright",
-          type: "check",
-          penalty: 0,
-          sideable: false,
-          tracks: false,
-        },
-        {
-          key: "writingOnShell",
-          label: "Writing on shell/label",
-          type: "check",
-          penalty: MEDIA_PENALTIES.labelShellHubMinor,
-          sideable: false,
-          tracks: false,
-        },
-        {
-          key: "stickersOnShell",
-          label: "Stickers or tape on shell",
-          type: "check",
-          penalty: MEDIA_PENALTIES.labelShellHubMinor,
-          sideable: false,
-          tracks: false,
-        },
-        {
-          key: "pressurePad",
-          label: "Pressure pad missing or degraded",
-          type: "check",
-          penalty: MEDIA_PENALTIES.scratches,
-          sideable: false,
-          tracks: false,
-        },
+        { key: "labelClean", label: "Shell/label clean and bright", type: "check", penalty: 0, sideable: false, tracks: false },
+        { key: "writingOnShell", label: "Writing on shell/label", type: "check", penalty: MEDIA_PENALTIES.labelShellHubMinor, sideable: false, tracks: false },
+        { key: "stickersOnShell", label: "Stickers or tape on shell", type: "check", penalty: MEDIA_PENALTIES.labelShellHubMinor, sideable: false, tracks: false },
+        { key: "pressurePad", label: "Pressure pad missing or degraded", type: "check", penalty: MEDIA_PENALTIES.scratches, sideable: false, tracks: false },
       ],
     };
   }
@@ -306,94 +125,20 @@ function getMediaLabels(mediaType) {
     itemWord: "Disc",
     sideable: false,
     mediaVisual: [
-      {
-        key: "lightScuffs",
-        label: "Light scuffs visible",
-        type: "check+sub",
-        sub: ["Very light", "Visible, minor", "Multiple light scuffs"],
-        penalty: MEDIA_PENALTIES.lightScuffs,
-        sideable: false,
-        tracks: false,
-      },
-      {
-        key: "scratches",
-        label: "Scratches present",
-        type: "check+sub",
-        sub: ["Few light", "Some deeper", "Many/deep"],
-        penalty: MEDIA_PENALTIES.scratches,
-        sideable: false,
-        tracks: false,
-      },
-      {
-        key: "laserRot",
-        label: "Laser-rot / pinholes visible (label/top coat)",
-        type: "check+sub",
-        sub: ["Minimal", "Noticeable", "Significant"],
-        penalty: MEDIA_PENALTIES.grooveWearOrAlt,
-        sideable: false,
-        tracks: false,
-      },
-      {
-        key: "wobble",
-        label: "Disc wobble present",
-        type: "check+sub",
-        sub: ["Slight", "Moderate", "Severe"],
-        penalty: MEDIA_PENALTIES.warpingOrWobble,
-        sideable: false,
-        tracks: false,
-      },
+      { key: "lightScuffs", label: "Light scuffs visible", type: "check+sub", sub: ["Very light","Visible, minor","Multiple light scuffs"], penalty: MEDIA_PENALTIES.lightScuffs, sideable: false, tracks: false },
+      { key: "scratches", label: "Scratches present", type: "check+sub", sub: ["Few light","Some deeper","Many/deep"], penalty: MEDIA_PENALTIES.scratches, sideable: false, tracks: false },
+      { key: "laserRot", label: "Laser-rot / pinholes visible (label/top coat)", type: "check+sub", sub: ["Minimal","Noticeable","Significant"], penalty: MEDIA_PENALTIES.grooveWearOrAlt, sideable: false, tracks: false },
+      { key: "wobble", label: "Disc wobble present", type: "check+sub", sub: ["Slight","Moderate","Severe"], penalty: MEDIA_PENALTIES.warpingOrWobble, sideable: false, tracks: false },
     ],
     mediaAudio: [
-      {
-        key: "playsClean",
-        label: "Plays with no read errors",
-        type: "check",
-        penalty: 0,
-        sideable: false,
-        tracks: false,
-      },
-      {
-        key: "correctedErrors",
-        label: "Occasional read errors corrected",
-        type: "check",
-        penalty: MEDIA_PENALTIES.popsClicksOrReadErrors,
-        sideable: false,
-        tracks: true,
-      },
-      {
-        key: "unreadable",
-        label: "Unreadable sectors / skipping",
-        type: "check",
-        penalty: MEDIA_PENALTIES.skippingOrUnreadable,
-        sideable: false,
-        tracks: true,
-      },
+      { key: "playsClean", label: "Plays with no read errors", type: "check", penalty: 0, sideable: false, tracks: false },
+      { key: "correctedErrors", label: "Occasional read errors corrected", type: "check", penalty: MEDIA_PENALTIES.popsClicksOrReadErrors, sideable: false, tracks: true },
+      { key: "unreadable", label: "Unreadable sectors / skipping", type: "check", penalty: MEDIA_PENALTIES.skippingOrUnreadable, sideable: false, tracks: true },
     ],
     mediaLabelArea: [
-      {
-        key: "hubClean",
-        label: "Hub/face clean and bright",
-        type: "check",
-        penalty: 0,
-        sideable: false,
-        tracks: false,
-      },
-      {
-        key: "writingOnFace",
-        label: "Writing on disc face",
-        type: "check",
-        penalty: MEDIA_PENALTIES.labelShellHubMinor,
-        sideable: false,
-        tracks: false,
-      },
-      {
-        key: "stickersOnFace",
-        label: "Stickers or tape on disc face",
-        type: "check",
-        penalty: MEDIA_PENALTIES.labelShellHubMinor,
-        sideable: false,
-        tracks: false,
-      },
+      { key: "hubClean", label: "Hub/face clean and bright", type: "check", penalty: 0, sideable: false, tracks: false },
+      { key: "writingOnFace", label: "Writing on disc face", type: "check", penalty: MEDIA_PENALTIES.labelShellHubMinor, sideable: false, tracks: false },
+      { key: "stickersOnFace", label: "Stickers or tape on disc face", type: "check", penalty: MEDIA_PENALTIES.labelShellHubMinor, sideable: false, tracks: false },
     ],
   };
 }
@@ -404,67 +149,21 @@ function getPackagingLabels(mediaType) {
       title: "Jacket & Packaging Condition Assessment",
       overall: [
         { key: "looksNew", label: "Looks like new, no flaws", penalty: 0 },
-        {
-          key: "minorShelfWear",
-          label: "Shelf wear present",
-          penalty: SLEEVE_PENALTIES.minorShelfWear,
-          sub: ["Light", "Moderate", "Heavy"], // severity selection
-        },
-        {
-          key: "cornerWear",
-          label: "Corner wear present",
-          penalty: SLEEVE_PENALTIES.cornerWear,
-          sub: ["Slight bumping", "Creased/frayed", "Cut/heavily damaged"],
-        },
-        {
-          key: "ringWear",
-          label: "Ring wear visible",
-          penalty: SLEEVE_PENALTIES.ringWearOrBookletRing,
-          sub: ["Light", "Moderate", "Heavy"],
-        },
+        { key: "minorShelfWear", label: "Shelf wear present", penalty: SLEEVE_PENALTIES.minorShelfWear, sub: ["Light","Moderate","Heavy"] },
+        { key: "cornerWear", label: "Corner wear present", penalty: SLEEVE_PENALTIES.cornerWear, sub: ["Slight bumping","Creased/frayed","Cut/heavily damaged"] },
+        { key: "ringWear", label: "Ring wear visible", penalty: SLEEVE_PENALTIES.ringWearOrBookletRing, sub: ["Light","Moderate","Heavy"] },
       ],
       seams: [
         { key: "allSeamsIntact", label: "All seams intact", penalty: 0 },
-        {
-          key: "seamSplits",
-          label: "Seam splits present",
-          penalty: SLEEVE_PENALTIES.seamSplitOrCaseCracked,
-          sub: ["Small", "Medium", "Large / multiple"],
-        },
-        {
-          key: "spineWear",
-          label: "Spine shows wear",
-          penalty: SLEEVE_PENALTIES.spineWear,
-          sub: ["Light", "Moderate", "Heavy"],
-        },
+        { key: "seamSplits", label: "Seam splits present", penalty: SLEEVE_PENALTIES.seamSplitOrCaseCracked, sub: ["Small","Medium","Large / multiple"] },
+        { key: "spineWear", label: "Spine shows wear", penalty: SLEEVE_PENALTIES.spineWear, sub: ["Light","Moderate","Heavy"] },
       ],
       damage: [
-        {
-          key: "creases",
-          label: "Creases / crushing present",
-          penalty: SLEEVE_PENALTIES.cornerWear,
-          sub: ["Small", "Moderate", "Large/through"],
-        },
-        {
-          key: "tears",
-          label: "Tears present",
-          penalty: SLEEVE_PENALTIES.tears,
-          sub: ["Small", "Medium", "Large / across"],
-        },
-        {
-          key: "writing",
-          label: "Writing present",
-          penalty: SLEEVE_PENALTIES.writing,
-          sub: ["Initials/small", "Notes", "Large/covering"],
-        },
-        {
-          key: "stickers",
-          label: "Stickers or tape",
-          penalty: SLEEVE_PENALTIES.stickers,
-          sub: ["Price", "Hype", "Residue"],
-        },
+        { key: "creases", label: "Creases / crushing present", penalty: SLEEVE_PENALTIES.cornerWear, sub: ["Small","Moderate","Large/through"] },
+        { key: "tears", label: "Tears present", penalty: SLEEVE_PENALTIES.tears, sub: ["Small","Medium","Large / across"] },
+        { key: "writing", label: "Writing present", penalty: SLEEVE_PENALTIES.writing, sub: ["Initials/small","Notes","Large/covering"] },
+        { key: "stickers", label: "Stickers or tape", penalty: SLEEVE_PENALTIES.stickers, sub: ["Price","Hype","Residue"] },
       ],
-      // Sleeve appearance nudge (Vinyl covers only)
       appearance: {
         key: "appearance",
         label: "Sleeve appearance (Vinyl covers only; tiny bump on the cusp)",
@@ -494,46 +193,17 @@ function getPackagingLabels(mediaType) {
       title: "J-Card & Packaging Condition Assessment",
       overall: [
         { key: "looksNew", label: "Looks like new, no flaws", penalty: 0 },
-        {
-          key: "minorShelfWear",
-          label: "Minor shelf wear only",
-          penalty: SLEEVE_PENALTIES.minorShelfWear,
-        },
-        {
-          key: "cornerWear",
-          label: "Corner wear present",
-          penalty: SLEEVE_PENALTIES.cornerWear,
-          sub: ["Slight bumping", "Creased/frayed", "Cut/damaged"],
-        },
+        { key: "minorShelfWear", label: "Minor shelf wear only", penalty: SLEEVE_PENALTIES.minorShelfWear },
+        { key: "cornerWear", label: "Corner wear present", penalty: SLEEVE_PENALTIES.cornerWear, sub: ["Slight bumping","Creased/frayed","Cut/damaged"] },
       ],
       seams: [
         { key: "allIntact", label: "J-card intact", penalty: 0 },
-        {
-          key: "foldTears",
-          label: "J-card creases/tears",
-          penalty: SLEEVE_PENALTIES.tears,
-          sub: ["Small", "Medium", "Large"],
-        },
+        { key: "foldTears", label: "J-card creases/tears", penalty: SLEEVE_PENALTIES.tears, sub: ["Small","Medium","Large"] },
       ],
       damage: [
-        {
-          key: "creases",
-          label: "Creases / crushing present",
-          penalty: SLEEVE_PENALTIES.cornerWear,
-          sub: ["Small", "Moderate", "Large"],
-        },
-        {
-          key: "writing",
-          label: "Writing present",
-          penalty: SLEEVE_PENALTIES.writing,
-          sub: ["Initials", "Notes", "Large/covering"],
-        },
-        {
-          key: "stickers",
-          label: "Stickers or tape",
-          penalty: SLEEVE_PENALTIES.stickers,
-          sub: ["Small", "Multiple", "Residue"],
-        },
+        { key: "creases", label: "Creases / crushing present", penalty: SLEEVE_PENALTIES.cornerWear, sub: ["Small","Moderate","Large"] },
+        { key: "writing", label: "Writing present", penalty: SLEEVE_PENALTIES.writing, sub: ["Initials","Notes","Large/covering"] },
+        { key: "stickers", label: "Stickers or tape", penalty: SLEEVE_PENALTIES.stickers, sub: ["Small","Multiple","Residue"] },
       ],
       notes: [
         { key: "standardCaseCracked", label: "Standard Norelco case cracked (replaceable)" },
@@ -548,49 +218,24 @@ function getPackagingLabels(mediaType) {
     };
   }
 
-  // CD
+  // CD — expanded booklet/insert grading
   return {
     title: "Inlay/Booklet & Packaging Condition Assessment",
     overall: [
       { key: "looksNew", label: "Looks like new, no flaws", penalty: 0 },
-      {
-        key: "minorShelfWear",
-        label: "Minor shelf wear only",
-        penalty: SLEEVE_PENALTIES.minorShelfWear,
-      },
-      {
-        key: "cornerWear",
-        label: "Corner wear present (insert/digipak)",
-        penalty: SLEEVE_PENALTIES.cornerWear,
-        sub: ["Slight bumping", "Creased/frayed", "Cut/damaged"],
-      },
-      {
-        key: "ringWear",
-        label: "Booklet ring wear visible",
-        penalty: SLEEVE_PENALTIES.ringWearOrBookletRing,
-        sub: ["Light", "Moderate", "Heavy"],
-      },
+      { key: "minorShelfWear", label: "Minor shelf wear only", penalty: SLEEVE_PENALTIES.minorShelfWear },
+      { key: "cornerWear", label: "Corner wear present (insert/digipak)", penalty: SLEEVE_PENALTIES.cornerWear, sub: ["Slight bumping","Creased/frayed","Cut/damaged"] },
+      { key: "ringWear", label: "Booklet ring wear visible", penalty: SLEEVE_PENALTIES.ringWearOrBookletRing, sub: ["Light","Moderate","Heavy"] },
     ],
     seams: [{ key: "allIntact", label: "Booklet/tray insert intact", penalty: 0 }],
     damage: [
-      {
-        key: "creases",
-        label: "Creases / crushing present",
-        penalty: SLEEVE_PENALTIES.cornerWear,
-        sub: ["Small", "Moderate", "Large/through"],
-      },
-      {
-        key: "writing",
-        label: "Writing present",
-        penalty: SLEEVE_PENALTIES.writing,
-        sub: ["Initials", "Notes", "Large/covering"],
-      },
-      {
-        key: "stickers",
-        label: "Stickers or tape",
-        penalty: SLEEVE_PENALTIES.stickers,
-        sub: ["Price", "Hype", "Residue"],
-      },
+      { key: "creases", label: "Creases / crushing present", penalty: SLEEVE_PENALTIES.cornerWear, sub: ["Small","Moderate","Large/through"] },
+      { key: "tears", label: "Tears present", penalty: SLEEVE_PENALTIES.tears, sub: ["Small","Medium","Large / across"] },
+      { key: "tornPages", label: "Torn pages", penalty: SLEEVE_PENALTIES.tears, sub: ["Small tears","Multiple tears","Large/edge tears"] },
+      { key: "missingPages", label: "Missing pages (booklet incomplete)", penalty: 20 },
+      { key: "waterDamage", label: "Water/moisture damage", penalty: 10, sub: ["Light spotting","Noticeable staining","Severe/warped"] },
+      { key: "writing", label: "Writing present", penalty: SLEEVE_PENALTIES.writing, sub: ["Initials","Notes","Large/covering"] },
+      { key: "stickers", label: "Stickers or tape", penalty: SLEEVE_PENALTIES.stickers, sub: ["Price","Hype","Residue"] },
     ],
     notes: [
       { key: "stdJewelCracked", label: "Standard jewel case cracked (replaceable)" },
@@ -643,7 +288,7 @@ export default function MediaGradingPage() {
   const [customNotes, setCustomNotes] = useState("");
 
   // Sleeve appearance nudge (Vinyl only)
-  const [packagingAppearance, setPackagingAppearance] = useState("gentlyHandled"); // 'wellPreserved' | 'gentlyHandled' | 'wellWorn'
+  const [packagingAppearance, setPackagingAppearance] = useState("gentlyHandled");
 
   const labels = useMemo(() => getMediaLabels(mediaType), [mediaType]);
   const pkgLabels = useMemo(() => getPackagingLabels(mediaType), [mediaType]);
@@ -699,9 +344,9 @@ export default function MediaGradingPage() {
           // Sealed gating
           if (sealed) {
             if (mediaType === "vinyl") {
-              if (entry.key !== "warping") return; // only warping evaluable
+              if (entry.key !== "warping") return;
             } else {
-              return; // cassette/CD: all media assumed perfect when sealed
+              return; // cassette/CD: media assumed perfect when sealed
             }
           }
 
@@ -744,11 +389,11 @@ export default function MediaGradingPage() {
     [sealed, mediaType, labels.sideable]
   );
 
-  // helper: severity penalty just for Minor Shelf Wear (vinyl & cd/cassette where present)
-  const shelfWearPenalty = (idx /* 0=Light,1=Moderate,2=Heavy */) => {
-    if (idx === 0) return 2;  // Light: keep NM
-    if (idx === 1) return 8;  // Moderate: strong VG+
-    return 12;                // Heavy: firmly VG+
+  // Shelf wear severity penalties (Light/Moderate/Heavy)
+  const shelfWearPenalty = (idx) => {
+    if (idx === 0) return 2;
+    if (idx === 1) return 8;
+    return 12;
   };
 
   const computePackagingScore = useCallback(() => {
@@ -760,16 +405,8 @@ export default function MediaGradingPage() {
     let totalDeduction = 0;
 
     // Sealed gating for packaging
-    const sealedVinylAllowed = new Set([
-      "minorShelfWear",
-      "cornerWear",
-      "ringWear",
-      "creases",
-      "tears",
-      "writing",
-      "stickers",
-    ]);
-    const allowedWhenSealedNonVinyl = new Set(["minorShelfWear", "cornerWear", "creases"]);
+    const sealedVinylAllowed = new Set(["minorShelfWear","cornerWear","ringWear","creases","tears","writing","stickers"]);
+    const allowedWhenSealedNonVinyl = new Set(["minorShelfWear","cornerWear","creases"]);
 
     const allowKey = (key) => {
       if (!sealed) return true;
@@ -783,7 +420,6 @@ export default function MediaGradingPage() {
         const on = !!packagingChecks[cfg.key];
         if (!on) return;
 
-        // Custom severity for Minor Shelf Wear
         let p = cfg.penalty || 0;
         if (cfg.key === "minorShelfWear" && Array.isArray(cfg.sub)) {
           const idx = packagingSubs[cfg.key];
@@ -797,19 +433,17 @@ export default function MediaGradingPage() {
       });
     };
 
-    // Apply blocks with allowed gating
     applyBlock(pkgLabels.overall);
     applyBlock(pkgLabels.seams);
     applyBlock(pkgLabels.damage);
 
-    // Sealed bonus still applies (cap 100)
     if (sealed) {
       score = Math.min(100, score - totalDeduction + SLEEVE_PENALTIES.sealedBonus);
     } else {
       score = Math.max(0, 100 - totalDeduction);
     }
 
-    // VINYL ONLY: Sleeve appearance nudge (±2) if on cusp
+    // Sleeve appearance nudge (Vinyl only) on grade cusps
     let appearanceApplied = null;
     if (mediaType === "vinyl" && pkgLabels.appearance) {
       const boundaries = [97, 85, 75, 65, 50];
@@ -827,15 +461,7 @@ export default function MediaGradingPage() {
     }
 
     return { score, deductions, sealedM: sealed && totalDeduction === 0, appearanceApplied };
-  }, [
-    packagingChecks,
-    packagingMissing,
-    sealed,
-    pkgLabels,
-    mediaType,
-    packagingSubs,
-    packagingAppearance,
-  ]);
+  }, [packagingChecks, packagingMissing, sealed, pkgLabels, mediaType, packagingSubs, packagingAppearance]);
 
   const mediaAgg = useMemo(() => {
     let total = 0;
@@ -849,9 +475,7 @@ export default function MediaGradingPage() {
     let mediaAllM = false;
     if (sealed) {
       if (mediaType === "vinyl") {
-        const anyWarp = items.some((it) =>
-          it.sections.visual.some((e) => e.key === "warping" && e.checked)
-        );
+        const anyWarp = items.some((it) => it.sections.visual.some((e) => e.key === "warping" && e.checked));
         const anyMissing = items.some((it) => it.missing);
         mediaAllM = !anyWarp && !anyMissing;
       } else {
@@ -865,29 +489,17 @@ export default function MediaGradingPage() {
 
   const packagingAgg = useMemo(() => computePackagingScore(), [computePackagingScore]);
 
-  // ----- NM gate helpers -----
+  // NM gate helpers
   const isVinylMediaNMEligible = useMemo(() => {
-    if (mediaType !== "vinyl") return true; // NM gate applies only to vinyl media per request
+    if (mediaType !== "vinyl") return true;
     if (!items.length) return false;
     for (const item of items) {
       if (item.missing) return false;
       let glossyChecked = false;
       let anyOtherChecked = false;
-
-      const scan = (arr) => {
-        for (const e of arr) {
-          if (e.checked) {
-            if (e.key === "glossy") glossyChecked = true;
-            else anyOtherChecked = true;
-          }
-        }
-      };
-      scan(item.sections.visual);
-      scan(item.sections.audio);
-      scan(item.sections.labelArea);
-
-      if (!glossyChecked) return false;
-      if (anyOtherChecked) return false;
+      const scan = (arr) => { for (const e of arr) { if (e.checked) { if (e.key === "glossy") glossyChecked = true; else anyOtherChecked = true; } } };
+      scan(item.sections.visual); scan(item.sections.audio); scan(item.sections.labelArea);
+      if (!glossyChecked || anyOtherChecked) return false;
     }
     return true;
   }, [items, mediaType]);
@@ -896,7 +508,6 @@ export default function MediaGradingPage() {
     if (packagingMissing) return false;
     const looksNewOn = !!packagingChecks["looksNew"];
     if (!looksNewOn) return false;
-    // nothing else in packaging should be checked
     for (const [k, v] of Object.entries(packagingChecks)) {
       if (!v) continue;
       if (k !== "looksNew") return false;
@@ -915,28 +526,13 @@ export default function MediaGradingPage() {
 
   const overall = useMemo(() => {
     const mediaScore = mediaAgg.avg;
-    let mediaGrade = scoreToGrade(mediaScore, {
-      isMedia: true,
-      mediaSealedAllM: mediaAgg.sealedAllM,
-      packagingSealedM: false,
-      isSealed: sealed,
-    });
-
+    let mediaGrade = scoreToGrade(mediaScore, { isMedia: true, mediaSealedAllM: mediaAgg.sealedAllM, packagingSealedM: false, isSealed: sealed });
     const pkgScore = packagingAgg.score;
-    let pkgGrade = scoreToGrade(pkgScore, {
-      isMedia: false,
-      mediaSealedAllM: false,
-      packagingSealedM: packagingAgg.sealedM,
-      isSealed: sealed,
-    });
+    let pkgGrade = scoreToGrade(pkgScore, { isMedia: false, mediaSealedAllM: false, packagingSealedM: packagingAgg.sealedM, isSealed: sealed });
 
-    // --- Apply NM caps per rules ---
-    if (mediaGrade === "NM" && mediaType === "vinyl" && !isVinylMediaNMEligible) {
-      mediaGrade = "VG+";
-    }
-    if (pkgGrade === "NM" && !isPackagingNMEligible) {
-      pkgGrade = "VG+";
-    }
+    // Apply NM caps
+    if (mediaGrade === "NM" && mediaType === "vinyl" && !isVinylMediaNMEligible) mediaGrade = "VG+";
+    if (pkgGrade === "NM" && !isPackagingNMEligible) pkgGrade = "VG+";
 
     const componentMissing = packagingMissing || items.every((it) => it.missing);
     const denom = componentMissing ? 4 : 2;
@@ -950,7 +546,7 @@ export default function MediaGradingPage() {
       overallGrade = numericToBaseGrade(overallScore);
     }
 
-    // Ensure overall NM only when both parts are NM
+    // Ensure overall NM only when both are NM
     if (overallGrade === "NM" && !(mediaGrade === "NM" && pkgGrade === "NM")) {
       overallGrade = "VG+";
     }
@@ -959,71 +555,27 @@ export default function MediaGradingPage() {
     const pkgTop = [...packagingAgg.deductions].sort((a, b) => b.amount - a.amount).slice(0, 3);
 
     const details = [];
-    details.push(
-      mediaTop.length
-        ? `Media deductions: ${mediaTop.map((d) => `${d.label} (−${d.amount})`).join("; ")}.`
-        : "Media: No deductions."
-    );
-    details.push(
-      pkgTop.length
-        ? `Packaging deductions: ${pkgTop.map((d) => `${d.label} (−${d.amount})`).join("; ")}.`
-        : "Packaging: No deductions."
-    );
+    details.push(mediaTop.length ? `Media deductions: ${mediaTop.map((d) => `${d.label} (−${d.amount})`).join("; ")}.` : "Media: No deductions.");
+    details.push(pkgTop.length ? `Packaging deductions: ${pkgTop.map((d) => `${d.label} (−${d.amount})`).join("; ")}.` : "Packaging: No deductions.");
 
     if (packagingAgg.appearanceApplied) {
       const { before, after, bump } = packagingAgg.appearanceApplied;
-      details.push(
-        `Sleeve appearance nudge applied: ${bump > 0 ? "+" : ""}${bump} (from ${Math.round(
-          before
-        )} to ${Math.round(after)}), on cusp.`
-      );
+      details.push(`Sleeve appearance nudge applied: ${bump > 0 ? "+" : ""}${bump} (from ${Math.round(before)} to ${Math.round(after)}), on cusp.`);
     }
 
-    const formula = componentMissing
-      ? "Overall = (Media + Packaging) ÷ 4 because a core component is missing."
-      : "Overall = (Media + Packaging) ÷ 2.";
+    const formula = componentMissing ? "Overall = (Media + Packaging) ÷ 4 because a core component is missing." : "Overall = (Media + Packaging) ÷ 2.";
 
-    return {
-      mediaScore,
-      mediaGrade,
-      pkgScore,
-      pkgGrade,
-      overallScore,
-      overallGrade,
-      explanation: `${formula} ${details.join(" ")}`,
-    };
-  }, [
-    mediaAgg,
-    packagingAgg,
-    sealed,
-    packagingMissing,
-    items,
-    mediaType,
-    isVinylMediaNMEligible,
-    isPackagingNMEligible,
-  ]);
+    return { mediaScore, mediaGrade, pkgScore, pkgGrade, overallScore, overallGrade, explanation: `${formula} ${details.join(" ")}` };
+  }, [mediaAgg, packagingAgg, sealed, packagingMissing, items, mediaType, isVinylMediaNMEligible, isPackagingNMEligible]);
 
-  function togglePackaging(key) {
-    setPackagingChecks((p) => ({ ...p, [key]: !p[key] }));
-  }
-  function setPackagingSub(key, idx) {
-    setPackagingSubs((p) => ({ ...p, [key]: idx }));
-  }
-  function toggleNote(key) {
-    setAdditionalNotes((p) => ({ ...p, [key]: !p[key] }));
-  }
+  function togglePackaging(key) { setPackagingChecks((p) => ({ ...p, [key]: !p[key] })); }
+  function setPackagingSub(key, idx) { setPackagingSubs((p) => ({ ...p, [key]: idx })); }
+  function toggleNote(key) { setAdditionalNotes((p) => ({ ...p, [key]: !p[key] })); }
 
   const typeTabs = (
     <div className="mg-type-tabs" role="tablist" aria-label="Media type">
       {MEDIA_TYPES.map((t) => (
-        <button
-          key={t.key}
-          role="tab"
-          aria-selected={mediaType === t.key}
-          className={`pill ${mediaType === t.key ? "selected" : ""}`}
-          onClick={() => onSelectType(t.key)}
-          type="button"
-        >
+        <button key={t.key} role="tab" aria-selected={mediaType === t.key} className={`pill ${mediaType === t.key ? "selected" : ""}`} onClick={() => onSelectType(t.key)} type="button">
           <span className="icon">{t.icon}</span> {t.label}
         </button>
       ))}
@@ -1034,21 +586,13 @@ export default function MediaGradingPage() {
     <div className="mg-sealed">
       <div className="sealed-row">
         <label htmlFor="sealedToggle" className="checkbox-row">
-          <input
-            id="sealedToggle"
-            type="checkbox"
-            checked={sealed}
-            onChange={(e) => setSealed(e.target.checked)}
-          />
+          <input id="sealedToggle" type="checkbox" checked={sealed} onChange={(e) => setSealed(e.target.checked)} />
           <span>Sealed (factory shrink intact)</span>
         </label>
-
-        {/* Reset/clear action */}
         <button type="button" className="btn reset" onClick={resetForNextAlbum} aria-label="Start next album">
           Start Next Album (Reset)
         </button>
       </div>
-
       <p className="help">
         When <strong>Sealed</strong> is on:
         <br />• <strong>Vinyl</strong>: only evaluate <em>Warping present</em> for the record; all other record criteria are assumed perfect.
@@ -1074,9 +618,7 @@ export default function MediaGradingPage() {
     const setEntry = (sectionKey, entryKey, updates) => {
       updateItem(index, (it) => {
         const next = { ...it, sections: { ...it.sections } };
-        const arr = next.sections[sectionKey].map((e) =>
-          e.key === entryKey ? { ...e, ...updates } : e
-        );
+        const arr = next.sections[sectionKey].map((e) => (e.key === entryKey ? { ...e, ...updates } : e));
         next.sections[sectionKey] = arr;
         return next;
       });
@@ -1085,29 +627,16 @@ export default function MediaGradingPage() {
     const setMissing = (val) => updateItem(index, (it) => ({ ...it, missing: val }));
 
     const sectionBlock = (title, keyName, arr) => {
-      // Sealed media gating
-      if (sealed && mediaType !== "vinyl") {
-        // Cassette/CD: hide ALL media details when sealed
-        return null;
-      }
+      if (sealed && mediaType !== "vinyl") return null; // hide ALL media details when sealed for cassette/CD
 
       let filtered = arr;
-
       if (sealed && mediaType === "vinyl") {
         if (title.toLowerCase().includes("visual")) {
-          // Vinyl sealed: only Warping in Visual Appearance
           filtered = arr.filter((row) => row.key === "warping");
-        } else if (
-          title.toLowerCase().includes("audio") ||
-          title.toLowerCase().includes("playback") ||
-          title.toLowerCase().includes("label") ||
-          title.toLowerCase().includes("center")
-        ) {
-          // Hide Audio & Label/Center entirely when sealed (vinyl)
+        } else if (title.toLowerCase().includes("audio") || title.toLowerCase().includes("playback") || title.toLowerCase().includes("label") || title.toLowerCase().includes("center")) {
           return null;
         }
       }
-
       if (filtered.length === 0) return null;
 
       return (
@@ -1120,29 +649,17 @@ export default function MediaGradingPage() {
             return (
               <div key={entry.key} className={`row ${entry.checked ? "active" : ""}`}>
                 <label htmlFor={id} className="checkbox-row">
-                  <input
-                    id={id}
-                    type="checkbox"
-                    checked={entry.checked}
-                    onChange={(e) => onToggle(e.target.checked)}
-                  />
+                  <input id={id} type="checkbox" checked={entry.checked} onChange={(e) => onToggle(e.target.checked)} />
                   <span>{entry.label}</span>
                 </label>
 
-                {/* Sub-severity radios */}
                 {entry.checked && Array.isArray(entry.subOptions) && (
                   <div className="subradios" role="group" aria-label={`${entry.label} severity`}>
                     {entry.subOptions.map((slabel, i) => {
                       const rid = `${id}-sub-${i}`;
                       return (
                         <label key={rid} htmlFor={rid} className="radio-row">
-                          <input
-                            id={rid}
-                            type="radio"
-                            name={`${id}-sub`}
-                            checked={entry.subIndex === i}
-                            onChange={() => setEntry(keyName, entry.key, { subIndex: i })}
-                          />
+                          <input id={rid} type="radio" name={`${id}-sub`} checked={entry.subIndex === i} onChange={() => setEntry(keyName, entry.key, { subIndex: i })} />
                           <span>{slabel}</span>
                         </label>
                       );
@@ -1150,27 +667,14 @@ export default function MediaGradingPage() {
                   </div>
                 )}
 
-                {/* Side selectors */}
                 {entry.checked && entry.sides && (
                   <div className="sides" role="group" aria-label="Which side(s) affected">
                     <span className="sides-label">Which side(s) affected</span>
-                    {[
-                      { key: "S1", label: L1 },
-                      { key: "S2", label: L2 },
-                    ].map((s) => {
+                    {[{ key: "S1", label: L1 }, { key: "S2", label: L2 }].map((s) => {
                       const sid = `${id}-side-${s.key}`;
                       return (
                         <label key={sid} htmlFor={sid} className="checkbox-row side">
-                          <input
-                            id={sid}
-                            type="checkbox"
-                            checked={!!entry.sides[s.key]}
-                            onChange={(e) =>
-                              setEntry(keyName, entry.key, {
-                                sides: { ...entry.sides, [s.key]: e.target.checked },
-                              })
-                            }
-                          />
+                          <input id={sid} type="checkbox" checked={!!entry.sides[s.key]} onChange={(e) => setEntry(keyName, entry.key, { sides: { ...entry.sides, [s.key]: e.target.checked } })} />
                           <span>Side {s.label}</span>
                         </label>
                       );
@@ -1178,59 +682,20 @@ export default function MediaGradingPage() {
                   </div>
                 )}
 
-                {/* Tracks affected */}
                 {entry.checked && entry.tracks !== null && (
                   <div className="tracks">
                     {labels.sideable && typeof entry.tracks === "object" ? (
                       <>
                         <label htmlFor={`${id}-tracks-S1`}>Tracks affected — Side {L1}</label>
-                        <input
-                          id={`${id}-tracks-S1`}
-                          type="number"
-                          min="0"
-                          value={entry.tracks.S1}
-                          onChange={(e) =>
-                            setEntry(keyName, entry.key, {
-                              tracks: {
-                                ...entry.tracks,
-                                S1: Math.max(0, parseInt(e.target.value || "0", 10)),
-                              },
-                            })
-                          }
-                        />
+                        <input id={`${id}-tracks-S1`} type="number" min="0" value={entry.tracks.S1} onChange={(e) => setEntry(keyName, entry.key, { tracks: { ...entry.tracks, S1: Math.max(0, parseInt(e.target.value || "0", 10)) } })} />
                         <label htmlFor={`${id}-tracks-S2`}>Side {L2}</label>
-                        <input
-                          id={`${id}-tracks-S2`}
-                          type="number"
-                          min="0"
-                          value={entry.tracks.S2}
-                          onChange={(e) =>
-                            setEntry(keyName, entry.key, {
-                              tracks: {
-                                ...entry.tracks,
-                                S2: Math.max(0, parseInt(e.target.value || "0", 10)),
-                              },
-                            })
-                          }
-                        />
-                        <span className="hint">
-                          −1 per track applies only to <em>audio</em> defects; for visual, track counts are informational.
-                        </span>
+                        <input id={`${id}-tracks-S2`} type="number" min="0" value={entry.tracks.S2} onChange={(e) => setEntry(keyName, entry.key, { tracks: { ...entry.tracks, S2: Math.max(0, parseInt(e.target.value || "0", 10)) } })} />
+                        <span className="hint">−1 per track applies only to <em>audio</em> defects; for visual, track counts are informational.</span>
                       </>
                     ) : (
                       <>
                         <label htmlFor={`${id}-tracks`}>Tracks affected</label>
-                        <input
-                          id={`${id}-tracks`}
-                          type="number"
-                          min="0"
-                          value={entry.tracks}
-                          onChange={(e) =>
-                            setEntry(keyName, entry.key, {
-                              tracks: Math.max(0, parseInt(e.target.value || "0", 10)),
-                            })
-                          }
-                        />
+                        <input id={`${id}-tracks`} type="number" min="0" value={entry.tracks} onChange={(e) => setEntry(keyName, entry.key, { tracks: Math.max(0, parseInt(e.target.value || "0", 10)) })} />
                         <span className="hint">−1 per track applies only to audio defects.</span>
                       </>
                     )}
@@ -1249,51 +714,24 @@ export default function MediaGradingPage() {
           <h3>{idxLabel}</h3>
           <div className="title-actions">
             <label htmlFor={`missing-${index}`} className="checkbox-row">
-              <input
-                id={`missing-${index}`}
-                type="checkbox"
-                checked={item.missing}
-                onChange={(e) => setMissing(e.target.checked)}
-              />
+              <input id={`missing-${index}`} type="checkbox" checked={item.missing} onChange={(e) => setMissing(e.target.checked)} />
               <span>Mark this media as Missing (auto P)</span>
             </label>
-            <button
-              type="button"
-              className="btn danger"
-              onClick={() => removeItem(index)}
-              aria-label={`Remove ${labels.itemWord}`}
-            >
+            <button type="button" className="btn danger" onClick={() => removeItem(index)} aria-label={`Remove ${labels.itemWord}`}>
               Remove {labels.itemWord}
             </button>
           </div>
         </div>
 
         {sectionBlock("Visual Appearance", "visual", item.sections.visual)}
-        {sectionBlock(
-          mediaType === "cassette" ? "Playback & Transport" : "Audio Performance",
-          "audio",
-          item.sections.audio
-        )}
-        {sectionBlock(
-          mediaType === "vinyl" ? "Label / Center" : mediaType === "cd" ? "Hub / Face" : "Shell / Label",
-          "labelArea",
-          item.sections.labelArea
-        )}
+        {sectionBlock(mediaType === "cassette" ? "Playback & Transport" : "Audio Performance", "audio", item.sections.audio)}
+        {sectionBlock(mediaType === "vinyl" ? "Label / Center" : mediaType === "cd" ? "Hub / Face" : "Shell / Label", "labelArea", item.sections.labelArea)}
       </section>
     );
   }
 
-  // Helpers to filter packaging UI in sealed+vinyl mode
   const isSealedVinyl = sealed && mediaType === "vinyl";
-  const vinylAllowedKeys = new Set([
-    "minorShelfWear",
-    "cornerWear",
-    "ringWear",
-    "creases",
-    "tears",
-    "writing",
-    "stickers",
-  ]);
+  const vinylAllowedKeys = new Set(["minorShelfWear","cornerWear","ringWear","creases","tears","writing","stickers"]);
   const filterAllowed = (arr) => (isSealedVinyl ? arr.filter((x) => vinylAllowedKeys.has(x.key)) : arr);
 
   const PackagingPanel = (
@@ -1302,12 +740,7 @@ export default function MediaGradingPage() {
         <h3>{pkgLabels.title}</h3>
         <div className="title-actions">
           <label htmlFor="pkg-missing" className="checkbox-row">
-            <input
-              id="pkg-missing"
-              type="checkbox"
-              checked={packagingMissing}
-              onChange={(e) => setPackagingMissing(e.target.checked)}
-            />
+            <input id="pkg-missing" type="checkbox" checked={packagingMissing} onChange={(e) => setPackagingMissing(e.target.checked)} />
             <span>Mark packaging as Missing (auto P)</span>
           </label>
         </div>
@@ -1319,20 +752,11 @@ export default function MediaGradingPage() {
         {filterAllowed(pkgLabels.overall).map((cfg) => {
           const id = `pkg-${cfg.key}`;
           const checked = !!packagingChecks[cfg.key];
-          const disabled =
-            sealed &&
-            mediaType !== "vinyl" &&
-            !["minorShelfWear", "cornerWear", "creases"].includes(cfg.key);
+          const disabled = sealed && mediaType !== "vinyl" && !["minorShelfWear","cornerWear","creases"].includes(cfg.key);
           return (
             <div key={cfg.key} className={`row ${checked ? "active" : ""}`}>
               <label htmlFor={id} className="checkbox-row">
-                <input
-                  id={id}
-                  type="checkbox"
-                  checked={checked}
-                  onChange={() => togglePackaging(cfg.key)}
-                  disabled={disabled}
-                />
+                <input id={id} type="checkbox" checked={checked} onChange={() => togglePackaging(cfg.key)} disabled={disabled} />
                 <span>{cfg.label}</span>
               </label>
               {checked && Array.isArray(cfg.sub) && (
@@ -1341,14 +765,7 @@ export default function MediaGradingPage() {
                     const rid = `${id}-sub-${i}`;
                     return (
                       <label key={rid} htmlFor={rid} className="radio-row">
-                        <input
-                          id={rid}
-                          type="radio"
-                          name={`${id}-sub`}
-                          checked={packagingSubs[cfg.key] === i}
-                          onChange={() => setPackagingSub(cfg.key, i)}
-                          disabled={disabled}
-                        />
+                        <input id={rid} type="radio" name={`${id}-sub`} checked={packagingSubs[cfg.key] === i} onChange={() => setPackagingSub(cfg.key, i)} disabled={disabled} />
                         <span>{txt}</span>
                       </label>
                     );
@@ -1360,26 +777,17 @@ export default function MediaGradingPage() {
         })}
         {mediaType !== "vinyl" && (
           <p className="help">
-            Standard plastic cases are <strong>not graded</strong>; evaluate the J-card/inlay/booklet/digipak. Use
-            Additional Notes for replaceable case issues.
+            Standard plastic cases are <strong>not graded</strong>; evaluate the insert/booklet/inlay (digipak if applicable). Use Additional Notes for replaceable case issues.
           </p>
         )}
-        {sealed && (
-          <p className="help">
-            Sealed adds +5 (cap 100). <strong>M</strong> only if sealed &amp; flawless (no allowed deductions).
-          </p>
-        )}
+        {sealed && <p className="help">Sealed adds +5 (cap 100). <strong>M</strong> only if sealed &amp; flawless (no allowed deductions).</p>}
       </fieldset>
 
       {/* Structure — hidden entirely when sealed+vinyl */}
       {!isSealedVinyl && (
         <fieldset className="mg-fieldset">
           <legend>
-            {mediaType === "vinyl"
-              ? "Seams & Structure"
-              : mediaType === "cassette"
-              ? "J-card Structure"
-              : "Insert/Tray Structure"}
+            {mediaType === "vinyl" ? "Seams & Structure" : mediaType === "cassette" ? "J-card Structure" : "Insert/Tray Structure"}
           </legend>
           {pkgLabels.seams.map((cfg) => {
             const id = `pkg-${cfg.key}`;
@@ -1388,13 +796,7 @@ export default function MediaGradingPage() {
             return (
               <div key={cfg.key} className={`row ${checked ? "active" : ""}`}>
                 <label htmlFor={id} className="checkbox-row">
-                  <input
-                    id={id}
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => togglePackaging(cfg.key)}
-                    disabled={disabled}
-                  />
+                  <input id={id} type="checkbox" checked={checked} onChange={() => togglePackaging(cfg.key)} disabled={disabled} />
                   <span>{cfg.label}</span>
                 </label>
                 {checked && Array.isArray(cfg.sub) && (
@@ -1403,14 +805,7 @@ export default function MediaGradingPage() {
                       const rid = `${id}-sub-${i}`;
                       return (
                         <label key={rid} htmlFor={rid} className="radio-row">
-                          <input
-                            id={rid}
-                            type="radio"
-                            name={`${id}-sub`}
-                            checked={packagingSubs[cfg.key] === i}
-                            onChange={() => setPackagingSub(cfg.key, i)}
-                            disabled={disabled}
-                          />
+                          <input id={rid} type="radio" name={`${id}-sub`} checked={packagingSubs[cfg.key] === i} onChange={() => setPackagingSub(cfg.key, i)} disabled={disabled} />
                           <span>{txt}</span>
                         </label>
                       );
@@ -1433,13 +828,7 @@ export default function MediaGradingPage() {
           return (
             <div key={cfg.key} className={`row ${checked ? "active" : ""}`}>
               <label htmlFor={id} className="checkbox-row">
-                <input
-                  id={id}
-                  type="checkbox"
-                  checked={checked}
-                  onChange={() => togglePackaging(cfg.key)}
-                  disabled={disabled}
-                />
+                <input id={id} type="checkbox" checked={checked} onChange={() => togglePackaging(cfg.key)} disabled={disabled} />
                 <span>{cfg.label}</span>
               </label>
               {checked && Array.isArray(cfg.sub) && (
@@ -1448,14 +837,7 @@ export default function MediaGradingPage() {
                     const rid = `${id}-sub-${i}`;
                     return (
                       <label key={rid} htmlFor={rid} className="radio-row">
-                        <input
-                          id={rid}
-                          type="radio"
-                          name={`${id}-sub`}
-                          checked={packagingSubs[cfg.key] === i}
-                          onChange={() => setPackagingSub(cfg.key, i)}
-                          disabled={disabled}
-                        />
+                        <input id={rid} type="radio" name={`${id}-sub`} checked={packagingSubs[cfg.key] === i} onChange={() => setPackagingSub(cfg.key, i)} disabled={disabled} />
                         <span>{txt}</span>
                       </label>
                     );
@@ -1476,21 +858,13 @@ export default function MediaGradingPage() {
               const id = `pkg-appearance-${opt.key}`;
               return (
                 <label key={id} htmlFor={id} className="radio-row">
-                  <input
-                    id={id}
-                    type="radio"
-                    name="pkg-appearance"
-                    checked={packagingAppearance === opt.key}
-                    onChange={() => setPackagingAppearance(opt.key)}
-                  />
+                  <input id={id} type="radio" name="pkg-appearance" checked={packagingAppearance === opt.key} onChange={() => setPackagingAppearance(opt.key)} />
                   <span>{opt.label}</span>
                 </label>
               );
             })}
           </div>
-          <p className="help">
-            This adjusts the <strong>sleeve/cover</strong> score slightly (±2) <em>only</em> when it’s on the cusp of a grade boundary.
-          </p>
+          <p className="help">This adjusts the <strong>sleeve/cover</strong> score slightly (±2) <em>only</em> when it’s on the cusp of a grade boundary.</p>
         </fieldset>
       )}
 
@@ -1501,12 +875,7 @@ export default function MediaGradingPage() {
           <div className="notes-grid">
             {pkgLabels.notes.map((n) => (
               <label key={n.key} htmlFor={`note-${n.key}`} className="checkbox-row note">
-                <input
-                  id={`note-${n.key}`}
-                  type="checkbox"
-                  checked={!!additionalNotes[n.key]}
-                  onChange={() => toggleNote(n.key)}
-                />
+                <input id={`note-${n.key}`} type="checkbox" checked={!!additionalNotes[n.key]} onChange={() => toggleNote(n.key)} />
                 <span>{n.label}</span>
               </label>
             ))}
@@ -1550,19 +919,12 @@ export default function MediaGradingPage() {
 
       <section className="panel">
         <h3>📝 Custom Condition Notes</h3>
-        <textarea
-          rows={4}
-          value={customNotes}
-          onChange={(e) => setCustomNotes(e.target.value)}
-          aria-label="Custom condition notes"
-        />
+        <textarea rows={4} value={customNotes} onChange={(e) => setCustomNotes(e.target.value)} aria-label="Custom condition notes" />
       </section>
 
       <section className="results">
         <div className={`card grade ${overall.mediaGrade}`}>
-          <div className="label">
-            {mediaType === "vinyl" ? "Record Grade" : mediaType === "cassette" ? "Tape Grade" : "Disc Grade"}
-          </div>
+          <div className="label">{mediaType === "vinyl" ? "Record Grade" : mediaType === "cassette" ? "Tape Grade" : "Disc Grade"}</div>
           <div className="value">{overall.mediaGrade}</div>
           <div className="score">{Math.round(overall.mediaScore)}/100</div>
         </div>
