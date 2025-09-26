@@ -175,6 +175,16 @@ export default function AdminSidebar() {
           >
             📥 Import Discogs
           </Link>
+          <Link 
+            href="/admin/cd-only-checker"
+            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+              pathname === "/admin/cd-only-checker" 
+                ? "bg-red-700 text-white" 
+                : "bg-red-600 text-white hover:bg-red-700"
+            }`}
+          >
+            💿 CD-Only Finder
+          </Link>
         </div>
       </div>
 
