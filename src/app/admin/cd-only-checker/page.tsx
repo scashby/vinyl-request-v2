@@ -59,9 +59,7 @@ export default function CDOnlyChecker() {
     discogs_master_id: number | null;
     discogs_release_id: number | null;
   }): Promise<CDOnlyResult> => {
-    const masterId = album.discogs_master_id || album.discogs_release_id;
-    
-    if (!masterId) {
+    if (!album.discogs_release_id) {
       return {
         id: album.id,
         artist: album.artist,
@@ -75,63 +73,40 @@ export default function CDOnlyChecker() {
     }
 
     try {
-      // Use your existing proxy route
-      const response = await fetch(`/api/discogsProxy?releaseId=${masterId}`);
+      // Get the specific release
+      const response = await fetch(`/api/discogsProxy?releaseId=${album.discogs_release_id}`);
       
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
       
-      const data: DiscogsResponse = await response.json();
+      const releaseData: DiscogsResponse = await response.json();
       
-      // If this is a release (not master), we need to get the master
-      let masterData: DiscogsResponse = data;
-      if (data.master_id && data.master_id !== masterId) {
-        const masterResponse = await fetch(`/api/discogsProxy?releaseId=${data.master_id}`);
-        if (masterResponse.ok) {
-          // Get all versions of the master release through the proxy
-          const masterVersionsResponse = await fetch(`/api/discogsProxy?releaseId=${data.master_id}&type=master`);
-          
-          if (masterVersionsResponse.ok) {
-            const versionsData: DiscogsResponse = await masterVersionsResponse.json();
-            masterData = versionsData;
-          }
-        }
-      }
-      
-      // Extract available formats
+      // For now, just check this single release
+      // This is less comprehensive but will work with existing proxy
       const availableFormats = new Set<string>();
       
-      // Check current release format
-      if (data.formats) {
-        data.formats.forEach((format: DiscogsFormat) => {
+      if (releaseData.formats) {
+        releaseData.formats.forEach((format: DiscogsFormat) => {
           if (format.name) {
             availableFormats.add(format.name.toLowerCase());
           }
         });
       }
       
-      // Check all versions if we have master data
-      if (masterData.versions && masterData.versions.results) {
-        masterData.versions.results.forEach((version: DiscogsVersion) => {
-          if (version.format) {
-            version.format.forEach((format: string) => {
-              availableFormats.add(format.toLowerCase());
-            });
-          }
-        });
-      }
-      
       const formatArray = Array.from(availableFormats);
       
-      // Determine if CD-only (has CD but no vinyl formats)
+      // More conservative detection - only mark as CD-only if we're very sure
       const hasCD = formatArray.some(f => f.includes('cd'));
       const hasVinyl = formatArray.some(f => 
         f.includes('vinyl') || 
         f.includes('lp') || 
-        f.includes('12"') ||
-        f.includes('album') // Sometimes vinyl is just marked as "Album"
+        f.includes('12"')
       );
+      
+      // If this specific release is CD and has master_id, 
+      // we should assume vinyl versions might exist unless proven otherwise
+      const hasMaster = releaseData.master_id && releaseData.master_id > 0;
       
       return {
         id: album.id,
@@ -141,7 +116,8 @@ export default function CDOnlyChecker() {
         discogs_master_id: album.discogs_master_id,
         discogs_release_id: album.discogs_release_id,
         available_formats: formatArray,
-        is_cd_only: hasCD && !hasVinyl
+        // Only mark as CD-only if it's CD format AND has no master (indicating no other versions)
+        is_cd_only: hasCD && !hasVinyl && !hasMaster
       };
       
     } catch (error) {
