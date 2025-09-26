@@ -4,7 +4,6 @@ import { useState } from 'react';
 import Papa from 'papaparse';
 import { supabase } from 'src/lib/supabaseClient';
 
-
 // Updated type to match actual Discogs CSV export structure
 type DiscogsCSVRow = {
   'Catalog#': string;
@@ -14,7 +13,7 @@ type DiscogsCSVRow = {
   Format: string;
   Rating: string | null;
   Released: number;
-  release_id: number | string | null; // Can be number, string, or null from CSV parsing
+  release_id: number | string | null;
   CollectionFolder: string;
   'Date Added': string;
   'Collection Media Condition': string;
@@ -30,7 +29,7 @@ type ProcessedRow = {
   format: string;
   folder: string;
   media_condition: string;
-  discogs_release_id: string; // String to match database schema
+  discogs_release_id: string;
   date_added: string;
   image_url: string | null;
   tracklists: string | null;
@@ -70,6 +69,34 @@ interface SyncDataStorage {
   recordsToRemove?: ExistingRecord[];
 }
 
+// Helper function to normalize values for comparison
+function normalizeValue(value: string | number | null | undefined): string {
+  if (value === null || value === undefined) return '';
+  return String(value).trim();
+}
+
+// Helper function to safely compare two values
+function valuesAreEqual(val1: string | number | null | undefined, val2: string | number | null | undefined): boolean {
+  const norm1 = normalizeValue(val1);
+  const norm2 = normalizeValue(val2);
+  return norm1 === norm2;
+}
+
+// Helper function to provide default values for required fields
+function sanitizeMediaCondition(condition: string | null | undefined): string {
+  if (!condition || condition.trim() === '') {
+    return 'Unknown'; // Default value for required field
+  }
+  return condition.trim();
+}
+
+function sanitizeFolder(folder: string | null | undefined): string {
+  if (!folder || folder.trim() === '') {
+    return 'Uncategorized'; // Default folder
+  }
+  return folder.trim();
+}
+
 function parseDiscogsDate(dateString: string): string {
   if (!dateString || dateString.trim() === '') {
     return new Date().toISOString();
@@ -86,6 +113,18 @@ function parseDiscogsDate(dateString: string): string {
     return new Date().toISOString();
   }
 }
+
+type DiscogsTrack = {
+  position?: string;
+  type_?: string;
+  title?: string;
+  duration?: string;
+};
+
+type DiscogsResponse = {
+  images?: Array<{ uri: string }>;
+  tracklist?: DiscogsTrack[];
+};
 
 export default function ImportDiscogsPage() {
   const [syncPreview, setSyncPreview] = useState<SyncPreview | null>(null);
@@ -109,7 +148,7 @@ export default function ImportDiscogsPage() {
         
         const res = await fetch(url, {
           headers: {
-            'User-Agent': 'DeadwaxDialogues/1.0 +https://yourwebsite.com', // Replace with your actual website
+            'User-Agent': 'DeadwaxDialogues/1.0 +https://yourwebsite.com',
             'Authorization': `Discogs token=${process.env.NEXT_PUBLIC_DISCOGS_TOKEN}`
           }
         });
@@ -125,17 +164,12 @@ export default function ImportDiscogsPage() {
           return { image_url: null, tracklists: null };
         }
         
-        const data = await res.json();
+        const data = await res.json() as DiscogsResponse;
         
         // Process tracklist - store as JSON string for Supabase
         let tracklistsStr = null;
         if (Array.isArray(data.tracklist) && data.tracklist.length > 0) {
-          tracklistsStr = JSON.stringify(data.tracklist.map((track: {
-            position?: string;
-            type_?: string;
-            title?: string;
-            duration?: string;
-          }) => ({
+          tracklistsStr = JSON.stringify(data.tracklist.map((track: DiscogsTrack) => ({
             position: track.position || '',
             type_: track.type_ || 'track',
             title: track.title || '',
@@ -171,12 +205,12 @@ export default function ImportDiscogsPage() {
       Papa.parse(file, {
         header: true,
         skipEmptyLines: true,
-        dynamicTyping: true, // This will convert numbers properly
+        dynamicTyping: true,
         complete: async (results: { data: DiscogsCSVRow[], meta: { fields?: string[] } }) => {
           console.log('CSV Headers:', results.meta.fields);
           console.log('Sample row:', results.data[0]);
           console.log('Sample release_id value:', results.data[0]?.release_id);
-          console.log('Sample release_id type:', typeof results.data[0]?.release_id);
+          console.log('Sample media condition:', results.data[0]?.['Collection Media Condition']);
           
           setDebugInfo(`CSV Headers: ${results.meta.fields?.join(', ')}`);
           
@@ -196,7 +230,7 @@ export default function ImportDiscogsPage() {
               }
               return false;
             }
-            // Also filter out non-numeric strings (we'll convert valid numbers to strings later)
+            // Also filter out non-numeric strings
             const numericValue = Number(releaseId);
             if (isNaN(numericValue) || numericValue <= 0) {
               if (index < 10) {
@@ -216,14 +250,14 @@ export default function ImportDiscogsPage() {
           
           console.log(`Total rows: ${results.data.length}, Valid rows: ${validRows.length}`);
           
-          // Convert to the format expected by Supabase
+          // Convert to the format expected by Supabase with proper sanitization
           const processedRows: ProcessedRow[] = validRows.map(row => ({
-            artist: row.Artist,
-            title: row.Title,
-            year: row.Released,
-            format: row.Format,
-            folder: row.CollectionFolder,
-            media_condition: row['Collection Media Condition'],
+            artist: row.Artist || 'Unknown Artist',
+            title: row.Title || 'Unknown Title',
+            year: row.Released || 0,
+            format: row.Format || 'Unknown',
+            folder: sanitizeFolder(row.CollectionFolder),
+            media_condition: sanitizeMediaCondition(row['Collection Media Condition']),
             discogs_release_id: String(row.release_id), // Convert to string to match database
             date_added: parseDiscogsDate(row['Date Added']),
             image_url: null,
@@ -232,7 +266,8 @@ export default function ImportDiscogsPage() {
 
           const releaseIds = processedRows.map(r => r.discogs_release_id);
           
-          console.log('Release IDs to check (converted to strings):', releaseIds.slice(0, 5)); // Log first 5 for debugging
+          console.log('Release IDs to check (converted to strings):', releaseIds.slice(0, 5));
+          console.log('Sample processed row:', processedRows[0]);
           
           setStatus(`Checking Supabase for existing entries among ${releaseIds.length} items...`);
           
@@ -294,30 +329,36 @@ export default function ImportDiscogsPage() {
           const existingInCsv = releaseIds.filter(id => allExistingIds.has(id));
           const newRows = processedRows.filter(row => !allExistingIds.has(row.discogs_release_id));
 
-          // Find items that need updates (folder/condition changes or missing images/tracklists)
+          // Find items that need updates with improved comparison logic
           const updateOperations: UpdateOperation[] = [];
           for (const csvRow of processedRows) {
             const existingRecord = existingRecordsMap.get(csvRow.discogs_release_id);
             if (existingRecord) {
-              const folderChanged = csvRow.folder !== existingRecord.folder;
-              const conditionChanged = csvRow.media_condition !== existingRecord.media_condition;
+              // Use improved comparison logic
+              const folderChanged = !valuesAreEqual(csvRow.folder, existingRecord.folder);
+              const conditionChanged = !valuesAreEqual(csvRow.media_condition, existingRecord.media_condition);
               const needsImage = !existingRecord.image_url;
-              const needsTracklists = !existingRecord.tracklists || existingRecord.tracklists === '' || existingRecord.tracklists === 'null';
+              const needsTracklists = !existingRecord.tracklists || 
+                                   existingRecord.tracklists === '' || 
+                                   existingRecord.tracklists === 'null' ||
+                                   existingRecord.tracklists === '[]';
               
               if (folderChanged || conditionChanged || needsImage || needsTracklists) {
                 updateOperations.push({ csvRow, existingRecord });
                 
-                if (folderChanged || conditionChanged) {
-                  console.log('Change detected:', {
-                    releaseId: csvRow.discogs_release_id,
-                    artist: csvRow.artist,
-                    title: csvRow.title,
-                    folderChange: folderChanged ? `${existingRecord.folder} → ${csvRow.folder}` : 'no change',
-                    conditionChange: conditionChanged ? `${existingRecord.media_condition} → ${csvRow.media_condition}` : 'no change',
-                    needsImage: needsImage,
-                    needsTracklists: needsTracklists
-                  });
-                }
+                console.log('Change detected:', {
+                  releaseId: csvRow.discogs_release_id,
+                  artist: csvRow.artist,
+                  title: csvRow.title,
+                  folderChange: folderChanged ? 
+                    `${normalizeValue(existingRecord.folder)} → ${normalizeValue(csvRow.folder)}` : 
+                    'no change',
+                  conditionChange: conditionChanged ? 
+                    `${normalizeValue(existingRecord.media_condition)} → ${normalizeValue(csvRow.media_condition)}` : 
+                    'no change',
+                  needsImage: needsImage,
+                  needsTracklists: needsTracklists
+                });
               }
             }
           }
@@ -332,7 +373,7 @@ export default function ImportDiscogsPage() {
           console.log('Sample new release IDs:', newRows.slice(0, 5).map(r => r.discogs_release_id));
           
           setStatus(`Found ${newRows.length} new items, ${updateOperations.length} items to update, ${recordsToRemove.length} items to remove`);
-          setDebugInfo(prev => prev + `\nTotal CSV rows: ${results.data.length}, Valid rows with release_id: ${validRows.length}, New items: ${newRows.length}, Updates: ${updateOperations.length}, Removals: ${recordsToRemove.length}\nTotal existing items in database: ${allExistingIds.size}\nNote: Converting release IDs to strings to match database schema`);
+          setDebugInfo(prev => prev + `\nTotal CSV rows: ${results.data.length}, Valid rows with release_id: ${validRows.length}, New items: ${newRows.length}, Updates: ${updateOperations.length}, Removals: ${recordsToRemove.length}\nTotal existing items in database: ${allExistingIds.size}\nSample processed media_condition: ${processedRows[0]?.media_condition}`);
           
           if (validRows.length === 0) {
             setDebugInfo(prev => prev + `\nPROBLEM: No rows have valid release_id values! This suggests the Discogs export may be missing release IDs.`);
@@ -367,10 +408,13 @@ export default function ImportDiscogsPage() {
   };
 
   const enrichAndImport = async () => {
-    if (!syncPreview || syncPreview.newItems.length === 0) return;
+    if (!syncPreview || (syncPreview.newItems.length === 0 && syncPreview.updateOperations.length === 0)) {
+      setStatus('Nothing to import or update');
+      return;
+    }
     
     setIsProcessing(true);
-    const BATCH_SIZE = 50; // Process 50 items at a time
+    const BATCH_SIZE = 25; // Reduced batch size for better error handling
     const totalItems = syncPreview.newItems.length;
     let allEnriched: EnrichedRow[] = [];
     
@@ -412,64 +456,29 @@ export default function ImportDiscogsPage() {
           }
         }
         
-        // Save this batch to database immediately
+        // Save this batch to database immediately with better error handling
         setStatus(`Batch ${batchNumber}: Saving ${batchEnriched.length} items to database...`);
         
-        // Check for existing items in this batch
-        const { data: existingItems, error: existingError } = await supabase
-          .from('collection')
-          .select('discogs_release_id, date_added')
-          .in('discogs_release_id', batchEnriched.map(r => r.discogs_release_id));
-        
-        if (existingError) {
-          console.warn(`Failed to check existing items in batch ${batchNumber}:`, existingError);
-        } else {
-          const existingMap = new Map(
-            (existingItems || []).map(item => [item.discogs_release_id, item.date_added])
-          );
-          
-          const newItems = batchEnriched.filter(row => !existingMap.has(row.discogs_release_id));
-          const updateItems = batchEnriched.filter(row => {
-            const dateAdded = existingMap.get(row.discogs_release_id);
-            return existingMap.has(row.discogs_release_id) && !dateAdded;
-          });
-          
-          let batchInsertCount = 0;
-          let batchUpdateCount = 0;
-          
-          // Insert new items from this batch
-          if (newItems.length > 0) {
+        // Insert new items from this batch one by one for better error handling
+        let batchInsertCount = 0;
+        for (const item of batchEnriched) {
+          try {
             const { error: insertError } = await supabase
               .from('collection')
-              .insert(newItems);
+              .insert([item]); // Insert one item at a time
 
             if (insertError) {
-              console.warn(`Database insert failed for batch ${batchNumber}:`, insertError);
+              console.error(`Failed to insert ${item.artist} - ${item.title}:`, insertError);
+              console.log('Failed item data:', item);
             } else {
-              batchInsertCount = newItems.length;
+              batchInsertCount++;
             }
+          } catch (error) {
+            console.error(`Error inserting ${item.artist} - ${item.title}:`, error);
           }
-          
-          // Update existing items from this batch
-          for (const item of updateItems) {
-            const { error: updateError } = await supabase
-              .from('collection')
-              .update({ 
-                date_added: item.date_added,
-                image_url: item.image_url,
-                tracklists: item.tracklists
-              })
-              .eq('discogs_release_id', item.discogs_release_id);
-            
-            if (updateError) {
-              console.warn(`Failed to update ${item.discogs_release_id} in batch ${batchNumber}:`, updateError);
-            } else {
-              batchUpdateCount++;
-            }
-          }
-          
-          setStatus(`Batch ${batchNumber} complete: ${batchInsertCount} inserted, ${batchUpdateCount} updated`);
         }
+        
+        setStatus(`Batch ${batchNumber} complete: ${batchInsertCount}/${batchEnriched.length} inserted successfully`);
         
         // Add this batch to preview
         allEnriched = allEnriched.concat(batchEnriched);
@@ -491,6 +500,7 @@ export default function ImportDiscogsPage() {
       if (updateOperations.length > 0) {
         setStatus(`Processing ${updateOperations.length} update operations...`);
         
+        let updateCount = 0;
         for (let i = 0; i < updateOperations.length; i++) {
           const { csvRow, existingRecord } = updateOperations[i];
           setStatus(`Update ${i + 1}/${updateOperations.length}: ${csvRow.artist} - ${csvRow.title}`);
@@ -500,7 +510,7 @@ export default function ImportDiscogsPage() {
           
           // Check if we need to fetch missing data
           const needsImage = !image_url;
-          const needsTracklists = !tracklists || tracklists === '' || tracklists === 'null';
+          const needsTracklists = !tracklists || tracklists === '' || tracklists === 'null' || tracklists === '[]';
           
           // Fetch missing image/tracklist data if needed
           if (needsImage || needsTracklists) {
@@ -532,15 +542,23 @@ export default function ImportDiscogsPage() {
             tracklists: tracklists
           };
           
-          const { error: updateError } = await supabase
-            .from('collection')
-            .update(updateData)
-            .eq('id', existingRecord.id);
+          try {
+            const { error: updateError } = await supabase
+              .from('collection')
+              .update(updateData)
+              .eq('id', existingRecord.id);
 
-          if (updateError) {
-            console.warn(`Failed to update ${csvRow.discogs_release_id}:`, updateError);
+            if (updateError) {
+              console.warn(`Failed to update ${csvRow.discogs_release_id}:`, updateError);
+            } else {
+              updateCount++;
+            }
+          } catch (error) {
+            console.error(`Error updating ${csvRow.discogs_release_id}:`, error);
           }
         }
+        
+        setStatus(`Completed ${updateCount}/${updateOperations.length} updates`);
       }
       
       // Process removals
@@ -587,7 +605,7 @@ export default function ImportDiscogsPage() {
       
       // Filter items that actually need tracklists
       const itemsToFix = itemsNeedingTracklists.filter(item => {
-        if (!item.tracklists || item.tracklists === '' || item.tracklists === 'null') {
+        if (!item.tracklists || item.tracklists === '' || item.tracklists === 'null' || item.tracklists === '[]') {
           return true;
         }
         
@@ -745,7 +763,7 @@ export default function ImportDiscogsPage() {
         <div style={{ backgroundColor: '#ffffff', color: '#212529' }}>
           <h2 style={{ color: '#212529', marginBottom: '1.5rem', marginTop: '2rem' }}>Sync Preview - All Changes</h2>
           
-          {/* New Items Section - SHOW ALL ITEMS */}
+          {/* New Items Section */}
           {syncPreview.newItems.length > 0 && (
             <div style={{ marginBottom: '2rem' }}>
               <h3 style={{ color: '#28a745' }}>✅ Items to Add ({syncPreview.newItems.length})</h3>
@@ -783,7 +801,7 @@ export default function ImportDiscogsPage() {
             </div>
           )}
 
-          {/* Update Items Section - SHOW ALL UPDATES */}
+          {/* Update Items Section */}
           {syncPreview.updateOperations.length > 0 && (
             <div style={{ marginBottom: '2rem' }}>
               <h3 style={{ color: '#fd7e14' }}>⚠️ Items to Update ({syncPreview.updateOperations.length})</h3>
@@ -806,10 +824,10 @@ export default function ImportDiscogsPage() {
                 </thead>
                 <tbody>
                   {syncPreview.updateOperations.map((op, i) => {
-                    const folderChanged = op.csvRow.folder !== op.existingRecord.folder;
-                    const conditionChanged = op.csvRow.media_condition !== op.existingRecord.media_condition;
+                    const folderChanged = !valuesAreEqual(op.csvRow.folder, op.existingRecord.folder);
+                    const conditionChanged = !valuesAreEqual(op.csvRow.media_condition, op.existingRecord.media_condition);
                     const needsImage = !op.existingRecord.image_url;
-                    const needsTracklists = !op.existingRecord.tracklists || op.existingRecord.tracklists === '' || op.existingRecord.tracklists === 'null';
+                    const needsTracklists = !op.existingRecord.tracklists || op.existingRecord.tracklists === '' || op.existingRecord.tracklists === 'null' || op.existingRecord.tracklists === '[]';
                     return (
                       <tr key={i} style={{ backgroundColor: i % 2 === 0 ? '#ffffff' : '#f8f9fa' }}>
                         <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>{op.csvRow.artist}</td>
@@ -818,14 +836,14 @@ export default function ImportDiscogsPage() {
                         <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>
                           {folderChanged ? (
                             <span style={{ color: '#fd7e14', fontWeight: 'bold' }}>
-                              {op.existingRecord.folder || '(none)'} → {op.csvRow.folder}
+                              {normalizeValue(op.existingRecord.folder)} → {normalizeValue(op.csvRow.folder)}
                             </span>
                           ) : '—'}
                         </td>
                         <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>
                           {conditionChanged ? (
                             <span style={{ color: '#fd7e14', fontWeight: 'bold' }}>
-                              {op.existingRecord.media_condition || '(none)'} → {op.csvRow.media_condition}
+                              {normalizeValue(op.existingRecord.media_condition)} → {normalizeValue(op.csvRow.media_condition)}
                             </span>
                           ) : '—'}
                         </td>
@@ -839,7 +857,7 @@ export default function ImportDiscogsPage() {
             </div>
           )}
 
-          {/* Remove Items Section - SHOW ALL DELETIONS */}
+          {/* Remove Items Section */}
           {syncPreview.recordsToRemove.length > 0 && (
             <div style={{ marginBottom: '2rem' }}>
               <h3 style={{ color: '#dc3545' }}>🗑️ Items to Remove ({syncPreview.recordsToRemove.length})</h3>
