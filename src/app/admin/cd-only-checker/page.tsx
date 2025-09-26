@@ -8,16 +8,18 @@ type DiscogsFormat = {
   name?: string;
 };
 
-type DiscogsVersion = {
+type DiscogsSearchResult = {
+  master_id?: number;
   format?: string[];
+};
+
+type DiscogsSearchResponse = {
+  results?: DiscogsSearchResult[];
 };
 
 type DiscogsResponse = {
   formats?: DiscogsFormat[];
   master_id?: number;
-  versions?: {
-    results?: DiscogsVersion[];
-  };
 };
 
 type CDOnlyResult = {
@@ -25,10 +27,11 @@ type CDOnlyResult = {
   artist: string;
   title: string;
   year: number;
-  discogs_master_id: number;
-  discogs_release_id: number;
+  discogs_master_id: number | null;
+  discogs_release_id: number | null;
   available_formats: string[];
   is_cd_only: boolean;
+  format_check_method: string;
 };
 
 type CheckResult = {
@@ -68,12 +71,13 @@ export default function CDOnlyChecker() {
         discogs_master_id: album.discogs_master_id,
         discogs_release_id: album.discogs_release_id,
         available_formats: ['Unknown'],
-        is_cd_only: false
+        is_cd_only: false,
+        format_check_method: 'No release ID'
       };
     }
 
     try {
-      // Get the specific release
+      // Get the specific release first
       const response = await fetch(`/api/discogsProxy?releaseId=${album.discogs_release_id}`);
       
       if (!response.ok) {
@@ -81,32 +85,81 @@ export default function CDOnlyChecker() {
       }
       
       const releaseData: DiscogsResponse = await response.json();
+      const masterId = releaseData.master_id;
+
+      if (!masterId) {
+        // No master - check this single release
+        const availableFormats = new Set<string>();
+        if (releaseData.formats) {
+          releaseData.formats.forEach((format: DiscogsFormat) => {
+            if (format.name) {
+              availableFormats.add(format.name.toLowerCase());
+            }
+          });
+        }
+        
+        const formatArray = Array.from(availableFormats);
+        const hasCD = formatArray.some(f => f.includes('cd'));
+        const hasVinyl = formatArray.some(f => 
+          f.includes('vinyl') || f.includes('lp') || f.includes('12"')
+        );
+        
+        return {
+          id: album.id,
+          artist: album.artist,
+          title: album.title,
+          year: album.year,
+          discogs_master_id: album.discogs_master_id,
+          discogs_release_id: album.discogs_release_id,
+          available_formats: formatArray,
+          is_cd_only: hasCD && !hasVinyl,
+          format_check_method: 'Single release (no master)'
+        };
+      }
+
+      // Use search API to find all releases for this master
+      const searchQuery = encodeURIComponent(`${album.artist} ${album.title}`);
+      const searchUrl = `https://api.discogs.com/database/search?q=${searchQuery}&type=release&per_page=100&token=${process.env.NEXT_PUBLIC_DISCOGS_TOKEN}`;
       
-      // For now, just check this single release
-      // This is less comprehensive but will work with existing proxy
+      const searchResponse = await fetch(searchUrl, {
+        headers: {
+          'User-Agent': 'DeadwaxDialogues/1.0 +https://yourwebsite.com'
+        }
+      });
+      
+      if (!searchResponse.ok) {
+        throw new Error(`Search failed: ${searchResponse.status}`);
+      }
+      
+      const searchData: DiscogsSearchResponse = await searchResponse.json();
+      
+      // Extract all formats from search results for this master
       const availableFormats = new Set<string>();
+      let releaseCount = 0;
       
-      if (releaseData.formats) {
-        releaseData.formats.forEach((format: DiscogsFormat) => {
-          if (format.name) {
-            availableFormats.add(format.name.toLowerCase());
+      if (searchData.results) {
+        searchData.results.forEach((result: DiscogsSearchResult) => {
+          // Only include results that match our master ID
+          if (result.master_id === masterId) {
+            releaseCount++;
+            if (result.format) {
+              result.format.forEach((format: string) => {
+                availableFormats.add(format.toLowerCase());
+              });
+            }
           }
         });
       }
       
       const formatArray = Array.from(availableFormats);
       
-      // More conservative detection - only mark as CD-only if we're very sure
+      // Determine if CD-only
       const hasCD = formatArray.some(f => f.includes('cd'));
       const hasVinyl = formatArray.some(f => 
         f.includes('vinyl') || 
         f.includes('lp') || 
         f.includes('12"')
       );
-      
-      // If this specific release is CD and has master_id, 
-      // we should assume vinyl versions might exist unless proven otherwise
-      const hasMaster = releaseData.master_id && releaseData.master_id > 0;
       
       return {
         id: album.id,
@@ -116,8 +169,8 @@ export default function CDOnlyChecker() {
         discogs_master_id: album.discogs_master_id,
         discogs_release_id: album.discogs_release_id,
         available_formats: formatArray,
-        // Only mark as CD-only if it's CD format AND has no master (indicating no other versions)
-        is_cd_only: hasCD && !hasVinyl && !hasMaster
+        is_cd_only: hasCD && !hasVinyl,
+        format_check_method: `Master search (${releaseCount} releases found)`
       };
       
     } catch (error) {
@@ -130,7 +183,8 @@ export default function CDOnlyChecker() {
         discogs_master_id: album.discogs_master_id,
         discogs_release_id: album.discogs_release_id,
         available_formats: ['Error'],
-        is_cd_only: false
+        is_cd_only: false,
+        format_check_method: 'Error occurred'
       };
     }
   };
@@ -158,23 +212,21 @@ export default function CDOnlyChecker() {
         return;
       }
       
-      setStatus(`Found ${cdAlbums.length} CDs. Checking formats...`);
+      setStatus(`Found ${cdAlbums.length} CDs. Checking formats with comprehensive search...`);
       
       const results: CDOnlyResult[] = [];
       const errors: Array<{album: string, error: string}> = [];
       
-      // Process in smaller batches to avoid rate limiting
-      const BATCH_SIZE = 5;
-      for (let i = 0; i < cdAlbums.length; i += BATCH_SIZE) {
-        const batch = cdAlbums.slice(i, Math.min(i + BATCH_SIZE, cdAlbums.length));
+      // Process one by one with longer delays due to search API
+      for (let i = 0; i < cdAlbums.length; i++) {
+        const album = cdAlbums[i];
         
-        setStatus(`Processing batch ${Math.floor(i/BATCH_SIZE) + 1}/${Math.ceil(cdAlbums.length/BATCH_SIZE)}`);
-        setProgress((i / cdAlbums.length) * 100);
+        setStatus(`Checking ${i + 1}/${cdAlbums.length}: ${album.artist} - ${album.title}`);
+        setProgress(((i + 1) / cdAlbums.length) * 100);
         
-        const batchPromises = batch.map(album => checkAlbumFormats(album));
-        const batchResults = await Promise.all(batchPromises);
-        
-        batchResults.forEach((result) => {
+        try {
+          const result = await checkAlbumFormats(album);
+          
           if (result.available_formats.includes('Error')) {
             errors.push({
               album: `${result.artist} - ${result.title}`,
@@ -183,11 +235,16 @@ export default function CDOnlyChecker() {
           } else {
             results.push(result);
           }
-        });
+        } catch (error) {
+          errors.push({
+            album: `${album.artist} - ${album.title}`,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
+        }
         
-        // Rate limiting - wait 5 seconds between batches
-        if (i + BATCH_SIZE < cdAlbums.length) {
-          await delay(5000);
+        // Rate limiting - wait 3 seconds between requests for search API
+        if (i < cdAlbums.length - 1) {
+          await delay(3000);
         }
       }
       
@@ -224,7 +281,7 @@ export default function CDOnlyChecker() {
       <h1 style={{ color: '#212529', marginBottom: '1.5rem' }}>CD-Only Album Finder</h1>
       
       <p style={{ marginBottom: '1.5rem', color: '#6c757d' }}>
-        This will check all CDs in your collection against Discogs to find albums that were never released on vinyl.
+        This will comprehensively check all CDs against Discogs master releases to find albums never released on vinyl.
       </p>
       
       <button
@@ -307,6 +364,7 @@ export default function CDOnlyChecker() {
                     <th style={{ padding: '12px', border: '1px solid #f5c6cb', textAlign: 'left' }}>Title</th>
                     <th style={{ padding: '12px', border: '1px solid #f5c6cb', textAlign: 'left' }}>Year</th>
                     <th style={{ padding: '12px', border: '1px solid #f5c6cb', textAlign: 'left' }}>Available Formats</th>
+                    <th style={{ padding: '12px', border: '1px solid #f5c6cb', textAlign: 'left' }}>Check Method</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -316,6 +374,7 @@ export default function CDOnlyChecker() {
                       <td style={{ padding: '8px', border: '1px solid #dee2e6' }}>{album.title}</td>
                       <td style={{ padding: '8px', border: '1px solid #dee2e6' }}>{album.year}</td>
                       <td style={{ padding: '8px', border: '1px solid #dee2e6' }}>{album.available_formats.join(', ')}</td>
+                      <td style={{ padding: '8px', border: '1px solid #dee2e6', fontSize: '12px', color: '#6c757d' }}>{album.format_check_method}</td>
                     </tr>
                   ))}
                 </tbody>
