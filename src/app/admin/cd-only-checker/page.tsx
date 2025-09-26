@@ -119,8 +119,7 @@ export default function CDOnlyChecker() {
 
       // Use search API to find all releases for this master
       const searchQuery = encodeURIComponent(`${album.artist} ${album.title}`);
-      const searchUrl = `https://api.discogs.com/database/search?q=${searchQuery}&type=release&per_page=100&token=${process.env.NEXT_PUBLIC_DISCOGS_TOKEN}`;
-      
+const searchUrl = `https://api.discogs.com/database/search?q=${searchQuery}&type=release&per_page=100&token=${process.env.VITE_DISCOGS_TOKEN}`;      
       const searchResponse = await fetch(searchUrl, {
         headers: {
           'User-Agent': 'DeadwaxDialogues/1.0 +https://yourwebsite.com'
