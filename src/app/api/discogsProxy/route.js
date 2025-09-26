@@ -1,5 +1,5 @@
 // API route: /api/discogsProxy?releaseId=xxxx
-// Debug version to see what's happening
+// FIXED: Updated environment variable priority and removed deprecated VITE_DISCOGS_TOKEN
 
 export async function GET(req) {
   try {
@@ -16,16 +16,16 @@ export async function GET(req) {
     // Check what environment variables are available
     console.log("Available DISCOGS env vars:", Object.keys(process.env).filter(k => k.includes('DISCOGS')));
     
-    // Try multiple possible environment variable names
-    const token = process.env.DISCOGS_TOKEN || 
-                  process.env.NEXT_PUBLIC_DISCOGS_TOKEN || 
-                  process.env.VITE_DISCOGS_TOKEN;
+    // FIXED: Updated priority order and removed deprecated VITE_DISCOGS_TOKEN
+    // Try environment variable names in order of preference
+    const token = process.env.NEXT_PUBLIC_DISCOGS_TOKEN || 
+                  process.env.DISCOGS_TOKEN;
     
     console.log("Token found:", !!token);
     console.log("Token starts with:", token ? token.substring(0, 10) + "..." : "none");
     
     if (!token) {
-      console.log("No Discogs token found");
+      console.log("No Discogs token found - check NEXT_PUBLIC_DISCOGS_TOKEN or DISCOGS_TOKEN environment variables");
       return new Response("Missing Discogs token", { status: 500 });
     }
 
