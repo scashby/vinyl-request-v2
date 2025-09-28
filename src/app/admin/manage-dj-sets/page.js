@@ -95,38 +95,42 @@ export default function ManageDJSetsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           fileName: file.name,
-          fileSize: file.size,
           mimeType: file.type
         })
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to get upload URL: ${response.statusText}`);
+        const errorData = await response.json();
+        throw new Error(`Failed to get upload URL: ${errorData.details || response.statusText}`);
       }
 
-      const { uploadUrl, fileId } = await response.json();
+      const { uploadUrl } = await response.json();
       
       setStatus('Uploading to Google Drive...');
       setUploadProgress(10);
 
-      // Step 2: Upload directly to Google Drive
+      // Step 2: Upload directly to Google Drive using the resumable upload URL
       const uploadResponse = await fetch(uploadUrl, {
         method: 'PUT',
         headers: {
           'Content-Type': file.type,
-          'Content-Length': file.size.toString(),
         },
         body: file,
       });
 
       if (!uploadResponse.ok) {
-        throw new Error(`Upload failed: ${uploadResponse.statusText}`);
+        const errorText = await uploadResponse.text();
+        throw new Error(`Upload failed: ${uploadResponse.status} ${errorText}`);
       }
 
       setUploadProgress(80);
-      setStatus('Finalizing upload...');
+      setStatus('Getting file information...');
 
-      // Step 3: Get file info and make it public
+      // Step 3: Get the file ID from the upload response
+      const uploadResult = await uploadResponse.json();
+      const fileId = uploadResult.id;
+
+      // Step 4: Finalize upload (make public and get links)
       const finalizeResponse = await fetch('/api/google-drive/finalize-upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

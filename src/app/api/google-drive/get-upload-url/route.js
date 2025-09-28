@@ -11,38 +11,57 @@ const initGoogleDrive = async () => {
     scopes: ['https://www.googleapis.com/auth/drive.file'],
   });
 
-  const drive = google.drive({ version: 'v3', auth });
-  return drive;
+  return auth;
 };
 
 export async function POST(request) {
   try {
     const { fileName, mimeType } = await request.json();
 
-    // Initialize Google Drive
-    const drive = await initGoogleDrive();
+    // Get authentication
+    const auth = await initGoogleDrive();
+    const authClient = await auth.getClient();
+    const accessToken = await authClient.getAccessToken();
 
-    // Create a resumable upload session
-    const response = await drive.files.create({
-      requestBody: {
-        name: fileName,
-        parents: process.env.GOOGLE_DRIVE_FOLDER_ID ? [process.env.GOOGLE_DRIVE_FOLDER_ID] : undefined,
-      },
-      media: {
-        mimeType: mimeType,
-        body: '', // Empty body for resumable upload
-      },
-      uploadType: 'resumable',
-      fields: 'id,name,webViewLink,webContentLink',
-    });
+    if (!accessToken.token) {
+      throw new Error('Failed to get access token');
+    }
 
-    // Get the upload URL from the response headers
-    const uploadUrl = response.headers['location'];
+    // Create resumable upload session with Google Drive API
+    const metadata = {
+      name: fileName,
+      parents: process.env.GOOGLE_DRIVE_FOLDER_ID ? [process.env.GOOGLE_DRIVE_FOLDER_ID] : undefined,
+    };
+
+    const initResponse = await fetch(
+      'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable',
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken.token}`,
+          'Content-Type': 'application/json',
+          'X-Upload-Content-Type': mimeType,
+        },
+        body: JSON.stringify(metadata),
+      }
+    );
+
+    if (!initResponse.ok) {
+      const errorText = await initResponse.text();
+      throw new Error(`Failed to initiate upload: ${initResponse.status} ${errorText}`);
+    }
+
+    // Get the resumable upload URL from the Location header
+    const uploadUrl = initResponse.headers.get('location');
+
+    if (!uploadUrl) {
+      throw new Error('No upload URL returned from Google Drive');
+    }
 
     return NextResponse.json({
       success: true,
       uploadUrl,
-      fileId: response.data.id,
+      accessToken: accessToken.token, // Need this for the actual upload
     });
 
   } catch (error) {
