@@ -9,6 +9,8 @@ interface DJSet {
   title: string;
   description?: string;
   file_url: string;
+  download_url?: string;
+  google_drive_id?: string;
   recorded_at: string;
   tags?: string[];
   track_listing?: string[];
@@ -24,7 +26,6 @@ interface EventDJSetsProps {
 export default function EventDJSets({ eventId }: EventDJSetsProps) {
   const [djSets, setDjSets] = useState<DJSet[]>([]);
   const [loading, setLoading] = useState(true);
-  const [playingSetId, setPlayingSetId] = useState<number | null>(null);
 
   useEffect(() => {
     if (!eventId) {
@@ -206,39 +207,56 @@ export default function EventDJSets({ eventId }: EventDJSetsProps) {
               </div>
             )}
 
-            {/* Audio Player & Controls */}
+            {/* Playback & Download Controls */}
             <div style={{
               display: 'flex',
               alignItems: 'center',
               gap: '1rem',
               flexWrap: 'wrap'
             }}>
-              <audio
-                controls
+              {/* Play in Google Drive */}
+              <a
+                href={set.file_url}
+                target="_blank"
+                rel="noopener noreferrer"
                 style={{
+                  background: '#4285f4',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '0.75rem 1.25rem',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  textDecoration: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  transition: 'background 0.2s ease',
                   flex: 1,
-                  minWidth: '250px',
-                  height: '40px'
+                  minWidth: '200px',
+                  justifyContent: 'center'
                 }}
-                onPlay={() => setPlayingSetId(set.id)}
-                onPause={() => setPlayingSetId(null)}
-                onEnded={() => setPlayingSetId(null)}
+                onMouseOver={(e) => e.currentTarget.style.background = '#3367d6'}
+                onMouseOut={(e) => e.currentTarget.style.background = '#4285f4'}
               >
-                <source src={set.file_url} type="audio/mpeg" />
-                Your browser does not support the audio element.
-              </audio>
+                ▶️ Play in Google Drive
+              </a>
 
-              <button
+              {/* Download Button */}
+              <a
+                href={set.download_url || set.file_url}
+                target="_blank"
+                rel="noopener noreferrer"
                 onClick={() => handleDownload(set.id, set.file_url, set.title)}
                 style={{
                   background: '#059669',
                   color: 'white',
                   border: 'none',
                   borderRadius: '8px',
-                  padding: '0.5rem 1rem',
+                  padding: '0.75rem 1.25rem',
                   fontSize: '0.875rem',
                   fontWeight: 600,
-                  cursor: 'pointer',
+                  textDecoration: 'none',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.5rem',
@@ -248,7 +266,7 @@ export default function EventDJSets({ eventId }: EventDJSetsProps) {
                 onMouseOut={(e) => e.currentTarget.style.background = '#059669'}
               >
                 ⬇️ Download
-              </button>
+              </a>
             </div>
 
             {/* Track Listing */}
@@ -289,43 +307,29 @@ export default function EventDJSets({ eventId }: EventDJSetsProps) {
               </details>
             )}
 
-            {/* Now Playing Indicator */}
-            {playingSetId === set.id && (
-              <div style={{
-                position: 'absolute',
-                top: '1rem',
-                right: '1rem',
-                background: '#10b981',
-                color: 'white',
-                padding: '0.25rem 0.75rem',
-                borderRadius: '1rem',
-                fontSize: '0.75rem',
-                fontWeight: 600,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.25rem'
-              }}>
-                <span style={{
-                  width: '6px',
-                  height: '6px',
-                  background: 'white',
-                  borderRadius: '50%',
-                  animation: 'pulse 1s infinite'
-                }}></span>
-                Now Playing
-              </div>
-            )}
+            {/* Google Drive Storage Indicator */}
+            <div style={{
+              position: 'absolute',
+              top: '1rem',
+              right: '1rem',
+              background: '#4285f4',
+              color: 'white',
+              padding: '0.25rem 0.75rem',
+              borderRadius: '1rem',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.25rem'
+            }}>
+              📁 Google Drive
+            </div>
           </div>
         ))}
       </div>
 
-      {/* CSS for animations */}
+      {/* CSS for details styling */}
       <style jsx>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.5; }
-        }
-        
         details summary::-webkit-details-marker {
           display: none;
         }

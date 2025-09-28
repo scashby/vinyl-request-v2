@@ -83,6 +83,30 @@ export default function ManageDJSetsPage() {
     }
   };
 
+  // Google Drive upload function
+  const uploadToGoogleDrive = async (file) => {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('name', file.name);
+
+      const response = await fetch('/api/google-drive/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Upload failed: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error('Google Drive upload error:', error);
+      throw error;
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -92,52 +116,43 @@ export default function ManageDJSetsPage() {
     }
 
     setUploading(true);
-    setStatus('Uploading DJ set...');
+    setStatus('Uploading DJ set to Google Drive...');
     setUploadProgress(0);
 
     try {
-      // Generate unique filename
-      const fileExt = formData.file.name.split('.').pop();
-      const fileName = `${Date.now()}-${formData.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.${fileExt}`;
-
-      // Upload file to Supabase storage - FIXED: removed unused uploadData variable
-      const { error: uploadError } = await supabase.storage
-        .from('dj-sets')
-        .upload(fileName, formData.file, {
-          onUploadProgress: (progress) => {
-            setUploadProgress(Math.round((progress.loaded / progress.total) * 100));
-          }
-        });
-
-      if (uploadError) throw uploadError;
-
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('dj-sets')
-        .getPublicUrl(fileName);
+      // Upload to Google Drive
+      setUploadProgress(25);
+      const driveResult = await uploadToGoogleDrive(formData.file);
+      
+      setStatus('File uploaded! Saving metadata...');
+      setUploadProgress(75);
 
       // Parse tags and track listing
       const tags = formData.tags ? formData.tags.split(',').map(tag => tag.trim()) : [];
       const trackListing = formData.track_listing ? 
         formData.track_listing.split('\n').map(track => track.trim()).filter(Boolean) : [];
 
-      // Save metadata to database
+      // Save metadata to database with Google Drive info
       const { error: dbError } = await supabase
         .from('dj_sets')
         .insert({
           title: formData.title,
           description: formData.description,
           event_id: formData.event_id || null,
-          file_url: publicUrl,
+          file_url: driveResult.webViewLink, // Google Drive viewing link
+          download_url: driveResult.webContentLink, // Direct download link
+          google_drive_id: driveResult.id,
           file_size: formData.file.size,
           recorded_at: formData.recorded_at || new Date().toISOString(),
           tags,
-          track_listing: trackListing
+          track_listing: trackListing,
+          storage_provider: 'google_drive'
         });
 
       if (dbError) throw dbError;
 
-      setStatus('DJ set uploaded successfully!');
+      setStatus('DJ set uploaded successfully to Google Drive! 🎉');
+      setUploadProgress(100);
       
       // Reset form
       setFormData({
@@ -160,25 +175,25 @@ export default function ManageDJSetsPage() {
     } catch (error) {
       console.error('Upload error:', error);
       setStatus(`Upload failed: ${error.message}`);
+      setUploadProgress(0);
     } finally {
       setUploading(false);
-      setUploadProgress(0);
+      setTimeout(() => setUploadProgress(0), 2000);
     }
   };
 
-  const deleteDJSet = async (id, fileUrl) => {
+  const deleteDJSet = async (id, googleDriveId) => {
     if (!confirm('Are you sure you want to delete this DJ set? This cannot be undone.')) {
       return;
     }
 
     try {
-      // Extract filename from URL
-      const fileName = fileUrl.split('/').pop();
-      
-      // Delete file from storage
-      await supabase.storage
-        .from('dj-sets')
-        .remove([fileName]);
+      // Delete from Google Drive
+      if (googleDriveId) {
+        await fetch(`/api/google-drive/delete/${googleDriveId}`, {
+          method: 'DELETE'
+        });
+      }
 
       // Delete from database
       const { error } = await supabase
@@ -233,7 +248,7 @@ export default function ManageDJSetsPage() {
             🎧 Manage DJ Sets
           </h1>
           <p style={{ color: '#666', fontSize: 16, margin: 0 }}>
-            Upload and manage recordings from your Reloop Tape
+            Upload and manage recordings from your Reloop Tape via Google Drive
           </p>
         </div>
         <Link
@@ -261,7 +276,7 @@ export default function ManageDJSetsPage() {
         marginBottom: 32
       }}>
         <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 16 }}>
-          Upload New DJ Set
+          Upload New DJ Set to Google Drive
         </h2>
         
         <form onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
@@ -269,7 +284,7 @@ export default function ManageDJSetsPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div>
               <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 14 }}>
-                Audio File *
+                Audio File * (up to 1GB supported)
               </label>
               <input
                 id="audio-file"
@@ -285,6 +300,11 @@ export default function ManageDJSetsPage() {
                   fontSize: 14
                 }}
               />
+              {formData.file && (
+                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+                  Selected: {formData.file.name} ({formatFileSize(formData.file.size)})
+                </div>
+              )}
             </div>
 
             <div>
@@ -295,7 +315,7 @@ export default function ManageDJSetsPage() {
                 type="text"
                 value={formData.title}
                 onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                placeholder="e.g. Vinyl Night Set - January 2025"
+                placeholder="e.g. Live Jukebox at Devil's Purse"
                 disabled={uploading}
                 required
                 style={{
@@ -426,7 +446,7 @@ export default function ManageDJSetsPage() {
               type="submit"
               disabled={uploading || !formData.file || !formData.title}
               style={{
-                background: uploading ? '#9ca3af' : '#2563eb',
+                background: uploading ? '#9ca3af' : '#4285f4',
                 color: 'white',
                 border: 'none',
                 borderRadius: 8,
@@ -436,24 +456,33 @@ export default function ManageDJSetsPage() {
                 cursor: uploading ? 'not-allowed' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: 8
+                gap: 8,
+                position: 'relative',
+                overflow: 'hidden'
               }}
             >
-              {uploading ? (
-                <>
-                  <span>Uploading... {uploadProgress}%</span>
-                  <div style={{
-                    width: 16,
-                    height: 16,
-                    border: '2px solid #fff',
-                    borderTop: '2px solid transparent',
-                    borderRadius: '50%',
-                    animation: 'spin 1s linear infinite'
-                  }}></div>
-                </>
-              ) : (
-                '🎧 Upload DJ Set'
+              {/* Progress bar background */}
+              {uploading && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    height: '100%',
+                    width: `${uploadProgress}%`,
+                    background: 'rgba(255,255,255,0.2)',
+                    transition: 'width 0.3s ease'
+                  }}
+                />
               )}
+              
+              <span style={{ position: 'relative', zIndex: 1 }}>
+                {uploading ? (
+                  `🔄 Uploading to Google Drive... ${uploadProgress}%`
+                ) : (
+                  '🎧 Upload DJ Set'
+                )}
+              </span>
             </button>
           </div>
         </form>
@@ -526,7 +555,8 @@ export default function ManageDJSetsPage() {
                     {set.events?.title && `${set.events.title} • `}
                     {new Date(set.recorded_at || set.created_at).toLocaleDateString()} • 
                     {formatFileSize(set.file_size)} • 
-                    {formatDuration(set.duration)}
+                    {formatDuration(set.duration)} •
+                    <span style={{ color: '#4285f4' }}> 📁 Google Drive</span>
                   </div>
                   {set.tags && set.tags.length > 0 && (
                     <div style={{ marginTop: 4 }}>
@@ -549,13 +579,27 @@ export default function ManageDJSetsPage() {
                 </div>
 
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <audio controls style={{ width: 200 }}>
-                    <source src={set.file_url} type="audio/mpeg" />
-                  </audio>
-                  
                   <a
                     href={set.file_url}
-                    download
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      background: '#4285f4',
+                      color: 'white',
+                      padding: '6px 12px',
+                      borderRadius: 6,
+                      textDecoration: 'none',
+                      fontSize: 12,
+                      fontWeight: 600
+                    }}
+                  >
+                    🔗 Open in Drive
+                  </a>
+                  
+                  <a
+                    href={set.download_url || set.file_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     style={{
                       background: '#059669',
                       color: 'white',
@@ -566,11 +610,11 @@ export default function ManageDJSetsPage() {
                       fontWeight: 600
                     }}
                   >
-                    Download
+                    ⬇️ Download
                   </a>
 
                   <button
-                    onClick={() => deleteDJSet(set.id, set.file_url)}
+                    onClick={() => deleteDJSet(set.id, set.google_drive_id)}
                     style={{
                       background: '#dc2626',
                       color: 'white',
@@ -590,14 +634,6 @@ export default function ManageDJSetsPage() {
           </div>
         )}
       </div>
-
-      {/* CSS for spinner animation */}
-      <style jsx>{`
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   );
 }
