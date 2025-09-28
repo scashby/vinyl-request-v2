@@ -87,14 +87,14 @@ export default function DJSetsPage() {
       background: '#000', 
       color: '#fff', 
       minHeight: '100vh',
-      backgroundImage: 'url(/images/dj-sets-hero.jpg)',
+      backgroundImage: 'url(/images/event-header-still.jpg)',
       backgroundSize: 'cover',
       backgroundPosition: 'center',
       backgroundAttachment: 'fixed'
     }}>
       {/* Hero Section */}
       <div style={{
-        background: 'linear-gradient(135deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.6) 100%)',
+        background: 'linear-gradient(135deg, rgba(0,0,0,0.8) 0%, rgba(30,30,30,0.9) 100%)',
         padding: '4rem 2rem 2rem',
         textAlign: 'center'
       }}>
@@ -119,9 +119,8 @@ export default function DJSetsPage() {
 
       {/* Search and Filter */}
       <div style={{
-        background: 'rgba(0,0,0,0.7)',
-        padding: '2rem',
-        backdropFilter: 'blur(10px)'
+        background: 'rgba(0,0,0,0.4)',
+        padding: '2rem'
       }}>
         <div style={{
           maxWidth: '800px',
@@ -140,8 +139,8 @@ export default function DJSetsPage() {
               minWidth: '300px',
               padding: '0.75rem 1rem',
               borderRadius: '8px',
-              border: '1px solid rgba(255,255,255,0.2)',
-              background: 'rgba(255,255,255,0.1)',
+              border: '1px solid #555',
+              background: '#333',
               color: '#fff',
               fontSize: '1rem'
             }}
@@ -152,16 +151,16 @@ export default function DJSetsPage() {
             style={{
               padding: '0.75rem 1rem',
               borderRadius: '8px',
-              border: '1px solid rgba(255,255,255,0.2)',
-              background: 'rgba(255,255,255,0.1)',
+              border: '1px solid #555',
+              background: '#333',
               color: '#fff',
               fontSize: '1rem',
               minWidth: '150px'
             }}
           >
-            <option value="all" style={{background: '#333'}}>All Sets</option>
-            <option value="events" style={{background: '#333'}}>Event Sets</option>
-            <option value="standalone" style={{background: '#333'}}>Standalone Sets</option>
+            <option value="all">All Sets</option>
+            <option value="events">Event Sets</option>
+            <option value="standalone">Standalone Sets</option>
           </select>
         </div>
       </div>
@@ -169,7 +168,7 @@ export default function DJSetsPage() {
       {/* DJ Sets Grid */}
       <div style={{
         padding: '2rem',
-        background: 'rgba(0,0,0,0.5)'
+        background: 'rgba(0,0,0,0.2)'
       }}>
         <div style={{
           maxWidth: '1200px',

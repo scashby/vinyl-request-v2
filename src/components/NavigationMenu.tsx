@@ -47,6 +47,9 @@ function NavigationMenu() {
               <Link href="/events/events-page" onClick={() => setOpen(false)}>Events</Link>
             </li>
             <li>
+              <Link href="/dj-sets" onClick={() => setOpen(false)}>DJ Sets</Link>
+            </li>
+            <li>
               <Link href="/browse/browse-albums" onClick={() => setOpen(false)}>Browse Albums</Link>
             </li>
             <li>
