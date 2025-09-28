@@ -207,6 +207,29 @@ export default function EventDJSets({ eventId }: EventDJSetsProps) {
               </div>
             )}
 
+            {/* Audio Player for Direct Playback */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '1rem',
+              flexWrap: 'wrap',
+              marginBottom: '1rem'
+            }}>
+              {/* HTML5 Audio Player - Uses direct download URL */}
+              <audio
+                controls
+                style={{
+                  flex: 1,
+                  minWidth: '300px',
+                  height: '40px'
+                }}
+                preload="metadata"
+              >
+                <source src={set.download_url || set.file_url} type="audio/mpeg" />
+                Your browser does not support the audio element.
+              </audio>
+            </div>
+
             {/* Playback & Download Controls */}
             <div style={{
               display: 'flex',
