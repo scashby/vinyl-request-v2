@@ -1,4 +1,4 @@
-// src/app/admin/manage-dj-sets/page.js
+// src/app/admin/manage-dj-sets/page.js - Updated for direct upload
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -83,26 +83,67 @@ export default function ManageDJSetsPage() {
     }
   };
 
-  // Google Drive upload function
-  const uploadToGoogleDrive = async (file) => {
+  // Direct upload to Google Drive (bypasses Vercel limits)
+  const uploadDirectlyToGoogleDrive = async (file) => {
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('name', file.name);
+      // Step 1: Get upload URL from our API
+      setStatus('Preparing upload...');
+      setUploadProgress(5);
 
-      const response = await fetch('/api/google-drive/upload', {
+      const response = await fetch('/api/google-drive/get-upload-url', {
         method: 'POST',
-        body: formData,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fileName: file.name,
+          fileSize: file.size,
+          mimeType: file.type
+        })
       });
 
       if (!response.ok) {
-        throw new Error(`Upload failed: ${response.statusText}`);
+        throw new Error(`Failed to get upload URL: ${response.statusText}`);
       }
 
-      const result = await response.json();
+      const { uploadUrl, fileId } = await response.json();
+      
+      setStatus('Uploading to Google Drive...');
+      setUploadProgress(10);
+
+      // Step 2: Upload directly to Google Drive
+      const uploadResponse = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': file.type,
+          'Content-Length': file.size.toString(),
+        },
+        body: file,
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error(`Upload failed: ${uploadResponse.statusText}`);
+      }
+
+      setUploadProgress(80);
+      setStatus('Finalizing upload...');
+
+      // Step 3: Get file info and make it public
+      const finalizeResponse = await fetch('/api/google-drive/finalize-upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileId })
+      });
+
+      if (!finalizeResponse.ok) {
+        throw new Error(`Failed to finalize upload: ${finalizeResponse.statusText}`);
+      }
+
+      const result = await finalizeResponse.json();
+      setUploadProgress(100);
+
       return result;
+
     } catch (error) {
-      console.error('Google Drive upload error:', error);
+      console.error('Direct upload error:', error);
       throw error;
     }
   };
@@ -116,31 +157,29 @@ export default function ManageDJSetsPage() {
     }
 
     setUploading(true);
-    setStatus('Uploading DJ set to Google Drive...');
+    setStatus('Starting upload...');
     setUploadProgress(0);
 
     try {
-      // Upload to Google Drive
-      setUploadProgress(25);
-      const driveResult = await uploadToGoogleDrive(formData.file);
+      // Upload directly to Google Drive
+      const driveResult = await uploadDirectlyToGoogleDrive(formData.file);
       
-      setStatus('File uploaded! Saving metadata...');
-      setUploadProgress(75);
+      setStatus('Saving metadata...');
 
       // Parse tags and track listing
       const tags = formData.tags ? formData.tags.split(',').map(tag => tag.trim()) : [];
       const trackListing = formData.track_listing ? 
         formData.track_listing.split('\n').map(track => track.trim()).filter(Boolean) : [];
 
-      // Save metadata to database with Google Drive info
+      // Save metadata to database
       const { error: dbError } = await supabase
         .from('dj_sets')
         .insert({
           title: formData.title,
           description: formData.description,
           event_id: formData.event_id || null,
-          file_url: driveResult.webViewLink, // Google Drive viewing link
-          download_url: driveResult.webContentLink, // Direct download link
+          file_url: driveResult.webViewLink,
+          download_url: driveResult.webContentLink,
           google_drive_id: driveResult.id,
           file_size: formData.file.size,
           recorded_at: formData.recorded_at || new Date().toISOString(),
@@ -152,7 +191,6 @@ export default function ManageDJSetsPage() {
       if (dbError) throw dbError;
 
       setStatus('DJ set uploaded successfully to Google Drive! 🎉');
-      setUploadProgress(100);
       
       // Reset form
       setFormData({
@@ -178,7 +216,7 @@ export default function ManageDJSetsPage() {
       setUploadProgress(0);
     } finally {
       setUploading(false);
-      setTimeout(() => setUploadProgress(0), 2000);
+      setTimeout(() => setUploadProgress(0), 3000);
     }
   };
 
@@ -248,7 +286,7 @@ export default function ManageDJSetsPage() {
             🎧 Manage DJ Sets
           </h1>
           <p style={{ color: '#666', fontSize: 16, margin: 0 }}>
-            Upload and manage recordings from your Reloop Tape via Google Drive
+            Upload large recordings (up to 1GB) directly to Google Drive
           </p>
         </div>
         <Link
@@ -276,7 +314,7 @@ export default function ManageDJSetsPage() {
         marginBottom: 32
       }}>
         <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 16 }}>
-          Upload New DJ Set to Google Drive
+          Upload New DJ Set (Direct to Google Drive)
         </h2>
         
         <form onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
@@ -284,7 +322,7 @@ export default function ManageDJSetsPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div>
               <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 14 }}>
-                Audio File * (up to 1GB supported)
+                Audio File * (supports files up to 1GB)
               </label>
               <input
                 id="audio-file"
@@ -458,11 +496,12 @@ export default function ManageDJSetsPage() {
                 alignItems: 'center',
                 gap: 8,
                 position: 'relative',
-                overflow: 'hidden'
+                overflow: 'hidden',
+                width: 'fit-content'
               }}
             >
               {/* Progress bar background */}
-              {uploading && (
+              {uploading && uploadProgress > 0 && (
                 <div
                   style={{
                     position: 'absolute',
@@ -478,9 +517,9 @@ export default function ManageDJSetsPage() {
               
               <span style={{ position: 'relative', zIndex: 1 }}>
                 {uploading ? (
-                  `🔄 Uploading to Google Drive... ${uploadProgress}%`
+                  `🔄 ${status} ${uploadProgress}%`
                 ) : (
-                  '🎧 Upload DJ Set'
+                  '🎧 Upload DJ Set (Direct)'
                 )}
               </span>
             </button>
