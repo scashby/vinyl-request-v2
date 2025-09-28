@@ -79,12 +79,12 @@ export default function DJSetsPage() {
       <div className="internal-wrapper">
         <header className="event-hero">
           <div className="overlay">
-            <h1>DJ Sets</h1>
+            <h1>Live Sessions & DJ Sets</h1>
           </div>
         </header>
         <main className="event-body">
           <div style={{ padding: '2rem', textAlign: 'center' }}>
-            <h2>Loading DJ Sets...</h2>
+            <h2>Loading Live Sessions & DJ Sets...</h2>
           </div>
         </main>
       </div>
