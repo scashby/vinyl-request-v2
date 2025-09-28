@@ -207,62 +207,48 @@ export default function EventDJSets({ eventId }: EventDJSetsProps) {
               </div>
             )}
 
-            {/* Audio Player for Direct Playback */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '1rem',
-              flexWrap: 'wrap',
-              marginBottom: '1rem'
-            }}>
-              {/* HTML5 Audio Player - Uses direct download URL */}
-              <audio
-                controls
-                style={{
-                  flex: 1,
-                  minWidth: '300px',
-                  height: '40px'
-                }}
-                preload="metadata"
-              >
-                <source src={set.download_url || set.file_url} type="audio/mpeg" />
-                Your browser does not support the audio element.
-              </audio>
-            </div>
-
-            {/* Playback & Download Controls */}
+            {/* Play Controls - Google Drive */}
             <div style={{
               display: 'flex',
               alignItems: 'center',
               gap: '1rem',
               flexWrap: 'wrap'
             }}>
-              {/* Play in Google Drive */}
+              {/* Large Play Button */}
               <a
                 href={set.file_url}
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{
-                  background: '#4285f4',
+                  background: 'linear-gradient(135deg, #4285f4 0%, #34a853 100%)',
                   color: 'white',
                   border: 'none',
-                  borderRadius: '8px',
-                  padding: '0.75rem 1.25rem',
-                  fontSize: '0.875rem',
+                  borderRadius: '12px',
+                  padding: '1rem 2rem',
+                  fontSize: '1.1rem',
                   fontWeight: 600,
                   textDecoration: 'none',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '0.5rem',
-                  transition: 'background 0.2s ease',
+                  gap: '0.75rem',
+                  transition: 'all 0.2s ease',
                   flex: 1,
                   minWidth: '200px',
-                  justifyContent: 'center'
+                  justifyContent: 'center',
+                  boxShadow: '0 4px 12px rgba(66, 133, 244, 0.3)'
                 }}
-                onMouseOver={(e) => e.currentTarget.style.background = '#3367d6'}
-                onMouseOut={(e) => e.currentTarget.style.background = '#4285f4'}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 6px 20px rgba(66, 133, 244, 0.4)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(66, 133, 244, 0.3)';
+                }}
               >
-                ▶️ Play in Google Drive
+                <span style={{ fontSize: '1.4rem' }}>▶</span>
+                Play in Google Drive
+                <span style={{ fontSize: '0.9rem', opacity: 0.8 }}>(opens in new tab)</span>
               </a>
 
               {/* Download Button */}
@@ -276,19 +262,20 @@ export default function EventDJSets({ eventId }: EventDJSetsProps) {
                   color: 'white',
                   border: 'none',
                   borderRadius: '8px',
-                  padding: '0.75rem 1.25rem',
-                  fontSize: '0.875rem',
+                  padding: '0.75rem 1.5rem',
+                  fontSize: '0.95rem',
                   fontWeight: 600,
                   textDecoration: 'none',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.5rem',
-                  transition: 'background 0.2s ease'
+                  transition: 'all 0.2s ease',
+                  whiteSpace: 'nowrap'
                 }}
                 onMouseOver={(e) => e.currentTarget.style.background = '#047857'}
                 onMouseOut={(e) => e.currentTarget.style.background = '#059669'}
               >
-                ⬇️ Download
+                ⬇ Download
               </a>
             </div>
 
