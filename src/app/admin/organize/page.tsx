@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
-import { supabase } from 'lib/supabaseClient';
+import { supabase } from '../../../lib/supabaseClient';
 
 type Row = {
   id: number;
@@ -59,7 +59,7 @@ export default function AdminOrganizePage() {
         const k = r.artist || '(unknown)';
         map.set(k, (map.get(k) || 0) + 1);
       } else {
-        // Fun buckets (simple heuristics)
+        // Minimal “fun” buckets without guessing styles
         if (/\b2xLP\b/i.test(r.format)) map.set('Double LPs', (map.get('Double LPs') || 0) + 1);
         if (/\bComp\b/i.test(r.format)) map.set('Compilations', (map.get('Compilations') || 0) + 1);
         if ((r.media_condition || '').toLowerCase().startsWith('near mint')) map.set('Near Mint Media', (map.get('Near Mint Media') || 0) + 1);
@@ -92,53 +92,60 @@ export default function AdminOrganizePage() {
   }, [rows, mode, selected]);
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 text-white">
       <h1 className="text-2xl font-bold">Admin · Organize Collection</h1>
 
+      {/* Controls */}
       <div className="flex flex-wrap gap-2 items-center">
-        <select
-          value={mode}
-          onChange={e => { setMode(e.target.value as BucketMode); setSelected(null); }}
-          className="border rounded px-2 py-1"
-        >
-          <option value="genre">By Genre</option>
-          <option value="style">By Style</option>
-          <option value="decade">By Decade</option>
-          <option value="artist">By Artist</option>
-          <option value="fun">Fun Buckets</option>
-        </select>
+        <div className="inline-flex rounded-md overflow-hidden border border-gray-700">
+          {(['genre','style','decade','artist','fun'] as BucketMode[]).map(m => (
+            <button
+              key={m}
+              onClick={() => { setMode(m); setSelected(null); }}
+              className={`px-3 py-1 text-sm ${mode === m ? 'bg-gray-200 text-black' : 'bg-gray-800 hover:bg-gray-700'}`}
+            >
+              {m[0].toUpperCase() + m.slice(1)}
+            </button>
+          ))}
+        </div>
 
         <input
-          className="border rounded px-2 py-1"
+          className="border border-gray-700 rounded px-3 py-1 bg-white text-black"
           placeholder="Filter buckets…"
           value={query}
           onChange={e => setQuery(e.target.value)}
         />
       </div>
 
+      {/* Buckets */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         {loading ? (
-          <div>Loading…</div>
+          <div className="text-gray-300">Loading…</div>
+        ) : buckets.length === 0 ? (
+          <div className="text-gray-300">No buckets to show.</div>
         ) : (
           buckets.map(b => (
             <button
               key={b.key}
-              className={`border rounded p-3 text-left ${selected === b.key ? 'bg-gray-100' : ''}`}
+              className={`border border-gray-700 rounded p-3 text-left bg-black/40 hover:bg-black/30 ${
+                selected === b.key ? 'ring-2 ring-indigo-400' : ''
+              }`}
               onClick={() => setSelected(b.key === selected ? null : b.key)}
             >
               <div className="font-semibold">{b.key}</div>
-              <div className="text-sm opacity-70">{b.count} items</div>
+              <div className="text-sm text-gray-300">{b.count} items</div>
             </button>
           ))
         )}
       </div>
 
+      {/* Items */}
       {selected && (
         <div className="space-y-2">
           <h2 className="text-xl font-semibold">{selected}</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {filteredRows.map(r => (
-              <div key={r.id} className="border rounded p-3 flex gap-3 items-center">
+              <div key={r.id} className="border border-gray-700 rounded p-3 flex gap-3 items-center bg-black/40">
                 {r.image_url ? (
                   <Image
                     src={r.image_url}
@@ -148,18 +155,21 @@ export default function AdminOrganizePage() {
                     className="object-cover rounded"
                   />
                 ) : (
-                  <div className="w-20 h-20 bg-gray-200 rounded" />
+                  <div className="w-20 h-20 bg-gray-800 rounded" />
                 )}
                 <div>
                   <div className="font-semibold">{r.artist} — {r.title}</div>
-                  <div className="text-sm opacity-70">{r.year} • {r.format}</div>
-                  <div className="text-xs opacity-70">
+                  <div className="text-sm text-gray-300">{r.year} • {r.format}</div>
+                  <div className="text-xs text-gray-300">
                     {(r.discogs_genres || []).join('; ')}
                     {r.discogs_styles?.length ? ' • ' + r.discogs_styles.join('; ') : ''}
                   </div>
                 </div>
               </div>
             ))}
+            {filteredRows.length === 0 && (
+              <div className="text-gray-300">No items in this bucket yet.</div>
+            )}
           </div>
         </div>
       )}
