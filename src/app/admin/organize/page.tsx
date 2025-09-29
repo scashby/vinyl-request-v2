@@ -14,32 +14,31 @@ type Row = {
   discogs_genres: string[] | null;
   discogs_styles: string[] | null;
   decade: number | null;
-  media_condition: string | null;
 };
 
-type BucketMode = 'genre' | 'style' | 'decade' | 'artist' | 'fun';
+type Mode = 'genre' | 'style' | 'decade' | 'artist';
 type Bucket = { key: string; count: number };
 
 export default function AdminOrganizePage() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
-  const [mode, setMode] = useState<BucketMode>('genre');
+  const [mode, setMode] = useState<Mode>('genre');
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<string | null>(null);
+  const [status, setStatus] = useState<string>('');
 
-  useEffect(() => {
-    (async () => {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('collection')
-        .select('id,artist,title,year,format,image_url,discogs_genres,discogs_styles,decade,media_condition')
-        .order('artist', { ascending: true })
-        .limit(4000);
+  async function load() {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('collection')
+      .select('id,artist,title,year,format,image_url,discogs_genres,discogs_styles,decade')
+      .order('artist', { ascending: true })
+      .limit(4000);
+    if (!error && data) setRows(data as Row[]);
+    setLoading(false);
+  }
 
-      if (!error && data) setRows(data as Row[]);
-      setLoading(false);
-    })();
-  }, []);
+  useEffect(() => { load(); }, []);
 
   const buckets: Bucket[] = useMemo(() => {
     const map = new Map<string, number>();
@@ -55,14 +54,9 @@ export default function AdminOrganizePage() {
       } else if (mode === 'decade') {
         const k = r.decade ? String(r.decade) : '(unknown)';
         map.set(k, (map.get(k) || 0) + 1);
-      } else if (mode === 'artist') {
+      } else {
         const k = r.artist || '(unknown)';
         map.set(k, (map.get(k) || 0) + 1);
-      } else {
-        if (/\b2xLP\b/i.test(r.format)) map.set('Double LPs', (map.get('Double LPs') || 0) + 1);
-        if (/\bComp\b/i.test(r.format)) map.set('Compilations', (map.get('Compilations') || 0) + 1);
-        if ((r.media_condition || '').toLowerCase().startsWith('near mint')) map.set('Near Mint Media', (map.get('Near Mint Media') || 0) + 1);
-        if (/\bblue\b/i.test(r.title)) map.set('Blue Album Titles', (map.get('Blue Album Titles') || 0) + 1);
       }
     }
     let arr = Array.from(map.entries()).map(([key, count]) => ({ key, count }));
@@ -80,24 +74,40 @@ export default function AdminOrganizePage() {
       if (mode === 'style') return (r.discogs_styles ?? []).includes(selected);
       if (mode === 'decade') return String(r.decade || '(unknown)') === selected;
       if (mode === 'artist') return r.artist === selected;
-      if (mode === 'fun') {
-        if (selected === 'Double LPs') return /\b2xLP\b/i.test(r.format);
-        if (selected === 'Compilations') return /\bComp\b/i.test(r.format);
-        if (selected === 'Near Mint Media') return (r.media_condition || '').toLowerCase().startsWith('near mint');
-        if (selected === 'Blue Album Titles') return /\bblue\b/i.test(r.title);
-      }
       return false;
     });
   }, [rows, mode, selected]);
 
+  async function handleEnrich() {
+    setStatus('Enriching…');
+    try {
+      const res = await fetch('/api/enrich', { method: 'POST' });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error || `HTTP ${res.status}`);
+      setStatus(`Enriched: updated ${json.updated} of ${json.scanned} scanned`);
+      await load();
+    } catch (e: unknown) {
+      setStatus(String(e));
+    }
+  }
+
   return (
     <div className="p-6 space-y-6 bg-white text-black">
-      <h1 className="text-2xl font-bold">Admin · Organize Collection</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Admin · Organize Collection</h1>
+        <button
+          onClick={handleEnrich}
+          className="px-3 py-2 rounded bg-indigo-600 text-white hover:bg-indigo-700"
+        >
+          Run Discogs Enrichment
+        </button>
+      </div>
+      {status && <div className="text-sm text-gray-600">{status}</div>}
 
       {/* Controls */}
       <div className="flex flex-wrap gap-2 items-center">
         <div className="inline-flex rounded-md overflow-hidden border border-gray-300">
-          {(['genre','style','decade','artist','fun'] as BucketMode[]).map(m => (
+          {(['genre','style','decade','artist'] as Mode[]).map(m => (
             <button
               key={m}
               onClick={() => { setMode(m); setSelected(null); }}
