@@ -78,17 +78,33 @@ export default function AdminOrganizePage() {
     });
   }, [rows, mode, selected]);
 
-  async function handleEnrich() {
-    setStatus('Enriching…');
-    try {
-      const res = await fetch('/api/enrich', { method: 'POST' });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json?.error || `HTTP ${res.status}`);
-      setStatus(`Enriched: updated ${json.updated} of ${json.scanned} scanned`);
-      await load();
-    } catch (e: unknown) {
-      setStatus(String(e));
+  async function handleEnrichAll() {
+    let cursor: number | null = 0;
+    let totalUpdated = 0;
+    let totalScanned = 0;
+
+    setStatus('Starting enrichment…');
+
+    while (cursor !== null) {
+      const res = await fetch(`/api/enrich?limit=60&cursor=${cursor}`, { method: 'POST' });
+      const json = await res.json();
+      if (!res.ok) {
+        setStatus(`Error: ${json?.error || res.status}`);
+        break;
+      }
+
+      totalUpdated += json.updated || 0;
+      totalScanned += json.scanned || 0;
+      cursor = json.nextCursor;
+
+      setStatus(`Enriched: updated ${totalUpdated} of ${totalScanned} scanned…`);
+
+      // gentle pause between batches
+      await new Promise(r => setTimeout(r, 500));
     }
+
+    if (cursor === null) setStatus(`Done. Updated ${totalUpdated} of ${totalScanned}.`);
+    await load();
   }
 
   return (
@@ -96,7 +112,7 @@ export default function AdminOrganizePage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Admin · Organize Collection</h1>
         <button
-          onClick={handleEnrich}
+          onClick={handleEnrichAll}
           className="px-3 py-2 rounded bg-indigo-600 text-white hover:bg-indigo-700"
         >
           Run Discogs Enrichment
