@@ -124,80 +124,45 @@ export default function AdminOrganizePage() {
     let cursor: number | null = 0;
     let updated = 0, scanned = 0;
 
-    // Build filter parameters for API
-    interface EnrichFilters {
-      cursor: number | null;
-      limit: number;
-      folderExact?: string;
-      artistSearch?: string;
-      titleSearch?: string;
-    }
-    
-    const filters: EnrichFilters = { cursor, limit: 80 };
-    if (folderFilter !== 'all') filters.folderExact = folderFilter;
-    if (artistSearch) filters.artistSearch = artistSearch;
-    if (titleSearch) filters.titleSearch = titleSearch;
-
     while (cursor !== null) {
+      // Build fresh filters for each iteration
+      interface EnrichFilters {
+        cursor: number | null;
+        limit: number;
+        folderExact?: string;
+        artistSearch?: string;
+        titleSearch?: string;
+      }
+      
+      const filters: EnrichFilters = { cursor, limit: 80 };
+      if (folderFilter !== 'all') filters.folderExact = folderFilter;
+      if (artistSearch) filters.artistSearch = artistSearch;
+      if (titleSearch) filters.titleSearch = titleSearch;
+
       const res = await fetch('/api/enrich', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...filters, cursor })
+        body: JSON.stringify(filters)
       });
+      
       const json = await res.json();
-      if (!res.ok) { setStatus(`Error: ${json?.error || res.status}`); return; }
+      if (!res.ok) { 
+        setStatus(`Error: ${json?.error || res.status}`); 
+        return; 
+      }
+      
       updated += json.updated || 0;
       scanned += json.scanned || 0;
       cursor = json.nextCursor;
+      
       setStatus(`Updated ${updated} / scanned ${scanned}...`);
-      await new Promise(r => setTimeout(r, 400));
-    }
-    setStatus(`✅ Done! Updated ${updated} of ${scanned} albums.`);
-    await load();
-  }
-
-  async function applyGenreFolders(dryRun = false) {
-    setStatus(dryRun ? 'Previewing genre folder moves...' : 'Moving to genre folders...');
-    let cursor: number | null = 0;
-    let mk = 0, mu = 0, scanned = 0;
-
-    // Build filter parameters
-    interface OrganizeScope {
-      folderExact?: string;
-      artistSearch?: string;
-      titleSearch?: string;
+      
+      if (cursor !== null) {
+        await new Promise(r => setTimeout(r, 400));
+      }
     }
     
-    const scope: OrganizeScope = {};
-    if (folderFilter !== 'all') scope.folderExact = folderFilter;
-    if (artistSearch) scope.artistSearch = artistSearch;
-    if (titleSearch) scope.titleSearch = titleSearch;
-
-    // Determine base folder from current filter
-    const base = folderFilter !== 'all' ? folderFilter : 'vinyl';
-
-    while (cursor !== null) {
-      const res = await fetch('/api/organize', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          cursor, limit: 800,
-          scope,
-          base,
-          unknownLabel: '(unknown)',
-          dryRun: dryRun
-        })
-      });
-      const json = await res.json();
-      if (!res.ok) { setStatus(`Error: ${json?.error || res.status}`); return; }
-      mk += json.moved_known || 0;
-      mu += json.moved_unknown || 0;
-      scanned += json.scanned || 0;
-      cursor = json.nextCursor;
-      setStatus(`${dryRun ? 'Preview' : 'Moved'} — known: ${mk}, unknown: ${mu}, scanned: ${scanned}...`);
-      await new Promise(r => setTimeout(r, 200));
-    }
-    setStatus(`${dryRun ? '👁️ Preview complete' : '✅ Move complete'} — ${mk} with genres, ${mu} without genres.`);
+    setStatus(`✅ Done! Updated ${updated} of ${scanned} albums.`);
     await load();
   }
 
@@ -244,58 +209,23 @@ export default function AdminOrganizePage() {
           </p>
         </div>
         
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          <button
-            onClick={() => runEnrichAll()}
-            style={{
-              background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
-              color: 'white',
-              border: 'none',
-              borderRadius: 8,
-              padding: '12px 20px',
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: 'pointer',
-              boxShadow: '0 4px 6px rgba(99, 102, 241, 0.2)'
-            }}
-          >
-            🔄 Enrich Missing Metadata
-          </button>
-          
-          <button
-            onClick={() => applyGenreFolders(true)}
-            style={{
-              background: 'linear-gradient(135deg, #f59e0b, #d97706)',
-              color: 'white',
-              border: 'none',
-              borderRadius: 8,
-              padding: '12px 20px',
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: 'pointer',
-              boxShadow: '0 4px 6px rgba(245, 158, 11, 0.2)'
-            }}
-          >
-            👁️ Preview Genre Folders
-          </button>
-          
-          <button
-            onClick={() => applyGenreFolders(false)}
-            style={{
-              background: 'linear-gradient(135deg, #10b981, #059669)',
-              color: 'white',
-              border: 'none',
-              borderRadius: 8,
-              padding: '12px 20px',
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: 'pointer',
-              boxShadow: '0 4px 6px rgba(16, 185, 129, 0.2)'
-            }}
-          >
-            📁 Apply Genre Folders
-          </button>
-        </div>
+        <button
+          onClick={() => runEnrichAll()}
+          disabled={loading}
+          style={{
+            background: loading ? '#9ca3af' : 'linear-gradient(135deg, #6366f1, #4f46e5)',
+            color: 'white',
+            border: 'none',
+            borderRadius: 8,
+            padding: '12px 20px',
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: loading ? 'not-allowed' : 'pointer',
+            boxShadow: loading ? 'none' : '0 4px 6px rgba(99, 102, 241, 0.2)'
+          }}
+        >
+          🔄 Enrich Missing Metadata
+        </button>
       </div>
 
       {/* Status Message */}
