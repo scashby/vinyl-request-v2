@@ -1,4 +1,4 @@
-// Completely flexible collection organization with multi-select AND logic
+// Clean, usable flexible collection organization with proper UX
 // src/app/admin/organize/page.tsx
 'use client';
 
@@ -29,7 +29,6 @@ export default function FlexibleOrganizePage() {
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   const [selectedStyles, setSelectedStyles] = useState<string[]>([]);
   const [selectedDecades, setSelectedDecades] = useState<number[]>([]);
-  const [selectedFormats, setSelectedFormats] = useState<string[]>([]);
   const [yearRangeStart, setYearRangeStart] = useState<string>('');
   const [yearRangeEnd, setYearRangeEnd] = useState<string>('');
   const [artistSearch, setArtistSearch] = useState<string>('');
@@ -40,7 +39,6 @@ export default function FlexibleOrganizePage() {
   const [availableGenres, setAvailableGenres] = useState<string[]>([]);
   const [availableStyles, setAvailableStyles] = useState<string[]>([]);
   const [availableDecades, setAvailableDecades] = useState<number[]>([]);
-  const [availableFormats, setAvailableFormats] = useState<string[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -71,12 +69,9 @@ export default function FlexibleOrganizePage() {
     
     setRows(allRows);
     
-    // Extract all unique filter options
+    // Extract unique options
     const folders = Array.from(new Set(allRows.map(r => r.folder).filter(Boolean)));
     setAvailableFolders(folders.sort());
-    
-    const formats = Array.from(new Set(allRows.map(r => r.format).filter(Boolean)));
-    setAvailableFormats(formats.sort());
     
     const genres = new Set<string>();
     allRows.forEach(r => r.discogs_genres?.forEach(g => genres.add(g)));
@@ -96,26 +91,23 @@ export default function FlexibleOrganizePage() {
     load();
   }, [load]);
 
-  // Apply ALL filters with AND logic - COMPLETELY FLEXIBLE
+  // Apply filters with complete flexibility and AND logic
   const filteredAlbums = useMemo(() => {
     return rows.filter(row => {
-      // Multi-select folder filter (OR within selected folders)
+      // Folder filter (OR within selected)
       if (selectedFolders.length > 0 && !selectedFolders.includes(row.folder)) return false;
       
-      // Multi-select format filter (OR within selected formats)  
-      if (selectedFormats.length > 0 && !selectedFormats.includes(row.format)) return false;
-      
-      // Multi-select genre filter (OR within selected genres)
+      // Genre filter (OR within selected)
       if (selectedGenres.length > 0) {
         if (!row.discogs_genres || !row.discogs_genres.some(g => selectedGenres.includes(g))) return false;
       }
       
-      // Multi-select style filter (OR within selected styles)
+      // Style filter (OR within selected)
       if (selectedStyles.length > 0) {
         if (!row.discogs_styles || !row.discogs_styles.some(s => selectedStyles.includes(s))) return false;
       }
       
-      // Multi-select decade filter (OR within selected decades)
+      // Decade filter (OR within selected)
       if (selectedDecades.length > 0 && (!row.decade || !selectedDecades.includes(row.decade))) return false;
       
       // Year range filter
@@ -126,22 +118,19 @@ export default function FlexibleOrganizePage() {
         if (yearRangeEnd && albumYear > parseInt(yearRangeEnd)) return false;
       }
       
-      // Artist search
+      // Text searches
       if (artistSearch && !row.artist.toLowerCase().includes(artistSearch.toLowerCase())) return false;
-      
-      // Title search
       if (titleSearch && !row.title.toLowerCase().includes(titleSearch.toLowerCase())) return false;
       
       return true;
     });
-  }, [rows, selectedFolders, selectedFormats, selectedGenres, selectedStyles, selectedDecades, yearRangeStart, yearRangeEnd, artistSearch, titleSearch]);
+  }, [rows, selectedFolders, selectedGenres, selectedStyles, selectedDecades, yearRangeStart, yearRangeEnd, artistSearch, titleSearch]);
 
   const clearAllFilters = () => {
     setSelectedFolders([]);
     setSelectedGenres([]);
     setSelectedStyles([]);
     setSelectedDecades([]);
-    setSelectedFormats([]);
     setYearRangeStart('');
     setYearRangeEnd('');
     setArtistSearch('');
@@ -149,17 +138,7 @@ export default function FlexibleOrganizePage() {
   };
 
   const hasActiveFilters = selectedFolders.length > 0 || selectedGenres.length > 0 || selectedStyles.length > 0 || 
-                          selectedDecades.length > 0 || selectedFormats.length > 0 || yearRangeStart || yearRangeEnd || 
-                          artistSearch || titleSearch;
-
-  // Multi-select toggle helpers
-  const toggleArraySelection = <T,>(array: T[], setArray: (arr: T[]) => void, item: T) => {
-    if (array.includes(item)) {
-      setArray(array.filter(i => i !== item));
-    } else {
-      setArray([...array, item]);
-    }
-  };
+                          selectedDecades.length > 0 || yearRangeStart || yearRangeEnd || artistSearch || titleSearch;
 
   return (
     <div style={{
@@ -185,19 +164,37 @@ export default function FlexibleOrganizePage() {
             color: '#1f2937',
             margin: '0 0 8px 0'
           }}>
-            Completely Flexible Collection Organization
+            Flexible Collection Organization
           </h1>
           <p style={{
             color: '#6b7280',
             fontSize: 16,
             margin: 0
           }}>
-            Select multiple options from any category - all filters work together with AND logic
+            Combine any filters - select vinyl + 45s from 1960s-1980s that are prog rock
           </p>
         </div>
+        
+        {hasActiveFilters && (
+          <button
+            onClick={clearAllFilters}
+            style={{
+              background: '#ef4444',
+              border: 'none',
+              borderRadius: 6,
+              padding: '8px 16px',
+              fontSize: 14,
+              fontWeight: 600,
+              color: 'white',
+              cursor: 'pointer'
+            }}
+          >
+            Clear All Filters
+          </button>
+        )}
       </div>
 
-      {/* Completely Flexible Filters */}
+      {/* Clean Filter Interface */}
       <div style={{
         background: 'white',
         border: '1px solid #e5e7eb',
@@ -206,53 +203,28 @@ export default function FlexibleOrganizePage() {
         marginBottom: 24,
         boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
       }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: 20
+        <h3 style={{
+          fontSize: 18,
+          fontWeight: 600,
+          color: '#1f2937',
+          margin: '0 0 20px 0'
         }}>
-          <h3 style={{
-            fontSize: 18,
-            fontWeight: 600,
-            color: '#1f2937',
-            margin: 0
-          }}>
-            🎯 Multi-Select Filters (Pick Any Combination)
-          </h3>
-          
-          {hasActiveFilters && (
-            <button
-              onClick={clearAllFilters}
-              style={{
-                background: '#ef4444',
-                border: 'none',
-                borderRadius: 6,
-                padding: '8px 16px',
-                fontSize: 12,
-                fontWeight: 600,
-                color: 'white',
-                cursor: 'pointer'
-              }}
-            >
-              Clear All Filters
-            </button>
-          )}
-        </div>
+          🎯 Multi-Select Filters (All Work Together)
+        </h3>
 
         {/* Search Filters */}
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
           gap: 16,
-          marginBottom: 20
+          marginBottom: 24
         }}>
           <div>
             <label style={{
               display: 'block',
-              fontSize: 12,
+              fontSize: 14,
               fontWeight: 600,
-              color: '#6b7280',
+              color: '#374151',
               marginBottom: 6
             }}>
               Artist Contains
@@ -264,7 +236,7 @@ export default function FlexibleOrganizePage() {
               placeholder="Search artist..."
               style={{
                 width: '100%',
-                padding: '8px 12px',
+                padding: '10px 12px',
                 border: '1px solid #d1d5db',
                 borderRadius: 6,
                 fontSize: 14
@@ -275,9 +247,9 @@ export default function FlexibleOrganizePage() {
           <div>
             <label style={{
               display: 'block',
-              fontSize: 12,
+              fontSize: 14,
               fontWeight: 600,
-              color: '#6b7280',
+              color: '#374151',
               marginBottom: 6
             }}>
               Title Contains
@@ -289,7 +261,7 @@ export default function FlexibleOrganizePage() {
               placeholder="Search title..."
               style={{
                 width: '100%',
-                padding: '8px 12px',
+                padding: '10px 12px',
                 border: '1px solid #d1d5db',
                 borderRadius: 6,
                 fontSize: 14
@@ -300,9 +272,9 @@ export default function FlexibleOrganizePage() {
           <div>
             <label style={{
               display: 'block',
-              fontSize: 12,
+              fontSize: 14,
               fontWeight: 600,
-              color: '#6b7280',
+              color: '#374151',
               marginBottom: 6
             }}>
               Year From
@@ -314,7 +286,7 @@ export default function FlexibleOrganizePage() {
               placeholder="1960"
               style={{
                 width: '100%',
-                padding: '8px 12px',
+                padding: '10px 12px',
                 border: '1px solid #d1d5db',
                 borderRadius: 6,
                 fontSize: 14
@@ -325,9 +297,9 @@ export default function FlexibleOrganizePage() {
           <div>
             <label style={{
               display: 'block',
-              fontSize: 12,
+              fontSize: 14,
               fontWeight: 600,
-              color: '#6b7280',
+              color: '#374151',
               marginBottom: 6
             }}>
               Year To
@@ -339,7 +311,7 @@ export default function FlexibleOrganizePage() {
               placeholder="1980"
               style={{
                 width: '100%',
-                padding: '8px 12px',
+                padding: '10px 12px',
                 border: '1px solid #d1d5db',
                 borderRadius: 6,
                 fontSize: 14
@@ -348,229 +320,160 @@ export default function FlexibleOrganizePage() {
           </div>
         </div>
 
-        {/* Multi-Select Format Filter */}
-        <div style={{ marginBottom: 20 }}>
-          <label style={{
-            display: 'block',
-            fontSize: 14,
-            fontWeight: 600,
-            color: '#1f2937',
-            marginBottom: 8
-          }}>
-            📀 Formats (Select Multiple)
-          </label>
-          <div style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: 8
-          }}>
-            {availableFormats.map(format => (
-              <button
-                key={format}
-                onClick={() => toggleArraySelection(selectedFormats, setSelectedFormats, format)}
-                style={{
-                  padding: '6px 12px',
-                  fontSize: 12,
-                  fontWeight: 600,
-                  border: '2px solid #3b82f6',
-                  borderRadius: 6,
-                  background: selectedFormats.includes(format) ? '#3b82f6' : 'white',
-                  color: selectedFormats.includes(format) ? 'white' : '#3b82f6',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
-              >
-                {format}
-              </button>
-            ))}
+        {/* Multi-select dropdowns */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+          gap: 16,
+          marginBottom: 20
+        }}>
+          {/* Folders Multi-Select */}
+          <div>
+            <label style={{
+              display: 'block',
+              fontSize: 14,
+              fontWeight: 600,
+              color: '#374151',
+              marginBottom: 6
+            }}>
+              📁 Folders (Hold Ctrl/Cmd to select multiple)
+            </label>
+            <select
+              multiple
+              value={selectedFolders}
+              onChange={e => setSelectedFolders(Array.from(e.target.selectedOptions, option => option.value))}
+              style={{
+                width: '100%',
+                height: 120,
+                padding: '8px',
+                border: '1px solid #d1d5db',
+                borderRadius: 6,
+                fontSize: 13
+              }}
+            >
+              {availableFolders.map(folder => (
+                <option key={folder} value={folder}>
+                  {folder}
+                </option>
+              ))}
+            </select>
+            {selectedFolders.length > 0 && (
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+                Selected: {selectedFolders.join(', ')}
+              </div>
+            )}
           </div>
-          {selectedFormats.length > 0 && (
-            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
-              Selected: {selectedFormats.join(', ')}
-            </div>
-          )}
-        </div>
 
-        {/* Multi-Select Folder Filter */}
-        <div style={{ marginBottom: 20 }}>
-          <label style={{
-            display: 'block',
-            fontSize: 14,
-            fontWeight: 600,
-            color: '#1f2937',
-            marginBottom: 8
-          }}>
-            📁 Folders (Select Multiple)
-          </label>
-          <div style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: 8
-          }}>
-            {availableFolders.map(folder => (
-              <button
-                key={folder}
-                onClick={() => toggleArraySelection(selectedFolders, setSelectedFolders, folder)}
-                style={{
-                  padding: '6px 12px',
-                  fontSize: 12,
-                  fontWeight: 600,
-                  border: '2px solid #059669',
-                  borderRadius: 6,
-                  background: selectedFolders.includes(folder) ? '#059669' : 'white',
-                  color: selectedFolders.includes(folder) ? 'white' : '#059669',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
-              >
-                {folder}
-              </button>
-            ))}
+          {/* Genres Multi-Select */}
+          <div>
+            <label style={{
+              display: 'block',
+              fontSize: 14,
+              fontWeight: 600,
+              color: '#374151',
+              marginBottom: 6
+            }}>
+              🎵 Genres (Hold Ctrl/Cmd to select multiple)
+            </label>
+            <select
+              multiple
+              value={selectedGenres}
+              onChange={e => setSelectedGenres(Array.from(e.target.selectedOptions, option => option.value))}
+              style={{
+                width: '100%',
+                height: 120,
+                padding: '8px',
+                border: '1px solid #d1d5db',
+                borderRadius: 6,
+                fontSize: 13
+              }}
+            >
+              {availableGenres.map(genre => (
+                <option key={genre} value={genre}>
+                  {genre}
+                </option>
+              ))}
+            </select>
+            {selectedGenres.length > 0 && (
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+                Selected: {selectedGenres.join(', ')}
+              </div>
+            )}
           </div>
-          {selectedFolders.length > 0 && (
-            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
-              Selected: {selectedFolders.join(', ')}
-            </div>
-          )}
-        </div>
 
-        {/* Multi-Select Genre Filter */}
-        <div style={{ marginBottom: 20 }}>
-          <label style={{
-            display: 'block',
-            fontSize: 14,
-            fontWeight: 600,
-            color: '#1f2937',
-            marginBottom: 8
-          }}>
-            🎵 Genres (Select Multiple)
-          </label>
-          <div style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: 8,
-            maxHeight: 200,
-            overflowY: 'auto',
-            padding: 8,
-            border: '1px solid #e5e7eb',
-            borderRadius: 6
-          }}>
-            {availableGenres.map(genre => (
-              <button
-                key={genre}
-                onClick={() => toggleArraySelection(selectedGenres, setSelectedGenres, genre)}
-                style={{
-                  padding: '4px 8px',
-                  fontSize: 11,
-                  fontWeight: 600,
-                  border: '2px solid #7c3aed',
-                  borderRadius: 4,
-                  background: selectedGenres.includes(genre) ? '#7c3aed' : 'white',
-                  color: selectedGenres.includes(genre) ? 'white' : '#7c3aed',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
-              >
-                {genre}
-              </button>
-            ))}
+          {/* Styles Multi-Select */}
+          <div>
+            <label style={{
+              display: 'block',
+              fontSize: 14,
+              fontWeight: 600,
+              color: '#374151',
+              marginBottom: 6
+            }}>
+              🎨 Styles (Hold Ctrl/Cmd to select multiple)
+            </label>
+            <select
+              multiple
+              value={selectedStyles}
+              onChange={e => setSelectedStyles(Array.from(e.target.selectedOptions, option => option.value))}
+              style={{
+                width: '100%',
+                height: 120,
+                padding: '8px',
+                border: '1px solid #d1d5db',
+                borderRadius: 6,
+                fontSize: 13
+              }}
+            >
+              {availableStyles.map(style => (
+                <option key={style} value={style}>
+                  {style}
+                </option>
+              ))}
+            </select>
+            {selectedStyles.length > 0 && (
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+                Selected: {selectedStyles.join(', ')}
+              </div>
+            )}
           </div>
-          {selectedGenres.length > 0 && (
-            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
-              Selected: {selectedGenres.join(', ')}
-            </div>
-          )}
-        </div>
 
-        {/* Multi-Select Style Filter */}
-        <div style={{ marginBottom: 20 }}>
-          <label style={{
-            display: 'block',
-            fontSize: 14,
-            fontWeight: 600,
-            color: '#1f2937',
-            marginBottom: 8
-          }}>
-            🎨 Styles (Select Multiple)
-          </label>
-          <div style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: 8,
-            maxHeight: 200,
-            overflowY: 'auto',
-            padding: 8,
-            border: '1px solid #e5e7eb',
-            borderRadius: 6
-          }}>
-            {availableStyles.map(style => (
-              <button
-                key={style}
-                onClick={() => toggleArraySelection(selectedStyles, setSelectedStyles, style)}
-                style={{
-                  padding: '4px 8px',
-                  fontSize: 11,
-                  fontWeight: 600,
-                  border: '2px solid #f59e0b',
-                  borderRadius: 4,
-                  background: selectedStyles.includes(style) ? '#f59e0b' : 'white',
-                  color: selectedStyles.includes(style) ? 'white' : '#f59e0b',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
-              >
-                {style}
-              </button>
-            ))}
+          {/* Decades Multi-Select */}
+          <div>
+            <label style={{
+              display: 'block',
+              fontSize: 14,
+              fontWeight: 600,
+              color: '#374151',
+              marginBottom: 6
+            }}>
+              📅 Decades (Hold Ctrl/Cmd to select multiple)
+            </label>
+            <select
+              multiple
+              value={selectedDecades.map(String)}
+              onChange={e => setSelectedDecades(Array.from(e.target.selectedOptions, option => parseInt(option.value)))}
+              style={{
+                width: '100%',
+                height: 120,
+                padding: '8px',
+                border: '1px solid #d1d5db',
+                borderRadius: 6,
+                fontSize: 13
+              }}
+            >
+              {availableDecades.map(decade => (
+                <option key={decade} value={decade}>
+                  {decade}s
+                </option>
+              ))}
+            </select>
+            {selectedDecades.length > 0 && (
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+                Selected: {selectedDecades.map(d => `${d}s`).join(', ')}
+              </div>
+            )}
           </div>
-          {selectedStyles.length > 0 && (
-            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
-              Selected: {selectedStyles.join(', ')}
-            </div>
-          )}
-        </div>
-
-        {/* Multi-Select Decade Filter */}
-        <div style={{ marginBottom: 20 }}>
-          <label style={{
-            display: 'block',
-            fontSize: 14,
-            fontWeight: 600,
-            color: '#1f2937',
-            marginBottom: 8
-          }}>
-            📅 Decades (Select Multiple)
-          </label>
-          <div style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: 8
-          }}>
-            {availableDecades.map(decade => (
-              <button
-                key={decade}
-                onClick={() => toggleArraySelection(selectedDecades, setSelectedDecades, decade)}
-                style={{
-                  padding: '6px 12px',
-                  fontSize: 12,
-                  fontWeight: 600,
-                  border: '2px solid #dc2626',
-                  borderRadius: 6,
-                  background: selectedDecades.includes(decade) ? '#dc2626' : 'white',
-                  color: selectedDecades.includes(decade) ? 'white' : '#dc2626',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
-              >
-                {decade}s
-              </button>
-            ))}
-          </div>
-          {selectedDecades.length > 0 && (
-            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
-              Selected: {selectedDecades.map(d => `${d}s`).join(', ')}
-            </div>
-          )}
         </div>
         
         {/* Results Count */}
@@ -686,7 +589,6 @@ export default function FlexibleOrganizePage() {
                 }}>
                   {album.year && <span>{album.year}</span>}
                   {album.folder && <span>• {album.folder}</span>}
-                  {album.format && <span>• {album.format}</span>}
                 </div>
               </Link>
             ))}
