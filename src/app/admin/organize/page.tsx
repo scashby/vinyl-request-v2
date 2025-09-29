@@ -1,9 +1,10 @@
-// Fixed organize page with proper user-friendly filters
+// Flexible multi-filter collection browser
 // src/app/admin/organize/page.tsx
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { supabase } from '../../../lib/supabaseClient';
 
 type Row = {
@@ -19,31 +20,29 @@ type Row = {
   folder: string;
 };
 
-type Mode = 'genre' | 'style' | 'decade' | 'artist';
-type Bucket = { key: string; count: number };
-
 export default function AdminOrganizePage() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
-  const [mode, setMode] = useState<Mode>('genre');
-  const [query, setQuery] = useState('');
-  const [selected, setSelected] = useState<string | null>(null);
+  const [status, setStatus] = useState<string>('');
 
-  // Simple user-friendly filters
+  // All possible filter options
   const [folderFilter, setFolderFilter] = useState<string>('all');
+  const [genreFilter, setGenreFilter] = useState<string>('all');
+  const [styleFilter, setStyleFilter] = useState<string>('all');
+  const [decadeFilter, setDecadeFilter] = useState<string>('all');
+  const [letterFilter, setLetterFilter] = useState<string>('all');
   const [artistSearch, setArtistSearch] = useState<string>('');
   const [titleSearch, setTitleSearch] = useState<string>('');
 
-  // Available folders from data
+  // Available options
   const [availableFolders, setAvailableFolders] = useState<string[]>([]);
-
-  // status
-  const [status, setStatus] = useState<string>('');
+  const [availableGenres, setAvailableGenres] = useState<string[]>([]);
+  const [availableStyles, setAvailableStyles] = useState<string[]>([]);
+  const [availableDecades, setAvailableDecades] = useState<number[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
     
-    // Load ALL albums with pagination
     let allRows: Row[] = [];
     let from = 0;
     const batchSize = 1000;
@@ -70,9 +69,20 @@ export default function AdminOrganizePage() {
     
     setRows(allRows);
     
-    // Extract unique folders for dropdown
+    // Extract all unique filter options
     const folders = Array.from(new Set(allRows.map(r => r.folder).filter(Boolean)));
     setAvailableFolders(folders.sort());
+    
+    const genres = new Set<string>();
+    allRows.forEach(r => r.discogs_genres?.forEach(g => genres.add(g)));
+    setAvailableGenres(Array.from(genres).sort());
+    
+    const styles = new Set<string>();
+    allRows.forEach(r => r.discogs_styles?.forEach(s => styles.add(s)));
+    setAvailableStyles(Array.from(styles).sort());
+    
+    const decades = Array.from(new Set(allRows.map(r => r.decade).filter(Boolean))).sort() as number[];
+    setAvailableDecades(decades);
     
     setLoading(false);
   }, []);
@@ -81,59 +91,42 @@ export default function AdminOrganizePage() {
     load();
   }, [load]);
 
-  // Apply filters to rows
-  const filteredByScope = useMemo(() => {
-    return rows.filter(r => {
+  // Apply ALL filters with AND logic
+  const filteredAlbums = useMemo(() => {
+    return rows.filter(row => {
       // Folder filter
-      if (folderFilter !== 'all' && r.folder !== folderFilter) return false;
+      if (folderFilter !== 'all' && row.folder !== folderFilter) return false;
+      
+      // Genre filter
+      if (genreFilter !== 'all') {
+        if (!row.discogs_genres?.includes(genreFilter)) return false;
+      }
+      
+      // Style filter
+      if (styleFilter !== 'all') {
+        if (!row.discogs_styles?.includes(styleFilter)) return false;
+      }
+      
+      // Decade filter
+      if (decadeFilter !== 'all') {
+        if (String(row.decade) !== decadeFilter) return false;
+      }
+      
+      // Letter filter (artist starts with)
+      if (letterFilter !== 'all') {
+        const firstLetter = row.artist?.charAt(0).toUpperCase();
+        if (firstLetter !== letterFilter) return false;
+      }
       
       // Artist search
-      if (artistSearch && !r.artist.toLowerCase().includes(artistSearch.toLowerCase())) return false;
+      if (artistSearch && !row.artist.toLowerCase().includes(artistSearch.toLowerCase())) return false;
       
       // Title search
-      if (titleSearch && !r.title.toLowerCase().includes(titleSearch.toLowerCase())) return false;
+      if (titleSearch && !row.title.toLowerCase().includes(titleSearch.toLowerCase())) return false;
       
       return true;
     });
-  }, [rows, folderFilter, artistSearch, titleSearch]);
-
-  const buckets: Bucket[] = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const r of filteredByScope) {
-      if (mode === 'genre') {
-        const arr = r.discogs_genres ?? [];
-        if (!arr.length) map.set('(unknown)', (map.get('(unknown)') || 0) + 1);
-        for (const g of arr) map.set(g, (map.get(g) || 0) + 1);
-      } else if (mode === 'style') {
-        const arr = r.discogs_styles ?? [];
-        if (!arr.length) map.set('(unknown)', (map.get('(unknown)') || 0) + 1);
-        for (const s of arr) map.set(s, (map.get(s) || 0) + 1);
-      } else if (mode === 'decade') {
-        const k = r.decade ? String(r.decade) : '(unknown)';
-        map.set(k, (map.get(k) || 0) + 1);
-      } else {
-        const k = r.artist || '(unknown)';
-        map.set(k, (map.get(k) || 0) + 1);
-      }
-    }
-    let arr = Array.from(map.entries()).map(([key, count]) => ({ key, count }));
-    if (query) {
-      const q = query.toLowerCase();
-      arr = arr.filter(b => b.key.toLowerCase().includes(q));
-    }
-    return arr.sort((a, b) => b.count - a.count);
-  }, [filteredByScope, mode, query]);
-
-  const filteredRows: Row[] = useMemo(() => {
-    if (!selected) return [];
-    return filteredByScope.filter(r => {
-      if (mode === 'genre') return (r.discogs_genres ?? []).includes(selected) || (selected === '(unknown)' && !(r.discogs_genres?.length));
-      if (mode === 'style') return (r.discogs_styles ?? []).includes(selected) || (selected === '(unknown)' && !(r.discogs_styles?.length));
-      if (mode === 'decade') return String(r.decade || '(unknown)') === selected;
-      if (mode === 'artist') return r.artist === selected;
-      return false;
-    });
-  }, [filteredByScope, mode, selected]);
+  }, [rows, folderFilter, genreFilter, styleFilter, decadeFilter, letterFilter, artistSearch, titleSearch]);
 
   async function runEnrichAll() {
     setStatus('Enriching missing genres/styles from Discogs...');
@@ -141,7 +134,6 @@ export default function AdminOrganizePage() {
     let updated = 0, scanned = 0;
 
     while (cursor !== null) {
-      // Build fresh filters for each iteration
       interface EnrichFilters {
         cursor: number | null;
         limit: number;
@@ -184,11 +176,18 @@ export default function AdminOrganizePage() {
 
   const clearFilters = () => {
     setFolderFilter('all');
+    setGenreFilter('all');
+    setStyleFilter('all');
+    setDecadeFilter('all');
+    setLetterFilter('all');
     setArtistSearch('');
     setTitleSearch('');
   };
 
-  const hasActiveFilters = folderFilter !== 'all' || artistSearch || titleSearch;
+  const hasActiveFilters = folderFilter !== 'all' || genreFilter !== 'all' || styleFilter !== 'all' || 
+                          decadeFilter !== 'all' || letterFilter !== 'all' || artistSearch || titleSearch;
+
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
   return (
     <div style={{
@@ -221,7 +220,7 @@ export default function AdminOrganizePage() {
             fontSize: 16,
             margin: 0
           }}>
-            Browse and organize by genre, style, decade, or artist
+            Combine any filters to find exactly what you&apos;re looking for
           </p>
         </div>
         
@@ -259,7 +258,7 @@ export default function AdminOrganizePage() {
         </div>
       )}
 
-      {/* Filters - NOW USER FRIENDLY */}
+      {/* Flexible Filters */}
       <div style={{
         background: 'white',
         border: '1px solid #e5e7eb',
@@ -280,7 +279,7 @@ export default function AdminOrganizePage() {
             color: '#1f2937',
             margin: 0
           }}>
-            🔍 Filter Collection
+            🔍 Combine Filters (All work together)
           </h3>
           
           {hasActiveFilters && (
@@ -297,17 +296,19 @@ export default function AdminOrganizePage() {
                 cursor: 'pointer'
               }}
             >
-              Clear Filters
+              Clear All Filters
             </button>
           )}
         </div>
         
+        {/* Dropdown Filters */}
         <div style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: 16
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+          gap: 16,
+          marginBottom: 16
         }}>
-          <div style={{ flex: '1 1 200px' }}>
+          <div>
             <label style={{
               display: 'block',
               fontSize: 12,
@@ -338,6 +339,158 @@ export default function AdminOrganizePage() {
             </select>
           </div>
           
+          <div>
+            <label style={{
+              display: 'block',
+              fontSize: 12,
+              fontWeight: 600,
+              color: '#6b7280',
+              marginBottom: 6
+            }}>
+              Genre
+            </label>
+            <select
+              value={genreFilter}
+              onChange={e => setGenreFilter(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                border: '1px solid #d1d5db',
+                borderRadius: 6,
+                fontSize: 14,
+                background: 'white',
+                color: '#1f2937',
+                cursor: 'pointer'
+              }}
+            >
+              <option value="all" style={{ color: '#1f2937', background: 'white' }}>All Genres</option>
+              {availableGenres.map(genre => (
+                <option key={genre} value={genre} style={{ color: '#1f2937', background: 'white' }}>{genre}</option>
+              ))}
+            </select>
+          </div>
+          
+          <div>
+            <label style={{
+              display: 'block',
+              fontSize: 12,
+              fontWeight: 600,
+              color: '#6b7280',
+              marginBottom: 6
+            }}>
+              Style
+            </label>
+            <select
+              value={styleFilter}
+              onChange={e => setStyleFilter(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                border: '1px solid #d1d5db',
+                borderRadius: 6,
+                fontSize: 14,
+                background: 'white',
+                color: '#1f2937',
+                cursor: 'pointer'
+              }}
+            >
+              <option value="all" style={{ color: '#1f2937', background: 'white' }}>All Styles</option>
+              {availableStyles.map(style => (
+                <option key={style} value={style} style={{ color: '#1f2937', background: 'white' }}>{style}</option>
+              ))}
+            </select>
+          </div>
+          
+          <div>
+            <label style={{
+              display: 'block',
+              fontSize: 12,
+              fontWeight: 600,
+              color: '#6b7280',
+              marginBottom: 6
+            }}>
+              Decade
+            </label>
+            <select
+              value={decadeFilter}
+              onChange={e => setDecadeFilter(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                border: '1px solid #d1d5db',
+                borderRadius: 6,
+                fontSize: 14,
+                background: 'white',
+                color: '#1f2937',
+                cursor: 'pointer'
+              }}
+            >
+              <option value="all" style={{ color: '#1f2937', background: 'white' }}>All Decades</option>
+              {availableDecades.map(decade => (
+                <option key={decade} value={String(decade)} style={{ color: '#1f2937', background: 'white' }}>{decade}s</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Letter Filter */}
+        <div style={{ marginBottom: 16 }}>
+          <label style={{
+            display: 'block',
+            fontSize: 12,
+            fontWeight: 600,
+            color: '#6b7280',
+            marginBottom: 6
+          }}>
+            Artist Starts With
+          </label>
+          <div style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 4
+          }}>
+            <button
+              onClick={() => setLetterFilter('all')}
+              style={{
+                padding: '4px 10px',
+                fontSize: 12,
+                fontWeight: 600,
+                border: '1px solid #d1d5db',
+                borderRadius: 4,
+                background: letterFilter === 'all' ? '#3b82f6' : 'white',
+                color: letterFilter === 'all' ? 'white' : '#374151',
+                cursor: 'pointer'
+              }}
+            >
+              All
+            </button>
+            {alphabet.map(letter => (
+              <button
+                key={letter}
+                onClick={() => setLetterFilter(letter)}
+                style={{
+                  padding: '4px 10px',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  border: '1px solid #d1d5db',
+                  borderRadius: 4,
+                  background: letterFilter === letter ? '#3b82f6' : 'white',
+                  color: letterFilter === letter ? 'white' : '#374151',
+                  cursor: 'pointer'
+                }}
+              >
+                {letter}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Text Search Filters */}
+        <div style={{
+          display: 'flex',
+          gap: 16,
+          flexWrap: 'wrap'
+        }}>
           <div style={{ flex: '1 1 200px' }}>
             <label style={{
               display: 'block',
@@ -346,7 +499,7 @@ export default function AdminOrganizePage() {
               color: '#6b7280',
               marginBottom: 6
             }}>
-              Artist
+              Artist Contains
             </label>
             <input
               type="text"
@@ -371,7 +524,7 @@ export default function AdminOrganizePage() {
               color: '#6b7280',
               marginBottom: 6
             }}>
-              Title
+              Title Contains
             </label>
             <input
               type="text"
@@ -389,269 +542,126 @@ export default function AdminOrganizePage() {
           </div>
         </div>
         
-        {hasActiveFilters && (
-          <div style={{
-            marginTop: 12,
-            padding: 8,
-            background: '#f0f9ff',
-            border: '1px solid #bae6fd',
-            borderRadius: 6,
-            fontSize: 12,
-            color: '#0c4a6e'
-          }}>
-            Showing {filteredByScope.length} of {rows.length} albums
-          </div>
-        )}
-      </div>
-
-      {/* View Mode Selector */}
-      <div style={{
-        background: 'white',
-        border: '1px solid #e5e7eb',
-        borderRadius: 12,
-        padding: 20,
-        marginBottom: 24,
-        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
-      }}>
+        {/* Results Count */}
         <div style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: 16,
-          alignItems: 'center'
+          marginTop: 16,
+          padding: 12,
+          background: '#f0f9ff',
+          border: '1px solid #bae6fd',
+          borderRadius: 6,
+          fontSize: 14,
+          color: '#0c4a6e',
+          fontWeight: 600
         }}>
-          <div>
-            <label style={{
-              display: 'block',
-              fontSize: 12,
-              fontWeight: 600,
-              color: '#6b7280',
-              marginBottom: 8
-            }}>
-              Group By
-            </label>
-            <div style={{
-              display: 'inline-flex',
-              borderRadius: 8,
-              overflow: 'hidden',
-              border: '1px solid #d1d5db'
-            }}>
-              {(['genre', 'style', 'decade', 'artist'] as Mode[]).map(m => (
-                <button
-                  key={m}
-                  onClick={() => {
-                    setMode(m);
-                    setSelected(null);
-                  }}
-                  style={{
-                    padding: '10px 20px',
-                    fontSize: 14,
-                    fontWeight: 600,
-                    border: 'none',
-                    background: mode === m ? '#3b82f6' : '#f9fafb',
-                    color: mode === m ? 'white' : '#374151',
-                    cursor: 'pointer',
-                    borderRight: m !== 'artist' ? '1px solid #d1d5db' : 'none'
-                  }}
-                >
-                  {m.charAt(0).toUpperCase() + m.slice(1)}
-                </button>
-              ))}
-            </div>
-          </div>
-          
-          <div style={{ flex: '1 1 300px' }}>
-            <label style={{
-              display: 'block',
-              fontSize: 12,
-              fontWeight: 600,
-              color: '#6b7280',
-              marginBottom: 8
-            }}>
-              Search {mode.charAt(0).toUpperCase() + mode.slice(1)}s
-            </label>
-            <input
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                border: '1px solid #d1d5db',
-                borderRadius: 8,
-                fontSize: 14
-              }}
-              placeholder={`Search ${mode}s...`}
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-            />
-          </div>
+          📊 Showing {filteredAlbums.length} of {rows.length} albums
+          {hasActiveFilters && (
+            <span style={{ fontWeight: 400, marginLeft: 8 }}>
+              (with active filters)
+            </span>
+          )}
         </div>
       </div>
 
-      {/* Buckets Grid */}
+      {/* Results Grid */}
       <div style={{
         background: 'white',
         border: '1px solid #e5e7eb',
         borderRadius: 12,
         padding: 20,
-        marginBottom: 24,
         boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
       }}>
-        <h3 style={{
-          fontSize: 18,
-          fontWeight: 600,
-          color: '#1f2937',
-          marginBottom: 16
-        }}>
-          {mode.charAt(0).toUpperCase() + mode.slice(1)}s ({buckets.length})
-        </h3>
-        
         {loading ? (
           <div style={{ color: '#6b7280', textAlign: 'center', padding: 40 }}>
-            Loading...
+            Loading albums...
           </div>
-        ) : buckets.length === 0 ? (
+        ) : filteredAlbums.length === 0 ? (
           <div style={{ color: '#6b7280', textAlign: 'center', padding: 40 }}>
-            No {mode}s found
+            <div style={{ fontSize: 48, marginBottom: 16 }}>🔍</div>
+            <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>
+              No albums match your filters
+            </div>
+            <div style={{ fontSize: 14 }}>
+              Try adjusting your filter criteria
+            </div>
           </div>
         ) : (
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-            gap: 12
-          }}>
-            {buckets.map(b => (
-              <button
-                key={b.key}
-                onClick={() => setSelected(b.key === selected ? null : b.key)}
-                style={{
-                  background: selected === b.key ? '#eff6ff' : 'white',
-                  border: `2px solid ${selected === b.key ? '#3b82f6' : '#e5e7eb'}`,
-                  borderRadius: 8,
-                  padding: 16,
-                  textAlign: 'left',
-                  cursor: 'pointer',
-                  boxShadow: selected === b.key ? '0 4px 6px rgba(59, 130, 246, 0.1)' : '0 1px 3px rgba(0, 0, 0, 0.1)',
-                  transition: 'all 0.2s'
-                }}
-              >
-                <div style={{
-                  fontSize: 16,
-                  fontWeight: 600,
-                  color: '#1f2937',
-                  marginBottom: 4
-                }}>
-                  {b.key}
-                </div>
-                <div style={{
-                  fontSize: 14,
-                  color: '#6b7280'
-                }}>
-                  {b.count} album{b.count !== 1 ? 's' : ''}
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Selected Albums */}
-      {selected && (
-        <div style={{
-          background: 'white',
-          border: '1px solid #e5e7eb',
-          borderRadius: 12,
-          padding: 20,
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
-        }}>
-          <h3 style={{
-            fontSize: 18,
-            fontWeight: 600,
-            color: '#1f2937',
-            marginBottom: 16
-          }}>
-            Albums in &quot;{selected}&quot; ({filteredRows.length})
-          </h3>
-          
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
             gap: 16
           }}>
-            {filteredRows.map(r => (
-              <div
-                key={r.id}
+            {filteredAlbums.map(album => (
+              <Link
+                key={album.id}
+                href={`/admin/edit-entry/${album.id}`}
                 style={{
                   border: '1px solid #e5e7eb',
                   borderRadius: 8,
                   padding: 12,
                   display: 'flex',
-                  gap: 12,
-                  alignItems: 'flex-start',
-                  background: '#f9fafb'
+                  flexDirection: 'column',
+                  gap: 8,
+                  background: '#f9fafb',
+                  textDecoration: 'none',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.boxShadow = 'none';
+                  e.currentTarget.style.transform = 'translateY(0)';
                 }}
               >
                 <Image
-                  src={r.image_url || '/images/placeholder.png'}
-                  alt={r.title}
-                  width={80}
-                  height={80}
+                  src={album.image_url || '/images/placeholder.png'}
+                  alt={album.title}
+                  width={180}
+                  height={180}
                   style={{
+                    width: '100%',
+                    height: 'auto',
+                    aspectRatio: '1',
                     objectFit: 'cover',
-                    borderRadius: 6,
-                    flexShrink: 0
+                    borderRadius: 6
                   }}
                   unoptimized
                 />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{
-                    fontSize: 14,
-                    fontWeight: 600,
-                    color: '#1f2937',
-                    marginBottom: 2,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
-                  }}>
-                    {r.title}
-                  </div>
-                  <div style={{
-                    fontSize: 13,
-                    color: '#6b7280',
-                    marginBottom: 4
-                  }}>
-                    {r.artist}
-                  </div>
-                  <div style={{
-                    fontSize: 11,
-                    color: '#9ca3af'
-                  }}>
-                    {r.year} • {r.format} • {r.folder}
-                  </div>
-                  {(r.discogs_genres || r.discogs_styles) && (
-                    <div style={{
-                      fontSize: 10,
-                      color: '#6b7280',
-                      marginTop: 6
-                    }}>
-                      {r.discogs_genres?.join(', ')}
-                      {r.discogs_styles && r.discogs_genres && ' • '}
-                      {r.discogs_styles?.join(', ')}
-                    </div>
-                  )}
+                <div style={{
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: '#1f2937',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap'
+                }}>
+                  {album.title}
                 </div>
-              </div>
+                <div style={{
+                  fontSize: 12,
+                  color: '#6b7280',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap'
+                }}>
+                  {album.artist}
+                </div>
+                <div style={{
+                  fontSize: 11,
+                  color: '#9ca3af',
+                  display: 'flex',
+                  gap: 4,
+                  flexWrap: 'wrap'
+                }}>
+                  {album.year && <span>{album.year}</span>}
+                  {album.folder && <span>• {album.folder}</span>}
+                </div>
+              </Link>
             ))}
           </div>
-          
-          {filteredRows.length === 0 && (
-            <div style={{
-              textAlign: 'center',
-              color: '#6b7280',
-              padding: 40
-            }}>
-              No albums found in this category
-            </div>
-          )}
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
