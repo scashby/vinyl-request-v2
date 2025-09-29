@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import { supabase } from '../../../lib/supabaseClient';
 
@@ -14,6 +14,7 @@ type Row = {
   discogs_genres: string[] | null;
   discogs_styles: string[] | null;
   decade: number | null;
+  folder: string;
 };
 
 type Mode = 'genre' | 'style' | 'decade' | 'artist';
@@ -25,20 +26,35 @@ export default function AdminOrganizePage() {
   const [mode, setMode] = useState<Mode>('genre');
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<string | null>(null);
+
+  // scope controls
+  const [folderLike, setFolderLike] = useState<string>('%'); // e.g. '%', 'vinyl%', 'tapes%'
+  const [artistLike, setArtistLike] = useState<string>('');  // optional
+  const [titleLike, setTitleLike]   = useState<string>('');  // optional
+
+  // status
   const [status, setStatus] = useState<string>('');
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    let queryBuilder = supabase
       .from('collection')
-      .select('id,artist,title,year,format,image_url,discogs_genres,discogs_styles,decade')
+      .select('id,artist,title,year,format,image_url,discogs_genres,discogs_styles,decade,folder')
       .order('artist', { ascending: true })
-      .limit(4000);
+      .limit(5000);
+
+    if (folderLike && folderLike !== '%') queryBuilder = queryBuilder.like('folder', folderLike);
+    if (artistLike) queryBuilder = queryBuilder.ilike('artist', artistLike);
+    if (titleLike)  queryBuilder = queryBuilder.ilike('title', titleLike);
+
+    const { data, error } = await queryBuilder;
     if (!error && data) setRows(data as Row[]);
     setLoading(false);
-  }
+  }, [folderLike, artistLike, titleLike]);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const buckets: Bucket[] = useMemo(() => {
     const map = new Map<string, number>();
@@ -70,40 +86,64 @@ export default function AdminOrganizePage() {
   const filteredRows: Row[] = useMemo(() => {
     if (!selected) return [];
     return rows.filter(r => {
-      if (mode === 'genre') return (r.discogs_genres ?? []).includes(selected);
-      if (mode === 'style') return (r.discogs_styles ?? []).includes(selected);
+      if (mode === 'genre') return (r.discogs_genres ?? []).includes(selected) || (selected === '(unknown)' && !(r.discogs_genres?.length));
+      if (mode === 'style') return (r.discogs_styles ?? []).includes(selected) || (selected === '(unknown)' && !(r.discogs_styles?.length));
       if (mode === 'decade') return String(r.decade || '(unknown)') === selected;
       if (mode === 'artist') return r.artist === selected;
       return false;
     });
   }, [rows, mode, selected]);
 
-  async function handleEnrichAll() {
+  async function runEnrichAll() {
+    setStatus('Enriching missing genres/styles…');
     let cursor: number | null = 0;
-    let totalUpdated = 0;
-    let totalScanned = 0;
-
-    setStatus('Starting enrichment…');
+    let updated = 0, scanned = 0;
 
     while (cursor !== null) {
-      const res = await fetch(`/api/enrich?limit=60&cursor=${cursor}`, { method: 'POST' });
+      const res = await fetch('/api/enrich', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cursor, limit: 80, folderLike, artistLike, titleLike })
+      });
       const json = await res.json();
-      if (!res.ok) {
-        setStatus(`Error: ${json?.error || res.status}`);
-        break;
-      }
-
-      totalUpdated += json.updated || 0;
-      totalScanned += json.scanned || 0;
+      if (!res.ok) { setStatus(`Error: ${json?.error || res.status}`); return; }
+      updated += json.updated || 0;
+      scanned += json.scanned || 0;
       cursor = json.nextCursor;
-
-      setStatus(`Enriched: updated ${totalUpdated} of ${totalScanned} scanned…`);
-
-      // gentle pause between batches
-      await new Promise(r => setTimeout(r, 500));
+      setStatus(`Updated ${updated} / scanned ${scanned}…`);
+      await new Promise(r => setTimeout(r, 400));
     }
+    setStatus(`Done. Updated ${updated} of ${scanned}.`);
+    await load();
+  }
 
-    if (cursor === null) setStatus(`Done. Updated ${totalUpdated} of ${totalScanned}.`);
+  async function applyGenreFolders(dryRun=false) {
+    setStatus(dryRun ? 'Previewing genre folder moves…' : 'Moving to genre folders…');
+    let cursor: number | null = 0;
+    let mk = 0, mu = 0, scanned = 0;
+
+    while (cursor !== null) {
+      const res = await fetch('/api/organize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cursor, limit: 800,
+          scope: { folderLike, artistLike, titleLike },
+          base: (folderLike && folderLike.endsWith('%')) ? folderLike.slice(0, -1) : 'vinyl',
+          unknownLabel: '(unknown)',
+          dryRun: dryRun
+        })
+      });
+      const json = await res.json();
+      if (!res.ok) { setStatus(`Error: ${json?.error || res.status}`); return; }
+      mk += json.moved_known || 0;
+      mu += json.moved_unknown || 0;
+      scanned += json.scanned || 0;
+      cursor = json.nextCursor;
+      setStatus(`${dryRun ? 'Preview' : 'Moved'} — known: ${mk}, unknown: ${mu}, scanned: ${scanned}…`);
+      await new Promise(r => setTimeout(r, 200));
+    }
+    setStatus(`${dryRun ? 'Preview complete' : 'Move complete'} — known: ${mk}, unknown: ${mu}.`);
     await load();
   }
 
@@ -111,35 +151,48 @@ export default function AdminOrganizePage() {
     <div className="p-6 space-y-6 bg-white text-black">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Admin · Organize Collection</h1>
-        <button
-          onClick={handleEnrichAll}
-          className="px-3 py-2 rounded bg-indigo-600 text-white hover:bg-indigo-700"
-        >
-          Run Discogs Enrichment
-        </button>
+        <div className="flex gap-2">
+          <button onClick={() => runEnrichAll()} className="px-3 py-2 rounded bg-indigo-600 text-white hover:bg-indigo-700">
+            Enrich Missing (Discogs)
+          </button>
+          <button onClick={() => applyGenreFolders(true)} className="px-3 py-2 rounded bg-amber-600 text-white hover:bg-amber-700">
+            Preview Genre Folders
+          </button>
+          <button onClick={() => applyGenreFolders(false)} className="px-3 py-2 rounded bg-emerald-600 text-white hover:bg-emerald-700">
+            Apply Genre Folders
+          </button>
+        </div>
       </div>
-      {status && <div className="text-sm text-gray-600">{status}</div>}
+
+      {status ? <div className="text-sm text-gray-700">{status}</div> : null}
+
+      {/* Scope */}
+      <div className="flex flex-wrap gap-2 items-end">
+        <div className="flex flex-col">
+          <label className="text-xs text-gray-600">Folder LIKE</label>
+          <input className="border border-gray-300 rounded px-3 py-1" value={folderLike} onChange={e=>setFolderLike(e.target.value)} placeholder="e.g. vinyl% or %" />
+        </div>
+        <div className="flex flex-col">
+          <label className="text-xs text-gray-600">Artist ILIKE</label>
+          <input className="border border-gray-300 rounded px-3 py-1" value={artistLike} onChange={e=>setArtistLike(e.target.value)} placeholder="%beatles%" />
+        </div>
+        <div className="flex flex-col">
+          <label className="text-xs text-gray-600">Title ILIKE</label>
+          <input className="border border-gray-300 rounded px-3 py-1" value={titleLike} onChange={e=>setTitleLike(e.target.value)} placeholder="%blue%" />
+        </div>
+      </div>
 
       {/* Controls */}
       <div className="flex flex-wrap gap-2 items-center">
         <div className="inline-flex rounded-md overflow-hidden border border-gray-300">
           {(['genre','style','decade','artist'] as Mode[]).map(m => (
-            <button
-              key={m}
-              onClick={() => { setMode(m); setSelected(null); }}
-              className={`px-3 py-1 text-sm ${mode === m ? 'bg-indigo-600 text-white' : 'bg-gray-100 hover:bg-gray-200'}`}
-            >
+            <button key={m} onClick={() => { setMode(m); setSelected(null); }}
+              className={`px-3 py-1 text-sm ${mode === m ? 'bg-indigo-600 text-white' : 'bg-gray-100 hover:bg-gray-200'}`}>
               {m[0].toUpperCase() + m.slice(1)}
             </button>
           ))}
         </div>
-
-        <input
-          className="border border-gray-300 rounded px-3 py-1 bg-white text-black"
-          placeholder="Filter buckets…"
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-        />
+        <input className="border border-gray-300 rounded px-3 py-1" placeholder="Filter buckets…" value={query} onChange={e=>setQuery(e.target.value)} />
       </div>
 
       {/* Buckets */}
@@ -147,16 +200,12 @@ export default function AdminOrganizePage() {
         {loading ? (
           <div className="text-gray-500">Loading…</div>
         ) : buckets.length === 0 ? (
-          <div className="text-gray-500">No buckets to show.</div>
+          <div className="text-gray-500">No buckets.</div>
         ) : (
           buckets.map(b => (
-            <button
-              key={b.key}
-              className={`border border-gray-300 rounded p-3 text-left bg-white hover:bg-gray-50 shadow-sm ${
-                selected === b.key ? 'ring-2 ring-indigo-400' : ''
-              }`}
-              onClick={() => setSelected(b.key === selected ? null : b.key)}
-            >
+            <button key={b.key}
+              className={`border border-gray-300 rounded p-3 text-left bg-white hover:bg-gray-50 shadow-sm ${selected === b.key ? 'ring-2 ring-indigo-400' : ''}`}
+              onClick={() => setSelected(b.key === selected ? null : b.key)}>
               <div className="font-semibold">{b.key}</div>
               <div className="text-sm text-gray-500">{b.count} items</div>
             </button>
@@ -165,26 +214,20 @@ export default function AdminOrganizePage() {
       </div>
 
       {/* Items */}
-      {selected && (
+      {selected ? (
         <div className="space-y-2">
           <h2 className="text-xl font-semibold">{selected}</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {filteredRows.map(r => (
               <div key={r.id} className="border border-gray-300 rounded p-3 flex gap-3 items-center bg-white shadow-sm">
                 {r.image_url ? (
-                  <Image
-                    src={r.image_url}
-                    alt={r.title}
-                    width={80}
-                    height={80}
-                    className="object-cover rounded"
-                  />
+                  <Image src={r.image_url} alt={r.title} width={80} height={80} className="object-cover rounded" />
                 ) : (
                   <div className="w-20 h-20 bg-gray-200 rounded" />
                 )}
                 <div>
                   <div className="font-semibold">{r.artist} — {r.title}</div>
-                  <div className="text-sm text-gray-500">{r.year} • {r.format}</div>
+                  <div className="text-sm text-gray-500">{r.year} • {r.format} • {r.folder}</div>
                   <div className="text-xs text-gray-500">
                     {(r.discogs_genres || []).join('; ')}
                     {r.discogs_styles?.length ? ' • ' + r.discogs_styles.join('; ') : ''}
@@ -192,12 +235,12 @@ export default function AdminOrganizePage() {
                 </div>
               </div>
             ))}
-            {filteredRows.length === 0 && (
-              <div className="text-gray-500">No items in this bucket yet.</div>
-            )}
+            {filteredRows.length === 0 ? (
+              <div className="text-gray-500">No items in this bucket.</div>
+            ) : null}
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

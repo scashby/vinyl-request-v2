@@ -1,30 +1,35 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-type Row = { id: number; artist: string | null; title: string | null; year: string | null; discogs_release_id: string | null };
+type Row = {
+  id: number;
+  artist: string | null;
+  title: string | null;
+  year: string | null;
+  discogs_release_id: string | null;
+};
+
 type DiscogsRelease = { genres?: string[]; styles?: string[] };
 type DiscogsSearchItem = { resource_url?: string; genre?: string[]; style?: string[] };
 type DiscogsSearchResponse = { results?: DiscogsSearchItem[] };
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { persistSession: false } }
-);
-
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const DISCOGS_TOKEN = process.env.DISCOGS_TOKEN ?? process.env.NEXT_PUBLIC_DISCOGS_TOKEN;
+const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
+
 const UA = "DWD-Discogs-Enrichment/1.0";
 const BASE = "https://api.discogs.com";
-const pause = (ms:number)=>new Promise(r=>setTimeout(r,ms));
+const sleep = (ms:number)=>new Promise(r=>setTimeout(r,ms));
 
 async function getJson<T>(url: string) {
-  for (let a=1; a<=5; a++){
+  for (let a=1;a<=5;a++){
     try{
       const res = await fetch(url, { headers:{ "User-Agent": UA, Authorization:`Discogs token=${DISCOGS_TOKEN}` }});
       if (res.status===200) return {ok:true, data: await res.json() as T};
-      if ([429,500,502,503,504].includes(res.status)) { await pause(600*a); continue; }
+      if ([429,500,502,503,504].includes(res.status)) { await sleep(600*a); continue; }
       return {ok:false, status:res.status};
-    }catch{ await pause(600*a); }
+    } catch { await sleep(600*a); }
   }
   return {ok:false, status:599};
 }
@@ -34,47 +39,52 @@ const pick = (r?:DiscogsRelease)=>({
 });
 const yearInt = (y:string|null)=> (y||"").match(/\b(\d{4})\b/)?.[1];
 
+type Body = {
+  cursor?: number|null;
+  limit?: number;          // 10..250 (default 60)
+  folderLike?: string;     // e.g. 'vinyl%' (optional)
+  artistLike?: string;     // e.g. '%beatles%' (optional)
+  titleLike?: string;      // e.g. '%blue%' (optional)
+};
+
 export async function POST(req: Request) {
   if (!DISCOGS_TOKEN) return NextResponse.json({ error: "Missing Discogs token" }, { status: 500 });
+  const b = (await req.json().catch(()=> ({}))) as Body;
 
-  const url = new URL(req.url);
-  const limit = Math.min(Math.max(parseInt(url.searchParams.get("limit")||"60",10), 10), 250); // 10..250
-  const cursor = parseInt(url.searchParams.get("cursor")||"0",10);
+  const limit = Math.min(Math.max(Number(b.limit ?? 60), 10), 250);
+  const cursor = Number(b.cursor ?? 0);
 
-  // Pull a batch AFTER the cursor where genres or styles are NULL
-  const { data, error } = await supabase
+  let q = supabase
     .from("collection")
     .select("id,artist,title,year,discogs_release_id")
-    .or("discogs_genres.is.null,discogs_styles.is.null")
+    .or("discogs_genres.is.null,discogs_styles.is.null") // ONLY rows missing data
     .gt("id", cursor)
     .order("id", { ascending: true })
     .limit(limit);
 
+  if (b.folderLike) q = q.like("folder", b.folderLike);
+  if (b.artistLike) q = q.ilike("artist", b.artistLike);
+  if (b.titleLike)  q = q.ilike("title", b.titleLike);
+
+  const { data, error } = await q;
   if (error) return NextResponse.json({ error }, { status: 500 });
 
   const rows = (data ?? []) as Row[];
   if (!rows.length) return NextResponse.json({ updated: 0, scanned: 0, nextCursor: null });
 
-  let updated = 0;
-  let scanned = 0;
-  let lastId = cursor;
+  let updated = 0, scanned = 0, lastId = cursor;
 
   for (const row of rows) {
-    lastId = row.id;
-    scanned++;
+    lastId = row.id; scanned++;
+    let genres: string[] = []; let styles: string[] = [];
 
-    let genres: string[] = [];
-    let styles: string[] = [];
-
-    // Prefer explicit release
     if (row.discogs_release_id) {
       const rel = await getJson<DiscogsRelease>(`${BASE}/releases/${encodeURIComponent(row.discogs_release_id)}`);
       if (rel.ok) ({ genres, styles } = pick(rel.data));
-      await pause(1000);
+      await sleep(1000);
     }
 
-    // Fallback search
-    if (!(genres.length || styles.length) && (row.artist || row.title)) {
+    if (!(genres.length||styles.length) && (row.artist||row.title)) {
       const params = new URLSearchParams({
         artist: row.artist ?? "",
         release_title: row.title ?? "",
@@ -82,9 +92,7 @@ export async function POST(req: Request) {
         per_page: "1",
         page: "1",
       });
-      const yi = yearInt(row.year);
-      if (yi) params.set("year", yi);
-
+      const yi = yearInt(row.year); if (yi) params.set("year", yi);
       const sr = await getJson<DiscogsSearchResponse>(`${BASE}/database/search?${params.toString()}`);
       if (sr.ok && sr.data?.results?.[0]) {
         const top = sr.data.results[0];
@@ -96,7 +104,7 @@ export async function POST(req: Request) {
           styles = Array.isArray(top.style) ? top.style.filter(Boolean).map(String) : [];
         }
       }
-      await pause(1000);
+      await sleep(1000);
     }
 
     if (genres.length || styles.length) {
@@ -109,8 +117,7 @@ export async function POST(req: Request) {
   }
 
   return NextResponse.json({
-    updated,
-    scanned,
+    updated, scanned,
     nextCursor: rows.length < limit ? null : lastId,
   });
 }
