@@ -43,20 +43,36 @@ export default function AdminOrganizePage() {
   const load = useCallback(async () => {
     setLoading(true);
     
-    // Load all albums
-    const { data, error } = await supabase
-      .from('collection')
-      .select('id,artist,title,year,format,image_url,discogs_genres,discogs_styles,decade,folder')
-      .order('artist', { ascending: true })
-      .limit(5000);
-
-    if (!error && data) {
-      setRows(data as Row[]);
+    // Load ALL albums with pagination
+    let allRows: Row[] = [];
+    let from = 0;
+    const batchSize = 1000;
+    let keepGoing = true;
+    
+    while (keepGoing) {
+      const { data: batch, error } = await supabase
+        .from('collection')
+        .select('id,artist,title,year,format,image_url,discogs_genres,discogs_styles,decade,folder')
+        .order('artist', { ascending: true })
+        .range(from, from + batchSize - 1);
       
-      // Extract unique folders for dropdown
-      const folders = Array.from(new Set(data.map(r => r.folder).filter(Boolean)));
-      setAvailableFolders(folders.sort());
+      if (error) {
+        console.error('Error loading albums:', error);
+        break;
+      }
+      
+      if (!batch || batch.length === 0) break;
+      
+      allRows = allRows.concat(batch as Row[]);
+      keepGoing = batch.length === batchSize;
+      from += batchSize;
     }
+    
+    setRows(allRows);
+    
+    // Extract unique folders for dropdown
+    const folders = Array.from(new Set(allRows.map(r => r.folder).filter(Boolean)));
+    setAvailableFolders(folders.sort());
     
     setLoading(false);
   }, []);
