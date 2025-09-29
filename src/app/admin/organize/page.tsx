@@ -1,4 +1,4 @@
-// Clean, usable flexible collection organization with proper UX
+// TRUE flexibility with checkbox multi-select - no more dropdown hell
 // src/app/admin/organize/page.tsx
 'use client';
 
@@ -24,7 +24,7 @@ export default function FlexibleOrganizePage() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Multi-select filter states
+  // TRUE multi-select with checkboxes - no compartmentalization 
   const [selectedFolders, setSelectedFolders] = useState<string[]>([]);
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   const [selectedStyles, setSelectedStyles] = useState<string[]>([]);
@@ -91,23 +91,23 @@ export default function FlexibleOrganizePage() {
     load();
   }, [load]);
 
-  // Apply filters with complete flexibility and AND logic
+  // Apply ALL filters with complete flexibility and AND logic
   const filteredAlbums = useMemo(() => {
     return rows.filter(row => {
-      // Folder filter (OR within selected)
+      // Multi-folder filter (OR within selected)
       if (selectedFolders.length > 0 && !selectedFolders.includes(row.folder)) return false;
       
-      // Genre filter (OR within selected)
+      // Multi-genre filter (OR within selected)
       if (selectedGenres.length > 0) {
         if (!row.discogs_genres || !row.discogs_genres.some(g => selectedGenres.includes(g))) return false;
       }
       
-      // Style filter (OR within selected)
+      // Multi-style filter (OR within selected)
       if (selectedStyles.length > 0) {
         if (!row.discogs_styles || !row.discogs_styles.some(s => selectedStyles.includes(s))) return false;
       }
       
-      // Decade filter (OR within selected)
+      // Multi-decade filter (OR within selected)
       if (selectedDecades.length > 0 && (!row.decade || !selectedDecades.includes(row.decade))) return false;
       
       // Year range filter
@@ -140,6 +140,39 @@ export default function FlexibleOrganizePage() {
   const hasActiveFilters = selectedFolders.length > 0 || selectedGenres.length > 0 || selectedStyles.length > 0 || 
                           selectedDecades.length > 0 || yearRangeStart || yearRangeEnd || artistSearch || titleSearch;
 
+  // Helper functions for checkbox handling
+  const toggleFolder = (folder: string) => {
+    setSelectedFolders(prev => 
+      prev.includes(folder) 
+        ? prev.filter(f => f !== folder)
+        : [...prev, folder]
+    );
+  };
+
+  const toggleGenre = (genre: string) => {
+    setSelectedGenres(prev => 
+      prev.includes(genre) 
+        ? prev.filter(g => g !== genre)
+        : [...prev, genre]
+    );
+  };
+
+  const toggleStyle = (style: string) => {
+    setSelectedStyles(prev => 
+      prev.includes(style) 
+        ? prev.filter(s => s !== style)
+        : [...prev, style]
+    );
+  };
+
+  const toggleDecade = (decade: number) => {
+    setSelectedDecades(prev => 
+      prev.includes(decade) 
+        ? prev.filter(d => d !== decade)
+        : [...prev, decade]
+    );
+  };
+
   return (
     <div style={{
       padding: 24,
@@ -171,7 +204,7 @@ export default function FlexibleOrganizePage() {
             fontSize: 16,
             margin: 0
           }}>
-            Combine any filters - select vinyl + 45s from 1960s-1980s that are prog rock
+            Check any combination: ☑️ Vinyl ☑️ 45s ☑️ Prog Rock ☑️ 1960s ☑️ 1970s
           </p>
         </div>
         
@@ -194,7 +227,7 @@ export default function FlexibleOrganizePage() {
         )}
       </div>
 
-      {/* Clean Filter Interface */}
+      {/* TRUE Multi-Select with Checkboxes */}
       <div style={{
         background: 'white',
         border: '1px solid #e5e7eb',
@@ -209,7 +242,7 @@ export default function FlexibleOrganizePage() {
           color: '#1f2937',
           margin: '0 0 20px 0'
         }}>
-          🎯 Multi-Select Filters (All Work Together)
+          ✅ Check Any Combination - Complete Flexibility
         </h3>
 
         {/* Search Filters */}
@@ -239,7 +272,9 @@ export default function FlexibleOrganizePage() {
                 padding: '10px 12px',
                 border: '1px solid #d1d5db',
                 borderRadius: 6,
-                fontSize: 14
+                fontSize: 14,
+                backgroundColor: 'white',
+                color: '#1f2937'
               }}
             />
           </div>
@@ -264,7 +299,9 @@ export default function FlexibleOrganizePage() {
                 padding: '10px 12px',
                 border: '1px solid #d1d5db',
                 borderRadius: 6,
-                fontSize: 14
+                fontSize: 14,
+                backgroundColor: 'white',
+                color: '#1f2937'
               }}
             />
           </div>
@@ -289,7 +326,9 @@ export default function FlexibleOrganizePage() {
                 padding: '10px 12px',
                 border: '1px solid #d1d5db',
                 borderRadius: 6,
-                fontSize: 14
+                fontSize: 14,
+                backgroundColor: 'white',
+                color: '#1f2937'
               }}
             />
           </div>
@@ -314,165 +353,210 @@ export default function FlexibleOrganizePage() {
                 padding: '10px 12px',
                 border: '1px solid #d1d5db',
                 borderRadius: 6,
-                fontSize: 14
+                fontSize: 14,
+                backgroundColor: 'white',
+                color: '#1f2937'
               }}
             />
           </div>
         </div>
 
-        {/* Multi-select dropdowns */}
+        {/* Checkbox Multi-Select Sections */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-          gap: 16,
+          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+          gap: 24,
           marginBottom: 20
         }}>
-          {/* Folders Multi-Select */}
-          <div>
-            <label style={{
-              display: 'block',
-              fontSize: 14,
+          
+          {/* Folders Checkboxes */}
+          <div style={{
+            border: '1px solid #e5e7eb',
+            borderRadius: 8,
+            padding: 16,
+            background: '#f9fafb'
+          }}>
+            <h4 style={{
+              fontSize: 16,
               fontWeight: 600,
-              color: '#374151',
-              marginBottom: 6
+              color: '#1f2937',
+              marginBottom: 12,
+              margin: 0
             }}>
-              📁 Folders (Hold Ctrl/Cmd to select multiple)
-            </label>
-            <select
-              multiple
-              value={selectedFolders}
-              onChange={e => setSelectedFolders(Array.from(e.target.selectedOptions, option => option.value))}
-              style={{
-                width: '100%',
-                height: 120,
-                padding: '8px',
-                border: '1px solid #d1d5db',
-                borderRadius: 6,
-                fontSize: 13
-              }}
-            >
+              📁 Folders ({selectedFolders.length} selected)
+            </h4>
+            <div style={{
+              maxHeight: 200,
+              overflowY: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8
+            }}>
               {availableFolders.map(folder => (
-                <option key={folder} value={folder}>
+                <label key={folder} style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  cursor: 'pointer',
+                  padding: '4px 0',
+                  fontSize: 14,
+                  color: '#374151'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={selectedFolders.includes(folder)}
+                    onChange={() => toggleFolder(folder)}
+                    style={{
+                      transform: 'scale(1.2)',
+                      accentColor: '#3b82f6'
+                    }}
+                  />
                   {folder}
-                </option>
+                </label>
               ))}
-            </select>
-            {selectedFolders.length > 0 && (
-              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
-                Selected: {selectedFolders.join(', ')}
-              </div>
-            )}
+            </div>
           </div>
 
-          {/* Genres Multi-Select */}
-          <div>
-            <label style={{
-              display: 'block',
-              fontSize: 14,
+          {/* Genres Checkboxes */}
+          <div style={{
+            border: '1px solid #e5e7eb',
+            borderRadius: 8,
+            padding: 16,
+            background: '#f9fafb'
+          }}>
+            <h4 style={{
+              fontSize: 16,
               fontWeight: 600,
-              color: '#374151',
-              marginBottom: 6
+              color: '#1f2937',
+              marginBottom: 12,
+              margin: 0
             }}>
-              🎵 Genres (Hold Ctrl/Cmd to select multiple)
-            </label>
-            <select
-              multiple
-              value={selectedGenres}
-              onChange={e => setSelectedGenres(Array.from(e.target.selectedOptions, option => option.value))}
-              style={{
-                width: '100%',
-                height: 120,
-                padding: '8px',
-                border: '1px solid #d1d5db',
-                borderRadius: 6,
-                fontSize: 13
-              }}
-            >
+              🎵 Genres ({selectedGenres.length} selected)
+            </h4>
+            <div style={{
+              maxHeight: 200,
+              overflowY: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8
+            }}>
               {availableGenres.map(genre => (
-                <option key={genre} value={genre}>
+                <label key={genre} style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  cursor: 'pointer',
+                  padding: '4px 0',
+                  fontSize: 14,
+                  color: '#374151'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={selectedGenres.includes(genre)}
+                    onChange={() => toggleGenre(genre)}
+                    style={{
+                      transform: 'scale(1.2)',
+                      accentColor: '#7c3aed'
+                    }}
+                  />
                   {genre}
-                </option>
+                </label>
               ))}
-            </select>
-            {selectedGenres.length > 0 && (
-              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
-                Selected: {selectedGenres.join(', ')}
-              </div>
-            )}
+            </div>
           </div>
 
-          {/* Styles Multi-Select */}
-          <div>
-            <label style={{
-              display: 'block',
-              fontSize: 14,
+          {/* Styles Checkboxes */}
+          <div style={{
+            border: '1px solid #e5e7eb',
+            borderRadius: 8,
+            padding: 16,
+            background: '#f9fafb'
+          }}>
+            <h4 style={{
+              fontSize: 16,
               fontWeight: 600,
-              color: '#374151',
-              marginBottom: 6
+              color: '#1f2937',
+              marginBottom: 12,
+              margin: 0
             }}>
-              🎨 Styles (Hold Ctrl/Cmd to select multiple)
-            </label>
-            <select
-              multiple
-              value={selectedStyles}
-              onChange={e => setSelectedStyles(Array.from(e.target.selectedOptions, option => option.value))}
-              style={{
-                width: '100%',
-                height: 120,
-                padding: '8px',
-                border: '1px solid #d1d5db',
-                borderRadius: 6,
-                fontSize: 13
-              }}
-            >
+              🎨 Styles ({selectedStyles.length} selected)
+            </h4>
+            <div style={{
+              maxHeight: 200,
+              overflowY: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8
+            }}>
               {availableStyles.map(style => (
-                <option key={style} value={style}>
+                <label key={style} style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  cursor: 'pointer',
+                  padding: '4px 0',
+                  fontSize: 14,
+                  color: '#374151'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={selectedStyles.includes(style)}
+                    onChange={() => toggleStyle(style)}
+                    style={{
+                      transform: 'scale(1.2)',
+                      accentColor: '#f59e0b'
+                    }}
+                  />
                   {style}
-                </option>
+                </label>
               ))}
-            </select>
-            {selectedStyles.length > 0 && (
-              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
-                Selected: {selectedStyles.join(', ')}
-              </div>
-            )}
+            </div>
           </div>
 
-          {/* Decades Multi-Select */}
-          <div>
-            <label style={{
-              display: 'block',
-              fontSize: 14,
+          {/* Decades Checkboxes */}
+          <div style={{
+            border: '1px solid #e5e7eb',
+            borderRadius: 8,
+            padding: 16,
+            background: '#f9fafb'
+          }}>
+            <h4 style={{
+              fontSize: 16,
               fontWeight: 600,
-              color: '#374151',
-              marginBottom: 6
+              color: '#1f2937',
+              marginBottom: 12,
+              margin: 0
             }}>
-              📅 Decades (Hold Ctrl/Cmd to select multiple)
-            </label>
-            <select
-              multiple
-              value={selectedDecades.map(String)}
-              onChange={e => setSelectedDecades(Array.from(e.target.selectedOptions, option => parseInt(option.value)))}
-              style={{
-                width: '100%',
-                height: 120,
-                padding: '8px',
-                border: '1px solid #d1d5db',
-                borderRadius: 6,
-                fontSize: 13
-              }}
-            >
+              📅 Decades ({selectedDecades.length} selected)
+            </h4>
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8
+            }}>
               {availableDecades.map(decade => (
-                <option key={decade} value={decade}>
+                <label key={decade} style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  cursor: 'pointer',
+                  padding: '4px 0',
+                  fontSize: 14,
+                  color: '#374151'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={selectedDecades.includes(decade)}
+                    onChange={() => toggleDecade(decade)}
+                    style={{
+                      transform: 'scale(1.2)',
+                      accentColor: '#dc2626'
+                    }}
+                  />
                   {decade}s
-                </option>
+                </label>
               ))}
-            </select>
-            {selectedDecades.length > 0 && (
-              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
-                Selected: {selectedDecades.map(d => `${d}s`).join(', ')}
-              </div>
-            )}
+            </div>
           </div>
         </div>
         
@@ -514,7 +598,7 @@ export default function FlexibleOrganizePage() {
               No albums match your filter combination
             </div>
             <div style={{ fontSize: 14 }}>
-              Try adjusting your filter selection
+              Try adjusting your checkbox selections
             </div>
           </div>
         ) : (
