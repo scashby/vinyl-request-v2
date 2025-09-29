@@ -1,4 +1,4 @@
-// Flexible multi-filter collection browser
+// Completely flexible collection organization with multi-select AND logic
 // src/app/admin/organize/page.tsx
 'use client';
 
@@ -20,17 +20,18 @@ type Row = {
   folder: string;
 };
 
-export default function AdminOrganizePage() {
+export default function FlexibleOrganizePage() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
-  const [status, setStatus] = useState<string>('');
 
-  // All possible filter options
-  const [folderFilter, setFolderFilter] = useState<string>('all');
-  const [genreFilter, setGenreFilter] = useState<string>('all');
-  const [styleFilter, setStyleFilter] = useState<string>('all');
-  const [decadeFilter, setDecadeFilter] = useState<string>('all');
-  const [letterFilter, setLetterFilter] = useState<string>('all');
+  // Multi-select filter states
+  const [selectedFolders, setSelectedFolders] = useState<string[]>([]);
+  const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
+  const [selectedStyles, setSelectedStyles] = useState<string[]>([]);
+  const [selectedDecades, setSelectedDecades] = useState<number[]>([]);
+  const [selectedFormats, setSelectedFormats] = useState<string[]>([]);
+  const [yearRangeStart, setYearRangeStart] = useState<string>('');
+  const [yearRangeEnd, setYearRangeEnd] = useState<string>('');
   const [artistSearch, setArtistSearch] = useState<string>('');
   const [titleSearch, setTitleSearch] = useState<string>('');
 
@@ -39,6 +40,7 @@ export default function AdminOrganizePage() {
   const [availableGenres, setAvailableGenres] = useState<string[]>([]);
   const [availableStyles, setAvailableStyles] = useState<string[]>([]);
   const [availableDecades, setAvailableDecades] = useState<number[]>([]);
+  const [availableFormats, setAvailableFormats] = useState<string[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -73,6 +75,9 @@ export default function AdminOrganizePage() {
     const folders = Array.from(new Set(allRows.map(r => r.folder).filter(Boolean)));
     setAvailableFolders(folders.sort());
     
+    const formats = Array.from(new Set(allRows.map(r => r.format).filter(Boolean)));
+    setAvailableFormats(formats.sort());
+    
     const genres = new Set<string>();
     allRows.forEach(r => r.discogs_genres?.forEach(g => genres.add(g)));
     setAvailableGenres(Array.from(genres).sort());
@@ -91,31 +96,34 @@ export default function AdminOrganizePage() {
     load();
   }, [load]);
 
-  // Apply ALL filters with AND logic
+  // Apply ALL filters with AND logic - COMPLETELY FLEXIBLE
   const filteredAlbums = useMemo(() => {
     return rows.filter(row => {
-      // Folder filter
-      if (folderFilter !== 'all' && row.folder !== folderFilter) return false;
+      // Multi-select folder filter (OR within selected folders)
+      if (selectedFolders.length > 0 && !selectedFolders.includes(row.folder)) return false;
       
-      // Genre filter
-      if (genreFilter !== 'all') {
-        if (!row.discogs_genres?.includes(genreFilter)) return false;
+      // Multi-select format filter (OR within selected formats)  
+      if (selectedFormats.length > 0 && !selectedFormats.includes(row.format)) return false;
+      
+      // Multi-select genre filter (OR within selected genres)
+      if (selectedGenres.length > 0) {
+        if (!row.discogs_genres || !row.discogs_genres.some(g => selectedGenres.includes(g))) return false;
       }
       
-      // Style filter
-      if (styleFilter !== 'all') {
-        if (!row.discogs_styles?.includes(styleFilter)) return false;
+      // Multi-select style filter (OR within selected styles)
+      if (selectedStyles.length > 0) {
+        if (!row.discogs_styles || !row.discogs_styles.some(s => selectedStyles.includes(s))) return false;
       }
       
-      // Decade filter
-      if (decadeFilter !== 'all') {
-        if (String(row.decade) !== decadeFilter) return false;
-      }
+      // Multi-select decade filter (OR within selected decades)
+      if (selectedDecades.length > 0 && (!row.decade || !selectedDecades.includes(row.decade))) return false;
       
-      // Letter filter (artist starts with)
-      if (letterFilter !== 'all') {
-        const firstLetter = row.artist?.charAt(0).toUpperCase();
-        if (firstLetter !== letterFilter) return false;
+      // Year range filter
+      if (yearRangeStart || yearRangeEnd) {
+        const albumYear = parseInt(row.year || '0');
+        if (isNaN(albumYear)) return false;
+        if (yearRangeStart && albumYear < parseInt(yearRangeStart)) return false;
+        if (yearRangeEnd && albumYear > parseInt(yearRangeEnd)) return false;
       }
       
       // Artist search
@@ -126,68 +134,32 @@ export default function AdminOrganizePage() {
       
       return true;
     });
-  }, [rows, folderFilter, genreFilter, styleFilter, decadeFilter, letterFilter, artistSearch, titleSearch]);
+  }, [rows, selectedFolders, selectedFormats, selectedGenres, selectedStyles, selectedDecades, yearRangeStart, yearRangeEnd, artistSearch, titleSearch]);
 
-  async function runEnrichAll() {
-    setStatus('Enriching missing genres/styles from Discogs...');
-    let cursor: number | null = 0;
-    let updated = 0, scanned = 0;
-
-    while (cursor !== null) {
-      interface EnrichFilters {
-        cursor: number | null;
-        limit: number;
-        folderExact?: string;
-        artistSearch?: string;
-        titleSearch?: string;
-      }
-      
-      const filters: EnrichFilters = { cursor, limit: 80 };
-      if (folderFilter !== 'all') filters.folderExact = folderFilter;
-      if (artistSearch) filters.artistSearch = artistSearch;
-      if (titleSearch) filters.titleSearch = titleSearch;
-
-      const res = await fetch('/api/enrich', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(filters)
-      });
-      
-      const json = await res.json();
-      if (!res.ok) { 
-        setStatus(`Error: ${json?.error || res.status}`); 
-        return; 
-      }
-      
-      updated += json.updated || 0;
-      scanned += json.scanned || 0;
-      cursor = json.nextCursor;
-      
-      setStatus(`Updated ${updated} / scanned ${scanned}...`);
-      
-      if (cursor !== null) {
-        await new Promise(r => setTimeout(r, 400));
-      }
-    }
-    
-    setStatus(`✅ Done! Updated ${updated} of ${scanned} albums.`);
-    await load();
-  }
-
-  const clearFilters = () => {
-    setFolderFilter('all');
-    setGenreFilter('all');
-    setStyleFilter('all');
-    setDecadeFilter('all');
-    setLetterFilter('all');
+  const clearAllFilters = () => {
+    setSelectedFolders([]);
+    setSelectedGenres([]);
+    setSelectedStyles([]);
+    setSelectedDecades([]);
+    setSelectedFormats([]);
+    setYearRangeStart('');
+    setYearRangeEnd('');
     setArtistSearch('');
     setTitleSearch('');
   };
 
-  const hasActiveFilters = folderFilter !== 'all' || genreFilter !== 'all' || styleFilter !== 'all' || 
-                          decadeFilter !== 'all' || letterFilter !== 'all' || artistSearch || titleSearch;
+  const hasActiveFilters = selectedFolders.length > 0 || selectedGenres.length > 0 || selectedStyles.length > 0 || 
+                          selectedDecades.length > 0 || selectedFormats.length > 0 || yearRangeStart || yearRangeEnd || 
+                          artistSearch || titleSearch;
 
-  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+  // Multi-select toggle helpers
+  const toggleArraySelection = <T,>(array: T[], setArray: (arr: T[]) => void, item: T) => {
+    if (array.includes(item)) {
+      setArray(array.filter(i => i !== item));
+    } else {
+      setArray([...array, item]);
+    }
+  };
 
   return (
     <div style={{
@@ -213,57 +185,24 @@ export default function AdminOrganizePage() {
             color: '#1f2937',
             margin: '0 0 8px 0'
           }}>
-            Organize Collection
+            Completely Flexible Collection Organization
           </h1>
           <p style={{
             color: '#6b7280',
             fontSize: 16,
             margin: 0
           }}>
-            Combine any filters to find exactly what you&apos;re looking for
+            Select multiple options from any category - all filters work together with AND logic
           </p>
         </div>
-        
-        <button
-          onClick={() => runEnrichAll()}
-          disabled={loading}
-          style={{
-            background: loading ? '#9ca3af' : 'linear-gradient(135deg, #6366f1, #4f46e5)',
-            color: 'white',
-            border: 'none',
-            borderRadius: 8,
-            padding: '12px 20px',
-            fontSize: 14,
-            fontWeight: 600,
-            cursor: loading ? 'not-allowed' : 'pointer',
-            boxShadow: loading ? 'none' : '0 4px 6px rgba(99, 102, 241, 0.2)'
-          }}
-        >
-          🔄 Enrich Missing Metadata
-        </button>
       </div>
 
-      {/* Status Message */}
-      {status && (
-        <div style={{
-          background: status.includes('✅') ? '#dcfce7' : status.includes('Error') ? '#fee2e2' : '#dbeafe',
-          border: `1px solid ${status.includes('✅') ? '#16a34a' : status.includes('Error') ? '#dc2626' : '#3b82f6'}`,
-          borderRadius: 8,
-          padding: 16,
-          marginBottom: 24,
-          color: status.includes('✅') ? '#15803d' : status.includes('Error') ? '#991b1b' : '#1e40af',
-          fontSize: 14
-        }}>
-          {status}
-        </div>
-      )}
-
-      {/* Flexible Filters */}
+      {/* Completely Flexible Filters */}
       <div style={{
         background: 'white',
         border: '1px solid #e5e7eb',
         borderRadius: 12,
-        padding: 20,
+        padding: 24,
         marginBottom: 24,
         boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
       }}>
@@ -271,28 +210,28 @@ export default function AdminOrganizePage() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          marginBottom: 16
+          marginBottom: 20
         }}>
           <h3 style={{
-            fontSize: 16,
+            fontSize: 18,
             fontWeight: 600,
             color: '#1f2937',
             margin: 0
           }}>
-            🔍 Combine Filters (All work together)
+            🎯 Multi-Select Filters (Pick Any Combination)
           </h3>
           
           {hasActiveFilters && (
             <button
-              onClick={clearFilters}
+              onClick={clearAllFilters}
               style={{
-                background: '#f3f4f6',
-                border: '1px solid #d1d5db',
+                background: '#ef4444',
+                border: 'none',
                 borderRadius: 6,
-                padding: '6px 12px',
+                padding: '8px 16px',
                 fontSize: 12,
                 fontWeight: 600,
-                color: '#6b7280',
+                color: 'white',
                 cursor: 'pointer'
               }}
             >
@@ -300,198 +239,15 @@ export default function AdminOrganizePage() {
             </button>
           )}
         </div>
-        
-        {/* Dropdown Filters */}
+
+        {/* Search Filters */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
           gap: 16,
-          marginBottom: 16
+          marginBottom: 20
         }}>
           <div>
-            <label style={{
-              display: 'block',
-              fontSize: 12,
-              fontWeight: 600,
-              color: '#6b7280',
-              marginBottom: 6
-            }}>
-              Folder
-            </label>
-            <select
-              value={folderFilter}
-              onChange={e => setFolderFilter(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                border: '1px solid #d1d5db',
-                borderRadius: 6,
-                fontSize: 14,
-                background: 'white',
-                color: '#1f2937',
-                cursor: 'pointer'
-              }}
-            >
-              <option value="all" style={{ color: '#1f2937', background: 'white' }}>All Folders</option>
-              {availableFolders.map(folder => (
-                <option key={folder} value={folder} style={{ color: '#1f2937', background: 'white' }}>{folder}</option>
-              ))}
-            </select>
-          </div>
-          
-          <div>
-            <label style={{
-              display: 'block',
-              fontSize: 12,
-              fontWeight: 600,
-              color: '#6b7280',
-              marginBottom: 6
-            }}>
-              Genre
-            </label>
-            <select
-              value={genreFilter}
-              onChange={e => setGenreFilter(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                border: '1px solid #d1d5db',
-                borderRadius: 6,
-                fontSize: 14,
-                background: 'white',
-                color: '#1f2937',
-                cursor: 'pointer'
-              }}
-            >
-              <option value="all" style={{ color: '#1f2937', background: 'white' }}>All Genres</option>
-              {availableGenres.map(genre => (
-                <option key={genre} value={genre} style={{ color: '#1f2937', background: 'white' }}>{genre}</option>
-              ))}
-            </select>
-          </div>
-          
-          <div>
-            <label style={{
-              display: 'block',
-              fontSize: 12,
-              fontWeight: 600,
-              color: '#6b7280',
-              marginBottom: 6
-            }}>
-              Style
-            </label>
-            <select
-              value={styleFilter}
-              onChange={e => setStyleFilter(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                border: '1px solid #d1d5db',
-                borderRadius: 6,
-                fontSize: 14,
-                background: 'white',
-                color: '#1f2937',
-                cursor: 'pointer'
-              }}
-            >
-              <option value="all" style={{ color: '#1f2937', background: 'white' }}>All Styles</option>
-              {availableStyles.map(style => (
-                <option key={style} value={style} style={{ color: '#1f2937', background: 'white' }}>{style}</option>
-              ))}
-            </select>
-          </div>
-          
-          <div>
-            <label style={{
-              display: 'block',
-              fontSize: 12,
-              fontWeight: 600,
-              color: '#6b7280',
-              marginBottom: 6
-            }}>
-              Decade
-            </label>
-            <select
-              value={decadeFilter}
-              onChange={e => setDecadeFilter(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                border: '1px solid #d1d5db',
-                borderRadius: 6,
-                fontSize: 14,
-                background: 'white',
-                color: '#1f2937',
-                cursor: 'pointer'
-              }}
-            >
-              <option value="all" style={{ color: '#1f2937', background: 'white' }}>All Decades</option>
-              {availableDecades.map(decade => (
-                <option key={decade} value={String(decade)} style={{ color: '#1f2937', background: 'white' }}>{decade}s</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Letter Filter */}
-        <div style={{ marginBottom: 16 }}>
-          <label style={{
-            display: 'block',
-            fontSize: 12,
-            fontWeight: 600,
-            color: '#6b7280',
-            marginBottom: 6
-          }}>
-            Artist Starts With
-          </label>
-          <div style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: 4
-          }}>
-            <button
-              onClick={() => setLetterFilter('all')}
-              style={{
-                padding: '4px 10px',
-                fontSize: 12,
-                fontWeight: 600,
-                border: '1px solid #d1d5db',
-                borderRadius: 4,
-                background: letterFilter === 'all' ? '#3b82f6' : 'white',
-                color: letterFilter === 'all' ? 'white' : '#374151',
-                cursor: 'pointer'
-              }}
-            >
-              All
-            </button>
-            {alphabet.map(letter => (
-              <button
-                key={letter}
-                onClick={() => setLetterFilter(letter)}
-                style={{
-                  padding: '4px 10px',
-                  fontSize: 12,
-                  fontWeight: 600,
-                  border: '1px solid #d1d5db',
-                  borderRadius: 4,
-                  background: letterFilter === letter ? '#3b82f6' : 'white',
-                  color: letterFilter === letter ? 'white' : '#374151',
-                  cursor: 'pointer'
-                }}
-              >
-                {letter}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Text Search Filters */}
-        <div style={{
-          display: 'flex',
-          gap: 16,
-          flexWrap: 'wrap'
-        }}>
-          <div style={{ flex: '1 1 200px' }}>
             <label style={{
               display: 'block',
               fontSize: 12,
@@ -503,6 +259,9 @@ export default function AdminOrganizePage() {
             </label>
             <input
               type="text"
+              value={artistSearch}
+              onChange={e => setArtistSearch(e.target.value)}
+              placeholder="Search artist..."
               style={{
                 width: '100%',
                 padding: '8px 12px',
@@ -510,13 +269,10 @@ export default function AdminOrganizePage() {
                 borderRadius: 6,
                 fontSize: 14
               }}
-              value={artistSearch}
-              onChange={e => setArtistSearch(e.target.value)}
-              placeholder="Search by artist..."
             />
           </div>
           
-          <div style={{ flex: '1 1 200px' }}>
+          <div>
             <label style={{
               display: 'block',
               fontSize: 12,
@@ -528,6 +284,9 @@ export default function AdminOrganizePage() {
             </label>
             <input
               type="text"
+              value={titleSearch}
+              onChange={e => setTitleSearch(e.target.value)}
+              placeholder="Search title..."
               style={{
                 width: '100%',
                 padding: '8px 12px',
@@ -535,16 +294,287 @@ export default function AdminOrganizePage() {
                 borderRadius: 6,
                 fontSize: 14
               }}
-              value={titleSearch}
-              onChange={e => setTitleSearch(e.target.value)}
-              placeholder="Search by title..."
             />
           </div>
+
+          <div>
+            <label style={{
+              display: 'block',
+              fontSize: 12,
+              fontWeight: 600,
+              color: '#6b7280',
+              marginBottom: 6
+            }}>
+              Year From
+            </label>
+            <input
+              type="number"
+              value={yearRangeStart}
+              onChange={e => setYearRangeStart(e.target.value)}
+              placeholder="1960"
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                border: '1px solid #d1d5db',
+                borderRadius: 6,
+                fontSize: 14
+              }}
+            />
+          </div>
+
+          <div>
+            <label style={{
+              display: 'block',
+              fontSize: 12,
+              fontWeight: 600,
+              color: '#6b7280',
+              marginBottom: 6
+            }}>
+              Year To
+            </label>
+            <input
+              type="number"
+              value={yearRangeEnd}
+              onChange={e => setYearRangeEnd(e.target.value)}
+              placeholder="1980"
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                border: '1px solid #d1d5db',
+                borderRadius: 6,
+                fontSize: 14
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Multi-Select Format Filter */}
+        <div style={{ marginBottom: 20 }}>
+          <label style={{
+            display: 'block',
+            fontSize: 14,
+            fontWeight: 600,
+            color: '#1f2937',
+            marginBottom: 8
+          }}>
+            📀 Formats (Select Multiple)
+          </label>
+          <div style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 8
+          }}>
+            {availableFormats.map(format => (
+              <button
+                key={format}
+                onClick={() => toggleArraySelection(selectedFormats, setSelectedFormats, format)}
+                style={{
+                  padding: '6px 12px',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  border: '2px solid #3b82f6',
+                  borderRadius: 6,
+                  background: selectedFormats.includes(format) ? '#3b82f6' : 'white',
+                  color: selectedFormats.includes(format) ? 'white' : '#3b82f6',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                {format}
+              </button>
+            ))}
+          </div>
+          {selectedFormats.length > 0 && (
+            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+              Selected: {selectedFormats.join(', ')}
+            </div>
+          )}
+        </div>
+
+        {/* Multi-Select Folder Filter */}
+        <div style={{ marginBottom: 20 }}>
+          <label style={{
+            display: 'block',
+            fontSize: 14,
+            fontWeight: 600,
+            color: '#1f2937',
+            marginBottom: 8
+          }}>
+            📁 Folders (Select Multiple)
+          </label>
+          <div style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 8
+          }}>
+            {availableFolders.map(folder => (
+              <button
+                key={folder}
+                onClick={() => toggleArraySelection(selectedFolders, setSelectedFolders, folder)}
+                style={{
+                  padding: '6px 12px',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  border: '2px solid #059669',
+                  borderRadius: 6,
+                  background: selectedFolders.includes(folder) ? '#059669' : 'white',
+                  color: selectedFolders.includes(folder) ? 'white' : '#059669',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                {folder}
+              </button>
+            ))}
+          </div>
+          {selectedFolders.length > 0 && (
+            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+              Selected: {selectedFolders.join(', ')}
+            </div>
+          )}
+        </div>
+
+        {/* Multi-Select Genre Filter */}
+        <div style={{ marginBottom: 20 }}>
+          <label style={{
+            display: 'block',
+            fontSize: 14,
+            fontWeight: 600,
+            color: '#1f2937',
+            marginBottom: 8
+          }}>
+            🎵 Genres (Select Multiple)
+          </label>
+          <div style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 8,
+            maxHeight: 200,
+            overflowY: 'auto',
+            padding: 8,
+            border: '1px solid #e5e7eb',
+            borderRadius: 6
+          }}>
+            {availableGenres.map(genre => (
+              <button
+                key={genre}
+                onClick={() => toggleArraySelection(selectedGenres, setSelectedGenres, genre)}
+                style={{
+                  padding: '4px 8px',
+                  fontSize: 11,
+                  fontWeight: 600,
+                  border: '2px solid #7c3aed',
+                  borderRadius: 4,
+                  background: selectedGenres.includes(genre) ? '#7c3aed' : 'white',
+                  color: selectedGenres.includes(genre) ? 'white' : '#7c3aed',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                {genre}
+              </button>
+            ))}
+          </div>
+          {selectedGenres.length > 0 && (
+            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+              Selected: {selectedGenres.join(', ')}
+            </div>
+          )}
+        </div>
+
+        {/* Multi-Select Style Filter */}
+        <div style={{ marginBottom: 20 }}>
+          <label style={{
+            display: 'block',
+            fontSize: 14,
+            fontWeight: 600,
+            color: '#1f2937',
+            marginBottom: 8
+          }}>
+            🎨 Styles (Select Multiple)
+          </label>
+          <div style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 8,
+            maxHeight: 200,
+            overflowY: 'auto',
+            padding: 8,
+            border: '1px solid #e5e7eb',
+            borderRadius: 6
+          }}>
+            {availableStyles.map(style => (
+              <button
+                key={style}
+                onClick={() => toggleArraySelection(selectedStyles, setSelectedStyles, style)}
+                style={{
+                  padding: '4px 8px',
+                  fontSize: 11,
+                  fontWeight: 600,
+                  border: '2px solid #f59e0b',
+                  borderRadius: 4,
+                  background: selectedStyles.includes(style) ? '#f59e0b' : 'white',
+                  color: selectedStyles.includes(style) ? 'white' : '#f59e0b',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                {style}
+              </button>
+            ))}
+          </div>
+          {selectedStyles.length > 0 && (
+            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+              Selected: {selectedStyles.join(', ')}
+            </div>
+          )}
+        </div>
+
+        {/* Multi-Select Decade Filter */}
+        <div style={{ marginBottom: 20 }}>
+          <label style={{
+            display: 'block',
+            fontSize: 14,
+            fontWeight: 600,
+            color: '#1f2937',
+            marginBottom: 8
+          }}>
+            📅 Decades (Select Multiple)
+          </label>
+          <div style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 8
+          }}>
+            {availableDecades.map(decade => (
+              <button
+                key={decade}
+                onClick={() => toggleArraySelection(selectedDecades, setSelectedDecades, decade)}
+                style={{
+                  padding: '6px 12px',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  border: '2px solid #dc2626',
+                  borderRadius: 6,
+                  background: selectedDecades.includes(decade) ? '#dc2626' : 'white',
+                  color: selectedDecades.includes(decade) ? 'white' : '#dc2626',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                {decade}s
+              </button>
+            ))}
+          </div>
+          {selectedDecades.length > 0 && (
+            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+              Selected: {selectedDecades.map(d => `${d}s`).join(', ')}
+            </div>
+          )}
         </div>
         
         {/* Results Count */}
         <div style={{
-          marginTop: 16,
           padding: 12,
           background: '#f0f9ff',
           border: '1px solid #bae6fd',
@@ -578,10 +608,10 @@ export default function AdminOrganizePage() {
           <div style={{ color: '#6b7280', textAlign: 'center', padding: 40 }}>
             <div style={{ fontSize: 48, marginBottom: 16 }}>🔍</div>
             <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>
-              No albums match your filters
+              No albums match your filter combination
             </div>
             <div style={{ fontSize: 14 }}>
-              Try adjusting your filter criteria
+              Try adjusting your filter selection
             </div>
           </div>
         ) : (
@@ -656,6 +686,7 @@ export default function AdminOrganizePage() {
                 }}>
                   {album.year && <span>{album.year}</span>}
                   {album.folder && <span>• {album.folder}</span>}
+                  {album.format && <span>• {album.format}</span>}
                 </div>
               </Link>
             ))}
