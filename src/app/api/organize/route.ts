@@ -1,3 +1,4 @@
+// Fixed API route: src/app/api/organize/route.ts
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -7,15 +8,15 @@ const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSessi
 
 type Body = {
   cursor?: number | null;
-  limit?: number; // 50..2000 (default 500)
+  limit?: number;
   scope?: {
-    folderLike?: string;
-    artistLike?: string;
-    titleLike?: string;
+    folderExact?: string;
+    artistSearch?: string;
+    titleSearch?: string;
   };
-  base?: string;            // e.g. 'vinyl'
-  unknownLabel?: string;    // default '(unknown)'
-  dryRun?: boolean;         // preview only if true
+  base?: string;
+  unknownLabel?: string;
+  dryRun?: boolean;
 };
 
 function sanitize(text: string) {
@@ -39,10 +40,17 @@ export async function POST(req: Request) {
     .order("id", { ascending: true })
     .limit(limit);
 
+  // Apply user-friendly filters
   const s = body.scope ?? {};
-  if (s.folderLike) q = q.like("folder", s.folderLike);
-  if (s.artistLike) q = q.ilike("artist", s.artistLike);
-  if (s.titleLike)  q = q.ilike("title", s.titleLike);
+  if (s.folderExact && s.folderExact !== 'all') {
+    q = q.eq("folder", s.folderExact);
+  }
+  if (s.artistSearch) {
+    q = q.ilike("artist", `%${s.artistSearch}%`);
+  }
+  if (s.titleSearch) {
+    q = q.ilike("title", `%${s.titleSearch}%`);
+  }
 
   const { data, error } = await q;
   if (error) return NextResponse.json({ error }, { status: 500 });

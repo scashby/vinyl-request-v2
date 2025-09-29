@@ -1,3 +1,4 @@
+// Fixed API route: src/app/api/enrich/route.ts
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -33,18 +34,20 @@ async function getJson<T>(url: string) {
   }
   return {ok:false, status:599};
 }
+
 const pick = (r?:DiscogsRelease)=>({
   genres: Array.isArray(r?.genres)? r!.genres.filter(Boolean).map(String):[],
   styles: Array.isArray(r?.styles)? r!.styles.filter(Boolean).map(String):[],
 });
+
 const yearInt = (y:string|null)=> (y||"").match(/\b(\d{4})\b/)?.[1];
 
 type Body = {
   cursor?: number|null;
-  limit?: number;          // 10..250 (default 60)
-  folderLike?: string;     // e.g. 'vinyl%' (optional)
-  artistLike?: string;     // e.g. '%beatles%' (optional)
-  titleLike?: string;      // e.g. '%blue%' (optional)
+  limit?: number;
+  folderExact?: string;      // Exact folder match
+  artistSearch?: string;      // Partial artist search
+  titleSearch?: string;       // Partial title search
 };
 
 export async function POST(req: Request) {
@@ -57,14 +60,21 @@ export async function POST(req: Request) {
   let q = supabase
     .from("collection")
     .select("id,artist,title,year,discogs_release_id")
-    .or("discogs_genres.is.null,discogs_styles.is.null") // ONLY rows missing data
+    .or("discogs_genres.is.null,discogs_styles.is.null")
     .gt("id", cursor)
     .order("id", { ascending: true })
     .limit(limit);
 
-  if (b.folderLike) q = q.like("folder", b.folderLike);
-  if (b.artistLike) q = q.ilike("artist", b.artistLike);
-  if (b.titleLike)  q = q.ilike("title", b.titleLike);
+  // Apply user-friendly filters
+  if (b.folderExact && b.folderExact !== 'all') {
+    q = q.eq("folder", b.folderExact);
+  }
+  if (b.artistSearch) {
+    q = q.ilike("artist", `%${b.artistSearch}%`);
+  }
+  if (b.titleSearch) {
+    q = q.ilike("title", `%${b.titleSearch}%`);
+  }
 
   const { data, error } = await q;
   if (error) return NextResponse.json({ error }, { status: 500 });
