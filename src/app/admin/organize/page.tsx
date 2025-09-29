@@ -12,6 +12,7 @@ type Row = {
   artist: string;
   title: string;
   year: string | null;
+  master_release_date: string | null;
   format: string;
   image_url: string | null;
   discogs_genres: string[] | null;
@@ -51,7 +52,7 @@ export default function FlexibleOrganizePage() {
     while (keepGoing) {
       const { data: batch, error } = await supabase
         .from('collection')
-        .select('id,artist,title,year,format,image_url,discogs_genres,discogs_styles,decade,folder')
+        .select('id,artist,title,year,master_release_date,format,image_url,discogs_genres,discogs_styles,decade,folder')
         .order('artist', { ascending: true })
         .range(from, from + batchSize - 1);
       
@@ -110,9 +111,11 @@ export default function FlexibleOrganizePage() {
       // Multi-decade filter (OR within selected)
       if (selectedDecades.length > 0 && (!row.decade || !selectedDecades.includes(row.decade))) return false;
       
-      // Year range filter
+      // Year range filter - use master release date (original release) if available
       if (yearRangeStart || yearRangeEnd) {
-        const albumYear = parseInt(row.year || '0');
+        // Prefer master release date (original release) over pressing year
+        const originalYear = row.master_release_date || row.year;
+        const albumYear = parseInt(originalYear || '0');
         if (isNaN(albumYear)) return false;
         if (yearRangeStart && albumYear < parseInt(yearRangeStart)) return false;
         if (yearRangeEnd && albumYear > parseInt(yearRangeEnd)) return false;
@@ -204,9 +207,43 @@ export default function FlexibleOrganizePage() {
             fontSize: 16,
             margin: 0
           }}>
-            Check any combination: ☑️ Vinyl ☑️ 45s ☑️ Prog Rock ☑️ 1960s ☑️ 1970s
+            Check any combination: ☑️ Vinyl ☑️ 45s ☑️ Prog Rock ☑️ 1960s-1980s (original release years)
           </p>
         </div>
+        
+        <button
+          onClick={async () => {
+            setLoading(true);
+            try {
+              const res = await fetch('/api/enrich', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ cursor: 0, limit: 100 })
+              });
+              const result = await res.json();
+              alert(`Enriched ${result.updated} items with master release dates`);
+              await load(); // Reload data
+            } catch (err) {
+              alert(`Enrichment failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+            } finally {
+              setLoading(false);
+            }
+          }}
+          disabled={loading}
+          style={{
+            background: '#059669',
+            border: 'none',
+            borderRadius: 6,
+            padding: '8px 16px',
+            fontSize: 14,
+            fontWeight: 600,
+            color: 'white',
+            cursor: loading ? 'not-allowed' : 'pointer',
+            opacity: loading ? 0.6 : 1
+          }}
+        >
+          {loading ? 'Enriching...' : 'Enrich Master Release Dates'}
+        </button>
         
         {hasActiveFilters && (
           <button
@@ -314,7 +351,7 @@ export default function FlexibleOrganizePage() {
               color: '#374151',
               marginBottom: 6
             }}>
-              Year From
+              Original Release Year From
             </label>
             <input
               type="number"
@@ -341,7 +378,7 @@ export default function FlexibleOrganizePage() {
               color: '#374151',
               marginBottom: 6
             }}>
-              Year To
+              Original Release Year To
             </label>
             <input
               type="number"
@@ -671,7 +708,12 @@ export default function FlexibleOrganizePage() {
                   gap: 4,
                   flexWrap: 'wrap'
                 }}>
-                  {album.year && <span>{album.year}</span>}
+                  {/* Show original release year primarily, with pressing year if different */}
+                  {album.master_release_date && album.master_release_date !== album.year ? (
+                    <span title="Original release / This pressing">{album.master_release_date} ({album.year})</span>
+                  ) : (
+                    album.year && <span>{album.year}</span>
+                  )}
                   {album.folder && <span>• {album.folder}</span>}
                 </div>
               </Link>
