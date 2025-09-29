@@ -381,12 +381,13 @@ export default function AdminOrganizePage() {
                 borderRadius: 6,
                 fontSize: 14,
                 background: 'white',
+                color: '#1f2937',
                 cursor: 'pointer'
               }}
             >
-              <option value="all">All Folders</option>
+              <option value="all" style={{ color: '#1f2937', background: 'white' }}>All Folders</option>
               {availableFolders.map(folder => (
-                <option key={folder} value={folder}>{folder}</option>
+                <option key={folder} value={folder} style={{ color: '#1f2937', background: 'white' }}>{folder}</option>
               ))}
             </select>
           </div>

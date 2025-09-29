@@ -1,10 +1,12 @@
+// Enhanced Discogs Import - populates genres, styles, and decade
+// Replace: src/app/admin/import-discogs/page.tsx
+
 'use client';
 
 import { useState } from 'react';
 import Papa from 'papaparse';
 import { supabase } from 'src/lib/supabaseClient';
 
-// Updated type to match actual Discogs CSV export structure
 type DiscogsCSVRow = {
   'Catalog#': string;
   Artist: string;
@@ -21,7 +23,6 @@ type DiscogsCSVRow = {
   'Collection Notes': string | null;
 };
 
-// Type for the processed row that will go to Supabase
 type ProcessedRow = {
   artist: string;
   title: string;
@@ -33,11 +34,11 @@ type ProcessedRow = {
   date_added: string;
   image_url: string | null;
   tracklists: string | null;
+  discogs_genres: string[] | null;
+  discogs_styles: string[] | null;
+  decade: number | null;
 };
 
-type EnrichedRow = ProcessedRow;
-
-// Type for existing database records
 type ExistingRecord = {
   id: number;
   discogs_release_id: string;
@@ -48,68 +49,61 @@ type ExistingRecord = {
   media_condition: string | null;
   image_url: string | null;
   tracklists: string | null;
+  discogs_genres: string[] | null;
+  discogs_styles: string[] | null;
+  decade: number | null;
 };
 
-// Type for update operations
 type UpdateOperation = {
   csvRow: ProcessedRow;
   existingRecord: ExistingRecord;
 };
 
-// Type for complete sync preview
 type SyncPreview = {
-  newItems: EnrichedRow[];
+  newItems: ProcessedRow[];
   updateOperations: UpdateOperation[];
   recordsToRemove: ExistingRecord[];
 };
 
-// Type for sync data storage
 interface SyncDataStorage {
   updateOperations?: UpdateOperation[];
   recordsToRemove?: ExistingRecord[];
 }
 
-// Helper function to normalize values for comparison
+// Calculate decade from year
+function calculateDecade(year: number | null): number | null {
+  if (!year || year <= 0) return null;
+  return Math.floor(year / 10) * 10;
+}
+
 function normalizeValue(value: string | number | null | undefined): string {
   if (value === null || value === undefined) return '';
   return String(value).trim();
 }
 
-// Helper function to safely compare two values
 function valuesAreEqual(val1: string | number | null | undefined, val2: string | number | null | undefined): boolean {
   const norm1 = normalizeValue(val1);
   const norm2 = normalizeValue(val2);
   return norm1 === norm2;
 }
 
-// Helper function to provide default values for required fields
 function sanitizeMediaCondition(condition: string | null | undefined): string {
-  if (!condition || condition.trim() === '') {
-    return 'Unknown'; // Default value for required field
-  }
+  if (!condition || condition.trim() === '') return 'Unknown';
   return condition.trim();
 }
 
 function sanitizeFolder(folder: string | null | undefined): string {
-  if (!folder || folder.trim() === '') {
-    return 'Uncategorized'; // Default folder
-  }
+  if (!folder || folder.trim() === '') return 'Uncategorized';
   return folder.trim();
 }
 
 function parseDiscogsDate(dateString: string): string {
-  if (!dateString || dateString.trim() === '') {
-    return new Date().toISOString();
-  }
-  
+  if (!dateString || dateString.trim() === '') return new Date().toISOString();
   try {
     const parsed = new Date(dateString);
-    if (isNaN(parsed.getTime())) {
-      return new Date().toISOString();
-    }
+    if (isNaN(parsed.getTime())) return new Date().toISOString();
     return parsed.toISOString();
-  } catch (error) {
-    console.warn('Failed to parse Discogs date:', dateString, error);
+  } catch {
     return new Date().toISOString();
   }
 }
@@ -124,26 +118,31 @@ type DiscogsTrack = {
 type DiscogsResponse = {
   images?: Array<{ uri: string }>;
   tracklist?: DiscogsTrack[];
+  genres?: string[];
+  styles?: string[];
 };
 
 export default function ImportDiscogsPage() {
   const [syncPreview, setSyncPreview] = useState<SyncPreview | null>(null);
   const [status, setStatus] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [debugInfo, setDebugInfo] = useState<string>('');
 
-  // Add rate limiting for Discogs API
   const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+  // ENHANCED: Now fetches genres, styles, images, and tracklists
   const fetchDiscogsData = async (
     releaseId: string,
     retries = 3
-  ): Promise<{ image_url: string | null; tracklists: string | null }> => {
+  ): Promise<{ 
+    image_url: string | null; 
+    tracklists: string | null;
+    genres: string[] | null;
+    styles: string[] | null;
+  }> => {
     const url = `https://api.discogs.com/releases/${releaseId}`;
     
     for (let attempt = 0; attempt < retries; attempt++) {
       try {
-        // Add delay to respect rate limits (1 request per second for free accounts)
         if (attempt > 0) await delay(1000);
         
         const res = await fetch(url, {
@@ -154,19 +153,18 @@ export default function ImportDiscogsPage() {
         });
         
         if (res.status === 429) {
-          // Rate limited, wait longer
           await delay(2000);
           continue;
         }
         
         if (!res.ok) {
           console.warn(`Failed to fetch release ${releaseId}, status: ${res.status}`);
-          return { image_url: null, tracklists: null };
+          return { image_url: null, tracklists: null, genres: null, styles: null };
         }
         
         const data = await res.json() as DiscogsResponse;
         
-        // Process tracklist - store as JSON string for Supabase
+        // Process tracklist
         let tracklistsStr = null;
         if (Array.isArray(data.tracklist) && data.tracklist.length > 0) {
           tracklistsStr = JSON.stringify(data.tracklist.map((track: DiscogsTrack) => ({
@@ -177,20 +175,31 @@ export default function ImportDiscogsPage() {
           })));
         }
         
+        // Extract genres and styles
+        const genres = Array.isArray(data.genres) && data.genres.length > 0 
+          ? data.genres.filter(g => g && g.trim()).map(g => g.trim()) 
+          : null;
+          
+        const styles = Array.isArray(data.styles) && data.styles.length > 0 
+          ? data.styles.filter(s => s && s.trim()).map(s => s.trim()) 
+          : null;
+        
         return {
           image_url: data.images?.[0]?.uri || null,
-          tracklists: tracklistsStr
+          tracklists: tracklistsStr,
+          genres,
+          styles
         };
       } catch (error) {
         console.warn(`Attempt ${attempt + 1} failed for release ${releaseId}:`, error);
         if (attempt === retries - 1) {
-          return { image_url: null, tracklists: null };
+          return { image_url: null, tracklists: null, genres: null, styles: null };
         }
         await delay(1000);
       }
     }
     
-    return { image_url: null, tracklists: null };
+    return { image_url: null, tracklists: null, genres: null, styles: null };
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -199,7 +208,6 @@ export default function ImportDiscogsPage() {
 
     setIsProcessing(true);
     setStatus('Parsing CSV...');
-    setDebugInfo('');
     
     try {
       Papa.parse(file, {
@@ -207,83 +215,39 @@ export default function ImportDiscogsPage() {
         skipEmptyLines: true,
         dynamicTyping: true,
         complete: async (results: { data: DiscogsCSVRow[], meta: { fields?: string[] } }) => {
-          console.log('CSV Headers:', results.meta.fields);
-          console.log('Sample row:', results.data[0]);
-          console.log('Sample release_id value:', results.data[0]?.release_id);
-          console.log('Sample media condition:', results.data[0]?.['Collection Media Condition']);
-          
-          setDebugInfo(`CSV Headers: ${results.meta.fields?.join(', ')}`);
-          
-          // Filter out rows without Release ID and log issues
-          const validRows = results.data.filter((row, index) => {
+          // Filter valid rows
+          const validRows = results.data.filter((row) => {
             const releaseId = row.release_id;
-            // Check for missing, null, undefined, empty string, or zero values
-            if (!releaseId || releaseId === 0 || releaseId === '' || releaseId === null || releaseId === undefined) {
-              if (index < 10) { // Only log first 10 for brevity
-                console.log(`Row ${index} missing/invalid release_id:`, { 
-                  catalog: row['Catalog#'], 
-                  artist: row.Artist, 
-                  title: row.Title,
-                  release_id: releaseId,
-                  release_id_type: typeof releaseId 
-                });
-              }
-              return false;
-            }
-            // Also filter out non-numeric strings
+            if (!releaseId || releaseId === 0 || releaseId === '') return false;
             const numericValue = Number(releaseId);
-            if (isNaN(numericValue) || numericValue <= 0) {
-              if (index < 10) {
-                console.log(`Row ${index} invalid release_id (not a positive number):`, { 
-                  catalog: row['Catalog#'], 
-                  artist: row.Artist, 
-                  title: row.Title,
-                  release_id: releaseId,
-                  release_id_type: typeof releaseId,
-                  numeric_value: numericValue
-                });
-              }
-              return false;
-            }
-            return true;
+            return !isNaN(numericValue) && numericValue > 0;
           });
           
-          console.log(`Total rows: ${results.data.length}, Valid rows: ${validRows.length}`);
-          
-          // Convert to the format expected by Supabase with proper sanitization
-          const processedRows: ProcessedRow[] = validRows.map(row => ({
-            artist: row.Artist || 'Unknown Artist',
-            title: row.Title || 'Unknown Title',
-            year: row.Released || 0,
-            format: row.Format || 'Unknown',
-            folder: sanitizeFolder(row.CollectionFolder),
-            media_condition: sanitizeMediaCondition(row['Collection Media Condition']),
-            discogs_release_id: String(row.release_id), // Convert to string to match database
-            date_added: parseDiscogsDate(row['Date Added']),
-            image_url: null,
-            tracklists: null
-          }));
+          // Process with decade calculation
+          const processedRows: ProcessedRow[] = validRows.map(row => {
+            const year = row.Released || 0;
+            return {
+              artist: row.Artist || 'Unknown Artist',
+              title: row.Title || 'Unknown Title',
+              year,
+              format: row.Format || 'Unknown',
+              folder: sanitizeFolder(row.CollectionFolder),
+              media_condition: sanitizeMediaCondition(row['Collection Media Condition']),
+              discogs_release_id: String(row.release_id),
+              date_added: parseDiscogsDate(row['Date Added']),
+              image_url: null,
+              tracklists: null,
+              discogs_genres: null,
+              discogs_styles: null,
+              decade: calculateDecade(year)
+            };
+          });
 
           const releaseIds = processedRows.map(r => r.discogs_release_id);
           
-          console.log('Release IDs to check (converted to strings):', releaseIds.slice(0, 5));
-          console.log('Sample processed row:', processedRows[0]);
+          setStatus(`Checking existing entries for ${releaseIds.length} items...`);
           
-          setStatus(`Checking Supabase for existing entries among ${releaseIds.length} items...`);
-          
-          // First, get a count of all records with discogs_release_id
-          const { count: totalCount, error: countError } = await supabase
-            .from('collection')
-            .select('*', { count: 'exact', head: true })
-            .not('discogs_release_id', 'is', null);
-
-          if (countError) {
-            console.warn('Count query failed:', countError);
-          } else {
-            console.log('Total records with discogs_release_id in database:', totalCount);
-          }
-          
-          // Use pagination to get ALL existing release IDs with additional fields for change detection
+          // Fetch all existing records
           let allExisting: ExistingRecord[] = [];
           let start = 0;
           const pageSize = 1000;
@@ -292,49 +256,32 @@ export default function ImportDiscogsPage() {
           while (hasMore) {
             const { data: pageData, error: queryError } = await supabase
               .from('collection')
-              .select('id, discogs_release_id, artist, title, date_added, folder, media_condition, image_url, tracklists')
+              .select('id, discogs_release_id, artist, title, date_added, folder, media_condition, image_url, tracklists, discogs_genres, discogs_styles, decade')
               .not('discogs_release_id', 'is', null)
               .range(start, start + pageSize - 1);
 
-            if (queryError) {
-              throw new Error(`Database query failed: ${queryError.message}`);
-            }
+            if (queryError) throw new Error(`Database query failed: ${queryError.message}`);
 
             if (pageData && pageData.length > 0) {
               allExisting = allExisting.concat(pageData as ExistingRecord[]);
               start += pageSize;
-              hasMore = pageData.length === pageSize; // Continue if we got a full page
-              console.log(`Fetched page: ${pageData.length} records, total so far: ${allExisting.length}`);
+              hasMore = pageData.length === pageSize;
             } else {
               hasMore = false;
             }
           }
 
-          console.log('Total existing entries fetched from database via pagination:', allExisting.length);
-          
-          // Create lookup maps
-          const allExistingIds = new Set(
-            allExisting.map(r => r.discogs_release_id).filter(id => id)
-          );
-          const existingRecordsMap = new Map(
-            allExisting.map(record => [record.discogs_release_id, record])
-          );
-          const csvRecordsMap = new Map(
-            processedRows.map(row => [row.discogs_release_id, row])
-          );
+          const allExistingIds = new Set(allExisting.map(r => r.discogs_release_id).filter(id => id));
+          const existingRecordsMap = new Map(allExisting.map(record => [record.discogs_release_id, record]));
+          const csvRecordsMap = new Map(processedRows.map(row => [row.discogs_release_id, row]));
 
-          console.log('All existing release IDs count:', allExistingIds.size);
-          
-          // Categorize items
-          const existingInCsv = releaseIds.filter(id => allExistingIds.has(id));
           const newRows = processedRows.filter(row => !allExistingIds.has(row.discogs_release_id));
 
-          // Find items that need updates with improved comparison logic
+          // Find updates - check genres/styles/decade too
           const updateOperations: UpdateOperation[] = [];
           for (const csvRow of processedRows) {
             const existingRecord = existingRecordsMap.get(csvRow.discogs_release_id);
             if (existingRecord) {
-              // Use improved comparison logic
               const folderChanged = !valuesAreEqual(csvRow.folder, existingRecord.folder);
               const conditionChanged = !valuesAreEqual(csvRow.media_condition, existingRecord.media_condition);
               const needsImage = !existingRecord.image_url;
@@ -342,57 +289,26 @@ export default function ImportDiscogsPage() {
                                    existingRecord.tracklists === '' || 
                                    existingRecord.tracklists === 'null' ||
                                    existingRecord.tracklists === '[]';
+              const needsGenres = !existingRecord.discogs_genres || existingRecord.discogs_genres.length === 0;
+              const needsStyles = !existingRecord.discogs_styles || existingRecord.discogs_styles.length === 0;
+              const needsDecade = existingRecord.decade === null && csvRow.decade !== null;
               
-              if (folderChanged || conditionChanged || needsImage || needsTracklists) {
+              if (folderChanged || conditionChanged || needsImage || needsTracklists || needsGenres || needsStyles || needsDecade) {
                 updateOperations.push({ csvRow, existingRecord });
-                
-                console.log('Change detected:', {
-                  releaseId: csvRow.discogs_release_id,
-                  artist: csvRow.artist,
-                  title: csvRow.title,
-                  folderChange: folderChanged ? 
-                    `${normalizeValue(existingRecord.folder)} → ${normalizeValue(csvRow.folder)}` : 
-                    'no change',
-                  conditionChange: conditionChanged ? 
-                    `${normalizeValue(existingRecord.media_condition)} → ${normalizeValue(csvRow.media_condition)}` : 
-                    'no change',
-                  needsImage: needsImage,
-                  needsTracklists: needsTracklists
-                });
               }
             }
           }
           
-          // Find items to remove (in database but not in current CSV)
           const recordsToRemove: ExistingRecord[] = allExisting.filter(
             existingRecord => !csvRecordsMap.has(existingRecord.discogs_release_id)
           );
 
-          console.log(`CSV analysis: ${existingInCsv.length} already exist, ${newRows.length} are new, ${updateOperations.length} need updates, ${recordsToRemove.length} to remove`);
-          console.log('Sample existing in CSV:', existingInCsv.slice(0, 5));
-          console.log('Sample new release IDs:', newRows.slice(0, 5).map(r => r.discogs_release_id));
-          
-          setStatus(`Found ${newRows.length} new items, ${updateOperations.length} items to update, ${recordsToRemove.length} items to remove`);
-          setDebugInfo(prev => prev + `\nTotal CSV rows: ${results.data.length}, Valid rows with release_id: ${validRows.length}, New items: ${newRows.length}, Updates: ${updateOperations.length}, Removals: ${recordsToRemove.length}\nTotal existing items in database: ${allExistingIds.size}\nSample processed media_condition: ${processedRows[0]?.media_condition}`);
-          
-          if (validRows.length === 0) {
-            setDebugInfo(prev => prev + `\nPROBLEM: No rows have valid release_id values! This suggests the Discogs export may be missing release IDs.`);
-            setStatus('No rows with valid Release IDs found. Please check your Discogs CSV export includes Release IDs.');
-            setIsProcessing(false);
-            return;
-          }
+          setStatus(`Found ${newRows.length} new, ${updateOperations.length} updates, ${recordsToRemove.length} removals`);
 
-          // Store sync data for enrichAndImport function
           (window as Window & SyncDataStorage).updateOperations = updateOperations;
           (window as Window & SyncDataStorage).recordsToRemove = recordsToRemove;
 
-          // Show comprehensive preview of ALL changes
-          setSyncPreview({
-            newItems: newRows,
-            updateOperations,
-            recordsToRemove
-          });
-          setStatus(`Preview ready: ${newRows.length} new items, ${updateOperations.length} updates, ${recordsToRemove.length} removals. Review all changes below.`);
+          setSyncPreview({ newItems: newRows, updateOperations, recordsToRemove });
           setIsProcessing(false);
         },
         error: (error: Error) => {
@@ -414,91 +330,74 @@ export default function ImportDiscogsPage() {
     }
     
     setIsProcessing(true);
-    const BATCH_SIZE = 25; // Reduced batch size for better error handling
+    const BATCH_SIZE = 25;
     const totalItems = syncPreview.newItems.length;
-    let allEnriched: EnrichedRow[] = [];
+    let allEnriched: ProcessedRow[] = [];
     
-    // Get stored sync data
     const updateOperations = (window as Window & SyncDataStorage).updateOperations || [];
     const recordsToRemove = (window as Window & SyncDataStorage).recordsToRemove || [];
     
-    setStatus(`Starting enrichment process for ${totalItems} new items, ${updateOperations.length} updates, ${recordsToRemove.length} removals`);
+    setStatus(`Starting enrichment for ${totalItems} new items...`);
 
     try {
-      // Process new items in batches
+      // Process new items
       for (let batchStart = 0; batchStart < totalItems; batchStart += BATCH_SIZE) {
         const batchEnd = Math.min(batchStart + BATCH_SIZE, totalItems);
         const currentBatch = syncPreview.newItems.slice(batchStart, batchEnd);
         const batchNumber = Math.floor(batchStart / BATCH_SIZE) + 1;
         const totalBatches = Math.ceil(totalItems / BATCH_SIZE);
         
-        setStatus(`Processing batch ${batchNumber}/${totalBatches} (items ${batchStart + 1}-${batchEnd})...`);
+        setStatus(`Batch ${batchNumber}/${totalBatches} (items ${batchStart + 1}-${batchEnd})...`);
         
-        // Enrich current batch
-        const batchEnriched: EnrichedRow[] = [];
+        const batchEnriched: ProcessedRow[] = [];
         for (let i = 0; i < currentBatch.length; i++) {
           const row = currentBatch[i];
           const globalIndex = batchStart + i + 1;
-          setStatus(`Batch ${batchNumber}/${totalBatches}: Enriching ${globalIndex}/${totalItems}: ${row.artist} - ${row.title}`);
+          setStatus(`Batch ${batchNumber}: Enriching ${globalIndex}/${totalItems}: ${row.artist} - ${row.title}`);
           
           try {
-            const { image_url, tracklists } = await fetchDiscogsData(row.discogs_release_id);
-            batchEnriched.push({ ...row, image_url, tracklists });
+            const { image_url, tracklists, genres, styles } = await fetchDiscogsData(row.discogs_release_id);
+            batchEnriched.push({ 
+              ...row, 
+              image_url, 
+              tracklists,
+              discogs_genres: genres,
+              discogs_styles: styles
+            });
           } catch (error) {
             console.warn(`Failed to enrich ${row.discogs_release_id}:`, error);
-            // Add the row without enrichment if Discogs API fails
-            batchEnriched.push({ ...row, image_url: null, tracklists: null });
+            batchEnriched.push({ ...row });
           }
           
-          // Rate limiting: wait 2 seconds between requests
-          if (i < currentBatch.length - 1) {
-            await delay(2000);
-          }
+          if (i < currentBatch.length - 1) await delay(2000);
         }
         
-        // Save this batch to database immediately with better error handling
-        setStatus(`Batch ${batchNumber}: Saving ${batchEnriched.length} items to database...`);
-        
-        // Insert new items from this batch one by one for better error handling
+        // Insert batch
         let batchInsertCount = 0;
         for (const item of batchEnriched) {
           try {
             const { error: insertError } = await supabase
               .from('collection')
-              .insert([item]); // Insert one item at a time
+              .insert([item]);
 
-            if (insertError) {
-              console.error(`Failed to insert ${item.artist} - ${item.title}:`, insertError);
-              console.log('Failed item data:', item);
-            } else {
-              batchInsertCount++;
-            }
+            if (!insertError) batchInsertCount++;
           } catch (error) {
             console.error(`Error inserting ${item.artist} - ${item.title}:`, error);
           }
         }
         
-        setStatus(`Batch ${batchNumber} complete: ${batchInsertCount}/${batchEnriched.length} inserted successfully`);
-        
-        // Add this batch to preview
+        setStatus(`Batch ${batchNumber} complete: ${batchInsertCount}/${batchEnriched.length} inserted`);
         allEnriched = allEnriched.concat(batchEnriched);
-        if (syncPreview) {
-          setSyncPreview({
-            ...syncPreview,
-            newItems: allEnriched
-          });
-        }
         
-        // Longer delay between batches to avoid rate limiting
         if (batchEnd < totalItems) {
-          setStatus(`Batch ${batchNumber} saved. Waiting 10 seconds before next batch...`);
+          setStatus(`Waiting before next batch...`);
           await delay(10000);
         }
       }
       
-      // Process updates with improved tracklist handling
+      // Process updates - includes genres/styles/decade
       if (updateOperations.length > 0) {
-        setStatus(`Processing ${updateOperations.length} update operations...`);
+        setStatus(`Processing ${updateOperations.length} updates...`);
         
         let updateCount = 0;
         for (let i = 0; i < updateOperations.length; i++) {
@@ -507,25 +406,22 @@ export default function ImportDiscogsPage() {
           
           let image_url = existingRecord.image_url;
           let tracklists = existingRecord.tracklists;
+          let genres = existingRecord.discogs_genres;
+          let styles = existingRecord.discogs_styles;
           
-          // Check if we need to fetch missing data
           const needsImage = !image_url;
           const needsTracklists = !tracklists || tracklists === '' || tracklists === 'null' || tracklists === '[]';
+          const needsGenres = !genres || genres.length === 0;
+          const needsStyles = !styles || styles.length === 0;
           
-          // Fetch missing image/tracklist data if needed
-          if (needsImage || needsTracklists) {
+          if (needsImage || needsTracklists || needsGenres || needsStyles) {
             try {
               const discogsData = await fetchDiscogsData(csvRow.discogs_release_id);
               
-              // Only update image_url if it was missing
-              if (needsImage && discogsData.image_url) {
-                image_url = discogsData.image_url;
-              }
-              
-              // Only update tracklists if they were missing/invalid
-              if (needsTracklists && discogsData.tracklists) {
-                tracklists = discogsData.tracklists;
-              }
+              if (needsImage && discogsData.image_url) image_url = discogsData.image_url;
+              if (needsTracklists && discogsData.tracklists) tracklists = discogsData.tracklists;
+              if (needsGenres && discogsData.genres) genres = discogsData.genres;
+              if (needsStyles && discogsData.styles) styles = discogsData.styles;
               
               await delay(2000);
             } catch (error) {
@@ -533,13 +429,15 @@ export default function ImportDiscogsPage() {
             }
           }
           
-          // Build update object
           const updateData = {
             folder: csvRow.folder,
             media_condition: csvRow.media_condition,
             date_added: csvRow.date_added,
-            image_url: image_url,
-            tracklists: tracklists
+            image_url,
+            tracklists,
+            discogs_genres: genres,
+            discogs_styles: styles,
+            decade: csvRow.decade
           };
           
           try {
@@ -548,11 +446,7 @@ export default function ImportDiscogsPage() {
               .update(updateData)
               .eq('id', existingRecord.id);
 
-            if (updateError) {
-              console.warn(`Failed to update ${csvRow.discogs_release_id}:`, updateError);
-            } else {
-              updateCount++;
-            }
+            if (!updateError) updateCount++;
           } catch (error) {
             console.error(`Error updating ${csvRow.discogs_release_id}:`, error);
           }
@@ -563,357 +457,174 @@ export default function ImportDiscogsPage() {
       
       // Process removals
       if (recordsToRemove.length > 0) {
-        setStatus(`Removing ${recordsToRemove.length} records no longer in collection...`);
-        
+        setStatus(`Removing ${recordsToRemove.length} records...`);
         const idsToDelete = recordsToRemove.map(record => record.id);
-        const { error: deleteError } = await supabase
-          .from('collection')
-          .delete()
-          .in('id', idsToDelete);
-
-        if (deleteError) {
-          console.warn('Failed to delete records:', deleteError);
-        }
+        await supabase.from('collection').delete().in('id', idsToDelete);
       }
       
-      const totalChanges = allEnriched.length + updateOperations.length + recordsToRemove.length;
-      setStatus(`✅ All processing complete! Total: ${totalChanges} changes (${allEnriched.length} new, ${updateOperations.length} updated, ${recordsToRemove.length} removed).`);
+      setStatus(`✅ Complete! ${allEnriched.length} new, ${updateOperations.length} updated, ${recordsToRemove.length} removed`);
     } catch (error) {
-      console.error('Processing error:', error);
-      setStatus(`❌ Processing failed after ${allEnriched.length} items: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const recoverMissingTracklists = async () => {
-    setIsProcessing(true);
-    setStatus('Finding items with missing tracklists...');
-    
-    try {
-      // Find all items with discogs_release_id but missing/invalid tracklists
-      const { data: itemsNeedingTracklists, error: queryError } = await supabase
-        .from('collection')
-        .select('id, discogs_release_id, artist, title, tracklists')
-        .not('discogs_release_id', 'is', null)
-        .neq('discogs_release_id', '');
-      
-      if (queryError) {
-        setStatus(`Error querying database: ${queryError.message}`);
-        return;
-      }
-      
-      // Filter items that actually need tracklists
-      const itemsToFix = itemsNeedingTracklists.filter(item => {
-        if (!item.tracklists || item.tracklists === '' || item.tracklists === 'null' || item.tracklists === '[]') {
-          return true;
-        }
-        
-        try {
-          const parsed = JSON.parse(item.tracklists);
-          return !Array.isArray(parsed) || parsed.length === 0;
-        } catch {
-          return true; // Invalid JSON
-        }
-      });
-      
-      if (itemsToFix.length === 0) {
-        setStatus('✅ No items found that need tracklist recovery!');
-        setIsProcessing(false);
-        return;
-      }
-      
-      setStatus(`Found ${itemsToFix.length} items missing tracklists. Starting recovery...`);
-      
-      let successCount = 0;
-      let errorCount = 0;
-      
-      for (let i = 0; i < itemsToFix.length; i++) {
-        const item = itemsToFix[i];
-        setStatus(`Recovering ${i + 1}/${itemsToFix.length}: ${item.artist} - ${item.title}`);
-        
-        try {
-          const { tracklists } = await fetchDiscogsData(item.discogs_release_id);
-          
-          if (tracklists) {
-            const { error: updateError } = await supabase
-              .from('collection')
-              .update({ tracklists })
-              .eq('id', item.id);
-            
-            if (updateError) {
-              console.warn(`Failed to update tracklists for ID ${item.id}:`, updateError);
-              errorCount++;
-            } else {
-              successCount++;
-            }
-          } else {
-            console.warn(`No tracklists found for ${item.discogs_release_id}`);
-            errorCount++;
-          }
-          
-          // Rate limiting
-          await delay(2000);
-          
-        } catch (error) {
-          console.warn(`Error processing item ID ${item.id}:`, error);
-          errorCount++;
-        }
-      }
-      
-      setStatus(`✅ Tracklist recovery complete! ${successCount} recovered, ${errorCount} failed.`);
-      
-    } catch (error) {
-      console.error('Tracklist recovery error:', error);
-      setStatus(`❌ Recovery failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setStatus(`❌ Failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsProcessing(false);
     }
   };
 
   return (
-    <div style={{ 
-      padding: '2rem', 
-      backgroundColor: '#ffffff', 
+    <div style={{
+      padding: 24,
+      background: '#f8fafc',
       minHeight: '100vh',
-      color: '#212529'
+      maxWidth: 1400,
+      margin: '0 auto'
     }}>
-      <h1 style={{ color: '#212529', marginBottom: '1.5rem' }}>Import Discogs CSV</h1>
-      <input 
-        type="file" 
-        accept=".csv" 
-        onChange={handleFileUpload} 
-        disabled={isProcessing}
-        style={{
-          padding: '8px 12px',
-          border: '1px solid #ced4da',
-          borderRadius: '6px',
-          fontSize: '16px',
-          backgroundColor: '#ffffff',
-          color: '#212529'
-        }}
-      />
-      
-      {syncPreview && (
-        <button 
-          onClick={enrichAndImport}
-          disabled={isProcessing}
-          style={{ 
-            marginLeft: '1rem', 
-            padding: '12px 24px',
-            backgroundColor: isProcessing ? '#6c757d' : '#007bff',
-            color: 'white',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: isProcessing ? 'not-allowed' : 'pointer',
-            opacity: isProcessing ? 0.6 : 1,
-            fontSize: '16px',
-            fontWeight: '500'
-          }}
-        >
-          {isProcessing ? 'Processing...' : 'Enrich with Discogs Data & Import'}
-        </button>
-      )}
-
-      <button 
-        onClick={recoverMissingTracklists}
-        disabled={isProcessing}
-        style={{ 
-          marginLeft: '1rem', 
-          padding: '12px 24px',
-          backgroundColor: isProcessing ? '#6c757d' : '#28a745',
-          color: 'white',
-          border: 'none',
-          borderRadius: '6px',
-          cursor: isProcessing ? 'not-allowed' : 'pointer',
-          opacity: isProcessing ? 0.6 : 1,
-          fontSize: '16px',
-          fontWeight: '500'
-        }}
-      >
-        {isProcessing ? 'Processing...' : 'Fix Missing Tracklists'}
-      </button>
-      
-      <p style={{ 
-        color: status.includes('error') || status.includes('failed') ? '#dc3545' : '#212529',
-        fontWeight: status.includes('Successfully') ? 'bold' : 'normal',
-        marginTop: '1rem',
-        fontSize: '16px'
+      <h1 style={{
+        fontSize: 32,
+        fontWeight: 'bold',
+        color: '#1f2937',
+        marginBottom: 8
       }}>
-        {status}
+        Import Discogs Collection
+      </h1>
+      <p style={{
+        color: '#6b7280',
+        fontSize: 16,
+        marginBottom: 24
+      }}>
+        Enhanced import now includes genres, styles, and decade classification
       </p>
 
-      {debugInfo && (
-        <details style={{ marginTop: '1.5rem', fontSize: '14px', color: '#6c757d' }}>
-          <summary style={{ cursor: 'pointer', padding: '8px 0', color: '#212529' }}>Debug Info</summary>
-          <pre style={{ 
-            backgroundColor: '#f8f9fa', 
-            color: '#212529',
-            padding: '12px', 
-            border: '1px solid #dee2e6', 
-            borderRadius: '4px',
-            marginTop: '8px',
-            fontSize: '12px',
-            overflow: 'auto'
-          }}>{debugInfo}</pre>
-        </details>
+      <div style={{
+        background: 'white',
+        border: '1px solid #e5e7eb',
+        borderRadius: 12,
+        padding: 24,
+        marginBottom: 24,
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+      }}>
+        <input
+          type="file"
+          accept=".csv"
+          onChange={handleFileUpload}
+          disabled={isProcessing}
+          style={{
+            padding: '10px 16px',
+            border: '2px solid #d1d5db',
+            borderRadius: 8,
+            fontSize: 14,
+            cursor: isProcessing ? 'not-allowed' : 'pointer'
+          }}
+        />
+        
+        {syncPreview && (
+          <button
+            onClick={enrichAndImport}
+            disabled={isProcessing}
+            style={{
+              marginLeft: 16,
+              padding: '12px 24px',
+              background: isProcessing ? '#9ca3af' : 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+              color: 'white',
+              border: 'none',
+              borderRadius: 8,
+              cursor: isProcessing ? 'not-allowed' : 'pointer',
+              fontSize: 14,
+              fontWeight: 600,
+              boxShadow: isProcessing ? 'none' : '0 4px 6px rgba(59, 130, 246, 0.2)'
+            }}
+          >
+            {isProcessing ? 'Processing...' : '⚡ Enrich & Import'}
+          </button>
+        )}
+      </div>
+
+      {status && (
+        <div style={{
+          background: status.includes('✅') ? '#dcfce7' : status.includes('❌') ? '#fee2e2' : '#dbeafe',
+          border: `1px solid ${status.includes('✅') ? '#16a34a' : status.includes('❌') ? '#dc2626' : '#3b82f6'}`,
+          borderRadius: 8,
+          padding: 16,
+          marginBottom: 24,
+          color: status.includes('✅') ? '#15803d' : status.includes('❌') ? '#991b1b' : '#1e40af',
+          fontSize: 14,
+          fontWeight: 500
+        }}>
+          {status}
+        </div>
       )}
 
       {syncPreview && (
-        <div style={{ backgroundColor: '#ffffff', color: '#212529' }}>
-          <h2 style={{ color: '#212529', marginBottom: '1.5rem', marginTop: '2rem' }}>Sync Preview - All Changes</h2>
-          
-          {/* New Items Section */}
-          {syncPreview.newItems.length > 0 && (
-            <div style={{ marginBottom: '2rem' }}>
-              <h3 style={{ color: '#28a745' }}>✅ Items to Add ({syncPreview.newItems.length})</h3>
-              <table style={{ 
-                marginTop: '0.5rem', 
-                width: '100%', 
-                borderCollapse: 'collapse',
-                backgroundColor: '#ffffff'
-              }}>
-                <thead>
-                  <tr style={{ backgroundColor: '#d4edda' }}>
-                    <th style={{ textAlign: 'left', padding: '12px', border: '1px solid #c3e6cb', color: '#155724' }}>Artist</th>
-                    <th style={{ textAlign: 'left', padding: '12px', border: '1px solid #c3e6cb', color: '#155724' }}>Title</th>
-                    <th style={{ textAlign: 'left', padding: '12px', border: '1px solid #c3e6cb', color: '#155724' }}>Year</th>
-                    <th style={{ textAlign: 'left', padding: '12px', border: '1px solid #c3e6cb', color: '#155724' }}>Format</th>
-                    <th style={{ textAlign: 'left', padding: '12px', border: '1px solid #c3e6cb', color: '#155724' }}>Folder</th>
-                    <th style={{ textAlign: 'left', padding: '12px', border: '1px solid #c3e6cb', color: '#155724' }}>Condition</th>
-                    <th style={{ textAlign: 'left', padding: '12px', border: '1px solid #c3e6cb', color: '#155724' }}>Release ID</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {syncPreview.newItems.map((row, i) => (
-                    <tr key={i} style={{ backgroundColor: i % 2 === 0 ? '#ffffff' : '#f8f9fa' }}>
-                      <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>{row.artist}</td>
-                      <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>{row.title}</td>
-                      <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>{row.year}</td>
-                      <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>{row.format}</td>
-                      <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>{row.folder}</td>
-                      <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>{row.media_condition}</td>
-                      <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>{row.discogs_release_id}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* Update Items Section */}
-          {syncPreview.updateOperations.length > 0 && (
-            <div style={{ marginBottom: '2rem' }}>
-              <h3 style={{ color: '#fd7e14' }}>⚠️ Items to Update ({syncPreview.updateOperations.length})</h3>
-              <table style={{ 
-                marginTop: '0.5rem', 
-                width: '100%', 
-                borderCollapse: 'collapse',
-                backgroundColor: '#ffffff'
-              }}>
-                <thead>
-                  <tr style={{ backgroundColor: '#fff3cd' }}>
-                    <th style={{ textAlign: 'left', padding: '12px', border: '1px solid #ffeaa7', color: '#856404' }}>Artist</th>
-                    <th style={{ textAlign: 'left', padding: '12px', border: '1px solid #ffeaa7', color: '#856404' }}>Title</th>
-                    <th style={{ textAlign: 'left', padding: '12px', border: '1px solid #ffeaa7', color: '#856404' }}>Release ID</th>
-                    <th style={{ textAlign: 'left', padding: '12px', border: '1px solid #ffeaa7', color: '#856404' }}>Folder Change</th>
-                    <th style={{ textAlign: 'left', padding: '12px', border: '1px solid #ffeaa7', color: '#856404' }}>Condition Change</th>
-                    <th style={{ textAlign: 'left', padding: '12px', border: '1px solid #ffeaa7', color: '#856404' }}>Will Fetch Image</th>
-                    <th style={{ textAlign: 'left', padding: '12px', border: '1px solid #ffeaa7', color: '#856404' }}>Will Fetch Tracklists</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {syncPreview.updateOperations.map((op, i) => {
-                    const folderChanged = !valuesAreEqual(op.csvRow.folder, op.existingRecord.folder);
-                    const conditionChanged = !valuesAreEqual(op.csvRow.media_condition, op.existingRecord.media_condition);
-                    const needsImage = !op.existingRecord.image_url;
-                    const needsTracklists = !op.existingRecord.tracklists || op.existingRecord.tracklists === '' || op.existingRecord.tracklists === 'null' || op.existingRecord.tracklists === '[]';
-                    return (
-                      <tr key={i} style={{ backgroundColor: i % 2 === 0 ? '#ffffff' : '#f8f9fa' }}>
-                        <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>{op.csvRow.artist}</td>
-                        <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>{op.csvRow.title}</td>
-                        <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>{op.csvRow.discogs_release_id}</td>
-                        <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>
-                          {folderChanged ? (
-                            <span style={{ color: '#fd7e14', fontWeight: 'bold' }}>
-                              {normalizeValue(op.existingRecord.folder)} → {normalizeValue(op.csvRow.folder)}
-                            </span>
-                          ) : '—'}
-                        </td>
-                        <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>
-                          {conditionChanged ? (
-                            <span style={{ color: '#fd7e14', fontWeight: 'bold' }}>
-                              {normalizeValue(op.existingRecord.media_condition)} → {normalizeValue(op.csvRow.media_condition)}
-                            </span>
-                          ) : '—'}
-                        </td>
-                        <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>{needsImage ? '✓' : '—'}</td>
-                        <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>{needsTracklists ? '✓' : '—'}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* Remove Items Section */}
-          {syncPreview.recordsToRemove.length > 0 && (
-            <div style={{ marginBottom: '2rem' }}>
-              <h3 style={{ color: '#dc3545' }}>🗑️ Items to Remove ({syncPreview.recordsToRemove.length})</h3>
-              <div style={{ 
-                backgroundColor: '#f8d7da', 
-                color: '#721c24', 
-                padding: '12px', 
-                marginBottom: '12px', 
-                border: '1px solid #f5c6cb', 
-                borderRadius: '4px' 
-              }}>
-                <strong>⚠️ WARNING:</strong> These records exist in your database but are NOT in the current CSV. They will be PERMANENTLY DELETED.
-              </div>
-              <table style={{ 
-                marginTop: '0.5rem', 
-                width: '100%', 
-                borderCollapse: 'collapse',
-                backgroundColor: '#ffffff'
-              }}>
-                <thead>
-                  <tr style={{ backgroundColor: '#f8d7da' }}>
-                    <th style={{ textAlign: 'left', padding: '12px', border: '1px solid #f5c6cb', color: '#721c24' }}>Artist</th>
-                    <th style={{ textAlign: 'left', padding: '12px', border: '1px solid #f5c6cb', color: '#721c24' }}>Title</th>
-                    <th style={{ textAlign: 'left', padding: '12px', border: '1px solid #f5c6cb', color: '#721c24' }}>Release ID</th>
-                    <th style={{ textAlign: 'left', padding: '12px', border: '1px solid #f5c6cb', color: '#721c24' }}>Folder</th>
-                    <th style={{ textAlign: 'left', padding: '12px', border: '1px solid #f5c6cb', color: '#721c24' }}>Condition</th>
-                    <th style={{ textAlign: 'left', padding: '12px', border: '1px solid #f5c6cb', color: '#721c24' }}>Date Added</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {syncPreview.recordsToRemove.map((record, i) => (
-                    <tr key={i} style={{ backgroundColor: i % 2 === 0 ? '#ffffff' : '#f8f9fa' }}>
-                      <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>{record.artist || '—'}</td>
-                      <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>{record.title || '—'}</td>
-                      <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>{record.discogs_release_id}</td>
-                      <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>{record.folder || '—'}</td>
-                      <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>{record.media_condition || '—'}</td>
-                      <td style={{ padding: '8px', border: '1px solid #dee2e6', color: '#212529' }}>{record.date_added ? new Date(record.date_added).toLocaleDateString() : '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-          
-          <div style={{ 
-            padding: '16px', 
-            backgroundColor: '#f8f9fa', 
-            color: '#495057',
-            border: '1px solid #dee2e6', 
-            borderRadius: '6px',
-            marginTop: '2rem'
+        <div style={{
+          background: 'white',
+          border: '1px solid #e5e7eb',
+          borderRadius: 12,
+          padding: 24,
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+        }}>
+          <h2 style={{
+            fontSize: 24,
+            fontWeight: 600,
+            color: '#1f2937',
+            marginBottom: 16
           }}>
-            <strong>Summary:</strong> This operation will make {
-              syncPreview.newItems.length + syncPreview.updateOperations.length + syncPreview.recordsToRemove.length
-            } total changes to your collection.
+            Sync Preview
+          </h2>
+          
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: 16,
+            marginBottom: 24
+          }}>
+            <div style={{
+              background: '#dcfce7',
+              border: '1px solid #16a34a',
+              borderRadius: 8,
+              padding: 16,
+              textAlign: 'center'
+            }}>
+              <div style={{ fontSize: 32, fontWeight: 'bold', color: '#15803d' }}>
+                {syncPreview.newItems.length}
+              </div>
+              <div style={{ fontSize: 14, color: '#15803d' }}>New Albums</div>
+            </div>
+            
+            <div style={{
+              background: '#fef3c7',
+              border: '1px solid #f59e0b',
+              borderRadius: 8,
+              padding: 16,
+              textAlign: 'center'
+            }}>
+              <div style={{ fontSize: 32, fontWeight: 'bold', color: '#d97706' }}>
+                {syncPreview.updateOperations.length}
+              </div>
+              <div style={{ fontSize: 14, color: '#d97706' }}>Updates</div>
+            </div>
+            
+            <div style={{
+              background: '#fee2e2',
+              border: '1px solid #dc2626',
+              borderRadius: 8,
+              padding: 16,
+              textAlign: 'center'
+            }}>
+              <div style={{ fontSize: 32, fontWeight: 'bold', color: '#991b1b' }}>
+                {syncPreview.recordsToRemove.length}
+              </div>
+              <div style={{ fontSize: 14, color: '#991b1b' }}>To Remove</div>
+            </div>
+          </div>
+          
+          <div style={{
+            padding: 12,
+            background: '#f0f9ff',
+            border: '1px solid #bae6fd',
+            borderRadius: 6,
+            fontSize: 13,
+            color: '#0c4a6e'
+          }}>
+            <strong>📊 What&apos;s New:</strong> This import will automatically fetch genres, styles from Discogs and calculate decade from release year for all items.
           </div>
         </div>
       )}
