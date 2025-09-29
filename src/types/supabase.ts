@@ -160,6 +160,8 @@ export interface Database {
           blocked: boolean | null;
           created_at: string | null;
           updated_at: string | null;
+          master_release_id: string | null;
+          master_release_date: string | null;
         };
         Insert: {
           id?: number;

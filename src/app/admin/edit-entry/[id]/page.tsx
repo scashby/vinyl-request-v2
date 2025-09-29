@@ -1,5 +1,5 @@
-// Enhanced Admin Edit Entry page with sell price support
-// Update for: src/app/admin/edit-entry/[id]/page.tsx
+// Enhanced edit-entry with missing metadata detection and master release support
+// Replace: src/app/admin/edit-entry/[id]/page.tsx
 
 "use client";
 
@@ -27,6 +27,11 @@ type CollectionEntry = {
   blocked_sides: string[] | null;
   tracklists: string | null;
   discogs_release_id: string | null;
+  discogs_genres: string[] | null;
+  discogs_styles: string[] | null;
+  decade: number | null;
+  master_release_id: string | null;
+  master_release_date: string | null;
   [key: string]: unknown;
 };
 
@@ -34,22 +39,47 @@ type DiscogsData = {
   year?: string | number;
   images?: { uri: string }[];
   tracklist?: { position?: string; title?: string; duration?: string }[];
+  genres?: string[];
+  styles?: string[];
+  master_id?: number;
+  master_url?: string;
   [key: string]: unknown;
 };
 
-async function fetchDiscogsField(
-  releaseId: string,
-  field: string
-) {
+type DiscogsMasterData = {
+  year?: string | number;
+  main_release?: number;
+  [key: string]: unknown;
+};
+
+type MissingField = {
+  field: string;
+  label: string;
+  isEmpty: boolean;
+};
+
+function calculateDecade(year: string | null): number | null {
+  if (!year) return null;
+  const yearNum = parseInt(year, 10);
+  if (isNaN(yearNum)) return null;
+  return Math.floor(yearNum / 10) * 10;
+}
+
+async function fetchDiscogsRelease(releaseId: string): Promise<DiscogsData> {
   const res = await fetch(`/api/discogsProxy?releaseId=${releaseId}`);
   if (!res.ok) throw new Error('Discogs fetch failed');
-  const data: DiscogsData = await res.json();
-  switch (field) {
-    case 'year': return data.year ? String(data.year) : '';
-    case 'image_url': return data.images?.[0]?.uri || '';
-    case 'tracklists': return JSON.stringify(data.tracklist || []);
-    default: return '';
-  }
+  return await res.json() as DiscogsData;
+}
+
+async function fetchDiscogsMaster(masterId: string): Promise<DiscogsMasterData> {
+  const res = await fetch(`https://api.discogs.com/masters/${masterId}`, {
+    headers: {
+      'User-Agent': 'DeadwaxDialogues/1.0',
+      'Authorization': `Discogs token=${process.env.NEXT_PUBLIC_DISCOGS_TOKEN}`
+    }
+  });
+  if (!res.ok) throw new Error('Discogs master fetch failed');
+  return await res.json() as DiscogsMasterData;
 }
 
 function cleanTrack(track: Partial<Track>): Track {
@@ -69,11 +99,10 @@ export default function EditEntryPage() {
   const [blockedSides, setBlockedSides] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [tracks, setTracks] = useState<Track[]>([]);
+  const [fetching, setFetching] = useState(false);
 
   useEffect(() => {
     fetchEntry(id).then((data) => {
-      console.log('Fetched entry data:', data);
-      console.log('sell_price value:', data?.sell_price);
       setEntry(data);
       setBlockedSides(Array.isArray(data?.blocked_sides) ? data.blocked_sides : []);
       let tl: unknown[] = [];
@@ -87,6 +116,95 @@ export default function EditEntryPage() {
   async function fetchEntry(rowId: string): Promise<CollectionEntry> {
     const { data } = await supabase.from('collection').select('*').eq('id', rowId).single();
     return data as CollectionEntry;
+  }
+
+  // Detect missing metadata
+  const missingFields: MissingField[] = [
+    { field: 'discogs_genres', label: 'Genres', isEmpty: !entry?.discogs_genres || entry.discogs_genres.length === 0 },
+    { field: 'discogs_styles', label: 'Styles', isEmpty: !entry?.discogs_styles || entry.discogs_styles.length === 0 },
+    { field: 'decade', label: 'Decade', isEmpty: !entry?.decade },
+    { field: 'tracklists', label: 'Tracklist', isEmpty: !tracks || tracks.length === 0 },
+    { field: 'image_url', label: 'Image', isEmpty: !entry?.image_url },
+    { field: 'master_release_date', label: 'Master Release Date', isEmpty: !entry?.master_release_date }
+  ];
+
+  const hasMissingData = missingFields.some(f => f.isEmpty);
+
+  async function fetchAllMissingMetadata() {
+    if (!entry?.discogs_release_id) {
+      setStatus('No Discogs Release ID - cannot fetch metadata');
+      return;
+    }
+
+    setFetching(true);
+    setStatus('Fetching missing metadata from Discogs...');
+
+    try {
+      const data = await fetchDiscogsRelease(entry.discogs_release_id);
+      let updated = false;
+
+      // Only update fields that are missing
+      if (!entry.discogs_genres || entry.discogs_genres.length === 0) {
+        if (data.genres && data.genres.length > 0) {
+          handleChange('discogs_genres', data.genres);
+          updated = true;
+        }
+      }
+
+      if (!entry.discogs_styles || entry.discogs_styles.length === 0) {
+        if (data.styles && data.styles.length > 0) {
+          handleChange('discogs_styles', data.styles);
+          updated = true;
+        }
+      }
+
+      if (!entry.decade && entry.year) {
+        const decade = calculateDecade(entry.year);
+        if (decade) {
+          handleChange('decade', decade);
+          updated = true;
+        }
+      }
+
+      if (!tracks || tracks.length === 0) {
+        if (data.tracklist && data.tracklist.length > 0) {
+          const newTracks = data.tracklist.map(cleanTrack);
+          setTracks(newTracks);
+          handleChange('tracklists', JSON.stringify(newTracks));
+          updated = true;
+        }
+      }
+
+      if (!entry.image_url && data.images?.[0]?.uri) {
+        handleChange('image_url', data.images[0].uri);
+        updated = true;
+      }
+
+      // Fetch master release date if we have a master_id
+      if (!entry.master_release_date) {
+        if (data.master_id || data.master_url) {
+          const masterId = data.master_id || data.master_url?.split('/').pop();
+          if (masterId) {
+            try {
+              const masterData = await fetchDiscogsMaster(String(masterId));
+              if (masterData.year) {
+                handleChange('master_release_id', String(masterId));
+                handleChange('master_release_date', String(masterData.year));
+                updated = true;
+              }
+            } catch (err) {
+              console.warn('Could not fetch master release:', err);
+            }
+          }
+        }
+      }
+
+      setStatus(updated ? '✅ Updated missing metadata from Discogs' : 'ℹ️ No missing fields to update');
+    } catch (err) {
+      setStatus(`❌ Failed to fetch metadata: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setFetching(false);
+    }
   }
 
   if (!entry) {
@@ -113,24 +231,6 @@ export default function EditEntryPage() {
     setBlockedSides((bs) =>
       bs.includes(side) ? bs.filter((s) => s !== side) : [...bs, side]
     );
-  }
-
-  async function fetchDiscogs(field: string) {
-    setStatus(`Fetching ${field} from Discogs...`);
-    try {
-      const val = await fetchDiscogsField(entry!.discogs_release_id, field);
-      if (field === "tracklists") {
-        let arr: unknown[] = [];
-        try { arr = JSON.parse(val as string); } catch { arr = []; }
-        setTracks(Array.isArray(arr) ? (arr as Partial<Track>[]).map(cleanTrack) : []);
-        handleChange('tracklists', val);
-      } else {
-        handleChange(field, val);
-      }
-      setStatus(`Updated ${field} from Discogs`);
-    } catch {
-      setStatus(`Failed to fetch ${field} from Discogs`);
-    }
   }
 
   function handleTrackChange(i: number, key: keyof Track, value: string) {
@@ -166,13 +266,12 @@ export default function EditEntryPage() {
       blocked: !!entry.blocked,
       tracklists: JSON.stringify(tracks),
       discogs_release_id: entry.discogs_release_id || '',
+      discogs_genres: entry.discogs_genres || null,
+      discogs_styles: entry.discogs_styles || null,
+      decade: entry.decade || null,
+      master_release_id: entry.master_release_id || null,
+      master_release_date: entry.master_release_date || null,
     };
-    
-    console.log('Saving entry with badges:', {
-      steves_top_200: update.steves_top_200,
-      this_weeks_top_10: update.this_weeks_top_10,
-      inner_circle_preferred: update.inner_circle_preferred
-    });
     
     const { error } = await supabase.from('collection').update(update).eq('id', entry.id);
     
@@ -181,7 +280,7 @@ export default function EditEntryPage() {
       setStatus(`Error: ${error.message}`);
       setSaving(false);
     } else {
-      setStatus('Saved successfully!');
+      setStatus('✅ Saved successfully!');
       setSaving(false);
       setTimeout(() => {
         router.push('/admin/edit-collection');
@@ -189,7 +288,6 @@ export default function EditEntryPage() {
     }
   }
 
-  // For blocking sides (gather all unique sides)
   const sides = Array.from(
     new Set(tracks.map(t => t.position?.[0]).filter(Boolean))
   );
@@ -223,7 +321,7 @@ export default function EditEntryPage() {
 
   return (
     <div style={{ 
-      maxWidth: 900, 
+      maxWidth: 1200, 
       margin: '32px auto', 
       padding: 32, 
       background: '#fff', 
@@ -231,17 +329,51 @@ export default function EditEntryPage() {
       color: "#222",
       boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
     }}>
-      {/* Header */}
+      {/* Header with Missing Metadata Alert */}
       <div style={{ marginBottom: 32, paddingBottom: 16, borderBottom: '1px solid #e5e7eb' }}>
-        <h2 style={{ color: "#222", margin: 0, fontSize: '24px', fontWeight: '600' }}>
-          Edit Entry #{entry.id}
-        </h2>
-        <p style={{ color: "#6b7280", margin: '8px 0 0 0', fontSize: '14px' }}>
-          {entry.artist} - {entry.title}
-        </p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <h2 style={{ color: "#222", margin: 0, fontSize: '24px', fontWeight: '600' }}>
+              Edit Entry #{entry.id}
+            </h2>
+            <p style={{ color: "#6b7280", margin: '8px 0 0 0', fontSize: '14px' }}>
+              {entry.artist} - {entry.title}
+            </p>
+          </div>
+
+          {hasMissingData && (
+            <div style={{
+              background: '#fef3c7',
+              border: '1px solid #f59e0b',
+              borderRadius: 8,
+              padding: 16,
+              maxWidth: 400
+            }}>
+              <div style={{ fontSize: '14px', fontWeight: '600', color: '#92400e', marginBottom: 8 }}>
+                ⚠️ Missing Metadata
+              </div>
+              <div style={{ fontSize: '12px', color: '#78350f', marginBottom: 12 }}>
+                {missingFields.filter(f => f.isEmpty).map(f => f.label).join(', ')}
+              </div>
+              <button
+                onClick={fetchAllMissingMetadata}
+                disabled={fetching || !entry.discogs_release_id}
+                style={{
+                  ...primaryButtonStyle,
+                  width: '100%',
+                  background: fetching ? '#9ca3af' : '#f59e0b',
+                  border: fetching ? 'none' : '1px solid #f59e0b',
+                  cursor: fetching ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {fetching ? 'Fetching...' : '🔄 Fetch Missing from Discogs'}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: 32, alignItems: 'flex-start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.5fr', gap: 32, alignItems: 'flex-start' }}>
         
         {/* Left Column - Basic Info */}
         <div style={{ color: "#222" }}>
@@ -271,22 +403,37 @@ export default function EditEntryPage() {
             </div>
             
             <div>
-              <label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>Year</label>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <input 
-                  style={{...inputStyle, flex: 1}}
-                  value={entry.year || ''} 
-                  onChange={e => handleChange('year', e.target.value)}
-                  placeholder="e.g. 1969" 
-                />
-                <button 
-                  type="button" 
-                  style={buttonStyle} 
-                  onClick={() => fetchDiscogs('year')}
-                  title="Fetch from Discogs"
-                >
-                  Discogs
-                </button>
+              <label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>
+                This Release Year
+              </label>
+              <input 
+                style={inputStyle}
+                value={entry.year || ''} 
+                onChange={e => {
+                  handleChange('year', e.target.value);
+                  // Auto-calculate decade when year changes
+                  const decade = calculateDecade(e.target.value);
+                  if (decade) handleChange('decade', decade);
+                }}
+                placeholder="e.g. 1969" 
+              />
+              <div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>
+                Year of this specific pressing/release
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>
+                Master Release Year
+              </label>
+              <input 
+                style={inputStyle}
+                value={entry.master_release_date || ''} 
+                onChange={e => handleChange('master_release_date', e.target.value)}
+                placeholder="e.g. 1967" 
+              />
+              <div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>
+                Original first release year
               </div>
             </div>
             
@@ -320,7 +467,6 @@ export default function EditEntryPage() {
               />
             </div>
 
-            {/* Sell Price Field */}
             <div>
               <label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>
                 💰 Sell Price
@@ -328,23 +474,99 @@ export default function EditEntryPage() {
               <input 
                 style={inputStyle}
                 value={entry.sell_price || ''} 
-                onChange={e => {
-                  console.log('Updating sell_price to:', e.target.value);
-                  handleChange('sell_price', e.target.value);
-                }}
+                onChange={e => handleChange('sell_price', e.target.value)}
                 placeholder="e.g. $25.00 or NFS"
               />
               <div style={{ fontSize: '12px', color: '#6b7280', marginTop: 4 }}>
-                Enter price like &quot;$25.00&quot; or &quot;NFS&quot; for not for sale. Leave blank if not selling.
+                Enter price like &quot;$25.00&quot; or &quot;NFS&quot;
               </div>
-              {entry.sell_price && (
-                <div style={{ fontSize: '12px', color: '#059669', marginTop: 4, fontWeight: 'bold' }}>
-                  Current price: {entry.sell_price}
+            </div>
+
+            <div>
+              <label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>Image URL</label>
+              <input 
+                style={inputStyle}
+                value={entry.image_url || ''} 
+                onChange={e => handleChange('image_url', e.target.value)}
+                placeholder="Cover image URL" 
+              />
+              {entry.image_url && (
+                <div style={{ 
+                  padding: 12, 
+                  background: '#f9fafb', 
+                  borderRadius: 8, 
+                  display: 'flex', 
+                  justifyContent: 'center',
+                  marginTop: 12
+                }}>
+                  <Image
+                    src={entry.image_url}
+                    alt="cover"
+                    width={120}
+                    height={120}
+                    style={{ borderRadius: 8, objectFit: 'cover', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}
+                    unoptimized
+                  />
                 </div>
               )}
             </div>
+          </div>
+        </div>
 
-            {/* Badge Options */}
+        {/* Middle Column - Metadata */}
+        <div style={{ color: "#222" }}>
+          <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: 16, color: '#374151' }}>
+            Metadata
+          </h3>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div>
+              <label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>
+                Genres {!entry.discogs_genres || entry.discogs_genres.length === 0 ? '⚠️' : '✓'}
+              </label>
+              <input 
+                style={inputStyle}
+                value={entry.discogs_genres?.join(', ') || ''} 
+                onChange={e => handleChange('discogs_genres', e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+                placeholder="Rock, Jazz, Electronic"
+              />
+              <div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>
+                Comma-separated genres
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>
+                Styles {!entry.discogs_styles || entry.discogs_styles.length === 0 ? '⚠️' : '✓'}
+              </label>
+              <input 
+                style={inputStyle}
+                value={entry.discogs_styles?.join(', ') || ''} 
+                onChange={e => handleChange('discogs_styles', e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+                placeholder="Progressive Rock, Modal, Ambient"
+              />
+              <div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>
+                Comma-separated styles
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>
+                Decade {!entry.decade ? '⚠️' : '✓'}
+              </label>
+              <input 
+                style={inputStyle}
+                value={entry.decade || ''} 
+                onChange={e => handleChange('decade', parseInt(e.target.value) || null)}
+                placeholder="1970"
+                type="number"
+                step="10"
+              />
+              <div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>
+                Auto-calculated from year
+              </div>
+            </div>
+
             <div style={{ 
               padding: 16, 
               background: '#f0f9ff', 
@@ -386,73 +608,74 @@ export default function EditEntryPage() {
                   <span style={{ fontWeight: '600', color: '#7c3aed' }}>💎 Inner Circle Preferred</span>
                 </label>
               </div>
-              
-              <div style={{ fontSize: '12px', color: '#0369a1', marginTop: 8 }}>
-                These badges will appear on the browse page and TV display
-              </div>
             </div>
 
-            <div>
-              <label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>Image URL</label>
-              <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-                <input 
-                  style={{...inputStyle, flex: 1}}
-                  value={entry.image_url || ''} 
-                  onChange={e => handleChange('image_url', e.target.value)}
-                  placeholder="Cover image URL" 
+            <div style={{ 
+              padding: 16, 
+              background: '#fef3c7', 
+              borderRadius: 8, 
+              border: '1px solid #f59e0b' 
+            }}>
+              <h4 style={{ fontSize: '16px', fontWeight: '600', margin: '0 0 12px 0', color: '#92400e' }}>
+                Blocking Options
+              </h4>
+              
+              <label style={{ display: 'flex', alignItems: 'center', marginBottom: 12, color: "#374151", cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={!!entry.blocked}
+                  onChange={e => handleChange('blocked', e.target.checked)}
+                  style={{ marginRight: 8 }}
                 />
-                <button 
-                  type="button" 
-                  style={buttonStyle} 
-                  onClick={() => fetchDiscogs('image_url')}
-                  title="Fetch from Discogs"
-                >
-                  Discogs
-                </button>
-              </div>
-              {entry.image_url && (
-                <div style={{ 
-                  padding: 12, 
-                  background: '#f9fafb', 
-                  borderRadius: 8, 
-                  display: 'flex', 
-                  justifyContent: 'center' 
-                }}>
-                  <Image
-                    src={entry.image_url}
-                    alt="cover"
-                    width={120}
-                    height={120}
-                    style={{ borderRadius: 8, objectFit: 'cover', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}
-                    unoptimized
-                  />
+                <strong>Block Entire Album</strong>
+              </label>
+              
+              {sides.length > 0 && (
+                <div>
+                  <div style={{ fontWeight: '600', marginBottom: 8, color: "#374151" }}>Block Individual Sides:</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {sides.map(side => (
+                      <label 
+                        key={side} 
+                        style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          padding: '6px 12px',
+                          background: blockedSides.includes(side) ? '#fee2e2' : '#fff',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          fontSize: '13px'
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={blockedSides.includes(side)}
+                          onChange={() => handleBlockSide(side)}
+                          style={{ marginRight: 6 }}
+                        />
+                        Side {side}
+                      </label>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
           </div>
         </div>
 
-        {/* Right Column - Tracklist & Blocking */}
+        {/* Right Column - Tracklist */}
         <div style={{ color: "#222" }}>
           <div style={{ marginBottom: 24 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-              <h3 style={{ fontSize: '18px', fontWeight: '600', margin: 0, color: '#374151' }}>
-                Tracklist
-              </h3>
-              <button 
-                type="button" 
-                style={buttonStyle} 
-                onClick={() => fetchDiscogs('tracklists')}
-              >
-                Fetch from Discogs
-              </button>
-            </div>
+            <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: 16, color: '#374151' }}>
+              Tracklist {!tracks || tracks.length === 0 ? '⚠️' : '✓'}
+            </h3>
             
             <div style={{ 
               border: '1px solid #e5e7eb', 
               borderRadius: 8, 
               overflow: 'hidden',
-              maxHeight: 400,
+              maxHeight: 600,
               overflowY: 'auto'
             }}>
               <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
@@ -545,59 +768,6 @@ export default function EditEntryPage() {
               + Add Track
             </button>
           </div>
-
-          {/* Blocking Section */}
-          <div style={{ 
-            padding: 20, 
-            background: '#fef3c7', 
-            borderRadius: 8, 
-            border: '1px solid #f59e0b' 
-          }}>
-            <h4 style={{ fontSize: '16px', fontWeight: '600', margin: '0 0 12px 0', color: '#92400e' }}>
-              Blocking Options
-            </h4>
-            
-            <label style={{ display: 'flex', alignItems: 'center', marginBottom: 12, color: "#374151", cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                checked={!!entry.blocked}
-                onChange={e => handleChange('blocked', e.target.checked)}
-                style={{ marginRight: 8 }}
-              />
-              <strong>Block Entire Album</strong>
-            </label>
-            
-            {sides.length > 0 && (
-              <div>
-                <div style={{ fontWeight: '600', marginBottom: 8, color: "#374151" }}>Block Individual Sides:</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                  {sides.map(side => (
-                    <label 
-                      key={side} 
-                      style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        padding: '6px 12px',
-                        background: blockedSides.includes(side) ? '#fee2e2' : '#fff',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontSize: '13px'
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={blockedSides.includes(side)}
-                        onChange={() => handleBlockSide(side)}
-                        style={{ marginRight: 6 }}
-                      />
-                      Side {side}
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
         </div>
       </div>
 
@@ -638,7 +808,7 @@ export default function EditEntryPage() {
         
         {status && (
           <div style={{ 
-            color: status.includes('Error') ? '#dc2626' : status.includes('success') ? '#059669' : '#374151',
+            color: status.includes('❌') ? '#dc2626' : status.includes('✅') ? '#059669' : '#374151',
             fontWeight: '500',
             fontSize: '14px'
           }}>
