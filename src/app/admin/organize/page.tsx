@@ -109,8 +109,18 @@ export default function FlexibleOrganizePage() {
         if (!row.discogs_styles || !row.discogs_styles.some(s => selectedStyles.includes(s))) return false;
       }
       
-      // Multi-decade filter (OR within selected)
-      if (selectedDecades.length > 0 && (!row.decade || !selectedDecades.includes(row.decade))) return false;
+      // Multi-decade filter - calculate from master release date when available
+      if (selectedDecades.length > 0) {
+        // Use master release date to calculate the original decade
+        const originalYear = row.master_release_date || row.year;
+        if (!originalYear) return false;
+        
+        const yearNum = parseInt(originalYear);
+        if (isNaN(yearNum)) return false;
+        
+        const originalDecade = Math.floor(yearNum / 10) * 10;
+        if (!selectedDecades.includes(originalDecade)) return false;
+      }
       
       // Year range filter - use master release date (original release) if available
       if (yearRangeStart || yearRangeEnd) {
