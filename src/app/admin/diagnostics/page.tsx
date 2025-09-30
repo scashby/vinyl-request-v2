@@ -1,15 +1,15 @@
-// src/app/admin/diagnostics/page.tsx - Data health check and cleanup
+// src/app/admin/diagnostics/page.tsx - Redesigned to match existing admin style
 "use client";
 
 import { useEffect, useState } from 'react';
 import { supabase } from 'src/lib/supabaseClient';
+import Link from 'next/link';
 
 type DataIssue = {
   id: number;
   artist: string;
   title: string;
   issues: string[];
-  severity: 'critical' | 'warning' | 'info';
 };
 
 export default function DataDiagnosticsPage() {
@@ -29,6 +29,7 @@ export default function DataDiagnosticsPage() {
     missingDiscogsId: 0,
     emptyRows: 0,
   });
+  const [status, setStatus] = useState('');
 
   useEffect(() => {
     runDiagnostics();
@@ -36,22 +37,53 @@ export default function DataDiagnosticsPage() {
 
   async function runDiagnostics() {
     setLoading(true);
+    setStatus('Loading all rows...');
     
-    // Fetch all rows
-    const { data: rows, error } = await supabase
-      .from('collection')
-      .select('*')
-      .order('id');
+    // Fetch ALL rows in batches
+    type CollectionRow = {
+      id: number;
+      artist: string | null;
+      title: string | null;
+      year: string | null;
+      discogs_release_id: string | null;
+      master_release_date: string | null;
+      discogs_genres: string[] | null;
+      discogs_styles: string[] | null;
+      decade: number | null;
+      image_url: string | null;
+      tracklists: string | null;
+    };
+    
+    let allRows: CollectionRow[] = [];
+    let from = 0;
+    const batchSize = 1000;
+    let keepGoing = true;
+    
+    while (keepGoing) {
+      const { data: batch, error } = await supabase
+        .from('collection')
+        .select('*')
+        .range(from, from + batchSize - 1)
+        .order('id');
 
-    if (error || !rows) {
-      console.error('Error fetching data:', error);
-      setLoading(false);
-      return;
+      if (error) {
+        console.error('Error fetching data:', error);
+        setLoading(false);
+        return;
+      }
+      
+      if (!batch || batch.length === 0) break;
+      
+      allRows = allRows.concat(batch as CollectionRow[]);
+      setStatus(`Loaded ${allRows.length} rows...`);
+      
+      keepGoing = batch.length === batchSize;
+      from += batchSize;
     }
 
     const foundIssues: DataIssue[] = [];
     const newStats = {
-      total: rows.length,
+      total: allRows.length,
       missingArtist: 0,
       missingTitle: 0,
       missingYear: 0,
@@ -65,68 +97,54 @@ export default function DataDiagnosticsPage() {
       emptyRows: 0,
     };
 
-    rows.forEach(row => {
+    allRows.forEach(row => {
       const rowIssues: string[] = [];
-      let severity: 'critical' | 'warning' | 'info' = 'info';
 
-      // Critical issues - core data missing
-      if (!row.artist || row.artist.trim() === '') {
-        rowIssues.push('Missing artist');
-        newStats.missingArtist++;
-        severity = 'critical';
-      }
-      if (!row.title || row.title.trim() === '') {
-        rowIssues.push('Missing title');
-        newStats.missingTitle++;
-        severity = 'critical';
-      }
-
-      // Check for completely empty rows (fragments)
+      // Check for completely empty rows
       const hasNoData = !row.artist && !row.title && !row.year && !row.discogs_release_id;
       if (hasNoData) {
-        rowIssues.push('EMPTY ROW - Fragment to delete');
+        rowIssues.push('EMPTY ROW');
         newStats.emptyRows++;
-        severity = 'critical';
       }
 
-      // Warning issues - important metadata missing
+      if (!row.artist || row.artist.trim() === '') {
+        rowIssues.push('No artist');
+        newStats.missingArtist++;
+      }
+      if (!row.title || row.title.trim() === '') {
+        rowIssues.push('No title');
+        newStats.missingTitle++;
+      }
       if (!row.discogs_release_id) {
-        rowIssues.push('No Discogs Release ID');
+        rowIssues.push('No Discogs ID');
         newStats.missingDiscogsId++;
-        if (severity !== 'critical') severity = 'warning';
       }
       if (!row.year) {
-        rowIssues.push('Missing year');
+        rowIssues.push('No year');
         newStats.missingYear++;
-        if (severity !== 'critical') severity = 'warning';
       }
       if (!row.master_release_date) {
-        rowIssues.push('Missing master release date');
+        rowIssues.push('No master date');
         newStats.missingMasterDate++;
-        if (severity !== 'critical') severity = 'warning';
       }
       if (!row.discogs_genres || row.discogs_genres.length === 0) {
-        rowIssues.push('Missing genres');
+        rowIssues.push('No genres');
         newStats.missingGenres++;
-        if (severity !== 'critical') severity = 'warning';
       }
       if (!row.discogs_styles || row.discogs_styles.length === 0) {
-        rowIssues.push('Missing styles');
+        rowIssues.push('No styles');
         newStats.missingStyles++;
-        if (severity !== 'critical') severity = 'warning';
       }
       if (!row.decade) {
-        rowIssues.push('Missing decade');
+        rowIssues.push('No decade');
         newStats.missingDecade++;
       }
-      
-      // Info issues - nice to have
       if (!row.image_url) {
-        rowIssues.push('Missing image');
+        rowIssues.push('No image');
         newStats.missingImage++;
       }
       if (!row.tracklists || row.tracklists === '[]' || row.tracklists === 'null') {
-        rowIssues.push('Missing tracklist');
+        rowIssues.push('No tracklist');
         newStats.missingTracklist++;
       }
 
@@ -135,23 +153,23 @@ export default function DataDiagnosticsPage() {
           id: row.id,
           artist: row.artist || '(no artist)',
           title: row.title || '(no title)',
-          issues: rowIssues,
-          severity
+          issues: rowIssues
         });
       }
     });
 
     setIssues(foundIssues);
     setStats(newStats);
+    setStatus('');
     setLoading(false);
   }
 
   async function deleteEmptyRows() {
-    if (!confirm('Delete all empty/fragment rows? This cannot be undone.')) return;
+    if (!confirm('Delete all empty rows? This cannot be undone.')) return;
 
     setLoading(true);
     const emptyRowIds = issues
-      .filter(issue => issue.issues.includes('EMPTY ROW - Fragment to delete'))
+      .filter(issue => issue.issues.includes('EMPTY ROW'))
       .map(issue => issue.id);
 
     if (emptyRowIds.length === 0) {
@@ -169,220 +187,148 @@ export default function DataDiagnosticsPage() {
       alert(`Error deleting: ${error.message}`);
     } else {
       alert(`Deleted ${emptyRowIds.length} empty rows`);
-      runDiagnostics(); // Refresh
+      runDiagnostics();
     }
     setLoading(false);
   }
 
-  const criticalIssues = issues.filter(i => i.severity === 'critical');
-  const warningIssues = issues.filter(i => i.severity === 'warning');
-  const infoIssues = issues.filter(i => i.severity === 'info');
-
   return (
-    <div style={{ padding: 24, maxWidth: 1400, margin: '0 auto' }}>
-      <h1 style={{ fontSize: 32, fontWeight: 'bold', marginBottom: 8 }}>
-        📊 Collection Data Diagnostics
-      </h1>
-      <p style={{ color: '#6b7280', marginBottom: 32 }}>
-        Identify missing metadata, empty rows, and data quality issues
-      </p>
-
-      {loading ? (
-        <div style={{ textAlign: 'center', padding: 40 }}>Loading diagnostics...</div>
-      ) : (
-        <>
-          {/* Stats Dashboard */}
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: 16,
-            marginBottom: 32
-          }}>
-            <StatCard label="Total Albums" value={stats.total} color="#3b82f6" />
-            <StatCard label="Empty Rows" value={stats.emptyRows} color="#dc2626" />
-            <StatCard label="Missing Artist" value={stats.missingArtist} color="#dc2626" />
-            <StatCard label="Missing Title" value={stats.missingTitle} color="#dc2626" />
-            <StatCard label="No Discogs ID" value={stats.missingDiscogsId} color="#f59e0b" />
-            <StatCard label="Missing Genres" value={stats.missingGenres} color="#f59e0b" />
-            <StatCard label="Missing Styles" value={stats.missingStyles} color="#f59e0b" />
-            <StatCard label="Missing Master Date" value={stats.missingMasterDate} color="#f59e0b" />
-            <StatCard label="Missing Decade" value={stats.missingDecade} color="#f59e0b" />
-            <StatCard label="Missing Image" value={stats.missingImage} color="#8b5cf6" />
-            <StatCard label="Missing Tracklist" value={stats.missingTracklist} color="#8b5cf6" />
-          </div>
-
-          {/* Action Buttons */}
+    <div style={{ padding: 24, background: "#fff", color: "#222", minHeight: "100vh" }}>
+      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <h2 style={{ color: "#222", margin: 0 }}>Data Diagnostics</h2>
+        <div style={{ display: 'flex', gap: 12 }}>
           {stats.emptyRows > 0 && (
-            <div style={{
-              background: '#fee2e2',
-              border: '2px solid #dc2626',
-              borderRadius: 8,
-              padding: 16,
-              marginBottom: 24
-            }}>
-              <h3 style={{ color: '#991b1b', margin: '0 0 8px 0' }}>
-                ⚠️ Found {stats.emptyRows} Empty Rows
-              </h3>
-              <p style={{ color: '#7f1d1d', marginBottom: 12, fontSize: 14 }}>
-                These are likely abandoned fragments with no useful data. Safe to delete.
-              </p>
-              <button
-                onClick={deleteEmptyRows}
-                style={{
-                  background: '#dc2626',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: 6,
-                  padding: '8px 16px',
-                  fontWeight: 600,
-                  cursor: 'pointer'
-                }}
-              >
-                🗑️ Delete All Empty Rows
-              </button>
-            </div>
+            <button
+              onClick={deleteEmptyRows}
+              disabled={loading}
+              style={{
+                padding: '4px 12px',
+                background: '#dc2626',
+                color: 'white',
+                border: 'none',
+                borderRadius: 4,
+                cursor: loading ? 'not-allowed' : 'pointer',
+                fontWeight: 'bold'
+              }}
+            >
+              🗑️ Delete {stats.emptyRows} Empty Rows
+            </button>
           )}
+          <button 
+            onClick={runDiagnostics}
+            disabled={loading}
+            style={{
+              padding: '4px 8px',
+              background: '#2563eb',
+              color: 'white',
+              border: 'none',
+              borderRadius: 4,
+              cursor: loading ? 'not-allowed' : 'pointer'
+            }}
+          >
+            Reload
+          </button>
+        </div>
+      </div>
 
-          {/* Critical Issues */}
-          {criticalIssues.length > 0 && (
-            <IssueSection
-              title="🚨 Critical Issues"
-              subtitle="Missing core data - needs immediate attention"
-              issues={criticalIssues}
-              bgColor="#fee2e2"
-              borderColor="#dc2626"
-            />
-          )}
-
-          {/* Warning Issues */}
-          {warningIssues.length > 0 && (
-            <IssueSection
-              title="⚠️ Warnings"
-              subtitle="Missing important metadata - should be addressed"
-              issues={warningIssues}
-              bgColor="#fef3c7"
-              borderColor="#f59e0b"
-            />
-          )}
-
-          {/* Info Issues */}
-          {infoIssues.length > 0 && (
-            <IssueSection
-              title="ℹ️ Info"
-              subtitle="Missing nice-to-have metadata"
-              issues={infoIssues}
-              bgColor="#dbeafe"
-              borderColor="#3b82f6"
-            />
-          )}
-
-          {issues.length === 0 && (
-            <div style={{
-              background: '#dcfce7',
-              border: '2px solid #16a34a',
-              borderRadius: 8,
-              padding: 24,
-              textAlign: 'center'
-            }}>
-              <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
-              <div style={{ fontSize: 18, fontWeight: 600, color: '#15803d' }}>
-                All Clear! No data issues found.
-              </div>
-            </div>
-          )}
-        </>
+      {status && (
+        <div style={{ padding: 8, background: '#dbeafe', border: '1px solid #3b82f6', borderRadius: 4, marginBottom: 16, fontSize: 14 }}>
+          {status}
+        </div>
       )}
+
+      {/* Stats Row */}
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+        gap: 12,
+        marginBottom: 24
+      }}>
+        <StatBox label="Total" value={stats.total} color="#3b82f6" />
+        <StatBox label="Empty" value={stats.emptyRows} color="#dc2626" />
+        <StatBox label="No Artist" value={stats.missingArtist} color="#dc2626" />
+        <StatBox label="No Title" value={stats.missingTitle} color="#dc2626" />
+        <StatBox label="No Discogs ID" value={stats.missingDiscogsId} color="#f59e0b" />
+        <StatBox label="No Genres" value={stats.missingGenres} color="#f59e0b" />
+        <StatBox label="No Styles" value={stats.missingStyles} color="#f59e0b" />
+        <StatBox label="No Master Date" value={stats.missingMasterDate} color="#f59e0b" />
+        <StatBox label="No Decade" value={stats.missingDecade} color="#f59e0b" />
+        <StatBox label="No Image" value={stats.missingImage} color="#8b5cf6" />
+        <StatBox label="No Tracklist" value={stats.missingTracklist} color="#8b5cf6" />
+      </div>
+
+      {/* Issues Table */}
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: 40 }}>Loading...</div>
+      ) : issues.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: 40, background: '#dcfce7', border: '1px solid #16a34a', borderRadius: 4 }}>
+          ✅ All clear! No data issues found.
+        </div>
+      ) : (
+        <div style={{ overflowX: 'auto', border: '1px solid #ddd' }}>
+          <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: 13 }}>
+            <thead style={{ background: '#f5f5f5' }}>
+              <tr style={{ color: "#222" }}>
+                <th style={{ padding: '8px 4px', borderBottom: '1px solid #ddd', textAlign: 'left' }}>ID</th>
+                <th style={{ padding: '8px 4px', borderBottom: '1px solid #ddd', textAlign: 'left' }}>Artist</th>
+                <th style={{ padding: '8px 4px', borderBottom: '1px solid #ddd', textAlign: 'left' }}>Title</th>
+                <th style={{ padding: '8px 4px', borderBottom: '1px solid #ddd', textAlign: 'left' }}>Issues</th>
+                <th style={{ padding: '8px 4px', borderBottom: '1px solid #ddd' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {issues.map((issue) => (
+                <tr key={issue.id} style={{
+                  color: "#222",
+                  borderBottom: '1px solid #f0f0f0',
+                  background: issue.issues.includes('EMPTY ROW') ? '#fee2e2' : ''
+                }}>
+                  <td style={{ padding: '4px', fontWeight: 'bold' }}>{issue.id}</td>
+                  <td style={{ padding: '4px', maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {issue.artist}
+                  </td>
+                  <td style={{ padding: '4px', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {issue.title}
+                  </td>
+                  <td style={{ padding: '4px', fontSize: 12 }}>
+                    {issue.issues.join(', ')}
+                  </td>
+                  <td style={{ padding: '4px', textAlign: 'center' }}>
+                    <Link
+                      href={`/admin/edit-entry/${issue.id}`}
+                      style={{ color: '#2563eb', fontWeight: 500, textDecoration: 'none', fontSize: 12 }}
+                    >
+                      Edit
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <div style={{ color: "#222", marginTop: 16, fontSize: 12 }}>
+        Showing {issues.length} items with issues out of {stats.total} total albums
+      </div>
     </div>
   );
 }
 
-function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
+function StatBox({ label, value, color }: { label: string; value: number; color: string }) {
   return (
     <div style={{
       background: 'white',
       border: `2px solid ${color}`,
-      borderRadius: 8,
-      padding: 16,
+      borderRadius: 4,
+      padding: 12,
       textAlign: 'center'
     }}>
-      <div style={{ fontSize: 32, fontWeight: 'bold', color, marginBottom: 4 }}>
+      <div style={{ fontSize: 24, fontWeight: 'bold', color }}>
         {value}
       </div>
-      <div style={{ fontSize: 12, color: '#6b7280', fontWeight: 500 }}>
+      <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
         {label}
-      </div>
-    </div>
-  );
-}
-
-function IssueSection({ 
-  title, 
-  subtitle, 
-  issues, 
-  bgColor, 
-  borderColor 
-}: { 
-  title: string; 
-  subtitle: string; 
-  issues: DataIssue[];
-  bgColor: string;
-  borderColor: string;
-}) {
-  return (
-    <div style={{
-      background: bgColor,
-      border: `1px solid ${borderColor}`,
-      borderRadius: 8,
-      padding: 16,
-      marginBottom: 24
-    }}>
-      <h3 style={{ margin: '0 0 4px 0', fontSize: 18, fontWeight: 600 }}>
-        {title} ({issues.length})
-      </h3>
-      <p style={{ margin: '0 0 16px 0', fontSize: 13, opacity: 0.8 }}>
-        {subtitle}
-      </p>
-      
-      <div style={{ maxHeight: 400, overflowY: 'auto' }}>
-        {issues.map(issue => (
-          <div key={issue.id} style={{
-            background: 'white',
-            border: '1px solid #e5e7eb',
-            borderRadius: 6,
-            padding: 12,
-            marginBottom: 8
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-              <div style={{ fontWeight: 600, fontSize: 14 }}>
-                #{issue.id}: {issue.artist} - {issue.title}
-              </div>
-              <a
-                href={`/admin/edit-entry/${issue.id}`}
-                style={{
-                  color: '#2563eb',
-                  textDecoration: 'none',
-                  fontSize: 13,
-                  fontWeight: 500
-                }}
-              >
-                Edit →
-              </a>
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {issue.issues.map((iss, idx) => (
-                <span key={idx} style={{
-                  background: '#f3f4f6',
-                  padding: '2px 8px',
-                  borderRadius: 4,
-                  fontSize: 12,
-                  color: '#374151'
-                }}>
-                  {iss}
-                </span>
-              ))}
-            </div>
-          </div>
-        ))}
       </div>
     </div>
   );

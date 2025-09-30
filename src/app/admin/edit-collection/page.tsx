@@ -1,4 +1,4 @@
-// src/app/admin/edit-collection/page.tsx
+// src/app/admin/edit-collection/page.tsx - Complete with all metadata filters
 "use client";
 
 import { useEffect, useState, useCallback } from 'react';
@@ -21,6 +21,10 @@ interface CollectionRow {
   inner_circle_preferred?: boolean | null;
   tracklists?: string | { position?: string; title?: string }[];
   blocked?: boolean;
+  discogs_genres?: string[] | null;
+  discogs_styles?: string[] | null;
+  decade?: number | null;
+  master_release_date?: string | null;
 }
 
 type SortColumn = 'id' | 'artist' | 'title' | 'year' | 'folder' | 'format' | 'media_condition' | 'sell_price';
@@ -34,6 +38,10 @@ interface PageState {
   query: string;
   showMissingImages: boolean;
   showMissingTracklists: boolean;
+  showMissingGenres: boolean;
+  showMissingStyles: boolean;
+  showMissingDecade: boolean;
+  showMissingMasterDate: boolean;
   showForSale: boolean;
   showTop200Only: boolean;
   showTop10Only: boolean;
@@ -49,6 +57,10 @@ export default function EditCollectionPage() {
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [showMissingImages, setShowMissingImages] = useState<boolean>(false);
   const [showMissingTracklists, setShowMissingTracklists] = useState<boolean>(false);
+  const [showMissingGenres, setShowMissingGenres] = useState<boolean>(false);
+  const [showMissingStyles, setShowMissingStyles] = useState<boolean>(false);
+  const [showMissingDecade, setShowMissingDecade] = useState<boolean>(false);
+  const [showMissingMasterDate, setShowMissingMasterDate] = useState<boolean>(false);
   const [showForSale, setShowForSale] = useState<boolean>(false);
   const [showTop200Only, setShowTop200Only] = useState<boolean>(false);
   const [showTop10Only, setShowTop10Only] = useState<boolean>(false);
@@ -65,6 +77,10 @@ export default function EditCollectionPage() {
       query,
       showMissingImages,
       showMissingTracklists,
+      showMissingGenres,
+      showMissingStyles,
+      showMissingDecade,
+      showMissingMasterDate,
       showForSale,
       showTop200Only,
       showTop10Only,
@@ -72,7 +88,7 @@ export default function EditCollectionPage() {
       scrollPosition: window.scrollY
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  }, [sortColumn, sortDirection, query, showMissingImages, showMissingTracklists, showForSale, showTop200Only, showTop10Only, showInnerCircleOnly]);
+  }, [sortColumn, sortDirection, query, showMissingImages, showMissingTracklists, showMissingGenres, showMissingStyles, showMissingDecade, showMissingMasterDate, showForSale, showTop200Only, showTop10Only, showInnerCircleOnly]);
 
   // Load state from localStorage
   const loadState = useCallback(() => {
@@ -85,12 +101,15 @@ export default function EditCollectionPage() {
         setQuery(state.query || '');
         setShowMissingImages(state.showMissingImages || false);
         setShowMissingTracklists(state.showMissingTracklists || false);
+        setShowMissingGenres(state.showMissingGenres || false);
+        setShowMissingStyles(state.showMissingStyles || false);
+        setShowMissingDecade(state.showMissingDecade || false);
+        setShowMissingMasterDate(state.showMissingMasterDate || false);
         setShowForSale(state.showForSale || false);
         setShowTop200Only(state.showTop200Only || false);
         setShowTop10Only(state.showTop10Only || false);
         setShowInnerCircleOnly(state.showInnerCircleOnly || false);
         
-        // Restore scroll position after data loads
         setTimeout(() => {
           window.scrollTo(0, state.scrollPosition || 0);
         }, 100);
@@ -105,7 +124,6 @@ export default function EditCollectionPage() {
     fetchAllRows();
   }, [loadState]);
 
-  // Save state whenever it changes
   useEffect(() => {
     saveState();
   }, [saveState]);
@@ -183,11 +201,9 @@ export default function EditCollectionPage() {
           bVal = (b.media_condition || '').toLowerCase();
           break;
         case 'sell_price':
-          // Custom sorting for sell price
           const priceA = a.sell_price;
           const priceB = b.sell_price;
           
-          // NFS should sort after prices, nulls at the end
           if (!priceA && !priceB) return 0;
           if (!priceA) return 1;
           if (!priceB) return -1;
@@ -196,7 +212,6 @@ export default function EditCollectionPage() {
           if (priceB === 'NFS' && priceA !== 'NFS') return -1;
           if (priceA === 'NFS' && priceB === 'NFS') return 0;
           
-          // Try to parse as numbers for proper price sorting
           const numA = parseFloat(priceA.replace(/[^0-9.]/g, ''));
           const numB = parseFloat(priceB.replace(/[^0-9.]/g, ''));
           
@@ -239,30 +254,25 @@ export default function EditCollectionPage() {
     }
   }
 
-
-
   const filtered = data.filter(row => {
-    // Text search filter
     const matchesQuery = !query || 
       (row.title || '').toLowerCase().includes(query.toLowerCase()) ||
       (row.artist || '').toLowerCase().includes(query.toLowerCase());
 
-    // Missing image filter
     const matchesImageFilter = !showMissingImages || !hasValidImage(row);
-
-    // Missing tracklist filter
     const matchesTracklistFilter = !showMissingTracklists || !hasValidTracklist(row);
-
-    // For sale filter
+    const matchesGenresFilter = !showMissingGenres || !row.discogs_genres || row.discogs_genres.length === 0;
+    const matchesStylesFilter = !showMissingStyles || !row.discogs_styles || row.discogs_styles.length === 0;
+    const matchesDecadeFilter = !showMissingDecade || !row.decade;
+    const matchesMasterDateFilter = !showMissingMasterDate || !row.master_release_date;
     const matchesForSaleFilter = !showForSale || (row.sell_price && row.sell_price !== '');
-
-    // Individual badge filters
     const matchesTop200Filter = !showTop200Only || !!row.steves_top_200;
     const matchesTop10Filter = !showTop10Only || !!row.this_weeks_top_10;
     const matchesInnerCircleFilter = !showInnerCircleOnly || !!row.inner_circle_preferred;
 
-    return matchesQuery && matchesImageFilter && matchesTracklistFilter && matchesForSaleFilter && 
-           matchesTop200Filter && matchesTop10Filter && matchesInnerCircleFilter;
+    return matchesQuery && matchesImageFilter && matchesTracklistFilter && 
+           matchesGenresFilter && matchesStylesFilter && matchesDecadeFilter && matchesMasterDateFilter &&
+           matchesForSaleFilter && matchesTop200Filter && matchesTop10Filter && matchesInnerCircleFilter;
   });
 
   const sortedAndFiltered = sortData(filtered);
@@ -299,7 +309,6 @@ export default function EditCollectionPage() {
 
       if (error) throw error;
 
-      // Update local data
       setData(prevData => 
         prevData.map(row => 
           row.id === rowId 
@@ -336,7 +345,6 @@ export default function EditCollectionPage() {
 
       if (error) throw error;
 
-      // Update local data
       setData(prevData => 
         prevData.map(row => 
           row.id === rowId 
@@ -370,7 +378,6 @@ export default function EditCollectionPage() {
 
       if (error) throw error;
 
-      // Remove from local data
       setData(prevData => prevData.filter(r => r.id !== row.id));
       setStatus(`Deleted: ${row.artist} - ${row.title}`);
       setTimeout(() => setStatus(''), 3000);
@@ -400,7 +407,6 @@ export default function EditCollectionPage() {
     updateSellPrice(rowId, '');
   };
 
-  // Print/Export function
   const exportToPrint = () => {
     const printContent = `
       <!DOCTYPE html>
@@ -434,11 +440,15 @@ export default function EditCollectionPage() {
             ${query ? `Search: "${query}" • ` : ''}
             ${showMissingImages ? 'Missing Images • ' : ''}
             ${showMissingTracklists ? 'Missing Tracklists • ' : ''}
+            ${showMissingGenres ? 'Missing Genres • ' : ''}
+            ${showMissingStyles ? 'Missing Styles • ' : ''}
+            ${showMissingDecade ? 'Missing Decade • ' : ''}
+            ${showMissingMasterDate ? 'Missing Master Date • ' : ''}
             ${showForSale ? 'For Sale Only • ' : ''}
             ${showTop200Only ? 'Steve\'s Top 200 Only • ' : ''}
             ${showTop10Only ? 'This Week\'s Top 10 Only • ' : ''}
             ${showInnerCircleOnly ? 'Inner Circle Preferred Only • ' : ''}
-            ${!query && !showMissingImages && !showMissingTracklists && !showForSale && !showTop200Only && !showTop10Only && !showInnerCircleOnly ? 'None' : ''}
+            ${!query && !showMissingImages && !showMissingTracklists && !showMissingGenres && !showMissingStyles && !showMissingDecade && !showMissingMasterDate && !showForSale && !showTop200Only && !showTop10Only && !showInnerCircleOnly ? 'None' : ''}
           </div>
           
           <table>
@@ -552,7 +562,7 @@ export default function EditCollectionPage() {
               checked={showMissingImages}
               onChange={e => setShowMissingImages(e.target.checked)}
             />
-            Missing images only
+            Missing images
           </label>
           
           <label style={{ display: 'flex', alignItems: 'center', gap: 4, color: "#222", fontSize: 14 }}>
@@ -561,7 +571,43 @@ export default function EditCollectionPage() {
               checked={showMissingTracklists}
               onChange={e => setShowMissingTracklists(e.target.checked)}
             />
-            Missing tracklists only
+            Missing tracklists
+          </label>
+
+          <label style={{ display: 'flex', alignItems: 'center', gap: 4, color: "#222", fontSize: 14 }}>
+            <input
+              type="checkbox"
+              checked={showMissingGenres}
+              onChange={e => setShowMissingGenres(e.target.checked)}
+            />
+            Missing genres
+          </label>
+
+          <label style={{ display: 'flex', alignItems: 'center', gap: 4, color: "#222", fontSize: 14 }}>
+            <input
+              type="checkbox"
+              checked={showMissingStyles}
+              onChange={e => setShowMissingStyles(e.target.checked)}
+            />
+            Missing styles
+          </label>
+
+          <label style={{ display: 'flex', alignItems: 'center', gap: 4, color: "#222", fontSize: 14 }}>
+            <input
+              type="checkbox"
+              checked={showMissingDecade}
+              onChange={e => setShowMissingDecade(e.target.checked)}
+            />
+            Missing decade
+          </label>
+
+          <label style={{ display: 'flex', alignItems: 'center', gap: 4, color: "#222", fontSize: 14 }}>
+            <input
+              type="checkbox"
+              checked={showMissingMasterDate}
+              onChange={e => setShowMissingMasterDate(e.target.checked)}
+            />
+            Missing master date
           </label>
 
           <label style={{ display: 'flex', alignItems: 'center', gap: 4, color: "#222", fontSize: 14 }}>
@@ -814,6 +860,10 @@ export default function EditCollectionPage() {
           Showing {sortedAndFiltered.length} / {data.length} rows.
           {showMissingImages && ` (${data.filter(row => !hasValidImage(row)).length} missing images)`}
           {showMissingTracklists && ` (${data.filter(row => !hasValidTracklist(row)).length} missing tracklists)`}
+          {showMissingGenres && ` (${data.filter(row => !row.discogs_genres || row.discogs_genres.length === 0).length} missing genres)`}
+          {showMissingStyles && ` (${data.filter(row => !row.discogs_styles || row.discogs_styles.length === 0).length} missing styles)`}
+          {showMissingDecade && ` (${data.filter(row => !row.decade).length} missing decade)`}
+          {showMissingMasterDate && ` (${data.filter(row => !row.master_release_date).length} missing master date)`}
           {showForSale && ` (${forSaleCount} for sale)`}
           {showTop200Only && ` (${top200Count} top 200)`}
           {showTop10Only && ` (${top10Count} top 10)`}
