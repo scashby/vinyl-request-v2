@@ -23,7 +23,7 @@ interface EventData {
   recurrence_interval: number;
   recurrence_end_date: string;
   parent_event_id?: number;
-  is_tba: boolean; // New field for TBA events
+  is_tba: boolean;
 }
 
 // Utility function to generate recurring events
@@ -31,7 +31,6 @@ function generateRecurringEvents(baseEvent: EventData & { id?: number }): Omit<E
   const events: Omit<EventData, 'id'>[] = [];
   
   if (!baseEvent.is_recurring || !baseEvent.recurrence_end_date || baseEvent.is_tba) {
-    // Return without ID for non-recurring events or TBA events
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { id: _id, ...eventWithoutId } = baseEvent;
     return [eventWithoutId];
@@ -42,21 +41,18 @@ function generateRecurringEvents(baseEvent: EventData & { id?: number }): Omit<E
   const pattern = baseEvent.recurrence_pattern;
   const interval = baseEvent.recurrence_interval || 1;
 
-  // eslint-disable-next-line prefer-const
-  let currentDate = new Date(startDate);
+  const currentDate = new Date(startDate);
 
   while (currentDate <= endDate) {
-    // Create event for current date WITHOUT the ID
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { id: _id, ...baseEventWithoutId } = baseEvent;
     const eventForDate: Omit<EventData, 'id'> = {
       ...baseEventWithoutId,
       date: currentDate.toISOString().split('T')[0],
-      parent_event_id: baseEvent.id // Link to parent
+      parent_event_id: baseEvent.id
     };
     events.push(eventForDate);
 
-    // Calculate next occurrence
     switch (pattern) {
       case 'daily':
         currentDate.setDate(currentDate.getDate() + interval);
@@ -68,7 +64,7 @@ function generateRecurringEvents(baseEvent: EventData & { id?: number }): Omit<E
         currentDate.setMonth(currentDate.getMonth() + interval);
         break;
       default:
-        return events; // Stop if pattern is unrecognized
+        return events;
     }
   }
 
@@ -119,7 +115,6 @@ export default function EditEventForm() {
           title: copiedEvent.title ? `${copiedEvent.title} (Copy)` : '',
           is_tba: isTBA,
           date: isTBA ? '' : copiedEvent.date,
-          // Reset recurring settings for copied events
           is_recurring: false,
           recurrence_end_date: '',
           parent_event_id: undefined,
@@ -157,7 +152,6 @@ export default function EditEventForm() {
     // eslint-disable-next-line
   }, [id]);
 
-  // For all text inputs and textareas (NO CHECKBOXES HERE)
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
@@ -168,24 +162,20 @@ export default function EditEventForm() {
     }));
   };
 
-  // For has_queue, is_recurring, and is_tba checkboxes
   const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, checked } = e.target;
     setEventData((prev) => ({
       ...prev,
       [name]: checked,
-      // Clear date when TBA is checked, restore a default date when unchecked
       ...(name === 'is_tba' && checked ? { 
         date: '', 
-        is_recurring: false, // Can't have recurring TBA events
+        is_recurring: false,
         recurrence_end_date: '' 
       } : {}),
-      // Clear recurrence_end_date when is_recurring is unchecked
       ...(name === 'is_recurring' && !checked ? { recurrence_end_date: '' } : {})
     }));
   };
 
-  // For allowed_formats checkboxes only
   const handleFormatChange = (format: string, checked: boolean) => {
     setEventData((prev) => {
       const formats = Array.isArray(prev.allowed_formats) ? [...prev.allowed_formats] : [];
@@ -201,7 +191,6 @@ export default function EditEventForm() {
     e.preventDefault();
     
     try {
-      // Basic validation
       if (!eventData.is_tba && eventData.is_recurring) {
         if (!eventData.date) {
           alert('Please set a start date for the recurring event');
@@ -217,10 +206,9 @@ export default function EditEventForm() {
         }
       }
 
-      // Prepare payload with proper null handling for date fields
       const payload = {
         title: eventData.title,
-        date: eventData.is_tba ? '9999-12-31' : eventData.date, // Use special date for TBA events
+        date: eventData.is_tba ? '9999-12-31' : eventData.date,
         time: eventData.time,
         location: eventData.location,
         image_url: eventData.image_url,
@@ -228,8 +216,7 @@ export default function EditEventForm() {
         info_url: eventData.info_url,
         has_queue: eventData.has_queue,
         allowed_formats: `{${eventData.allowed_formats.map(f => f.trim()).join(',')}}`,
-        is_recurring: eventData.is_tba ? false : eventData.is_recurring, // TBA events can't be recurring
-        // Only include recurrence fields if the event is recurring and not TBA
+        is_recurring: eventData.is_tba ? false : eventData.is_recurring,
         ...(!eventData.is_tba && eventData.is_recurring ? {
           recurrence_pattern: eventData.recurrence_pattern,
           recurrence_interval: eventData.recurrence_interval,
@@ -239,63 +226,142 @@ export default function EditEventForm() {
           recurrence_interval: null,
           recurrence_end_date: null,
         }),
-        // Only include parent_event_id if it exists
         ...(eventData.parent_event_id ? { parent_event_id: eventData.parent_event_id } : {})
       };
 
       console.log('Submitting payload:', payload);
 
-      if (!eventData.is_tba && eventData.is_recurring && !id) {
-        // Creating a new recurring event (not TBA)
-        console.log('Creating recurring event...');
-        const { data: savedEvent, error: saveError } = await supabase
-          .from('events')
-          .insert([payload])
-          .select()
-          .single();
-
-        if (saveError) {
-          console.error('Error saving main event:', saveError);
-          throw saveError;
-        }
-
-        console.log('Main event saved:', savedEvent);
-
-        // Generate and save recurring instances
-        const recurringEvents = generateRecurringEvents({
-          ...eventData,
-          id: savedEvent.id
-        });
-
-        console.log('Generated recurring events:', recurringEvents.length);
-
-        // Remove the first event (it's already saved) and save the rest
-        const eventsToInsert = recurringEvents.slice(1).map(e => ({
-          ...e,
-          date: e.date, // Keep the calculated date
-          allowed_formats: `{${e.allowed_formats.map(f => f.trim()).join(',')}}`,
-          parent_event_id: savedEvent.id,
-          recurrence_pattern: null,
-          recurrence_interval: null,
-          recurrence_end_date: null,
-        }));
-
-        console.log('Events to insert:', eventsToInsert);
-
-        if (eventsToInsert.length > 0) {
-          const { error: insertError } = await supabase
+      if (!eventData.is_tba && eventData.is_recurring) {
+        if (id) {
+          // EDITING an existing event and making it recurring
+          console.log('Updating event to be recurring...');
+          
+          const { error: updateError } = await supabase
             .from('events')
-            .insert(eventsToInsert);
+            .update(payload)
+            .eq('id', id);
 
-          if (insertError) {
-            console.error('Error inserting recurring events:', insertError);
-            throw insertError;
+          if (updateError) {
+            console.error('Error updating parent event:', updateError);
+            throw updateError;
           }
-        }
 
-        alert(`Successfully created ${recurringEvents.length} recurring events!`);
+          const recurringEvents = generateRecurringEvents({
+            ...eventData,
+            id: parseInt(id)
+          });
+
+          console.log('Generated recurring events:', recurringEvents.length);
+
+          const { data: existingChildren } = await supabase
+            .from('events')
+            .select('id, date')
+            .eq('parent_event_id', id);
+
+          const existingDates = new Set(existingChildren?.map(e => e.date) || []);
+          const newDates = recurringEvents.slice(1).map(e => e.date);
+          
+          for (const child of existingChildren || []) {
+            if (newDates.includes(child.date)) {
+              await supabase
+                .from('events')
+                .update({
+                  title: eventData.title,
+                  time: eventData.time,
+                  location: eventData.location,
+                  image_url: eventData.image_url,
+                  info: eventData.info,
+                  info_url: eventData.info_url,
+                  has_queue: eventData.has_queue,
+                  allowed_formats: `{${eventData.allowed_formats.map(f => f.trim()).join(',')}}`,
+                })
+                .eq('id', child.id);
+            } else {
+              await supabase
+                .from('events')
+                .update({ 
+                  title: `${eventData.title} (Cancelled)`,
+                  info: `This event was cancelled as part of a recurring series update.`
+                })
+                .eq('id', child.id);
+            }
+          }
+
+          const eventsToInsert = recurringEvents
+            .slice(1)
+            .filter(e => !existingDates.has(e.date))
+            .map(e => ({
+              ...e,
+              date: e.date,
+              allowed_formats: `{${e.allowed_formats.map(f => f.trim()).join(',')}}`,
+              parent_event_id: parseInt(id),
+              recurrence_pattern: null,
+              recurrence_interval: null,
+              recurrence_end_date: null,
+            }));
+
+          if (eventsToInsert.length > 0) {
+            const { error: insertError } = await supabase
+              .from('events')
+              .insert(eventsToInsert);
+
+            if (insertError) {
+              console.error('Error inserting new recurring events:', insertError);
+              throw insertError;
+            }
+          }
+
+          alert(`Successfully updated recurring event series! (${recurringEvents.length} total events)`);
+        } else {
+          // CREATING a new recurring event
+          console.log('Creating new recurring event...');
+          const { data: savedEvent, error: saveError } = await supabase
+            .from('events')
+            .insert([payload])
+            .select()
+            .single();
+
+          if (saveError) {
+            console.error('Error saving main event:', saveError);
+            throw saveError;
+          }
+
+          console.log('Main event saved:', savedEvent);
+
+          const recurringEvents = generateRecurringEvents({
+            ...eventData,
+            id: savedEvent.id
+          });
+
+          console.log('Generated recurring events:', recurringEvents.length);
+
+          const eventsToInsert = recurringEvents.slice(1).map(e => ({
+            ...e,
+            date: e.date,
+            allowed_formats: `{${e.allowed_formats.map(f => f.trim()).join(',')}}`,
+            parent_event_id: savedEvent.id,
+            recurrence_pattern: null,
+            recurrence_interval: null,
+            recurrence_end_date: null,
+          }));
+
+          console.log('Events to insert:', eventsToInsert);
+
+          if (eventsToInsert.length > 0) {
+            const { error: insertError } = await supabase
+              .from('events')
+              .insert(eventsToInsert);
+
+            if (insertError) {
+              console.error('Error inserting recurring events:', insertError);
+              throw insertError;
+            }
+          }
+
+          alert(`Successfully created ${recurringEvents.length} recurring events!`);
+        }
       } else {
-        // Single event (including TBA) or updating existing event
+        // Single event (including TBA) or non-recurring update
         console.log('Saving single event...');
         let result;
         if (id) {
