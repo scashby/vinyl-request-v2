@@ -1,3 +1,5 @@
+// EditEventForm.tsx — Enhanced with TBA support and fixed date handling for recurring events
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -24,19 +26,27 @@ interface EventData {
   is_tba: boolean;
 }
 
-/** Remove the `id` field while keeping types happy (and ESLint clean). */
-function withoutId<T extends { id?: unknown }>(obj: T): Omit<T, 'id'> {
-  const { id, ...rest } = obj;
-  void id; // mark as used to satisfy no-unused-vars
-  return rest as Omit<T, 'id'>;
-}
-
-// Utility function to generate recurring events
+/** Generate recurring child events from a parent definition (logic-only; no UX changes). */
 function generateRecurringEvents(baseEvent: EventData & { id?: number }): Omit<EventData, 'id'>[] {
-  const events: Omit<EventData, 'id'>[] = [];
-  
+  // If not recurring (or TBA), return a single event
   if (!baseEvent.is_recurring || !baseEvent.recurrence_end_date || baseEvent.is_tba) {
-    return [withoutId(baseEvent)];
+    return [{
+      title: baseEvent.title,
+      date: baseEvent.date,
+      time: baseEvent.time,
+      location: baseEvent.location,
+      image_url: baseEvent.image_url,
+      info: baseEvent.info,
+      info_url: baseEvent.info_url,
+      has_queue: baseEvent.has_queue,
+      allowed_formats: baseEvent.allowed_formats,
+      is_recurring: baseEvent.is_recurring,
+      recurrence_pattern: baseEvent.recurrence_pattern,
+      recurrence_interval: baseEvent.recurrence_interval,
+      recurrence_end_date: baseEvent.recurrence_end_date,
+      parent_event_id: baseEvent.parent_event_id,
+      is_tba: baseEvent.is_tba,
+    }];
   }
 
   const startDate = new Date(baseEvent.date);
@@ -44,32 +54,42 @@ function generateRecurringEvents(baseEvent: EventData & { id?: number }): Omit<E
   const pattern = baseEvent.recurrence_pattern;
   const interval = baseEvent.recurrence_interval || 1;
 
-  const currentDate = new Date(startDate);
+  const out: Omit<EventData, 'id'>[] = [];
+  const d = new Date(startDate);
 
-  while (currentDate <= endDate) {
-    const eventForDate: Omit<EventData, 'id'> = {
-      ...withoutId(baseEvent),
-      date: currentDate.toISOString().split('T')[0],
-      parent_event_id: baseEvent.id
-    };
-    events.push(eventForDate);
+  while (d <= endDate) {
+    const dateISO = d.toISOString().split('T')[0];
 
-    switch (pattern) {
-      case 'daily':
-        currentDate.setDate(currentDate.getDate() + interval);
-        break;
-      case 'weekly':
-        currentDate.setDate(currentDate.getDate() + (7 * interval));
-        break;
-      case 'monthly':
-        currentDate.setMonth(currentDate.getMonth() + interval);
-        break;
-      default:
-        break;
+    out.push({
+      title: baseEvent.title,
+      date: dateISO,
+      time: baseEvent.time,
+      location: baseEvent.location,
+      image_url: baseEvent.image_url,
+      info: baseEvent.info,
+      info_url: baseEvent.info_url,
+      has_queue: baseEvent.has_queue,
+      allowed_formats: baseEvent.allowed_formats,
+      is_recurring: baseEvent.is_recurring,
+      recurrence_pattern: baseEvent.recurrence_pattern,
+      recurrence_interval: baseEvent.recurrence_interval,
+      recurrence_end_date: baseEvent.recurrence_end_date,
+      parent_event_id: baseEvent.id ?? baseEvent.parent_event_id,
+      is_tba: false, // child dates are concrete
+    });
+
+    if (pattern === 'daily') {
+      d.setDate(d.getDate() + interval);
+    } else if (pattern === 'weekly') {
+      d.setDate(d.getDate() + 7 * interval);
+    } else if (pattern === 'monthly') {
+      d.setMonth(d.getMonth() + interval);
+    } else {
+      break;
     }
   }
 
-  return events;
+  return out;
 }
 
 export default function EditEventForm() {
@@ -101,7 +121,7 @@ export default function EditEventForm() {
         if (data) {
           setEventData({
             ...data,
-            is_tba: data.date === "9999-12-31",
+            is_tba: data.date === "9999-12-31", // TBA sentinel
           });
         }
       }
@@ -112,8 +132,11 @@ export default function EditEventForm() {
   function handleChange(
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) {
-    const { name, value } = e.target;
-    setEventData((prev) => ({ ...prev, [name]: (e.target.type === 'number') ? Number(value) : value }));
+    const { name, value, type } = e.target;
+    setEventData((prev) => ({
+      ...prev,
+      [name]: type === 'number' ? Number(value) : value
+    }));
   }
 
   function handleCheckboxChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -133,72 +156,115 @@ export default function EditEventForm() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    const payload = { ...eventData, date: eventData.is_tba ? "9999-12-31" : eventData.date };
+    // Build DB-safe payload: sentinel date if TBA; DO NOT include `is_tba` in DB writes
+    const { is_tba, ...payloadBase } = eventData;
+    const payload: Omit<EventData, 'is_tba'> = {
+      ...payloadBase,
+      date: is_tba ? "9999-12-31" : eventData.date,
+    };
 
     if (eventData.is_recurring) {
-      // Recurring events
-      const events = generateRecurringEvents({ ...payload, id: id ? parseInt(id) : undefined });
-      
+      // Create full desired set from current state (has is_tba for logic)
+      const desired = generateRecurringEvents({
+        ...eventData,
+        id: id ? parseInt(id) : undefined,
+      });
+
       if (id) {
+        // Existing series: upsert and cancel as needed
         const { data: existingChildren } = await supabase
           .from('events')
           .select('id, date')
           .eq('parent_event_id', parseInt(id));
 
-        const existingDates = new Map((existingChildren || []).map(c => [c.date, c.id]));
-        const newDates = events.map(ev => ev.date);
+        const existingDates = new Map((existingChildren || []).map((c) => [c.date, c.id]));
+        const newDates = desired.map((ev) => ev.date);
 
-        // Upsert all new dates
-        for (const ev of events) {
+        // Upsert children — build `safeChild` explicitly (no unused vars)
+        for (const ev of desired) {
+          const safeChild: Omit<EventData, 'id' | 'is_tba'> = {
+            title: ev.title,
+            date: ev.date,
+            time: ev.time,
+            location: ev.location,
+            image_url: ev.image_url,
+            info: ev.info,
+            info_url: ev.info_url,
+            has_queue: ev.has_queue,
+            allowed_formats: ev.allowed_formats,
+            is_recurring: ev.is_recurring,
+            recurrence_pattern: ev.recurrence_pattern,
+            recurrence_interval: ev.recurrence_interval,
+            recurrence_end_date: ev.recurrence_end_date,
+            parent_event_id: ev.parent_event_id,
+          };
+
           if (existingDates.has(ev.date)) {
-            await supabase
-              .from('events')
-              .update(ev)
-              .eq('id', existingDates.get(ev.date));
+            await supabase.from('events').update(safeChild).eq('id', existingDates.get(ev.date));
           } else {
-            await supabase.from('events').insert({ ...ev, parent_event_id: parseInt(id) });
+            await supabase.from('events').insert({ ...safeChild, parent_event_id: parseInt(id) });
           }
         }
 
-        // Cancel children outside the new range
+        // Soft-cancel out-of-range children (no deletes)
         for (const child of existingChildren || []) {
           if (!newDates.includes(child.date)) {
             try {
               const { error: cancelErr } = await supabase
                 .from('events')
-                .update({ 
+                .update({
                   title: `${eventData.title} (Cancelled)`,
                   info: `This event was cancelled as part of a recurring series update.`,
-                  is_cancelled: true
+                  is_cancelled: true,
                 })
                 .eq('id', child.id);
               if (cancelErr) throw cancelErr;
             } catch {
               await supabase
                 .from('events')
-                .update({ 
+                .update({
                   title: `${eventData.title} (Cancelled)`,
-                  info: `This event was cancelled as part of a recurring series update.`
+                  info: `This event was cancelled as part of a recurring series update.`,
                 })
                 .eq('id', child.id);
             }
           }
         }
       } else {
-        const { data: parent, error } = await supabase.from('events').insert(payload).select().single();
+        // New series: create parent, then children
+        const { data: parent, error } = await supabase
+          .from('events')
+          .insert(payload)
+          .select()
+          .single();
         if (error) {
           console.error("Error creating parent:", error);
           return;
         }
-        const parentId = parent.id;
-        for (const ev of events) {
-          await supabase.from('events').insert({ ...ev, parent_event_id: parentId });
+        const parentId: number = parent.id;
+
+        for (const ev of desired) {
+          const safeChild: Omit<EventData, 'id' | 'is_tba'> = {
+            title: ev.title,
+            date: ev.date,
+            time: ev.time,
+            location: ev.location,
+            image_url: ev.image_url,
+            info: ev.info,
+            info_url: ev.info_url,
+            has_queue: ev.has_queue,
+            allowed_formats: ev.allowed_formats,
+            is_recurring: ev.is_recurring,
+            recurrence_pattern: ev.recurrence_pattern,
+            recurrence_interval: ev.recurrence_interval,
+            recurrence_end_date: ev.recurrence_end_date,
+            parent_event_id: parentId, // ensure linkage to new parent
+          };
+          await supabase.from('events').insert(safeChild);
         }
       }
     } else {
       // Single event (including TBA) or non-recurring update
-      let result;
-
       // Cancel any existing children not matching the single date
       try {
         if (id) {
@@ -214,19 +280,19 @@ export default function EditEventForm() {
                 try {
                   const { error: cancelErr2 } = await supabase
                     .from('events')
-                    .update({ 
+                    .update({
                       title: `${eventData.title} (Cancelled)`,
                       info: `This event was cancelled when the series was changed to a single date.`,
-                      is_cancelled: true
+                      is_cancelled: true,
                     })
                     .eq('id', child.id);
                   if (cancelErr2) throw cancelErr2;
                 } catch {
                   await supabase
                     .from('events')
-                    .update({ 
+                    .update({
                       title: `${eventData.title} (Cancelled)`,
-                      info: `This event was cancelled when the series was changed to a single date.`
+                      info: `This event was cancelled when the series was changed to a single date.`,
                     })
                     .eq('id', child.id);
                 }
@@ -236,11 +302,9 @@ export default function EditEventForm() {
         }
       } catch { /* ignore child-cancel fallback errors */ }
 
-      if (id) {
-        result = await supabase.from('events').update(payload).eq('id', id);
-      } else {
-        result = await supabase.from('events').insert(payload);
-      }
+      const result = id
+        ? await supabase.from('events').update(payload).eq('id', id)
+        : await supabase.from('events').insert(payload);
 
       if (result.error) {
         console.error("Error saving single event:", result.error);
@@ -316,7 +380,7 @@ export default function EditEventForm() {
         <textarea
           name="info"
           value={eventData.info}
-          onChange={handleChange}
+          onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleChange(e)}
           placeholder="Info"
           style={{ display: 'block', width: '100%', height: '6rem', marginBottom: '1rem', padding: '0.5rem' }}
         />
@@ -371,7 +435,7 @@ export default function EditEventForm() {
               <select
                 name="recurrence_pattern"
                 value={eventData.recurrence_pattern}
-                onChange={handleChange}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleChange(e)}
                 style={{ display: 'block', marginBottom: '1rem', padding: '0.5rem' }}
               >
                 <option value="daily">Daily</option>
