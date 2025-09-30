@@ -24,6 +24,7 @@ type Row = {
 export default function FlexibleOrganizePage() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
+  const [enrichStatus, setEnrichStatus] = useState<string>('');
 
   // TRUE multi-select with checkboxes - no compartmentalization 
   const [selectedFolders, setSelectedFolders] = useState<string[]>([]);
@@ -214,36 +215,84 @@ export default function FlexibleOrganizePage() {
         <button
           onClick={async () => {
             setLoading(true);
+            setEnrichStatus('Starting enrichment...');
+            
+            let totalUpdated = 0;
+            let totalScanned = 0;
+            let cursor: number | null = 0;
+            
             try {
-              const res = await fetch('/api/enrich', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ cursor: 0, limit: 100 })
-              });
-              const result = await res.json();
-              alert(`Enriched ${result.updated} items with master release dates`);
+              while (cursor !== null) {
+                setEnrichStatus(`Enriching batch... (${totalUpdated} updated / ${totalScanned} scanned so far)`);
+                
+                const res = await fetch('/api/enrich', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ cursor, limit: 80 })
+                });
+                
+                if (!res.ok) {
+                  throw new Error(`HTTP ${res.status}`);
+                }
+                
+                const result = await res.json();
+                totalUpdated += result.updated || 0;
+                totalScanned += result.scanned || 0;
+                cursor = result.nextCursor;
+                
+                setEnrichStatus(`Processed batch: ${result.updated} updated, ${result.scanned} scanned. Total: ${totalUpdated} updated / ${totalScanned} scanned`);
+                
+                // Brief pause between batches
+                if (cursor !== null) {
+                  await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+              }
+              
+              setEnrichStatus(`✅ Enrichment complete! Updated ${totalUpdated} items out of ${totalScanned} scanned`);
               await load(); // Reload data
+              
+              // Clear status after 5 seconds
+              setTimeout(() => setEnrichStatus(''), 5000);
+              
             } catch (err) {
-              alert(`Enrichment failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+              setEnrichStatus(`❌ Enrichment failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+              setTimeout(() => setEnrichStatus(''), 10000);
             } finally {
               setLoading(false);
             }
           }}
           disabled={loading}
           style={{
-            background: '#059669',
+            background: loading ? '#9ca3af' : '#059669',
             border: 'none',
             borderRadius: 6,
             padding: '8px 16px',
             fontSize: 14,
             fontWeight: 600,
             color: 'white',
-            cursor: loading ? 'not-allowed' : 'pointer',
-            opacity: loading ? 0.6 : 1
+            cursor: loading ? 'not-allowed' : 'pointer'
           }}
         >
-          {loading ? 'Enriching...' : 'Enrich Master Release Dates'}
+          {loading ? 'Enriching...' : 'Enrich Missing Metadata'}
         </button>
+
+        {enrichStatus && (
+          <div style={{
+            marginTop: 12,
+            padding: 12,
+            background: enrichStatus.includes('❌') ? '#fee2e2' : 
+                       enrichStatus.includes('✅') ? '#dcfce7' : '#dbeafe',
+            border: `1px solid ${enrichStatus.includes('❌') ? '#dc2626' : 
+                                 enrichStatus.includes('✅') ? '#16a34a' : '#3b82f6'}`,
+            borderRadius: 6,
+            fontSize: 14,
+            color: enrichStatus.includes('❌') ? '#991b1b' : 
+                   enrichStatus.includes('✅') ? '#15803d' : '#1e40af',
+            fontWeight: 500
+          }}>
+            {enrichStatus}
+          </div>
+        )}
         
         {hasActiveFilters && (
           <button
