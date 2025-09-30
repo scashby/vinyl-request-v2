@@ -1,5 +1,4 @@
-// Updated enrich API - preserves manual edits and fetches master release
-// Replace: src/app/api/enrich/route.ts
+// src/app/api/enrich/route.ts - COMPLETE FILE WITH DECADE FIXES
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -68,6 +67,7 @@ const pick = (r?:DiscogsRelease)=>({
 
 const yearInt = (y:string|null)=> (y||"").match(/\b(\d{4})\b/)?.[1];
 
+// FIXED: Calculate decade from year string, preferring master release date
 function calculateDecade(year: string | null): number | null {
   if (!year) return null;
   const yearNum = parseInt(year, 10);
@@ -123,7 +123,7 @@ export async function POST(req: Request) {
     // Determine what needs to be updated
     const needsGenres = !row.discogs_genres || row.discogs_genres.length === 0;
     const needsStyles = !row.discogs_styles || row.discogs_styles.length === 0;
-    const needsDecade = !row.decade && row.year;
+    const needsDecade = !row.decade;
     const needsMasterDate = !row.master_release_date;
     
     // Skip if nothing needs updating
@@ -134,11 +134,6 @@ export async function POST(req: Request) {
     let master_id: string | null = row.master_release_id;
     let master_date: string | null = row.master_release_date;
     let decade: number | null = row.decade;
-
-    // Calculate decade from year if missing
-    if (needsDecade && row.year) {
-      decade = calculateDecade(row.year);
-    }
 
     // Fetch from Discogs if we need genres/styles/master
     if ((needsGenres || needsStyles || needsMasterDate) && row.discogs_release_id) {
@@ -194,6 +189,14 @@ export async function POST(req: Request) {
         }
       }
       await sleep(1000);
+    }
+
+    // FIXED: Calculate decade from master_release_date (original year) when available, fallback to pressing year
+    if (needsDecade) {
+      const yearToUse = master_date || row.master_release_date || row.year;
+      if (yearToUse) {
+        decade = calculateDecade(yearToUse);
+      }
     }
 
     // Only update fields that were missing

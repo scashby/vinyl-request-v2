@@ -1,6 +1,4 @@
-// Enhanced edit-entry with missing metadata detection and master release support
-// Replace: src/app/admin/edit-entry/[id]/page.tsx
-
+// src/app/admin/edit-entry/[id]/page.tsx - COMPLETE FILE WITH DECADE FIXES
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -58,6 +56,7 @@ type MissingField = {
   isEmpty: boolean;
 };
 
+// FIXED: Calculate decade from year string
 function calculateDecade(year: string | null): number | null {
   if (!year) return null;
   const yearNum = parseInt(year, 10);
@@ -158,14 +157,6 @@ export default function EditEntryPage() {
         }
       }
 
-      if (!entry.decade && entry.year) {
-        const decade = calculateDecade(entry.year);
-        if (decade) {
-          handleChange('decade', decade);
-          updated = true;
-        }
-      }
-
       if (!tracks || tracks.length === 0) {
         if (data.tracklist && data.tracklist.length > 0) {
           const newTracks = data.tracklist.map(cleanTrack);
@@ -180,7 +171,7 @@ export default function EditEntryPage() {
         updated = true;
       }
 
-      // Fetch master release date if we have a master_id
+      // FIXED: Fetch master release date and calculate decade from it
       if (!entry.master_release_date) {
         if (data.master_id || data.master_url) {
           const masterId = data.master_id || data.master_url?.split('/').pop();
@@ -190,11 +181,30 @@ export default function EditEntryPage() {
               if (masterData.year) {
                 handleChange('master_release_id', String(masterId));
                 handleChange('master_release_date', String(masterData.year));
+                
+                // FIXED: Calculate decade from master release year (original year)
+                const decade = calculateDecade(String(masterData.year));
+                if (decade) {
+                  handleChange('decade', decade);
+                }
+                
                 updated = true;
               }
             } catch (err) {
               console.warn('Could not fetch master release:', err);
             }
+          }
+        }
+      }
+
+      // FIXED: If still no decade, calculate from existing master_release_date or year
+      if (!entry.decade) {
+        const yearToUse = entry.master_release_date || entry.year;
+        if (yearToUse) {
+          const decade = calculateDecade(yearToUse);
+          if (decade) {
+            handleChange('decade', decade);
+            updated = true;
           }
         }
       }
@@ -411,9 +421,11 @@ export default function EditEntryPage() {
                 value={entry.year || ''} 
                 onChange={e => {
                   handleChange('year', e.target.value);
-                  // Auto-calculate decade when year changes
-                  const decade = calculateDecade(e.target.value);
-                  if (decade) handleChange('decade', decade);
+                  // FIXED: Only auto-calculate decade from pressing year if no master release date exists
+                  if (!entry.master_release_date) {
+                    const decade = calculateDecade(e.target.value);
+                    if (decade) handleChange('decade', decade);
+                  }
                 }}
                 placeholder="e.g. 1969" 
               />
@@ -429,11 +441,16 @@ export default function EditEntryPage() {
               <input 
                 style={inputStyle}
                 value={entry.master_release_date || ''} 
-                onChange={e => handleChange('master_release_date', e.target.value)}
+                onChange={e => {
+                  handleChange('master_release_date', e.target.value);
+                  // FIXED: Auto-calculate decade from master release year (original release)
+                  const decade = calculateDecade(e.target.value);
+                  if (decade) handleChange('decade', decade);
+                }}
                 placeholder="e.g. 1967" 
               />
               <div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>
-                Original first release year
+                Original first release year (decade calculated from this)
               </div>
             </div>
             
@@ -563,7 +580,7 @@ export default function EditEntryPage() {
                 step="10"
               />
               <div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>
-                Auto-calculated from year
+                Auto-calculated from master release year
               </div>
             </div>
 
