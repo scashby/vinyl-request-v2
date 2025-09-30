@@ -1,4 +1,4 @@
-// Updated src/components/AdminSidebar.tsx - Clean organization without NEW badges
+// Updated src/components/AdminSidebar.tsx - Added diagnostics and enrichment
 
 "use client";
 
@@ -136,6 +136,16 @@ export default function AdminSidebar() {
             📚 Edit Collection
           </Link>
           <Link 
+            href="/admin/diagnostics"
+            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+              pathname === "/admin/diagnostics" 
+                ? "bg-indigo-700 text-white" 
+                : "bg-indigo-600 text-white hover:bg-indigo-700"
+            }`}
+          >
+            🔍 Data Diagnostics
+          </Link>
+          <Link 
             href="/admin/add-album"
             className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
               pathname === "/admin/add-album" 
@@ -164,6 +174,16 @@ export default function AdminSidebar() {
             }`}
           >
             🗂️ Organize
+          </Link>
+          <Link 
+            href="/admin/enrich-sources"
+            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+              pathname === "/admin/enrich-sources" 
+                ? "bg-indigo-700 text-white" 
+                : "bg-indigo-600 text-white hover:bg-indigo-700"
+            }`}
+          >
+            🎵 Multi-Source Enrich
           </Link>
           <Link 
             href="/admin/add-customer-vinyl"

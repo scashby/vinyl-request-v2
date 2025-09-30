@@ -30,6 +30,17 @@ type CollectionEntry = {
   decade: number | null;
   master_release_id: string | null;
   master_release_date: string | null;
+  spotify_id?: string | null;
+  spotify_url?: string | null;
+  spotify_label?: string | null;
+  spotify_genres?: string[] | null;
+  spotify_popularity?: number | null;
+  spotify_release_date?: string | null;
+  apple_music_id?: string | null;
+  apple_music_url?: string | null;
+  apple_music_label?: string | null;
+  apple_music_genres?: string[] | null;
+  apple_music_release_date?: string | null;
   [key: string]: unknown;
 };
 
