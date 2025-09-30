@@ -304,17 +304,17 @@ export default function MultiSourceEnrichmentPage() {
                   }}>
                     {album.artist}
                   </div>
-                  <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-                    <Badge
-                      label="Spotify"
-                      active={!!album.spotify_id}
-                      color="#1DB954"
-                    />
-                    <Badge
-                      label="Apple"
-                      active={!!album.apple_music_id}
-                      color="#FA57C1"
-                    />
+                  <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+                    {album.spotify_id ? (
+                      <Badge label="✓ Spotify" active={true} color="#1DB954" />
+                    ) : (
+                      <Badge label="✗ Spotify" active={false} color="#dc2626" />
+                    )}
+                    {album.apple_music_id ? (
+                      <Badge label="✓ Apple" active={true} color="#FA57C1" />
+                    ) : (
+                      <Badge label="✗ Apple" active={false} color="#dc2626" />
+                    )}
                   </div>
                 </div>
               </div>

@@ -1,4 +1,4 @@
-// src/app/api/enrich-multi/route.ts - Multi-source enrichment with fixed types
+// src/app/api/enrich-multi/route.ts - Multi-source enrichment with full lyrics
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -174,7 +174,7 @@ async function searchAppleMusic(artist: string, title: string): Promise<AppleMus
   }
 }
 
-// Lyrics - using Genius API (free tier)
+// Lyrics - using Genius API
 async function searchLyrics(artist: string, trackTitle: string): Promise<LyricsData | null> {
   try {
     const GENIUS_TOKEN = process.env.GENIUS_API_TOKEN;
@@ -254,7 +254,7 @@ export async function POST(req: Request) {
     const appleMusicData = await searchAppleMusic(albumData.artist, albumData.title);
     await sleep(500);
 
-    // Enrich tracklist with lyrics (optional, can be heavy)
+    // Enrich tracklist with lyrics
     let enrichedTracklist: string | null = null;
     if (albumData.tracklists) {
       try {
@@ -263,11 +263,11 @@ export async function POST(req: Request) {
           : albumData.tracklists as Track[];
 
         if (Array.isArray(tracks) && tracks.length > 0) {
-          // Only enrich first 3 tracks to avoid rate limits
+          // Enrich ALL tracks with lyrics
           const enrichedTracks = await Promise.all(
-            tracks.slice(0, 3).map(async (track: Track) => {
+            tracks.map(async (track: Track) => {
               const lyricsData = await searchLyrics(albumData.artist, track.title || '');
-              await sleep(1000);
+              await sleep(1000); // Rate limit between requests
               return {
                 ...track,
                 lyrics_url: lyricsData?.genius_url
@@ -275,11 +275,7 @@ export async function POST(req: Request) {
             })
           );
 
-          // Merge enriched tracks with remaining tracks
-          enrichedTracklist = JSON.stringify([
-            ...enrichedTracks,
-            ...tracks.slice(3)
-          ]);
+          enrichedTracklist = JSON.stringify(enrichedTracks);
         }
       } catch (err) {
         console.error('Tracklist enrichment error:', err);
