@@ -1,4 +1,4 @@
-// src/app/admin/enrich-sources/page.tsx - CORRECT PATH (admin, not api!)
+// src/app/admin/enrich-sources/page.tsx - COMPLETE with pagination
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
@@ -24,6 +24,8 @@ export default function MultiSourceEnrichmentPage() {
   const [enriching, setEnriching] = useState<number | null>(null);
   const [status, setStatus] = useState('');
   const [filter, setFilter] = useState<'all' | 'unenriched' | 'partial'>('unenriched');
+  const [limit, setLimit] = useState(100);
+  const [offset, setOffset] = useState(0);
 
   const loadAlbums = useCallback(async () => {
     setLoading(true);
@@ -32,7 +34,7 @@ export default function MultiSourceEnrichmentPage() {
       .from('collection')
       .select('id, artist, title, image_url, spotify_id, apple_music_id, spotify_label, apple_music_label, enrichment_sources, last_enriched_at')
       .order('id', { ascending: false })
-      .limit(50);
+      .range(offset, offset + limit - 1);
 
     if (filter === 'unenriched') {
       query = query.is('spotify_id', null).is('apple_music_id', null);
@@ -50,7 +52,7 @@ export default function MultiSourceEnrichmentPage() {
     }
 
     setLoading(false);
-  }, [filter]);
+  }, [filter, limit, offset]);
 
   useEffect(() => {
     loadAlbums();
@@ -133,12 +135,15 @@ export default function MultiSourceEnrichmentPage() {
         <StatCard label="Fully Enriched" value={fullyEnrichedCount} color="#16a34a" />
       </div>
 
-      {/* Filter */}
-      <div style={{ marginBottom: 24, display: 'flex', gap: 12, alignItems: 'center' }}>
+      {/* Filter & Pagination */}
+      <div style={{ marginBottom: 24, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
         <label style={{ fontWeight: 600 }}>Show:</label>
         <select
           value={filter}
-          onChange={e => setFilter(e.target.value as 'all' | 'unenriched' | 'partial')}
+          onChange={e => {
+            setFilter(e.target.value as 'all' | 'unenriched' | 'partial');
+            setOffset(0);
+          }}
           style={{
             padding: '8px 12px',
             border: '1px solid #d1d5db',
@@ -151,6 +156,71 @@ export default function MultiSourceEnrichmentPage() {
           <option value="partial">Partially Enriched</option>
         </select>
 
+        <label style={{ fontWeight: 600 }}>Per Page:</label>
+        <select
+          value={limit}
+          onChange={e => {
+            setLimit(Number(e.target.value));
+            setOffset(0);
+          }}
+          style={{
+            padding: '8px 12px',
+            border: '1px solid #d1d5db',
+            borderRadius: 6,
+            fontSize: 14
+          }}
+        >
+          <option value="50">50</option>
+          <option value="100">100</option>
+          <option value="200">200</option>
+          <option value="500">500</option>
+        </select>
+
+        {/* Pagination Controls */}
+        <div style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
+          <button
+            onClick={() => setOffset(Math.max(0, offset - limit))}
+            disabled={offset === 0}
+            style={{
+              padding: '8px 16px',
+              background: offset === 0 ? '#9ca3af' : '#3b82f6',
+              color: 'white',
+              border: 'none',
+              borderRadius: 6,
+              fontWeight: 600,
+              cursor: offset === 0 ? 'not-allowed' : 'pointer',
+              fontSize: 14
+            }}
+          >
+            ← Previous
+          </button>
+          <span style={{ 
+            padding: '8px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            fontSize: 14,
+            fontWeight: 600
+          }}>
+            {offset + 1} - {offset + albums.length}
+          </span>
+          <button
+            onClick={() => setOffset(offset + limit)}
+            disabled={albums.length < limit}
+            style={{
+              padding: '8px 16px',
+              background: albums.length < limit ? '#9ca3af' : '#3b82f6',
+              color: 'white',
+              border: 'none',
+              borderRadius: 6,
+              fontWeight: 600,
+              cursor: albums.length < limit ? 'not-allowed' : 'pointer',
+              fontSize: 14
+            }}
+          >
+            Next →
+          </button>
+        </div>
+
         <button
           onClick={enrichAllUnenriched}
           disabled={loading || enriching !== null || unenrichedCount === 0}
@@ -161,8 +231,7 @@ export default function MultiSourceEnrichmentPage() {
             border: 'none',
             borderRadius: 6,
             fontWeight: 600,
-            cursor: unenrichedCount === 0 ? 'not-allowed' : 'pointer',
-            marginLeft: 'auto'
+            cursor: unenrichedCount === 0 ? 'not-allowed' : 'pointer'
           }}
         >
           ⚡ Enrich All Unenriched ({unenrichedCount})
