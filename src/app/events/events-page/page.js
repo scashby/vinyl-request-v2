@@ -216,11 +216,9 @@ export default function Page() {
   );
 
   const renderBookingSection = () => (
-    <section style={{
+    <div style={{
       backgroundColor: '#f8f9fa',
-      padding: '3rem 1rem',
-      marginTop: '3rem',
-      borderTop: '1px solid #e9ecef'
+      padding: '3rem 1rem'
     }}>
       <div style={{
         maxWidth: '640px',
@@ -329,17 +327,16 @@ export default function Page() {
           </p>
         </div>
       </div>
-    </section>
+    </div>
   );
 
   const renderPastDJSets = () => {
     if (pastDJSets.length === 0) return null;
 
     return (
-      <section style={{
+      <div style={{
         backgroundColor: '#ffffff',
         padding: '3rem 1rem',
-        marginTop: '0',
         borderTop: '1px solid #e9ecef'
       }}>
         <div style={{
@@ -587,7 +584,7 @@ export default function Page() {
             </Link>
           </div>
         </div>
-      </section>
+      </div>
     );
   };
 
@@ -712,8 +709,30 @@ export default function Page() {
           </section>
         )}
       </main>
-      {events.length > 0 && renderBookingSection()}
-      {renderPastDJSets()}
+      
+      {/* DJ Sets and Booking section - side by side */}
+      {(pastDJSets.length > 0 || events.length > 0) && (
+        <section style={{
+          padding: '3rem 1rem',
+          marginTop: '0',
+          borderTop: '1px solid #e9ecef'
+        }}>
+          <div style={{
+            maxWidth: '1400px',
+            margin: '0 auto',
+            display: 'grid',
+            gridTemplateColumns: pastDJSets.length > 0 ? 'repeat(auto-fit, minmax(500px, 1fr))' : '1fr',
+            gap: '3rem',
+            alignItems: 'start'
+          }}>
+            {/* DJ Sets on the left */}
+            {pastDJSets.length > 0 && renderPastDJSets()}
+            
+            {/* Bookings on the right */}
+            {events.length > 0 && renderBookingSection()}
+          </div>
+        </section>
+      )}
     </div>
   );
 }
