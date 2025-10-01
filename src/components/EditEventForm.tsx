@@ -23,14 +23,15 @@ interface EventData {
   recurrence_interval: number;
   recurrence_end_date: string;
   parent_event_id?: number;
-  is_tba: boolean;
 }
 
 // Utility function to generate recurring events
 function generateRecurringEvents(baseEvent: EventData & { id?: number }): Omit<EventData, 'id'>[] {
   const events: Omit<EventData, 'id'>[] = [];
   
-  if (!baseEvent.is_recurring || !baseEvent.recurrence_end_date || baseEvent.is_tba) {
+  const isTBA = !baseEvent.date || baseEvent.date === '' || baseEvent.date === '9999-12-31';
+  
+  if (!baseEvent.is_recurring || !baseEvent.recurrence_end_date || isTBA) {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { id: _id, ...eventWithoutId } = baseEvent;
     return [eventWithoutId];
@@ -89,7 +90,6 @@ export default function EditEventForm() {
     recurrence_pattern: 'weekly',
     recurrence_interval: 1,
     recurrence_end_date: '',
-    is_tba: false,
   });
 
   useEffect(() => {
@@ -113,8 +113,7 @@ export default function EditEventForm() {
               ? copiedEvent.allowed_formats.replace(/[{}]/g, '').split(',').map((f: string) => f.trim()).filter(Boolean)
               : [],
           title: copiedEvent.title ? `${copiedEvent.title} (Copy)` : '',
-          is_tba: isTBA,
-          date: isTBA ? '' : copiedEvent.date,
+          date: isTBA ? '9999-12-31' : copiedEvent.date,
           is_recurring: false,
           recurrence_end_date: '',
           parent_event_id: undefined,
@@ -142,8 +141,7 @@ export default function EditEventForm() {
             recurrence_pattern: data.recurrence_pattern || 'weekly',
             recurrence_interval: data.recurrence_interval || 1,
             recurrence_end_date: data.recurrence_end_date || '',
-            is_tba: isTBA,
-            date: isTBA ? '' : data.date,
+            date: isTBA ? '9999-12-31' : data.date,
           });
         }
       }
@@ -159,6 +157,8 @@ export default function EditEventForm() {
     setEventData((prev) => ({
       ...prev,
       [name]: name === 'recurrence_interval' ? parseInt(value) || 1 : value,
+      // If date is being cleared, disable recurring
+      ...(name === 'date' && !value ? { is_recurring: false, recurrence_end_date: '' } : {})
     }));
   };
 
@@ -167,11 +167,6 @@ export default function EditEventForm() {
     setEventData((prev) => ({
       ...prev,
       [name]: checked,
-      ...(name === 'is_tba' && checked ? { 
-        date: '', 
-        is_recurring: false,
-        recurrence_end_date: '' 
-      } : {}),
       ...(name === 'is_recurring' && !checked ? { recurrence_end_date: '' } : {})
     }));
   };
@@ -191,7 +186,9 @@ export default function EditEventForm() {
     e.preventDefault();
     
     try {
-      if (!eventData.is_tba && eventData.is_recurring) {
+      const isTBA = !eventData.date || eventData.date === '' || eventData.date === '9999-12-31';
+      
+      if (!isTBA && eventData.is_recurring) {
         if (!eventData.date) {
           alert('Please set a start date for the recurring event');
           return;
@@ -208,7 +205,7 @@ export default function EditEventForm() {
 
       const payload = {
         title: eventData.title,
-        date: eventData.is_tba ? '9999-12-31' : eventData.date,
+        date: isTBA ? '9999-12-31' : eventData.date,
         time: eventData.time,
         location: eventData.location,
         image_url: eventData.image_url,
@@ -216,8 +213,8 @@ export default function EditEventForm() {
         info_url: eventData.info_url,
         has_queue: eventData.has_queue,
         allowed_formats: `{${eventData.allowed_formats.map(f => f.trim()).join(',')}}`,
-        is_recurring: eventData.is_tba ? false : eventData.is_recurring,
-        ...(!eventData.is_tba && eventData.is_recurring ? {
+        is_recurring: isTBA ? false : eventData.is_recurring,
+        ...(!isTBA && eventData.is_recurring ? {
           recurrence_pattern: eventData.recurrence_pattern,
           recurrence_interval: eventData.recurrence_interval,
           recurrence_end_date: eventData.recurrence_end_date || null,
@@ -231,9 +228,9 @@ export default function EditEventForm() {
 
       console.log('Submitting payload:', payload);
 
-      if (!eventData.is_tba && eventData.is_recurring) {
+      if (!isTBA && eventData.is_recurring) {
         if (id) {
-          // EDIT or CONVERT to recurring
+          // EDITING an existing event and making it recurring
           console.log('Updating event to be recurring...');
           
           const { error: updateError } = await supabase
@@ -256,12 +253,11 @@ export default function EditEventForm() {
           const { data: existingChildren } = await supabase
             .from('events')
             .select('id, date')
-            .eq('parent_event_id', parseInt(id)); // numeric compare
+            .eq('parent_event_id', id);
 
           const existingDates = new Set(existingChildren?.map(e => e.date) || []);
           const newDates = recurringEvents.slice(1).map(e => e.date);
           
-          // Update or cancel existing children
           for (const child of existingChildren || []) {
             if (newDates.includes(child.date)) {
               await supabase
@@ -278,30 +274,16 @@ export default function EditEventForm() {
                 })
                 .eq('id', child.id);
             } else {
-              // soft-cancel
-              try {
-                const { error: cancelErr } = await supabase
-                  .from('events')
-                  .update({ 
-                    title: `${eventData.title} (Cancelled)`,
-                    info: `This event was cancelled as part of a recurring series update.`,
-                    is_cancelled: true
-                  })
-                  .eq('id', child.id);
-                if (cancelErr) throw cancelErr;
-              } catch {
-                await supabase
-                  .from('events')
-                  .update({ 
-                    title: `${eventData.title} (Cancelled)`,
-                    info: `This event was cancelled as part of a recurring series update.`
-                  })
-                  .eq('id', child.id);
-              }
+              await supabase
+                .from('events')
+                .update({ 
+                  title: `${eventData.title} (Cancelled)`,
+                  info: `This event was cancelled as part of a recurring series update.`
+                })
+                .eq('id', child.id);
             }
           }
 
-          // Insert new children for any new dates
           const eventsToInsert = recurringEvents
             .slice(1)
             .filter(e => !existingDates.has(e.date))
@@ -328,7 +310,7 @@ export default function EditEventForm() {
 
           alert(`Successfully updated recurring event series! (${recurringEvents.length} total events)`);
         } else {
-          // CREATE recurring
+          // CREATING a new recurring event
           console.log('Creating new recurring event...');
           const { data: savedEvent, error: saveError } = await supabase
             .from('events')
@@ -377,46 +359,13 @@ export default function EditEventForm() {
         }
       } else {
         // Single event (including TBA) or non-recurring update
-
-        // If converting from recurring → single, soft-cancel existing children
-        if (id) {
-          const { data: childrenToCancel } = await supabase
-            .from('events')
-            .select('id, date')
-            .eq('parent_event_id', parseInt(id));
-
-          if (childrenToCancel && childrenToCancel.length) {
-            const targetDate = payload.date;
-            for (const child of childrenToCancel) {
-              if (child.date !== targetDate) {
-                try {
-                  const { error: cancelErr2 } = await supabase
-                    .from('events')
-                    .update({
-                      title: `${eventData.title} (Cancelled)`,
-                      info: `This event was cancelled when the series was changed to a single date.`,
-                      is_cancelled: true
-                    })
-                    .eq('id', child.id);
-                  if (cancelErr2) throw cancelErr2;
-                } catch {
-                  await supabase
-                    .from('events')
-                    .update({
-                      title: `${eventData.title} (Cancelled)`,
-                      info: `This event was cancelled when the series was changed to a single date.`
-                    })
-                    .eq('id', child.id);
-                }
-              }
-            }
-          }
-        }
-
         console.log('Saving single event...');
-        const result = id
-          ? await supabase.from('events').update(payload).eq('id', id)
-          : await supabase.from('events').insert([payload]);
+        let result;
+        if (id) {
+          result = await supabase.from('events').update(payload).eq('id', id);
+        } else {
+          result = await supabase.from('events').insert([payload]);
+        }
 
         if (result.error) {
           console.error('Error saving single event:', result.error);
@@ -432,12 +381,12 @@ export default function EditEventForm() {
       let errorMessage = 'An unknown error occurred';
       
       if (error && typeof error === 'object') {
-        if ('message' in error && typeof (error as { message?: string }).message === 'string') {
-          errorMessage = (error as { message: string }).message;
-        } else if ('details' in error && typeof (error as { details?: string }).details === 'string') {
-          errorMessage = (error as { details: string }).details;
-        } else if ('hint' in error && typeof (error as { hint?: string }).hint === 'string') {
-          errorMessage = (error as { hint: string }).hint;
+        if ('message' in error && typeof error.message === 'string') {
+          errorMessage = error.message;
+        } else if ('details' in error && typeof error.details === 'string') {
+          errorMessage = error.details;
+        } else if ('hint' in error && typeof error.hint === 'string') {
+          errorMessage = error.hint;
         }
       }
       
@@ -470,27 +419,17 @@ export default function EditEventForm() {
           style={{ display: 'block', width: '100%', marginBottom: '1rem', padding: '0.5rem' }}
         />
 
-        <label style={{ display: 'block', marginBottom: '1rem' }}>
-          <input
-            type="checkbox"
-            name="is_tba"
-            checked={eventData.is_tba}
-            onChange={handleCheckboxChange}
-          />
-          {' '}Date To Be Announced (TBA)
-        </label>
-
-        {!eventData.is_tba && (
-          <input
-            name="date"
-            type="date"
-            value={eventData.date}
-            onChange={handleChange}
-            placeholder="Date"
-            required
-            style={{ display: 'block', width: '100%', marginBottom: '1rem', padding: '0.5rem' }}
-          />
-        )}
+        <input
+          name="date"
+          type="date"
+          value={eventData.date === '9999-12-31' ? '' : eventData.date}
+          onChange={handleChange}
+          placeholder="Date (leave empty for TBA)"
+          style={{ display: 'block', width: '100%', marginBottom: '0.25rem', padding: '0.5rem' }}
+        />
+        <small style={{ display: 'block', marginBottom: '1rem', color: '#666' }}>
+          Leave empty for &ldquo;Date To Be Announced&rdquo; events
+        </small>
 
         <input
           name="time"
@@ -545,7 +484,7 @@ export default function EditEventForm() {
           {' '}Has Queue
         </label>
 
-        {!eventData.is_tba && (
+        {eventData.date && eventData.date !== '9999-12-31' && (
           <label style={{ display: 'block', marginBottom: '1rem' }}>
             <input
               type="checkbox"
@@ -557,7 +496,7 @@ export default function EditEventForm() {
           </label>
         )}
 
-        {eventData.is_tba && (
+        {(!eventData.date || eventData.date === '9999-12-31') && (
           <div style={{
             backgroundColor: '#fff3cd',
             border: '1px solid #ffeaa7',
@@ -570,7 +509,7 @@ export default function EditEventForm() {
           </div>
         )}
 
-        {!eventData.is_tba && eventData.is_recurring && (
+        {eventData.date && eventData.date !== '9999-12-31' && eventData.is_recurring && (
           <div style={{ 
             border: '1px solid #ddd', 
             padding: '1rem', 
@@ -652,7 +591,7 @@ export default function EditEventForm() {
             cursor: 'pointer'
           }}
         >
-          {!eventData.is_tba && eventData.is_recurring && !id ? 'Create Recurring Events' : 'Save Event'}
+          {eventData.date && eventData.date !== '9999-12-31' && eventData.is_recurring && !id ? 'Create Recurring Events' : 'Save Event'}
         </button>
       </form>
     </div>
