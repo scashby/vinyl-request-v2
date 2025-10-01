@@ -638,49 +638,63 @@ export default function Page() {
                     />
                   </Link>
                   
-                  {/* Date & Time - EMPHASIZED at top */}
-                  <div style={{
-                    backgroundColor: '#f0f9ff',
-                    border: '2px solid #0284c7',
-                    borderRadius: '8px',
-                    padding: '1rem',
-                    marginTop: '1rem',
-                    marginBottom: '1rem',
-                    textAlign: 'center'
-                  }}>
-                    <p style={{
-                      fontSize: '1.25rem',
-                      fontWeight: 'bold',
-                      color: '#0369a1',
-                      margin: '0 0 0.25rem 0',
-                      lineHeight: '1.3'
+                  {/* Date & Time - EMPHASIZED at top and LINKED */}
+                  <Link href={`/events/event-detail/${event.id}`} style={{ textDecoration: 'none' }}>
+                    <div style={{
+                      backgroundColor: '#f0f9ff',
+                      border: '2px solid #0284c7',
+                      borderRadius: '8px',
+                      padding: '1rem',
+                      marginTop: '1rem',
+                      marginBottom: '1rem',
+                      textAlign: 'center',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.backgroundColor = '#e0f2fe';
+                      e.currentTarget.style.borderColor = '#0369a1';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.backgroundColor = '#f0f9ff';
+                      e.currentTarget.style.borderColor = '#0284c7';
                     }}>
-                      {formatDate(event.date)}
-                    </p>
-                    {!isTBA && event.time && (
                       <p style={{
-                        fontSize: '1.1rem',
-                        fontWeight: '600',
-                        color: '#075985',
-                        margin: 0
+                        fontSize: '1.25rem',
+                        fontWeight: 'bold',
+                        color: '#0369a1',
+                        margin: '0 0 0.25rem 0',
+                        lineHeight: '1.3'
                       }}>
-                        {event.time}
+                        {formatDate(event.date)}
                       </p>
-                    )}
-                    {isTBA && (
-                      <p style={{ 
-                        fontSize: '1rem', 
-                        color: '#666',
-                        fontStyle: 'italic',
-                        fontWeight: '500',
-                        margin: 0
-                      }}>
-                        Coming Soon
-                      </p>
-                    )}
-                  </div>
+                      {!isTBA && event.time && (
+                        <p style={{
+                          fontSize: '1.1rem',
+                          fontWeight: '600',
+                          color: '#075985',
+                          margin: 0
+                        }}>
+                          {event.time}
+                        </p>
+                      )}
+                      {isTBA && (
+                        <p style={{ 
+                          fontSize: '1rem', 
+                          color: '#666',
+                          fontStyle: 'italic',
+                          fontWeight: '500',
+                          margin: 0
+                        }}>
+                          Coming Soon
+                        </p>
+                      )}
+                    </div>
+                  </Link>
                   
-                  <h2>{event.title}</h2>
+                  <Link href={`/events/event-detail/${event.id}`} style={{ textDecoration: 'none' }}>
+                    <h2 style={{ cursor: 'pointer' }}>{event.title}</h2>
+                  </Link>
                   {event.location && (
                     <p>
                       <a
