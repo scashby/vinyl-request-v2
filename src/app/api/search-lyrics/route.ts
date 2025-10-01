@@ -49,28 +49,97 @@ type Body = {
   forceRefresh?: boolean; // Force re-scan even if tags exist
 };
 
-// Extract lyrics from Genius HTML page
+// Extract lyrics from Genius HTML page - improved extraction
 async function fetchLyricsFromGeniusUrl(url: string): Promise<string | null> {
   try {
     const response = await fetch(url);
-    if (!response.ok) return null;
+    if (!response.ok) {
+      console.log(`Failed to fetch ${url}: HTTP ${response.status}`);
+      return null;
+    }
     
     const html = await response.text();
     
-    // Genius stores lyrics in div with data-lyrics-container attribute
-    // This is a simple regex extraction - may need adjustment if Genius changes their HTML
-    const lyricsMatch = html.match(/data-lyrics-container="true"[^>]*>([\s\S]*?)<\/div>/g);
+    // Try multiple patterns that Genius uses
+    let lyrics = '';
     
-    if (!lyricsMatch) return null;
+    // Pattern 1: data-lyrics-container (current structure)
+    const containerPattern = /data-lyrics-container="true"[^>]*>([\s\S]*?)<\/div>/gi;
+    let matches = html.match(containerPattern);
     
-    // Combine all lyrics containers and strip HTML tags
-    const lyrics = lyricsMatch
-      .map(match => match.replace(/<[^>]*>/g, ' '))
-      .join(' ')
-      .replace(/\s+/g, ' ')
+    if (matches && matches.length > 0) {
+      lyrics = matches
+        .map(match => {
+          // Remove HTML tags but keep line breaks
+          return match
+            .replace(/<br\s*\/?>/gi, '\n')
+            .replace(/<[^>]+>/g, '')
+            .trim();
+        })
+        .join('\n');
+    }
+    
+    // Pattern 2: Lyrics__Container (alternative structure)
+    if (!lyrics) {
+      const altPattern = /<div[^>]*class="[^"]*Lyrics__Container[^"]*"[^>]*>([\s\S]*?)<\/div>/gi;
+      matches = html.match(altPattern);
+      
+      if (matches && matches.length > 0) {
+        lyrics = matches
+          .map(match => {
+            return match
+              .replace(/<br\s*\/?>/gi, '\n')
+              .replace(/<[^>]+>/g, '')
+              .trim();
+          })
+          .join('\n');
+      }
+    }
+    
+    // Pattern 3: Look for JSON-LD structured data
+    if (!lyrics) {
+      const jsonLdPattern = /<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi;
+      const jsonMatches = html.match(jsonLdPattern);
+      
+      if (jsonMatches) {
+        for (const jsonMatch of jsonMatches) {
+          try {
+            const jsonText = jsonMatch.replace(/<script[^>]*>/, '').replace(/<\/script>/, '');
+            const data = JSON.parse(jsonText);
+            if (data['@type'] === 'MusicRecording' && data.lyrics) {
+              lyrics = data.lyrics;
+              break;
+            }
+          } catch {
+            // Skip invalid JSON
+          }
+        }
+      }
+    }
+    
+    if (!lyrics) {
+      console.log(`No lyrics found for ${url} - tried all extraction patterns`);
+      return null;
+    }
+    
+    // Clean up the lyrics text
+    lyrics = lyrics
+      .replace(/\s+/g, ' ') // Collapse whitespace
+      .replace(/\n+/g, '\n') // Collapse multiple newlines
       .trim();
     
+    // Decode HTML entities
+    lyrics = lyrics
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&nbsp;/g, ' ');
+    
+    console.log(`Successfully extracted ${lyrics.length} characters of lyrics from ${url}`);
     return lyrics;
+    
   } catch (error) {
     console.error(`Error fetching lyrics from ${url}:`, error);
     return null;
