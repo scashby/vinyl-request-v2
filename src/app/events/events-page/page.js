@@ -637,6 +637,49 @@ export default function Page() {
                       unoptimized
                     />
                   </Link>
+                  
+                  {/* Date & Time - EMPHASIZED at top */}
+                  <div style={{
+                    backgroundColor: '#f0f9ff',
+                    border: '2px solid #0284c7',
+                    borderRadius: '8px',
+                    padding: '1rem',
+                    marginTop: '1rem',
+                    marginBottom: '1rem',
+                    textAlign: 'center'
+                  }}>
+                    <p style={{
+                      fontSize: '1.25rem',
+                      fontWeight: 'bold',
+                      color: '#0369a1',
+                      margin: '0 0 0.25rem 0',
+                      lineHeight: '1.3'
+                    }}>
+                      {formatDate(event.date)}
+                    </p>
+                    {!isTBA && event.time && (
+                      <p style={{
+                        fontSize: '1.1rem',
+                        fontWeight: '600',
+                        color: '#075985',
+                        margin: 0
+                      }}>
+                        {event.time}
+                      </p>
+                    )}
+                    {isTBA && (
+                      <p style={{ 
+                        fontSize: '1rem', 
+                        color: '#666',
+                        fontStyle: 'italic',
+                        fontWeight: '500',
+                        margin: 0
+                      }}>
+                        Coming Soon
+                      </p>
+                    )}
+                  </div>
+                  
                   <h2>{event.title}</h2>
                   {event.location && (
                     <p>
@@ -649,26 +692,6 @@ export default function Page() {
                       </a>
                     </p>
                   )}
-                  <p className="event-date">
-                    {formatDate(event.date)}
-                    {!isTBA && event.time && (
-                      <>
-                        <br />
-                        <span className="event-time">{event.time}</span>
-                      </>
-                    )}
-                    {isTBA && (
-                      <span style={{ 
-                        display: 'block', 
-                        fontSize: '0.9rem', 
-                        color: '#666',
-                        fontStyle: 'italic',
-                        marginTop: '0.25rem'
-                      }}>
-                        Coming Soon
-                      </span>
-                    )}
-                  </p>
                 </article>
               );
             })}
