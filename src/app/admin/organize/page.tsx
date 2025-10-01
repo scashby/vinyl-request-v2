@@ -1,5 +1,4 @@
-// TRUE flexibility with checkbox multi-select - no more dropdown hell
-// src/app/admin/organize/page.tsx
+// src/app/admin/organize/page.tsx - WITH LYRIC SEARCH
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -21,10 +20,27 @@ type Row = {
   folder: string;
 };
 
+type LyricSearchResult = {
+  collection_id: number;
+  artist: string;
+  album_title: string;
+  track_title: string;
+  track_position: string | null;
+  genius_url: string | null;
+  image_url: string | null;
+};
+
 export default function FlexibleOrganizePage() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [enrichStatus, setEnrichStatus] = useState<string>('');
+
+  // Lyric search state
+  const [lyricSearchTerm, setLyricSearchTerm] = useState('');
+  const [lyricSearchFolder, setLyricSearchFolder] = useState('');
+  const [lyricSearching, setLyricSearching] = useState(false);
+  const [lyricResults, setLyricResults] = useState<LyricSearchResult[]>([]);
+  const [lyricSearchMessage, setLyricSearchMessage] = useState('');
 
   // TRUE multi-select with checkboxes - no compartmentalization 
   const [selectedFolders, setSelectedFolders] = useState<string[]>([]);
@@ -92,6 +108,55 @@ export default function FlexibleOrganizePage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Lyric search handler
+  const handleLyricSearch = async () => {
+    if (!lyricSearchTerm.trim()) {
+      setLyricSearchMessage('Please enter a search term');
+      return;
+    }
+
+    setLyricSearching(true);
+    setLyricSearchMessage('Searching lyrics...');
+    setLyricResults([]);
+
+    try {
+      const body: { term: string; folder?: string } = {
+        term: lyricSearchTerm.trim()
+      };
+      
+      if (lyricSearchFolder) {
+        body.folder = lyricSearchFolder;
+      }
+
+      const res = await fetch('/api/search-lyrics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+
+      const result = await res.json();
+
+      if (result.success) {
+        setLyricResults(result.results || []);
+        if (result.cached) {
+          setLyricSearchMessage(`✅ Found ${result.count} tracks (from cache)`);
+        } else {
+          setLyricSearchMessage(result.message || `✅ Found ${result.count} tracks`);
+        }
+      } else {
+        setLyricSearchMessage(`❌ Search failed: ${result.error}`);
+      }
+    } catch (error) {
+      setLyricSearchMessage(`❌ Search failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setLyricSearching(false);
+    }
+  };
 
   // Apply ALL filters with complete flexibility and AND logic
   const filteredAlbums = useMemo(() => {
@@ -211,14 +276,14 @@ export default function FlexibleOrganizePage() {
             color: '#1f2937',
             margin: '0 0 8px 0'
           }}>
-            Flexible Collection Organization
+            Collection Organization & Search
           </h1>
           <p style={{
             color: '#6b7280',
             fontSize: 16,
             margin: 0
           }}>
-            Check any combination: ☑️ Vinyl ☑️ 45s ☑️ Prog Rock ☑️ 1960s-1980s (original release years)
+            Organize by metadata or search lyrics content
           </p>
         </div>
         
@@ -323,6 +388,218 @@ export default function FlexibleOrganizePage() {
         )}
       </div>
 
+      {/* LYRIC SEARCH SECTION */}
+      <div style={{
+        background: 'linear-gradient(135deg, #7c3aed 0%, #a855f7 100%)',
+        border: '2px solid #7c3aed',
+        borderRadius: 12,
+        padding: 24,
+        marginBottom: 24,
+        color: 'white'
+      }}>
+        <h2 style={{
+          fontSize: 24,
+          fontWeight: 'bold',
+          margin: '0 0 8px 0'
+        }}>
+          🎵 Lyric Content Search
+        </h2>
+        <p style={{
+          fontSize: 14,
+          margin: '0 0 20px 0',
+          opacity: 0.9
+        }}>
+          Search for tracks that mention specific words or phrases in their lyrics
+        </p>
+
+        <div style={{
+          display: 'flex',
+          gap: 12,
+          flexWrap: 'wrap',
+          marginBottom: 16
+        }}>
+          <input
+            type="text"
+            value={lyricSearchTerm}
+            onChange={e => setLyricSearchTerm(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !lyricSearching) {
+                handleLyricSearch();
+              }
+            }}
+            placeholder="Search lyrics... (e.g., artificial intelligence, Memphis)"
+            style={{
+              flex: '1 1 300px',
+              padding: '12px 16px',
+              border: 'none',
+              borderRadius: 6,
+              fontSize: 14,
+              backgroundColor: 'white',
+              color: '#1f2937'
+            }}
+            disabled={lyricSearching}
+          />
+
+          <select
+            value={lyricSearchFolder}
+            onChange={e => setLyricSearchFolder(e.target.value)}
+            style={{
+              padding: '12px 16px',
+              border: 'none',
+              borderRadius: 6,
+              fontSize: 14,
+              backgroundColor: 'white',
+              color: '#1f2937',
+              minWidth: 150
+            }}
+            disabled={lyricSearching}
+          >
+            <option value="">All Folders</option>
+            {availableFolders.map(folder => (
+              <option key={folder} value={folder}>{folder}</option>
+            ))}
+          </select>
+
+          <button
+            onClick={handleLyricSearch}
+            disabled={lyricSearching || !lyricSearchTerm.trim()}
+            style={{
+              padding: '12px 24px',
+              background: lyricSearching || !lyricSearchTerm.trim() ? '#9ca3af' : 'white',
+              color: lyricSearching || !lyricSearchTerm.trim() ? 'white' : '#7c3aed',
+              border: 'none',
+              borderRadius: 6,
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: lyricSearching || !lyricSearchTerm.trim() ? 'not-allowed' : 'pointer'
+            }}
+          >
+            {lyricSearching ? '🔍 Searching...' : '🔍 Search Lyrics'}
+          </button>
+        </div>
+
+        {lyricSearchMessage && (
+          <div style={{
+            padding: 12,
+            background: lyricSearchMessage.includes('❌') ? '#fee2e2' :
+                       lyricSearchMessage.includes('✅') ? '#dcfce7' : '#dbeafe',
+            border: `1px solid ${lyricSearchMessage.includes('❌') ? '#dc2626' :
+                                 lyricSearchMessage.includes('✅') ? '#16a34a' : '#3b82f6'}`,
+            borderRadius: 6,
+            fontSize: 13,
+            color: lyricSearchMessage.includes('❌') ? '#991b1b' :
+                   lyricSearchMessage.includes('✅') ? '#15803d' : '#1e40af',
+            fontWeight: 500
+          }}>
+            {lyricSearchMessage}
+          </div>
+        )}
+
+        {lyricResults.length > 0 && (
+          <div style={{
+            marginTop: 20,
+            background: 'rgba(255, 255, 255, 0.95)',
+            borderRadius: 8,
+            padding: 16,
+            maxHeight: 500,
+            overflowY: 'auto'
+          }}>
+            <div style={{
+              fontSize: 16,
+              fontWeight: 600,
+              color: '#7c3aed',
+              marginBottom: 12
+            }}>
+              Found {lyricResults.length} tracks mentioning &quot;{lyricSearchTerm}&quot;
+            </div>
+
+            <div style={{
+              display: 'grid',
+              gap: 12
+            }}>
+              {lyricResults.map((result, idx) => (
+                <Link
+                  key={`${result.collection_id}-${result.track_title}-${idx}`}
+                  href={`/admin/edit-entry/${result.collection_id}`}
+                  style={{
+                    display: 'flex',
+                    gap: 12,
+                    padding: 12,
+                    background: 'white',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: 6,
+                    textDecoration: 'none',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(124, 58, 237, 0.2)';
+                    e.currentTarget.style.transform = 'translateX(4px)';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.boxShadow = 'none';
+                    e.currentTarget.style.transform = 'translateX(0)';
+                  }}
+                >
+                  <Image
+                    src={result.image_url || '/images/placeholder.png'}
+                    alt={result.album_title}
+                    width={60}
+                    height={60}
+                    style={{
+                      borderRadius: 4,
+                      objectFit: 'cover'
+                    }}
+                    unoptimized
+                  />
+                  <div style={{ flex: 1 }}>
+                    <div style={{
+                      fontSize: 14,
+                      fontWeight: 600,
+                      color: '#1f2937',
+                      marginBottom: 2
+                    }}>
+                      {result.track_title}
+                      {result.track_position && (
+                        <span style={{
+                          marginLeft: 8,
+                          fontSize: 12,
+                          color: '#6b7280',
+                          fontWeight: 400
+                        }}>
+                          ({result.track_position})
+                        </span>
+                      )}
+                    </div>
+                    <div style={{
+                      fontSize: 13,
+                      color: '#6b7280',
+                      marginBottom: 4
+                    }}>
+                      {result.artist} - {result.album_title}
+                    </div>
+                    {result.genius_url && (
+                      <a
+                        href={result.genius_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={e => e.stopPropagation()}
+                        style={{
+                          fontSize: 12,
+                          color: '#7c3aed',
+                          textDecoration: 'none'
+                        }}
+                      >
+                        View lyrics on Genius →
+                      </a>
+                    )}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* TRUE Multi-Select with Checkboxes */}
       <div style={{
         background: 'white',
@@ -338,7 +615,7 @@ export default function FlexibleOrganizePage() {
           color: '#1f2937',
           margin: '0 0 20px 0'
         }}>
-          ✅ Check Any Combination - Complete Flexibility
+          ✅ Metadata Filters - Complete Flexibility
         </h3>
 
         {/* Search Filters */}
@@ -767,7 +1044,6 @@ export default function FlexibleOrganizePage() {
                   gap: 4,
                   flexWrap: 'wrap'
                 }}>
-                  {/* Show original release year primarily, with pressing year if different */}
                   {album.master_release_date && album.master_release_date !== album.year ? (
                     <span title="Original release / This pressing">{album.master_release_date} ({album.year})</span>
                   ) : (
