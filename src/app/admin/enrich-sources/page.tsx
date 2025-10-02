@@ -19,6 +19,7 @@ export default function MultiSourceEnrichment() {
   const [batchSize, setBatchSize] = useState('all');
   const [folderFilter, setFolderFilter] = useState('');
   const [folders, setFolders] = useState([]);
+  const [totalEnriched, setTotalEnriched] = useState(0);
 
   useEffect(() => {
     loadStatsAndFolders();
@@ -41,17 +42,18 @@ export default function MultiSourceEnrichment() {
   }
 
   async function enrichAll() {
-    const targetCount = folderFilter ? 'filtered' : stats.unenriched;
-    if (!confirm(`This will enrich ${targetCount} albums${folderFilter ? ` in folder "${folderFilter}"` : ''}. This may take a while and consume API quota. Continue?`)) {
+    if (!confirm(`This will enrich albums${folderFilter ? ` in folder "${folderFilter}"` : ' (all folders)'}. This may take a while and consume API quota. Continue?`)) {
       return;
     }
 
     setEnriching(true);
-    setProgress({ current: 0, total: stats.unenriched });
+    setProgress({ current: 0, total: 0 });
+    setTotalEnriched(0);
+    setStatus('Starting enrichment...');
     
     let cursor = 0;
     let totalProcessed = 0;
-    let totalEnriched = 0;
+    let enrichedCount = 0;
     const limit = batchSize === 'all' ? 10000 : parseInt(batchSize);
 
     try {
@@ -76,17 +78,20 @@ export default function MultiSourceEnrichment() {
         }
 
         totalProcessed += result.processed;
-        totalEnriched += result.enriched;
-        setProgress({ current: totalProcessed, total: stats.unenriched });
+        enrichedCount += result.enriched;
+        
+        // Update progress
+        setProgress({ current: totalProcessed, total: totalProcessed });
+        setTotalEnriched(enrichedCount);
         
         if (result.lastAlbum) {
           setLastEnriched(result.lastAlbum);
         }
 
-        setStatus(`Processed ${totalProcessed} albums, enriched ${totalEnriched}...`);
+        setStatus(`Processed ${totalProcessed} albums, enriched ${enrichedCount}...`);
 
         if (!result.hasMore) {
-          setStatus(`✅ Complete! Processed ${totalProcessed} albums, enriched ${totalEnriched}`);
+          setStatus(`✅ Complete! Processed ${totalProcessed} albums, enriched ${enrichedCount}`);
           await loadStatsAndFolders();
           break;
         }
@@ -102,10 +107,6 @@ export default function MultiSourceEnrichment() {
       setEnriching(false);
     }
   }
-
-  const progressPercent = progress.total > 0 
-    ? Math.round((progress.current / progress.total) * 100)
-    : 0;
 
   return (
     <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
@@ -239,21 +240,22 @@ export default function MultiSourceEnrichment() {
               fontSize: 14,
               color: '#6b7280'
             }}>
-              <span>Progress: {progress.current} / {progress.total}</span>
-              <span>{progressPercent}%</span>
+              <span>Processed: {progress.current} albums</span>
+              <span>{totalEnriched} enriched</span>
             </div>
             <div style={{
               width: '100%',
               height: 24,
               background: '#e5e7eb',
               borderRadius: 12,
-              overflow: 'hidden'
+              overflow: 'hidden',
+              position: 'relative'
             }}>
               <div style={{
-                width: `${progressPercent}%`,
+                width: '100%',
                 height: '100%',
                 background: 'linear-gradient(135deg, #7c3aed, #a855f7)',
-                transition: 'width 0.3s ease'
+                opacity: 0.8
               }} />
             </div>
           </div>
