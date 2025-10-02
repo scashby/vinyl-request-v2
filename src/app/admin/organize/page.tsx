@@ -1,4 +1,4 @@
-// src/app/admin/organize/page.tsx - WITH LYRIC SEARCH
+// src/app/admin/organize/page.tsx - Clean version without duplicates
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -42,7 +42,7 @@ export default function FlexibleOrganizePage() {
   const [lyricResults, setLyricResults] = useState<LyricSearchResult[]>([]);
   const [lyricSearchMessage, setLyricSearchMessage] = useState('');
 
-  // TRUE multi-select with checkboxes - no compartmentalization 
+  // Multi-select filters
   const [selectedFolders, setSelectedFolders] = useState<string[]>([]);
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   const [selectedStyles, setSelectedStyles] = useState<string[]>([]);
@@ -158,25 +158,20 @@ export default function FlexibleOrganizePage() {
     }
   };
 
-  // Apply ALL filters with complete flexibility and AND logic
+  // Apply filters
   const filteredAlbums = useMemo(() => {
     return rows.filter(row => {
-      // Multi-folder filter (OR within selected)
       if (selectedFolders.length > 0 && !selectedFolders.includes(row.folder)) return false;
       
-      // Multi-genre filter (OR within selected)
       if (selectedGenres.length > 0) {
         if (!row.discogs_genres || !row.discogs_genres.some(g => selectedGenres.includes(g))) return false;
       }
       
-      // Multi-style filter (OR within selected)
       if (selectedStyles.length > 0) {
         if (!row.discogs_styles || !row.discogs_styles.some(s => selectedStyles.includes(s))) return false;
       }
       
-      // Multi-decade filter - calculate from master release date when available
       if (selectedDecades.length > 0) {
-        // Use master release date to calculate the original decade
         const originalYear = row.master_release_date || row.year;
         if (!originalYear) return false;
         
@@ -187,9 +182,7 @@ export default function FlexibleOrganizePage() {
         if (!selectedDecades.includes(originalDecade)) return false;
       }
       
-      // Year range filter - use master release date (original release) if available
       if (yearRangeStart || yearRangeEnd) {
-        // Prefer master release date (original release) over pressing year
         const originalYear = row.master_release_date || row.year;
         const albumYear = parseInt(originalYear || '0');
         if (isNaN(albumYear)) return false;
@@ -197,7 +190,6 @@ export default function FlexibleOrganizePage() {
         if (yearRangeEnd && albumYear > parseInt(yearRangeEnd)) return false;
       }
       
-      // Text searches
       if (artistSearch && !row.artist.toLowerCase().includes(artistSearch.toLowerCase())) return false;
       if (titleSearch && !row.title.toLowerCase().includes(titleSearch.toLowerCase())) return false;
       
@@ -219,7 +211,6 @@ export default function FlexibleOrganizePage() {
   const hasActiveFilters = selectedFolders.length > 0 || selectedGenres.length > 0 || selectedStyles.length > 0 || 
                           selectedDecades.length > 0 || yearRangeStart || yearRangeEnd || artistSearch || titleSearch;
 
-  // Helper functions for checkbox handling
   const toggleFolder = (folder: string) => {
     setSelectedFolders(prev => 
       prev.includes(folder) 
@@ -317,16 +308,14 @@ export default function FlexibleOrganizePage() {
                 
                 setEnrichStatus(`Processed batch: ${result.updated} updated, ${result.scanned} scanned. Total: ${totalUpdated} updated / ${totalScanned} scanned`);
                 
-                // Brief pause between batches
                 if (cursor !== null) {
                   await new Promise(resolve => setTimeout(resolve, 1000));
                 }
               }
               
               setEnrichStatus(`✅ Enrichment complete! Updated ${totalUpdated} items out of ${totalScanned} scanned`);
-              await load(); // Reload data
+              await load();
               
-              // Clear status after 5 seconds
               setTimeout(() => setEnrichStatus(''), 5000);
               
             } catch (err) {
@@ -600,7 +589,7 @@ export default function FlexibleOrganizePage() {
         )}
       </div>
 
-      {/* TRUE Multi-Select with Checkboxes */}
+      {/* Multi-Select Filters */}
       <div style={{
         background: 'white',
         border: '1px solid #e5e7eb',
@@ -742,7 +731,7 @@ export default function FlexibleOrganizePage() {
           marginBottom: 20
         }}>
           
-          {/* Folders Checkboxes */}
+          {/* Folders */}
           <div style={{
             border: '1px solid #e5e7eb',
             borderRadius: 8,
@@ -790,7 +779,7 @@ export default function FlexibleOrganizePage() {
             </div>
           </div>
 
-          {/* Genres Checkboxes */}
+          {/* Genres */}
           <div style={{
             border: '1px solid #e5e7eb',
             borderRadius: 8,
@@ -838,7 +827,7 @@ export default function FlexibleOrganizePage() {
             </div>
           </div>
 
-          {/* Styles Checkboxes */}
+          {/* Styles */}
           <div style={{
             border: '1px solid #e5e7eb',
             borderRadius: 8,
@@ -886,7 +875,7 @@ export default function FlexibleOrganizePage() {
             </div>
           </div>
 
-          {/* Decades Checkboxes */}
+          {/* Decades */}
           <div style={{
             border: '1px solid #e5e7eb',
             borderRadius: 8,

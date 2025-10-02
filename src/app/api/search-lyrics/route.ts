@@ -1,4 +1,4 @@
-// src/app/api/search-lyrics/route.ts - WITH DEBUGGING
+// src/app/api/search-lyrics/route.ts - Clean version without duplicates
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -49,7 +49,6 @@ type Body = {
   forceRefresh?: boolean;
 };
 
-// Extract lyrics from Genius HTML page
 async function fetchLyricsFromGeniusUrl(url: string): Promise<string | null> {
   try {
     console.log(`📥 Fetching lyrics from: ${url}`);
@@ -65,7 +64,7 @@ async function fetchLyricsFromGeniusUrl(url: string): Promise<string | null> {
     
     let lyrics = '';
     
-    // Pattern 1: data-lyrics-container (current structure)
+    // Pattern 1: data-lyrics-container
     const containerPattern = /data-lyrics-container="true"[^>]*>([\s\S]*?)<\/div>/gi;
     let matches = html.match(containerPattern);
     
@@ -81,7 +80,7 @@ async function fetchLyricsFromGeniusUrl(url: string): Promise<string | null> {
         .join('\n');
     }
     
-    // Pattern 2: Lyrics__Container (alternative structure)
+    // Pattern 2: Lyrics__Container
     if (!lyrics) {
       console.log(`⚠️ Trying alternative pattern: Lyrics__Container`);
       const altPattern = /<div[^>]*class="[^"]*Lyrics__Container[^"]*"[^>]*>([\s\S]*?)<\/div>/gi;
@@ -128,13 +127,11 @@ async function fetchLyricsFromGeniusUrl(url: string): Promise<string | null> {
       return null;
     }
     
-    // Clean up the lyrics text
     lyrics = lyrics
       .replace(/\s+/g, ' ')
       .replace(/\n+/g, '\n')
       .trim();
     
-    // Decode HTML entities
     lyrics = lyrics
       .replace(/&amp;/g, '&')
       .replace(/&lt;/g, '<')
@@ -153,12 +150,10 @@ async function fetchLyricsFromGeniusUrl(url: string): Promise<string | null> {
   }
 }
 
-// Check if term exists in text (case-insensitive)
 function containsTerm(text: string, term: string): boolean {
   return text.toLowerCase().includes(term.toLowerCase());
 }
 
-// Sleep function for rate limiting
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export async function POST(req: Request) {
@@ -172,7 +167,7 @@ export async function POST(req: Request) {
     const searchTerm = body.term.trim().toLowerCase();
     console.log(`\n🔍 LYRICS SEARCH: "${searchTerm}"${body.folder ? ` in folder "${body.folder}"` : ''}`);
     
-    // Step 1: Check if we already have tags for this term
+    // Check cache first
     if (!body.forceRefresh) {
       console.log(`📋 Checking for cached results...`);
       const { data: existingTags, error: tagError } = await supabase
@@ -214,7 +209,7 @@ export async function POST(req: Request) {
       console.log(`ℹ️ No cached results, starting fresh search...`);
     }
 
-    // Step 2: Get all albums with tracklists that have lyrics URLs
+    // Get albums with tracklists
     console.log(`📀 Querying albums with tracklists...`);
     let query = supabase
       .from('collection')
@@ -246,7 +241,6 @@ export async function POST(req: Request) {
 
     console.log(`📀 Found ${albums.length} albums to search`);
 
-    // Step 3: Scan lyrics for the term
     const results: SearchResult[] = [];
     const tagsToInsert: TagInsert[] = [];
     let processedCount = 0;
@@ -279,7 +273,6 @@ export async function POST(req: Request) {
           console.log(`\n  🎵 Track: ${track.title}`);
           console.log(`  🔗 URL: ${track.lyrics_url}`);
           
-          // Fetch lyrics
           const lyrics = await fetchLyricsFromGeniusUrl(track.lyrics_url);
           tracksFetched++;
           
@@ -288,7 +281,6 @@ export async function POST(req: Request) {
             continue;
           }
 
-          // Check if term exists in lyrics
           if (containsTerm(lyrics, searchTerm)) {
             console.log(`  ✅ MATCH FOUND!`);
             tracksMatched++;
@@ -313,7 +305,6 @@ export async function POST(req: Request) {
             console.log(`  ❌ No match`);
           }
 
-          // Rate limit: 1 second between requests
           await sleep(1000);
         }
       } catch (error) {
@@ -327,7 +318,7 @@ export async function POST(req: Request) {
     console.log(`   Lyrics fetched successfully: ${tracksFetched}`);
     console.log(`   Matches found: ${tracksMatched}`);
 
-    // Step 4: Insert tags into database for future searches
+    // Cache results
     if (tagsToInsert.length > 0) {
       console.log(`💾 Caching ${tagsToInsert.length} results...`);
       const { error: insertError } = await supabase
@@ -359,7 +350,6 @@ export async function POST(req: Request) {
   }
 }
 
-// GET endpoint to retrieve cached search stats
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
