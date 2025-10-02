@@ -1,4 +1,4 @@
-// src/app/api/search-lyrics/route.ts - Clean version without duplicates
+// src/app/api/search-lyrics/route.ts - Fixed with better Genius scraping
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -51,64 +51,63 @@ type Body = {
 
 async function fetchLyricsFromGeniusUrl(url: string): Promise<string | null> {
   try {
-    console.log(`📥 Fetching lyrics from: ${url}`);
+    console.log(`📥 Fetching: ${url}`);
     const response = await fetch(url);
     
     if (!response.ok) {
-      console.log(`❌ HTTP ${response.status} for ${url}`);
+      console.log(`❌ HTTP ${response.status}`);
       return null;
     }
     
     const html = await response.text();
-    console.log(`✅ Fetched ${html.length} characters of HTML`);
+    console.log(`✅ Fetched ${html.length} bytes`);
     
     let lyrics = '';
     
-    // Pattern 1: data-lyrics-container
-    const containerPattern = /data-lyrics-container="true"[^>]*>([\s\S]*?)<\/div>/gi;
-    let matches = html.match(containerPattern);
-    
-    if (matches && matches.length > 0) {
-      console.log(`✅ Found ${matches.length} lyrics sections using data-lyrics-container`);
-      lyrics = matches
-        .map(match => {
-          return match
-            .replace(/<br\s*\/?>/gi, '\n')
-            .replace(/<[^>]+>/g, '')
-            .trim();
-        })
-        .join('\n');
-    }
-    
-    // Pattern 2: Lyrics__Container
-    if (!lyrics) {
-      console.log(`⚠️ Trying alternative pattern: Lyrics__Container`);
-      const altPattern = /<div[^>]*class="[^"]*Lyrics__Container[^"]*"[^>]*>([\s\S]*?)<\/div>/gi;
-      matches = html.match(altPattern);
-      
+    // Method 1: Look for any div with lyrics-related data attributes or classes
+    const lyricsPatterns = [
+      // Current Genius structure (2024+)
+      /<div[^>]*data-lyrics-container="true"[^>]*>([\s\S]*?)<\/div>/gi,
+      // Alternative container patterns
+      /<div[^>]*class="[^"]*Lyrics__Container[^"]*"[^>]*>([\s\S]*?)<\/div>/gi,
+      // Older structure
+      /<div[^>]*class="[^"]*lyrics[^"]*"[^>]*>([\s\S]*?)<\/div>/gi,
+    ];
+
+    for (const pattern of lyricsPatterns) {
+      const matches = html.match(pattern);
       if (matches && matches.length > 0) {
-        console.log(`✅ Found ${matches.length} sections using Lyrics__Container`);
+        console.log(`✅ Found ${matches.length} sections with pattern ${pattern.source.substring(0, 50)}...`);
+        
         lyrics = matches
           .map(match => {
-            return match
+            // Remove HTML tags but preserve line breaks
+            const text = match
               .replace(/<br\s*\/?>/gi, '\n')
+              .replace(/<\/p>/gi, '\n')
               .replace(/<[^>]+>/g, '')
               .trim();
+            return text;
           })
-          .join('\n');
+          .filter(text => text.length > 0)
+          .join('\n\n');
+        
+        if (lyrics.length > 100) { // Reasonable lyrics length
+          break;
+        }
       }
     }
     
-    // Pattern 3: JSON-LD structured data
-    if (!lyrics) {
-      console.log(`⚠️ Trying JSON-LD pattern`);
+    // Method 2: Try to find JSON-LD structured data
+    if (!lyrics || lyrics.length < 100) {
+      console.log(`⚠️ Trying JSON-LD fallback`);
       const jsonLdPattern = /<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi;
       const jsonMatches = html.match(jsonLdPattern);
       
       if (jsonMatches) {
         for (const jsonMatch of jsonMatches) {
           try {
-            const jsonText = jsonMatch.replace(/<script[^>]*>/, '').replace(/<\/script>/, '');
+            const jsonText = jsonMatch.replace(/<script[^>]*>/i, '').replace(/<\/script>/i, '');
             const data = JSON.parse(jsonText);
             if (data['@type'] === 'MusicRecording' && data.lyrics) {
               lyrics = data.lyrics;
@@ -116,36 +115,36 @@ async function fetchLyricsFromGeniusUrl(url: string): Promise<string | null> {
               break;
             }
           } catch {
-            // Skip invalid JSON
+            continue;
           }
         }
       }
     }
     
-    if (!lyrics) {
-      console.log(`❌ No lyrics found using any pattern for ${url}`);
+    if (!lyrics || lyrics.length < 50) {
+      console.log(`❌ No valid lyrics found (extracted ${lyrics.length} chars)`);
+      console.log(`First 500 chars of HTML: ${html.substring(0, 500)}`);
       return null;
     }
     
-    lyrics = lyrics
-      .replace(/\s+/g, ' ')
-      .replace(/\n+/g, '\n')
-      .trim();
-    
+    // Clean up
     lyrics = lyrics
       .replace(/&amp;/g, '&')
       .replace(/&lt;/g, '<')
       .replace(/&gt;/g, '>')
       .replace(/&quot;/g, '"')
       .replace(/&#39;/g, "'")
-      .replace(/&nbsp;/g, ' ');
+      .replace(/&nbsp;/g, ' ')
+      .replace(/\s+/g, ' ') // Normalize spaces
+      .replace(/\n\s+/g, '\n') // Clean line breaks
+      .trim();
     
-    console.log(`✅ Extracted ${lyrics.length} characters of clean lyrics`);
-    console.log(`📝 First 100 chars: "${lyrics.substring(0, 100)}..."`);
+    console.log(`✅ Extracted ${lyrics.length} chars of lyrics`);
+    console.log(`Preview: "${lyrics.substring(0, 150)}..."`);
     return lyrics;
     
   } catch (error) {
-    console.error(`❌ Error fetching lyrics from ${url}:`, error);
+    console.error(`❌ Error fetching ${url}:`, error);
     return null;
   }
 }
@@ -169,7 +168,7 @@ export async function POST(req: Request) {
     
     // Check cache first
     if (!body.forceRefresh) {
-      console.log(`📋 Checking for cached results...`);
+      console.log(`📋 Checking cache...`);
       const { data: existingTags, error: tagError } = await supabase
         .from('lyric_search_tags')
         .select(`
@@ -206,11 +205,11 @@ export async function POST(req: Request) {
           count: results.length
         });
       }
-      console.log(`ℹ️ No cached results, starting fresh search...`);
+      console.log(`ℹ️ No cache, starting fresh search...`);
     }
 
     // Get albums with tracklists
-    console.log(`📀 Querying albums with tracklists...`);
+    console.log(`📀 Querying albums...`);
     let query = supabase
       .from('collection')
       .select('id, artist, title, image_url, folder, tracklists')
@@ -228,7 +227,7 @@ export async function POST(req: Request) {
     }
 
     if (!albums || albums.length === 0) {
-      console.log(`⚠️ No albums with tracklists found`);
+      console.log(`⚠️ No albums found`);
       return NextResponse.json({
         success: true,
         cached: false,
@@ -243,9 +242,9 @@ export async function POST(req: Request) {
 
     const results: SearchResult[] = [];
     const tagsToInsert: TagInsert[] = [];
-    let processedCount = 0;
-    let tracksWithLyrics = 0;
-    let tracksFetched = 0;
+    let tracksWithUrls = 0;
+    let successfulFetches = 0;
+    let failedFetches = 0;
     let tracksMatched = 0;
 
     for (const album of albums) {
@@ -256,33 +255,29 @@ export async function POST(req: Request) {
           : album.tracklists as Track[];
 
         if (!Array.isArray(tracklists)) {
-          console.log(`⚠️ Invalid tracklists format`);
+          console.log(`⚠️ Invalid tracklists`);
           continue;
         }
-
-        console.log(`📝 Album has ${tracklists.length} tracks`);
 
         for (const track of tracklists) {
           if (!track.lyrics_url || !track.title) {
             continue;
           }
 
-          tracksWithLyrics++;
-          processedCount++;
-          
-          console.log(`\n  🎵 Track: ${track.title}`);
-          console.log(`  🔗 URL: ${track.lyrics_url}`);
+          tracksWithUrls++;
+          console.log(`\n  🎵 ${track.title}`);
           
           const lyrics = await fetchLyricsFromGeniusUrl(track.lyrics_url);
-          tracksFetched++;
           
           if (!lyrics) {
-            console.log(`  ❌ Failed to fetch lyrics`);
+            failedFetches++;
             continue;
           }
 
+          successfulFetches++;
+
           if (containsTerm(lyrics, searchTerm)) {
-            console.log(`  ✅ MATCH FOUND!`);
+            console.log(`  ✅ MATCH!`);
             tracksMatched++;
             results.push({
               collection_id: album.id,
@@ -301,8 +296,6 @@ export async function POST(req: Request) {
               search_term: searchTerm,
               genius_url: track.lyrics_url
             });
-          } else {
-            console.log(`  ❌ No match`);
           }
 
           await sleep(1000);
@@ -312,11 +305,18 @@ export async function POST(req: Request) {
       }
     }
 
-    console.log(`\n📊 SEARCH SUMMARY:`);
-    console.log(`   Albums scanned: ${albums.length}`);
-    console.log(`   Tracks with lyrics URLs: ${tracksWithLyrics}`);
-    console.log(`   Lyrics fetched successfully: ${tracksFetched}`);
-    console.log(`   Matches found: ${tracksMatched}`);
+    console.log(`\n📊 SUMMARY:`);
+    console.log(`   Albums: ${albums.length}`);
+    console.log(`   Tracks with URLs: ${tracksWithUrls}`);
+    console.log(`   Successful fetches: ${successfulFetches}`);
+    console.log(`   Failed fetches: ${failedFetches}`);
+    console.log(`   Matches: ${tracksMatched}`);
+
+    // Show warning if most fetches failed
+    let message = `Scanned ${tracksWithUrls} tracks, found ${tracksMatched} matches.`;
+    if (failedFetches > successfulFetches) {
+      message = `⚠️ Warning: Failed to fetch lyrics from ${failedFetches}/${tracksWithUrls} tracks. Found ${tracksMatched} matches from ${successfulFetches} successful fetches.`;
+    }
 
     // Cache results
     if (tagsToInsert.length > 0) {
@@ -326,9 +326,7 @@ export async function POST(req: Request) {
         .insert(tagsToInsert);
 
       if (insertError) {
-        console.error('⚠️ Error caching results:', insertError);
-      } else {
-        console.log(`✅ Results cached successfully`);
+        console.error('⚠️ Cache error:', insertError);
       }
     }
 
@@ -338,12 +336,17 @@ export async function POST(req: Request) {
       term: body.term,
       results,
       count: results.length,
-      scanned: processedCount,
-      message: `Scanned ${processedCount} tracks, found ${results.length} matches. Results cached for future searches.`
+      stats: {
+        tracksWithUrls,
+        successfulFetches,
+        failedFetches,
+        matches: tracksMatched
+      },
+      message
     });
 
   } catch (error) {
-    console.error('❌ Lyric search error:', error);
+    console.error('❌ Search error:', error);
     return NextResponse.json({
       error: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
@@ -408,7 +411,7 @@ export async function GET(req: Request) {
       });
     }
   } catch (error) {
-    console.error('Error fetching search stats:', error);
+    console.error('Error:', error);
     return NextResponse.json({
       error: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
