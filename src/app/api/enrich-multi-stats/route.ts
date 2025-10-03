@@ -1,4 +1,4 @@
-// src/app/api/enrich-multi-stats/route.ts
+// src/app/api/enrich-multi-stats/route.ts - COMPLETE FILE
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -13,7 +13,13 @@ export async function GET() {
       .from('collection')
       .select('id', { count: 'exact', head: true });
 
-    // Get unenriched count (no spotify AND no apple music)
+    // Get albums needing enrichment (missing either Spotify OR Apple Music)
+    const { count: needsEnrichment } = await supabase
+      .from('collection')
+      .select('id', { count: 'exact', head: true })
+      .or('spotify_id.is.null,apple_music_id.is.null');
+
+    // Get completely unenriched count (no spotify AND no apple music)
     const { count: unenriched } = await supabase
       .from('collection')
       .select('id', { count: 'exact', head: true })
@@ -77,6 +83,7 @@ export async function GET() {
       success: true,
       stats: {
         total: total || 0,
+        needsEnrichment: needsEnrichment || 0,
         unenriched: unenriched || 0,
         spotifyOnly: spotifyOnly || 0,
         appleOnly: appleOnly || 0,

@@ -1,4 +1,4 @@
-// src/app/admin/enrich-sources/page.tsx - COMPLETE with proper batch processing
+// src/app/admin/enrich-sources/page.tsx - COMPLETE FILE
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react';
 export default function MultiSourceEnrichment() {
   const [stats, setStats] = useState({
     total: 0,
+    needsEnrichment: 0,
     unenriched: 0,
     spotifyOnly: 0,
     appleOnly: 0,
@@ -31,7 +32,6 @@ export default function MultiSourceEnrichment() {
       const data = await res.json();
       if (data.success) {
         setStats(data.stats);
-        // Extract folders from stats response
         if (data.folders) {
           setFolders(data.folders);
         }
@@ -42,7 +42,7 @@ export default function MultiSourceEnrichment() {
   }
 
   async function enrichAll() {
-    if (!confirm(`This will enrich albums${folderFilter ? ` in folder "${folderFilter}"` : ' (all folders)'}. This may take a while and consume API quota. Continue?`)) {
+    if (!confirm(`This will enrich ${stats.needsEnrichment} albums${folderFilter ? ` in folder "${folderFilter}"` : ' (all folders)'}. This may take a while and consume API quota. Continue?`)) {
       return;
     }
 
@@ -80,7 +80,6 @@ export default function MultiSourceEnrichment() {
         totalProcessed += result.processed;
         enrichedCount += result.enriched;
         
-        // Update progress
         setProgress({ current: totalProcessed, total: totalProcessed });
         setTotalEnriched(enrichedCount);
         
@@ -98,7 +97,6 @@ export default function MultiSourceEnrichment() {
 
         cursor = result.nextCursor;
         
-        // Brief pause between batches
         await new Promise(resolve => setTimeout(resolve, 2000));
       }
     } catch (error) {
@@ -125,7 +123,8 @@ export default function MultiSourceEnrichment() {
         marginBottom: 24
       }}>
         <StatCard label="Total Albums" value={stats.total} color="#3b82f6" />
-        <StatCard label="Unenriched" value={stats.unenriched} color="#dc2626" />
+        <StatCard label="Needs Enrichment" value={stats.needsEnrichment} color="#f59e0b" />
+        <StatCard label="No Data" value={stats.unenriched} color="#dc2626" />
         <StatCard label="Spotify Only" value={stats.spotifyOnly} color="#1DB954" />
         <StatCard label="Apple Only" value={stats.appleOnly} color="#FA57C1" />
         <StatCard label="Fully Enriched" value={stats.fullyEnriched} color="#16a34a" />
@@ -143,16 +142,16 @@ export default function MultiSourceEnrichment() {
         <div style={{ display: 'flex', gap: 16, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
           <button
             onClick={enrichAll}
-            disabled={enriching || stats.unenriched === 0}
+            disabled={enriching || stats.needsEnrichment === 0}
             style={{
               padding: '12px 24px',
-              background: enriching || stats.unenriched === 0 ? '#9ca3af' : 'linear-gradient(135deg, #7c3aed, #a855f7)',
+              background: enriching || stats.needsEnrichment === 0 ? '#9ca3af' : 'linear-gradient(135deg, #7c3aed, #a855f7)',
               color: 'white',
               border: 'none',
               borderRadius: 8,
               fontSize: 16,
               fontWeight: 600,
-              cursor: enriching || stats.unenriched === 0 ? 'not-allowed' : 'pointer',
+              cursor: enriching || stats.needsEnrichment === 0 ? 'not-allowed' : 'pointer',
               boxShadow: enriching ? 'none' : '0 4px 12px rgba(124, 58, 237, 0.3)'
             }}
           >
@@ -316,11 +315,12 @@ export default function MultiSourceEnrichment() {
           📊 How it works:
         </div>
         <ul style={{ margin: 0, paddingLeft: 20 }}>
-          <li>Process ALL albums or filter by folder</li>
+          <li>Process albums missing Spotify OR Apple Music (or both)</li>
           <li>Select batch size from 50 to 1000, or &quot;ALL&quot; for no limit</li>
-          <li>Fetches metadata from Spotify and Apple Music</li>
+          <li>Fetches missing metadata from Spotify and/or Apple Music</li>
           <li>Enriches ALL tracks with lyrics from Genius</li>
           <li>Progress is saved - safe to stop and resume</li>
+          <li><strong>Will process {stats.needsEnrichment.toLocaleString()} albums that need enrichment</strong></li>
         </ul>
       </div>
     </div>

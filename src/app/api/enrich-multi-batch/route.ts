@@ -1,4 +1,4 @@
-// src/app/api/enrich-multi-batch/route.ts
+// src/app/api/enrich-multi-batch/route.ts - COMPLETE FILE
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -175,12 +175,11 @@ export async function POST(req: Request) {
     const cursor = body.cursor || 0;
     const limit = Math.min(body.limit || 20, 50);
 
-    // Get unenriched albums
+    // FIXED: Get albums missing EITHER Spotify OR Apple Music (or both)
     const { data: albums, error } = await supabase
       .from('collection')
       .select('id, artist, title, tracklists, spotify_id, apple_music_id')
-      .is('spotify_id', null)
-      .is('apple_music_id', null)
+      .or('spotify_id.is.null,apple_music_id.is.null')
       .gt('id', cursor)
       .order('id', { ascending: true })
       .limit(limit);
@@ -210,7 +209,7 @@ export async function POST(req: Request) {
       let hasUpdate = false;
       const updateData: UpdateData = {};
 
-      // Search Spotify
+      // Search Spotify if missing
       if (!album.spotify_id) {
         const spotifyData = await searchSpotify(album.artist, album.title);
         if (spotifyData) {
@@ -220,7 +219,7 @@ export async function POST(req: Request) {
         await sleep(500);
       }
 
-      // Search Apple Music
+      // Search Apple Music if missing
       if (!album.apple_music_id) {
         const appleMusicData = await searchAppleMusic(album.artist, album.title);
         if (appleMusicData) {
