@@ -1,6 +1,4 @@
-// Enhanced Discogs Import - populates genres, styles, and decade
-// Replace: src/app/admin/import-discogs/page.tsx
-
+// src/app/admin/import-discogs/page.tsx - IMPROVED WITH DETAILED PREVIEW
 'use client';
 
 import { useState } from 'react';
@@ -57,6 +55,7 @@ type ExistingRecord = {
 type UpdateOperation = {
   csvRow: ProcessedRow;
   existingRecord: ExistingRecord;
+  changes: string[];
 };
 
 type SyncPreview = {
@@ -70,7 +69,6 @@ interface SyncDataStorage {
   recordsToRemove?: ExistingRecord[];
 }
 
-// Calculate decade from year
 function calculateDecade(year: number | null): number | null {
   if (!year || year <= 0) return null;
   return Math.floor(year / 10) * 10;
@@ -126,10 +124,11 @@ export default function ImportDiscogsPage() {
   const [syncPreview, setSyncPreview] = useState<SyncPreview | null>(null);
   const [status, setStatus] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showDetails, setShowDetails] = useState<'new' | 'updates' | 'removes' | null>(null);
+  const [expandedUpdate, setExpandedUpdate] = useState<number | null>(null);
 
   const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-  // ENHANCED: Now fetches genres, styles, images, and tracklists
   const fetchDiscogsData = async (
     releaseId: string,
     retries = 3
@@ -164,7 +163,6 @@ export default function ImportDiscogsPage() {
         
         const data = await res.json() as DiscogsResponse;
         
-        // Process tracklist
         let tracklistsStr = null;
         if (Array.isArray(data.tracklist) && data.tracklist.length > 0) {
           tracklistsStr = JSON.stringify(data.tracklist.map((track: DiscogsTrack) => ({
@@ -175,7 +173,6 @@ export default function ImportDiscogsPage() {
           })));
         }
         
-        // Extract genres and styles
         const genres = Array.isArray(data.genres) && data.genres.length > 0 
           ? data.genres.filter(g => g && g.trim()).map(g => g.trim()) 
           : null;
@@ -215,7 +212,6 @@ export default function ImportDiscogsPage() {
         skipEmptyLines: true,
         dynamicTyping: true,
         complete: async (results: { data: DiscogsCSVRow[], meta: { fields?: string[] } }) => {
-          // Filter valid rows
           const validRows = results.data.filter((row) => {
             const releaseId = row.release_id;
             if (!releaseId || releaseId === 0 || releaseId === '') return false;
@@ -223,7 +219,6 @@ export default function ImportDiscogsPage() {
             return !isNaN(numericValue) && numericValue > 0;
           });
           
-          // Process with decade calculation
           const processedRows: ProcessedRow[] = validRows.map(row => {
             const year = row.Released || 0;
             return {
@@ -244,10 +239,8 @@ export default function ImportDiscogsPage() {
           });
 
           const releaseIds = processedRows.map(r => r.discogs_release_id);
-          
           setStatus(`Checking existing entries for ${releaseIds.length} items...`);
           
-          // Fetch all existing records
           let allExisting: ExistingRecord[] = [];
           let start = 0;
           const pageSize = 1000;
@@ -277,24 +270,37 @@ export default function ImportDiscogsPage() {
 
           const newRows = processedRows.filter(row => !allExistingIds.has(row.discogs_release_id));
 
-          // Find updates - check genres/styles/decade too
+          // Find updates with detailed change tracking
           const updateOperations: UpdateOperation[] = [];
           for (const csvRow of processedRows) {
             const existingRecord = existingRecordsMap.get(csvRow.discogs_release_id);
             if (existingRecord) {
-              const folderChanged = !valuesAreEqual(csvRow.folder, existingRecord.folder);
-              const conditionChanged = !valuesAreEqual(csvRow.media_condition, existingRecord.media_condition);
-              const needsImage = !existingRecord.image_url;
-              const needsTracklists = !existingRecord.tracklists || 
-                                   existingRecord.tracklists === '' || 
-                                   existingRecord.tracklists === 'null' ||
-                                   existingRecord.tracklists === '[]';
-              const needsGenres = !existingRecord.discogs_genres || existingRecord.discogs_genres.length === 0;
-              const needsStyles = !existingRecord.discogs_styles || existingRecord.discogs_styles.length === 0;
-              const needsDecade = existingRecord.decade === null && csvRow.decade !== null;
+              const changes: string[] = [];
               
-              if (folderChanged || conditionChanged || needsImage || needsTracklists || needsGenres || needsStyles || needsDecade) {
-                updateOperations.push({ csvRow, existingRecord });
+              if (!valuesAreEqual(csvRow.folder, existingRecord.folder)) {
+                changes.push(`Folder: "${existingRecord.folder}" → "${csvRow.folder}"`);
+              }
+              if (!valuesAreEqual(csvRow.media_condition, existingRecord.media_condition)) {
+                changes.push(`Condition: "${existingRecord.media_condition}" → "${csvRow.media_condition}"`);
+              }
+              if (!existingRecord.image_url) {
+                changes.push('Will fetch: Image from Discogs');
+              }
+              if (!existingRecord.tracklists || existingRecord.tracklists === '' || existingRecord.tracklists === 'null' || existingRecord.tracklists === '[]') {
+                changes.push('Will fetch: Tracklist from Discogs');
+              }
+              if (!existingRecord.discogs_genres || existingRecord.discogs_genres.length === 0) {
+                changes.push('Will fetch: Genres from Discogs');
+              }
+              if (!existingRecord.discogs_styles || existingRecord.discogs_styles.length === 0) {
+                changes.push('Will fetch: Styles from Discogs');
+              }
+              if (existingRecord.decade === null && csvRow.decade !== null) {
+                changes.push(`Will calculate: Decade = ${csvRow.decade}s`);
+              }
+              
+              if (changes.length > 0) {
+                updateOperations.push({ csvRow, existingRecord, changes });
               }
             }
           }
@@ -372,7 +378,6 @@ export default function ImportDiscogsPage() {
           if (i < currentBatch.length - 1) await delay(2000);
         }
         
-        // Insert batch
         let batchInsertCount = 0;
         for (const item of batchEnriched) {
           try {
@@ -395,7 +400,7 @@ export default function ImportDiscogsPage() {
         }
       }
       
-      // Process updates - includes genres/styles/decade
+      // Process updates
       if (updateOperations.length > 0) {
         setStatus(`Processing ${updateOperations.length} updates...`);
         
@@ -576,45 +581,247 @@ export default function ImportDiscogsPage() {
             gap: 16,
             marginBottom: 24
           }}>
-            <div style={{
-              background: '#dcfce7',
-              border: '1px solid #16a34a',
-              borderRadius: 8,
-              padding: 16,
-              textAlign: 'center'
-            }}>
+            <div 
+              onClick={() => setShowDetails(showDetails === 'new' ? null : 'new')}
+              style={{
+                background: '#dcfce7',
+                border: '1px solid #16a34a',
+                borderRadius: 8,
+                padding: 16,
+                textAlign: 'center',
+                cursor: syncPreview.newItems.length > 0 ? 'pointer' : 'default',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={e => {
+                if (syncPreview.newItems.length > 0) {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(22, 163, 74, 0.3)';
+                }
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+            >
               <div style={{ fontSize: 32, fontWeight: 'bold', color: '#15803d' }}>
                 {syncPreview.newItems.length}
               </div>
-              <div style={{ fontSize: 14, color: '#15803d' }}>New Albums</div>
+              <div style={{ fontSize: 14, color: '#15803d', fontWeight: 600 }}>New Albums</div>
+              {syncPreview.newItems.length > 0 && (
+                <div style={{ fontSize: 11, color: '#16a34a', marginTop: 4 }}>
+                  Click to view →
+                </div>
+              )}
             </div>
             
-            <div style={{
-              background: '#fef3c7',
-              border: '1px solid #f59e0b',
-              borderRadius: 8,
-              padding: 16,
-              textAlign: 'center'
-            }}>
+            <div 
+              onClick={() => setShowDetails(showDetails === 'updates' ? null : 'updates')}
+              style={{
+                background: '#fef3c7',
+                border: '1px solid #f59e0b',
+                borderRadius: 8,
+                padding: 16,
+                textAlign: 'center',
+                cursor: syncPreview.updateOperations.length > 0 ? 'pointer' : 'default',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={e => {
+                if (syncPreview.updateOperations.length > 0) {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(245, 158, 11, 0.3)';
+                }
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+            >
               <div style={{ fontSize: 32, fontWeight: 'bold', color: '#d97706' }}>
                 {syncPreview.updateOperations.length}
               </div>
-              <div style={{ fontSize: 14, color: '#d97706' }}>Updates</div>
+              <div style={{ fontSize: 14, color: '#d97706', fontWeight: 600 }}>Updates</div>
+              {syncPreview.updateOperations.length > 0 && (
+                <div style={{ fontSize: 11, color: '#f59e0b', marginTop: 4 }}>
+                  Click to view changes →
+                </div>
+              )}
             </div>
             
-            <div style={{
-              background: '#fee2e2',
-              border: '1px solid #dc2626',
-              borderRadius: 8,
-              padding: 16,
-              textAlign: 'center'
-            }}>
+            <div 
+              onClick={() => setShowDetails(showDetails === 'removes' ? null : 'removes')}
+              style={{
+                background: '#fee2e2',
+                border: '1px solid #dc2626',
+                borderRadius: 8,
+                padding: 16,
+                textAlign: 'center',
+                cursor: syncPreview.recordsToRemove.length > 0 ? 'pointer' : 'default',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={e => {
+                if (syncPreview.recordsToRemove.length > 0) {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(220, 38, 38, 0.3)';
+                }
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+            >
               <div style={{ fontSize: 32, fontWeight: 'bold', color: '#991b1b' }}>
                 {syncPreview.recordsToRemove.length}
               </div>
-              <div style={{ fontSize: 14, color: '#991b1b' }}>To Remove</div>
+              <div style={{ fontSize: 14, color: '#991b1b', fontWeight: 600 }}>To Remove</div>
+              {syncPreview.recordsToRemove.length > 0 && (
+                <div style={{ fontSize: 11, color: '#dc2626', marginTop: 4 }}>
+                  Click to view →
+                </div>
+              )}
             </div>
           </div>
+          
+          {/* Detailed Views */}
+          {showDetails === 'new' && syncPreview.newItems.length > 0 && (
+            <div style={{
+              background: '#f0fdf4',
+              border: '1px solid #16a34a',
+              borderRadius: 8,
+              padding: 16,
+              marginBottom: 16,
+              maxHeight: 400,
+              overflowY: 'auto'
+            }}>
+              <h3 style={{ fontSize: 16, fontWeight: 600, color: '#15803d', marginBottom: 12 }}>
+                New Albums to Import
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {syncPreview.newItems.slice(0, 50).map((item, idx) => (
+                  <div key={idx} style={{
+                    padding: 10,
+                    background: 'white',
+                    borderRadius: 6,
+                    fontSize: 13,
+                    border: '1px solid #bbf7d0'
+                  }}>
+                    <div style={{ fontWeight: 600, color: '#1f2937' }}>
+                      {item.artist} - {item.title}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
+                      {item.year} • {item.format} • {item.folder}
+                    </div>
+                  </div>
+                ))}
+                {syncPreview.newItems.length > 50 && (
+                  <div style={{ fontSize: 12, color: '#6b7280', textAlign: 'center', padding: 8 }}>
+                    ... and {syncPreview.newItems.length - 50} more
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {showDetails === 'updates' && syncPreview.updateOperations.length > 0 && (
+            <div style={{
+              background: '#fffbeb',
+              border: '1px solid #f59e0b',
+              borderRadius: 8,
+              padding: 16,
+              marginBottom: 16,
+              maxHeight: 400,
+              overflowY: 'auto'
+            }}>
+              <h3 style={{ fontSize: 16, fontWeight: 600, color: '#d97706', marginBottom: 12 }}>
+                Albums to Update
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {syncPreview.updateOperations.map((op, idx) => (
+                  <div key={idx} style={{
+                    padding: 10,
+                    background: 'white',
+                    borderRadius: 6,
+                    fontSize: 13,
+                    border: '1px solid #fde68a'
+                  }}>
+                    <div 
+                      onClick={() => setExpandedUpdate(expandedUpdate === idx ? null : idx)}
+                      style={{ 
+                        fontWeight: 600, 
+                        color: '#1f2937',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center'
+                      }}
+                    >
+                      <span>{op.existingRecord.artist} - {op.existingRecord.title}</span>
+                      <span style={{ fontSize: 11, color: '#f59e0b' }}>
+                        {expandedUpdate === idx ? '▼' : '▶'} {op.changes.length} changes
+                      </span>
+                    </div>
+                    {expandedUpdate === idx && (
+                      <div style={{ 
+                        marginTop: 8, 
+                        paddingTop: 8, 
+                        borderTop: '1px solid #fde68a',
+                        fontSize: 12
+                      }}>
+                        {op.changes.map((change, changeIdx) => (
+                          <div key={changeIdx} style={{ 
+                            color: '#6b7280', 
+                            marginBottom: 4,
+                            paddingLeft: 12,
+                            position: 'relative'
+                          }}>
+                            <span style={{ 
+                              position: 'absolute', 
+                              left: 0, 
+                              color: '#f59e0b' 
+                            }}>•</span>
+                            {change}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {showDetails === 'removes' && syncPreview.recordsToRemove.length > 0 && (
+            <div style={{
+              background: '#fef2f2',
+              border: '1px solid #dc2626',
+              borderRadius: 8,
+              padding: 16,
+              marginBottom: 16,
+              maxHeight: 400,
+              overflowY: 'auto'
+            }}>
+              <h3 style={{ fontSize: 16, fontWeight: 600, color: '#991b1b', marginBottom: 12 }}>
+                Albums to Remove (Not in CSV)
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {syncPreview.recordsToRemove.map((item, idx) => (
+                  <div key={idx} style={{
+                    padding: 10,
+                    background: 'white',
+                    borderRadius: 6,
+                    fontSize: 13,
+                    border: '1px solid #fecaca'
+                  }}>
+                    <div style={{ fontWeight: 600, color: '#1f2937' }}>
+                      {item.artist} - {item.title}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
+                      ID: {item.id} • Folder: {item.folder}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           
           <div style={{
             padding: 12,
@@ -624,7 +831,7 @@ export default function ImportDiscogsPage() {
             fontSize: 13,
             color: '#0c4a6e'
           }}>
-            <strong>📊 What&apos;s New:</strong> This import will automatically fetch genres, styles from Discogs and calculate decade from release year for all items.
+            <strong>📊 What&apos;s New:</strong> This import will automatically fetch genres, styles from Discogs and calculate decade from release year for all items. Click the cards above to review detailed changes before importing.
           </div>
         </div>
       )}

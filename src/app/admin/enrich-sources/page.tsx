@@ -1,7 +1,18 @@
-// src/app/admin/enrich-sources/page.tsx - COMPLETE FILE
+// src/app/admin/enrich-sources/page.tsx - IMPROVED WITH CLICKABLE CARDS
 "use client";
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import Image from 'next/image';
+
+type Album = {
+  id: number;
+  artist: string;
+  title: string;
+  image_url: string | null;
+  spotify_id: string | null;
+  apple_music_id: string | null;
+};
 
 export default function MultiSourceEnrichment() {
   const [stats, setStats] = useState({
@@ -21,6 +32,12 @@ export default function MultiSourceEnrichment() {
   const [folderFilter, setFolderFilter] = useState('');
   const [folders, setFolders] = useState([]);
   const [totalEnriched, setTotalEnriched] = useState(0);
+  
+  // Modal state
+  const [showModal, setShowModal] = useState(false);
+  const [modalTitle, setModalTitle] = useState('');
+  const [modalAlbums, setModalAlbums] = useState<Album[]>([]);
+  const [loadingModal, setLoadingModal] = useState(false);
 
   useEffect(() => {
     loadStatsAndFolders();
@@ -38,6 +55,25 @@ export default function MultiSourceEnrichment() {
       }
     } catch (error) {
       console.error('Failed to load stats:', error);
+    }
+  }
+
+  async function showAlbumsForCategory(category: string, title: string) {
+    setShowModal(true);
+    setModalTitle(title);
+    setModalAlbums([]);
+    setLoadingModal(true);
+
+    try {
+      const res = await fetch(`/api/enrich-multi-albums?category=${category}`);
+      const data = await res.json();
+      if (data.success) {
+        setModalAlbums(data.albums || []);
+      }
+    } catch (error) {
+      console.error('Failed to load albums:', error);
+    } finally {
+      setLoadingModal(false);
     }
   }
 
@@ -96,7 +132,6 @@ export default function MultiSourceEnrichment() {
         }
 
         cursor = result.nextCursor;
-        
         await new Promise(resolve => setTimeout(resolve, 2000));
       }
     } catch (error) {
@@ -107,7 +142,7 @@ export default function MultiSourceEnrichment() {
   }
 
   return (
-    <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
+    <div style={{ padding: 24, maxWidth: 1400, margin: '0 auto' }}>
       <h1 style={{ fontSize: 32, fontWeight: 'bold', marginBottom: 8 }}>
         🎵 Multi-Source Metadata Enrichment
       </h1>
@@ -115,20 +150,80 @@ export default function MultiSourceEnrichment() {
         Enrich your entire collection with data from Spotify, Apple Music, and lyrics databases
       </p>
 
-      {/* Stats */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: 16,
-        marginBottom: 24
-      }}>
-        <StatCard label="Total Albums" value={stats.total} color="#3b82f6" />
-        <StatCard label="Needs Enrichment" value={stats.needsEnrichment} color="#f59e0b" />
-        <StatCard label="No Data" value={stats.unenriched} color="#dc2626" />
-        <StatCard label="Spotify Only" value={stats.spotifyOnly} color="#1DB954" />
-        <StatCard label="Apple Only" value={stats.appleOnly} color="#FA57C1" />
-        <StatCard label="Fully Enriched" value={stats.fullyEnriched} color="#16a34a" />
-        <StatCard label="With Lyrics" value={stats.partialLyrics} color="#7c3aed" />
+      {/* Overview Stats */}
+      <div style={{ marginBottom: 32 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 16, color: '#1f2937' }}>
+          📊 Collection Overview
+        </h2>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: 16
+        }}>
+          <ClickableStatCard 
+            label="Total Albums" 
+            value={stats.total} 
+            color="#3b82f6"
+            description="All albums in collection"
+            onClick={() => {}}
+            disabled
+          />
+          <ClickableStatCard 
+            label="✅ Fully Enriched" 
+            value={stats.fullyEnriched} 
+            color="#16a34a"
+            description="Has both Spotify & Apple Music"
+            onClick={() => showAlbumsForCategory('fully-enriched', '✅ Fully Enriched Albums')}
+          />
+          <ClickableStatCard 
+            label="⚠️ Needs Enrichment" 
+            value={stats.needsEnrichment} 
+            color="#f59e0b"
+            description="Missing Spotify or Apple Music"
+            onClick={() => showAlbumsForCategory('needs-enrichment', '⚠️ Albums Needing Enrichment')}
+          />
+        </div>
+      </div>
+
+      {/* Breakdown of What Needs Enrichment */}
+      <div style={{ marginBottom: 32 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 16, color: '#1f2937' }}>
+          🔍 Enrichment Breakdown
+        </h2>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: 16
+        }}>
+          <ClickableStatCard 
+            label="❌ No Data" 
+            value={stats.unenriched} 
+            color="#dc2626"
+            description="Missing both services"
+            onClick={() => showAlbumsForCategory('no-data', '❌ Albums with No Data')}
+          />
+          <ClickableStatCard 
+            label="🎵 Missing Spotify" 
+            value={stats.appleOnly} 
+            color="#1DB954"
+            description="Has Apple Music only"
+            onClick={() => showAlbumsForCategory('missing-spotify', '🎵 Albums Missing Spotify')}
+          />
+          <ClickableStatCard 
+            label="🍎 Missing Apple Music" 
+            value={stats.spotifyOnly} 
+            color="#FA57C1"
+            description="Has Spotify only"
+            onClick={() => showAlbumsForCategory('missing-apple', '🍎 Albums Missing Apple Music')}
+          />
+          <ClickableStatCard 
+            label="📝 With Lyrics" 
+            value={stats.partialLyrics} 
+            color="#7c3aed"
+            description="Has some lyrics data"
+            onClick={() => showAlbumsForCategory('with-lyrics', '📝 Albums with Lyrics')}
+          />
+        </div>
       </div>
 
       {/* Controls */}
@@ -139,6 +234,10 @@ export default function MultiSourceEnrichment() {
         padding: 24,
         marginBottom: 24
       }}>
+        <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 16, color: '#1f2937' }}>
+          ⚡ Start Enrichment
+        </h2>
+        
         <div style={{ display: 'flex', gap: 16, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
           <button
             onClick={enrichAll}
@@ -155,7 +254,7 @@ export default function MultiSourceEnrichment() {
               boxShadow: enriching ? 'none' : '0 4px 12px rgba(124, 58, 237, 0.3)'
             }}
           >
-            {enriching ? '⚡ Enriching...' : `⚡ Enrich ${folderFilter ? 'Filtered' : 'All'} Albums`}
+            {enriching ? '⚡ Enriching...' : `⚡ Enrich ${stats.needsEnrichment} Albums`}
           </button>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -312,36 +411,218 @@ export default function MultiSourceEnrichment() {
         color: '#0c4a6e'
       }}>
         <div style={{ fontWeight: 600, marginBottom: 8 }}>
-          📊 How it works:
+          💡 Click any stat card above to view albums in that category
         </div>
-        <ul style={{ margin: 0, paddingLeft: 20 }}>
-          <li>Process albums missing Spotify OR Apple Music (or both)</li>
-          <li>Select batch size from 50 to 1000, or &quot;ALL&quot; for no limit</li>
-          <li>Fetches missing metadata from Spotify and/or Apple Music</li>
-          <li>Enriches ALL tracks with lyrics from Genius</li>
-          <li>Progress is saved - safe to stop and resume</li>
-          <li><strong>Will process {stats.needsEnrichment.toLocaleString()} albums that need enrichment</strong></li>
-        </ul>
       </div>
+
+      {/* Modal */}
+      {showModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 50,
+          padding: 24
+        }}
+        onClick={() => setShowModal(false)}
+        >
+          <div style={{
+            background: 'white',
+            borderRadius: 12,
+            padding: 32,
+            maxWidth: 1200,
+            width: '100%',
+            maxHeight: '90vh',
+            overflow: 'auto',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+          }}
+          onClick={e => e.stopPropagation()}
+          >
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: 24
+            }}>
+              <h2 style={{ fontSize: 24, fontWeight: 600, color: '#1f2937', margin: 0 }}>
+                {modalTitle}
+              </h2>
+              <button
+                onClick={() => setShowModal(false)}
+                style={{
+                  padding: '8px 16px',
+                  background: '#e5e7eb',
+                  border: 'none',
+                  borderRadius: 6,
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                Close
+              </button>
+            </div>
+
+            {loadingModal ? (
+              <div style={{ textAlign: 'center', padding: 40, color: '#6b7280' }}>
+                Loading albums...
+              </div>
+            ) : modalAlbums.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: 40, color: '#6b7280' }}>
+                No albums found in this category
+              </div>
+            ) : (
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
+                gap: 16
+              }}>
+                {modalAlbums.map(album => (
+                  <div key={album.id} style={{
+                    border: '1px solid #e5e7eb',
+                    borderRadius: 8,
+                    padding: 12,
+                    background: '#f9fafb'
+                  }}>
+                    <Image
+                      src={album.image_url || '/images/placeholder.png'}
+                      alt={album.title}
+                      width={160}
+                      height={160}
+                      style={{
+                        width: '100%',
+                        height: 'auto',
+                        aspectRatio: '1',
+                        objectFit: 'cover',
+                        borderRadius: 6,
+                        marginBottom: 8
+                      }}
+                      unoptimized
+                    />
+                    <div style={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: '#1f2937',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      marginBottom: 4
+                    }}>
+                      {album.title}
+                    </div>
+                    <div style={{
+                      fontSize: 12,
+                      color: '#6b7280',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      marginBottom: 8
+                    }}>
+                      {album.artist}
+                    </div>
+                    <div style={{
+                      display: 'flex',
+                      gap: 4,
+                      marginBottom: 8,
+                      fontSize: 10
+                    }}>
+                      {album.spotify_id && (
+                        <span style={{
+                          background: '#dcfce7',
+                          color: '#15803d',
+                          padding: '2px 6px',
+                          borderRadius: 4,
+                          fontWeight: 600
+                        }}>
+                          Spotify
+                        </span>
+                      )}
+                      {album.apple_music_id && (
+                        <span style={{
+                          background: '#fce7f3',
+                          color: '#be185d',
+                          padding: '2px 6px',
+                          borderRadius: 4,
+                          fontWeight: 600
+                        }}>
+                          Apple
+                        </span>
+                      )}
+                    </div>
+                    <Link
+                      href={`/admin/edit-entry/${album.id}`}
+                      style={{
+                        display: 'block',
+                        textAlign: 'center',
+                        padding: '6px 12px',
+                        background: '#3b82f6',
+                        color: 'white',
+                        borderRadius: 6,
+                        fontSize: 12,
+                        fontWeight: 600,
+                        textDecoration: 'none'
+                      }}
+                    >
+                      Edit
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function StatCard({ label, value, color }) {
+function ClickableStatCard({ label, value, color, description, onClick, disabled = false }) {
   return (
-    <div style={{
-      background: 'white',
-      border: `2px solid ${color}`,
-      borderRadius: 8,
-      padding: 16,
-      textAlign: 'center'
-    }}>
-      <div style={{ fontSize: 32, fontWeight: 'bold', color }}>
+    <div 
+      onClick={disabled ? undefined : onClick}
+      style={{
+        background: 'white',
+        border: `2px solid ${color}`,
+        borderRadius: 8,
+        padding: 16,
+        textAlign: 'center',
+        cursor: disabled ? 'default' : 'pointer',
+        transition: 'all 0.2s',
+        opacity: disabled ? 0.6 : 1
+      }}
+      onMouseEnter={e => {
+        if (!disabled) {
+          e.currentTarget.style.transform = 'translateY(-2px)';
+          e.currentTarget.style.boxShadow = `0 4px 12px ${color}40`;
+        }
+      }}
+      onMouseLeave={e => {
+        if (!disabled) {
+          e.currentTarget.style.transform = 'translateY(0)';
+          e.currentTarget.style.boxShadow = 'none';
+        }
+      }}
+    >
+      <div style={{ fontSize: 32, fontWeight: 'bold', color, marginBottom: 4 }}>
         {value.toLocaleString()}
       </div>
-      <div style={{ fontSize: 12, color: '#6b7280', fontWeight: 500 }}>
+      <div style={{ fontSize: 14, color: '#1f2937', fontWeight: 600, marginBottom: 4 }}>
         {label}
       </div>
+      <div style={{ fontSize: 11, color: '#6b7280' }}>
+        {description}
+      </div>
+      {!disabled && (
+        <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 4 }}>
+          Click to view →
+        </div>
+      )}
     </div>
   );
 }
