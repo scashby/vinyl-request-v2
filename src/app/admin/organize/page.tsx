@@ -1,4 +1,4 @@
-// src/app/admin/organize/page.tsx - Clean version without duplicates
+// src/app/admin/organize/page.tsx - COMPLETE WITH UNIFIED GENRE FILTERING
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -16,6 +16,8 @@ type Row = {
   image_url: string | null;
   discogs_genres: string[] | null;
   discogs_styles: string[] | null;
+  spotify_genres: string[] | null;
+  apple_music_genres: string[] | null;
   decade: number | null;
   folder: string;
 };
@@ -69,7 +71,7 @@ export default function FlexibleOrganizePage() {
     while (keepGoing) {
       const { data: batch, error } = await supabase
         .from('collection')
-        .select('id,artist,title,year,master_release_date,format,image_url,discogs_genres,discogs_styles,decade,folder')
+        .select('id,artist,title,year,master_release_date,format,image_url,discogs_genres,discogs_styles,spotify_genres,apple_music_genres,decade,folder')
         .order('artist', { ascending: true })
         .range(from, from + batchSize - 1);
       
@@ -91,10 +93,16 @@ export default function FlexibleOrganizePage() {
     const folders = Array.from(new Set(allRows.map(r => r.folder).filter(Boolean)));
     setAvailableFolders(folders.sort());
     
+    // UNIFIED GENRES: Combine Discogs + Spotify + Apple Music
     const genres = new Set<string>();
-    allRows.forEach(r => r.discogs_genres?.forEach(g => genres.add(g)));
+    allRows.forEach(r => {
+      r.discogs_genres?.forEach(g => genres.add(g));
+      r.spotify_genres?.forEach(g => genres.add(g));
+      r.apple_music_genres?.forEach(g => genres.add(g));
+    });
     setAvailableGenres(Array.from(genres).sort());
     
+    // UNIFIED STYLES: Only Discogs (Spotify/Apple don't have styles)
     const styles = new Set<string>();
     allRows.forEach(r => r.discogs_styles?.forEach(s => styles.add(s)));
     setAvailableStyles(Array.from(styles).sort());
@@ -158,15 +166,23 @@ export default function FlexibleOrganizePage() {
     }
   };
 
-  // Apply filters
+  // Apply filters with UNIFIED GENRE FILTERING
   const filteredAlbums = useMemo(() => {
     return rows.filter(row => {
       if (selectedFolders.length > 0 && !selectedFolders.includes(row.folder)) return false;
       
+      // UNIFIED GENRE FILTERING: Check ALL sources
       if (selectedGenres.length > 0) {
-        if (!row.discogs_genres || !row.discogs_genres.some(g => selectedGenres.includes(g))) return false;
+        const hasMatchingGenre = selectedGenres.some(selectedGenre => {
+          const inDiscogs = row.discogs_genres?.includes(selectedGenre);
+          const inSpotify = row.spotify_genres?.includes(selectedGenre);
+          const inApple = row.apple_music_genres?.includes(selectedGenre);
+          return inDiscogs || inSpotify || inApple;
+        });
+        if (!hasMatchingGenre) return false;
       }
       
+      // UNIFIED STYLE FILTERING: Only Discogs (Spotify/Apple don't have styles)
       if (selectedStyles.length > 0) {
         if (!row.discogs_styles || !row.discogs_styles.some(s => selectedStyles.includes(s))) return false;
       }
@@ -779,7 +795,7 @@ export default function FlexibleOrganizePage() {
             </div>
           </div>
 
-          {/* Genres */}
+          {/* Genres - UNIFIED */}
           <div style={{
             border: '1px solid #e5e7eb',
             borderRadius: 8,
@@ -790,11 +806,18 @@ export default function FlexibleOrganizePage() {
               fontSize: 16,
               fontWeight: 600,
               color: '#1f2937',
-              marginBottom: 12,
+              marginBottom: 8,
               margin: 0
             }}>
               🎵 Genres ({selectedGenres.length} selected)
             </h4>
+            <div style={{
+              fontSize: 11,
+              color: '#6b7280',
+              marginBottom: 12
+            }}>
+              Combined from Discogs, Spotify & Apple Music
+            </div>
             <div style={{
               maxHeight: 200,
               overflowY: 'auto',

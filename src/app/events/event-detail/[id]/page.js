@@ -12,24 +12,57 @@ import 'styles/events.css';
 import Image from 'next/image';
 import QueueSection from 'components/QueueSection';
 import EventDJSets from 'components/EventDJSets';
-// import Footer from 'components/Footer';
 
 export default function Page() {
   const params = useParams();
   const router = useRouter();
   const id = params.id;
   const [event, setEvent] = useState(null);
+  const [prevEventId, setPrevEventId] = useState(null);
+  const [nextEventId, setNextEventId] = useState(null);
 
   useEffect(() => {
-    const fetchEvent = async () => {
-      const { data, error } = await supabase
+    const fetchEventAndNavigation = async () => {
+      // Fetch current event
+      const { data: currentEvent, error } = await supabase
         .from('events')
         .select('*')
         .eq('id', id)
         .single();
-      if (!error) setEvent(data);
+      
+      if (error) {
+        console.error('Error fetching event:', error);
+        return;
+      }
+      
+      setEvent(currentEvent);
+
+      // Fetch all events ordered by date (descending - most recent first)
+      const { data: allEvents, error: eventsError } = await supabase
+        .from('events')
+        .select('id, date')
+        .order('date', { ascending: false });
+
+      if (eventsError) {
+        console.error('Error fetching all events:', eventsError);
+        return;
+      }
+
+      // Find current event's position and set prev/next
+      const currentIndex = allEvents.findIndex(e => e.id === parseInt(id));
+      if (currentIndex > 0) {
+        setPrevEventId(allEvents[currentIndex - 1].id);
+      } else {
+        setPrevEventId(null);
+      }
+      if (currentIndex < allEvents.length - 1) {
+        setNextEventId(allEvents[currentIndex + 1].id);
+      } else {
+        setNextEventId(null);
+      }
     };
-    fetchEvent();
+
+    fetchEventAndNavigation();
   }, [id]);
 
   if (!event) return <div>Loading...</div>;
@@ -63,6 +96,10 @@ export default function Page() {
     router.push(`/browse/browse-albums?eventId=${event.id}`);
   };
 
+  const navigateToEvent = (eventId) => {
+    router.push(`/events/event-detail/${eventId}`);
+  };
+
   return (
     <div className="page-wrapper event-detail-body">
       <header className="event-hero">
@@ -70,6 +107,63 @@ export default function Page() {
           <h1>{title}</h1>
         </div>
       </header>
+
+      {/* Navigation buttons at top */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: '1rem 2rem',
+        maxWidth: '1200px',
+        margin: '0 auto'
+      }}>
+        <button
+          onClick={() => navigateToEvent(prevEventId)}
+          disabled={!prevEventId}
+          style={{
+            padding: '0.5rem 1rem',
+            backgroundColor: prevEventId ? '#2563eb' : '#ccc',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: prevEventId ? 'pointer' : 'not-allowed',
+            fontSize: '1rem',
+            fontWeight: '500'
+          }}
+        >
+          ← Previous Event
+        </button>
+        <button
+          onClick={() => router.push('/events/events-page')}
+          style={{
+            padding: '0.5rem 1rem',
+            backgroundColor: '#6b7280',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '1rem'
+          }}
+        >
+          All Events
+        </button>
+        <button
+          onClick={() => navigateToEvent(nextEventId)}
+          disabled={!nextEventId}
+          style={{
+            padding: '0.5rem 1rem',
+            backgroundColor: nextEventId ? '#2563eb' : '#ccc',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: nextEventId ? 'pointer' : 'not-allowed',
+            fontSize: '1rem',
+            fontWeight: '500'
+          }}
+        >
+          Next Event →
+        </button>
+      </div>
 
       <main className="event-body">
         <div className="event-content-grid">
@@ -121,7 +215,7 @@ export default function Page() {
               </div>
             )}
 
-            {/* DJ Sets Section - NEW ADDITION */}
+            {/* DJ Sets Section */}
             <EventDJSets eventId={event.id} />
 
             {has_queue && (
@@ -146,6 +240,49 @@ export default function Page() {
           </section>
         </div>
       </main>
+
+      {/* Navigation buttons at bottom */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: '2rem',
+        maxWidth: '1200px',
+        margin: '0 auto'
+      }}>
+        <button
+          onClick={() => navigateToEvent(prevEventId)}
+          disabled={!prevEventId}
+          style={{
+            padding: '0.5rem 1rem',
+            backgroundColor: prevEventId ? '#2563eb' : '#ccc',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: prevEventId ? 'pointer' : 'not-allowed',
+            fontSize: '1rem',
+            fontWeight: '500'
+          }}
+        >
+          ← Previous Event
+        </button>
+        <button
+          onClick={() => navigateToEvent(nextEventId)}
+          disabled={!nextEventId}
+          style={{
+            padding: '0.5rem 1rem',
+            backgroundColor: nextEventId ? '#2563eb' : '#ccc',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: nextEventId ? 'pointer' : 'not-allowed',
+            fontSize: '1rem',
+            fontWeight: '500'
+          }}
+        >
+          Next Event →
+        </button>
+      </div>
     </div>
   );
 }

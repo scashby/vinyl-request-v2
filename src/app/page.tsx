@@ -25,6 +25,9 @@ export default function Page() {
           <Link href="/browse/browse-albums">Browse Collection</Link>
           <Link href="/dialogues">Dialogues</Link>
           <Link href="/about">About</Link>
+          <a href="https://shop.deadwaxdialogues.com" target="_blank" rel="noopener noreferrer">
+            Merch
+          </a>
           {session && (
             <Link href="/admin/admin-dashboard" style={{ 
               backgroundColor: 'rgba(37, 99, 235, 0.8)',

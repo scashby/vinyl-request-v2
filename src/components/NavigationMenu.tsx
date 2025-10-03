@@ -58,6 +58,16 @@ function NavigationMenu() {
             <li>
               <Link href="/about" onClick={() => setOpen(false)}>About</Link>
             </li>
+            <li>
+              <a 
+                href="https://shop.deadwaxdialogues.com" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                onClick={() => setOpen(false)}
+              >
+                Merch
+              </a>
+            </li>
           </ul>
         </div>
       )}
