@@ -1,4 +1,4 @@
-// src/app/admin/edit-entry/[id]/page.tsx - COMPLETE FILE WITH DECADE FIXES
+// src/app/admin/edit-entry/[id]/page.tsx - WITH MULTI-SOURCE ENRICHMENT
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -6,7 +6,12 @@ import { useParams, useRouter } from 'next/navigation';
 import { supabase } from 'lib/supabaseClient'
 import Image from 'next/image';
 
-type Track = { position: string; title: string; duration: string };
+type Track = { 
+  position: string; 
+  title: string; 
+  duration: string;
+  lyrics_url?: string;
+};
 
 type CollectionEntry = {
   id: string;
@@ -67,7 +72,6 @@ type MissingField = {
   isEmpty: boolean;
 };
 
-// FIXED: Calculate decade from year string
 function calculateDecade(year: string | null): number | null {
   if (!year) return null;
   const yearNum = parseInt(year, 10);
@@ -97,6 +101,7 @@ function cleanTrack(track: Partial<Track>): Track {
     position: track.position || '',
     title: track.title || '',
     duration: track.duration || '',
+    lyrics_url: track.lyrics_url
   };
 }
 
@@ -110,6 +115,7 @@ export default function EditEntryPage() {
   const [saving, setSaving] = useState(false);
   const [tracks, setTracks] = useState<Track[]>([]);
   const [fetching, setFetching] = useState(false);
+  const [enrichingMulti, setEnrichingMulti] = useState(false);
 
   useEffect(() => {
     fetchEntry(id).then((data) => {
@@ -128,8 +134,8 @@ export default function EditEntryPage() {
     return data as CollectionEntry;
   }
 
-  // Detect missing metadata
-  const missingFields: MissingField[] = [
+  // Detect missing Discogs metadata
+  const missingDiscogsFields: MissingField[] = [
     { field: 'discogs_genres', label: 'Genres', isEmpty: !entry?.discogs_genres || entry.discogs_genres.length === 0 },
     { field: 'discogs_styles', label: 'Styles', isEmpty: !entry?.discogs_styles || entry.discogs_styles.length === 0 },
     { field: 'decade', label: 'Decade', isEmpty: !entry?.decade },
@@ -138,7 +144,16 @@ export default function EditEntryPage() {
     { field: 'master_release_date', label: 'Master Release Date', isEmpty: !entry?.master_release_date }
   ];
 
-  const hasMissingData = missingFields.some(f => f.isEmpty);
+  const hasMissingDiscogs = missingDiscogsFields.some(f => f.isEmpty);
+
+  // Detect missing multi-source metadata
+  const missingMultiSourceFields: MissingField[] = [
+    { field: 'spotify_id', label: 'Spotify', isEmpty: !entry?.spotify_id },
+    { field: 'apple_music_id', label: 'Apple Music', isEmpty: !entry?.apple_music_id },
+    { field: 'lyrics', label: 'Lyrics', isEmpty: !tracks.some(t => t.lyrics_url) }
+  ];
+
+  const hasMissingMultiSource = missingMultiSourceFields.some(f => f.isEmpty);
 
   async function fetchAllMissingMetadata() {
     if (!entry?.discogs_release_id) {
@@ -153,7 +168,6 @@ export default function EditEntryPage() {
       const data = await fetchDiscogsRelease(entry.discogs_release_id);
       let updated = false;
 
-      // Only update fields that are missing
       if (!entry.discogs_genres || entry.discogs_genres.length === 0) {
         if (data.genres && data.genres.length > 0) {
           handleChange('discogs_genres', data.genres);
@@ -182,7 +196,6 @@ export default function EditEntryPage() {
         updated = true;
       }
 
-      // FIXED: Fetch master release date and calculate decade from it
       if (!entry.master_release_date) {
         if (data.master_id || data.master_url) {
           const masterId = data.master_id || data.master_url?.split('/').pop();
@@ -193,7 +206,6 @@ export default function EditEntryPage() {
                 handleChange('master_release_id', String(masterId));
                 handleChange('master_release_date', String(masterData.year));
                 
-                // FIXED: Calculate decade from master release year (original year)
                 const decade = calculateDecade(String(masterData.year));
                 if (decade) {
                   handleChange('decade', decade);
@@ -208,7 +220,6 @@ export default function EditEntryPage() {
         }
       }
 
-      // FIXED: If still no decade, calculate from existing master_release_date or year
       if (!entry.decade) {
         const yearToUse = entry.master_release_date || entry.year;
         if (yearToUse) {
@@ -225,6 +236,57 @@ export default function EditEntryPage() {
       setStatus(`❌ Failed to fetch metadata: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setFetching(false);
+    }
+  }
+
+  async function enrichMultiSource() {
+    if (!entry) return;
+
+    setEnrichingMulti(true);
+    setStatus('Enriching from Spotify, Apple Music, and Genius...');
+
+    try {
+      const res = await fetch('/api/enrich-multi', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ albumId: parseInt(entry.id) })
+      });
+
+      const result = await res.json();
+
+      if (!result.success) {
+        setStatus(`❌ Enrichment failed: ${result.error}`);
+        return;
+      }
+
+      // Reload the entry to get updated data
+      const updatedEntry = await fetchEntry(id);
+      setEntry(updatedEntry);
+      
+      // Reload tracks with lyrics
+      if (updatedEntry.tracklists) {
+        try {
+          const tl = JSON.parse(updatedEntry.tracklists);
+          setTracks(Array.isArray(tl) ? (tl as Partial<Track>[]).map(cleanTrack) : []);
+        } catch {
+          // Keep existing tracks
+        }
+      }
+
+      const enrichedParts = [];
+      if (result.enriched?.spotify) enrichedParts.push('Spotify');
+      if (result.enriched?.appleMusic) enrichedParts.push('Apple Music');
+      if (result.enriched?.lyrics) enrichedParts.push('Lyrics');
+
+      if (enrichedParts.length > 0) {
+        setStatus(`✅ Enriched with: ${enrichedParts.join(', ')}`);
+      } else {
+        setStatus('ℹ️ No new data found from services');
+      }
+    } catch (err) {
+      setStatus(`❌ Enrichment failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setEnrichingMulti(false);
     }
   }
 
@@ -350,9 +412,9 @@ export default function EditEntryPage() {
       color: "#222",
       boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
     }}>
-      {/* Header with Missing Metadata Alert */}
+      {/* Header */}
       <div style={{ marginBottom: 32, paddingBottom: 16, borderBottom: '1px solid #e5e7eb' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
           <div>
             <h2 style={{ color: "#222", margin: 0, fontSize: '24px', fontWeight: '600' }}>
               Edit Entry #{entry.id}
@@ -362,36 +424,132 @@ export default function EditEntryPage() {
             </p>
           </div>
 
-          {hasMissingData && (
-            <div style={{
-              background: '#fef3c7',
-              border: '1px solid #f59e0b',
-              borderRadius: 8,
-              padding: 16,
-              maxWidth: 400
-            }}>
-              <div style={{ fontSize: '14px', fontWeight: '600', color: '#92400e', marginBottom: 8 }}>
-                ⚠️ Missing Metadata
+          <div style={{ display: 'flex', gap: 12 }}>
+            {/* Discogs Enrichment */}
+            {hasMissingDiscogs && (
+              <div style={{
+                background: '#fef3c7',
+                border: '1px solid #f59e0b',
+                borderRadius: 8,
+                padding: 16,
+                maxWidth: 300
+              }}>
+                <div style={{ fontSize: '14px', fontWeight: '600', color: '#92400e', marginBottom: 8 }}>
+                  ⚠️ Missing Discogs Data
+                </div>
+                <div style={{ fontSize: '12px', color: '#78350f', marginBottom: 12 }}>
+                  {missingDiscogsFields.filter(f => f.isEmpty).map(f => f.label).join(', ')}
+                </div>
+                <button
+                  onClick={fetchAllMissingMetadata}
+                  disabled={fetching || !entry.discogs_release_id}
+                  style={{
+                    ...primaryButtonStyle,
+                    width: '100%',
+                    background: fetching ? '#9ca3af' : '#f59e0b',
+                    border: fetching ? 'none' : '1px solid #f59e0b',
+                    cursor: fetching ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  {fetching ? 'Fetching...' : '🔄 Fetch from Discogs'}
+                </button>
               </div>
-              <div style={{ fontSize: '12px', color: '#78350f', marginBottom: 12 }}>
-                {missingFields.filter(f => f.isEmpty).map(f => f.label).join(', ')}
+            )}
+
+            {/* Multi-Source Enrichment */}
+            {hasMissingMultiSource && (
+              <div style={{
+                background: '#f0f9ff',
+                border: '1px solid #3b82f6',
+                borderRadius: 8,
+                padding: 16,
+                maxWidth: 300
+              }}>
+                <div style={{ fontSize: '14px', fontWeight: '600', color: '#1e40af', marginBottom: 8 }}>
+                  🎵 Missing Streaming Data
+                </div>
+                <div style={{ fontSize: '12px', color: '#1e3a8a', marginBottom: 12 }}>
+                  {missingMultiSourceFields.filter(f => f.isEmpty).map(f => f.label).join(', ')}
+                </div>
+                <button
+                  onClick={enrichMultiSource}
+                  disabled={enrichingMulti}
+                  style={{
+                    ...primaryButtonStyle,
+                    width: '100%',
+                    background: enrichingMulti ? '#9ca3af' : 'linear-gradient(135deg, #7c3aed, #a855f7)',
+                    border: 'none',
+                    cursor: enrichingMulti ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  {enrichingMulti ? 'Enriching...' : '⚡ Enrich from Spotify/Apple'}
+                </button>
               </div>
-              <button
-                onClick={fetchAllMissingMetadata}
-                disabled={fetching || !entry.discogs_release_id}
+            )}
+          </div>
+        </div>
+
+        {/* Show enrichment status */}
+        {(entry.spotify_id || entry.apple_music_id) && (
+          <div style={{
+            marginTop: 16,
+            padding: 12,
+            background: '#f0fdf4',
+            border: '1px solid #16a34a',
+            borderRadius: 6,
+            display: 'flex',
+            gap: 12,
+            alignItems: 'center',
+            fontSize: 13
+          }}>
+            <span style={{ fontWeight: 600, color: '#15803d' }}>✅ Enriched with:</span>
+            {entry.spotify_id && (
+              <a 
+                href={entry.spotify_url || `https://open.spotify.com/album/${entry.spotify_id}`}
+                target="_blank"
+                rel="noopener noreferrer"
                 style={{
-                  ...primaryButtonStyle,
-                  width: '100%',
-                  background: fetching ? '#9ca3af' : '#f59e0b',
-                  border: fetching ? 'none' : '1px solid #f59e0b',
-                  cursor: fetching ? 'not-allowed' : 'pointer'
+                  padding: '4px 8px',
+                  background: '#dcfce7',
+                  color: '#15803d',
+                  borderRadius: 4,
+                  textDecoration: 'none',
+                  fontWeight: 600
                 }}
               >
-                {fetching ? 'Fetching...' : '🔄 Fetch Missing from Discogs'}
-              </button>
-            </div>
-          )}
-        </div>
+                Spotify →
+              </a>
+            )}
+            {entry.apple_music_id && (
+              <a
+                href={entry.apple_music_url || `https://music.apple.com/album/${entry.apple_music_id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  padding: '4px 8px',
+                  background: '#fce7f3',
+                  color: '#be185d',
+                  borderRadius: 4,
+                  textDecoration: 'none',
+                  fontWeight: 600
+                }}
+              >
+                Apple Music →
+              </a>
+            )}
+            {tracks.some(t => t.lyrics_url) && (
+              <span style={{
+                padding: '4px 8px',
+                background: '#e9d5ff',
+                color: '#7c3aed',
+                borderRadius: 4,
+                fontWeight: 600
+              }}>
+                📝 {tracks.filter(t => t.lyrics_url).length} tracks with lyrics
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.5fr', gap: 32, alignItems: 'flex-start' }}>
@@ -432,7 +590,6 @@ export default function EditEntryPage() {
                 value={entry.year || ''} 
                 onChange={e => {
                   handleChange('year', e.target.value);
-                  // FIXED: Only auto-calculate decade from pressing year if no master release date exists
                   if (!entry.master_release_date) {
                     const decade = calculateDecade(e.target.value);
                     if (decade) handleChange('decade', decade);
@@ -454,7 +611,6 @@ export default function EditEntryPage() {
                 value={entry.master_release_date || ''} 
                 onChange={e => {
                   handleChange('master_release_date', e.target.value);
-                  // FIXED: Auto-calculate decade from master release year (original release)
                   const decade = calculateDecade(e.target.value);
                   if (decade) handleChange('decade', decade);
                 }}
@@ -712,6 +868,7 @@ export default function EditEntryPage() {
                     <th style={{ padding: '12px 8px', textAlign: 'left', fontWeight: '600', borderBottom: '1px solid #e5e7eb' }}>Pos</th>
                     <th style={{ padding: '12px 8px', textAlign: 'left', fontWeight: '600', borderBottom: '1px solid #e5e7eb' }}>Title</th>
                     <th style={{ padding: '12px 8px', textAlign: 'left', fontWeight: '600', borderBottom: '1px solid #e5e7eb' }}>Duration</th>
+                    <th style={{ padding: '12px 8px', textAlign: 'center', fontWeight: '600', borderBottom: '1px solid #e5e7eb' }}>📝</th>
                     <th style={{ padding: '12px 8px', width: 40, borderBottom: '1px solid #e5e7eb' }}></th>
                   </tr>
                 </thead>
@@ -757,6 +914,19 @@ export default function EditEntryPage() {
                           }} 
                           placeholder="3:45"
                         />
+                      </td>
+                      <td style={{ padding: '8px', textAlign: 'center' }}>
+                        {t.lyrics_url && (
+                          <a 
+                            href={t.lyrics_url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            style={{ fontSize: 16, textDecoration: 'none' }}
+                            title="View lyrics on Genius"
+                          >
+                            ✓
+                          </a>
+                        )}
                       </td>
                       <td style={{ padding: '8px', textAlign: 'center' }}>
                         <button 
