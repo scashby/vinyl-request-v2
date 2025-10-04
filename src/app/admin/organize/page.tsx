@@ -1,4 +1,4 @@
-// src/app/admin/organize/page.tsx - Combined Genres & Styles
+// src/app/admin/organize/page.tsx - COMPLETE FILE - Fixed to include ALL genre sources
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -16,6 +16,8 @@ type Row = {
   image_url: string | null;
   discogs_genres: string[] | null;
   discogs_styles: string[] | null;
+  spotify_genres: string[] | null;
+  apple_music_genres: string[] | null;
   decade: number | null;
   folder: string;
 };
@@ -35,14 +37,12 @@ export default function FlexibleOrganizePage() {
   const [loading, setLoading] = useState(true);
   const [enrichStatus, setEnrichStatus] = useState<string>('');
 
-  // Lyric search state
   const [lyricSearchTerm, setLyricSearchTerm] = useState('');
   const [lyricSearchFolder, setLyricSearchFolder] = useState('');
   const [lyricSearching, setLyricSearching] = useState(false);
   const [lyricResults, setLyricResults] = useState<LyricSearchResult[]>([]);
   const [lyricSearchMessage, setLyricSearchMessage] = useState('');
 
-  // Multi-select filters
   const [selectedFolders, setSelectedFolders] = useState<string[]>([]);
   const [selectedGenresStyles, setSelectedGenresStyles] = useState<string[]>([]);
   const [selectedDecades, setSelectedDecades] = useState<number[]>([]);
@@ -51,7 +51,6 @@ export default function FlexibleOrganizePage() {
   const [artistSearch, setArtistSearch] = useState<string>('');
   const [titleSearch, setTitleSearch] = useState<string>('');
 
-  // Available options
   const [availableFolders, setAvailableFolders] = useState<string[]>([]);
   const [availableGenresStyles, setAvailableGenresStyles] = useState<string[]>([]);
   const [availableDecades, setAvailableDecades] = useState<number[]>([]);
@@ -67,7 +66,7 @@ export default function FlexibleOrganizePage() {
     while (keepGoing) {
       const { data: batch, error } = await supabase
         .from('collection')
-        .select('id,artist,title,year,master_release_date,format,image_url,discogs_genres,discogs_styles,decade,folder')
+        .select('id,artist,title,year,master_release_date,format,image_url,discogs_genres,discogs_styles,spotify_genres,apple_music_genres,decade,folder')
         .order('artist', { ascending: true })
         .range(from, from + batchSize - 1);
       
@@ -85,15 +84,15 @@ export default function FlexibleOrganizePage() {
     
     setRows(allRows);
     
-    // Extract unique options
     const folders = Array.from(new Set(allRows.map(r => r.folder).filter(Boolean)));
     setAvailableFolders(folders.sort());
     
-    // COMBINE genres and styles into one list
     const genresStyles = new Set<string>();
     allRows.forEach(r => {
       r.discogs_genres?.forEach(g => genresStyles.add(g));
       r.discogs_styles?.forEach(s => genresStyles.add(s));
+      r.spotify_genres?.forEach(g => genresStyles.add(g));
+      r.apple_music_genres?.forEach(g => genresStyles.add(g));
     });
     setAvailableGenresStyles(Array.from(genresStyles).sort());
     
@@ -107,7 +106,6 @@ export default function FlexibleOrganizePage() {
     load();
   }, [load]);
 
-  // Lyric search handler
   const handleLyricSearch = async () => {
     if (!lyricSearchTerm.trim()) {
       setLyricSearchMessage('Please enter a search term');
@@ -156,16 +154,16 @@ export default function FlexibleOrganizePage() {
     }
   };
 
-  // Apply filters
   const filteredAlbums = useMemo(() => {
     return rows.filter(row => {
       if (selectedFolders.length > 0 && !selectedFolders.includes(row.folder)) return false;
       
-      // COMBINED genre/style filtering
       if (selectedGenresStyles.length > 0) {
         const albumGenresStyles = [
           ...(row.discogs_genres || []),
-          ...(row.discogs_styles || [])
+          ...(row.discogs_styles || []),
+          ...(row.spotify_genres || []),
+          ...(row.apple_music_genres || [])
         ];
         if (!albumGenresStyles.some(gs => selectedGenresStyles.includes(gs))) return false;
       }
@@ -241,7 +239,6 @@ export default function FlexibleOrganizePage() {
       maxWidth: 1400,
       margin: '0 auto'
     }}>
-      {/* Header */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
@@ -367,7 +364,6 @@ export default function FlexibleOrganizePage() {
         )}
       </div>
 
-      {/* LYRIC SEARCH SECTION */}
       <div style={{
         background: 'linear-gradient(135deg, #7c3aed 0%, #a855f7 100%)',
         border: '2px solid #7c3aed',
@@ -579,7 +575,6 @@ export default function FlexibleOrganizePage() {
         )}
       </div>
 
-      {/* Multi-Select Filters */}
       <div style={{
         background: 'white',
         border: '1px solid #e5e7eb',
@@ -597,7 +592,6 @@ export default function FlexibleOrganizePage() {
           ✅ Metadata Filters - Complete Flexibility
         </h3>
 
-        {/* Search Filters */}
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
@@ -713,7 +707,6 @@ export default function FlexibleOrganizePage() {
           </div>
         </div>
 
-        {/* Checkbox Multi-Select Sections */}
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
@@ -721,7 +714,6 @@ export default function FlexibleOrganizePage() {
           marginBottom: 20
         }}>
           
-          {/* Folders */}
           <div style={{
             border: '1px solid #e5e7eb',
             borderRadius: 8,
@@ -769,7 +761,6 @@ export default function FlexibleOrganizePage() {
             </div>
           </div>
 
-          {/* COMBINED Genres & Styles */}
           <div style={{
             border: '1px solid #e5e7eb',
             borderRadius: 8,
@@ -783,7 +774,7 @@ export default function FlexibleOrganizePage() {
               marginBottom: 12,
               margin: 0
             }}>
-              🎵 Genres & Styles ({selectedGenresStyles.length} selected)
+              🎵 All Genres & Styles ({selectedGenresStyles.length} selected)
             </h4>
             <div style={{
               maxHeight: 200,
@@ -817,7 +808,6 @@ export default function FlexibleOrganizePage() {
             </div>
           </div>
 
-          {/* Decades */}
           <div style={{
             border: '1px solid #e5e7eb',
             borderRadius: 8,
@@ -864,7 +854,6 @@ export default function FlexibleOrganizePage() {
           </div>
         </div>
         
-        {/* Results Count */}
         <div style={{
           padding: 12,
           background: '#f0f9ff',
@@ -883,7 +872,6 @@ export default function FlexibleOrganizePage() {
         </div>
       </div>
 
-      {/* Results Grid */}
       <div style={{
         background: 'white',
         border: '1px solid #e5e7eb',
