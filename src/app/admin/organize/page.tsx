@@ -35,14 +35,6 @@ type LyricSearchResult = {
 function parseGenres(value: string | string[] | null): string[] {
   if (!value) return [];
   if (Array.isArray(value)) return value;
-  if (typeof value === 'string') {
-    try {
-      const parsed = JSON.parse(value);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  }
   return [];
 }
 
@@ -102,12 +94,33 @@ export default function FlexibleOrganizePage() {
     setAvailableFolders(folders.sort());
     
     const genresStyles = new Set<string>();
+    
+    // Debug: Check first album with data
+    const sampleWithSpotify = allRows.find(r => r.spotify_genres);
+    if (sampleWithSpotify) {
+      console.log('Sample album with Spotify data:', {
+        artist: sampleWithSpotify.artist,
+        title: sampleWithSpotify.title,
+        spotify_genres_raw: sampleWithSpotify.spotify_genres,
+        spotify_genres_type: typeof sampleWithSpotify.spotify_genres,
+        spotify_genres_parsed: parseGenres(sampleWithSpotify.spotify_genres),
+        apple_music_genres_raw: sampleWithSpotify.apple_music_genres,
+        apple_music_genres_type: typeof sampleWithSpotify.apple_music_genres,
+        apple_music_genres_parsed: parseGenres(sampleWithSpotify.apple_music_genres)
+      });
+    }
+    
     allRows.forEach(r => {
       parseGenres(r.discogs_genres).forEach(g => genresStyles.add(g));
       parseGenres(r.discogs_styles).forEach(s => genresStyles.add(s));
       parseGenres(r.spotify_genres).forEach(g => genresStyles.add(g));
       parseGenres(r.apple_music_genres).forEach(g => genresStyles.add(g));
     });
+    
+    console.log('Total unique genres/styles found:', genresStyles.size);
+    console.log('Has "classic rock"?', genresStyles.has('classic rock'));
+    console.log('Has "Classic Rock"?', genresStyles.has('Classic Rock'));
+    
     setAvailableGenresStyles(Array.from(genresStyles).sort());
     
     const decades = Array.from(new Set(allRows.map(r => r.decade).filter(Boolean))).sort() as number[];

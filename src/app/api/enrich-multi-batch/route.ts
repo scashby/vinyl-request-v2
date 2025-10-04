@@ -1,4 +1,4 @@
-// src/app/api/enrich-multi-batch/route.ts - COMPLETE FILE
+// src/app/api/enrich-multi-batch/route.ts - COMPLETE FIXED FILE - Gets artist genres from Spotify
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -12,7 +12,6 @@ const GENIUS_TOKEN = process.env.GENIUS_API_TOKEN;
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-// Types
 type Track = {
   position?: string;
   title?: string;
@@ -47,7 +46,6 @@ type UpdateData = Partial<SpotifyData & AppleMusicData> & {
   tracklists?: string;
 };
 
-// Spotify Auth
 let spotifyToken: { token: string; expires: number } | null = null;
 
 async function getSpotifyToken(): Promise<string> {
@@ -95,11 +93,30 @@ async function searchSpotify(artist: string, title: string) {
     
     if (!album) return null;
 
+    let genres: string[] = [];
+    
+    if (album.artists && album.artists.length > 0) {
+      const artistId = album.artists[0].id;
+      
+      try {
+        const artistRes = await fetch(`https://api.spotify.com/v1/artists/${artistId}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (artistRes.ok) {
+          const artistData = await artistRes.json();
+          genres = artistData.genres || [];
+        }
+      } catch (err) {
+        console.error('Failed to fetch artist genres:', err);
+      }
+    }
+
     return {
       spotify_id: album.id,
       spotify_url: album.external_urls?.spotify,
       spotify_popularity: album.popularity,
-      spotify_genres: album.genres || [],
+      spotify_genres: genres,
       spotify_label: album.label,
       spotify_release_date: album.release_date,
       spotify_total_tracks: album.total_tracks,
@@ -175,7 +192,6 @@ export async function POST(req: Request) {
     const cursor = body.cursor || 0;
     const limit = Math.min(body.limit || 20, 50);
 
-    // FIXED: Get albums missing EITHER Spotify OR Apple Music (or both)
     const { data: albums, error } = await supabase
       .from('collection')
       .select('id, artist, title, tracklists, spotify_id, apple_music_id')
@@ -209,7 +225,6 @@ export async function POST(req: Request) {
       let hasUpdate = false;
       const updateData: UpdateData = {};
 
-      // Search Spotify if missing
       if (!album.spotify_id) {
         const spotifyData = await searchSpotify(album.artist, album.title);
         if (spotifyData) {
@@ -219,7 +234,6 @@ export async function POST(req: Request) {
         await sleep(500);
       }
 
-      // Search Apple Music if missing
       if (!album.apple_music_id) {
         const appleMusicData = await searchAppleMusic(album.artist, album.title);
         if (appleMusicData) {
@@ -229,7 +243,6 @@ export async function POST(req: Request) {
         await sleep(500);
       }
 
-      // Enrich tracklist with lyrics
       if (album.tracklists) {
         try {
           const tracks = typeof album.tracklists === 'string' 
@@ -259,7 +272,6 @@ export async function POST(req: Request) {
         }
       }
 
-      // Update if we have new data
       if (hasUpdate) {
         const { error: updateError } = await supabase
           .from('collection')

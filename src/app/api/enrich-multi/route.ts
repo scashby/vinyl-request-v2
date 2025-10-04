@@ -1,4 +1,4 @@
-// src/app/api/enrich-multi/route.ts - UPDATED WITH APPLE MUSIC LYRICS
+// src/app/api/enrich-multi/route.ts - COMPLETE FIXED FILE - Gets artist genres from Spotify
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -21,7 +21,6 @@ type Track = {
   lyrics_source?: 'apple_music' | 'genius';
 };
 
-// Spotify Auth
 let spotifyToken: { token: string; expires: number } | null = null;
 
 async function getSpotifyToken(): Promise<string> {
@@ -69,11 +68,30 @@ async function searchSpotify(artist: string, title: string) {
     
     if (!album) return null;
 
+    let genres: string[] = [];
+    
+    if (album.artists && album.artists.length > 0) {
+      const artistId = album.artists[0].id;
+      
+      try {
+        const artistRes = await fetch(`https://api.spotify.com/v1/artists/${artistId}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (artistRes.ok) {
+          const artistData = await artistRes.json();
+          genres = artistData.genres || [];
+        }
+      } catch (err) {
+        console.error('Failed to fetch artist genres:', err);
+      }
+    }
+
     return {
       spotify_id: album.id,
       spotify_url: album.external_urls?.spotify,
       spotify_popularity: album.popularity,
-      spotify_genres: album.genres || [],
+      spotify_genres: genres,
       spotify_label: album.label,
       spotify_release_date: album.release_date,
       spotify_total_tracks: album.total_tracks,
@@ -155,7 +173,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // Get the album
     const { data: album, error: dbError } = await supabase
       .from('collection')
       .select('*')
@@ -177,7 +194,6 @@ export async function POST(req: Request) {
       lyrics: false
     };
 
-    // Enrich Spotify
     if (!album.spotify_id) {
       const spotifyData = await searchSpotify(album.artist, album.title);
       if (spotifyData) {
@@ -187,7 +203,6 @@ export async function POST(req: Request) {
       await new Promise(resolve => setTimeout(resolve, 500));
     }
 
-    // Enrich Apple Music
     if (!album.apple_music_id) {
       const appleMusicData = await searchAppleMusic(album.artist, album.title);
       if (appleMusicData) {
@@ -197,7 +212,6 @@ export async function POST(req: Request) {
       await new Promise(resolve => setTimeout(resolve, 500));
     }
 
-    // Enrich tracklist with Genius lyrics URLs (if no Apple Music lyrics yet)
     if (album.tracklists) {
       try {
         const tracks = typeof album.tracklists === 'string' 
@@ -207,7 +221,6 @@ export async function POST(req: Request) {
         if (Array.isArray(tracks) && tracks.length > 0) {
           const enrichedTracks = await Promise.all(
             tracks.map(async (track: Track) => {
-              // Skip if already has lyrics from any source
               if (track.lyrics || track.lyrics_url) {
                 return track;
               }
@@ -226,7 +239,6 @@ export async function POST(req: Request) {
 
           updateData.tracklists = JSON.stringify(enrichedTracks);
           
-          // Check if we added any lyrics URLs
           if (enrichedTracks.some((t: Track) => t.lyrics_url && !tracks.find((orig: Track) => orig.position === t.position)?.lyrics_url)) {
             enriched.lyrics = true;
           }
@@ -236,7 +248,6 @@ export async function POST(req: Request) {
       }
     }
 
-    // Update database with Spotify/Apple/Genius data
     if (Object.keys(updateData).length > 0) {
       const { error: updateError } = await supabase
         .from('collection')
@@ -251,11 +262,10 @@ export async function POST(req: Request) {
       }
     }
 
-    // Now fetch Apple Music lyrics if we have apple_music_id
     const finalAppleMusicId = updateData.apple_music_id || album.apple_music_id;
     if (finalAppleMusicId && APPLE_MUSIC_TOKEN) {
       try {
-        console.log('🍎 Attempting to fetch Apple Music lyrics...');
+        console.log('Attempting to fetch Apple Music lyrics...');
         const lyricsRes = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/fetch-apple-lyrics`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -266,12 +276,11 @@ export async function POST(req: Request) {
           const lyricsResult = await lyricsRes.json();
           if (lyricsResult.success && lyricsResult.stats.lyricsFound > 0) {
             enriched.appleLyrics = true;
-            console.log(`✅ Fetched Apple Music lyrics: ${lyricsResult.stats.lyricsFound} tracks`);
+            console.log(`Fetched Apple Music lyrics: ${lyricsResult.stats.lyricsFound} tracks`);
           }
         }
       } catch (error) {
         console.warn('Failed to fetch Apple Music lyrics:', error);
-        // Don't fail the whole enrichment if Apple lyrics fail
       }
     }
 
