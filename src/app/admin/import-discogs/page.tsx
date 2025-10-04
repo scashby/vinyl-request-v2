@@ -1,4 +1,4 @@
-// src/app/admin/import-discogs/page.tsx - IMPROVED WITH DETAILED PREVIEW
+// src/app/admin/import-discogs/page.tsx - COMPLETE FILE WITH COMBINED GENRES & STYLES
 'use client';
 
 import { useState } from 'react';
@@ -173,19 +173,24 @@ export default function ImportDiscogsPage() {
           })));
         }
         
-        const genres = Array.isArray(data.genres) && data.genres.length > 0 
+        // COMBINE genres and styles into unified lists
+        const genresFromDiscogs = Array.isArray(data.genres) && data.genres.length > 0 
           ? data.genres.filter(g => g && g.trim()).map(g => g.trim()) 
-          : null;
+          : [];
           
-        const styles = Array.isArray(data.styles) && data.styles.length > 0 
+        const stylesFromDiscogs = Array.isArray(data.styles) && data.styles.length > 0 
           ? data.styles.filter(s => s && s.trim()).map(s => s.trim()) 
-          : null;
+          : [];
+        
+        // Combine and deduplicate
+        const combined = [...genresFromDiscogs, ...stylesFromDiscogs].filter(Boolean);
+        const unique = Array.from(new Set(combined));
         
         return {
           image_url: data.images?.[0]?.uri || null,
           tracklists: tracklistsStr,
-          genres,
-          styles
+          genres: unique.length > 0 ? unique : null,
+          styles: unique.length > 0 ? unique : null
         };
       } catch (error) {
         console.warn(`Attempt ${attempt + 1} failed for release ${releaseId}:`, error);
@@ -290,10 +295,7 @@ export default function ImportDiscogsPage() {
                 changes.push('Will fetch: Tracklist from Discogs');
               }
               if (!existingRecord.discogs_genres || existingRecord.discogs_genres.length === 0) {
-                changes.push('Will fetch: Genres from Discogs');
-              }
-              if (!existingRecord.discogs_styles || existingRecord.discogs_styles.length === 0) {
-                changes.push('Will fetch: Styles from Discogs');
+                changes.push('Will fetch: Genres & Styles from Discogs');
               }
               if (existingRecord.decade === null && csvRow.decade !== null) {
                 changes.push(`Will calculate: Decade = ${csvRow.decade}s`);
@@ -425,8 +427,10 @@ export default function ImportDiscogsPage() {
               
               if (needsImage && discogsData.image_url) image_url = discogsData.image_url;
               if (needsTracklists && discogsData.tracklists) tracklists = discogsData.tracklists;
-              if (needsGenres && discogsData.genres) genres = discogsData.genres;
-              if (needsStyles && discogsData.styles) styles = discogsData.styles;
+              if ((needsGenres || needsStyles) && discogsData.genres) {
+                genres = discogsData.genres;
+                styles = discogsData.styles;
+              }
               
               await delay(2000);
             } catch (error) {
@@ -496,7 +500,7 @@ export default function ImportDiscogsPage() {
         fontSize: 16,
         marginBottom: 24
       }}>
-        Enhanced import now includes genres, styles, and decade classification
+        Enhanced import now combines genres & styles and includes decade classification
       </p>
 
       <div style={{
@@ -831,7 +835,7 @@ export default function ImportDiscogsPage() {
             fontSize: 13,
             color: '#0c4a6e'
           }}>
-            <strong>📊 What&apos;s New:</strong> This import will automatically fetch genres, styles from Discogs and calculate decade from release year for all items. Click the cards above to review detailed changes before importing.
+            <strong>📊 What&apos;s New:</strong> This import will automatically combine genres & styles from Discogs into a unified list and calculate decade from release year for all items. Click the cards above to review detailed changes before importing.
           </div>
         </div>
       )}

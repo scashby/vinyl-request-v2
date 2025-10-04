@@ -1,4 +1,4 @@
-// src/app/admin/enrich-sources/page.tsx - IMPROVED WITH CLICKABLE CARDS
+// src/app/admin/enrich-sources/page.tsx - UPDATED WITH APPLE MUSIC LYRICS STATS
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -22,7 +22,9 @@ export default function MultiSourceEnrichment() {
     spotifyOnly: 0,
     appleOnly: 0,
     fullyEnriched: 0,
-    partialLyrics: 0
+    geniusLyrics: 0,
+    appleLyrics: 0,
+    anyLyrics: 0
   });
   const [enriching, setEnriching] = useState(false);
   const [status, setStatus] = useState('');
@@ -216,12 +218,41 @@ export default function MultiSourceEnrichment() {
             description="Has Spotify only"
             onClick={() => showAlbumsForCategory('missing-apple', '🍎 Albums Missing Apple Music')}
           />
+        </div>
+      </div>
+
+      {/* Lyrics Stats */}
+      <div style={{ marginBottom: 32 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 16, color: '#1f2937' }}>
+          📝 Lyrics Enrichment
+        </h2>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: 16
+        }}>
           <ClickableStatCard 
-            label="📝 With Lyrics" 
-            value={stats.partialLyrics} 
+            label="📝 Any Lyrics" 
+            value={stats.anyLyrics} 
             color="#7c3aed"
-            description="Has some lyrics data"
+            description="Has any lyrics data"
             onClick={() => showAlbumsForCategory('with-lyrics', '📝 Albums with Lyrics')}
+          />
+          <ClickableStatCard 
+            label="🍎 Apple Music Lyrics" 
+            value={stats.appleLyrics} 
+            color="#ec4899"
+            description="Full lyrics from Apple Music"
+            onClick={() => {}}
+            disabled
+          />
+          <ClickableStatCard 
+            label="🔗 Genius Links" 
+            value={stats.geniusLyrics} 
+            color="#6366f1"
+            description="Has Genius lyrics URLs"
+            onClick={() => {}}
+            disabled
           />
         </div>
       </div>
@@ -408,10 +439,14 @@ export default function MultiSourceEnrichment() {
         borderRadius: 8,
         padding: 16,
         fontSize: 14,
-        color: '#0c4a6e'
+        color: '#0c4a6e',
+        marginBottom: 24
       }}>
         <div style={{ fontWeight: 600, marginBottom: 8 }}>
-          💡 Click any stat card above to view albums in that category
+          💡 About Apple Music Lyrics
+        </div>
+        <div>
+          This enrichment process now fetches full lyrics text from Apple Music (when available) in addition to Spotify/Apple Music IDs and Genius lyrics links. Apple Music lyrics are stored directly in your database for instant searching!
         </div>
       </div>
 

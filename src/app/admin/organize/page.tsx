@@ -1,4 +1,4 @@
-// src/app/admin/organize/page.tsx - COMPLETE WITH UNIFIED GENRE FILTERING
+// src/app/admin/organize/page.tsx - Combined Genres & Styles
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -16,8 +16,6 @@ type Row = {
   image_url: string | null;
   discogs_genres: string[] | null;
   discogs_styles: string[] | null;
-  spotify_genres: string[] | null;
-  apple_music_genres: string[] | null;
   decade: number | null;
   folder: string;
 };
@@ -46,8 +44,7 @@ export default function FlexibleOrganizePage() {
 
   // Multi-select filters
   const [selectedFolders, setSelectedFolders] = useState<string[]>([]);
-  const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
-  const [selectedStyles, setSelectedStyles] = useState<string[]>([]);
+  const [selectedGenresStyles, setSelectedGenresStyles] = useState<string[]>([]);
   const [selectedDecades, setSelectedDecades] = useState<number[]>([]);
   const [yearRangeStart, setYearRangeStart] = useState<string>('');
   const [yearRangeEnd, setYearRangeEnd] = useState<string>('');
@@ -56,8 +53,7 @@ export default function FlexibleOrganizePage() {
 
   // Available options
   const [availableFolders, setAvailableFolders] = useState<string[]>([]);
-  const [availableGenres, setAvailableGenres] = useState<string[]>([]);
-  const [availableStyles, setAvailableStyles] = useState<string[]>([]);
+  const [availableGenresStyles, setAvailableGenresStyles] = useState<string[]>([]);
   const [availableDecades, setAvailableDecades] = useState<number[]>([]);
 
   const load = useCallback(async () => {
@@ -71,7 +67,7 @@ export default function FlexibleOrganizePage() {
     while (keepGoing) {
       const { data: batch, error } = await supabase
         .from('collection')
-        .select('id,artist,title,year,master_release_date,format,image_url,discogs_genres,discogs_styles,spotify_genres,apple_music_genres,decade,folder')
+        .select('id,artist,title,year,master_release_date,format,image_url,discogs_genres,discogs_styles,decade,folder')
         .order('artist', { ascending: true })
         .range(from, from + batchSize - 1);
       
@@ -93,19 +89,13 @@ export default function FlexibleOrganizePage() {
     const folders = Array.from(new Set(allRows.map(r => r.folder).filter(Boolean)));
     setAvailableFolders(folders.sort());
     
-    // UNIFIED GENRES: Combine Discogs + Spotify + Apple Music
-    const genres = new Set<string>();
+    // COMBINE genres and styles into one list
+    const genresStyles = new Set<string>();
     allRows.forEach(r => {
-      r.discogs_genres?.forEach(g => genres.add(g));
-      r.spotify_genres?.forEach(g => genres.add(g));
-      r.apple_music_genres?.forEach(g => genres.add(g));
+      r.discogs_genres?.forEach(g => genresStyles.add(g));
+      r.discogs_styles?.forEach(s => genresStyles.add(s));
     });
-    setAvailableGenres(Array.from(genres).sort());
-    
-    // UNIFIED STYLES: Only Discogs (Spotify/Apple don't have styles)
-    const styles = new Set<string>();
-    allRows.forEach(r => r.discogs_styles?.forEach(s => styles.add(s)));
-    setAvailableStyles(Array.from(styles).sort());
+    setAvailableGenresStyles(Array.from(genresStyles).sort());
     
     const decades = Array.from(new Set(allRows.map(r => r.decade).filter(Boolean))).sort() as number[];
     setAvailableDecades(decades);
@@ -166,25 +156,18 @@ export default function FlexibleOrganizePage() {
     }
   };
 
-  // Apply filters with UNIFIED GENRE FILTERING
+  // Apply filters
   const filteredAlbums = useMemo(() => {
     return rows.filter(row => {
       if (selectedFolders.length > 0 && !selectedFolders.includes(row.folder)) return false;
       
-      // UNIFIED GENRE FILTERING: Check ALL sources
-      if (selectedGenres.length > 0) {
-        const hasMatchingGenre = selectedGenres.some(selectedGenre => {
-          const inDiscogs = row.discogs_genres?.includes(selectedGenre);
-          const inSpotify = row.spotify_genres?.includes(selectedGenre);
-          const inApple = row.apple_music_genres?.includes(selectedGenre);
-          return inDiscogs || inSpotify || inApple;
-        });
-        if (!hasMatchingGenre) return false;
-      }
-      
-      // UNIFIED STYLE FILTERING: Only Discogs (Spotify/Apple don't have styles)
-      if (selectedStyles.length > 0) {
-        if (!row.discogs_styles || !row.discogs_styles.some(s => selectedStyles.includes(s))) return false;
+      // COMBINED genre/style filtering
+      if (selectedGenresStyles.length > 0) {
+        const albumGenresStyles = [
+          ...(row.discogs_genres || []),
+          ...(row.discogs_styles || [])
+        ];
+        if (!albumGenresStyles.some(gs => selectedGenresStyles.includes(gs))) return false;
       }
       
       if (selectedDecades.length > 0) {
@@ -211,12 +194,11 @@ export default function FlexibleOrganizePage() {
       
       return true;
     });
-  }, [rows, selectedFolders, selectedGenres, selectedStyles, selectedDecades, yearRangeStart, yearRangeEnd, artistSearch, titleSearch]);
+  }, [rows, selectedFolders, selectedGenresStyles, selectedDecades, yearRangeStart, yearRangeEnd, artistSearch, titleSearch]);
 
   const clearAllFilters = () => {
     setSelectedFolders([]);
-    setSelectedGenres([]);
-    setSelectedStyles([]);
+    setSelectedGenresStyles([]);
     setSelectedDecades([]);
     setYearRangeStart('');
     setYearRangeEnd('');
@@ -224,7 +206,7 @@ export default function FlexibleOrganizePage() {
     setTitleSearch('');
   };
 
-  const hasActiveFilters = selectedFolders.length > 0 || selectedGenres.length > 0 || selectedStyles.length > 0 || 
+  const hasActiveFilters = selectedFolders.length > 0 || selectedGenresStyles.length > 0 || 
                           selectedDecades.length > 0 || yearRangeStart || yearRangeEnd || artistSearch || titleSearch;
 
   const toggleFolder = (folder: string) => {
@@ -235,19 +217,11 @@ export default function FlexibleOrganizePage() {
     );
   };
 
-  const toggleGenre = (genre: string) => {
-    setSelectedGenres(prev => 
-      prev.includes(genre) 
-        ? prev.filter(g => g !== genre)
-        : [...prev, genre]
-    );
-  };
-
-  const toggleStyle = (style: string) => {
-    setSelectedStyles(prev => 
-      prev.includes(style) 
-        ? prev.filter(s => s !== style)
-        : [...prev, style]
+  const toggleGenreStyle = (genreStyle: string) => {
+    setSelectedGenresStyles(prev => 
+      prev.includes(genreStyle) 
+        ? prev.filter(gs => gs !== genreStyle)
+        : [...prev, genreStyle]
     );
   };
 
@@ -795,62 +769,7 @@ export default function FlexibleOrganizePage() {
             </div>
           </div>
 
-          {/* Genres - UNIFIED */}
-          <div style={{
-            border: '1px solid #e5e7eb',
-            borderRadius: 8,
-            padding: 16,
-            background: '#f9fafb'
-          }}>
-            <h4 style={{
-              fontSize: 16,
-              fontWeight: 600,
-              color: '#1f2937',
-              marginBottom: 8,
-              margin: 0
-            }}>
-              🎵 Genres ({selectedGenres.length} selected)
-            </h4>
-            <div style={{
-              fontSize: 11,
-              color: '#6b7280',
-              marginBottom: 12
-            }}>
-              Combined from Discogs, Spotify & Apple Music
-            </div>
-            <div style={{
-              maxHeight: 200,
-              overflowY: 'auto',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 8
-            }}>
-              {availableGenres.map(genre => (
-                <label key={genre} style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  cursor: 'pointer',
-                  padding: '4px 0',
-                  fontSize: 14,
-                  color: '#374151'
-                }}>
-                  <input
-                    type="checkbox"
-                    checked={selectedGenres.includes(genre)}
-                    onChange={() => toggleGenre(genre)}
-                    style={{
-                      transform: 'scale(1.2)',
-                      accentColor: '#7c3aed'
-                    }}
-                  />
-                  {genre}
-                </label>
-              ))}
-            </div>
-          </div>
-
-          {/* Styles */}
+          {/* COMBINED Genres & Styles */}
           <div style={{
             border: '1px solid #e5e7eb',
             borderRadius: 8,
@@ -864,7 +783,7 @@ export default function FlexibleOrganizePage() {
               marginBottom: 12,
               margin: 0
             }}>
-              🎨 Styles ({selectedStyles.length} selected)
+              🎵 Genres & Styles ({selectedGenresStyles.length} selected)
             </h4>
             <div style={{
               maxHeight: 200,
@@ -873,8 +792,8 @@ export default function FlexibleOrganizePage() {
               flexDirection: 'column',
               gap: 8
             }}>
-              {availableStyles.map(style => (
-                <label key={style} style={{
+              {availableGenresStyles.map(genreStyle => (
+                <label key={genreStyle} style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: 8,
@@ -885,14 +804,14 @@ export default function FlexibleOrganizePage() {
                 }}>
                   <input
                     type="checkbox"
-                    checked={selectedStyles.includes(style)}
-                    onChange={() => toggleStyle(style)}
+                    checked={selectedGenresStyles.includes(genreStyle)}
+                    onChange={() => toggleGenreStyle(genreStyle)}
                     style={{
                       transform: 'scale(1.2)',
-                      accentColor: '#f59e0b'
+                      accentColor: '#7c3aed'
                     }}
                   />
-                  {style}
+                  {genreStyle}
                 </label>
               ))}
             </div>

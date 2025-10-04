@@ -1,4 +1,4 @@
-// src/app/admin/edit-entry/[id]/page.tsx - WITH MULTI-SOURCE ENRICHMENT
+// src/app/admin/edit-entry/[id]/page.tsx - UPDATED WITH APPLE MUSIC LYRICS
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -11,6 +11,8 @@ type Track = {
   title: string; 
   duration: string;
   lyrics_url?: string;
+  lyrics?: string;
+  lyrics_source?: 'apple_music' | 'genius';
 };
 
 type CollectionEntry = {
@@ -37,15 +39,8 @@ type CollectionEntry = {
   master_release_date: string | null;
   spotify_id?: string | null;
   spotify_url?: string | null;
-  spotify_label?: string | null;
-  spotify_genres?: string[] | null;
-  spotify_popularity?: number | null;
-  spotify_release_date?: string | null;
   apple_music_id?: string | null;
   apple_music_url?: string | null;
-  apple_music_label?: string | null;
-  apple_music_genres?: string[] | null;
-  apple_music_release_date?: string | null;
   [key: string]: unknown;
 };
 
@@ -101,7 +96,9 @@ function cleanTrack(track: Partial<Track>): Track {
     position: track.position || '',
     title: track.title || '',
     duration: track.duration || '',
-    lyrics_url: track.lyrics_url
+    lyrics_url: track.lyrics_url,
+    lyrics: track.lyrics,
+    lyrics_source: track.lyrics_source
   };
 }
 
@@ -116,6 +113,7 @@ export default function EditEntryPage() {
   const [tracks, setTracks] = useState<Track[]>([]);
   const [fetching, setFetching] = useState(false);
   const [enrichingMulti, setEnrichingMulti] = useState(false);
+  const [fetchingAppleLyrics, setFetchingAppleLyrics] = useState(false);
 
   useEffect(() => {
     fetchEntry(id).then((data) => {
@@ -149,11 +147,61 @@ export default function EditEntryPage() {
   // Detect missing multi-source metadata
   const missingMultiSourceFields: MissingField[] = [
     { field: 'spotify_id', label: 'Spotify', isEmpty: !entry?.spotify_id },
-    { field: 'apple_music_id', label: 'Apple Music', isEmpty: !entry?.apple_music_id },
-    { field: 'lyrics', label: 'Lyrics', isEmpty: !tracks.some(t => t.lyrics_url) }
+    { field: 'apple_music_id', label: 'Apple Music', isEmpty: !entry?.apple_music_id }
   ];
 
   const hasMissingMultiSource = missingMultiSourceFields.some(f => f.isEmpty);
+
+  // Check if we can fetch Apple Music lyrics
+  const canFetchAppleLyrics = entry?.apple_music_id && tracks.length > 0;
+  const hasAppleLyrics = tracks.some(t => t.lyrics && t.lyrics_source === 'apple_music');
+  const appleLyricsCount = tracks.filter(t => t.lyrics && t.lyrics_source === 'apple_music').length;
+  const geniusLyricsCount = tracks.filter(t => t.lyrics_url).length;
+
+  async function fetchAppleMusicLyrics() {
+    if (!entry?.apple_music_id) {
+      setStatus('No Apple Music ID - cannot fetch lyrics');
+      return;
+    }
+
+    setFetchingAppleLyrics(true);
+    setStatus('Fetching lyrics from Apple Music...');
+
+    try {
+      const res = await fetch('/api/fetch-apple-lyrics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ albumId: parseInt(entry.id) })
+      });
+
+      const result = await res.json();
+
+      if (!result.success) {
+        setStatus(`❌ Apple Music lyrics fetch failed: ${result.error}`);
+        return;
+      }
+
+      // Reload the entry to get updated tracks
+      const updatedEntry = await fetchEntry(id);
+      setEntry(updatedEntry);
+      
+      if (updatedEntry.tracklists) {
+        try {
+          const tl = JSON.parse(updatedEntry.tracklists);
+          setTracks(Array.isArray(tl) ? (tl as Partial<Track>[]).map(cleanTrack) : []);
+        } catch {
+          // Keep existing tracks
+        }
+      }
+
+      const { stats } = result;
+      setStatus(`✅ Apple Music: Found lyrics for ${stats.lyricsFound} out of ${stats.totalTracks} tracks`);
+    } catch (err) {
+      setStatus(`❌ Apple Music lyrics fetch failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setFetchingAppleLyrics(false);
+    }
+  }
 
   async function fetchAllMissingMetadata() {
     if (!entry?.discogs_release_id) {
@@ -263,7 +311,7 @@ export default function EditEntryPage() {
       const updatedEntry = await fetchEntry(id);
       setEntry(updatedEntry);
       
-      // Reload tracks with lyrics
+      // Reload tracks
       if (updatedEntry.tracklists) {
         try {
           const tl = JSON.parse(updatedEntry.tracklists);
@@ -276,7 +324,8 @@ export default function EditEntryPage() {
       const enrichedParts = [];
       if (result.enriched?.spotify) enrichedParts.push('Spotify');
       if (result.enriched?.appleMusic) enrichedParts.push('Apple Music');
-      if (result.enriched?.lyrics) enrichedParts.push('Lyrics');
+      if (result.enriched?.appleLyrics) enrichedParts.push('Apple Lyrics');
+      if (result.enriched?.lyrics) enrichedParts.push('Genius Lyrics');
 
       if (enrichedParts.length > 0) {
         setStatus(`✅ Enriched with: ${enrichedParts.join(', ')}`);
@@ -424,7 +473,7 @@ export default function EditEntryPage() {
             </p>
           </div>
 
-          <div style={{ display: 'flex', gap: 12 }}>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
             {/* Discogs Enrichment */}
             {hasMissingDiscogs && (
               <div style={{
@@ -482,7 +531,38 @@ export default function EditEntryPage() {
                     cursor: enrichingMulti ? 'not-allowed' : 'pointer'
                   }}
                 >
-                  {enrichingMulti ? 'Enriching...' : '⚡ Enrich from Spotify/Apple'}
+                  {enrichingMulti ? 'Enriching...' : '⚡ Enrich Spotify/Apple'}
+                </button>
+              </div>
+            )}
+
+            {/* Apple Music Lyrics */}
+            {canFetchAppleLyrics && !hasAppleLyrics && (
+              <div style={{
+                background: '#fce7f3',
+                border: '1px solid #ec4899',
+                borderRadius: 8,
+                padding: 16,
+                maxWidth: 300
+              }}>
+                <div style={{ fontSize: '14px', fontWeight: '600', color: '#9f1239', marginBottom: 8 }}>
+                  🍎 Apple Music Lyrics
+                </div>
+                <div style={{ fontSize: '12px', color: '#9f1239', marginBottom: 12 }}>
+                  Fetch full lyrics text from Apple Music
+                </div>
+                <button
+                  onClick={fetchAppleMusicLyrics}
+                  disabled={fetchingAppleLyrics}
+                  style={{
+                    ...primaryButtonStyle,
+                    width: '100%',
+                    background: fetchingAppleLyrics ? '#9ca3af' : '#ec4899',
+                    border: 'none',
+                    cursor: fetchingAppleLyrics ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  {fetchingAppleLyrics ? 'Fetching...' : '🍎 Fetch Apple Lyrics'}
                 </button>
               </div>
             )}
@@ -490,7 +570,7 @@ export default function EditEntryPage() {
         </div>
 
         {/* Show enrichment status */}
-        {(entry.spotify_id || entry.apple_music_id) && (
+        {(entry.spotify_id || entry.apple_music_id || hasAppleLyrics) && (
           <div style={{
             marginTop: 16,
             padding: 12,
@@ -500,7 +580,8 @@ export default function EditEntryPage() {
             display: 'flex',
             gap: 12,
             alignItems: 'center',
-            fontSize: 13
+            fontSize: 13,
+            flexWrap: 'wrap'
           }}>
             <span style={{ fontWeight: 600, color: '#15803d' }}>✅ Enriched with:</span>
             {entry.spotify_id && (
@@ -537,7 +618,18 @@ export default function EditEntryPage() {
                 Apple Music →
               </a>
             )}
-            {tracks.some(t => t.lyrics_url) && (
+            {hasAppleLyrics && (
+              <span style={{
+                padding: '4px 8px',
+                background: '#fce7f3',
+                color: '#be185d',
+                borderRadius: 4,
+                fontWeight: 600
+              }}>
+                🍎 {appleLyricsCount} Apple Music lyrics
+              </span>
+            )}
+            {geniusLyricsCount > 0 && (
               <span style={{
                 padding: '4px 8px',
                 background: '#e9d5ff',
@@ -545,7 +637,7 @@ export default function EditEntryPage() {
                 borderRadius: 4,
                 fontWeight: 600
               }}>
-                📝 {tracks.filter(t => t.lyrics_url).length} tracks with lyrics
+                📝 {geniusLyricsCount} Genius links
               </span>
             )}
           </div>
@@ -868,7 +960,7 @@ export default function EditEntryPage() {
                     <th style={{ padding: '12px 8px', textAlign: 'left', fontWeight: '600', borderBottom: '1px solid #e5e7eb' }}>Pos</th>
                     <th style={{ padding: '12px 8px', textAlign: 'left', fontWeight: '600', borderBottom: '1px solid #e5e7eb' }}>Title</th>
                     <th style={{ padding: '12px 8px', textAlign: 'left', fontWeight: '600', borderBottom: '1px solid #e5e7eb' }}>Duration</th>
-                    <th style={{ padding: '12px 8px', textAlign: 'center', fontWeight: '600', borderBottom: '1px solid #e5e7eb' }}>📝</th>
+                    <th style={{ padding: '12px 8px', textAlign: 'center', fontWeight: '600', borderBottom: '1px solid #e5e7eb' }}>Lyrics</th>
                     <th style={{ padding: '12px 8px', width: 40, borderBottom: '1px solid #e5e7eb' }}></th>
                   </tr>
                 </thead>
@@ -916,15 +1008,23 @@ export default function EditEntryPage() {
                         />
                       </td>
                       <td style={{ padding: '8px', textAlign: 'center' }}>
+                        {t.lyrics && t.lyrics_source === 'apple_music' && (
+                          <span 
+                            style={{ fontSize: 16, cursor: 'help' }}
+                            title="Has Apple Music lyrics"
+                          >
+                            🍎
+                          </span>
+                        )}
                         {t.lyrics_url && (
                           <a 
                             href={t.lyrics_url} 
                             target="_blank" 
                             rel="noopener noreferrer"
-                            style={{ fontSize: 16, textDecoration: 'none' }}
+                            style={{ fontSize: 16, textDecoration: 'none', marginLeft: t.lyrics ? 4 : 0 }}
                             title="View lyrics on Genius"
                           >
-                            ✓
+                            📝
                           </a>
                         )}
                       </td>

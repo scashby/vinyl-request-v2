@@ -1,4 +1,4 @@
-// src/app/api/enrich/route.ts - COMPLETE FILE WITH DECADE FIXES
+// src/app/api/enrich/route.ts - UPDATED WITH COMBINED GENRES & STYLES
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -67,7 +67,6 @@ const pick = (r?:DiscogsRelease)=>({
 
 const yearInt = (y:string|null)=> (y||"").match(/\b(\d{4})\b/)?.[1];
 
-// FIXED: Calculate decade from year string, preferring master release date
 function calculateDecade(year: string | null): number | null {
   if (!year) return null;
   const yearNum = parseInt(year, 10);
@@ -140,8 +139,10 @@ export async function POST(req: Request) {
       const rel = await getJson<DiscogsRelease>(`${BASE}/releases/${encodeURIComponent(row.discogs_release_id)}`);
       if (rel.ok) {
         const data = pick(rel.data);
-        if (needsGenres) genres = data.genres;
-        if (needsStyles) styles = data.styles;
+        if (needsGenres || needsStyles) {
+          genres = data.genres;
+          styles = data.styles;
+        }
         
         // Fetch master release date if we have a master_id
         if (needsMasterDate && (data.master_id || data.master_url)) {
@@ -180,18 +181,18 @@ export async function POST(req: Request) {
           const full = await getJson<DiscogsRelease>(top.resource_url);
           if (full.ok) {
             const data = pick(full.data);
-            if (needsGenres) genres = data.genres;
-            if (needsStyles) styles = data.styles;
+            genres = data.genres;
+            styles = data.styles;
           }
         } else {
-          if (needsGenres) genres = Array.isArray(top.genre) ? top.genre.filter(Boolean).map(String) : [];
-          if (needsStyles) styles = Array.isArray(top.style) ? top.style.filter(Boolean).map(String) : [];
+          genres = Array.isArray(top.genre) ? top.genre.filter(Boolean).map(String) : [];
+          styles = Array.isArray(top.style) ? top.style.filter(Boolean).map(String) : [];
         }
       }
       await sleep(1000);
     }
 
-    // FIXED: Calculate decade from master_release_date (original year) when available, fallback to pressing year
+    // Calculate decade from master_release_date (original year) when available, fallback to pressing year
     if (needsDecade) {
       const yearToUse = master_date || row.master_release_date || row.year;
       if (yearToUse) {
@@ -199,10 +200,14 @@ export async function POST(req: Request) {
       }
     }
 
-    // Only update fields that were missing
+    // COMBINE genres and styles into both fields for unified filtering
     const updateData: Partial<Row> = {};
-    if (needsGenres && genres.length) updateData.discogs_genres = genres;
-    if (needsStyles && styles.length) updateData.discogs_styles = styles;
+    if ((needsGenres || needsStyles) && (genres.length || styles.length)) {
+      const combined = [...genres, ...styles].filter(Boolean);
+      const unique = Array.from(new Set(combined));
+      updateData.discogs_genres = unique;
+      updateData.discogs_styles = unique;
+    }
     if (needsDecade && decade) updateData.decade = decade;
     if (needsMasterDate && master_date) {
       updateData.master_release_id = master_id;
