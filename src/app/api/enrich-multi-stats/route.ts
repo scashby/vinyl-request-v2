@@ -63,16 +63,25 @@ export async function GET() {
       .is('spotify_id', null)
       .not('apple_music_id', 'is', null);
 
-    // Check all albums with Apple Music IDs for lyrics
-    const { data: albumsWithAppleMusic } = await supabase
-      .from('collection')
-      .select('id, tracklists, apple_music_id')
-      .not('apple_music_id', 'is', null);
-
+    // Check all albums with Apple Music IDs for lyrics - PAGINATED to avoid 1000 row limit
     let appleLyricsCount = 0;
     let needsAppleLyrics = 0;
-    
-    if (albumsWithAppleMusic) {
+    let offset = 0;
+    const pageSize = 1000;
+    let hasMore = true;
+
+    while (hasMore) {
+      const { data: albumsWithAppleMusic } = await supabase
+        .from('collection')
+        .select('id, tracklists, apple_music_id')
+        .not('apple_music_id', 'is', null)
+        .range(offset, offset + pageSize - 1);
+
+      if (!albumsWithAppleMusic || albumsWithAppleMusic.length === 0) {
+        hasMore = false;
+        break;
+      }
+
       for (const album of albumsWithAppleMusic) {
         const hasLyrics = hasAppleMusicLyrics(album.tracklists);
         if (hasLyrics) {
@@ -81,18 +90,29 @@ export async function GET() {
           needsAppleLyrics++;
         }
       }
+
+      hasMore = albumsWithAppleMusic.length === pageSize;
+      offset += pageSize;
     }
 
-    // Count Genius lyrics
-    const { data: withTracklists } = await supabase
-      .from('collection')
-      .select('tracklists')
-      .not('tracklists', 'is', null);
-
+    // Count Genius lyrics - PAGINATED to avoid 1000 row limit
     let geniusLyricsCount = 0;
     let anyLyricsCount = 0;
+    offset = 0;
+    hasMore = true;
 
-    if (withTracklists) {
+    while (hasMore) {
+      const { data: withTracklists } = await supabase
+        .from('collection')
+        .select('tracklists')
+        .not('tracklists', 'is', null)
+        .range(offset, offset + pageSize - 1);
+
+      if (!withTracklists || withTracklists.length === 0) {
+        hasMore = false;
+        break;
+      }
+
       withTracklists.forEach(row => {
         try {
           const tracks = typeof row.tracklists === 'string' 
@@ -110,6 +130,9 @@ export async function GET() {
           // Skip invalid JSON
         }
       });
+
+      hasMore = withTracklists.length === pageSize;
+      offset += pageSize;
     }
 
     // FIXED: Calculate actual "needs enrichment" including lyrics
