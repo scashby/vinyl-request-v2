@@ -1,4 +1,4 @@
-// src/app/api/enrich-multi-batch/route.ts - COMPLETE FIXED FILE - Gets artist genres from Spotify
+// src/app/api/enrich-multi-batch/route.ts - FIXED: Now includes albums missing Apple Music lyrics
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -18,6 +18,8 @@ type Track = {
   duration?: string;
   type_?: string;
   lyrics_url?: string;
+  lyrics?: string;
+  lyrics_source?: 'apple_music' | 'genius';
 };
 
 type SpotifyData = {
@@ -186,19 +188,56 @@ async function searchLyrics(artist: string, trackTitle: string) {
   }
 }
 
+async function fetchAppleMusicLyrics(albumId: number): Promise<boolean> {
+  try {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/fetch-apple-lyrics`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ albumId })
+    });
+
+    if (!res.ok) return false;
+
+    const result = await res.json();
+    return result.success && result.stats?.lyricsFound > 0;
+  } catch (error) {
+    console.error('Apple Music lyrics fetch error:', error);
+    return false;
+  }
+}
+
+function needsAppleMusicLyrics(tracklists: string | null, appleMusicId: string | null): boolean {
+  if (!appleMusicId || !tracklists) return false;
+
+  try {
+    const tracks = typeof tracklists === 'string' ? JSON.parse(tracklists) : tracklists;
+    if (!Array.isArray(tracks) || tracks.length === 0) return false;
+
+    // Check if ANY track is missing Apple Music lyrics
+    const hasAppleLyrics = tracks.some((t: Track) => t.lyrics && t.lyrics_source === 'apple_music');
+    
+    // If no tracks have Apple Music lyrics, we need to fetch them
+    return !hasAppleLyrics;
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
     const cursor = body.cursor || 0;
     const limit = Math.min(body.limit || 20, 50);
 
+    // FIXED: Fetch albums that need ANY enrichment - Spotify, Apple Music, OR Apple Music lyrics
+    // We can't easily filter for "missing lyrics" in SQL, so we fetch a broader set and filter in code
     const { data: albums, error } = await supabase
       .from('collection')
       .select('id, artist, title, tracklists, spotify_id, apple_music_id')
-      .or('spotify_id.is.null,apple_music_id.is.null')
+      .or('spotify_id.is.null,apple_music_id.is.null,apple_music_id.not.is.null')
       .gt('id', cursor)
       .order('id', { ascending: true })
-      .limit(limit);
+      .limit(limit * 2); // Fetch more to account for filtering
 
     if (error) {
       return NextResponse.json({
@@ -216,15 +255,34 @@ export async function POST(req: Request) {
       });
     }
 
+    // Filter to only albums that actually need enrichment
+    const albumsNeedingEnrichment = albums.filter(album => 
+      !album.spotify_id || 
+      !album.apple_music_id || 
+      needsAppleMusicLyrics(album.tracklists, album.apple_music_id)
+    ).slice(0, limit); // Take only the limit we want
+
+    if (albumsNeedingEnrichment.length === 0) {
+      // All albums in this batch are fully enriched, move cursor forward
+      return NextResponse.json({
+        success: true,
+        processed: albums.length,
+        enriched: 0,
+        hasMore: albums.length >= limit * 2,
+        nextCursor: albums[albums.length - 1].id
+      });
+    }
+
     let processed = 0;
     let enriched = 0;
     let lastAlbum = null;
 
-    for (const album of albums) {
+    for (const album of albumsNeedingEnrichment) {
       processed++;
       let hasUpdate = false;
       const updateData: UpdateData = {};
 
+      // Enrich Spotify if missing
       if (!album.spotify_id) {
         const spotifyData = await searchSpotify(album.artist, album.title);
         if (spotifyData) {
@@ -234,6 +292,7 @@ export async function POST(req: Request) {
         await sleep(500);
       }
 
+      // Enrich Apple Music if missing
       if (!album.apple_music_id) {
         const appleMusicData = await searchAppleMusic(album.artist, album.title);
         if (appleMusicData) {
@@ -243,6 +302,7 @@ export async function POST(req: Request) {
         await sleep(500);
       }
 
+      // Enrich Genius lyrics for tracks without any lyrics
       if (album.tracklists) {
         try {
           const tracks = typeof album.tracklists === 'string' 
@@ -272,6 +332,7 @@ export async function POST(req: Request) {
         }
       }
 
+      // Update database with Spotify/Apple/Genius data
       if (hasUpdate) {
         const { error: updateError } = await supabase
           .from('collection')
@@ -280,18 +341,32 @@ export async function POST(req: Request) {
 
         if (!updateError) {
           enriched++;
-          lastAlbum = {
-            artist: album.artist,
-            title: album.title,
-            spotify: !!updateData.spotify_id,
-            appleMusic: !!updateData.apple_music_id,
-            lyrics: !!updateData.tracklists
-          };
         }
+      }
+
+      // FIXED: Fetch Apple Music lyrics if we have an Apple Music ID and need lyrics
+      const finalAppleMusicId = updateData.apple_music_id || album.apple_music_id;
+      if (finalAppleMusicId && needsAppleMusicLyrics(album.tracklists, finalAppleMusicId)) {
+        console.log(`Fetching Apple Music lyrics for album ${album.id}...`);
+        const lyricsSuccess = await fetchAppleMusicLyrics(album.id);
+        if (lyricsSuccess) {
+          if (!hasUpdate) enriched++; // Count this as an enrichment if we hadn't already
+          hasUpdate = true;
+        }
+      }
+
+      if (hasUpdate) {
+        lastAlbum = {
+          artist: album.artist,
+          title: album.title,
+          spotify: !!updateData.spotify_id || !!album.spotify_id,
+          appleMusic: !!updateData.apple_music_id || !!album.apple_music_id,
+          lyrics: !!updateData.tracklists
+        };
       }
     }
 
-    const hasMore = albums.length === limit;
+    const hasMore = albums.length >= limit * 2;
     const nextCursor = hasMore ? albums[albums.length - 1].id : null;
 
     return NextResponse.json({

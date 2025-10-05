@@ -1,4 +1,4 @@
-// src/app/admin/enrich-sources/page.tsx - UPDATED WITH APPLE MUSIC LYRICS STATS
+// src/app/admin/enrich-sources/page.tsx - UPDATED with clearer labels and stats
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -18,12 +18,14 @@ export default function MultiSourceEnrichment() {
   const [stats, setStats] = useState({
     total: 0,
     needsEnrichment: 0,
+    fullyEnriched: 0,
+    bothServices: 0,
     unenriched: 0,
     spotifyOnly: 0,
     appleOnly: 0,
-    fullyEnriched: 0,
     geniusLyrics: 0,
     appleLyrics: 0,
+    needsAppleLyrics: 0,
     anyLyrics: 0
   });
   const [enriching, setEnriching] = useState(false);
@@ -174,23 +176,23 @@ export default function MultiSourceEnrichment() {
             label="✅ Fully Enriched" 
             value={stats.fullyEnriched} 
             color="#16a34a"
-            description="Has both Spotify & Apple Music"
+            description="Has services + Apple lyrics"
             onClick={() => showAlbumsForCategory('fully-enriched', '✅ Fully Enriched Albums')}
           />
           <ClickableStatCard 
             label="⚠️ Needs Enrichment" 
             value={stats.needsEnrichment} 
             color="#f59e0b"
-            description="Missing Spotify or Apple Music"
+            description="Missing services or lyrics"
             onClick={() => showAlbumsForCategory('needs-enrichment', '⚠️ Albums Needing Enrichment')}
           />
         </div>
       </div>
 
-      {/* Breakdown of What Needs Enrichment */}
+      {/* Service Breakdown */}
       <div style={{ marginBottom: 32 }}>
         <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 16, color: '#1f2937' }}>
-          🔍 Enrichment Breakdown
+          🎵 Streaming Services
         </h2>
         <div style={{
           display: 'grid',
@@ -198,11 +200,19 @@ export default function MultiSourceEnrichment() {
           gap: 16
         }}>
           <ClickableStatCard 
-            label="❌ No Data" 
+            label="🔗 Both Services" 
+            value={stats.bothServices} 
+            color="#7c3aed"
+            description="Has Spotify + Apple Music"
+            onClick={() => {}}
+            disabled
+          />
+          <ClickableStatCard 
+            label="❌ No Services" 
             value={stats.unenriched} 
             color="#dc2626"
             description="Missing both services"
-            onClick={() => showAlbumsForCategory('no-data', '❌ Albums with No Data')}
+            onClick={() => showAlbumsForCategory('no-data', '❌ Albums with No Services')}
           />
           <ClickableStatCard 
             label="🎵 Missing Spotify" 
@@ -232,17 +242,18 @@ export default function MultiSourceEnrichment() {
           gap: 16
         }}>
           <ClickableStatCard 
-            label="📝 Any Lyrics" 
-            value={stats.anyLyrics} 
-            color="#7c3aed"
-            description="Has any lyrics data"
-            onClick={() => showAlbumsForCategory('with-lyrics', '📝 Albums with Lyrics')}
-          />
-          <ClickableStatCard 
             label="🍎 Apple Music Lyrics" 
             value={stats.appleLyrics} 
             color="#ec4899"
             description="Full lyrics from Apple Music"
+            onClick={() => {}}
+            disabled
+          />
+          <ClickableStatCard 
+            label="⚠️ Need Apple Lyrics" 
+            value={stats.needsAppleLyrics} 
+            color="#f59e0b"
+            description="Have Apple ID but no lyrics"
             onClick={() => {}}
             disabled
           />
@@ -253,6 +264,13 @@ export default function MultiSourceEnrichment() {
             description="Has Genius lyrics URLs"
             onClick={() => {}}
             disabled
+          />
+          <ClickableStatCard 
+            label="📝 Any Lyrics" 
+            value={stats.anyLyrics} 
+            color="#7c3aed"
+            description="Has any lyrics data"
+            onClick={() => showAlbumsForCategory('with-lyrics', '📝 Albums with Lyrics')}
           />
         </div>
       </div>
@@ -426,7 +444,8 @@ export default function MultiSourceEnrichment() {
             <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
               {lastEnriched.spotify && '✓ Spotify'} 
               {lastEnriched.appleMusic && ' • ✓ Apple Music'}
-              {lastEnriched.lyrics && ' • ✓ Lyrics'}
+              {lastEnriched.appleLyrics && ' • ✓ Apple Lyrics'}
+              {lastEnriched.lyrics && ' • ✓ Genius Lyrics'}
             </div>
           </div>
         )}
@@ -443,10 +462,19 @@ export default function MultiSourceEnrichment() {
         marginBottom: 24
       }}>
         <div style={{ fontWeight: 600, marginBottom: 8 }}>
-          💡 About Apple Music Lyrics
+          💡 How Enrichment Works
         </div>
-        <div>
-          This enrichment process now fetches full lyrics text from Apple Music (when available) in addition to Spotify/Apple Music IDs and Genius lyrics links. Apple Music lyrics are stored directly in your database for instant searching!
+        <div style={{ marginBottom: 8 }}>
+          This process will enrich ALL albums that are missing:
+        </div>
+        <ul style={{ margin: '0 0 0 20px', padding: 0 }}>
+          <li>Spotify ID or metadata</li>
+          <li>Apple Music ID or metadata</li>
+          <li>Apple Music lyrics (for albums that have Apple Music IDs)</li>
+          <li>Genius lyrics links</li>
+        </ul>
+        <div style={{ marginTop: 8, fontStyle: 'italic' }}>
+          The &quot;Needs Enrichment&quot; count now includes albums that have Apple Music IDs but are missing lyrics!
         </div>
       </div>
 
