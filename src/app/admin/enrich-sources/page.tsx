@@ -204,8 +204,7 @@ export default function MultiSourceEnrichment() {
             value={stats.bothServices} 
             color="#7c3aed"
             description="Has Spotify + Apple Music"
-            onClick={() => {}}
-            disabled
+            onClick={() => showAlbumsForCategory('both-services', '🔗 Albums with Both Services')}
           />
           <ClickableStatCard 
             label="❌ No Services" 
@@ -246,24 +245,21 @@ export default function MultiSourceEnrichment() {
             value={stats.appleLyrics} 
             color="#ec4899"
             description="Full lyrics from Apple Music"
-            onClick={() => {}}
-            disabled
+            onClick={() => showAlbumsForCategory('has-apple-lyrics', '🍎 Albums with Apple Music Lyrics')}
           />
           <ClickableStatCard 
             label="⚠️ Need Apple Lyrics" 
             value={stats.needsAppleLyrics} 
             color="#f59e0b"
             description="Have Apple ID but no lyrics"
-            onClick={() => {}}
-            disabled
+            onClick={() => showAlbumsForCategory('needs-apple-lyrics', '⚠️ Albums Needing Apple Music Lyrics')}
           />
           <ClickableStatCard 
             label="🔗 Genius Links" 
             value={stats.geniusLyrics} 
             color="#6366f1"
             description="Has Genius lyrics URLs"
-            onClick={() => {}}
-            disabled
+            onClick={() => showAlbumsForCategory('has-genius-links', '🔗 Albums with Genius Lyrics Links')}
           />
           <ClickableStatCard 
             label="📝 Any Lyrics" 
