@@ -39,12 +39,6 @@ export async function GET() {
       .not('spotify_id', 'is', null)
       .not('apple_music_id', 'is', null);
 
-    // Albums missing either Spotify OR Apple Music (but not lyrics check yet)
-    const { count: missingServices } = await supabase
-      .from('collection')
-      .select('id', { count: 'exact', head: true })
-      .or('spotify_id.is.null,apple_music_id.is.null');
-
     const { count: unenriched } = await supabase
       .from('collection')
       .select('id', { count: 'exact', head: true })
@@ -66,6 +60,7 @@ export async function GET() {
     // Check all albums with Apple Music IDs for lyrics - PAGINATED to avoid 1000 row limit
     let appleLyricsCount = 0;
     let needsAppleLyrics = 0;
+    let fullyEnrichedCount = 0; // NEW: count albums with BOTH services AND lyrics
     let offset = 0;
     const pageSize = 1000;
     let hasMore = true;
@@ -73,7 +68,7 @@ export async function GET() {
     while (hasMore) {
       const { data: albumsWithAppleMusic } = await supabase
         .from('collection')
-        .select('id, tracklists, apple_music_id')
+        .select('id, tracklists, apple_music_id, spotify_id')
         .not('apple_music_id', 'is', null)
         .range(offset, offset + pageSize - 1);
 
@@ -86,6 +81,10 @@ export async function GET() {
         const hasLyrics = hasAppleMusicLyrics(album.tracklists);
         if (hasLyrics) {
           appleLyricsCount++;
+          // If has Apple lyrics AND Spotify ID, it's fully enriched
+          if (album.spotify_id) {
+            fullyEnrichedCount++;
+          }
         } else {
           needsAppleLyrics++;
         }
@@ -135,11 +134,9 @@ export async function GET() {
       offset += pageSize;
     }
 
-    // FIXED: Calculate actual "needs enrichment" including lyrics
-    const needsEnrichment = (missingServices || 0) + needsAppleLyrics;
-
-    // Fully enriched = has both services AND has Apple Music lyrics (or no Apple Music)
-    const fullyEnriched = (bothServices || 0) - needsAppleLyrics;
+    // FIXED: Calculate "needs enrichment" and "fully enriched" correctly
+    const needsEnrichment = (total || 0) - fullyEnrichedCount;
+    const fullyEnriched = fullyEnrichedCount;
 
     const { data: folderData } = await supabase
       .from('collection')
