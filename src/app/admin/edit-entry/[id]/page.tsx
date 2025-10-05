@@ -1,4 +1,4 @@
-// src/app/admin/edit-entry/[id]/page.tsx - UPDATED WITH APPLE MUSIC LYRICS
+// src/app/admin/edit-entry/[id]/page.tsx - COMPLETE EDIT PAGE with manual metadata fields
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -37,10 +37,22 @@ type CollectionEntry = {
   decade: number | null;
   master_release_id: string | null;
   master_release_date: string | null;
-  spotify_id?: string | null;
-  spotify_url?: string | null;
-  apple_music_id?: string | null;
-  apple_music_url?: string | null;
+  spotify_id: string | null;
+  spotify_url: string | null;
+  spotify_popularity: number | null;
+  spotify_genres: string[] | null;
+  spotify_label: string | null;
+  spotify_release_date: string | null;
+  spotify_total_tracks: number | null;
+  spotify_image_url: string | null;
+  apple_music_id: string | null;
+  apple_music_url: string | null;
+  apple_music_genre: string | null;
+  apple_music_genres: string[] | null;
+  apple_music_label: string | null;
+  apple_music_release_date: string | null;
+  apple_music_track_count: number | null;
+  apple_music_artwork_url: string | null;
   [key: string]: unknown;
 };
 
@@ -403,6 +415,22 @@ export default function EditEntryPage() {
       decade: entry.decade || null,
       master_release_id: entry.master_release_id || null,
       master_release_date: entry.master_release_date || null,
+      spotify_id: entry.spotify_id || null,
+      spotify_url: entry.spotify_url || null,
+      spotify_popularity: entry.spotify_popularity || null,
+      spotify_genres: entry.spotify_genres || null,
+      spotify_label: entry.spotify_label || null,
+      spotify_release_date: entry.spotify_release_date || null,
+      spotify_total_tracks: entry.spotify_total_tracks || null,
+      spotify_image_url: entry.spotify_image_url || null,
+      apple_music_id: entry.apple_music_id || null,
+      apple_music_url: entry.apple_music_url || null,
+      apple_music_genre: entry.apple_music_genre || null,
+      apple_music_genres: entry.apple_music_genres || null,
+      apple_music_label: entry.apple_music_label || null,
+      apple_music_release_date: entry.apple_music_release_date || null,
+      apple_music_track_count: entry.apple_music_track_count || null,
+      apple_music_artwork_url: entry.apple_music_artwork_url || null,
     };
     
     const { error } = await supabase.from('collection').update(update).eq('id', entry.id);
@@ -453,7 +481,7 @@ export default function EditEntryPage() {
 
   return (
     <div style={{ 
-      maxWidth: 1200, 
+      maxWidth: 1600, 
       margin: '32px auto', 
       padding: 32, 
       background: '#fff', 
@@ -644,7 +672,7 @@ export default function EditEntryPage() {
         )}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.5fr', gap: 32, alignItems: 'flex-start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1.5fr', gap: 32, alignItems: 'flex-start' }}>
         
         {/* Left Column - Basic Info */}
         <div style={{ color: "#222" }}>
@@ -789,7 +817,116 @@ export default function EditEntryPage() {
           </div>
         </div>
 
-        {/* Middle Column - Metadata */}
+        {/* Middle Left Column - Streaming Services */}
+        <div style={{ color: "#222" }}>
+          <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: 16, color: '#374151' }}>
+            🎵 Streaming Services
+          </h3>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* Spotify Section */}
+            <div style={{
+              padding: 16,
+              background: '#dcfce7',
+              border: '1px solid #16a34a',
+              borderRadius: 8
+            }}>
+              <h4 style={{ fontSize: '16px', fontWeight: '600', margin: '0 0 12px 0', color: '#15803d' }}>
+                Spotify
+              </h4>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: 6, fontSize: '13px', fontWeight: '500', color: "#15803d" }}>
+                    Spotify ID {!entry.spotify_id && '⚠️'}
+                  </label>
+                  <input 
+                    style={{...inputStyle, fontSize: '13px'}}
+                    value={entry.spotify_id || ''} 
+                    onChange={e => handleChange('spotify_id', e.target.value)}
+                    placeholder="e.g. 4aawyAB9vmqN3uQ7FjRGTy" 
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', marginBottom: 6, fontSize: '13px', fontWeight: '500', color: "#15803d" }}>
+                    Spotify URL
+                  </label>
+                  <input 
+                    style={{...inputStyle, fontSize: '13px'}}
+                    value={entry.spotify_url || ''} 
+                    onChange={e => handleChange('spotify_url', e.target.value)}
+                    placeholder="https://open.spotify.com/album/..." 
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', marginBottom: 6, fontSize: '13px', fontWeight: '500', color: "#15803d" }}>
+                    Spotify Genres
+                  </label>
+                  <input 
+                    style={{...inputStyle, fontSize: '13px'}}
+                    value={entry.spotify_genres?.join(', ') || ''} 
+                    onChange={e => handleChange('spotify_genres', e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+                    placeholder="classic rock, psychedelic rock"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Apple Music Section */}
+            <div style={{
+              padding: 16,
+              background: '#fce7f3',
+              border: '1px solid #ec4899',
+              borderRadius: 8
+            }}>
+              <h4 style={{ fontSize: '16px', fontWeight: '600', margin: '0 0 12px 0', color: '#be185d' }}>
+                Apple Music
+              </h4>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: 6, fontSize: '13px', fontWeight: '500', color: "#be185d" }}>
+                    Apple Music ID {!entry.apple_music_id && '⚠️'}
+                  </label>
+                  <input 
+                    style={{...inputStyle, fontSize: '13px'}}
+                    value={entry.apple_music_id || ''} 
+                    onChange={e => handleChange('apple_music_id', e.target.value)}
+                    placeholder="e.g. 1440857781" 
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', marginBottom: 6, fontSize: '13px', fontWeight: '500', color: "#be185d" }}>
+                    Apple Music URL
+                  </label>
+                  <input 
+                    style={{...inputStyle, fontSize: '13px'}}
+                    value={entry.apple_music_url || ''} 
+                    onChange={e => handleChange('apple_music_url', e.target.value)}
+                    placeholder="https://music.apple.com/album/..." 
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', marginBottom: 6, fontSize: '13px', fontWeight: '500', color: "#be185d" }}>
+                    Apple Music Genres
+                  </label>
+                  <input 
+                    style={{...inputStyle, fontSize: '13px'}}
+                    value={entry.apple_music_genres?.join(', ') || ''} 
+                    onChange={e => handleChange('apple_music_genres', e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+                    placeholder="Rock, Psychedelic"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Middle Right Column - Metadata */}
         <div style={{ color: "#222" }}>
           <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: 16, color: '#374151' }}>
             Metadata
