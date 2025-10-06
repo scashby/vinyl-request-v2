@@ -1,4 +1,4 @@
-// src/app/api/enrich-sources/genius/route.ts - Genius lyrics URLs-only enrichment
+// src/app/api/enrich-sources/genius/route.ts - COMPLETE with logging
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -32,11 +32,14 @@ async function searchLyrics(artist: string, trackTitle: string): Promise<string 
   }
 
   const query = encodeURIComponent(`${artist} ${trackTitle}`);
+  console.log(`  → Searching Genius for: "${artist} - ${trackTitle}"`);
+
   const searchRes = await fetch(`https://api.genius.com/search?q=${query}`, {
     headers: { 'Authorization': `Bearer ${GENIUS_TOKEN}` }
   });
 
   if (!searchRes.ok) {
+    console.log(`  → Genius API error: HTTP ${searchRes.status}`);
     throw new Error(`Genius API returned ${searchRes.status}`);
   }
 
@@ -44,10 +47,13 @@ async function searchLyrics(artist: string, trackTitle: string): Promise<string 
   const hit = searchData?.response?.hits?.[0];
 
   if (!hit) {
+    console.log(`  → No results from Genius`);
     return null;
   }
 
-  return hit.result?.url || null;
+  const url = hit.result?.url;
+  console.log(`  → Found match: ${url}`);
+  return url;
 }
 
 export async function POST(req: Request) {
@@ -55,14 +61,16 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { albumId } = body;
 
+    console.log(`\n📝 === GENIUS LYRICS REQUEST for Album ID: ${albumId} ===`);
+
     if (!albumId) {
+      console.log('❌ ERROR: No albumId provided');
       return NextResponse.json({
         success: false,
         error: 'albumId required'
       }, { status: 400 });
     }
 
-    // Get album info
     const { data: album, error: dbError } = await supabase
       .from('collection')
       .select('id, artist, title, tracklists')
@@ -70,20 +78,24 @@ export async function POST(req: Request) {
       .single();
 
     if (dbError || !album) {
+      console.log('❌ ERROR: Album not found in database', dbError);
       return NextResponse.json({
         success: false,
         error: 'Album not found'
       }, { status: 404 });
     }
 
-    // Parse tracklist
+    console.log(`✓ Album found: "${album.artist} - ${album.title}"`);
+
     let tracks: Track[] = [];
     if (album.tracklists) {
       try {
         tracks = typeof album.tracklists === 'string' 
           ? JSON.parse(album.tracklists)
           : album.tracklists;
+        console.log(`✓ Parsed ${tracks.length} tracks from tracklist`);
       } catch {
+        console.log('❌ ERROR: Failed to parse tracklists');
         return NextResponse.json({
           success: false,
           error: 'Invalid tracklist format',
@@ -97,6 +109,7 @@ export async function POST(req: Request) {
     }
 
     if (!Array.isArray(tracks) || tracks.length === 0) {
+      console.log('❌ ERROR: No tracklist found');
       return NextResponse.json({
         success: false,
         error: 'No tracklist found',
@@ -108,16 +121,17 @@ export async function POST(req: Request) {
       });
     }
 
-    // Enrich each track
     const trackResults: TrackResult[] = [];
     const enrichedTracks: Track[] = [];
     let enrichedCount = 0;
     let skippedCount = 0;
     let failedCount = 0;
 
+    console.log(`🔍 Processing ${tracks.length} tracks...`);
+
     for (const track of tracks) {
-      // Skip if no title or already has lyrics URL
       if (!track.title) {
+        console.log(`⏭️  Skipping track with no title`);
         trackResults.push({
           position: track.position || '',
           title: '(no title)',
@@ -130,6 +144,7 @@ export async function POST(req: Request) {
       }
 
       if (track.lyrics_url) {
+        console.log(`⏭️  Track "${track.title}" already has lyrics URL`);
         trackResults.push({
           position: track.position || '',
           title: track.title,
@@ -141,11 +156,11 @@ export async function POST(req: Request) {
         continue;
       }
 
-      // Search Genius
       try {
         const lyricsUrl = await searchLyrics(album.artist, track.title);
 
         if (lyricsUrl) {
+          console.log(`✅ Found lyrics URL for "${track.title}"`);
           trackResults.push({
             position: track.position || '',
             title: track.title,
@@ -158,6 +173,7 @@ export async function POST(req: Request) {
           });
           enrichedCount++;
         } else {
+          console.log(`❌ No lyrics found for "${track.title}"`);
           trackResults.push({
             position: track.position || '',
             title: track.title,
@@ -168,10 +184,10 @@ export async function POST(req: Request) {
           failedCount++;
         }
 
-        // Rate limit: wait 1s between requests
         await new Promise(resolve => setTimeout(resolve, 1000));
 
       } catch (error) {
+        console.error(`❌ Error searching for "${track.title}":`, error);
         trackResults.push({
           position: track.position || '',
           title: track.title,
@@ -183,14 +199,17 @@ export async function POST(req: Request) {
       }
     }
 
-    // Update database if any tracks were enriched
+    console.log(`\n📊 SUMMARY: ${enrichedCount} enriched, ${skippedCount} skipped, ${failedCount} failed`);
+
     if (enrichedCount > 0) {
+      console.log(`💾 Updating database with enriched tracklist...`);
       const { error: updateError } = await supabase
         .from('collection')
         .update({ tracklists: JSON.stringify(enrichedTracks) })
         .eq('id', albumId);
 
       if (updateError) {
+        console.log('❌ ERROR: Database update failed', updateError);
         return NextResponse.json({
           success: false,
           error: `Database update failed: ${updateError.message}`,
@@ -203,6 +222,10 @@ export async function POST(req: Request) {
           }
         }, { status: 500 });
       }
+
+      console.log(`✅ Database updated successfully\n`);
+    } else {
+      console.log(`ℹ️  No tracks enriched, skipping database update\n`);
     }
 
     const enrichedTracksList = trackResults.filter(t => t.success && !t.error?.includes('already has'));
@@ -225,7 +248,7 @@ export async function POST(req: Request) {
     });
 
   } catch (error) {
-    console.error('Genius enrichment error:', error);
+    console.error('❌ FATAL ERROR in Genius enrichment:', error);
     return NextResponse.json({
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error'

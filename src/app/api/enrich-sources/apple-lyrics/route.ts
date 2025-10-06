@@ -71,6 +71,8 @@ async function fetchAppleAlbumTracks(albumId: string): Promise<AppleTrack[]> {
     throw new Error('Missing Apple Music token');
   }
 
+  console.log(`  → Fetching tracks for Apple Music album: ${albumId}`);
+
   const res = await fetch(
     `https://api.music.apple.com/v1/catalog/us/albums/${albumId}/tracks`,
     {
@@ -82,10 +84,12 @@ async function fetchAppleAlbumTracks(albumId: string): Promise<AppleTrack[]> {
   );
 
   if (!res.ok) {
+    console.log(`  → Apple API error: HTTP ${res.status}`);
     throw new Error(`Apple Music API error: ${res.status}`);
   }
 
   const data = await res.json();
+  console.log(`  → Got ${data.data?.length || 0} tracks from Apple Music API`);
   return data.data || [];
 }
 
@@ -95,6 +99,7 @@ async function fetchTrackLyrics(trackId: string): Promise<string | null> {
   }
 
   try {
+    console.log(`  → Fetching lyrics for track ID: ${trackId}`);
     const res = await fetch(
       `https://api.music.apple.com/v1/catalog/us/songs/${trackId}/lyrics`,
       {
@@ -105,7 +110,7 @@ async function fetchTrackLyrics(trackId: string): Promise<string | null> {
     );
 
     if (!res.ok) {
-      console.log(`No lyrics for track ${trackId}: ${res.status}`);
+      console.log(`  → Apple API returned ${res.status} for track ${trackId}`);
       return null;
     }
 
@@ -113,12 +118,16 @@ async function fetchTrackLyrics(trackId: string): Promise<string | null> {
     const ttml = data?.data?.[0]?.attributes?.ttml;
 
     if (!ttml) {
+      console.log(`  → No TTML data in response for track ${trackId}`);
       return null;
     }
 
-    return parseTTML(ttml);
+    console.log(`  → Got TTML data (${ttml.length} chars), parsing...`);
+    const parsed = parseTTML(ttml);
+    console.log(`  → Parsed to ${parsed.length} chars of lyrics`);
+    return parsed;
   } catch (error) {
-    console.error(`Error fetching lyrics for track ${trackId}:`, error);
+    console.error(`  → ERROR fetching lyrics for track ${trackId}:`, error);
     return null;
   }
 }
@@ -135,12 +144,14 @@ function matchTrackByTitle(
   const existingTitle = normalize(existingTrack.title || '');
   const appleTitle = normalize(appleTrack.attributes.name);
 
-  if (existingTitle === appleTitle) return true;
-  if (existingTitle.includes(appleTitle) || appleTitle.includes(existingTitle)) {
-    return true;
+  const exactMatch = existingTitle === appleTitle;
+  const partialMatch = existingTitle.includes(appleTitle) || appleTitle.includes(existingTitle);
+
+  if (!exactMatch && !partialMatch) {
+    console.log(`  → No match: "${existingTrack.title}" vs "${appleTrack.attributes.name}"`);
   }
 
-  return false;
+  return exactMatch || partialMatch;
 }
 
 export async function POST(req: Request) {
@@ -148,7 +159,10 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { albumId } = body;
 
+    console.log(`\n🍎 === APPLE LYRICS REQUEST for Album ID: ${albumId} ===`);
+
     if (!albumId) {
+      console.log('❌ ERROR: No albumId provided');
       return NextResponse.json(
         { success: false, error: 'albumId required' },
         { status: 400 }
@@ -156,6 +170,7 @@ export async function POST(req: Request) {
     }
 
     if (!APPLE_MUSIC_TOKEN) {
+      console.log('❌ ERROR: APPLE_MUSIC_TOKEN not configured');
       return NextResponse.json(
         { success: false, error: 'Apple Music token not configured' },
         { status: 500 }
@@ -169,13 +184,17 @@ export async function POST(req: Request) {
       .single();
 
     if (dbError || !album) {
+      console.log('❌ ERROR: Album not found in database', dbError);
       return NextResponse.json(
         { success: false, error: 'Album not found' },
         { status: 404 }
       );
     }
 
+    console.log(`✓ Album found: ID=${album.id}, Apple Music ID=${album.apple_music_id}`);
+
     if (!album.apple_music_id) {
+      console.log('❌ ERROR: Album has no Apple Music ID');
       return NextResponse.json(
         { success: false, error: 'Album has no Apple Music ID' },
         { status: 400 }
@@ -189,30 +208,36 @@ export async function POST(req: Request) {
           ? JSON.parse(album.tracklists)
           : album.tracklists;
         existingTracks = Array.isArray(parsed) ? parsed : [];
-      } catch {
+        console.log(`✓ Parsed ${existingTracks.length} existing tracks`);
+      } catch (err) {
+        console.log('❌ ERROR: Failed to parse tracklists', err);
         existingTracks = [];
       }
     }
 
     if (existingTracks.length === 0) {
+      console.log('❌ ERROR: No tracklist found to enrich');
       return NextResponse.json(
         { success: false, error: 'No tracklist found to enrich' },
         { status: 400 }
       );
     }
 
-    console.log(`\n🍎 Fetching Apple Music tracks for album ${album.apple_music_id}...`);
+    console.log(`🔍 Fetching Apple Music tracks for album ${album.apple_music_id}...`);
 
     const appleTracks = await fetchAppleAlbumTracks(album.apple_music_id);
     
     if (appleTracks.length === 0) {
+      console.log('❌ ERROR: No tracks found on Apple Music');
       return NextResponse.json(
         { success: false, error: 'No tracks found on Apple Music' },
         { status: 404 }
       );
     }
 
-    console.log(`✅ Found ${appleTracks.length} tracks on Apple Music`);
+    console.log(`✓ Found ${appleTracks.length} tracks on Apple Music`);
+    console.log(`📋 Sample existing track: "${existingTracks[0]?.title}"`);
+    console.log(`📋 Sample Apple track: "${appleTracks[0]?.attributes?.name}"`);
 
     let lyricsFound = 0;
     let lyricsNotFound = 0;
@@ -220,25 +245,25 @@ export async function POST(req: Request) {
     const enrichedTracks = await Promise.all(
       existingTracks.map(async (track, index) => {
         if (track.lyrics && track.lyrics_source === 'apple_music') {
-          console.log(`⏭️  Track ${index + 1}: Already has Apple Music lyrics`);
+          console.log(`⏭️  Track ${index + 1}/${existingTracks.length}: "${track.title}" - Already has Apple Music lyrics`);
           return track;
         }
 
         const appleTrack = appleTracks.find(at => matchTrackByTitle(track, at));
 
         if (!appleTrack) {
-          console.log(`⚠️  Track ${index + 1}: No match found for "${track.title}"`);
+          console.log(`⚠️  Track ${index + 1}/${existingTracks.length}: "${track.title}" - No Apple Music match found`);
           lyricsNotFound++;
           return track;
         }
 
-        console.log(`🔍 Track ${index + 1}: Fetching lyrics for "${track.title}"...`);
+        console.log(`🔍 Track ${index + 1}/${existingTracks.length}: "${track.title}" - Fetching lyrics (Apple ID: ${appleTrack.id})...`);
 
         const lyrics = await fetchTrackLyrics(appleTrack.id);
         await new Promise(resolve => setTimeout(resolve, 500));
 
         if (lyrics) {
-          console.log(`✅ Track ${index + 1}: Found lyrics (${lyrics.length} chars)`);
+          console.log(`✅ Track ${index + 1}/${existingTracks.length}: Found lyrics (${lyrics.length} chars)`);
           lyricsFound++;
           return {
             ...track,
@@ -246,12 +271,14 @@ export async function POST(req: Request) {
             lyrics_source: 'apple_music' as const
           };
         } else {
-          console.log(`❌ Track ${index + 1}: No lyrics available`);
+          console.log(`❌ Track ${index + 1}/${existingTracks.length}: No lyrics available from Apple`);
           lyricsNotFound++;
           return track;
         }
       })
     );
+
+    console.log(`\n📊 SUMMARY: ${lyricsFound} lyrics found, ${lyricsNotFound} not available`);
 
     const { error: updateError } = await supabase
       .from('collection')
@@ -261,13 +288,14 @@ export async function POST(req: Request) {
       .eq('id', albumId);
 
     if (updateError) {
+      console.log('❌ ERROR: Database update failed', updateError);
       return NextResponse.json(
         { success: false, error: `Database update failed: ${updateError.message}` },
         { status: 500 }
       );
     }
 
-    console.log(`\n📊 Summary: ${lyricsFound} lyrics found, ${lyricsNotFound} not available`);
+    console.log(`✅ Database updated successfully\n`);
 
     return NextResponse.json({
       success: true,
@@ -281,7 +309,7 @@ export async function POST(req: Request) {
     });
 
   } catch (error) {
-    console.error('Apple Music lyrics fetch error:', error);
+    console.error('❌ FATAL ERROR in Apple Music lyrics fetch:', error);
     return NextResponse.json({
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error'

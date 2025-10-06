@@ -1,4 +1,4 @@
-// src/app/api/enrich-sources/apple-music/route.ts - Apple Music-only enrichment
+// src/app/api/enrich-sources/apple-music/route.ts - COMPLETE with logging
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -14,11 +14,14 @@ async function searchAppleMusic(artist: string, title: string) {
   }
 
   const query = encodeURIComponent(`${artist} ${title}`);
+  console.log(`  → Querying Apple Music API: "${artist} ${title}"`);
+
   const res = await fetch(`https://api.music.apple.com/v1/catalog/us/search?types=albums&term=${query}&limit=1`, {
     headers: { 'Authorization': `Bearer ${APPLE_MUSIC_TOKEN}` }
   });
 
   if (!res.ok) {
+    console.log(`  → Apple Music API error: HTTP ${res.status}`);
     throw new Error(`Apple Music API returned ${res.status}`);
   }
 
@@ -26,7 +29,15 @@ async function searchAppleMusic(artist: string, title: string) {
   const album = data?.results?.albums?.data?.[0];
 
   if (!album) {
+    console.log(`  → No results from Apple Music`);
     return null;
+  }
+
+  console.log(`  → Found match: "${album.attributes?.name}" by ${album.attributes?.artistName}`);
+  
+  const genres = album.attributes?.genreNames || [];
+  if (genres.length > 0) {
+    console.log(`  → Genres: ${genres.join(', ')}`);
   }
 
   return {
@@ -46,14 +57,16 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { albumId } = body;
 
+    console.log(`\n🍎 === APPLE MUSIC REQUEST for Album ID: ${albumId} ===`);
+
     if (!albumId) {
+      console.log('❌ ERROR: No albumId provided');
       return NextResponse.json({
         success: false,
         error: 'albumId required'
       }, { status: 400 });
     }
 
-    // Get album info
     const { data: album, error: dbError } = await supabase
       .from('collection')
       .select('id, artist, title, apple_music_id')
@@ -61,14 +74,17 @@ export async function POST(req: Request) {
       .single();
 
     if (dbError || !album) {
+      console.log('❌ ERROR: Album not found in database', dbError);
       return NextResponse.json({
         success: false,
         error: 'Album not found'
       }, { status: 404 });
     }
 
-    // Skip if already has Apple Music ID
+    console.log(`✓ Album found: "${album.artist} - ${album.title}"`);
+
     if (album.apple_music_id) {
+      console.log(`⏭️  Album already has Apple Music ID: ${album.apple_music_id}\n`);
       return NextResponse.json({
         success: true,
         skipped: true,
@@ -82,11 +98,13 @@ export async function POST(req: Request) {
       });
     }
 
-    // Search Apple Music
+    console.log(`🔍 Searching Apple Music for: "${album.artist} - ${album.title}"...`);
+
     try {
       const appleData = await searchAppleMusic(album.artist, album.title);
 
       if (!appleData) {
+        console.log(`❌ No match found on Apple Music\n`);
         return NextResponse.json({
           success: false,
           error: 'No match found on Apple Music',
@@ -99,13 +117,15 @@ export async function POST(req: Request) {
         });
       }
 
-      // Update database
+      console.log(`✅ Found Apple Music match: ID=${appleData.apple_music_id}`);
+
       const { error: updateError } = await supabase
         .from('collection')
         .update(appleData)
         .eq('id', albumId);
 
       if (updateError) {
+        console.log('❌ ERROR: Database update failed', updateError);
         return NextResponse.json({
           success: false,
           error: `Database update failed: ${updateError.message}`,
@@ -117,6 +137,8 @@ export async function POST(req: Request) {
           }
         }, { status: 500 });
       }
+
+      console.log(`✅ Database updated successfully\n`);
 
       return NextResponse.json({
         success: true,
@@ -134,6 +156,7 @@ export async function POST(req: Request) {
       });
 
     } catch (error) {
+      console.error('❌ FATAL ERROR in Apple Music search:', error);
       return NextResponse.json({
         success: false,
         error: error instanceof Error ? error.message : 'Apple Music search failed',
@@ -146,7 +169,7 @@ export async function POST(req: Request) {
     }
 
   } catch (error) {
-    console.error('Apple Music enrichment error:', error);
+    console.error('❌ FATAL ERROR in Apple Music enrichment:', error);
     return NextResponse.json({
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error'
