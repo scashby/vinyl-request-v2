@@ -1,4 +1,4 @@
-// src/app/admin/edit-entry/[id]/page.tsx - COMPLETE FILE with fixed enrichMultiSource
+// src/app/admin/edit-entry/[id]/page.tsx - COMPLETE FILE
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -73,12 +73,6 @@ type DiscogsMasterData = {
   [key: string]: unknown;
 };
 
-type MissingField = {
-  field: string;
-  label: string;
-  isEmpty: boolean;
-};
-
 function calculateDecade(year: string | null): number | null {
   if (!year) return null;
   const yearNum = parseInt(year, 10);
@@ -123,8 +117,11 @@ export default function EditEntryPage() {
   const [blockedSides, setBlockedSides] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [tracks, setTracks] = useState<Track[]>([]);
-  const [fetching, setFetching] = useState(false);
-  const [enrichingMulti, setEnrichingMulti] = useState(false);
+  
+  const [fetchingDiscogs, setFetchingDiscogs] = useState(false);
+  const [enrichingSpotify, setEnrichingSpotify] = useState(false);
+  const [enrichingAppleMusic, setEnrichingAppleMusic] = useState(false);
+  const [enrichingGenius, setEnrichingGenius] = useState(false);
   const [fetchingAppleLyrics, setFetchingAppleLyrics] = useState(false);
 
   useEffect(() => {
@@ -144,8 +141,12 @@ export default function EditEntryPage() {
     return data as CollectionEntry;
   }
 
-  // Detect missing Discogs metadata
-  const missingDiscogsFields: MissingField[] = [
+  const missingSpotify = !entry?.spotify_id;
+  const missingAppleMusic = !entry?.apple_music_id;
+  const canFetchGenius = tracks.length > 0;
+  const canFetchAppleLyrics = entry?.apple_music_id && tracks.length > 0;
+  
+  const missingDiscogsFields = [
     { field: 'discogs_genres', label: 'Genres', isEmpty: !entry?.discogs_genres || entry.discogs_genres.length === 0 },
     { field: 'discogs_styles', label: 'Styles', isEmpty: !entry?.discogs_styles || entry.discogs_styles.length === 0 },
     { field: 'decade', label: 'Decade', isEmpty: !entry?.decade },
@@ -153,76 +154,20 @@ export default function EditEntryPage() {
     { field: 'image_url', label: 'Image', isEmpty: !entry?.image_url },
     { field: 'master_release_date', label: 'Master Release Date', isEmpty: !entry?.master_release_date }
   ];
-
   const hasMissingDiscogs = missingDiscogsFields.some(f => f.isEmpty);
-
-  // Detect missing multi-source metadata
-  const missingMultiSourceFields: MissingField[] = [
-    { field: 'spotify_id', label: 'Spotify', isEmpty: !entry?.spotify_id },
-    { field: 'apple_music_id', label: 'Apple Music', isEmpty: !entry?.apple_music_id }
-  ];
-
-  const hasMissingMultiSource = missingMultiSourceFields.some(f => f.isEmpty);
-
-  // Check if we can fetch Apple Music lyrics
-  const canFetchAppleLyrics = entry?.apple_music_id && tracks.length > 0;
+  
   const hasAppleLyrics = tracks.some(t => t.lyrics && t.lyrics_source === 'apple_music');
   const appleLyricsCount = tracks.filter(t => t.lyrics && t.lyrics_source === 'apple_music').length;
   const geniusLyricsCount = tracks.filter(t => t.lyrics_url).length;
 
-  async function fetchAppleMusicLyrics() {
-    if (!entry?.apple_music_id) {
-      setStatus('No Apple Music ID - cannot fetch lyrics');
-      return;
-    }
-
-    setFetchingAppleLyrics(true);
-    setStatus('Fetching lyrics from Apple Music...');
-
-    try {
-      const res = await fetch('/api/enrich-sources/apple-lyrics', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ albumId: parseInt(entry.id) })
-      });
-
-      const result = await res.json();
-
-      if (!result.success) {
-        setStatus(`❌ Apple Music lyrics fetch failed: ${result.error}`);
-        return;
-      }
-
-      // Reload the entry to get updated tracks
-      const updatedEntry = await fetchEntry(id);
-      setEntry(updatedEntry);
-      
-      if (updatedEntry.tracklists) {
-        try {
-          const tl = JSON.parse(updatedEntry.tracklists);
-          setTracks(Array.isArray(tl) ? (tl as Partial<Track>[]).map(cleanTrack) : []);
-        } catch {
-          // Keep existing tracks
-        }
-      }
-
-      const { stats } = result;
-      setStatus(`✅ Apple Music: Found lyrics for ${stats.lyricsFound} out of ${stats.totalTracks} tracks`);
-    } catch (err) {
-      setStatus(`❌ Apple Music lyrics fetch failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
-    } finally {
-      setFetchingAppleLyrics(false);
-    }
-  }
-
-  async function fetchAllMissingMetadata() {
+  async function fetchDiscogsMetadata() {
     if (!entry?.discogs_release_id) {
-      setStatus('No Discogs Release ID - cannot fetch metadata');
+      setStatus('No Discogs Release ID');
       return;
     }
 
-    setFetching(true);
-    setStatus('Fetching missing metadata from Discogs...');
+    setFetchingDiscogs(true);
+    setStatus('Fetching from Discogs...');
 
     try {
       const data = await fetchDiscogsRelease(entry.discogs_release_id);
@@ -265,16 +210,12 @@ export default function EditEntryPage() {
               if (masterData.year) {
                 handleChange('master_release_id', String(masterId));
                 handleChange('master_release_date', String(masterData.year));
-                
                 const decade = calculateDecade(String(masterData.year));
-                if (decade) {
-                  handleChange('decade', decade);
-                }
-                
+                if (decade) handleChange('decade', decade);
                 updated = true;
               }
             } catch (err) {
-              console.warn('Could not fetch master release:', err);
+              console.warn('Could not fetch master:', err);
             }
           }
         }
@@ -291,141 +232,155 @@ export default function EditEntryPage() {
         }
       }
 
-      setStatus(updated ? '✅ Updated missing metadata from Discogs' : 'ℹ️ No missing fields to update');
+      setStatus(updated ? '✅ Updated from Discogs' : 'ℹ️ No updates needed');
     } catch (err) {
-      setStatus(`❌ Failed to fetch metadata: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setStatus(`❌ ${err instanceof Error ? err.message : 'Error'}`);
     } finally {
-      setFetching(false);
+      setFetchingDiscogs(false);
     }
   }
 
-  async function enrichMultiSource() {
-    if (!entry) return;
+  async function enrichSpotify() {
+    if (!entry || entry.spotify_id) return;
 
-    setEnrichingMulti(true);
-    setStatus('Enriching from Spotify, Apple Music, and Genius...');
+    setEnrichingSpotify(true);
+    setStatus('Searching Spotify...');
 
     try {
-      const enrichedParts = [];
-      let hasUpdate = false;
+      const res = await fetch('/api/enrich-sources/spotify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ albumId: parseInt(entry.id) })
+      });
 
-      // 1. Enrich Spotify if missing
-      if (!entry.spotify_id) {
-        setStatus('Searching Spotify...');
-        const spotifyRes = await fetch('/api/enrich-sources/spotify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ albumId: parseInt(entry.id) })
-        });
-
-        const spotifyResult = await spotifyRes.json();
-        if (spotifyResult.success && !spotifyResult.skipped) {
-          enrichedParts.push('Spotify');
-          hasUpdate = true;
-        }
-      }
-
-      // 2. Enrich Apple Music if missing
-      if (!entry.apple_music_id) {
-        setStatus('Searching Apple Music...');
-        const appleRes = await fetch('/api/enrich-sources/apple-music', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ albumId: parseInt(entry.id) })
-        });
-
-        const appleResult = await appleRes.json();
-        if (appleResult.success && !appleResult.skipped) {
-          enrichedParts.push('Apple Music');
-          hasUpdate = true;
-        }
-      }
-
-      // 3. Enrich Genius lyrics if tracks exist
-      if (tracks && tracks.length > 0) {
-        setStatus('Searching Genius lyrics...');
-        const geniusRes = await fetch('/api/enrich-sources/genius', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ albumId: parseInt(entry.id) })
-        });
-
-        const geniusResult = await geniusRes.json();
-        if (geniusResult.success && geniusResult.data?.enrichedCount > 0) {
-          enrichedParts.push(`Genius Lyrics (${geniusResult.data.enrichedCount} tracks)`);
-          hasUpdate = true;
-        }
-      }
-
-      // 4. Reload entry if we made updates
-      if (hasUpdate) {
+      const result = await res.json();
+      
+      if (result.success && !result.skipped) {
         const updatedEntry = await fetchEntry(id);
         setEntry(updatedEntry);
-        
+        setStatus('✅ Added Spotify');
+      } else {
+        setStatus(`❌ ${result.error || 'Not found'}`);
+      }
+    } catch (err) {
+      setStatus(`❌ ${err instanceof Error ? err.message : 'Error'}`);
+    } finally {
+      setEnrichingSpotify(false);
+    }
+  }
+
+  async function enrichAppleMusic() {
+    if (!entry || entry.apple_music_id) return;
+
+    setEnrichingAppleMusic(true);
+    setStatus('Searching Apple Music...');
+
+    try {
+      const res = await fetch('/api/enrich-sources/apple-music', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ albumId: parseInt(entry.id) })
+      });
+
+      const result = await res.json();
+      
+      if (result.success && !result.skipped) {
+        const updatedEntry = await fetchEntry(id);
+        setEntry(updatedEntry);
+        setStatus('✅ Added Apple Music');
+      } else {
+        setStatus(`❌ ${result.error || 'Not found'}`);
+      }
+    } catch (err) {
+      setStatus(`❌ ${err instanceof Error ? err.message : 'Error'}`);
+    } finally {
+      setEnrichingAppleMusic(false);
+    }
+  }
+
+  async function enrichGenius() {
+    if (!entry || !tracks || tracks.length === 0) return;
+
+    setEnrichingGenius(true);
+    setStatus('Searching Genius...');
+
+    try {
+      const res = await fetch('/api/enrich-sources/genius', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ albumId: parseInt(entry.id) })
+      });
+
+      const result = await res.json();
+      
+      if (result.success && result.data?.enrichedCount > 0) {
+        const updatedEntry = await fetchEntry(id);
+        setEntry(updatedEntry);
         if (updatedEntry.tracklists) {
           try {
             const tl = JSON.parse(updatedEntry.tracklists);
             setTracks(Array.isArray(tl) ? (tl as Partial<Track>[]).map(cleanTrack) : []);
           } catch {
-            // Keep existing tracks
+            // Keep existing
           }
         }
-
-        // 5. Fetch Apple Music lyrics if we now have Apple Music ID and tracks
-        const finalAppleMusicId = updatedEntry.apple_music_id;
-        if (finalAppleMusicId && !hasAppleLyrics) {
-          setStatus('Fetching Apple Music lyrics...');
-          const appleLyricsRes = await fetch('/api/enrich-sources/apple-lyrics', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ albumId: parseInt(entry.id) })
-          });
-
-          const appleLyricsResult = await appleLyricsRes.json();
-          if (appleLyricsResult.success) {
-            enrichedParts.push(`Apple Lyrics (${appleLyricsResult.stats?.lyricsFound || 0} tracks)`);
-            
-            // Reload again to get lyrics
-            const finalEntry = await fetchEntry(id);
-            setEntry(finalEntry);
-            if (finalEntry.tracklists) {
-              try {
-                const tl = JSON.parse(finalEntry.tracklists);
-                setTracks(Array.isArray(tl) ? (tl as Partial<Track>[]).map(cleanTrack) : []);
-              } catch {
-                // Keep existing tracks
-              }
-            }
-          }
-        }
-      }
-
-      if (enrichedParts.length > 0) {
-        setStatus(`✅ Enriched with: ${enrichedParts.join(', ')}`);
+        setStatus(`✅ Added ${result.data.enrichedCount} Genius links`);
       } else {
-        setStatus('ℹ️ No new data found from services');
+        setStatus('ℹ️ No new links found');
       }
     } catch (err) {
-      setStatus(`❌ Enrichment failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setStatus(`❌ ${err instanceof Error ? err.message : 'Error'}`);
     } finally {
-      setEnrichingMulti(false);
+      setEnrichingGenius(false);
+    }
+  }
+
+  async function fetchAppleMusicLyrics() {
+    if (!entry?.apple_music_id) {
+      setStatus('No Apple Music ID');
+      return;
+    }
+
+    setFetchingAppleLyrics(true);
+    setStatus('Fetching Apple lyrics...');
+
+    try {
+      const res = await fetch('/api/enrich-sources/apple-lyrics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ albumId: parseInt(entry.id) })
+      });
+
+      const result = await res.json();
+
+      if (!result.success) {
+        setStatus(`❌ ${result.error}`);
+        return;
+      }
+
+      const updatedEntry = await fetchEntry(id);
+      setEntry(updatedEntry);
+      
+      if (updatedEntry.tracklists) {
+        try {
+          const tl = JSON.parse(updatedEntry.tracklists);
+          setTracks(Array.isArray(tl) ? (tl as Partial<Track>[]).map(cleanTrack) : []);
+        } catch {
+          // Keep existing
+        }
+      }
+
+      const { stats } = result;
+      setStatus(`✅ ${stats.lyricsFound}/${stats.totalTracks} lyrics`);
+    } catch (err) {
+      setStatus(`❌ ${err instanceof Error ? err.message : 'Error'}`);
+    } finally {
+      setFetchingAppleLyrics(false);
     }
   }
 
   if (!entry) {
-    return (
-      <div style={{ 
-        maxWidth: 750, 
-        margin: '32px auto', 
-        padding: 24, 
-        background: '#fff', 
-        borderRadius: 8, 
-        color: "#222",
-        textAlign: 'center'
-      }}>
-        Loading...
-      </div>
-    );
+    return <div style={{ maxWidth: 750, margin: '32px auto', padding: 24, background: '#fff', borderRadius: 8, color: "#222", textAlign: 'center' }}>Loading...</div>;
   }
 
   function handleChange(field: string, value: unknown) {
@@ -433,9 +388,7 @@ export default function EditEntryPage() {
   }
 
   function handleBlockSide(side: string) {
-    setBlockedSides((bs) =>
-      bs.includes(side) ? bs.filter((s) => s !== side) : [...bs, side]
-    );
+    setBlockedSides((bs) => bs.includes(side) ? bs.filter((s) => s !== side) : [...bs, side]);
   }
 
   function handleTrackChange(i: number, key: keyof Track, value: string) {
@@ -497,820 +450,151 @@ export default function EditEntryPage() {
     const { error } = await supabase.from('collection').update(update).eq('id', entry.id);
     
     if (error) {
-      console.error('Supabase error:', error);
       setStatus(`Error: ${error.message}`);
       setSaving(false);
     } else {
-      setStatus('✅ Saved successfully!');
+      setStatus('✅ Saved!');
       setSaving(false);
-      setTimeout(() => {
-        router.push('/admin/edit-collection');
-      }, 1000);
+      setTimeout(() => router.push('/admin/edit-collection'), 1000);
     }
   }
 
-  const sides = Array.from(
-    new Set(tracks.map(t => t.position?.[0]).filter(Boolean))
-  );
+  const sides = Array.from(new Set(tracks.map(t => t.position?.[0]).filter(Boolean)));
 
-  const inputStyle = {
-    padding: '8px 12px',
-    border: '1px solid #d1d5db',
-    borderRadius: '6px',
-    fontSize: '14px',
-    width: '100%',
-    boxSizing: 'border-box' as const,
-  };
-
-  const buttonStyle = {
-    padding: '6px 12px',
-    fontSize: '13px',
-    border: '1px solid #d1d5db',
-    borderRadius: '6px',
-    background: '#f9fafb',
-    cursor: 'pointer',
-    transition: 'all 0.2s',
-  };
-
-  const primaryButtonStyle = {
-    ...buttonStyle,
-    background: '#2563eb',
-    color: 'white',
-    border: '1px solid #2563eb',
-    fontWeight: '500',
-  };
+  const inputStyle = { padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px', width: '100%', boxSizing: 'border-box' as const };
+  const buttonStyle = { padding: '8px 16px', fontSize: '13px', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s' };
 
   return (
-    <div style={{ 
-      maxWidth: 1600, 
-      margin: '32px auto', 
-      padding: 32, 
-      background: '#fff', 
-      borderRadius: 12, 
-      color: "#222",
-      boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
-    }}>
-      {/* Header */}
+    <div style={{ maxWidth: 1600, margin: '32px auto', padding: 32, background: '#fff', borderRadius: 12, color: "#222", boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)' }}>
       <div style={{ marginBottom: 32, paddingBottom: 16, borderBottom: '1px solid #e5e7eb' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
           <div>
-            <h2 style={{ color: "#222", margin: 0, fontSize: '24px', fontWeight: '600' }}>
-              Edit Entry #{entry.id}
-            </h2>
-            <p style={{ color: "#6b7280", margin: '8px 0 0 0', fontSize: '14px' }}>
-              {entry.artist} - {entry.title}
-            </p>
+            <h2 style={{ color: "#222", margin: 0, fontSize: '24px', fontWeight: '600' }}>Edit Entry #{entry.id}</h2>
+            <p style={{ color: "#6b7280", margin: '8px 0 0 0', fontSize: '14px' }}>{entry.artist} - {entry.title}</p>
           </div>
 
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            {/* Discogs Enrichment */}
-            {hasMissingDiscogs && (
-              <div style={{
-                background: '#fef3c7',
-                border: '1px solid #f59e0b',
-                borderRadius: 8,
-                padding: 16,
-                maxWidth: 300
-              }}>
-                <div style={{ fontSize: '14px', fontWeight: '600', color: '#92400e', marginBottom: 8 }}>
-                  ⚠️ Missing Discogs Data
-                </div>
-                <div style={{ fontSize: '12px', color: '#78350f', marginBottom: 12 }}>
-                  {missingDiscogsFields.filter(f => f.isEmpty).map(f => f.label).join(', ')}
-                </div>
-                <button
-                  onClick={fetchAllMissingMetadata}
-                  disabled={fetching || !entry.discogs_release_id}
-                  style={{
-                    ...primaryButtonStyle,
-                    width: '100%',
-                    background: fetching ? '#9ca3af' : '#f59e0b',
-                    border: fetching ? 'none' : '1px solid #f59e0b',
-                    cursor: fetching ? 'not-allowed' : 'pointer'
-                  }}
-                >
-                  {fetching ? 'Fetching...' : '🔄 Fetch from Discogs'}
-                </button>
-              </div>
-            )}
-
-            {/* Multi-Source Enrichment */}
-            {hasMissingMultiSource && (
-              <div style={{
-                background: '#f0f9ff',
-                border: '1px solid #3b82f6',
-                borderRadius: 8,
-                padding: 16,
-                maxWidth: 300
-              }}>
-                <div style={{ fontSize: '14px', fontWeight: '600', color: '#1e40af', marginBottom: 8 }}>
-                  🎵 Missing Streaming Data
-                </div>
-                <div style={{ fontSize: '12px', color: '#1e3a8a', marginBottom: 12 }}>
-                  {missingMultiSourceFields.filter(f => f.isEmpty).map(f => f.label).join(', ')}
-                </div>
-                <button
-                  onClick={enrichMultiSource}
-                  disabled={enrichingMulti}
-                  style={{
-                    ...primaryButtonStyle,
-                    width: '100%',
-                    background: enrichingMulti ? '#9ca3af' : 'linear-gradient(135deg, #7c3aed, #a855f7)',
-                    border: 'none',
-                    cursor: enrichingMulti ? 'not-allowed' : 'pointer'
-                  }}
-                >
-                  {enrichingMulti ? 'Enriching...' : '⚡ Enrich Spotify/Apple'}
-                </button>
-              </div>
-            )}
-
-            {/* Apple Music Lyrics */}
-            {canFetchAppleLyrics && !hasAppleLyrics && (
-              <div style={{
-                background: '#fce7f3',
-                border: '1px solid #ec4899',
-                borderRadius: 8,
-                padding: 16,
-                maxWidth: 300
-              }}>
-                <div style={{ fontSize: '14px', fontWeight: '600', color: '#9f1239', marginBottom: 8 }}>
-                  🍎 Apple Music Lyrics
-                </div>
-                <div style={{ fontSize: '12px', color: '#9f1239', marginBottom: 12 }}>
-                  Fetch full lyrics text from Apple Music
-                </div>
-                <button
-                  onClick={fetchAppleMusicLyrics}
-                  disabled={fetchingAppleLyrics}
-                  style={{
-                    ...primaryButtonStyle,
-                    width: '100%',
-                    background: fetchingAppleLyrics ? '#9ca3af' : '#ec4899',
-                    border: 'none',
-                    cursor: fetchingAppleLyrics ? 'not-allowed' : 'pointer'
-                  }}
-                >
-                  {fetchingAppleLyrics ? 'Fetching...' : '🍎 Fetch Apple Lyrics'}
-                </button>
-              </div>
-            )}
+            {hasMissingDiscogs && <button onClick={fetchDiscogsMetadata} disabled={fetchingDiscogs} style={{ ...buttonStyle, background: fetchingDiscogs ? '#9ca3af' : '#f59e0b', color: 'white' }}>{fetchingDiscogs ? '⏳ Discogs...' : '🔄 Fetch Discogs'}</button>}
+            {missingSpotify && <button onClick={enrichSpotify} disabled={enrichingSpotify} style={{ ...buttonStyle, background: enrichingSpotify ? '#9ca3af' : '#1DB954', color: 'white' }}>{enrichingSpotify ? '⏳ Spotify...' : '🎵 Add Spotify'}</button>}
+            {missingAppleMusic && <button onClick={enrichAppleMusic} disabled={enrichingAppleMusic} style={{ ...buttonStyle, background: enrichingAppleMusic ? '#9ca3af' : '#FA57C1', color: 'white' }}>{enrichingAppleMusic ? '⏳ Apple...' : '🍎 Add Apple'}</button>}
+            {canFetchGenius && <button onClick={enrichGenius} disabled={enrichingGenius} style={{ ...buttonStyle, background: enrichingGenius ? '#9ca3af' : '#7c3aed', color: 'white' }}>{enrichingGenius ? '⏳ Genius...' : '📝 Add Genius'}</button>}
+            {canFetchAppleLyrics && !hasAppleLyrics && <button onClick={fetchAppleMusicLyrics} disabled={fetchingAppleLyrics} style={{ ...buttonStyle, background: fetchingAppleLyrics ? '#9ca3af' : '#ec4899', color: 'white' }}>{fetchingAppleLyrics ? '⏳ Lyrics...' : '🍎 Fetch Lyrics'}</button>}
           </div>
         </div>
 
-        {/* Show enrichment status */}
         {(entry.spotify_id || entry.apple_music_id || hasAppleLyrics) && (
-          <div style={{
-            marginTop: 16,
-            padding: 12,
-            background: '#f0fdf4',
-            border: '1px solid #16a34a',
-            borderRadius: 6,
-            display: 'flex',
-            gap: 12,
-            alignItems: 'center',
-            fontSize: 13,
-            flexWrap: 'wrap'
-          }}>
-            <span style={{ fontWeight: 600, color: '#15803d' }}>✅ Enriched with:</span>
-            {entry.spotify_id && (
-              <a 
-                href={entry.spotify_url || `https://open.spotify.com/album/${entry.spotify_id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  padding: '4px 8px',
-                  background: '#dcfce7',
-                  color: '#15803d',
-                  borderRadius: 4,
-                  textDecoration: 'none',
-                  fontWeight: 600
-                }}
-              >
-                Spotify →
-              </a>
-            )}
-            {entry.apple_music_id && (
-              <a
-                href={entry.apple_music_url || `https://music.apple.com/album/${entry.apple_music_id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  padding: '4px 8px',
-                  background: '#fce7f3',
-                  color: '#be185d',
-                  borderRadius: 4,
-                  textDecoration: 'none',
-                  fontWeight: 600
-                }}
-              >
-                Apple Music →
-              </a>
-            )}
-            {hasAppleLyrics && (
-              <span style={{
-                padding: '4px 8px',
-                background: '#fce7f3',
-                color: '#be185d',
-                borderRadius: 4,
-                fontWeight: 600
-              }}>
-                🍎 {appleLyricsCount} Apple Music lyrics
-              </span>
-            )}
-            {geniusLyricsCount > 0 && (
-              <span style={{
-                padding: '4px 8px',
-                background: '#e9d5ff',
-                color: '#7c3aed',
-                borderRadius: 4,
-                fontWeight: 600
-              }}>
-                📝 {geniusLyricsCount} Genius links
-              </span>
-            )}
+          <div style={{ marginTop: 16, padding: 12, background: '#f0fdf4', border: '1px solid #16a34a', borderRadius: 6, display: 'flex', gap: 12, alignItems: 'center', fontSize: 13, flexWrap: 'wrap' }}>
+            <span style={{ fontWeight: 600, color: '#15803d' }}>✅ Enriched:</span>
+            {entry.spotify_id && <a href={entry.spotify_url || `https://open.spotify.com/album/${entry.spotify_id}`} target="_blank" rel="noopener noreferrer" style={{ padding: '4px 8px', background: '#dcfce7', color: '#15803d', borderRadius: 4, textDecoration: 'none', fontWeight: 600 }}>Spotify</a>}
+            {entry.apple_music_id && <a href={entry.apple_music_url || `https://music.apple.com/album/${entry.apple_music_id}`} target="_blank" rel="noopener noreferrer" style={{ padding: '4px 8px', background: '#fce7f3', color: '#be185d', borderRadius: 4, textDecoration: 'none', fontWeight: 600 }}>Apple Music</a>}
+            {hasAppleLyrics && <span style={{ padding: '4px 8px', background: '#fce7f3', color: '#be185d', borderRadius: 4, fontWeight: 600 }}>🍎 {appleLyricsCount} lyrics</span>}
+            {geniusLyricsCount > 0 && <span style={{ padding: '4px 8px', background: '#e9d5ff', color: '#7c3aed', borderRadius: 4, fontWeight: 600 }}>📝 {geniusLyricsCount} links</span>}
           </div>
         )}
+
+        {status && <div style={{ marginTop: 16, padding: 12, background: status.includes('❌') ? '#fee2e2' : status.includes('✅') ? '#dcfce7' : '#dbeafe', border: `1px solid ${status.includes('❌') ? '#dc2626' : status.includes('✅') ? '#16a34a' : '#3b82f6'}`, borderRadius: 6, fontSize: 14, color: status.includes('❌') ? '#991b1b' : status.includes('✅') ? '#15803d' : '#1e40af', fontWeight: 500 }}>{status}</div>}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1.5fr', gap: 32, alignItems: 'flex-start' }}>
         
-        {/* Left Column - Basic Info */}
         <div style={{ color: "#222" }}>
-          <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: 16, color: '#374151' }}>
-            Basic Information
-          </h3>
+          <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: 16, color: '#374151' }}>Basic Information</h3>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div>
-              <label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>Artist</label>
-              <input 
-                style={inputStyle}
-                value={entry.artist || ''} 
-                onChange={e => handleChange('artist', e.target.value)} 
-                placeholder="Enter artist name"
-              />
-            </div>
-            
-            <div>
-              <label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>Title</label>
-              <input 
-                style={inputStyle}
-                value={entry.title || ''} 
-                onChange={e => handleChange('title', e.target.value)}
-                placeholder="Enter album title" 
-              />
-            </div>
-            
-            <div>
-              <label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>
-                This Release Year
-              </label>
-              <input 
-                style={inputStyle}
-                value={entry.year || ''} 
-                onChange={e => {
-                  handleChange('year', e.target.value);
-                  if (!entry.master_release_date) {
-                    const decade = calculateDecade(e.target.value);
-                    if (decade) handleChange('decade', decade);
-                  }
-                }}
-                placeholder="e.g. 1969" 
-              />
-              <div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>
-                Year of this specific pressing/release
-              </div>
-            </div>
-
-            <div>
-              <label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>
-                Master Release Year
-              </label>
-              <input 
-                style={inputStyle}
-                value={entry.master_release_date || ''} 
-                onChange={e => {
-                  handleChange('master_release_date', e.target.value);
-                  const decade = calculateDecade(e.target.value);
-                  if (decade) handleChange('decade', decade);
-                }}
-                placeholder="e.g. 1967" 
-              />
-              <div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>
-                Original first release year (decade calculated from this)
-              </div>
-            </div>
-            
-            <div>
-              <label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>Folder</label>
-              <input 
-                style={inputStyle}
-                value={entry.folder || ''} 
-                onChange={e => handleChange('folder', e.target.value)}
-                placeholder="Collection folder" 
-              />
-            </div>
-            
-            <div>
-              <label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>Format</label>
-              <input 
-                style={inputStyle}
-                value={entry.format || ''} 
-                onChange={e => handleChange('format', e.target.value)}
-                placeholder="e.g. Vinyl, LP, 12 inch" 
-              />
-            </div>
-            
-            <div>
-              <label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>Media Condition</label>
-              <input 
-                style={inputStyle}
-                value={entry.media_condition || ''} 
-                onChange={e => handleChange('media_condition', e.target.value)}
-                placeholder="e.g. VG+, NM, M" 
-              />
-            </div>
-
-            <div>
-              <label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>
-                💰 Sell Price
-              </label>
-              <input 
-                style={inputStyle}
-                value={entry.sell_price || ''} 
-                onChange={e => handleChange('sell_price', e.target.value)}
-                placeholder="e.g. $25.00 or NFS"
-              />
-              <div style={{ fontSize: '12px', color: '#6b7280', marginTop: 4 }}>
-                Enter price like &quot;$25.00&quot; or &quot;NFS&quot;
-              </div>
-            </div>
-
-            <div>
-              <label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>Image URL</label>
-              <input 
-                style={inputStyle}
-                value={entry.image_url || ''} 
-                onChange={e => handleChange('image_url', e.target.value)}
-                placeholder="Cover image URL" 
-              />
-              {entry.image_url && (
-                <div style={{ 
-                  padding: 12, 
-                  background: '#f9fafb', 
-                  borderRadius: 8, 
-                  display: 'flex', 
-                  justifyContent: 'center',
-                  marginTop: 12
-                }}>
-                  <Image
-                    src={entry.image_url}
-                    alt="cover"
-                    width={120}
-                    height={120}
-                    style={{ borderRadius: 8, objectFit: 'cover', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}
-                    unoptimized
-                  />
-                </div>
-              )}
-            </div>
+            <div><label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>Artist</label><input style={inputStyle} value={entry.artist || ''} onChange={e => handleChange('artist', e.target.value)} placeholder="Enter artist name" /></div>
+            <div><label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>Title</label><input style={inputStyle} value={entry.title || ''} onChange={e => handleChange('title', e.target.value)} placeholder="Enter album title" /></div>
+            <div><label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>This Release Year</label><input style={inputStyle} value={entry.year || ''} onChange={e => { handleChange('year', e.target.value); if (!entry.master_release_date) { const decade = calculateDecade(e.target.value); if (decade) handleChange('decade', decade); }}} placeholder="e.g. 1969" /><div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>Year of this pressing</div></div>
+            <div><label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>Master Release Year</label><input style={inputStyle} value={entry.master_release_date || ''} onChange={e => { handleChange('master_release_date', e.target.value); const decade = calculateDecade(e.target.value); if (decade) handleChange('decade', decade); }} placeholder="e.g. 1967" /><div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>Original first release</div></div>
+            <div><label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>Folder</label><input style={inputStyle} value={entry.folder || ''} onChange={e => handleChange('folder', e.target.value)} placeholder="Collection folder" /></div>
+            <div><label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>Format</label><input style={inputStyle} value={entry.format || ''} onChange={e => handleChange('format', e.target.value)} placeholder="e.g. Vinyl, LP" /></div>
+            <div><label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>Media Condition</label><input style={inputStyle} value={entry.media_condition || ''} onChange={e => handleChange('media_condition', e.target.value)} placeholder="e.g. VG+, NM" /></div>
+            <div><label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>💰 Sell Price</label><input style={inputStyle} value={entry.sell_price || ''} onChange={e => handleChange('sell_price', e.target.value)} placeholder="e.g. $25.00" /></div>
+            <div><label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>Image URL</label><input style={inputStyle} value={entry.image_url || ''} onChange={e => handleChange('image_url', e.target.value)} placeholder="Cover image URL" />{entry.image_url && <div style={{ padding: 12, background: '#f9fafb', borderRadius: 8, display: 'flex', justifyContent: 'center', marginTop: 12 }}><Image src={entry.image_url} alt="cover" width={120} height={120} style={{ borderRadius: 8, objectFit: 'cover', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }} unoptimized /></div>}</div>
           </div>
         </div>
 
-        {/* Middle Left Column - Streaming Services */}
         <div style={{ color: "#222" }}>
-          <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: 16, color: '#374151' }}>
-            🎵 Streaming Services
-          </h3>
-
+          <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: 16, color: '#374151' }}>🎵 Streaming</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {/* Spotify Section */}
-            <div style={{
-              padding: 16,
-              background: '#dcfce7',
-              border: '1px solid #16a34a',
-              borderRadius: 8
-            }}>
-              <h4 style={{ fontSize: '16px', fontWeight: '600', margin: '0 0 12px 0', color: '#15803d' }}>
-                Spotify
-              </h4>
-              
+            <div style={{ padding: 16, background: '#dcfce7', border: '1px solid #16a34a', borderRadius: 8 }}>
+              <h4 style={{ fontSize: '16px', fontWeight: '600', margin: '0 0 12px 0', color: '#15803d' }}>Spotify</h4>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: 6, fontSize: '13px', fontWeight: '500', color: "#15803d" }}>
-                    Spotify ID {!entry.spotify_id && '⚠️'}
-                  </label>
-                  <input 
-                    style={{...inputStyle, fontSize: '13px'}}
-                    value={entry.spotify_id || ''} 
-                    onChange={e => handleChange('spotify_id', e.target.value)}
-                    placeholder="e.g. 4aawyAB9vmqN3uQ7FjRGTy" 
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', marginBottom: 6, fontSize: '13px', fontWeight: '500', color: "#15803d" }}>
-                    Spotify URL
-                  </label>
-                  <input 
-                    style={{...inputStyle, fontSize: '13px'}}
-                    value={entry.spotify_url || ''} 
-                    onChange={e => handleChange('spotify_url', e.target.value)}
-                    placeholder="https://open.spotify.com/album/..." 
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', marginBottom: 6, fontSize: '13px', fontWeight: '500', color: "#15803d" }}>
-                    Spotify Genres
-                  </label>
-                  <input 
-                    style={{...inputStyle, fontSize: '13px'}}
-                    value={entry.spotify_genres?.join(', ') || ''} 
-                    onChange={e => handleChange('spotify_genres', e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
-                    placeholder="classic rock, psychedelic rock"
-                  />
-                </div>
+                <div><label style={{ display: 'block', marginBottom: 6, fontSize: '13px', fontWeight: '500', color: "#15803d" }}>Spotify ID {!entry.spotify_id && '⚠️'}</label><input style={{...inputStyle, fontSize: '13px'}} value={entry.spotify_id || ''} onChange={e => handleChange('spotify_id', e.target.value)} placeholder="e.g. 4aawyAB9vmqN3uQ7FjRGTy" /></div>
+                <div><label style={{ display: 'block', marginBottom: 6, fontSize: '13px', fontWeight: '500', color: "#15803d" }}>URL</label><input style={{...inputStyle, fontSize: '13px'}} value={entry.spotify_url || ''} onChange={e => handleChange('spotify_url', e.target.value)} placeholder="https://open.spotify.com/album/..." /></div>
+                <div><label style={{ display: 'block', marginBottom: 6, fontSize: '13px', fontWeight: '500', color: "#15803d" }}>Genres</label><input style={{...inputStyle, fontSize: '13px'}} value={entry.spotify_genres?.join(', ') || ''} onChange={e => handleChange('spotify_genres', e.target.value.split(',').map(s => s.trim()).filter(Boolean))} placeholder="classic rock" /></div>
               </div>
             </div>
-
-            {/* Apple Music Section */}
-            <div style={{
-              padding: 16,
-              background: '#fce7f3',
-              border: '1px solid #ec4899',
-              borderRadius: 8
-            }}>
-              <h4 style={{ fontSize: '16px', fontWeight: '600', margin: '0 0 12px 0', color: '#be185d' }}>
-                Apple Music
-              </h4>
-              
+            <div style={{ padding: 16, background: '#fce7f3', border: '1px solid #ec4899', borderRadius: 8 }}>
+              <h4 style={{ fontSize: '16px', fontWeight: '600', margin: '0 0 12px 0', color: '#be185d' }}>Apple Music</h4>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: 6, fontSize: '13px', fontWeight: '500', color: "#be185d" }}>
-                    Apple Music ID {!entry.apple_music_id && '⚠️'}
-                  </label>
-                  <input 
-                    style={{...inputStyle, fontSize: '13px'}}
-                    value={entry.apple_music_id || ''} 
-                    onChange={e => handleChange('apple_music_id', e.target.value)}
-                    placeholder="e.g. 1440857781" 
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', marginBottom: 6, fontSize: '13px', fontWeight: '500', color: "#be185d" }}>
-                    Apple Music URL
-                  </label>
-                  <input 
-                    style={{...inputStyle, fontSize: '13px'}}
-                    value={entry.apple_music_url || ''} 
-                    onChange={e => handleChange('apple_music_url', e.target.value)}
-                    placeholder="https://music.apple.com/album/..." 
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', marginBottom: 6, fontSize: '13px', fontWeight: '500', color: "#be185d" }}>
-                    Apple Music Genres
-                  </label>
-                  <input 
-                    style={{...inputStyle, fontSize: '13px'}}
-                    value={entry.apple_music_genres?.join(', ') || ''} 
-                    onChange={e => handleChange('apple_music_genres', e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
-                    placeholder="Rock, Psychedelic"
-                  />
-                </div>
+                <div><label style={{ display: 'block', marginBottom: 6, fontSize: '13px', fontWeight: '500', color: "#be185d" }}>Apple ID {!entry.apple_music_id && '⚠️'}</label><input style={{...inputStyle, fontSize: '13px'}} value={entry.apple_music_id || ''} onChange={e => handleChange('apple_music_id', e.target.value)} placeholder="e.g. 1440857781" /></div>
+                <div><label style={{ display: 'block', marginBottom: 6, fontSize: '13px', fontWeight: '500', color: "#be185d" }}>URL</label><input style={{...inputStyle, fontSize: '13px'}} value={entry.apple_music_url || ''} onChange={e => handleChange('apple_music_url', e.target.value)} placeholder="https://music.apple.com/..." /></div>
+                <div><label style={{ display: 'block', marginBottom: 6, fontSize: '13px', fontWeight: '500', color: "#be185d" }}>Genres</label><input style={{...inputStyle, fontSize: '13px'}} value={entry.apple_music_genres?.join(', ') || ''} onChange={e => handleChange('apple_music_genres', e.target.value.split(',').map(s => s.trim()).filter(Boolean))} placeholder="Rock, Psychedelic" /></div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Middle Right Column - Metadata */}
         <div style={{ color: "#222" }}>
-          <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: 16, color: '#374151' }}>
-            Metadata
-          </h3>
-
+          <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: 16, color: '#374151' }}>Metadata</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div>
-              <label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>
-                Genres {!entry.discogs_genres || entry.discogs_genres.length === 0 ? '⚠️' : '✓'}
-              </label>
-              <input 
-                style={inputStyle}
-                value={entry.discogs_genres?.join(', ') || ''} 
-                onChange={e => handleChange('discogs_genres', e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
-                placeholder="Rock, Jazz, Electronic"
-              />
-              <div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>
-                Comma-separated genres
-              </div>
-            </div>
-
-            <div>
-              <label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>
-                Styles {!entry.discogs_styles || entry.discogs_styles.length === 0 ? '⚠️' : '✓'}
-              </label>
-              <input 
-                style={inputStyle}
-                value={entry.discogs_styles?.join(', ') || ''} 
-                onChange={e => handleChange('discogs_styles', e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
-                placeholder="Progressive Rock, Modal, Ambient"
-              />
-              <div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>
-                Comma-separated styles
-              </div>
-            </div>
-
-            <div>
-              <label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>
-                Decade {!entry.decade ? '⚠️' : '✓'}
-              </label>
-              <input 
-                style={inputStyle}
-                value={entry.decade || ''} 
-                onChange={e => handleChange('decade', parseInt(e.target.value) || null)}
-                placeholder="1970"
-                type="number"
-                step="10"
-              />
-              <div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>
-                Auto-calculated from master release year
-              </div>
-            </div>
-
-            <div style={{ 
-              padding: 16, 
-              background: '#f0f9ff', 
-              borderRadius: 8, 
-              border: '1px solid #0369a1' 
-            }}>
-              <h4 style={{ fontSize: '16px', fontWeight: '600', margin: '0 0 12px 0', color: '#0c4a6e' }}>
-                🏆 Special Badges
-              </h4>
-              
+            <div><label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>Genres {!entry.discogs_genres || entry.discogs_genres.length === 0 ? '⚠️' : '✓'}</label><input style={inputStyle} value={entry.discogs_genres?.join(', ') || ''} onChange={e => handleChange('discogs_genres', e.target.value.split(',').map(s => s.trim()).filter(Boolean))} placeholder="Rock, Jazz" /><div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>Comma-separated</div></div>
+            <div><label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>Styles {!entry.discogs_styles || entry.discogs_styles.length === 0 ? '⚠️' : '✓'}</label><input style={inputStyle} value={entry.discogs_styles?.join(', ') || ''} onChange={e => handleChange('discogs_styles', e.target.value.split(',').map(s => s.trim()).filter(Boolean))} placeholder="Progressive Rock" /><div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>Comma-separated</div></div>
+            <div><label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>Decade {!entry.decade ? '⚠️' : '✓'}</label><input style={inputStyle} value={entry.decade || ''} onChange={e => handleChange('decade', parseInt(e.target.value) || null)} placeholder="1970" type="number" step="10" /><div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>Auto-calculated</div></div>
+            <div style={{ padding: 16, background: '#f0f9ff', borderRadius: 8, border: '1px solid #0369a1' }}>
+              <h4 style={{ fontSize: '16px', fontWeight: '600', margin: '0 0 12px 0', color: '#0c4a6e' }}>🏆 Badges</h4>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <label style={{ display: 'flex', alignItems: 'center', color: "#374151", cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={!!entry.steves_top_200}
-                    onChange={e => handleChange('steves_top_200', e.target.checked)}
-                    style={{ marginRight: 8, transform: 'scale(1.1)' }}
-                  />
-                  <span style={{ fontWeight: '600', color: '#dc2626' }}>⭐ Steve&apos;s Top 200</span>
-                </label>
-                
-                <label style={{ display: 'flex', alignItems: 'center', color: "#374151", cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={!!entry.this_weeks_top_10}
-                    onChange={e => handleChange('this_weeks_top_10', e.target.checked)}
-                    style={{ marginRight: 8, transform: 'scale(1.1)' }}
-                  />
-                  <span style={{ fontWeight: '600', color: '#ea580c' }}>🔥 This Week&apos;s Top 10</span>
-                </label>
-                
-                <label style={{ display: 'flex', alignItems: 'center', color: "#374151", cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={!!entry.inner_circle_preferred}
-                    onChange={e => handleChange('inner_circle_preferred', e.target.checked)}
-                    style={{ marginRight: 8, transform: 'scale(1.1)' }}
-                  />
-                  <span style={{ fontWeight: '600', color: '#7c3aed' }}>💎 Inner Circle Preferred</span>
-                </label>
+                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}><input type="checkbox" checked={!!entry.steves_top_200} onChange={e => handleChange('steves_top_200', e.target.checked)} style={{ marginRight: 8 }} /><span style={{ fontWeight: '600', color: '#dc2626' }}>⭐ Top 200</span></label>
+                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}><input type="checkbox" checked={!!entry.this_weeks_top_10} onChange={e => handleChange('this_weeks_top_10', e.target.checked)} style={{ marginRight: 8 }} /><span style={{ fontWeight: '600', color: '#ea580c' }}>🔥 Top 10</span></label>
+                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}><input type="checkbox" checked={!!entry.inner_circle_preferred} onChange={e => handleChange('inner_circle_preferred', e.target.checked)} style={{ marginRight: 8 }} /><span style={{ fontWeight: '600', color: '#7c3aed' }}>💎 Inner Circle</span></label>
               </div>
             </div>
-
-            <div style={{ 
-              padding: 16, 
-              background: '#fef3c7', 
-              borderRadius: 8, 
-              border: '1px solid #f59e0b' 
-            }}>
-              <h4 style={{ fontSize: '16px', fontWeight: '600', margin: '0 0 12px 0', color: '#92400e' }}>
-                Blocking Options
-              </h4>
-              
-              <label style={{ display: 'flex', alignItems: 'center', marginBottom: 12, color: "#374151", cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={!!entry.blocked}
-                  onChange={e => handleChange('blocked', e.target.checked)}
-                  style={{ marginRight: 8 }}
-                />
-                <strong>Block Entire Album</strong>
-              </label>
-              
-              {sides.length > 0 && (
-                <div>
-                  <div style={{ fontWeight: '600', marginBottom: 8, color: "#374151" }}>Block Individual Sides:</div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                    {sides.map(side => (
-                      <label 
-                        key={side} 
-                        style={{ 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          padding: '6px 12px',
-                          background: blockedSides.includes(side) ? '#fee2e2' : '#fff',
-                          border: '1px solid #d1d5db',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          fontSize: '13px'
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={blockedSides.includes(side)}
-                          onChange={() => handleBlockSide(side)}
-                          style={{ marginRight: 6 }}
-                        />
-                        Side {side}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
+            <div style={{ padding: 16, background: '#fef3c7', borderRadius: 8, border: '1px solid #f59e0b' }}>
+              <h4 style={{ fontSize: '16px', fontWeight: '600', margin: '0 0 12px 0', color: '#92400e' }}>Blocking</h4>
+              <label style={{ display: 'flex', alignItems: 'center', marginBottom: 12, cursor: 'pointer' }}><input type="checkbox" checked={!!entry.blocked} onChange={e => handleChange('blocked', e.target.checked)} style={{ marginRight: 8 }} /><strong>Block Album</strong></label>
+              {sides.length > 0 && <div><div style={{ fontWeight: '600', marginBottom: 8 }}>Block Sides:</div><div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>{sides.map(side => <label key={side} style={{ display: 'flex', alignItems: 'center', padding: '6px 12px', background: blockedSides.includes(side) ? '#fee2e2' : '#fff', border: '1px solid #d1d5db', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}><input type="checkbox" checked={blockedSides.includes(side)} onChange={() => handleBlockSide(side)} style={{ marginRight: 6 }} />Side {side}</label>)}</div></div>}
             </div>
           </div>
         </div>
 
-        {/* Right Column - Tracklist */}
         <div style={{ color: "#222" }}>
-          <div style={{ marginBottom: 24 }}>
-            <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: 16, color: '#374151' }}>
-              Tracklist {!tracks || tracks.length === 0 ? '⚠️' : '✓'}
-            </h3>
-            
-            <div style={{ 
-              border: '1px solid #e5e7eb', 
-              borderRadius: 8, 
-              overflow: 'hidden',
-              maxHeight: 600,
-              overflowY: 'auto'
-            }}>
-              <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
-                <thead style={{ background: '#f9fafb', position: 'sticky', top: 0 }}>
-                  <tr>
-                    <th style={{ padding: '12px 8px', textAlign: 'left', fontWeight: '600', borderBottom: '1px solid #e5e7eb' }}>Pos</th>
-                    <th style={{ padding: '12px 8px', textAlign: 'left', fontWeight: '600', borderBottom: '1px solid #e5e7eb' }}>Title</th>
-                    <th style={{ padding: '12px 8px', textAlign: 'left', fontWeight: '600', borderBottom: '1px solid #e5e7eb' }}>Duration</th>
-                    <th style={{ padding: '12px 8px', textAlign: 'center', fontWeight: '600', borderBottom: '1px solid #e5e7eb' }}>Lyrics</th>
-                    <th style={{ padding: '12px 8px', width: 40, borderBottom: '1px solid #e5e7eb' }}></th>
+          <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: 16, color: '#374151' }}>Tracklist {!tracks || tracks.length === 0 ? '⚠️' : '✓'}</h3>
+          <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden', maxHeight: 600, overflowY: 'auto' }}>
+            <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+              <thead style={{ background: '#f9fafb', position: 'sticky', top: 0 }}>
+                <tr>
+                  <th style={{ padding: '12px 8px', textAlign: 'left', fontWeight: '600', borderBottom: '1px solid #e5e7eb' }}>Pos</th>
+                  <th style={{ padding: '12px 8px', textAlign: 'left', fontWeight: '600', borderBottom: '1px solid #e5e7eb' }}>Title</th>
+                  <th style={{ padding: '12px 8px', textAlign: 'left', fontWeight: '600', borderBottom: '1px solid #e5e7eb' }}>Time</th>
+                  <th style={{ padding: '12px 8px', textAlign: 'center', fontWeight: '600', borderBottom: '1px solid #e5e7eb' }}>Lyrics</th>
+                  <th style={{ padding: '12px 8px', width: 40, borderBottom: '1px solid #e5e7eb' }}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {tracks.map((t, i) => (
+                  <tr key={i} style={{ borderBottom: i < tracks.length - 1 ? '1px solid #f3f4f6' : 'none' }}>
+                    <td style={{ padding: '8px' }}><input value={t.position} onChange={e => handleTrackChange(i, 'position', e.target.value)} style={{ ...inputStyle, width: 50, padding: '4px 6px', fontSize: '12px', textAlign: 'center' }} placeholder="A1" /></td>
+                    <td style={{ padding: '8px' }}><input value={t.title} onChange={e => handleTrackChange(i, 'title', e.target.value)} style={{ ...inputStyle, padding: '4px 6px', fontSize: '12px' }} placeholder="Track title" /></td>
+                    <td style={{ padding: '8px' }}><input value={t.duration} onChange={e => handleTrackChange(i, 'duration', e.target.value)} style={{ ...inputStyle, width: 70, padding: '4px 6px', fontSize: '12px', textAlign: 'center' }} placeholder="3:45" /></td>
+                    <td style={{ padding: '8px', textAlign: 'center' }}>
+                      {t.lyrics && t.lyrics_source === 'apple_music' && <span style={{ fontSize: 16 }} title="Has Apple lyrics">🍎</span>}
+                      {t.lyrics_url && <a href={t.lyrics_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 16, textDecoration: 'none', marginLeft: t.lyrics ? 4 : 0 }} title="Genius">📝</a>}
+                    </td>
+                    <td style={{ padding: '8px', textAlign: 'center' }}><button type="button" onClick={() => removeTrack(i)} style={{ color: "#dc2626", background: 'none', border: 'none', fontSize: 16, cursor: 'pointer', padding: '4px', borderRadius: '4px' }} title="Remove">×</button></td>
                   </tr>
-                </thead>
-                <tbody>
-                  {tracks.map((t, i) => (
-                    <tr key={i} style={{ borderBottom: i < tracks.length - 1 ? '1px solid #f3f4f6' : 'none' }}>
-                      <td style={{ padding: '8px' }}>
-                        <input 
-                          value={t.position} 
-                          onChange={e => handleTrackChange(i, 'position', e.target.value)} 
-                          style={{ 
-                            ...inputStyle, 
-                            width: 50, 
-                            padding: '4px 6px', 
-                            fontSize: '12px',
-                            textAlign: 'center'
-                          }} 
-                          placeholder="A1"
-                        />
-                      </td>
-                      <td style={{ padding: '8px' }}>
-                        <input 
-                          value={t.title} 
-                          onChange={e => handleTrackChange(i, 'title', e.target.value)} 
-                          style={{ 
-                            ...inputStyle, 
-                            padding: '4px 6px', 
-                            fontSize: '12px'
-                          }} 
-                          placeholder="Track title"
-                        />
-                      </td>
-                      <td style={{ padding: '8px' }}>
-                        <input 
-                          value={t.duration} 
-                          onChange={e => handleTrackChange(i, 'duration', e.target.value)} 
-                          style={{ 
-                            ...inputStyle, 
-                            width: 70, 
-                            padding: '4px 6px', 
-                            fontSize: '12px',
-                            textAlign: 'center'
-                          }} 
-                          placeholder="3:45"
-                        />
-                      </td>
-                      <td style={{ padding: '8px', textAlign: 'center' }}>
-                        {t.lyrics && t.lyrics_source === 'apple_music' && (
-                          <span 
-                            style={{ fontSize: 16, cursor: 'help' }}
-                            title="Has Apple Music lyrics"
-                          >
-                            🍎
-                          </span>
-                        )}
-                        {t.lyrics_url && (
-                          <a 
-                            href={t.lyrics_url} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            style={{ fontSize: 16, textDecoration: 'none', marginLeft: t.lyrics ? 4 : 0 }}
-                            title="View lyrics on Genius"
-                          >
-                            📝
-                          </a>
-                        )}
-                      </td>
-                      <td style={{ padding: '8px', textAlign: 'center' }}>
-                        <button 
-                          type="button" 
-                          onClick={() => removeTrack(i)} 
-                          style={{ 
-                            color: "#dc2626", 
-                            background: 'none', 
-                            border: 'none', 
-                            fontSize: 16, 
-                            cursor: 'pointer',
-                            padding: '4px',
-                            borderRadius: '4px'
-                          }}
-                          title="Remove track"
-                        >
-                          ×
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <button 
-              type="button" 
-              onClick={addTrack} 
-              style={{ 
-                ...buttonStyle, 
-                marginTop: 12, 
-                width: '100%',
-                background: '#f0f9ff',
-                color: '#0369a1',
-                border: '1px solid #0369a1'
-              }}
-            >
-              + Add Track
-            </button>
+                ))}
+              </tbody>
+            </table>
           </div>
+          <button type="button" onClick={addTrack} style={{ ...buttonStyle, marginTop: 12, width: '100%', background: '#f0f9ff', color: '#0369a1', border: '1px solid #0369a1' }}>+ Add Track</button>
         </div>
       </div>
 
-      {/* Footer Actions */}
-      <div style={{ 
-        marginTop: 32, 
-        paddingTop: 24, 
-        borderTop: '1px solid #e5e7eb',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between'
-      }}>
+      <div style={{ marginTop: 32, paddingTop: 24, borderTop: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', gap: 12 }}>
-          <button 
-            onClick={handleSave} 
-            disabled={saving} 
-            style={{
-              ...primaryButtonStyle,
-              padding: '12px 24px',
-              fontSize: '14px',
-              opacity: saving ? 0.6 : 1,
-              cursor: saving ? 'not-allowed' : 'pointer'
-            }}
-          >
-            {saving ? 'Saving...' : 'Save Changes'}
-          </button>
-          <button 
-            onClick={() => router.push('/admin/edit-collection')}
-            style={{
-              ...buttonStyle,
-              padding: '12px 24px',
-              fontSize: '14px'
-            }}
-          >
-            Back to Collection
-          </button>
+          <button onClick={handleSave} disabled={saving} style={{ ...buttonStyle, padding: '12px 24px', fontSize: '14px', background: saving ? '#9ca3af' : '#2563eb', color: 'white', cursor: saving ? 'not-allowed' : 'pointer' }}>{saving ? 'Saving...' : 'Save Changes'}</button>
+          <button onClick={() => router.push('/admin/edit-collection')} style={{ ...buttonStyle, padding: '12px 24px', fontSize: '14px', background: '#f3f4f6', color: '#374151' }}>Back</button>
         </div>
-        
-        {status && (
-          <div style={{ 
-            color: status.includes('❌') ? '#dc2626' : status.includes('✅') ? '#059669' : '#374151',
-            fontWeight: '500',
-            fontSize: '14px'
-          }}>
-            {status}
-          </div>
-        )}
       </div>
     </div>
   );
