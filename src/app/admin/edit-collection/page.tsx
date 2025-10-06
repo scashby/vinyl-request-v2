@@ -1,7 +1,7 @@
 // src/app/admin/enrich-sources/page.tsx - COMPLETE FILE
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 
@@ -81,6 +81,17 @@ export default function MultiSourceEnrichment() {
   const [enrichmentResults, setEnrichmentResults] = useState<AlbumResult[]>([]);
   const [expandedAlbum, setExpandedAlbum] = useState<number | null>(null);
   
+  // Calculate how many albums will actually be processed based on selected services
+  const albumsToEnrich = useMemo(() => {
+    if (selectedServices.appleLyrics && !selectedServices.spotify && !selectedServices.appleMusic && !selectedServices.genius) {
+      return stats.needsAppleLyrics;
+    } else if (selectedServices.spotify && selectedServices.appleMusic && !selectedServices.appleLyrics && !selectedServices.genius) {
+      return stats.unenriched + stats.spotifyOnly + stats.appleOnly;
+    } else {
+      return stats.needsEnrichment;
+    }
+  }, [selectedServices, stats]);
+  
   // Modal state
   const [showModal, setShowModal] = useState(false);
   const [modalTitle, setModalTitle] = useState('');
@@ -132,13 +143,29 @@ export default function MultiSourceEnrichment() {
       return;
     }
 
+    // Calculate actual number of albums that will be processed based on selected services
+    let albumsToProcess = 0;
+    if (selectedServices.spotify && selectedServices.appleMusic && selectedServices.appleLyrics && selectedServices.genius) {
+      // All services selected - use total needing enrichment
+      albumsToProcess = stats.needsEnrichment;
+    } else if (selectedServices.appleLyrics && !selectedServices.spotify && !selectedServices.appleMusic && !selectedServices.genius) {
+      // Only Apple Lyrics selected
+      albumsToProcess = stats.needsAppleLyrics;
+    } else if (selectedServices.spotify && selectedServices.appleMusic && !selectedServices.appleLyrics && !selectedServices.genius) {
+      // Both streaming services but no lyrics
+      albumsToProcess = stats.unenriched + stats.spotifyOnly + stats.appleOnly;
+    } else {
+      // Mixed selection - use total needing enrichment as approximation
+      albumsToProcess = stats.needsEnrichment;
+    }
+
     const serviceNames = [];
     if (selectedServices.spotify) serviceNames.push('Spotify');
     if (selectedServices.appleMusic) serviceNames.push('Apple Music');
     if (selectedServices.genius) serviceNames.push('Genius');
     if (selectedServices.appleLyrics) serviceNames.push('Apple Lyrics');
 
-    if (!confirm(`This will enrich ${stats.needsEnrichment} albums with: ${serviceNames.join(', ')}${folderFilter ? `\nFolder: "${folderFilter}"` : ' (all folders)'}\n\nThis may take a while and consume API quota. Continue?`)) {
+    if (!confirm(`This will enrich up to ${albumsToProcess} albums with: ${serviceNames.join(', ')}${folderFilter ? `\nFolder: "${folderFilter}"` : ' (all folders)'}\n\nThis may take a while and consume API quota. Continue?`)) {
       return;
     }
 
@@ -157,7 +184,7 @@ export default function MultiSourceEnrichment() {
     console.log('Selected services:', selectedServices);
     console.log('Batch size:', batchSize, '(limit:', limit, ')');
     console.log('Folder filter:', folderFilter || 'none');
-    console.log('Albums needing enrichment:', stats.needsEnrichment);
+    console.log('Albums needing enrichment:', albumsToProcess);
 
     try {
       while (true) {
@@ -458,20 +485,20 @@ export default function MultiSourceEnrichment() {
         <div style={{ display: 'flex', gap: 16, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
           <button
             onClick={enrichAll}
-            disabled={enriching || stats.needsEnrichment === 0 || Object.values(selectedServices).every(v => !v)}
+            disabled={enriching || albumsToEnrich === 0 || Object.values(selectedServices).every(v => !v)}
             style={{
               padding: '12px 24px',
-              background: (enriching || stats.needsEnrichment === 0 || Object.values(selectedServices).every(v => !v)) ? '#9ca3af' : 'linear-gradient(135deg, #7c3aed, #a855f7)',
+              background: (enriching || albumsToEnrich === 0 || Object.values(selectedServices).every(v => !v)) ? '#9ca3af' : 'linear-gradient(135deg, #7c3aed, #a855f7)',
               color: 'white',
               border: 'none',
               borderRadius: 8,
               fontSize: 16,
               fontWeight: 600,
-              cursor: (enriching || stats.needsEnrichment === 0 || Object.values(selectedServices).every(v => !v)) ? 'not-allowed' : 'pointer',
+              cursor: (enriching || albumsToEnrich === 0 || Object.values(selectedServices).every(v => !v)) ? 'not-allowed' : 'pointer',
               boxShadow: enriching ? 'none' : '0 4px 12px rgba(124, 58, 237, 0.3)'
             }}
           >
-            {enriching ? 'Enriching...' : `Enrich ${stats.needsEnrichment} Albums`}
+            {enriching ? 'Enriching...' : `Enrich ${albumsToEnrich} Albums`}
           </button>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
