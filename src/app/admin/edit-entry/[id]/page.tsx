@@ -1,4 +1,4 @@
-// src/app/admin/edit-entry/[id]/page.tsx - COMPLETE EDIT PAGE with manual metadata fields
+// src/app/admin/edit-entry/[id]/page.tsx - COMPLETE FILE with updated API paths
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -180,7 +180,8 @@ export default function EditEntryPage() {
     setStatus('Fetching lyrics from Apple Music...');
 
     try {
-      const res = await fetch('/api/fetch-apple-lyrics', {
+      // UPDATED: Changed from /api/fetch-apple-lyrics to /api/enrich-sources/apple-lyrics
+      const res = await fetch('/api/enrich-sources/apple-lyrics', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ albumId: parseInt(entry.id) })
@@ -306,7 +307,8 @@ export default function EditEntryPage() {
     setStatus('Enriching from Spotify, Apple Music, and Genius...');
 
     try {
-      const res = await fetch('/api/enrich-multi', {
+      // UPDATED: Changed from /api/enrich-multi to /api/enrich-sources/single
+      const res = await fetch('/api/enrich-sources/single', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ albumId: parseInt(entry.id) })

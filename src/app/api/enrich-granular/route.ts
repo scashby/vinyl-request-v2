@@ -1,4 +1,4 @@
-// src/app/api/enrich-multi-batch/route.ts - FIXED: Now includes albums missing Apple Music lyrics
+// src/app/api/enrich-granular/route.ts - NEW API for targeted enrichment
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -16,36 +16,20 @@ type Track = {
   position?: string;
   title?: string;
   duration?: string;
-  type_?: string;
   lyrics_url?: string;
   lyrics?: string;
   lyrics_source?: 'apple_music' | 'genius';
 };
 
-type SpotifyData = {
-  spotify_id: string;
-  spotify_url?: string;
-  spotify_popularity?: number;
-  spotify_genres: string[];
-  spotify_label?: string;
-  spotify_release_date?: string;
-  spotify_total_tracks?: number;
-  spotify_image_url?: string;
-};
-
-type AppleMusicData = {
-  apple_music_id: string;
-  apple_music_url?: string;
-  apple_music_genre?: string;
-  apple_music_genres: string[];
-  apple_music_label?: string;
-  apple_music_release_date?: string;
-  apple_music_track_count?: number;
-  apple_music_artwork_url?: string;
-};
-
-type UpdateData = Partial<SpotifyData & AppleMusicData> & {
-  tracklists?: string;
+type EnrichmentResult = {
+  albumId: number;
+  artist: string;
+  title: string;
+  spotify: boolean | null;
+  appleMusic: boolean | null;
+  appleLyrics: boolean | null;
+  geniusLyrics: boolean | null;
+  timestamp: string;
 };
 
 let spotifyToken: { token: string; expires: number } | null = null;
@@ -96,15 +80,12 @@ async function searchSpotify(artist: string, title: string) {
     if (!album) return null;
 
     let genres: string[] = [];
-    
     if (album.artists && album.artists.length > 0) {
       const artistId = album.artists[0].id;
-      
       try {
         const artistRes = await fetch(`https://api.spotify.com/v1/artists/${artistId}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
-        
         if (artistRes.ok) {
           const artistData = await artistRes.json();
           genres = artistData.genres || [];
@@ -162,6 +143,24 @@ async function searchAppleMusic(artist: string, title: string) {
   }
 }
 
+async function fetchAppleMusicLyrics(albumId: number): Promise<boolean> {
+  try {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/fetch-apple-lyrics`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ albumId })
+    });
+
+    if (!res.ok) return false;
+
+    const result = await res.json();
+    return result.success && result.stats?.lyricsFound > 0;
+  } catch (error) {
+    console.error('Apple Music lyrics fetch error:', error);
+    return false;
+  }
+}
+
 async function searchLyrics(artist: string, trackTitle: string) {
   try {
     if (!GENIUS_TOKEN) return null;
@@ -188,24 +187,6 @@ async function searchLyrics(artist: string, trackTitle: string) {
   }
 }
 
-async function fetchAppleMusicLyrics(albumId: number): Promise<boolean> {
-  try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/fetch-apple-lyrics`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ albumId })
-    });
-
-    if (!res.ok) return false;
-
-    const result = await res.json();
-    return result.success && result.stats?.lyricsFound > 0;
-  } catch (error) {
-    console.error('Apple Music lyrics fetch error:', error);
-    return false;
-  }
-}
-
 function needsAppleMusicLyrics(tracklists: string | null, appleMusicId: string | null): boolean {
   if (!appleMusicId || !tracklists) return false;
 
@@ -213,10 +194,7 @@ function needsAppleMusicLyrics(tracklists: string | null, appleMusicId: string |
     const tracks = typeof tracklists === 'string' ? JSON.parse(tracklists) : tracklists;
     if (!Array.isArray(tracks) || tracks.length === 0) return false;
 
-    // Check if ANY track is missing Apple Music lyrics
     const hasAppleLyrics = tracks.some((t: Track) => t.lyrics && t.lyrics_source === 'apple_music');
-    
-    // If no tracks have Apple Music lyrics, we need to fetch them
     return !hasAppleLyrics;
   } catch {
     return false;
@@ -228,16 +206,44 @@ export async function POST(req: Request) {
     const body = await req.json();
     const cursor = body.cursor || 0;
     const limit = Math.min(body.limit || 20, 50);
+    const enrichmentType = body.enrichmentType || 'all';
+    const folder = body.folder;
 
-    // FIXED: Fetch albums that need ANY enrichment - Spotify, Apple Music, OR Apple Music lyrics
-    // We can't easily filter for "missing lyrics" in SQL, so we fetch a broader set and filter in code
-    const { data: albums, error } = await supabase
+    // Build query based on enrichment type
+    let query = supabase
       .from('collection')
       .select('id, artist, title, tracklists, spotify_id, apple_music_id')
-      .or('spotify_id.is.null,apple_music_id.is.null,apple_music_id.not.is.null')
       .gt('id', cursor)
       .order('id', { ascending: true })
-      .limit(limit * 2); // Fetch more to account for filtering
+      .limit(limit);
+
+    // Apply folder filter if specified
+    if (folder) {
+      query = query.eq('folder', folder);
+    }
+
+    // Filter based on what needs enrichment
+    switch (enrichmentType) {
+      case 'spotify':
+        query = query.is('spotify_id', null);
+        break;
+      case 'apple-music':
+        query = query.is('apple_music_id', null);
+        break;
+      case 'apple-lyrics':
+        // Will filter in code after fetch
+        query = query.not('apple_music_id', 'is', null);
+        break;
+      case 'genius':
+        // Will filter in code after fetch
+        query = query.not('tracklists', 'is', null);
+        break;
+      case 'all':
+        query = query.or('spotify_id.is.null,apple_music_id.is.null');
+        break;
+    }
+
+    const { data: albums, error } = await query;
 
     if (error) {
       return NextResponse.json({
@@ -250,136 +256,154 @@ export async function POST(req: Request) {
       return NextResponse.json({
         success: true,
         processed: 0,
-        enriched: 0,
+        results: [],
         hasMore: false
       });
     }
 
-    // Filter to only albums that actually need enrichment
-    const albumsNeedingEnrichment = albums.filter(album => 
-      !album.spotify_id || 
-      !album.apple_music_id || 
-      needsAppleMusicLyrics(album.tracklists, album.apple_music_id)
-    ).slice(0, limit); // Take only the limit we want
-
-    if (albumsNeedingEnrichment.length === 0) {
-      // All albums in this batch are fully enriched, move cursor forward
-      return NextResponse.json({
-        success: true,
-        processed: albums.length,
-        enriched: 0,
-        hasMore: albums.length >= limit * 2,
-        nextCursor: albums[albums.length - 1].id
-      });
-    }
-
-    let processed = 0;
-    let enriched = 0;
-    let lastAlbum = null;
-
-    for (const album of albumsNeedingEnrichment) {
-      processed++;
-      let hasUpdate = false;
-      const updateData: UpdateData = {};
-
-      // Enrich Spotify if missing
-      if (!album.spotify_id) {
-        const spotifyData = await searchSpotify(album.artist, album.title);
-        if (spotifyData) {
-          Object.assign(updateData, spotifyData);
-          hasUpdate = true;
-        }
-        await sleep(500);
-      }
-
-      // Enrich Apple Music if missing
-      if (!album.apple_music_id) {
-        const appleMusicData = await searchAppleMusic(album.artist, album.title);
-        if (appleMusicData) {
-          Object.assign(updateData, appleMusicData);
-          hasUpdate = true;
-        }
-        await sleep(500);
-      }
-
-      // Enrich Genius lyrics for tracks without any lyrics
-      if (album.tracklists) {
+    // Filter for apple-lyrics and genius types
+    let albumsToProcess = albums;
+    if (enrichmentType === 'apple-lyrics') {
+      albumsToProcess = albums.filter(album => 
+        needsAppleMusicLyrics(album.tracklists, album.apple_music_id)
+      );
+    } else if (enrichmentType === 'genius') {
+      albumsToProcess = albums.filter(album => {
         try {
           const tracks = typeof album.tracklists === 'string' 
             ? JSON.parse(album.tracklists)
             : album.tracklists;
+          if (!Array.isArray(tracks)) return false;
+          return tracks.some((t: Track) => !t.lyrics_url && t.title);
+        } catch {
+          return false;
+        }
+      });
+    }
 
-          if (Array.isArray(tracks) && tracks.length > 0) {
-            const enrichedTracks = await Promise.all(
-              tracks.map(async (track: Track) => {
-                if (!track.lyrics_url && track.title) {
-                  const lyricsData = await searchLyrics(album.artist, track.title);
-                  await sleep(1000);
-                  return {
-                    ...track,
-                    lyrics_url: lyricsData?.genius_url
-                  };
-                }
-                return track;
-              })
-            );
+    const results: EnrichmentResult[] = [];
 
-            updateData.tracklists = JSON.stringify(enrichedTracks);
+    for (const album of albumsToProcess) {
+      const result: EnrichmentResult = {
+        albumId: album.id,
+        artist: album.artist,
+        title: album.title,
+        spotify: null,
+        appleMusic: null,
+        appleLyrics: null,
+        geniusLyrics: null,
+        timestamp: new Date().toISOString()
+      };
+
+      const updateData: Record<string, unknown> = {};
+      let hasUpdate = false;
+
+      // Enrich based on type
+      if (enrichmentType === 'spotify' || enrichmentType === 'all') {
+        if (!album.spotify_id) {
+          const spotifyData = await searchSpotify(album.artist, album.title);
+          if (spotifyData) {
+            Object.assign(updateData, spotifyData);
+            result.spotify = true;
             hasUpdate = true;
+          } else {
+            result.spotify = false;
           }
-        } catch (err) {
-          console.error('Tracklist enrichment error:', err);
+          await sleep(500);
         }
       }
 
-      // Update database with Spotify/Apple/Genius data
+      if (enrichmentType === 'apple-music' || enrichmentType === 'all') {
+        if (!album.apple_music_id) {
+          const appleMusicData = await searchAppleMusic(album.artist, album.title);
+          if (appleMusicData) {
+            Object.assign(updateData, appleMusicData);
+            result.appleMusic = true;
+            hasUpdate = true;
+          } else {
+            result.appleMusic = false;
+          }
+          await sleep(500);
+        }
+      }
+
+      if (enrichmentType === 'genius' || enrichmentType === 'all') {
+        if (album.tracklists) {
+          try {
+            const tracks = typeof album.tracklists === 'string' 
+              ? JSON.parse(album.tracklists)
+              : album.tracklists;
+
+            if (Array.isArray(tracks) && tracks.length > 0) {
+              const enrichedTracks = await Promise.all(
+                tracks.map(async (track: Track) => {
+                  if (!track.lyrics_url && track.title) {
+                    const lyricsData = await searchLyrics(album.artist, track.title);
+                    await sleep(1000);
+                    return {
+                      ...track,
+                      lyrics_url: lyricsData?.genius_url
+                    };
+                  }
+                  return track;
+                })
+              );
+
+              const foundAny = enrichedTracks.some((t: Track) => 
+                t.lyrics_url && !tracks.find((orig: Track) => orig.position === t.position)?.lyrics_url
+              );
+
+              if (foundAny) {
+                updateData.tracklists = JSON.stringify(enrichedTracks);
+                result.geniusLyrics = true;
+                hasUpdate = true;
+              } else {
+                result.geniusLyrics = false;
+              }
+            }
+          } catch (err) {
+            result.geniusLyrics = false;
+            console.error('Tracklist enrichment error:', err);
+          }
+        }
+      }
+
+      // Update database
       if (hasUpdate) {
-        const { error: updateError } = await supabase
+        await supabase
           .from('collection')
           .update(updateData)
           .eq('id', album.id);
+      }
 
-        if (!updateError) {
-          enriched++;
+      // Fetch Apple Music lyrics if needed
+      if (enrichmentType === 'apple-lyrics' || enrichmentType === 'all') {
+        const finalAppleMusicId = updateData.apple_music_id || album.apple_music_id;
+        if (finalAppleMusicId && needsAppleMusicLyrics(album.tracklists, finalAppleMusicId)) {
+          const lyricsSuccess = await fetchAppleMusicLyrics(album.id);
+          result.appleLyrics = lyricsSuccess;
+          if (lyricsSuccess) {
+            hasUpdate = true;
+          }
         }
       }
 
-      // FIXED: Fetch Apple Music lyrics if we have an Apple Music ID and need lyrics
-      const finalAppleMusicId = updateData.apple_music_id || album.apple_music_id;
-      if (finalAppleMusicId && needsAppleMusicLyrics(album.tracklists, finalAppleMusicId)) {
-        console.log(`Fetching Apple Music lyrics for album ${album.id}...`);
-        const lyricsSuccess = await fetchAppleMusicLyrics(album.id);
-        if (lyricsSuccess) {
-          if (!hasUpdate) enriched++; // Count this as an enrichment if we hadn't already
-          hasUpdate = true;
-        }
-      }
-
-      if (hasUpdate) {
-        lastAlbum = {
-          artist: album.artist,
-          title: album.title,
-          spotify: !!updateData.spotify_id || !!album.spotify_id,
-          appleMusic: !!updateData.apple_music_id || !!album.apple_music_id,
-          lyrics: !!updateData.tracklists
-        };
-      }
+      results.push(result);
     }
 
-    const hasMore = albums.length >= limit * 2;
+    const hasMore = albums.length === limit;
     const nextCursor = hasMore ? albums[albums.length - 1].id : null;
 
     return NextResponse.json({
       success: true,
-      processed,
-      enriched,
+      processed: albumsToProcess.length,
+      results,
       hasMore,
-      nextCursor,
-      lastAlbum
+      nextCursor
     });
 
   } catch (error) {
-    console.error('Batch enrichment error:', error);
+    console.error('Granular enrichment error:', error);
     return NextResponse.json({
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error'

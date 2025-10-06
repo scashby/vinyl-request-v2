@@ -1,4 +1,4 @@
-// src/app/api/enrich-multi/route.ts - COMPLETE FIXED FILE - Gets artist genres from Spotify
+// src/app/api/enrich-sources/single/route.ts - MOVED from enrich-multi + UPDATED API path
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -266,7 +266,8 @@ export async function POST(req: Request) {
     if (finalAppleMusicId && APPLE_MUSIC_TOKEN) {
       try {
         console.log('Attempting to fetch Apple Music lyrics...');
-        const lyricsRes = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/fetch-apple-lyrics`, {
+        // UPDATED: Changed from /api/fetch-apple-lyrics to /api/enrich-sources/apple-lyrics
+        const lyricsRes = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/enrich-sources/apple-lyrics`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ albumId })

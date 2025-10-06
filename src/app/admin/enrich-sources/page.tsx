@@ -1,4 +1,4 @@
-// src/app/admin/enrich-sources/page.tsx - UPDATED with clearer labels and stats
+// src/app/admin/enrich-sources/page.tsx - UPDATED API paths from enrich-multi-* to enrich-sources/*
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -49,7 +49,8 @@ export default function MultiSourceEnrichment() {
 
   async function loadStatsAndFolders() {
     try {
-      const res = await fetch('/api/enrich-multi-stats');
+      // UPDATED: Changed from /api/enrich-multi-stats to /api/enrich-sources/stats
+      const res = await fetch('/api/enrich-sources/stats');
       const data = await res.json();
       if (data.success) {
         setStats(data.stats);
@@ -69,7 +70,8 @@ export default function MultiSourceEnrichment() {
     setLoadingModal(true);
 
     try {
-      const res = await fetch(`/api/enrich-multi-albums?category=${category}`);
+      // UPDATED: Changed from /api/enrich-multi-albums to /api/enrich-sources/albums
+      const res = await fetch(`/api/enrich-sources/albums?category=${category}`);
       const data = await res.json();
       if (data.success) {
         setModalAlbums(data.albums || []);
@@ -100,7 +102,8 @@ export default function MultiSourceEnrichment() {
       while (true) {
         setStatus(`Processing${folderFilter ? ` folder "${folderFilter}"` : ''} from ID ${cursor}...`);
         
-        const res = await fetch('/api/enrich-multi-batch', {
+        // UPDATED: Changed from /api/enrich-multi-batch to /api/enrich-sources/batch
+        const res = await fetch('/api/enrich-sources/batch', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
