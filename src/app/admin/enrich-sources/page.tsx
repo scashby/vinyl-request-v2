@@ -344,42 +344,46 @@ export default function MultiSourceEnrichment() {
           <div style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
             Select Services to Enrich:
           </div>
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, cursor: 'pointer' }}>
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, cursor: 'pointer', padding: '8px 12px', background: '#f3f4f6', borderRadius: 6 }}>
               <input 
                 type="checkbox" 
                 checked={selectedServices.spotify}
                 onChange={e => setSelectedServices(prev => ({ ...prev, spotify: e.target.checked }))}
                 disabled={enriching}
+                style={{ width: 16, height: 16 }}
               />
-              <span style={{ fontWeight: 600 }}>Spotify</span>
+              <span style={{ fontWeight: 600, color: '#1f2937' }}>Spotify</span>
             </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, cursor: 'pointer' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, cursor: 'pointer', padding: '8px 12px', background: '#f3f4f6', borderRadius: 6 }}>
               <input 
                 type="checkbox" 
                 checked={selectedServices.appleMusic}
                 onChange={e => setSelectedServices(prev => ({ ...prev, appleMusic: e.target.checked }))}
                 disabled={enriching}
+                style={{ width: 16, height: 16 }}
               />
-              <span style={{ fontWeight: 600 }}>Apple Music</span>
+              <span style={{ fontWeight: 600, color: '#1f2937' }}>Apple Music</span>
             </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, cursor: 'pointer' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, cursor: 'pointer', padding: '8px 12px', background: '#f3f4f6', borderRadius: 6 }}>
               <input 
                 type="checkbox" 
                 checked={selectedServices.genius}
                 onChange={e => setSelectedServices(prev => ({ ...prev, genius: e.target.checked }))}
                 disabled={enriching}
+                style={{ width: 16, height: 16 }}
               />
-              <span style={{ fontWeight: 600 }}>Genius Lyrics</span>
+              <span style={{ fontWeight: 600, color: '#1f2937' }}>Genius Lyrics</span>
             </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, cursor: 'pointer' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, cursor: 'pointer', padding: '8px 12px', background: '#f3f4f6', borderRadius: 6 }}>
               <input 
                 type="checkbox" 
                 checked={selectedServices.appleLyrics}
                 onChange={e => setSelectedServices(prev => ({ ...prev, appleLyrics: e.target.checked }))}
                 disabled={enriching}
+                style={{ width: 16, height: 16 }}
               />
-              <span style={{ fontWeight: 600 }}>Apple Lyrics</span>
+              <span style={{ fontWeight: 600, color: '#1f2937' }}>Apple Lyrics</span>
             </label>
           </div>
         </div>
