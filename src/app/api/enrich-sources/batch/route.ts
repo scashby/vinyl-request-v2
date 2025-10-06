@@ -1,4 +1,4 @@
-// src/app/api/enrich-sources/batch/route.ts - Batch orchestrator with detailed per-album results
+// src/app/api/enrich-sources/batch/route.ts - Fixed TypeScript errors
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -8,19 +8,26 @@ const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
+type ServiceData = {
+  spotify_id?: string;
+  apple_music_id?: string;
+  genres?: string[];
+  [key: string]: unknown;
+};
+
 type AlbumResult = {
   albumId: number;
   artist: string;
   title: string;
   spotify?: {
     success: boolean;
-    data?: unknown;
+    data?: ServiceData;
     error?: string;
     skipped?: boolean;
   };
   appleMusic?: {
     success: boolean;
-    data?: unknown;
+    data?: ServiceData;
     error?: string;
     skipped?: boolean;
   };
@@ -85,7 +92,6 @@ export async function POST(req: Request) {
     const limit = Math.min(body.limit || 20, 50);
     const folder = body.folder;
 
-    // Build query with optional folder filter
     let query = supabase
       .from('collection')
       .select('id, artist, title, tracklists, spotify_id, apple_music_id, folder')
@@ -116,7 +122,6 @@ export async function POST(req: Request) {
       });
     }
 
-    // Filter to only albums that actually need enrichment
     const albumsNeedingEnrichment = albums.filter(album => 
       !album.spotify_id || 
       !album.apple_music_id || 
@@ -135,7 +140,6 @@ export async function POST(req: Request) {
 
     const results: AlbumResult[] = [];
 
-    // Process each album
     for (const album of albumsNeedingEnrichment) {
       const albumResult: AlbumResult = {
         albumId: album.id,
@@ -148,7 +152,7 @@ export async function POST(req: Request) {
         const spotifyResult = await callService('spotify', album.id);
         albumResult.spotify = {
           success: spotifyResult.success,
-          data: spotifyResult.data,
+          data: spotifyResult.data as ServiceData,
           error: spotifyResult.error,
           skipped: spotifyResult.skipped
         };
@@ -165,7 +169,7 @@ export async function POST(req: Request) {
         const appleResult = await callService('apple-music', album.id);
         albumResult.appleMusic = {
           success: appleResult.success,
-          data: appleResult.data,
+          data: appleResult.data as ServiceData,
           error: appleResult.error,
           skipped: appleResult.skipped
         };
@@ -189,11 +193,12 @@ export async function POST(req: Request) {
           error: geniusResult.error,
           skipped: geniusResult.data?.enrichedCount === 0 && geniusResult.data?.skippedCount > 0
         };
-        // Genius has built-in rate limiting, no extra sleep needed
       }
 
-      // Enrich Apple Music lyrics
-      const finalAppleMusicId = albumResult.appleMusic?.data?.apple_music_id || album.apple_music_id;
+      // Enrich Apple Music lyrics - get the newly added ID or use existing
+      const newlyAddedAppleMusicId = albumResult.appleMusic?.data?.apple_music_id;
+      const finalAppleMusicId = (typeof newlyAddedAppleMusicId === 'string' ? newlyAddedAppleMusicId : null) || album.apple_music_id;
+      
       if (finalAppleMusicId && needsAppleMusicLyrics(album.tracklists, finalAppleMusicId)) {
         const appleLyricsResult = await callService('apple-lyrics', album.id);
         albumResult.appleLyrics = {

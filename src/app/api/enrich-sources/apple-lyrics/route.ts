@@ -1,4 +1,4 @@
-// src/app/api/fetch-apple-lyrics/route.ts - NEW FILE
+// src/app/api/enrich-sources/apple-lyrics/route.ts
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -76,7 +76,7 @@ async function fetchAppleAlbumTracks(albumId: string): Promise<AppleTrack[]> {
     {
       headers: {
         'Authorization': `Bearer ${APPLE_MUSIC_TOKEN}`,
-        'Music-User-Token': '' // Optional: for user-specific content
+        'Music-User-Token': ''
       }
     }
   );
@@ -135,10 +135,7 @@ function matchTrackByTitle(
   const existingTitle = normalize(existingTrack.title || '');
   const appleTitle = normalize(appleTrack.attributes.name);
 
-  // Exact match
   if (existingTitle === appleTitle) return true;
-
-  // Partial match (for cases like "Song Title (Remastered)")
   if (existingTitle.includes(appleTitle) || appleTitle.includes(existingTitle)) {
     return true;
   }
@@ -165,7 +162,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // Get the album from database
     const { data: album, error: dbError } = await supabase
       .from('collection')
       .select('id, apple_music_id, tracklists')
@@ -186,7 +182,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // Parse existing tracklist
     let existingTracks: Track[] = [];
     if (album.tracklists) {
       try {
@@ -208,7 +203,6 @@ export async function POST(req: Request) {
 
     console.log(`\n🍎 Fetching Apple Music tracks for album ${album.apple_music_id}...`);
 
-    // Fetch Apple Music tracks
     const appleTracks = await fetchAppleAlbumTracks(album.apple_music_id);
     
     if (appleTracks.length === 0) {
@@ -223,16 +217,13 @@ export async function POST(req: Request) {
     let lyricsFound = 0;
     let lyricsNotFound = 0;
 
-    // Match and enrich tracks
     const enrichedTracks = await Promise.all(
       existingTracks.map(async (track, index) => {
-        // Skip if already has Apple Music lyrics
         if (track.lyrics && track.lyrics_source === 'apple_music') {
           console.log(`⏭️  Track ${index + 1}: Already has Apple Music lyrics`);
           return track;
         }
 
-        // Try to find matching Apple track
         const appleTrack = appleTracks.find(at => matchTrackByTitle(track, at));
 
         if (!appleTrack) {
@@ -243,10 +234,7 @@ export async function POST(req: Request) {
 
         console.log(`🔍 Track ${index + 1}: Fetching lyrics for "${track.title}"...`);
 
-        // Fetch lyrics for this track
         const lyrics = await fetchTrackLyrics(appleTrack.id);
-
-        // Rate limit: wait 500ms between requests
         await new Promise(resolve => setTimeout(resolve, 500));
 
         if (lyrics) {
@@ -265,7 +253,6 @@ export async function POST(req: Request) {
       })
     );
 
-    // Update database
     const { error: updateError } = await supabase
       .from('collection')
       .update({

@@ -1,4 +1,4 @@
-// src/app/admin/edit-entry/[id]/page.tsx - COMPLETE FILE with updated API paths
+// src/app/admin/edit-entry/[id]/page.tsx - COMPLETE FILE with fixed enrichMultiSource
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -180,7 +180,6 @@ export default function EditEntryPage() {
     setStatus('Fetching lyrics from Apple Music...');
 
     try {
-      // UPDATED: Changed from /api/fetch-apple-lyrics to /api/enrich-sources/apple-lyrics
       const res = await fetch('/api/enrich-sources/apple-lyrics', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -307,39 +306,99 @@ export default function EditEntryPage() {
     setStatus('Enriching from Spotify, Apple Music, and Genius...');
 
     try {
-      // UPDATED: Changed from /api/enrich-multi to /api/enrich-sources/single
-      const res = await fetch('/api/enrich-sources/single', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ albumId: parseInt(entry.id) })
-      });
+      const enrichedParts = [];
+      let hasUpdate = false;
 
-      const result = await res.json();
+      // 1. Enrich Spotify if missing
+      if (!entry.spotify_id) {
+        setStatus('Searching Spotify...');
+        const spotifyRes = await fetch('/api/enrich-sources/spotify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ albumId: parseInt(entry.id) })
+        });
 
-      if (!result.success) {
-        setStatus(`❌ Enrichment failed: ${result.error}`);
-        return;
-      }
-
-      // Reload the entry to get updated data
-      const updatedEntry = await fetchEntry(id);
-      setEntry(updatedEntry);
-      
-      // Reload tracks
-      if (updatedEntry.tracklists) {
-        try {
-          const tl = JSON.parse(updatedEntry.tracklists);
-          setTracks(Array.isArray(tl) ? (tl as Partial<Track>[]).map(cleanTrack) : []);
-        } catch {
-          // Keep existing tracks
+        const spotifyResult = await spotifyRes.json();
+        if (spotifyResult.success && !spotifyResult.skipped) {
+          enrichedParts.push('Spotify');
+          hasUpdate = true;
         }
       }
 
-      const enrichedParts = [];
-      if (result.enriched?.spotify) enrichedParts.push('Spotify');
-      if (result.enriched?.appleMusic) enrichedParts.push('Apple Music');
-      if (result.enriched?.appleLyrics) enrichedParts.push('Apple Lyrics');
-      if (result.enriched?.lyrics) enrichedParts.push('Genius Lyrics');
+      // 2. Enrich Apple Music if missing
+      if (!entry.apple_music_id) {
+        setStatus('Searching Apple Music...');
+        const appleRes = await fetch('/api/enrich-sources/apple-music', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ albumId: parseInt(entry.id) })
+        });
+
+        const appleResult = await appleRes.json();
+        if (appleResult.success && !appleResult.skipped) {
+          enrichedParts.push('Apple Music');
+          hasUpdate = true;
+        }
+      }
+
+      // 3. Enrich Genius lyrics if tracks exist
+      if (tracks && tracks.length > 0) {
+        setStatus('Searching Genius lyrics...');
+        const geniusRes = await fetch('/api/enrich-sources/genius', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ albumId: parseInt(entry.id) })
+        });
+
+        const geniusResult = await geniusRes.json();
+        if (geniusResult.success && geniusResult.data?.enrichedCount > 0) {
+          enrichedParts.push(`Genius Lyrics (${geniusResult.data.enrichedCount} tracks)`);
+          hasUpdate = true;
+        }
+      }
+
+      // 4. Reload entry if we made updates
+      if (hasUpdate) {
+        const updatedEntry = await fetchEntry(id);
+        setEntry(updatedEntry);
+        
+        if (updatedEntry.tracklists) {
+          try {
+            const tl = JSON.parse(updatedEntry.tracklists);
+            setTracks(Array.isArray(tl) ? (tl as Partial<Track>[]).map(cleanTrack) : []);
+          } catch {
+            // Keep existing tracks
+          }
+        }
+
+        // 5. Fetch Apple Music lyrics if we now have Apple Music ID and tracks
+        const finalAppleMusicId = updatedEntry.apple_music_id;
+        if (finalAppleMusicId && !hasAppleLyrics) {
+          setStatus('Fetching Apple Music lyrics...');
+          const appleLyricsRes = await fetch('/api/enrich-sources/apple-lyrics', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ albumId: parseInt(entry.id) })
+          });
+
+          const appleLyricsResult = await appleLyricsRes.json();
+          if (appleLyricsResult.success) {
+            enrichedParts.push(`Apple Lyrics (${appleLyricsResult.stats?.lyricsFound || 0} tracks)`);
+            
+            // Reload again to get lyrics
+            const finalEntry = await fetchEntry(id);
+            setEntry(finalEntry);
+            if (finalEntry.tracklists) {
+              try {
+                const tl = JSON.parse(finalEntry.tracklists);
+                setTracks(Array.isArray(tl) ? (tl as Partial<Track>[]).map(cleanTrack) : []);
+              } catch {
+                // Keep existing tracks
+              }
+            }
+          }
+        }
+      }
 
       if (enrichedParts.length > 0) {
         setStatus(`✅ Enriched with: ${enrichedParts.join(', ')}`);
