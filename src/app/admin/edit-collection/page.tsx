@@ -83,14 +83,31 @@ export default function MultiSourceEnrichment() {
   
   // Calculate how many albums will actually be processed based on selected services
   const albumsToEnrich = useMemo(() => {
-    if (selectedServices.appleLyrics && !selectedServices.spotify && !selectedServices.appleMusic && !selectedServices.genius) {
+    const servicesSelected = {
+      spotify: selectedServices.spotify,
+      appleMusic: selectedServices.appleMusic,
+      genius: selectedServices.genius,
+      appleLyrics: selectedServices.appleLyrics
+    };
+    
+    const count = Object.values(servicesSelected).filter(Boolean).length;
+    
+    // If nothing selected, return 0
+    if (count === 0) return 0;
+    
+    // If only Apple Lyrics is selected
+    if (servicesSelected.appleLyrics && !servicesSelected.spotify && !servicesSelected.appleMusic && !servicesSelected.genius) {
       return stats.needsAppleLyrics;
-    } else if (selectedServices.spotify && selectedServices.appleMusic && !selectedServices.appleLyrics && !selectedServices.genius) {
-      return stats.unenriched + stats.spotifyOnly + stats.appleOnly;
-    } else {
-      return stats.needsEnrichment;
     }
-  }, [selectedServices, stats]);
+    
+    // If only streaming services (no lyrics)
+    if ((servicesSelected.spotify || servicesSelected.appleMusic) && !servicesSelected.genius && !servicesSelected.appleLyrics) {
+      return stats.unenriched + stats.spotifyOnly + stats.appleOnly;
+    }
+    
+    // For any other combination, return total needing enrichment
+    return stats.needsEnrichment;
+  }, [selectedServices.spotify, selectedServices.appleMusic, selectedServices.genius, selectedServices.appleLyrics, stats.needsAppleLyrics, stats.unenriched, stats.spotifyOnly, stats.appleOnly, stats.needsEnrichment]);
   
   // Modal state
   const [showModal, setShowModal] = useState(false);
