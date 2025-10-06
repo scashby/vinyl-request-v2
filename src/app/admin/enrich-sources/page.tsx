@@ -1,4 +1,4 @@
-// src/app/admin/enrich-sources/page.tsx - COMPLETE FILE with ALL stats sections
+// src/app/admin/enrich-sources/page.tsx - COMPLETE FILE with browser console logging
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -147,9 +147,19 @@ export default function MultiSourceEnrichment() {
     const limit = batchSize === 'all' ? 10000 : parseInt(batchSize);
     const allResults: AlbumResult[] = [];
 
+    console.log('🎵 ========================================');
+    console.log('🎵 STARTING MULTI-SOURCE ENRICHMENT');
+    console.log('🎵 ========================================');
+    console.log('Selected services:', selectedServices);
+    console.log('Batch size:', batchSize, '(limit:', limit, ')');
+    console.log('Folder filter:', folderFilter || 'none');
+    console.log('Albums needing enrichment:', stats.needsEnrichment);
+
     try {
       while (true) {
         setStatus(`Processing${folderFilter ? ` folder "${folderFilter}"` : ''} from ID ${cursor}...`);
+        
+        console.log(`🔄 Starting batch from cursor ${cursor}, limit ${limit}`);
         
         const res = await fetch('/api/enrich-sources/batch', {
           method: 'POST',
@@ -164,8 +174,40 @@ export default function MultiSourceEnrichment() {
 
         const result = await res.json();
         
+        console.log(`📊 Batch result:`, {
+          success: result.success,
+          processed: result.processed,
+          hasMore: result.hasMore,
+          nextCursor: result.nextCursor,
+          resultsCount: result.results?.length || 0
+        });
+        
+        // Log each album's enrichment results
+        if (result.results && result.results.length > 0) {
+          result.results.forEach(albumResult => {
+            console.group(`🎵 Album #${albumResult.albumId}: ${albumResult.artist} - ${albumResult.title}`);
+            if (albumResult.spotify) {
+              console.log('Spotify:', albumResult.spotify);
+            }
+            if (albumResult.appleMusic) {
+              console.log('Apple Music:', albumResult.appleMusic);
+            }
+            if (albumResult.genius) {
+              console.log('Genius:', albumResult.genius);
+            }
+            if (albumResult.appleLyrics) {
+              console.log('Apple Lyrics:', albumResult.appleLyrics);
+              if (!albumResult.appleLyrics.success) {
+                console.error('❌ Apple Lyrics failed:', albumResult.appleLyrics.error);
+              }
+            }
+            console.groupEnd();
+          });
+        }
+        
         if (!result.success) {
           setStatus(`❌ Error: ${result.error}`);
+          console.error('❌ Batch failed:', result.error);
           break;
         }
 
@@ -181,6 +223,10 @@ export default function MultiSourceEnrichment() {
 
         if (!result.hasMore) {
           setStatus(`✅ Complete! Processed ${totalProcessed} albums. See detailed results below.`);
+          console.log('✅ ========================================');
+          console.log('✅ ENRICHMENT COMPLETE');
+          console.log('✅ Total albums processed:', totalProcessed);
+          console.log('✅ ========================================');
           await loadStatsAndFolders();
           break;
         }
@@ -190,6 +236,7 @@ export default function MultiSourceEnrichment() {
       }
     } catch (error) {
       setStatus(`❌ Error: ${error.message}`);
+      console.error('❌ Fatal error:', error);
     } finally {
       setEnriching(false);
     }
@@ -207,8 +254,11 @@ export default function MultiSourceEnrichment() {
       <h1 style={{ fontSize: 32, fontWeight: 'bold', marginBottom: 8, color: '#1f2937' }}>
         🎵 Multi-Source Metadata Enrichment
       </h1>
-      <p style={{ color: '#6b7280', marginBottom: 24 }}>
+      <p style={{ color: '#6b7280', marginBottom: 8 }}>
         Enrich your entire collection with data from Spotify, Apple Music, and lyrics databases
+      </p>
+      <p style={{ color: '#9ca3af', fontSize: 13, marginBottom: 24, fontStyle: 'italic' }}>
+        💡 Tip: Open browser DevTools Console (F12) to see detailed enrichment logs for each album
       </p>
 
       {/* Collection Overview */}
@@ -643,7 +693,14 @@ export default function MultiSourceEnrichment() {
                             )}
                           </div>
                         ) : (
-                          <div style={{ color: '#dc2626', fontSize: 12 }}>✗ {result.appleLyrics.error}</div>
+                          <div>
+                            <div style={{ color: '#dc2626', fontSize: 12, marginBottom: 4 }}>
+                              ✗ {result.appleLyrics.error}
+                            </div>
+                            <div style={{ fontSize: 11, color: '#9ca3af', fontStyle: 'italic' }}>
+                              Check browser console (F12) for detailed error info
+                            </div>
+                          </div>
                         )}
                       </div>
                     )}
