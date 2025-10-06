@@ -83,6 +83,17 @@ export default function MultiSourceEnrichment() {
   
   // Calculate how many albums will actually be processed based on selected services
   const albumsToEnrich = useMemo(() => {
+    console.log('🔢 Calculating albumsToEnrich with:', {
+      selectedServices,
+      stats: {
+        needsAppleLyrics: stats.needsAppleLyrics,
+        needsEnrichment: stats.needsEnrichment,
+        unenriched: stats.unenriched,
+        spotifyOnly: stats.spotifyOnly,
+        appleOnly: stats.appleOnly
+      }
+    });
+    
     const servicesSelected = {
       spotify: selectedServices.spotify,
       appleMusic: selectedServices.appleMusic,
@@ -91,21 +102,29 @@ export default function MultiSourceEnrichment() {
     };
     
     const count = Object.values(servicesSelected).filter(Boolean).length;
+    console.log('Services selected count:', count);
     
     // If nothing selected, return 0
-    if (count === 0) return 0;
+    if (count === 0) {
+      console.log('No services selected, returning 0');
+      return 0;
+    }
     
     // If only Apple Lyrics is selected
     if (servicesSelected.appleLyrics && !servicesSelected.spotify && !servicesSelected.appleMusic && !servicesSelected.genius) {
+      console.log('Only Apple Lyrics selected, returning needsAppleLyrics:', stats.needsAppleLyrics);
       return stats.needsAppleLyrics;
     }
     
     // If only streaming services (no lyrics)
     if ((servicesSelected.spotify || servicesSelected.appleMusic) && !servicesSelected.genius && !servicesSelected.appleLyrics) {
-      return stats.unenriched + stats.spotifyOnly + stats.appleOnly;
+      const total = stats.unenriched + stats.spotifyOnly + stats.appleOnly;
+      console.log('Only streaming services selected, returning:', total);
+      return total;
     }
     
     // For any other combination, return total needing enrichment
+    console.log('Mixed services or all services, returning needsEnrichment:', stats.needsEnrichment);
     return stats.needsEnrichment;
   }, [selectedServices.spotify, selectedServices.appleMusic, selectedServices.genius, selectedServices.appleLyrics, stats.needsAppleLyrics, stats.unenriched, stats.spotifyOnly, stats.appleOnly, stats.needsEnrichment]);
   
