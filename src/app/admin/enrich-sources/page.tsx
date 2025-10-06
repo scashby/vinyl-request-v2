@@ -1,4 +1,4 @@
-// src/app/admin/enrich-sources/page.tsx - UPDATED with detailed per-album results display
+// src/app/admin/enrich-sources/page.tsx - COMPLETE FILE with ALL stats sections
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -192,7 +192,7 @@ export default function MultiSourceEnrichment() {
         Enrich your entire collection with data from Spotify, Apple Music, and lyrics databases
       </p>
 
-      {/* Stats sections - keeping existing code */}
+      {/* Collection Overview */}
       <div style={{ marginBottom: 32 }}>
         <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 16, color: '#1f2937' }}>
           📊 Collection Overview
@@ -223,6 +223,88 @@ export default function MultiSourceEnrichment() {
             color="#f59e0b"
             description="Missing services or lyrics"
             onClick={() => showAlbumsForCategory('needs-enrichment', '⚠️ Albums Needing Enrichment')}
+          />
+        </div>
+      </div>
+
+      {/* Streaming Services */}
+      <div style={{ marginBottom: 32 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 16, color: '#1f2937' }}>
+          🎵 Streaming Services
+        </h2>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: 16
+        }}>
+          <ClickableStatCard 
+            label="🔗 Both Services" 
+            value={stats.bothServices} 
+            color="#7c3aed"
+            description="Has Spotify + Apple Music"
+            onClick={() => showAlbumsForCategory('both-services', '🔗 Albums with Both Services')}
+          />
+          <ClickableStatCard 
+            label="❌ No Services" 
+            value={stats.unenriched} 
+            color="#dc2626"
+            description="Missing both services"
+            onClick={() => showAlbumsForCategory('no-data', '❌ Albums with No Services')}
+          />
+          <ClickableStatCard 
+            label="🎵 Missing Spotify" 
+            value={stats.appleOnly} 
+            color="#1DB954"
+            description="Has Apple Music only"
+            onClick={() => showAlbumsForCategory('missing-spotify', '🎵 Albums Missing Spotify')}
+          />
+          <ClickableStatCard 
+            label="🍎 Missing Apple Music" 
+            value={stats.spotifyOnly} 
+            color="#FA57C1"
+            description="Has Spotify only"
+            onClick={() => showAlbumsForCategory('missing-apple', '🍎 Albums Missing Apple Music')}
+          />
+        </div>
+      </div>
+
+      {/* Lyrics Enrichment */}
+      <div style={{ marginBottom: 32 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 16, color: '#1f2937' }}>
+          📝 Lyrics Enrichment
+        </h2>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: 16
+        }}>
+          <ClickableStatCard 
+            label="🍎 Apple Music Lyrics" 
+            value={stats.appleLyrics} 
+            color="#ec4899"
+            description="Full lyrics from Apple Music"
+            onClick={() => showAlbumsForCategory('has-apple-lyrics', '🍎 Albums with Apple Music Lyrics')}
+          />
+          <ClickableStatCard 
+            label="⚠️ Need Apple Lyrics" 
+            value={stats.needsAppleLyrics} 
+            color="#f59e0b"
+            description="Have Apple ID but no lyrics"
+            onClick={() => showAlbumsForCategory('needs-apple-lyrics', '⚠️ Albums Needing Apple Music Lyrics')}
+          />
+          <ClickableStatCard 
+            label="🔗 Genius Links" 
+            value={stats.geniusLyrics} 
+            color="#6366f1"
+            description="Has Genius lyrics URLs"
+            onClick={() => showAlbumsForCategory('has-genius-links', '🔗 Albums with Genius Lyrics Links')}
+          />
+          <ClickableStatCard 
+            label="📝 Any Lyrics" 
+            value={stats.anyLyrics} 
+            color="#8b5cf6"
+            description="Has any lyrics data"
+            onClick={() => showAlbumsForCategory('with-lyrics', '📝 Albums with Any Lyrics')}
           />
         </div>
       </div>
@@ -524,7 +606,7 @@ export default function MultiSourceEnrichment() {
         </div>
       )}
 
-      {/* Modal - keeping existing code */}
+      {/* Modal */}
       {showModal && (
         <div style={{
           position: 'fixed',
