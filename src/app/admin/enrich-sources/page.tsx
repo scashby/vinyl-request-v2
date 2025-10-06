@@ -203,8 +203,8 @@ export default function MultiSourceEnrichment() {
   };
 
   return (
-    <div style={{ padding: 24, maxWidth: 1400, margin: '0 auto' }}>
-      <h1 style={{ fontSize: 32, fontWeight: 'bold', marginBottom: 8 }}>
+    <div style={{ padding: 24, maxWidth: 1400, margin: '0 auto', background: '#f8fafc', minHeight: '100vh' }}>
+      <h1 style={{ fontSize: 32, fontWeight: 'bold', marginBottom: 8, color: '#1f2937' }}>
         🎵 Multi-Source Metadata Enrichment
       </h1>
       <p style={{ color: '#6b7280', marginBottom: 24 }}>
