@@ -1,9 +1,10 @@
-// src/app/api/enrich-sources/batch/route.ts - FIXED: No longer stops early
+// src/app/api/enrich-sources/batch/route.ts - COMPLETE FILE
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const APPLE_MUSIC_TOKEN = process.env.APPLE_MUSIC_TOKEN;
 
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
@@ -50,16 +51,129 @@ type AlbumResult = {
   };
 };
 
+type Track = {
+  position?: string;
+  title?: string;
+  duration?: string;
+  type_?: string;
+  lyrics_url?: string;
+  lyrics?: string;
+  lyrics_source?: 'apple_music' | 'genius';
+};
+
+type AppleTrack = {
+  id: string;
+  attributes: {
+    name: string;
+    trackNumber?: number;
+    discNumber?: number;
+    durationInMillis?: number;
+  };
+};
+
+async function enrichAppleLyrics(albumId: number, appleMusicId: string, tracklists: string) {
+  if (!APPLE_MUSIC_TOKEN) {
+    return { success: false, error: 'Apple Music token not configured' };
+  }
+
+  let tracks: Track[] = [];
+  try {
+    tracks = typeof tracklists === 'string' ? JSON.parse(tracklists) : tracklists;
+  } catch {
+    return { success: false, error: 'Invalid tracklist' };
+  }
+
+  if (!Array.isArray(tracks) || tracks.length === 0) {
+    return { success: false, error: 'No tracks found' };
+  }
+
+  // Fetch Apple Music tracks
+  const tracksRes = await fetch(
+    `https://api.music.apple.com/v1/catalog/us/albums/${appleMusicId}/tracks`,
+    { headers: { 'Authorization': `Bearer ${APPLE_MUSIC_TOKEN}` }}
+  );
+
+  if (!tracksRes.ok) {
+    return { 
+      success: false, 
+      error: `Apple API HTTP ${tracksRes.status}`,
+      stats: { lyricsFound: 0, lyricsNotFound: tracks.length }
+    };
+  }
+
+  const tracksData = await tracksRes.json();
+  const appleTracks: AppleTrack[] = tracksData.data || [];
+
+  let lyricsFound = 0;
+  let lyricsNotFound = 0;
+
+  const enrichedTracks = await Promise.all(
+    tracks.map(async (track) => {
+      if (track.lyrics && track.lyrics_source === 'apple_music') {
+        return track;
+      }
+
+      const appleTrack = appleTracks.find(at => 
+        at.attributes.name.toLowerCase().replace(/[^a-z0-9]/g, '') === 
+        (track.title || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+      );
+
+      if (!appleTrack) {
+        lyricsNotFound++;
+        return track;
+      }
+
+      try {
+        const lyricsRes = await fetch(
+          `https://api.music.apple.com/v1/catalog/us/songs/${appleTrack.id}/lyrics`,
+          { headers: { 'Authorization': `Bearer ${APPLE_MUSIC_TOKEN}` }}
+        );
+
+        if (!lyricsRes.ok) {
+          lyricsNotFound++;
+          return track;
+        }
+
+        const lyricsData = await lyricsRes.json();
+        const ttml = lyricsData?.data?.[0]?.attributes?.ttml;
+
+        if (ttml) {
+          const lyrics = ttml.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+          lyricsFound++;
+          return { ...track, lyrics, lyrics_source: 'apple_music' as const };
+        }
+      } catch {
+        // Ignore errors for individual tracks
+      }
+
+      lyricsNotFound++;
+      return track;
+    })
+  );
+
+  // Update database
+  const { error: updateError } = await supabase
+    .from('collection')
+    .update({ tracklists: JSON.stringify(enrichedTracks) })
+    .eq('id', albumId);
+
+  if (updateError) {
+    return { success: false, error: 'Database update failed' };
+  }
+
+  return {
+    success: true,
+    stats: { lyricsFound, lyricsNotFound }
+  };
+}
+
 async function callService(endpoint: string, albumId: number) {
   try {
     // Build the URL - handle both local and production
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 
-                    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 
-                    'http://localhost:3000';
+                    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
     
     const url = `${baseUrl}/api/enrich-sources/${endpoint}`;
-    
-    console.log(`[callService] Calling ${endpoint} for album ${albumId} at ${url}`);
     
     const res = await fetch(url, {
       method: 'POST',
@@ -72,22 +186,35 @@ async function callService(endpoint: string, albumId: number) {
 
     if (!res.ok) {
       const errorText = await res.text();
-      console.error(`[callService] HTTP ${res.status} for ${endpoint}:`, errorText);
       return {
         success: false,
-        error: `HTTP ${res.status}: ${errorText.substring(0, 100)}`
+        error: `HTTP ${res.status}: ${errorText}`,
+        details: {
+          status: res.status,
+          statusText: res.statusText,
+          url,
+          endpoint,
+          albumId,
+          responseBody: errorText
+        }
       };
     }
 
     const result = await res.json();
     return result;
   } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : 'Service call failed';
-    const errorStack = error instanceof Error ? error.stack : '';
-    console.error(`[callService] Fetch error for ${endpoint}:`, errorMsg, errorStack);
     return {
       success: false,
-      error: `Fetch error: ${errorMsg}`
+      error: error instanceof Error ? error.message : 'Service call failed',
+      details: {
+        errorType: error instanceof Error ? error.constructor.name : typeof error,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorStack: error instanceof Error ? error.stack : undefined,
+        endpoint,
+        albumId,
+        baseUrl: process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL || 'localhost',
+        nodeEnv: process.env.NODE_ENV
+      }
     };
   }
 }
@@ -113,7 +240,7 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const cursor = body.cursor || 0;
-    const limit = body.limit || 20; // NO artificial limits - user controls this
+    const limit = body.limit || 20;
     const folder = body.folder;
     const services = body.services || {
       spotify: true,
@@ -123,7 +250,7 @@ export async function POST(req: Request) {
     };
 
     // Query more albums to account for filtering
-    const queryLimit = limit * 3; // Query 3x the batch size
+    const queryLimit = limit * 3;
 
     let query = supabase
       .from('collection')
@@ -160,14 +287,12 @@ export async function POST(req: Request) {
       needsAppleMusicLyrics(album.tracklists, album.apple_music_id)
     ).slice(0, limit);
 
-    // If we found NO albums needing enrichment in this batch, but got albums back,
-    // we should continue to the next batch
     if (albumsNeedingEnrichment.length === 0 && albums.length > 0) {
       return NextResponse.json({
         success: true,
         processed: 0,
         results: [],
-        hasMore: true, // Continue to next batch
+        hasMore: true,
         nextCursor: albums[albums.length - 1].id
       });
     }
@@ -184,8 +309,6 @@ export async function POST(req: Request) {
     const results: AlbumResult[] = [];
 
     for (const album of albumsNeedingEnrichment) {
-      console.log(`\n🎵 === ENRICHING ALBUM #${album.id}: ${album.artist} - ${album.title} ===`);
-      
       const albumResult: AlbumResult = {
         albumId: album.id,
         artist: album.artist,
@@ -194,9 +317,7 @@ export async function POST(req: Request) {
 
       // Enrich Spotify
       if (!album.spotify_id && services.spotify) {
-        console.log(`  🎵 Calling Spotify service...`);
         const spotifyResult = await callService('spotify', album.id);
-        console.log(`  → Spotify result:`, spotifyResult.success ? '✅ Success' : spotifyResult.skipped ? '⏭️ Skipped' : `❌ Failed: ${spotifyResult.error}`);
         albumResult.spotify = {
           success: spotifyResult.success,
           data: spotifyResult.data as ServiceData,
@@ -205,7 +326,6 @@ export async function POST(req: Request) {
         };
         await sleep(500);
       } else if (album.spotify_id) {
-        console.log(`  🎵 Spotify: Already has ID, skipping`);
         albumResult.spotify = {
           success: true,
           skipped: true
@@ -214,9 +334,7 @@ export async function POST(req: Request) {
 
       // Enrich Apple Music
       if (!album.apple_music_id && services.appleMusic) {
-        console.log(`  🍎 Calling Apple Music service...`);
         const appleResult = await callService('apple-music', album.id);
-        console.log(`  → Apple Music result:`, appleResult.success ? '✅ Success' : appleResult.skipped ? '⏭️ Skipped' : `❌ Failed: ${appleResult.error}`);
         albumResult.appleMusic = {
           success: appleResult.success,
           data: appleResult.data as ServiceData,
@@ -225,7 +343,6 @@ export async function POST(req: Request) {
         };
         await sleep(500);
       } else if (album.apple_music_id) {
-        console.log(`  🍎 Apple Music: Already has ID, skipping`);
         albumResult.appleMusic = {
           success: true,
           skipped: true
@@ -234,9 +351,7 @@ export async function POST(req: Request) {
 
       // Enrich Genius lyrics
       if (album.tracklists && services.genius) {
-        console.log(`  📝 Calling Genius lyrics service...`);
         const geniusResult = await callService('genius', album.id);
-        console.log(`  → Genius result:`, geniusResult.success ? `✅ Enriched ${geniusResult.data?.enrichedCount || 0} tracks` : `❌ Failed: ${geniusResult.error}`);
         albumResult.genius = {
           success: geniusResult.success,
           enrichedCount: geniusResult.data?.enrichedCount,
@@ -248,29 +363,24 @@ export async function POST(req: Request) {
         };
       }
 
-      // Enrich Apple Music lyrics - get the newly added ID or use existing
+      // Enrich Apple Music lyrics - call Apple Music API directly
       const newlyAddedAppleMusicId = albumResult.appleMusic?.data?.apple_music_id;
       const finalAppleMusicId = (typeof newlyAddedAppleMusicId === 'string' ? newlyAddedAppleMusicId : null) || album.apple_music_id;
       
       if (finalAppleMusicId && needsAppleMusicLyrics(album.tracklists, finalAppleMusicId) && services.appleLyrics) {
-        console.log(`  🍎📝 Calling Apple Music Lyrics service...`);
-        const appleLyricsResult = await callService('apple-lyrics', album.id);
-        console.log(`  → Apple Lyrics result:`, appleLyricsResult.success ? `✅ Found ${appleLyricsResult.stats?.lyricsFound || 0} lyrics` : `❌ Failed: ${appleLyricsResult.error}`);
+        const lyricsResult = await enrichAppleLyrics(album.id, finalAppleMusicId, album.tracklists);
         albumResult.appleLyrics = {
-          success: appleLyricsResult.success,
-          lyricsFound: appleLyricsResult.stats?.lyricsFound,
-          lyricsMissing: appleLyricsResult.stats?.lyricsNotFound,
-          missingTracks: appleLyricsResult.stats?.missingTracks,
-          error: appleLyricsResult.error
+          success: lyricsResult.success,
+          lyricsFound: lyricsResult.stats?.lyricsFound,
+          lyricsMissing: lyricsResult.stats?.lyricsNotFound,
+          error: lyricsResult.error
         };
         await sleep(500);
       }
 
       results.push(albumResult);
-      console.log(`✓ Album #${album.id} enrichment complete\n`);
     }
 
-    // Continue if we got the full query limit, meaning there might be more albums to check
     const hasMore = albums.length >= queryLimit;
     const nextCursor = hasMore ? albums[albums.length - 1].id : null;
 
@@ -283,7 +393,6 @@ export async function POST(req: Request) {
     });
 
   } catch (error) {
-    console.error('Batch enrichment error:', error);
     return NextResponse.json({
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error'

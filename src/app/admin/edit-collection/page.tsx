@@ -1,4 +1,4 @@
-// src/app/admin/enrich-sources/page.tsx - COMPLETE FILE with browser console logging
+// src/app/admin/enrich-sources/page.tsx - COMPLETE FILE
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -23,12 +23,14 @@ type AlbumResult = {
     data?: { spotify_id?: string; genres?: string[] };
     error?: string;
     skipped?: boolean;
+    details?: unknown;
   };
   appleMusic?: {
     success: boolean;
     data?: { apple_music_id?: string; genres?: string[] };
     error?: string;
     skipped?: boolean;
+    details?: unknown;
   };
   genius?: {
     success: boolean;
@@ -38,6 +40,7 @@ type AlbumResult = {
     failedTracks?: Array<{ position: string; title: string; error: string }>;
     error?: string;
     skipped?: boolean;
+    details?: unknown;
   };
   appleLyrics?: {
     success: boolean;
@@ -46,6 +49,7 @@ type AlbumResult = {
     missingTracks?: string[];
     error?: string;
     skipped?: boolean;
+    details?: unknown;
   };
 };
 
@@ -147,9 +151,9 @@ export default function MultiSourceEnrichment() {
     const limit = batchSize === 'all' ? 10000 : parseInt(batchSize);
     const allResults: AlbumResult[] = [];
 
-    console.log('🎵 ========================================');
-    console.log('🎵 STARTING MULTI-SOURCE ENRICHMENT');
-    console.log('🎵 ========================================');
+    console.log('========================================');
+    console.log('STARTING MULTI-SOURCE ENRICHMENT');
+    console.log('========================================');
     console.log('Selected services:', selectedServices);
     console.log('Batch size:', batchSize, '(limit:', limit, ')');
     console.log('Folder filter:', folderFilter || 'none');
@@ -159,7 +163,7 @@ export default function MultiSourceEnrichment() {
       while (true) {
         setStatus(`Processing${folderFilter ? ` folder "${folderFilter}"` : ''} from ID ${cursor}...`);
         
-        console.log(`🔄 Starting batch from cursor ${cursor}, limit ${limit}`);
+        console.log(`Starting batch from cursor ${cursor}, limit ${limit}`);
         
         const res = await fetch('/api/enrich-sources/batch', {
           method: 'POST',
@@ -174,7 +178,7 @@ export default function MultiSourceEnrichment() {
 
         const result = await res.json();
         
-        console.log(`📊 Batch result:`, {
+        console.log(`Batch result:`, {
           success: result.success,
           processed: result.processed,
           hasMore: result.hasMore,
@@ -184,23 +188,32 @@ export default function MultiSourceEnrichment() {
         
         // Log each album's enrichment results
         if (result.results && result.results.length > 0) {
-          result.results.forEach(albumResult => {
-            console.group(`🎵 Album #${albumResult.albumId}: ${albumResult.artist} - ${albumResult.title}`);
+          result.results.forEach((albumResult: AlbumResult) => {
+            console.group(`Album #${albumResult.albumId}: ${albumResult.artist} - ${albumResult.title}`);
             if (albumResult.spotify) {
               console.log('Spotify:', albumResult.spotify);
+              if (albumResult.spotify.details) {
+                console.log('Spotify details:', albumResult.spotify.details);
+              }
             }
             if (albumResult.appleMusic) {
               console.log('Apple Music:', albumResult.appleMusic);
+              if (albumResult.appleMusic.details) {
+                console.log('Apple Music details:', albumResult.appleMusic.details);
+              }
             }
             if (albumResult.genius) {
               console.log('Genius:', albumResult.genius);
+              if (albumResult.genius.details) {
+                console.log('Genius details:', albumResult.genius.details);
+              }
             }
             if (albumResult.appleLyrics) {
               console.log('Apple Lyrics:', albumResult.appleLyrics);
               if (!albumResult.appleLyrics.success) {
-                console.error('❌ Apple Lyrics failed:', albumResult.appleLyrics.error);
+                console.error('Apple Lyrics failed:', albumResult.appleLyrics.error);
                 if (albumResult.appleLyrics.details) {
-                  console.error('📋 Full error details:', albumResult.appleLyrics.details);
+                  console.error('Full error details:', albumResult.appleLyrics.details);
                 }
               }
             }
@@ -209,8 +222,8 @@ export default function MultiSourceEnrichment() {
         }
         
         if (!result.success) {
-          setStatus(`❌ Error: ${result.error}`);
-          console.error('❌ Batch failed:', result.error);
+          setStatus(`Error: ${result.error}`);
+          console.error('Batch failed:', result.error);
           break;
         }
 
@@ -225,11 +238,11 @@ export default function MultiSourceEnrichment() {
         setStatus(`Processed ${totalProcessed} albums...`);
 
         if (!result.hasMore) {
-          setStatus(`✅ Complete! Processed ${totalProcessed} albums. See detailed results below.`);
-          console.log('✅ ========================================');
-          console.log('✅ ENRICHMENT COMPLETE');
-          console.log('✅ Total albums processed:', totalProcessed);
-          console.log('✅ ========================================');
+          setStatus(`Complete! Processed ${totalProcessed} albums. See detailed results below.`);
+          console.log('========================================');
+          console.log('ENRICHMENT COMPLETE');
+          console.log('Total albums processed:', totalProcessed);
+          console.log('========================================');
           await loadStatsAndFolders();
           break;
         }
@@ -238,8 +251,9 @@ export default function MultiSourceEnrichment() {
         await new Promise(resolve => setTimeout(resolve, 2000));
       }
     } catch (error) {
-      setStatus(`❌ Error: ${error.message}`);
-      console.error('❌ Fatal error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      setStatus(`Error: ${errorMessage}`);
+      console.error('Fatal error:', error);
     } finally {
       setEnriching(false);
     }
@@ -255,19 +269,19 @@ export default function MultiSourceEnrichment() {
   return (
     <div style={{ padding: 24, maxWidth: 1400, margin: '0 auto', background: '#f8fafc', minHeight: '100vh' }}>
       <h1 style={{ fontSize: 32, fontWeight: 'bold', marginBottom: 8, color: '#1f2937' }}>
-        🎵 Multi-Source Metadata Enrichment
+        Multi-Source Metadata Enrichment
       </h1>
       <p style={{ color: '#6b7280', marginBottom: 8 }}>
         Enrich your entire collection with data from Spotify, Apple Music, and lyrics databases
       </p>
       <p style={{ color: '#9ca3af', fontSize: 13, marginBottom: 24, fontStyle: 'italic' }}>
-        💡 Tip: Open browser DevTools Console (F12) to see detailed enrichment logs for each album
+        Open browser DevTools Console (F12) to see detailed enrichment logs for each album
       </p>
 
       {/* Collection Overview */}
       <div style={{ marginBottom: 32 }}>
         <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 16, color: '#1f2937' }}>
-          📊 Collection Overview
+          Collection Overview
         </h2>
         <div style={{
           display: 'grid',
@@ -283,18 +297,18 @@ export default function MultiSourceEnrichment() {
             disabled
           />
           <ClickableStatCard 
-            label="✅ Fully Enriched" 
+            label="Fully Enriched" 
             value={stats.fullyEnriched} 
             color="#16a34a"
             description="Has services + Apple lyrics"
-            onClick={() => showAlbumsForCategory('fully-enriched', '✅ Fully Enriched Albums')}
+            onClick={() => showAlbumsForCategory('fully-enriched', 'Fully Enriched Albums')}
           />
           <ClickableStatCard 
-            label="⚠️ Needs Enrichment" 
+            label="Needs Enrichment" 
             value={stats.needsEnrichment} 
             color="#f59e0b"
             description="Missing services or lyrics"
-            onClick={() => showAlbumsForCategory('needs-enrichment', '⚠️ Albums Needing Enrichment')}
+            onClick={() => showAlbumsForCategory('needs-enrichment', 'Albums Needing Enrichment')}
           />
         </div>
       </div>
@@ -302,7 +316,7 @@ export default function MultiSourceEnrichment() {
       {/* Streaming Services */}
       <div style={{ marginBottom: 32 }}>
         <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 16, color: '#1f2937' }}>
-          🎵 Streaming Services
+          Streaming Services
         </h2>
         <div style={{
           display: 'grid',
@@ -310,32 +324,32 @@ export default function MultiSourceEnrichment() {
           gap: 16
         }}>
           <ClickableStatCard 
-            label="🔗 Both Services" 
+            label="Both Services" 
             value={stats.bothServices} 
             color="#7c3aed"
             description="Has Spotify + Apple Music"
-            onClick={() => showAlbumsForCategory('both-services', '🔗 Albums with Both Services')}
+            onClick={() => showAlbumsForCategory('both-services', 'Albums with Both Services')}
           />
           <ClickableStatCard 
-            label="❌ No Services" 
+            label="No Services" 
             value={stats.unenriched} 
             color="#dc2626"
             description="Missing both services"
-            onClick={() => showAlbumsForCategory('no-data', '❌ Albums with No Services')}
+            onClick={() => showAlbumsForCategory('no-data', 'Albums with No Services')}
           />
           <ClickableStatCard 
-            label="🎵 Missing Spotify" 
+            label="Missing Spotify" 
             value={stats.appleOnly} 
             color="#1DB954"
             description="Has Apple Music only"
-            onClick={() => showAlbumsForCategory('missing-spotify', '🎵 Albums Missing Spotify')}
+            onClick={() => showAlbumsForCategory('missing-spotify', 'Albums Missing Spotify')}
           />
           <ClickableStatCard 
-            label="🍎 Missing Apple Music" 
+            label="Missing Apple Music" 
             value={stats.spotifyOnly} 
             color="#FA57C1"
             description="Has Spotify only"
-            onClick={() => showAlbumsForCategory('missing-apple', '🍎 Albums Missing Apple Music')}
+            onClick={() => showAlbumsForCategory('missing-apple', 'Albums Missing Apple Music')}
           />
         </div>
       </div>
@@ -343,7 +357,7 @@ export default function MultiSourceEnrichment() {
       {/* Lyrics Enrichment */}
       <div style={{ marginBottom: 32 }}>
         <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 16, color: '#1f2937' }}>
-          📝 Lyrics Enrichment
+          Lyrics Enrichment
         </h2>
         <div style={{
           display: 'grid',
@@ -351,32 +365,32 @@ export default function MultiSourceEnrichment() {
           gap: 16
         }}>
           <ClickableStatCard 
-            label="🍎 Apple Music Lyrics" 
+            label="Apple Music Lyrics" 
             value={stats.appleLyrics} 
             color="#ec4899"
             description="Full lyrics from Apple Music"
-            onClick={() => showAlbumsForCategory('has-apple-lyrics', '🍎 Albums with Apple Music Lyrics')}
+            onClick={() => showAlbumsForCategory('has-apple-lyrics', 'Albums with Apple Music Lyrics')}
           />
           <ClickableStatCard 
-            label="⚠️ Need Apple Lyrics" 
+            label="Need Apple Lyrics" 
             value={stats.needsAppleLyrics} 
             color="#f59e0b"
             description="Have Apple ID but no lyrics"
-            onClick={() => showAlbumsForCategory('needs-apple-lyrics', '⚠️ Albums Needing Apple Music Lyrics')}
+            onClick={() => showAlbumsForCategory('needs-apple-lyrics', 'Albums Needing Apple Music Lyrics')}
           />
           <ClickableStatCard 
-            label="🔗 Genius Links" 
+            label="Genius Links" 
             value={stats.geniusLyrics} 
             color="#6366f1"
             description="Has Genius lyrics URLs"
-            onClick={() => showAlbumsForCategory('has-genius-links', '🔗 Albums with Genius Lyrics Links')}
+            onClick={() => showAlbumsForCategory('has-genius-links', 'Albums with Genius Lyrics Links')}
           />
           <ClickableStatCard 
-            label="📝 Any Lyrics" 
+            label="Any Lyrics" 
             value={stats.anyLyrics} 
             color="#8b5cf6"
             description="Has any lyrics data"
-            onClick={() => showAlbumsForCategory('with-lyrics', '📝 Albums with Any Lyrics')}
+            onClick={() => showAlbumsForCategory('with-lyrics', 'Albums with Any Lyrics')}
           />
         </div>
       </div>
@@ -390,7 +404,7 @@ export default function MultiSourceEnrichment() {
         marginBottom: 24
       }}>
         <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 16, color: '#1f2937' }}>
-          ⚡ Start Enrichment
+          Start Enrichment
         </h2>
         
         <div style={{ marginBottom: 16 }}>
@@ -457,7 +471,7 @@ export default function MultiSourceEnrichment() {
               boxShadow: enriching ? 'none' : '0 4px 12px rgba(124, 58, 237, 0.3)'
             }}
           >
-            {enriching ? '⚡ Enriching...' : `⚡ Enrich ${stats.needsEnrichment} Albums`}
+            {enriching ? 'Enriching...' : `Enrich ${stats.needsEnrichment} Albums`}
           </button>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -527,7 +541,7 @@ export default function MultiSourceEnrichment() {
               cursor: enriching ? 'not-allowed' : 'pointer'
             }}
           >
-            🔄 Refresh Stats
+            Refresh Stats
           </button>
         </div>
 
@@ -535,14 +549,14 @@ export default function MultiSourceEnrichment() {
         {status && (
           <div style={{
             padding: 12,
-            background: status.includes('❌') ? '#fee2e2' : 
-                       status.includes('✅') ? '#dcfce7' : '#dbeafe',
-            border: `1px solid ${status.includes('❌') ? '#dc2626' : 
-                                 status.includes('✅') ? '#16a34a' : '#3b82f6'}`,
+            background: status.includes('Error') ? '#fee2e2' : 
+                       status.includes('Complete') ? '#dcfce7' : '#dbeafe',
+            border: `1px solid ${status.includes('Error') ? '#dc2626' : 
+                                 status.includes('Complete') ? '#16a34a' : '#3b82f6'}`,
             borderRadius: 6,
             fontSize: 14,
-            color: status.includes('❌') ? '#991b1b' : 
-                   status.includes('✅') ? '#15803d' : '#1e40af',
+            color: status.includes('Error') ? '#991b1b' : 
+                   status.includes('Complete') ? '#15803d' : '#1e40af',
             fontWeight: 500
           }}>
             {status}
@@ -560,7 +574,7 @@ export default function MultiSourceEnrichment() {
           marginBottom: 24
         }}>
           <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 16, color: '#1f2937' }}>
-            📋 Detailed Results ({enrichmentResults.length} albums)
+            Detailed Results ({enrichmentResults.length} albums)
           </h2>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -611,13 +625,13 @@ export default function MultiSourceEnrichment() {
                           <div style={{ color: '#6b7280', fontSize: 12 }}>Already had Spotify ID</div>
                         ) : result.spotify.success ? (
                           <div style={{ color: '#15803d', fontSize: 12 }}>
-                            ✓ ID: {result.spotify.data?.spotify_id}
+                            ID: {result.spotify.data?.spotify_id}
                             {result.spotify.data?.genres && result.spotify.data.genres.length > 0 && (
                               <div>Genres: {result.spotify.data.genres.join(', ')}</div>
                             )}
                           </div>
                         ) : (
-                          <div style={{ color: '#dc2626', fontSize: 12 }}>✗ {result.spotify.error}</div>
+                          <div style={{ color: '#dc2626', fontSize: 12 }}>{result.spotify.error}</div>
                         )}
                       </div>
                     )}
@@ -632,13 +646,13 @@ export default function MultiSourceEnrichment() {
                           <div style={{ color: '#6b7280', fontSize: 12 }}>Already had Apple Music ID</div>
                         ) : result.appleMusic.success ? (
                           <div style={{ color: '#92400e', fontSize: 12 }}>
-                            ✓ ID: {result.appleMusic.data?.apple_music_id}
+                            ID: {result.appleMusic.data?.apple_music_id}
                             {result.appleMusic.data?.genres && result.appleMusic.data.genres.length > 0 && (
                               <div>Genres: {result.appleMusic.data.genres.join(', ')}</div>
                             )}
                           </div>
                         ) : (
-                          <div style={{ color: '#dc2626', fontSize: 12 }}>✗ {result.appleMusic.error}</div>
+                          <div style={{ color: '#dc2626', fontSize: 12 }}>{result.appleMusic.error}</div>
                         )}
                       </div>
                     )}
@@ -654,15 +668,15 @@ export default function MultiSourceEnrichment() {
                         ) : result.genius.success ? (
                           <div style={{ fontSize: 12 }}>
                             <div style={{ color: '#7c3aed', marginBottom: 4 }}>
-                              ✓ Enriched: {result.genius.enrichedCount} tracks
+                              Enriched: {result.genius.enrichedCount} tracks
                             </div>
                             {result.genius.failedCount > 0 && (
                               <div style={{ color: '#dc2626' }}>
-                                ✗ Failed: {result.genius.failedCount} tracks
+                                Failed: {result.genius.failedCount} tracks
                                 {result.genius.failedTracks && result.genius.failedTracks.length > 0 && (
                                   <div style={{ marginTop: 4, paddingLeft: 8 }}>
                                     {result.genius.failedTracks.slice(0, 3).map((t, i) => (
-                                      <div key={i}>• {t.position} {t.title}: {t.error}</div>
+                                      <div key={i}>{t.position} {t.title}: {t.error}</div>
                                     ))}
                                     {result.genius.failedTracks.length > 3 && (
                                       <div>... and {result.genius.failedTracks.length - 3} more</div>
@@ -673,7 +687,7 @@ export default function MultiSourceEnrichment() {
                             )}
                           </div>
                         ) : (
-                          <div style={{ color: '#dc2626', fontSize: 12 }}>✗ {result.genius.error}</div>
+                          <div style={{ color: '#dc2626', fontSize: 12 }}>{result.genius.error}</div>
                         )}
                       </div>
                     )}
@@ -687,7 +701,7 @@ export default function MultiSourceEnrichment() {
                         {result.appleLyrics.success ? (
                           <div style={{ fontSize: 12 }}>
                             <div style={{ color: '#be185d', marginBottom: 4 }}>
-                              ✓ Found: {result.appleLyrics.lyricsFound} tracks
+                              Found: {result.appleLyrics.lyricsFound} tracks
                             </div>
                             {result.appleLyrics.lyricsMissing > 0 && (
                               <div style={{ color: '#6b7280' }}>
@@ -698,7 +712,7 @@ export default function MultiSourceEnrichment() {
                         ) : (
                           <div>
                             <div style={{ color: '#dc2626', fontSize: 12, marginBottom: 4 }}>
-                              ✗ {result.appleLyrics.error}
+                              {result.appleLyrics.error}
                             </div>
                             <div style={{ fontSize: 11, color: '#9ca3af', fontStyle: 'italic' }}>
                               Check browser console (F12) for detailed error info
@@ -722,7 +736,7 @@ export default function MultiSourceEnrichment() {
                           textDecoration: 'none'
                         }}
                       >
-                        Edit Album →
+                        Edit Album
                       </Link>
                     </div>
                   </div>
@@ -909,7 +923,7 @@ function ClickableStatCard({ label, value, color, description, onClick, disabled
       </div>
       {!disabled && (
         <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 4 }}>
-          Click to view →
+          Click to view
         </div>
       )}
     </div>
