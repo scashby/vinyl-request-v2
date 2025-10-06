@@ -1,4 +1,4 @@
-// src/app/api/enrich-sources/batch/route.ts - Fixed TypeScript errors
+// src/app/api/enrich-sources/batch/route.ts - FIXED: No longer stops early
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -52,18 +52,42 @@ type AlbumResult = {
 
 async function callService(endpoint: string, albumId: number) {
   try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/enrich-sources/${endpoint}`, {
+    // Build the URL - handle both local and production
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 
+                    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 
+                    'http://localhost:3000';
+    
+    const url = `${baseUrl}/api/enrich-sources/${endpoint}`;
+    
+    console.log(`[callService] Calling ${endpoint} for album ${albumId} at ${url}`);
+    
+    const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'User-Agent': 'DWD-Internal-Batch'
+      },
       body: JSON.stringify({ albumId })
     });
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error(`[callService] HTTP ${res.status} for ${endpoint}:`, errorText);
+      return {
+        success: false,
+        error: `HTTP ${res.status}: ${errorText.substring(0, 100)}`
+      };
+    }
 
     const result = await res.json();
     return result;
   } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : 'Service call failed';
+    const errorStack = error instanceof Error ? error.stack : '';
+    console.error(`[callService] Fetch error for ${endpoint}:`, errorMsg, errorStack);
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Service call failed'
+      error: `Fetch error: ${errorMsg}`
     };
   }
 }
@@ -89,7 +113,7 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const cursor = body.cursor || 0;
-    const limit = Math.min(body.limit || 20, 50);
+    const limit = body.limit || 20; // NO artificial limits - user controls this
     const folder = body.folder;
     const services = body.services || {
       spotify: true,
@@ -98,13 +122,15 @@ export async function POST(req: Request) {
       appleLyrics: true
     };
 
+    // Query more albums to account for filtering
+    const queryLimit = limit * 3; // Query 3x the batch size
+
     let query = supabase
       .from('collection')
       .select('id, artist, title, tracklists, spotify_id, apple_music_id, folder')
-      .or('spotify_id.is.null,apple_music_id.is.null,apple_music_id.not.is.null')
       .gt('id', cursor)
       .order('id', { ascending: true })
-      .limit(limit * 2);
+      .limit(queryLimit);
 
     if (folder && folder !== '') {
       query = query.eq('folder', folder);
@@ -134,13 +160,24 @@ export async function POST(req: Request) {
       needsAppleMusicLyrics(album.tracklists, album.apple_music_id)
     ).slice(0, limit);
 
+    // If we found NO albums needing enrichment in this batch, but got albums back,
+    // we should continue to the next batch
+    if (albumsNeedingEnrichment.length === 0 && albums.length > 0) {
+      return NextResponse.json({
+        success: true,
+        processed: 0,
+        results: [],
+        hasMore: true, // Continue to next batch
+        nextCursor: albums[albums.length - 1].id
+      });
+    }
+
     if (albumsNeedingEnrichment.length === 0) {
       return NextResponse.json({
         success: true,
-        processed: albums.length,
+        processed: 0,
         results: [],
-        hasMore: albums.length >= limit * 2,
-        nextCursor: albums[albums.length - 1].id
+        hasMore: false
       });
     }
 
@@ -233,7 +270,8 @@ export async function POST(req: Request) {
       console.log(`✓ Album #${album.id} enrichment complete\n`);
     }
 
-    const hasMore = albums.length >= limit * 2;
+    // Continue if we got the full query limit, meaning there might be more albums to check
+    const hasMore = albums.length >= queryLimit;
     const nextCursor = hasMore ? albums[albums.length - 1].id : null;
 
     return NextResponse.json({
