@@ -68,6 +68,12 @@ export default function MultiSourceEnrichment() {
   const [batchSize, setBatchSize] = useState('all');
   const [folderFilter, setFolderFilter] = useState('');
   const [folders, setFolders] = useState([]);
+  const [selectedServices, setSelectedServices] = useState({
+    spotify: true,
+    appleMusic: true,
+    genius: true,
+    appleLyrics: true
+  });
   const [enrichmentResults, setEnrichmentResults] = useState<AlbumResult[]>([]);
   const [expandedAlbum, setExpandedAlbum] = useState<number | null>(null);
   
@@ -116,7 +122,19 @@ export default function MultiSourceEnrichment() {
   }
 
   async function enrichAll() {
-    if (!confirm(`This will enrich ${stats.needsEnrichment} albums${folderFilter ? ` in folder "${folderFilter}"` : ' (all folders)'}. This may take a while and consume API quota. Continue?`)) {
+    const selectedCount = Object.values(selectedServices).filter(Boolean).length;
+    if (selectedCount === 0) {
+      alert('Please select at least one service to enrich');
+      return;
+    }
+
+    const serviceNames = [];
+    if (selectedServices.spotify) serviceNames.push('Spotify');
+    if (selectedServices.appleMusic) serviceNames.push('Apple Music');
+    if (selectedServices.genius) serviceNames.push('Genius');
+    if (selectedServices.appleLyrics) serviceNames.push('Apple Lyrics');
+
+    if (!confirm(`This will enrich ${stats.needsEnrichment} albums with: ${serviceNames.join(', ')}${folderFilter ? `\nFolder: "${folderFilter}"` : ' (all folders)'}\n\nThis may take a while and consume API quota. Continue?`)) {
       return;
     }
 
@@ -139,7 +157,8 @@ export default function MultiSourceEnrichment() {
           body: JSON.stringify({ 
             cursor, 
             limit,
-            folder: folderFilter || undefined
+            folder: folderFilter || undefined,
+            services: selectedServices
           })
         });
 
@@ -321,19 +340,63 @@ export default function MultiSourceEnrichment() {
           ⚡ Start Enrichment
         </h2>
         
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
+            Select Services to Enrich:
+          </div>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, cursor: 'pointer' }}>
+              <input 
+                type="checkbox" 
+                checked={selectedServices.spotify}
+                onChange={e => setSelectedServices(prev => ({ ...prev, spotify: e.target.checked }))}
+                disabled={enriching}
+              />
+              <span style={{ fontWeight: 600 }}>Spotify</span>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, cursor: 'pointer' }}>
+              <input 
+                type="checkbox" 
+                checked={selectedServices.appleMusic}
+                onChange={e => setSelectedServices(prev => ({ ...prev, appleMusic: e.target.checked }))}
+                disabled={enriching}
+              />
+              <span style={{ fontWeight: 600 }}>Apple Music</span>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, cursor: 'pointer' }}>
+              <input 
+                type="checkbox" 
+                checked={selectedServices.genius}
+                onChange={e => setSelectedServices(prev => ({ ...prev, genius: e.target.checked }))}
+                disabled={enriching}
+              />
+              <span style={{ fontWeight: 600 }}>Genius Lyrics</span>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, cursor: 'pointer' }}>
+              <input 
+                type="checkbox" 
+                checked={selectedServices.appleLyrics}
+                onChange={e => setSelectedServices(prev => ({ ...prev, appleLyrics: e.target.checked }))}
+                disabled={enriching}
+              />
+              <span style={{ fontWeight: 600 }}>Apple Lyrics</span>
+            </label>
+          </div>
+        </div>
+        
         <div style={{ display: 'flex', gap: 16, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
           <button
             onClick={enrichAll}
-            disabled={enriching || stats.needsEnrichment === 0}
+            disabled={enriching || stats.needsEnrichment === 0 || Object.values(selectedServices).every(v => !v)}
             style={{
               padding: '12px 24px',
-              background: enriching || stats.needsEnrichment === 0 ? '#9ca3af' : 'linear-gradient(135deg, #7c3aed, #a855f7)',
+              background: (enriching || stats.needsEnrichment === 0 || Object.values(selectedServices).every(v => !v)) ? '#9ca3af' : 'linear-gradient(135deg, #7c3aed, #a855f7)',
               color: 'white',
               border: 'none',
               borderRadius: 8,
               fontSize: 16,
               fontWeight: 600,
-              cursor: enriching || stats.needsEnrichment === 0 ? 'not-allowed' : 'pointer',
+              cursor: (enriching || stats.needsEnrichment === 0 || Object.values(selectedServices).every(v => !v)) ? 'not-allowed' : 'pointer',
               boxShadow: enriching ? 'none' : '0 4px 12px rgba(124, 58, 237, 0.3)'
             }}
           >
