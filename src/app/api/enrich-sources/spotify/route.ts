@@ -1,4 +1,4 @@
-// src/app/api/enrich-sources/spotify/route.ts - COMPLETE with logging
+// src/app/api/enrich-sources/spotify/route.ts - WITH COMPREHENSIVE LOGGING
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -13,6 +13,7 @@ let spotifyToken: { token: string; expires: number } | null = null;
 
 async function getSpotifyToken(): Promise<string> {
   if (spotifyToken && Date.now() < spotifyToken.expires) {
+    console.log('  → Using cached Spotify token');
     return spotifyToken.token;
   }
 
@@ -20,8 +21,7 @@ async function getSpotifyToken(): Promise<string> {
     throw new Error('Missing Spotify credentials');
   }
 
-  console.log('  → Getting Spotify access token...');
-
+  console.log('  → Fetching new Spotify token...');
   const res = await fetch('https://accounts.spotify.com/api/token', {
     method: 'POST',
     headers: {
@@ -42,7 +42,7 @@ async function getSpotifyToken(): Promise<string> {
     expires: Date.now() + (data.expires_in - 60) * 1000
   };
   
-  console.log('  → Got Spotify token');
+  console.log('  → New Spotify token acquired');
   return spotifyToken.token;
 }
 
@@ -50,14 +50,14 @@ async function searchSpotify(artist: string, title: string) {
   const token = await getSpotifyToken();
   const query = encodeURIComponent(`artist:${artist} album:${title}`);
   
-  console.log(`  → Querying Spotify API: artist:"${artist}" album:"${title}"`);
-
+  console.log(`  → Searching Spotify: "${artist}" - "${title}"`);
+  
   const res = await fetch(`https://api.spotify.com/v1/search?type=album&limit=1&q=${query}`, {
     headers: { 'Authorization': `Bearer ${token}` }
   });
 
   if (!res.ok) {
-    console.log(`  → Spotify API error: HTTP ${res.status}`);
+    console.log(`  → Spotify search failed: HTTP ${res.status}`);
     throw new Error(`Spotify API returned ${res.status}`);
   }
   
@@ -65,12 +65,13 @@ async function searchSpotify(artist: string, title: string) {
   const album = data?.albums?.items?.[0];
   
   if (!album) {
-    console.log(`  → No results from Spotify`);
+    console.log(`  → No Spotify match found`);
     return null;
   }
 
-  console.log(`  → Found match: "${album.name}" by ${album.artists?.[0]?.name}`);
+  console.log(`  → Found Spotify album: "${album.name}" (ID: ${album.id})`);
 
+  // Get artist genres
   let genres: string[] = [];
   if (album.artists && album.artists.length > 0) {
     const artistId = album.artists[0].id;
@@ -84,11 +85,7 @@ async function searchSpotify(artist: string, title: string) {
       if (artistRes.ok) {
         const artistData = await artistRes.json();
         genres = artistData.genres || [];
-        if (genres.length > 0) {
-          console.log(`  → Artist genres: ${genres.join(', ')}`);
-        } else {
-          console.log(`  → No genres available for artist`);
-        }
+        console.log(`  → Got ${genres.length} genres: ${genres.join(', ')}`);
       }
     } catch (err) {
       console.error('  → Failed to fetch artist genres:', err);
@@ -112,7 +109,7 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { albumId } = body;
 
-    console.log(`\n🎵 === SPOTIFY REQUEST for Album ID: ${albumId} ===`);
+    console.log(`\n🎵 === SPOTIFY ENRICHMENT for Album ID: ${albumId} ===`);
 
     if (!albumId) {
       console.log('❌ ERROR: No albumId provided');
@@ -122,6 +119,7 @@ export async function POST(req: Request) {
       }, { status: 400 });
     }
 
+    // Get album info
     const { data: album, error: dbError } = await supabase
       .from('collection')
       .select('id, artist, title, spotify_id')
@@ -136,10 +134,11 @@ export async function POST(req: Request) {
       }, { status: 404 });
     }
 
-    console.log(`✓ Album found: "${album.artist} - ${album.title}"`);
+    console.log(`✓ Album found: "${album.artist}" - "${album.title}"`);
 
+    // Skip if already has Spotify ID
     if (album.spotify_id) {
-      console.log(`⏭️  Album already has Spotify ID: ${album.spotify_id}\n`);
+      console.log(`⏭️ Album already has Spotify ID: ${album.spotify_id}`);
       return NextResponse.json({
         success: true,
         skipped: true,
@@ -153,13 +152,12 @@ export async function POST(req: Request) {
       });
     }
 
-    console.log(`🔍 Searching Spotify for: "${album.artist} - ${album.title}"...`);
-
+    // Search Spotify
     try {
       const spotifyData = await searchSpotify(album.artist, album.title);
 
       if (!spotifyData) {
-        console.log(`❌ No match found on Spotify\n`);
+        console.log(`❌ No Spotify match found for "${album.artist}" - "${album.title}"`);
         return NextResponse.json({
           success: false,
           error: 'No match found on Spotify',
@@ -172,8 +170,9 @@ export async function POST(req: Request) {
         });
       }
 
-      console.log(`✅ Found Spotify match: ID=${spotifyData.spotify_id}`);
-
+      console.log(`💾 Updating database with Spotify data...`);
+      
+      // Update database
       const { error: updateError } = await supabase
         .from('collection')
         .update(spotifyData)
@@ -193,7 +192,7 @@ export async function POST(req: Request) {
         }, { status: 500 });
       }
 
-      console.log(`✅ Database updated successfully\n`);
+      console.log(`✅ Successfully enriched with Spotify data\n`);
 
       return NextResponse.json({
         success: true,
@@ -212,7 +211,7 @@ export async function POST(req: Request) {
       });
 
     } catch (error) {
-      console.error('❌ FATAL ERROR in Spotify search:', error);
+      console.error('❌ FATAL ERROR:', error);
       return NextResponse.json({
         success: false,
         error: error instanceof Error ? error.message : 'Spotify search failed',

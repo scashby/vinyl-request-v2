@@ -91,6 +91,12 @@ export async function POST(req: Request) {
     const cursor = body.cursor || 0;
     const limit = Math.min(body.limit || 20, 50);
     const folder = body.folder;
+    const services = body.services || {
+      spotify: true,
+      appleMusic: true,
+      genius: true,
+      appleLyrics: true
+    };
 
     let query = supabase
       .from('collection')
@@ -141,6 +147,8 @@ export async function POST(req: Request) {
     const results: AlbumResult[] = [];
 
     for (const album of albumsNeedingEnrichment) {
+      console.log(`\n🎵 === ENRICHING ALBUM #${album.id}: ${album.artist} - ${album.title} ===`);
+      
       const albumResult: AlbumResult = {
         albumId: album.id,
         artist: album.artist,
@@ -148,8 +156,10 @@ export async function POST(req: Request) {
       };
 
       // Enrich Spotify
-      if (!album.spotify_id) {
+      if (!album.spotify_id && services.spotify) {
+        console.log(`  🎵 Calling Spotify service...`);
         const spotifyResult = await callService('spotify', album.id);
+        console.log(`  → Spotify result:`, spotifyResult.success ? '✅ Success' : spotifyResult.skipped ? '⏭️ Skipped' : `❌ Failed: ${spotifyResult.error}`);
         albumResult.spotify = {
           success: spotifyResult.success,
           data: spotifyResult.data as ServiceData,
@@ -157,7 +167,8 @@ export async function POST(req: Request) {
           skipped: spotifyResult.skipped
         };
         await sleep(500);
-      } else {
+      } else if (album.spotify_id) {
+        console.log(`  🎵 Spotify: Already has ID, skipping`);
         albumResult.spotify = {
           success: true,
           skipped: true
@@ -165,8 +176,10 @@ export async function POST(req: Request) {
       }
 
       // Enrich Apple Music
-      if (!album.apple_music_id) {
+      if (!album.apple_music_id && services.appleMusic) {
+        console.log(`  🍎 Calling Apple Music service...`);
         const appleResult = await callService('apple-music', album.id);
+        console.log(`  → Apple Music result:`, appleResult.success ? '✅ Success' : appleResult.skipped ? '⏭️ Skipped' : `❌ Failed: ${appleResult.error}`);
         albumResult.appleMusic = {
           success: appleResult.success,
           data: appleResult.data as ServiceData,
@@ -174,7 +187,8 @@ export async function POST(req: Request) {
           skipped: appleResult.skipped
         };
         await sleep(500);
-      } else {
+      } else if (album.apple_music_id) {
+        console.log(`  🍎 Apple Music: Already has ID, skipping`);
         albumResult.appleMusic = {
           success: true,
           skipped: true
@@ -182,8 +196,10 @@ export async function POST(req: Request) {
       }
 
       // Enrich Genius lyrics
-      if (album.tracklists) {
+      if (album.tracklists && services.genius) {
+        console.log(`  📝 Calling Genius lyrics service...`);
         const geniusResult = await callService('genius', album.id);
+        console.log(`  → Genius result:`, geniusResult.success ? `✅ Enriched ${geniusResult.data?.enrichedCount || 0} tracks` : `❌ Failed: ${geniusResult.error}`);
         albumResult.genius = {
           success: geniusResult.success,
           enrichedCount: geniusResult.data?.enrichedCount,
@@ -199,8 +215,10 @@ export async function POST(req: Request) {
       const newlyAddedAppleMusicId = albumResult.appleMusic?.data?.apple_music_id;
       const finalAppleMusicId = (typeof newlyAddedAppleMusicId === 'string' ? newlyAddedAppleMusicId : null) || album.apple_music_id;
       
-      if (finalAppleMusicId && needsAppleMusicLyrics(album.tracklists, finalAppleMusicId)) {
+      if (finalAppleMusicId && needsAppleMusicLyrics(album.tracklists, finalAppleMusicId) && services.appleLyrics) {
+        console.log(`  🍎📝 Calling Apple Music Lyrics service...`);
         const appleLyricsResult = await callService('apple-lyrics', album.id);
+        console.log(`  → Apple Lyrics result:`, appleLyricsResult.success ? `✅ Found ${appleLyricsResult.stats?.lyricsFound || 0} lyrics` : `❌ Failed: ${appleLyricsResult.error}`);
         albumResult.appleLyrics = {
           success: appleLyricsResult.success,
           lyricsFound: appleLyricsResult.stats?.lyricsFound,
@@ -212,6 +230,7 @@ export async function POST(req: Request) {
       }
 
       results.push(albumResult);
+      console.log(`✓ Album #${album.id} enrichment complete\n`);
     }
 
     const hasMore = albums.length >= limit * 2;
