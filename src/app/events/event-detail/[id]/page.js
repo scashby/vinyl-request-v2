@@ -6,7 +6,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from 'src/lib/supabaseClient';
-
+import { formatEventText } from 'src/utils/textFormatter';
 import 'styles/internal.css';
 import 'styles/events.css';
 import Image from 'next/image';
@@ -202,7 +202,7 @@ export default function Page() {
             {(info || info_url) && (
               <div className="event-info-card event-section">
                 <h3>About This Event</h3>
-                {info && <p>{info}</p>}
+                {info && <p dangerouslySetInnerHTML={{ __html: formatEventText(info) }} />}
                 {info_url && (
                   <a
                     href={info_url}
