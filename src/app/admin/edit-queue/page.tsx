@@ -1,5 +1,5 @@
 // Admin Edit Queue page ("/admin/edit-queue")
-// Updated to allow selection of specific event queue before editing
+// Updated with queue type support (track/side/album)
 
 "use client";
 
@@ -13,6 +13,7 @@ type Event = {
   title: string;
   date: string;
   has_queue: boolean;
+  queue_type: string;
   [key: string]: unknown;
 };
 
@@ -20,7 +21,10 @@ type Request = {
   id: string;
   artist: string;
   title: string;
-  side: string;
+  side: string | null;
+  track_number: string | null;
+  track_name: string | null;
+  track_duration: string | null;
   votes: number;
   event_id: string;
   created_at: string;
@@ -65,12 +69,11 @@ function EditQueueContent() {
     try {
       console.log('🔍 Admin Debug: Fetching requests for event_id:', eventId);
       
-      // Load queue items for this event - using EXACT same approach as QueueSection and browse-queue
       const { data: requests, error: requestsError } = await supabase
         .from('requests')
         .select('*')
         .eq('event_id', eventId)
-        .order('id', { ascending: true }); // Same ordering as QueueSection
+        .order('id', { ascending: true });
 
       console.log('🔍 Admin Debug: Requests query result:', { requests, requestsError, count: requests?.length });
 
@@ -86,18 +89,19 @@ function EditQueueContent() {
         return;
       }
 
-      // Get unique album IDs
       const albumIds = requests.map(r => r.album_id).filter(Boolean);
       console.log('🔍 Admin Debug: Album IDs found:', albumIds);
       
       if (albumIds.length === 0) {
         console.log('🔍 Admin Debug: No album IDs, using direct request data');
-        // Handle requests without album_id (direct artist/title entries)
         const mapped = requests.map(req => ({
           id: req.id,
           artist: req.artist || '',
           title: req.title || '',
-          side: req.side || 'A',
+          side: req.side || null,
+          track_number: req.track_number || null,
+          track_name: req.track_name || null,
+          track_duration: req.track_duration || null,
           votes: req.votes || 1,
           album_id: req.album_id,
           created_at: req.created_at,
@@ -105,7 +109,6 @@ function EditQueueContent() {
         }));
         console.log('🔍 Admin Debug: Mapped requests without albums:', mapped);
         
-        // Sort by votes desc, then by created_at asc
         const sorted = mapped.sort((a, b) => {
           if (b.votes !== a.votes) {
             return b.votes - a.votes;
@@ -117,7 +120,6 @@ function EditQueueContent() {
         return;
       }
 
-      // Load album details
       console.log('🔍 Admin Debug: Fetching albums for IDs:', albumIds);
       const { data: albums, error: albumsError } = await supabase
         .from('collection')
@@ -132,14 +134,16 @@ function EditQueueContent() {
         return;
       }
 
-      // Map requests with album data
       const mapped = requests.map(req => {
         const album = albums?.find(a => a.id === req.album_id);
         return {
           id: req.id,
           artist: req.artist || album?.artist || '',
           title: req.title || album?.title || '',
-          side: req.side || 'A',
+          side: req.side || null,
+          track_number: req.track_number || null,
+          track_name: req.track_name || null,
+          track_duration: req.track_duration || null,
           votes: req.votes || 1,
           album_id: req.album_id,
           created_at: req.created_at,
@@ -149,7 +153,6 @@ function EditQueueContent() {
 
       console.log('🔍 Admin Debug: Final mapped queue items:', mapped);
       
-      // Sort by votes desc, then by created_at asc
       const sorted = mapped.sort((a, b) => {
         if (b.votes !== a.votes) {
           return b.votes - a.votes;
@@ -194,6 +197,15 @@ function EditQueueContent() {
     });
   };
 
+  const getQueueTypeLabel = (queueType: string) => {
+    switch(queueType) {
+      case 'track': return '🎵 By Track';
+      case 'album': return '💿 By Album';
+      case 'side':
+      default: return '📀 By Side';
+    }
+  };
+
   useEffect(() => {
     console.log('🔍 Admin Debug: Edit Queue component mounted');
     console.log('🔍 Admin Debug: URL eventId:', urlEventId);
@@ -201,7 +213,6 @@ function EditQueueContent() {
   }, [urlEventId]);
 
   useEffect(() => {
-    // Auto-select event if eventId in URL and events are loaded
     if (urlEventId && events.length > 0 && !selectedEvent) {
       console.log('🔍 Admin Debug: Auto-selecting event from URL:', urlEventId);
       const eventFromUrl = events.find(e => e.id === urlEventId);
@@ -231,6 +242,8 @@ function EditQueueContent() {
     );
   }
 
+  const queueType = selectedEvent?.queue_type || 'side';
+
   return (
     <div className="admin-edit-queue-page">
       <div className="edit-queue-container">
@@ -239,7 +252,6 @@ function EditQueueContent() {
         </h1>
 
         {!selectedEvent ? (
-          // Event Selection View
           <div>
             <h2 className="edit-queue-subtitle">
               Select an Event
@@ -266,7 +278,7 @@ function EditQueueContent() {
                       {formatDate(event.date)}
                     </p>
                     <div className="event-card-badge">
-                      🎵 Queue Enabled
+                      {getQueueTypeLabel(event.queue_type || 'side')}
                     </div>
                   </div>
                 ))}
@@ -274,7 +286,6 @@ function EditQueueContent() {
             )}
           </div>
         ) : (
-          // Queue Management View
           <div>
             <div className="queue-management-header">
               <div>
@@ -282,7 +293,7 @@ function EditQueueContent() {
                   {selectedEvent.title} - Queue
                 </h2>
                 <p className="queue-management-subtitle">
-                  {formatDate(selectedEvent.date)} • {requests.length} requests
+                  {formatDate(selectedEvent.date)} • {requests.length} requests • {getQueueTypeLabel(queueType)}
                 </p>
               </div>
               <button
@@ -304,27 +315,39 @@ function EditQueueContent() {
               </div>
             ) : (
               <div className="queue-table-container">
-                {/* Header */}
                 <div className="queue-table-header">
-                  <div>Album</div>
+                  <div>{queueType === 'track' ? 'Track' : 'Album'}</div>
                   <div>Artist</div>
-                  <div>Side</div>
+                  {queueType === 'side' && <div>Side</div>}
+                  {queueType === 'track' && <div>Track #</div>}
+                  {queueType === 'track' && <div>Duration</div>}
                   <div>Votes</div>
                   <div>Action</div>
                 </div>
 
-                {/* Requests */}
                 {requests.map((req) => (
                   <div key={req.id} className="queue-table-row">
                     <div className="queue-album-title">
-                      {req.title}
+                      {queueType === 'track' ? (req.track_name || req.title) : req.title}
                     </div>
                     <div className="queue-artist-name">
                       {req.artist}
                     </div>
-                    <div className="queue-side-indicator">
-                      {req.side}
-                    </div>
+                    {queueType === 'side' && (
+                      <div className="queue-side-indicator">
+                        {req.side || '--'}
+                      </div>
+                    )}
+                    {queueType === 'track' && (
+                      <>
+                        <div style={{ textAlign: 'center', fontSize: '14px' }}>
+                          {req.track_number || '--'}
+                        </div>
+                        <div style={{ textAlign: 'center', fontSize: '14px' }}>
+                          {req.track_duration || '--:--'}
+                        </div>
+                      </>
+                    )}
                     <div className={`queue-votes-count ${req.votes === 0 ? 'no-votes' : ''}`}>
                       {req.votes}
                     </div>
@@ -332,7 +355,10 @@ function EditQueueContent() {
                       <button
                         className="remove-button"
                         onClick={() => {
-                          if (confirm(`Are you sure you want to remove "${req.title}" by ${req.artist} from the queue?`)) {
+                          const itemDesc = queueType === 'track' 
+                            ? `"${req.track_name || req.title}"` 
+                            : `"${req.title}" by ${req.artist}`;
+                          if (confirm(`Are you sure you want to remove ${itemDesc} from the queue?`)) {
                             removeRequest(req.id);
                           }
                         }}
@@ -345,14 +371,12 @@ function EditQueueContent() {
               </div>
             )}
 
-            {/* Summary Stats */}
             {requests.length > 0 && (
               <div className="queue-summary">
                 <strong>Queue Summary:</strong> {requests.length} requests, {requests.reduce((sum, req) => sum + req.votes, 0)} total votes
               </div>
             )}
 
-            {/* Debug Info */}
             {process.env.NODE_ENV === 'development' && (
               <div style={{ 
                 marginTop: '2rem', 
@@ -364,6 +388,7 @@ function EditQueueContent() {
               }}>
                 <strong>Debug Info:</strong><br />
                 Event ID: {selectedEvent.id}<br />
+                Queue Type: {queueType}<br />
                 URL Event ID: {urlEventId || 'none'}<br />
                 Requests found: {requests.length}<br />
                 Request IDs: {requests.map(r => r.id).join(', ')}

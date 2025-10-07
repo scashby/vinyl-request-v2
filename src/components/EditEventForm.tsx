@@ -1,4 +1,4 @@
-// EditEventForm.tsx — Enhanced with TBA support and fixed date handling for recurring events
+// components/EditEventForm.tsx — Enhanced with TBA support, recurring events, and queue type options
 
 "use client";
 
@@ -17,6 +17,7 @@ interface EventData {
   info: string;
   info_url: string;
   has_queue: boolean;
+  queue_type: string;
   allowed_formats: string[];
   is_recurring: boolean;
   recurrence_pattern: string;
@@ -85,6 +86,7 @@ export default function EditEventForm() {
     info: '',
     info_url: '',
     has_queue: false,
+    queue_type: 'side',
     allowed_formats: [] as string[],
     is_recurring: false,
     recurrence_pattern: 'weekly',
@@ -114,6 +116,7 @@ export default function EditEventForm() {
               : [],
           title: copiedEvent.title ? `${copiedEvent.title} (Copy)` : '',
           date: isTBA ? '9999-12-31' : copiedEvent.date,
+          queue_type: copiedEvent.queue_type || 'side',
           is_recurring: false,
           recurrence_end_date: '',
           parent_event_id: undefined,
@@ -137,6 +140,7 @@ export default function EditEventForm() {
               : typeof data.allowed_formats === 'string'
                 ? data.allowed_formats.replace(/[{}]/g, '').split(',').map((f: string) => f.trim()).filter(Boolean)
                 : [],
+            queue_type: data.queue_type || 'side',
             is_recurring: data.is_recurring || false,
             recurrence_pattern: data.recurrence_pattern || 'weekly',
             recurrence_interval: data.recurrence_interval || 1,
@@ -212,6 +216,7 @@ export default function EditEventForm() {
         info: eventData.info,
         info_url: eventData.info_url,
         has_queue: eventData.has_queue,
+        queue_type: eventData.has_queue ? eventData.queue_type : null,
         allowed_formats: `{${eventData.allowed_formats.map(f => f.trim()).join(',')}}`,
         is_recurring: isTBA ? false : eventData.is_recurring,
         ...(!isTBA && eventData.is_recurring ? {
@@ -270,6 +275,7 @@ export default function EditEventForm() {
                   info: eventData.info,
                   info_url: eventData.info_url,
                   has_queue: eventData.has_queue,
+                  queue_type: eventData.has_queue ? eventData.queue_type : null,
                   allowed_formats: `{${eventData.allowed_formats.map(f => f.trim()).join(',')}}`,
                 })
                 .eq('id', child.id);
@@ -291,6 +297,7 @@ export default function EditEventForm() {
               ...e,
               date: e.date,
               allowed_formats: `{${e.allowed_formats.map(f => f.trim()).join(',')}}`,
+              queue_type: eventData.has_queue ? eventData.queue_type : null,
               parent_event_id: parseInt(id),
               recurrence_pattern: null,
               recurrence_interval: null,
@@ -336,6 +343,7 @@ export default function EditEventForm() {
             ...e,
             date: e.date,
             allowed_formats: `{${e.allowed_formats.map(f => f.trim()).join(',')}}`,
+            queue_type: eventData.has_queue ? eventData.queue_type : null,
             parent_event_id: savedEvent.id,
             recurrence_pattern: null,
             recurrence_interval: null,
@@ -474,15 +482,55 @@ export default function EditEventForm() {
           placeholder="Event Info URL (optional)"
           style={{ display: 'block', width: '100%', marginBottom: '1rem', padding: '0.5rem' }}
         />
-        <label style={{ display: 'block', marginBottom: '1rem' }}>
-          <input
-            type="checkbox"
-            name="has_queue"
-            checked={eventData.has_queue}
-            onChange={handleCheckboxChange}
-          />
-          {' '}Has Queue
-        </label>
+        
+        {/* Queue Settings Section */}
+        <div style={{
+          border: '2px solid #3b82f6',
+          borderRadius: '8px',
+          padding: '1rem',
+          marginBottom: '1rem',
+          backgroundColor: '#eff6ff'
+        }}>
+          <label style={{ display: 'block', marginBottom: '1rem' }}>
+            <input
+              type="checkbox"
+              name="has_queue"
+              checked={eventData.has_queue}
+              onChange={handleCheckboxChange}
+            />
+            {' '}<strong>Enable Queue</strong>
+          </label>
+
+          {eventData.has_queue && (
+            <div style={{ marginLeft: '1.5rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem' }}>
+                <strong>Queue Type:</strong>
+              </label>
+              <select
+                name="queue_type"
+                value={eventData.queue_type}
+                onChange={handleChange}
+                style={{ 
+                  display: 'block', 
+                  width: '100%', 
+                  padding: '0.5rem',
+                  marginBottom: '0.5rem',
+                  borderRadius: '4px',
+                  border: '1px solid #d1d5db'
+                }}
+              >
+                <option value="side">By Side (A, B, C, etc.)</option>
+                <option value="track">By Individual Track</option>
+                <option value="album">By Full Album</option>
+              </select>
+              <small style={{ display: 'block', color: '#666', fontSize: '0.85rem' }}>
+                {eventData.queue_type === 'side' && '📀 Attendees can request specific album sides'}
+                {eventData.queue_type === 'track' && '🎵 Attendees can request individual songs'}
+                {eventData.queue_type === 'album' && '💿 Attendees can request full albums'}
+              </small>
+            </div>
+          )}
+        </div>
 
         {eventData.date && eventData.date !== '9999-12-31' && (
           <label style={{ display: 'block', marginBottom: '1rem' }}>

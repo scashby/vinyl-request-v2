@@ -1,4 +1,4 @@
-// Fixed Album Detail page with track listings, event context, and navigation
+// Album Detail page with queue type support (track/side/album)
 // Replace: src/app/browse/album-detail/[id]/page.js
 
 "use client";
@@ -72,9 +72,7 @@ function AlbumDetailContent() {
     }
   }, [id, eventId, fetchAlbum, fetchEventData]);
 
-  // ─────────────────────────────────────────────────────────────
-  // Minimal fix: insert-or-increment for (event_id, album_id, side)
-  // ─────────────────────────────────────────────────────────────
+  // Handler for side-based queue
   const handleAddToQueue = async (side) => {
     if (!eventId) {
       setRequestStatus('No event selected');
@@ -87,14 +85,13 @@ function AlbumDetailContent() {
 
     setSubmittingRequest(true);
     try {
-      // 1) Look for an existing request row for this event/album/side
       const { data: existingRows, error: findErr } = await supabase
         .from('requests')
         .select('id, votes')
         .eq('event_id', eventId)
-        .eq('album_id', id)      // keep as-is to match your current schema usage
+        .eq('album_id', id)
         .eq('side', side)
-        .order('timestamp', { ascending: true }) // prefer the oldest if duplicates already exist
+        .order('timestamp', { ascending: true })
         .limit(1);
 
       if (findErr) throw findErr;
@@ -102,7 +99,6 @@ function AlbumDetailContent() {
       const existing = Array.isArray(existingRows) ? existingRows[0] : null;
 
       if (existing) {
-        // 2) Increment votes on the existing row
         const newVotes = (existing.votes ?? 0) + 1;
         const { error: updateErr } = await supabase
           .from('requests')
@@ -113,7 +109,6 @@ function AlbumDetailContent() {
 
         setRequestStatus(`Added vote: ${album.title} — Side ${side}. Votes: x${newVotes}`);
       } else {
-        // 3) No existing row — insert with votes = 1
         const { error: insertErr } = await supabase.from('requests').insert([{
           album_id: id,
           artist: album.artist,
@@ -135,7 +130,130 @@ function AlbumDetailContent() {
       setSubmittingRequest(false);
     }
   };
-  // ─────────────────────────────────────────────────────────────
+
+  // Handler for track-based queue
+  const handleAddTrackToQueue = async (track) => {
+    if (!eventId) {
+      setRequestStatus('No event selected');
+      return;
+    }
+    if (!album) {
+      setRequestStatus('Album not loaded');
+      return;
+    }
+
+    setSubmittingRequest(true);
+    try {
+      const { data: existingRows, error: findErr } = await supabase
+        .from('requests')
+        .select('id, votes')
+        .eq('event_id', eventId)
+        .eq('album_id', id)
+        .eq('track_number', track.position || '')
+        .order('timestamp', { ascending: true })
+        .limit(1);
+
+      if (findErr) throw findErr;
+
+      const existing = Array.isArray(existingRows) ? existingRows[0] : null;
+
+      if (existing) {
+        const newVotes = (existing.votes ?? 0) + 1;
+        const { error: updateErr } = await supabase
+          .from('requests')
+          .update({ votes: newVotes })
+          .eq('id', existing.id);
+
+        if (updateErr) throw updateErr;
+
+        setRequestStatus(`Added vote: ${track.title || track.name}. Votes: x${newVotes}`);
+      } else {
+        const { error: insertErr } = await supabase.from('requests').insert([{
+          album_id: id,
+          artist: track.artist || album.artist,
+          title: track.title || track.name,
+          track_number: track.position || '',
+          track_name: track.title || track.name,
+          track_duration: track.duration || '',
+          event_id: eventId,
+          votes: 1,
+          status: 'open',
+          side: null
+        }]);
+
+        if (insertErr) throw insertErr;
+
+        setRequestStatus(`Added "${track.title || track.name}" to queue! Votes: x1`);
+      }
+    } catch (e) {
+      console.error(e);
+      setRequestStatus('Failed to add to queue');
+    } finally {
+      setSubmittingRequest(false);
+    }
+  };
+
+  // Handler for album-based queue
+  const handleAddAlbumToQueue = async () => {
+    if (!eventId) {
+      setRequestStatus('No event selected');
+      return;
+    }
+    if (!album) {
+      setRequestStatus('Album not loaded');
+      return;
+    }
+
+    setSubmittingRequest(true);
+    try {
+      const { data: existingRows, error: findErr } = await supabase
+        .from('requests')
+        .select('id, votes')
+        .eq('event_id', eventId)
+        .eq('album_id', id)
+        .is('side', null)
+        .is('track_number', null)
+        .order('timestamp', { ascending: true })
+        .limit(1);
+
+      if (findErr) throw findErr;
+
+      const existing = Array.isArray(existingRows) ? existingRows[0] : null;
+
+      if (existing) {
+        const newVotes = (existing.votes ?? 0) + 1;
+        const { error: updateErr } = await supabase
+          .from('requests')
+          .update({ votes: newVotes })
+          .eq('id', existing.id);
+
+        if (updateErr) throw updateErr;
+
+        setRequestStatus(`Added vote for full album: ${album.title}. Votes: x${newVotes}`);
+      } else {
+        const { error: insertErr } = await supabase.from('requests').insert([{
+          album_id: id,
+          artist: album.artist,
+          title: album.title,
+          side: null,
+          track_number: null,
+          track_name: null,
+          event_id: eventId,
+          votes: 1,
+          status: 'open'
+        }]);
+
+        if (insertErr) throw insertErr;
+
+        setRequestStatus(`Added full album "${album.title}" to queue! Votes: x1`);
+      }
+    } catch (e) {
+      console.error(e);
+      setRequestStatus('Failed to add to queue');
+    } finally {
+      setSubmittingRequest(false);
+    }
+  };
 
   const goToEvent = () => {
     if (eventId) {
@@ -162,13 +280,11 @@ function AlbumDetailContent() {
     
     if (album?.tracklists) {
       try {
-        // Try to parse as JSON first
         const parsedTracks = JSON.parse(album.tracklists);
         
         if (Array.isArray(parsedTracks)) {
           parsedTracks.forEach(track => {
             if (track.position) {
-              // Extract side letter from positions like "A1", "B2", "C3", etc.
               const sideMatch = track.position.match(/^([A-Z])/);
               if (sideMatch) {
                 sides.add(sideMatch[1]);
@@ -177,7 +293,6 @@ function AlbumDetailContent() {
           });
         }
       } catch {
-        // If JSON parsing fails, treat as plain text and look for side patterns
         const trackLines = album.tracklists.split('\n').filter(track => track.trim());
         trackLines.forEach(track => {
           const sideMatch = track.match(/^([A-Z])\d+/);
@@ -188,21 +303,44 @@ function AlbumDetailContent() {
       }
     }
     
-    // If no sides found in tracklists, check the sides property
     if (sides.size === 0 && album?.sides) {
       Object.keys(album.sides).forEach(side => {
         sides.add(side.toUpperCase());
       });
     }
     
-    // If still no sides found, default to A and B
     if (sides.size === 0) {
       sides.add('A');
       sides.add('B');
     }
     
-    // Convert to sorted array
     return Array.from(sides).sort();
+  };
+
+  const getTracksList = () => {
+    if (!album?.tracklists) return [];
+
+    try {
+      const parsedTracks = JSON.parse(album.tracklists);
+      
+      if (Array.isArray(parsedTracks)) {
+        return parsedTracks;
+      }
+      return [];
+    } catch {
+      // Parse plain text format
+      return album.tracklists.split('\n').filter(track => track.trim()).map((track, index) => {
+        const trackMatch = track.trim().match(/^(\d+\.?\s*)?(.+)$/);
+        const trackName = trackMatch ? trackMatch[2] : track.trim();
+        
+        return {
+          position: index + 1,
+          title: trackName,
+          artist: album.artist,
+          duration: '--:--'
+        };
+      });
+    }
   };
 
   if (loading) {
@@ -239,15 +377,15 @@ function AlbumDetailContent() {
     ? album.image_url 
     : '/images/coverplaceholder.png';
 
+  const queueType = eventData?.queue_type || 'side';
+
   return (
     <div className="album-detail">
-      {/* Background blur effect */}
       <div 
         className="background-blur"
         style={{ backgroundImage: `url(${imageUrl})` }}
       />
 
-      {/* Navigation Bar */}
       {eventId && (
         <div style={{
           position: 'relative',
@@ -330,7 +468,6 @@ function AlbumDetailContent() {
         </div>
       )}
 
-      {/* Album Header */}
       <div className="album-header">
         <Image
           src={imageUrl}
@@ -373,42 +510,73 @@ function AlbumDetailContent() {
             </div>
           )}
 
-          {/* Queue Actions */}
-          {eventId && (
+          {/* Queue Actions - Adaptive based on queue type */}
+          {eventId && eventData?.has_queue && (
             <div style={{ marginTop: '20px' }}>
-              <h3 style={{ color: '#fff', marginBottom: '12px', fontSize: '18px' }}>
-                Add to Event Queue:
-              </h3>
-              <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
-                {getAvailableSides().map((side, index) => (
+              {queueType === 'side' && (
+                <>
+                  <h3 style={{ color: '#fff', marginBottom: '12px', fontSize: '18px' }}>
+                    Add to Event Queue (By Side):
+                  </h3>
+                  <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
+                    {getAvailableSides().map((side, index) => (
+                      <button
+                        key={side}
+                        onClick={() => handleAddToQueue(side)}
+                        disabled={submittingRequest}
+                        style={{
+                          background: index % 4 === 0 ? '#3b82f6' : 
+                                     index % 4 === 1 ? '#10b981' : 
+                                     index % 4 === 2 ? '#f59e0b' : '#ef4444',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: 6,
+                          padding: '12px 24px',
+                          cursor: submittingRequest ? 'not-allowed' : 'pointer',
+                          fontSize: 16,
+                          fontWeight: 'bold',
+                          opacity: submittingRequest ? 0.7 : 1
+                        }}
+                      >
+                        Side {side}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {queueType === 'album' && (
+                <>
+                  <h3 style={{ color: '#fff', marginBottom: '12px', fontSize: '18px' }}>
+                    Add to Event Queue:
+                  </h3>
                   <button
-                    key={side}
-                    onClick={() => handleAddToQueue(side)}
+                    onClick={handleAddAlbumToQueue}
                     disabled={submittingRequest}
                     style={{
-                      background: index % 4 === 0 ? '#3b82f6' : 
-                                 index % 4 === 1 ? '#10b981' : 
-                                 index % 4 === 2 ? '#f59e0b' : '#ef4444',
+                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                       color: 'white',
                       border: 'none',
-                      borderRadius: 6,
-                      padding: '12px 24px',
+                      borderRadius: 8,
+                      padding: '16px 32px',
                       cursor: submittingRequest ? 'not-allowed' : 'pointer',
-                      fontSize: 16,
+                      fontSize: 18,
                       fontWeight: 'bold',
-                      opacity: submittingRequest ? 0.7 : 1
+                      opacity: submittingRequest ? 0.7 : 1,
+                      boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)'
                     }}
                   >
-                    Side {side}
+                    💿 Add Full Album to Queue
                   </button>
-                ))}
-              </div>
+                </>
+              )}
               
               {requestStatus && (
                 <p style={{ 
-                  color: requestStatus.includes('Error') ? '#ef4444' : '#10b981',
+                  color: requestStatus.includes('Error') || requestStatus.includes('Failed') ? '#ef4444' : '#10b981',
                   fontWeight: 'bold',
-                  fontSize: '14px'
+                  fontSize: '14px',
+                  marginTop: '12px'
                 }}>
                   {requestStatus}
                 </p>
@@ -428,6 +596,11 @@ function AlbumDetailContent() {
             fontWeight: 'bold'
           }}>
             Track Listing
+            {queueType === 'track' && eventId && eventData?.has_queue && (
+              <span style={{ fontSize: '14px', marginLeft: '12px', opacity: 0.8 }}>
+                (Click any track to add to queue)
+              </span>
+            )}
           </h3>
           
           <div className="tracklist-header">
@@ -435,73 +608,60 @@ function AlbumDetailContent() {
             <div>Title</div>
             <div>Artist</div>
             <div>Duration</div>
+            {queueType === 'track' && eventId && eventData?.has_queue && (
+              <div>Add</div>
+            )}
           </div>
           
           {(() => {
-            try {
-              // Try to parse as JSON first
-              const parsedTracks = JSON.parse(album.tracklists);
-              
-              if (Array.isArray(parsedTracks)) {
-                // Handle array of track objects
-                return parsedTracks.map((track, index) => (
-                  <div key={index} className="track">
-                    <div>{track.position || index + 1}</div>
-                    <div style={{ color: '#fff', fontWeight: '500' }}>
-                      {track.title || track.name || 'Unknown Track'}
-                    </div>
-                    <div style={{ color: '#ccc' }}>
-                      {track.artist || album.artist}
-                    </div>
-                    <div style={{ color: '#aaa', fontSize: '14px' }}>
-                      {track.duration || '--:--'}
-                    </div>
+            const tracks = getTracksList();
+            
+            return tracks.map((track, index) => (
+              <div 
+                key={index} 
+                className="track"
+                style={{
+                  cursor: queueType === 'track' && eventId && eventData?.has_queue ? 'pointer' : 'default',
+                  transition: 'background-color 0.2s'
+                }}
+              >
+                <div>{track.position || index + 1}</div>
+                <div style={{ color: '#fff', fontWeight: '500' }}>
+                  {track.title || track.name || 'Unknown Track'}
+                </div>
+                <div style={{ color: '#ccc' }}>
+                  {track.artist || album.artist}
+                </div>
+                <div style={{ color: '#aaa', fontSize: '14px' }}>
+                  {track.duration || '--:--'}
+                </div>
+                {queueType === 'track' && eventId && eventData?.has_queue && (
+                  <div>
+                    <button
+                      onClick={() => handleAddTrackToQueue(track)}
+                      disabled={submittingRequest}
+                      style={{
+                        background: '#3b82f6',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        padding: '6px 12px',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        cursor: submittingRequest ? 'not-allowed' : 'pointer',
+                        opacity: submittingRequest ? 0.7 : 1
+                      }}
+                    >
+                      + Add
+                    </button>
                   </div>
-                ));
-              } else {
-                // Handle object with track data
-                return (
-                  <div className="track">
-                    <div>1</div>
-                    <div style={{ color: '#fff', fontWeight: '500' }}>
-                      JSON data structure not recognized
-                    </div>
-                    <div style={{ color: '#ccc' }}>
-                      {album.artist}
-                    </div>
-                    <div style={{ color: '#aaa', fontSize: '14px' }}>
-                      --:--
-                    </div>
-                  </div>
-                );
-              }
-            } catch {
-              // If JSON parsing fails, treat as plain text
-              return album.tracklists.split('\n').filter(track => track.trim()).map((track, index) => {
-                const trackMatch = track.trim().match(/^(\d+\.?\s*)?(.+)$/);
-                const trackName = trackMatch ? trackMatch[2] : track.trim();
-                
-                return (
-                  <div key={index} className="track">
-                    <div>{index + 1}</div>
-                    <div style={{ color: '#fff', fontWeight: '500' }}>
-                      {trackName}
-                    </div>
-                    <div style={{ color: '#ccc' }}>
-                      {album.artist}
-                    </div>
-                    <div style={{ color: '#aaa', fontSize: '14px' }}>
-                      --:--
-                    </div>
-                  </div>
-                );
-              });
-            }
+                )}
+              </div>
+            ));
           })()}
         </div>
       )}
 
-      {/* Alternative: Show sides data if available */}
       {!album?.tracklists && album?.sides && (
         <div className="tracklist">
           <h3 style={{ 

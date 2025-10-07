@@ -1,3 +1,5 @@
+//browse-queue/page.js
+
 "use client";
 
 import { useEffect, useState, useCallback, Suspense } from "react";
@@ -49,18 +51,33 @@ function BrowseQueueContent() {
         albums = res.data || [];
       }
 
+      const queueType = event?.queue_type || 'side';
+
       const mapped = requests.map(req => {
-        const album = albums.find(a => a.id === req.album_id);
+        const album = albums.find(a => a.id === req.album_id) || {
+          id: req.album_id,
+          artist: req.artist || "",
+          title: req.title || "",
+          image_url: "",
+        };
+
         return {
           id: req.id,
-          artist: req.artist || album?.artist || "",
-          title: req.title || album?.title || "",
-          side: req.side || "A",
+          artist: req.artist || album.artist || "",
+          title: req.title || album.title || "",
+          side: req.side || null,
+          track_number: req.track_number || null,
+          track_name: req.track_name || null,
+          track_duration: req.track_duration || null,
           votes: req.votes ?? 1,
           created_at: req.created_at,
-          collection: album
-            ? { id: album.id, image_url: album.image_url, year: album.year, format: album.format }
-            : null,
+          queue_type: queueType,
+          collection: {
+            id: album.id,
+            image_url: album.image_url,
+            year: album.year,
+            format: album.format
+          },
         };
       });
 
@@ -93,6 +110,8 @@ function BrowseQueueContent() {
   const formatDate = (dateString) =>
     dateString ? new Date(dateString).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : "";
 
+  const queueType = eventData?.queue_type || 'side';
+
   if (loading) return (
     <div className="page-wrapper" style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: 400 }}>
       Loading event queue...
@@ -106,6 +125,11 @@ function BrowseQueueContent() {
           <div style={{ textAlign: "center" }}>
             <h1>{eventData?.title || "Event Queue"}</h1>
             {eventData?.date && <p style={{ fontSize: 18, opacity: 0.9, marginTop: 16 }}>{formatDate(eventData.date)}</p>}
+            {queueType && (
+              <p style={{ fontSize: 14, opacity: 0.8, marginTop: 8 }}>
+                Queue Mode: {queueType === 'track' ? '🎵 By Track' : queueType === 'album' ? '💿 By Album' : '📀 By Side'}
+              </p>
+            )}
           </div>
         </div>
       </header>
@@ -128,7 +152,6 @@ function BrowseQueueContent() {
         </aside>
 
         <section className="queue-display">
-          {/* Header / stats / actions */}
           <div style={{ background: "#f8fafc", border: "1px solid #e5e7eb", borderRadius: 12, padding: 20, marginBottom: 24 }}>
             <h3 style={{ margin: 0, marginBottom: 16, fontSize: "1.5rem", fontWeight: 700, color: "#1f2937" }}>
               Current Queue
@@ -189,21 +212,21 @@ function BrowseQueueContent() {
             </div>
           </div>
 
-          {/* Suggestion Box (restored) */}
           {showSuggestionBox && (
             <div style={{ marginBottom: 24 }}>
               <AlbumSuggestionBox context="general" onClose={() => setShowSuggestionBox(false)} />
             </div>
           )}
 
-          {/* Table */}
           <div className="queue-wrapper">
             <table className="queue-table">
               <colgroup>
                 <col style={{ width: "50px" }} />
                 <col style={{ width: "60px" }} />
                 <col />
-                <col style={{ width: "60px" }} />
+                {queueType === 'side' && <col style={{ width: "60px" }} />}
+                {queueType === 'track' && <col style={{ width: "100px" }} />}
+                {queueType === 'track' && <col style={{ width: "80px" }} />}
                 <col style={{ width: "60px" }} />
                 <col style={{ width: "80px" }} />
               </colgroup>
@@ -211,8 +234,10 @@ function BrowseQueueContent() {
                 <tr>
                   <th>#</th>
                   <th><span className="sr-only">Cover</span></th>
-                  <th>Album / Artist</th>
-                  <th>Side</th>
+                  <th>{queueType === 'track' ? 'Track / Artist' : 'Album / Artist'}</th>
+                  {queueType === 'side' && <th>Side</th>}
+                  {queueType === 'track' && <th>Track #</th>}
+                  {queueType === 'track' && <th>Duration</th>}
                   <th>👍</th>
                   <th>Votes</th>
                 </tr>
@@ -238,17 +263,29 @@ function BrowseQueueContent() {
                           <Link
                             href={`/browse/album-detail/${item.collection.id}${eventId ? `?eventId=${eventId}` : ""}`}
                             className="queue-title-link"
-                            aria-label={`View album: ${item.title} by ${item.artist}`}
+                            aria-label={`View ${queueType === 'track' ? 'track' : 'album'}: ${item.title} by ${item.artist}`}
                           >
-                            {item.title}
+                            {queueType === 'track' ? (item.track_name || item.title) : item.title}
                           </Link>
                         ) : (
-                          <span>{item.title}</span>
+                          <span>{queueType === 'track' ? (item.track_name || item.title) : item.title}</span>
                         )}
                       </div>
                       <div className="queue-artist">{item.artist}</div>
                     </td>
-                    <td><span className="queue-side-badge">{item.side}</span></td>
+                    {queueType === 'side' && (
+                      <td><span className="queue-side-badge">{item.side}</span></td>
+                    )}
+                    {queueType === 'track' && (
+                      <>
+                        <td style={{ textAlign: 'center', fontSize: '14px', color: '#666' }}>
+                          {item.track_number || '--'}
+                        </td>
+                        <td style={{ textAlign: 'center', fontSize: '14px', color: '#666' }}>
+                          {item.track_duration || '--:--'}
+                        </td>
+                      </>
+                    )}
                     <td><button className="queue-plus-btn" onClick={() => voteForItem(item.id)}>＋</button></td>
                     <td>
                       <div className="queue-votes-inner">

@@ -1,3 +1,5 @@
+// components/QueueSection.tsx
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -6,7 +8,6 @@ import { useRouter } from "next/navigation";
 import { supabase } from 'src/lib/supabaseClient';
 import "styles/queue.css";
 
-// Models for Supabase data
 interface Album {
   id: string | number;
   artist: string;
@@ -18,7 +19,10 @@ interface Album {
 interface RequestEntry {
   id: string | number;
   album_id: string | number;
-  side: string;
+  side: string | null;
+  track_number: string | null;
+  track_name: string | null;
+  track_duration: string | null;
   votes: number;
   event_id: string;
 }
@@ -26,9 +30,13 @@ interface RequestEntry {
 interface QueueItem {
   id: string | number;
   index: number;
-  side: string;
+  side: string | null;
+  track_number: string | null;
+  track_name: string | null;
+  track_duration: string | null;
   votes: number;
   album: Album;
+  queue_type: string;
 }
 
 interface QueueSectionProps {
@@ -41,11 +49,22 @@ function getVoteKey(eventId: string, reqId: string | number) {
 
 export default function QueueSection({ eventId }: QueueSectionProps) {
   const [queue, setQueue] = useState<QueueItem[]>([]);
+  const [queueType, setQueueType] = useState<string>('side');
   const [voting, setVoting] = useState<{ [key: string]: boolean }>({});
   const router = useRouter();
 
   useEffect(() => {
     const fetchQueue = async () => {
+      // Fetch event to get queue type
+      const { data: eventData } = await supabase
+        .from("events")
+        .select("queue_type")
+        .eq("id", eventId)
+        .single();
+
+      const currentQueueType = eventData?.queue_type || 'side';
+      setQueueType(currentQueueType);
+
       const { data: requests, error } = await supabase
         .from("requests")
         .select("*")
@@ -86,8 +105,12 @@ export default function QueueSection({ eventId }: QueueSectionProps) {
         return {
           id: req.id,
           index: i + 1,
-          side: req.side,
+          side: req.side || null,
+          track_number: req.track_number || null,
+          track_name: req.track_name || null,
+          track_duration: req.track_duration || null,
           votes: req.votes || 1,
+          queue_type: currentQueueType,
           album,
         };
       });
@@ -131,6 +154,13 @@ export default function QueueSection({ eventId }: QueueSectionProps) {
     router.push(`/browse/album-detail/${albumId}${eventId ? `?eventId=${eventId}` : ""}`);
   };
 
+  const getDisplayTitle = (item: QueueItem) => {
+    if (queueType === 'track') {
+      return item.track_name || item.album.title;
+    }
+    return item.album.title;
+  };
+
   return (
     <div className="queue-wrapper">
       <h3>View the queue</h3>
@@ -146,7 +176,7 @@ export default function QueueSection({ eventId }: QueueSectionProps) {
           fontWeight: 500,
           maxWidth: 550
         }}>
-          The queue is empty. <br />Be the first to <span style={{ color: "#9333ea" }}>add an album side</span> to get started!
+          The queue is empty. <br />Be the first to <span style={{ color: "#9333ea" }}>add {queueType === 'track' ? 'a track' : queueType === 'album' ? 'an album' : 'an album side'}</span> to get started!
         </div>
       ) : (
         <table className="queue-table">
@@ -154,8 +184,10 @@ export default function QueueSection({ eventId }: QueueSectionProps) {
             <tr>
               <th>#</th>
               <th></th>
-              <th>Album / Artist</th>
-              <th>Side</th>
+              <th>{queueType === 'track' ? 'Track / Artist' : 'Album / Artist'}</th>
+              {queueType === 'side' && <th>Side</th>}
+              {queueType === 'track' && <th>Track #</th>}
+              {queueType === 'track' && <th>Duration</th>}
               <th>&#x1F44D;</th>
               <th>Votes</th>
             </tr>
@@ -186,10 +218,22 @@ export default function QueueSection({ eventId }: QueueSectionProps) {
                     style={{ cursor: "pointer" }}
                     onClick={() => goToAlbum(item.album.id)}
                   >
-                    <div className="queue-title">{item.album.title}</div>
+                    <div className="queue-title">{getDisplayTitle(item)}</div>
                     <div className="queue-artist">{item.album.artist}</div>
                   </td>
-                  <td className="queue-side">{item.side}</td>
+                  {queueType === 'side' && (
+                    <td className="queue-side">{item.side}</td>
+                  )}
+                  {queueType === 'track' && (
+                    <>
+                      <td style={{ textAlign: 'center', fontSize: '14px' }}>
+                        {item.track_number || '--'}
+                      </td>
+                      <td style={{ textAlign: 'center', fontSize: '14px' }}>
+                        {item.track_duration || '--:--'}
+                      </td>
+                    </>
+                  )}
                   <td className="queue-plus">
                     <button
                       className="queue-plus-btn"
