@@ -144,9 +144,16 @@ function BrowseAlbumsContent() {
   const filteredAlbums = useMemo(() => {
     let fa = albums.filter(album => {
       const folder = (album.folder || '').trim().toLowerCase();
-      const matchesSearch =
-        (album.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (album.artist || '').toLowerCase().includes(searchTerm.toLowerCase());
+      const searchLower = searchTerm.toLowerCase();
+      const matchesSearch = 
+        (album.title || '').toLowerCase().includes(searchLower) ||
+        (album.artist || '').toLowerCase().includes(searchLower) ||
+        (album.tracklists || '').toLowerCase().includes(searchLower) ||
+        (album.notes || '').toLowerCase().includes(searchLower) ||
+        (album.genre || '').toLowerCase().includes(searchLower) ||
+        (album.label || '').toLowerCase().includes(searchLower) ||
+        (album.media_condition || '').toLowerCase().includes(searchLower) ||
+        (album.sleeve_condition || '').toLowerCase().includes(searchLower);
       const isAllowed =
         !allowedFormats ||
         normalizedFormats.includes(folder);
