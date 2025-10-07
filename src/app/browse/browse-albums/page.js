@@ -110,6 +110,17 @@ function BrowseAlbumsContent() {
         steves_top_200: album.steves_top_200,
         this_weeks_top_10: album.this_weeks_top_10,
         inner_circle_preferred: album.inner_circle_preferred,
+        // Add all searchable text fields
+        tracklists: album.tracklists,
+        media_condition: album.media_condition,
+        discogs_notes: album.discogs_notes,
+        discogs_genres: album.discogs_genres,
+        discogs_styles: album.discogs_styles,
+        spotify_genres: album.spotify_genres,
+        spotify_label: album.spotify_label,
+        apple_music_genre: album.apple_music_genre,
+        apple_music_genres: album.apple_music_genres,
+        apple_music_label: album.apple_music_label,
         image:
           album.image_url && album.image_url.trim().toLowerCase() !== 'no'
             ? album.image_url.trim()
@@ -144,16 +155,29 @@ function BrowseAlbumsContent() {
   const filteredAlbums = useMemo(() => {
     let fa = albums.filter(album => {
       const folder = (album.folder || '').trim().toLowerCase();
+      
       const searchLower = searchTerm.toLowerCase();
-      const matchesSearch = 
+
+      // Helper to search in arrays
+      const searchInArray = (arr) => {
+        if (!Array.isArray(arr)) return false;
+        return arr.some(item => (item || '').toLowerCase().includes(searchLower));
+      };
+
+      const matchesSearch =
         (album.title || '').toLowerCase().includes(searchLower) ||
         (album.artist || '').toLowerCase().includes(searchLower) ||
         (album.tracklists || '').toLowerCase().includes(searchLower) ||
-        (album.notes || '').toLowerCase().includes(searchLower) ||
-        (album.genre || '').toLowerCase().includes(searchLower) ||
-        (album.label || '').toLowerCase().includes(searchLower) ||
         (album.media_condition || '').toLowerCase().includes(searchLower) ||
-        (album.sleeve_condition || '').toLowerCase().includes(searchLower);
+        (album.discogs_notes || '').toLowerCase().includes(searchLower) ||
+        (album.spotify_label || '').toLowerCase().includes(searchLower) ||
+        (album.apple_music_genre || '').toLowerCase().includes(searchLower) ||
+        (album.apple_music_label || '').toLowerCase().includes(searchLower) ||
+        searchInArray(album.discogs_genres) ||
+        searchInArray(album.discogs_styles) ||
+        searchInArray(album.spotify_genres) ||
+        searchInArray(album.apple_music_genres);
+      
       const isAllowed =
         !allowedFormats ||
         normalizedFormats.includes(folder);
