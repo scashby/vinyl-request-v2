@@ -7,6 +7,7 @@ import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { supabase } from 'lib/supabaseClient'
 import 'styles/admin-edit-queue.css';
+import { formatEventText } from 'src/utils/textFormatter';
 
 type Event = {
   id: string;
@@ -271,9 +272,10 @@ function EditQueueContent() {
                     className="event-selection-card"
                     onClick={() => setSelectedEvent(event)}
                   >
-                    <h3 className="event-card-title">
-                      {event.title}
-                    </h3>
+                    <h3 
+                      className="event-card-title"
+                      dangerouslySetInnerHTML={{ __html: formatEventText(event.title) }}
+                    />
                     <p className="event-card-date">
                       {formatDate(event.date)}
                     </p>
@@ -290,7 +292,7 @@ function EditQueueContent() {
             <div className="queue-management-header">
               <div>
                 <h2 className="queue-management-title">
-                  {selectedEvent.title} - Queue
+                  <span dangerouslySetInnerHTML={{ __html: formatEventText(selectedEvent.title) }} /> - Queue
                 </h2>
                 <p className="queue-management-subtitle">
                   {formatDate(selectedEvent.date)} • {requests.length} requests • {getQueueTypeLabel(queueType)}

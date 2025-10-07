@@ -11,6 +11,7 @@ import 'styles/internal.css';
 import 'styles/events.css';
 import Link from 'next/link';
 import Image from 'next/image';
+import { formatEventText } from 'src/utils/textFormatter';
 
 export default function Page() {
   const [events, setEvents] = useState([]);
@@ -690,7 +691,10 @@ export default function Page() {
                   </Link>
                   
                   <Link href={`/events/event-detail/${event.id}`} style={{ textDecoration: 'none' }}>
-                    <h2 style={{ cursor: 'pointer' }}>{event.title}</h2>
+                    <h2 
+                      style={{ cursor: 'pointer' }}
+                      dangerouslySetInnerHTML={{ __html: formatEventText(event.title) }}
+                    />
                   </Link>
                   {event.location && (
                     <p>

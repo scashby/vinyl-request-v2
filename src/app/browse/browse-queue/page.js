@@ -6,6 +6,7 @@ import { useEffect, useState, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
+import { formatEventText } from 'src/utils/textFormatter';
 import AlbumSuggestionBox from "components/AlbumSuggestionBox";
 import { supabase } from "src/lib/supabaseClient";
 import "styles/internal.css";
@@ -123,7 +124,7 @@ function BrowseQueueContent() {
       <header className="event-hero">
         <div className="overlay">
           <div style={{ textAlign: "center" }}>
-            <h1>{eventData?.title || "Event Queue"}</h1>
+            <h1 dangerouslySetInnerHTML={{ __html: formatEventText(eventData?.title || "Event Queue") }} />
             {eventData?.date && <p style={{ fontSize: 18, opacity: 0.9, marginTop: 16 }}>{formatDate(eventData.date)}</p>}
             {queueType && (
               <p style={{ fontSize: 14, opacity: 0.8, marginTop: 8 }}>
@@ -146,7 +147,7 @@ function BrowseQueueContent() {
               priority
               unoptimized
             />
-            <h2>{eventData?.title || "Event Name"}</h2>
+            <h2 dangerouslySetInnerHTML={{ __html: formatEventText(eventData?.title || "Event Name") }} />
             <p>{eventData?.date ? formatDate(eventData.date) : "Date TBD"}</p>
           </article>
         </aside>

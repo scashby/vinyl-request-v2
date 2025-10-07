@@ -104,7 +104,7 @@ export default function Page() {
     <div className="page-wrapper event-detail-body">
       <header className="event-hero">
         <div className="overlay">
-          <h1>{title}</h1>
+          <h1 dangerouslySetInnerHTML={{ __html: formatEventText(title) }} />
         </div>
       </header>
 

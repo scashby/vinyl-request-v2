@@ -12,6 +12,7 @@ import 'styles/album-browse.css';
 import 'styles/internal.css';
 import { supabase } from 'src/lib/supabaseClient';
 import { useSearchParams } from 'next/navigation';
+import { formatEventText } from 'src/utils/textFormatter';
 
 function BrowseAlbumsContent() {
   const searchParams = useSearchParams();
@@ -222,7 +223,7 @@ function BrowseAlbumsContent() {
       <header className="event-hero">
         <div className="overlay">
           <h1>
-            Browse the Collection{eventTitle ? ` for ${eventTitle}` : ''}
+            Browse the Collection{eventTitle ? <span> for <span dangerouslySetInnerHTML={{ __html: formatEventText(eventTitle) }} /></span> : ''}
           </h1>
         </div>
       </header>
