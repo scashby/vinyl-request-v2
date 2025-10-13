@@ -215,6 +215,16 @@ export default function AdminSidebar() {
           >
             💿 CD-Only Finder
           </Link>
+          <Link
+            href="/admin/1001-review"
+            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+              pathname === "/admin/1001-review"
+                ? "bg-indigo-700 text-white"
+                : "bg-indigo-600 text-white hover:bg-indigo-700"
+            }`}
+          >
+            ✅ 1001 Review
+          </Link>
         </div>
       </div>
 
