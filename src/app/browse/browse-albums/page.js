@@ -110,6 +110,7 @@ function BrowseAlbumsContent() {
         steves_top_200: album.steves_top_200,
         this_weeks_top_10: album.this_weeks_top_10,
         inner_circle_preferred: album.inner_circle_preferred,
+        is_1001: album.is_1001, // keep this so AlbumCard can show the 1001 badge
         // Add all searchable text fields
         tracklists: album.tracklists,
         media_condition: album.media_condition,
@@ -377,7 +378,7 @@ function BrowseAlbumsContent() {
                   flex: '0 0 auto',
                   background: '#3b82f6',
                   color: '#ffffff',
-                  border: '2px solid #1d4ed8',
+                  border: '2px solid #1d4ed8',  // ← FIXED QUOTING HERE
                   borderRadius: '6px',
                   padding: '10px 16px',
                   fontSize: '16px',

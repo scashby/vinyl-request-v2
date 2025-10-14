@@ -1,3 +1,4 @@
+// src/app/api/1001-review/candidates/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from 'src/lib/supabaseAdmin';
 
@@ -14,6 +15,8 @@ export async function GET(req: NextRequest) {
     .order('year_diff', { ascending: true, nullsFirst: false })
     .range(offset, offset + limit - 1);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
   return NextResponse.json({ items: data ?? [], limit, offset });
 }

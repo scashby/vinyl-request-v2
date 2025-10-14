@@ -10,6 +10,22 @@ import { supabase } from 'src/lib/supabaseClient';
 import 'styles/internal.css';
 import 'styles/album-detail.css';
 
+// tiny inline style object for the 1001 badge
+const badge1001 = {
+  display: "inline-flex",
+  alignItems: "center",
+  borderRadius: 999,
+  padding: "2px 6px",
+  fontSize: 10,
+  fontWeight: 700,
+  lineHeight: 1,
+  border: "1px solid rgba(0,0,0,0.2)",
+  background: "rgba(0,0,0,0.75)",
+  color: "#fff",
+  marginLeft: 8,
+  whiteSpace: "nowrap",
+};
+
 function AlbumDetailContent() {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -479,7 +495,14 @@ function AlbumDetailContent() {
         />
         
         <div className="album-info">
-          <h1 className="title">{album.title}</h1>
+          <h1 className="title">
+            {album.title}
+            {album.is_1001 ? (
+              <span title="On the 1001 Albums list" style={badge1001}>
+                1001
+              </span>
+            ) : null}
+          </h1>
           <h2 className="artist">{album.artist}</h2>
           
           <div className="meta">

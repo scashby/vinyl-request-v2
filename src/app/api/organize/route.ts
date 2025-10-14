@@ -35,7 +35,7 @@ export async function POST(req: Request) {
 
   let q = supabase
     .from("collection")
-    .select("id,discogs_genres,folder,artist,title")
+    .select("id,discogs_genres,folder,artist,title,is_1001")
     .gt("id", cursor)
     .order("id", { ascending: true })
     .limit(limit);

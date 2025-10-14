@@ -14,6 +14,7 @@ interface Album {
   title: string;
   image_url?: string;
   format?: string;
+  is_1001?: boolean | null; // ← added
 }
 
 interface RequestEntry {
@@ -85,7 +86,7 @@ export default function QueueSection({ eventId }: QueueSectionProps) {
 
       const { data: albums, error: albumError } = await supabase
         .from("collection")
-        .select("id, artist, title, image_url, format")
+        .select("id, artist, title, image_url, format, is_1001") // ← added is_1001
         .in("id", albumIds);
 
       if (albumError || !albums) {
@@ -95,13 +96,15 @@ export default function QueueSection({ eventId }: QueueSectionProps) {
       }
 
       const mapped: QueueItem[] = requests.map((req: RequestEntry, i: number) => {
-        const album = albums.find((a: Album) => a.id === req.album_id) || {
-          id: req.album_id,
-          artist: "",
-          title: "",
-          image_url: "",
-          format: "",
-        };
+        const album =
+          (albums as Album[]).find((a: Album) => a.id === req.album_id) || {
+            id: req.album_id,
+            artist: "",
+            title: "",
+            image_url: "",
+            format: "",
+            is_1001: null,
+          };
         return {
           id: req.id,
           index: i + 1,
@@ -184,6 +187,8 @@ export default function QueueSection({ eventId }: QueueSectionProps) {
             <tr>
               <th>#</th>
               <th></th>
+              {/* fixed badge column for stable layout */}
+              <th style={{ width: 42 }}></th>
               <th>{queueType === 'track' ? 'Track / Artist' : 'Album / Artist'}</th>
               {queueType === 'side' && <th>Side</th>}
               {queueType === 'track' && <th>Track #</th>}
@@ -212,6 +217,29 @@ export default function QueueSection({ eventId }: QueueSectionProps) {
                       onClick={() => goToAlbum(item.album.id)}
                       unoptimized
                     />
+                  </td>
+                  {/* badge cell (always rendered, may be empty) */}
+                  <td className="queue-badge" style={{ width: 42, textAlign: 'center' }}>
+                    {item.album.is_1001 ? (
+                      <span
+                        title="On the 1001 Albums list"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          borderRadius: 999,
+                          padding: '2px 6px',
+                          fontSize: 10,
+                          fontWeight: 700,
+                          lineHeight: 1,
+                          border: '1px solid rgba(0,0,0,0.2)',
+                          background: 'rgba(0,0,0,0.75)',
+                          color: '#fff',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        1001
+                      </span>
+                    ) : null}
                   </td>
                   <td
                     className="queue-meta"
