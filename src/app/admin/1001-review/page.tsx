@@ -5,6 +5,7 @@ import { supabase } from "src/lib/supabaseClient";
 import Link from "next/link";
 import "styles/internal.css";
 
+/** DB shapes */
 type A1001 = {
   id: number | string;
   artist: string;
@@ -34,77 +35,64 @@ type CollectionRow = {
 
 type JoinedRow = {
   a: A1001;
-  m: MatchRow | null;
-  c: CollectionRow | null;
+  matches: Array<{ m: MatchRow; c: CollectionRow | null }>;
 };
 
 const PAGE_SIZE = 50;
 
 export default function Admin1001ReviewPage() {
-  const [q, setQ] = useState("");
-  const [status, setStatus] = useState<"all" | "matched" | "unmatched" | "unconfirmed">("all");
+  const [status, setStatus] =
+    useState<"all" | "matched" | "unmatched" | "unconfirmed">("all");
   const [page, setPage] = useState(0);
 
   const [rows, setRows] = useState<JoinedRow[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
 
+  // Minimal picker used ONLY when you click “Link”
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerForId, setPickerForId] = useState<number | string | null>(null);
   const [pickerQ, setPickerQ] = useState("");
   const [pickerResults, setPickerResults] = useState<CollectionRow[]>([]);
   const [pickerBusy, setPickerBusy] = useState(false);
 
+  /** Load a page of 1001 rows + their matches + matched collection rows */
   useEffect(() => {
-    let abort = false;
+    let aborted = false;
 
     async function load() {
       setLoading(true);
 
-      // Build OR filters only when q present
-      const baseFilters: string[] = [];
-      const term = q.trim();
-      if (term) {
-        baseFilters.push(`artist.ilike.%${term}%`);
-        baseFilters.push(`album.ilike.%${term}%`);
-        if (!Number.isNaN(Number(term))) {
-          baseFilters.push(`year.eq.${Number(term)}`);
-        }
-      }
-      const orExpr = baseFilters.length ? baseFilters.join(",") : undefined;
-
-      // 1) count matches
+      // Count all 1001 rows (no search gate)
       const { count, error: countErr } = await supabase
         .from("albums_1001")
-        .select("id", { count: "exact", head: true })
-        .or(orExpr);
+        .select("id", { count: "exact", head: true });
 
       if (countErr) {
         console.error(countErr);
-        if (!abort) {
+        if (!aborted) {
           setRows([]);
           setTotal(0);
           setLoading(false);
         }
         return;
       }
-      const realTotal = typeof count === "number" ? count : 0;
 
-      // 2) fetch current page of 1001 rows
+      const totalCount = typeof count === "number" ? count : 0;
       const from = page * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
 
+      // Pull current slice of 1001
       const { data: aRows, error: aErr } = await supabase
         .from("albums_1001")
         .select("*")
-        .or(orExpr)
         .order("artist", { ascending: true })
         .order("album", { ascending: true })
         .range(from, to);
 
       if (aErr) {
         console.error(aErr);
-        if (!abort) {
+        if (!aborted) {
           setRows([]);
           setTotal(0);
           setLoading(false);
@@ -114,15 +102,15 @@ export default function Admin1001ReviewPage() {
 
       const ids = (aRows ?? []).map((r) => r.id);
       if (ids.length === 0) {
-        if (!abort) {
+        if (!aborted) {
           setRows([]);
-          setTotal(realTotal);
+          setTotal(totalCount);
           setLoading(false);
         }
         return;
       }
 
-      // 3) existing matches
+      // All matches for these 1001 ids (may be multiple per 1001 row)
       const { data: mRows, error: mErr } = await supabase
         .from("albums_1001_match")
         .select("*")
@@ -132,13 +120,12 @@ export default function Admin1001ReviewPage() {
         console.error(mErr);
       }
 
-      const by1001 = new Map<number | string, MatchRow>();
-      (mRows ?? []).forEach((m) => by1001.set(m.album_1001_id, m));
-
-      // 4) fetch collection records for the matches on this page
+      // Collect all collection ids referenced by matches
       const colIds = (mRows ?? [])
         .map((m) => m.collection_id)
-        .filter((v): v is number | string => v !== null && v !== undefined);
+        .filter(
+          (v): v is number | string => v !== null && v !== undefined
+        );
 
       let cById = new Map<number | string, CollectionRow>();
       if (colIds.length > 0) {
@@ -146,68 +133,89 @@ export default function Admin1001ReviewPage() {
           .from("collection")
           .select("id, artist, title, year, format, image_url, is_1001")
           .in("id", colIds);
+
         if (!cErr && cRows) {
           cById = new Map(cRows.map((c) => [c.id, c]));
         }
       }
 
-      // 5) compose + filter by status
-      let composed: JoinedRow[] = (aRows ?? []).map((a) => {
-        const m = by1001.get(a.id);
-        const c = m?.collection_id ? cById.get(m.collection_id) ?? null : null;
-        return { a: a as A1001, m: m ?? null, c };
+      // Group matches by album_1001_id
+      const matchesBy1001 = new Map<
+        number | string,
+        Array<{ m: MatchRow; c: CollectionRow | null }>
+      >();
+      (mRows ?? []).forEach((m) => {
+        const list = matchesBy1001.get(m.album_1001_id) ?? [];
+        const c = m.collection_id ? cById.get(m.collection_id) ?? null : null;
+        list.push({ m, c });
+        matchesBy1001.set(m.album_1001_id, list);
       });
 
+      // Compose display rows
+      let composed: JoinedRow[] = (aRows ?? []).map((a) => {
+        const list = matchesBy1001.get(a.id) ?? [];
+        return { a: a as A1001, matches: list };
+      });
+
+      // Status filter
       if (status === "matched") {
-        composed = composed.filter((r) => !!r.m?.collection_id);
+        composed = composed.filter((r) => r.matches.length > 0);
       } else if (status === "unmatched") {
-        composed = composed.filter((r) => !r.m?.collection_id);
+        composed = composed.filter((r) => r.matches.length === 0);
       } else if (status === "unconfirmed") {
-        composed = composed.filter((r) => r.m?.collection_id && !r.m?.confirmed);
+        composed = composed.filter(
+          (r) => r.matches.some(({ m }) => !m.confirmed)
+        );
       }
 
-      if (!abort) {
+      if (!aborted) {
         setRows(composed);
-        setTotal(realTotal);
+        setTotal(totalCount);
         setLoading(false);
       }
     }
 
     void load();
     return () => {
-      abort = true;
+      aborted = true;
     };
-  }, [q, status, page]);
+  }, [page, status]);
 
-  const maxPage = useMemo(() => Math.max(0, Math.ceil(total / PAGE_SIZE) - 1), [total]);
+  const maxPage = useMemo(
+    () => Math.max(0, Math.ceil(total / PAGE_SIZE) - 1),
+    [total]
+  );
 
-  // ----- actions -----
+  /** Actions */
   async function link(album_1001_id: number | string, collection_id: number | string) {
     const { error } = await supabase
       .from("albums_1001_match")
-      .upsert(
-        {
-          album_1001_id,
-          collection_id,
-          confirmed: false,
-          match_method: "manual",
-          confidence: 1.0,
-        },
-        { onConflict: "album_1001_id" }
-      );
+      .insert({
+        album_1001_id,
+        collection_id,
+        confirmed: false,
+        match_method: "manual",
+        confidence: 1.0,
+      });
+
     if (error) {
       alert(`Link failed: ${error.message}`);
       return;
     }
+
+    // Optional: mark the collection row
     await supabase.from("collection").update({ is_1001: true }).eq("id", collection_id);
-    setPage((p) => p); // refresh
+    // refresh
+    setPage((p) => p);
   }
 
-  async function unlink(album_1001_id: number | string) {
+  async function unlink(album_1001_id: number | string, collection_id: number | string) {
     const { error } = await supabase
       .from("albums_1001_match")
       .delete()
-      .eq("album_1001_id", album_1001_id);
+      .eq("album_1001_id", album_1001_id)
+      .eq("collection_id", collection_id);
+
     if (error) {
       alert(`Unlink failed: ${error.message}`);
       return;
@@ -215,11 +223,13 @@ export default function Admin1001ReviewPage() {
     setPage((p) => p);
   }
 
-  async function confirm(album_1001_id: number | string) {
+  async function confirm(album_1001_id: number | string, collection_id: number | string) {
     const { error } = await supabase
       .from("albums_1001_match")
       .update({ confirmed: true })
-      .eq("album_1001_id", album_1001_id);
+      .eq("album_1001_id", album_1001_id)
+      .eq("collection_id", collection_id);
+
     if (error) {
       alert(`Confirm failed: ${error.message}`);
       return;
@@ -227,12 +237,19 @@ export default function Admin1001ReviewPage() {
     setPage((p) => p);
   }
 
-  // ----- picker -----
+  /** Picker helpers */
   function openPicker(forId: number | string) {
     setPickerForId(forId);
     setPickerQ("");
     setPickerResults([]);
     setPickerOpen(true);
+  }
+
+  function closePicker() {
+    setPickerOpen(false);
+    setPickerForId(null);
+    setPickerQ("");
+    setPickerResults([]);
   }
 
   async function runPickerSearch() {
@@ -254,17 +271,10 @@ export default function Admin1001ReviewPage() {
       alert(`Search failed: ${error.message}`);
       return;
     }
-    setPickerResults(data || []);
+    setPickerResults(data ?? []);
   }
 
-  function closePicker() {
-    setPickerOpen(false);
-    setPickerForId(null);
-    setPickerQ("");
-    setPickerResults([]);
-  }
-
-  // ----- render -----
+  /** Render */
   return (
     <div style={{ background: "#f3f4f6", minHeight: "100vh" }}>
       <div style={{ padding: 20 }}>
@@ -272,56 +282,48 @@ export default function Admin1001ReviewPage() {
           1001 Review
         </h1>
         <p style={{ color: "#4b5563", marginBottom: 18 }}>
-          Review automatic matches, link a collection record to each 1001 album, confirm, or unlink.
+          See each 1001 album with its current collection match(es). Link, confirm, or unlink.
         </p>
 
-        {/* Controls */}
+        {/* Controls — high-contrast */}
         <div
           style={{
-            background: "#fff",
+            background: "#ffffff",
             border: "1px solid #e5e7eb",
             borderRadius: 12,
             padding: 16,
             marginBottom: 16,
           }}
         >
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
-            <input
-              value={q}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                setPage(0);
-                setQ(e.target.value);
-              }}
-              placeholder="Search 1001 by artist / album / year"
-              style={{
-                flex: "1 1 320px",
-                minWidth: 260,
-                border: "2px solid #374151",
-                borderRadius: 8,
-                padding: "10px 12px",
-                fontSize: 16,
-              }}
-            />
+          <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+            <label style={{ fontSize: 14, color: "#111827" }}>Status</label>
             <select
               value={status}
-              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
-                const next = e.target.value as "all" | "matched" | "unmatched" | "unconfirmed";
-                setPage(0);
-                setStatus(next);
-              }}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                setStatus(e.target.value as "all" | "matched" | "unmatched" | "unconfirmed")
+              }
               style={{
-                flex: "0 0 200px",
+                color: "#111827",
+                backgroundColor: "#ffffff",
                 border: "2px solid #374151",
                 borderRadius: 8,
-                padding: "10px 12px",
-                fontSize: 16,
-                background: "#fff",
+                padding: "8px 10px",
+                minWidth: 190,
+                fontSize: 14,
               }}
             >
-              <option value="all">All</option>
-              <option value="unmatched">Unmatched</option>
-              <option value="matched">Matched</option>
-              <option value="unconfirmed">Matched (Unconfirmed)</option>
+              <option value="all" style={{ color: "#111827", backgroundColor: "#ffffff" }}>
+                All
+              </option>
+              <option value="unmatched" style={{ color: "#111827", backgroundColor: "#ffffff" }}>
+                Unmatched
+              </option>
+              <option value="matched" style={{ color: "#111827", backgroundColor: "#ffffff" }}>
+                Matched
+              </option>
+              <option value="unconfirmed" style={{ color: "#111827", backgroundColor: "#ffffff" }}>
+                Matched (Unconfirmed)
+              </option>
             </select>
 
             <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
@@ -341,16 +343,15 @@ export default function Admin1001ReviewPage() {
               </button>
             </div>
           </div>
-
           <div style={{ marginTop: 8, color: "#6b7280", fontSize: 14 }}>
             Page {page + 1} of {Math.max(1, maxPage + 1)} • {total} total
           </div>
         </div>
 
-        {/* Table */}
+        {/* Data table */}
         <div
           style={{
-            background: "#fff",
+            background: "#ffffff",
             border: "1px solid #e5e7eb",
             borderRadius: 12,
             overflow: "hidden",
@@ -359,8 +360,7 @@ export default function Admin1001ReviewPage() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "1.2fr 1.3fr 220px",
-              gap: 0,
+              gridTemplateColumns: "1.2fr 1.4fr 230px",
               background: "#f9fafb",
               padding: "10px 12px",
               fontWeight: 700,
@@ -369,7 +369,7 @@ export default function Admin1001ReviewPage() {
             }}
           >
             <div>1001 Album</div>
-            <div>Matched Collection</div>
+            <div>Matched Collection (zero, one, or many)</div>
             <div>Actions</div>
           </div>
 
@@ -383,7 +383,7 @@ export default function Admin1001ReviewPage() {
                 key={String(r.a.id)}
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "1.2fr 1.3fr 220px",
+                  gridTemplateColumns: "1.2fr 1.4fr 230px",
                   gap: 0,
                   padding: "12px",
                   borderTop: "1px solid #f3f4f6",
@@ -393,7 +393,7 @@ export default function Admin1001ReviewPage() {
                 {/* 1001 side */}
                 <div>
                   <div style={{ fontWeight: 700, color: "#111827" }}>
-                    {r.a.album} <span style={{ color: "#9ca3af" }}>— {r.a.artist}</span>
+                    {r.a.album} <span style={{ color: "#6b7280" }}>— {r.a.artist}</span>
                     {r.a.year ? <span style={{ color: "#6b7280" }}> · {r.a.year}</span> : null}
                   </div>
                   <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
@@ -401,60 +401,72 @@ export default function Admin1001ReviewPage() {
                   </div>
                 </div>
 
-                {/* collection side */}
+                {/* matches list */}
                 <div>
-                  {r.c ? (
-                    <div>
-                      <div style={{ fontWeight: 700, color: "#111827" }}>
-                        {r.c.title} <span style={{ color: "#9ca3af" }}>— {r.c.artist}</span>
-                        {r.c.year ? <span style={{ color: "#6b7280" }}> · {r.c.year}</span> : null}
-                        {r.c.is_1001 ? (
-                          <span
-                            title="On the 1001 list"
-                            style={{
-                              marginLeft: 8,
-                              padding: "2px 6px",
-                              fontSize: 10,
-                              fontWeight: 800,
-                              borderRadius: 999,
-                              background: "#111827",
-                              color: "#fff",
-                              border: "1px solid rgba(0,0,0,.2)",
-                            }}
-                          >
-                            1001
-                          </span>
-                        ) : null}
-                      </div>
-                      <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
-                        id: {String(r.c.id)} {r.m?.confirmed ? "• confirmed" : "• unconfirmed"}
-                      </div>
-                    </div>
-                  ) : (
+                  {r.matches.length === 0 ? (
                     <span style={{ color: "#ef4444", fontWeight: 600 }}>No match</span>
+                  ) : (
+                    <ul style={{ margin: 0, paddingLeft: 18 }}>
+                      {r.matches.map(({ m, c }) => (
+                        <li key={`${String(m.album_1001_id)}-${String(m.collection_id)}`} style={{ marginBottom: 6 }}>
+                          {c ? (
+                            <>
+                              <strong style={{ color: "#111827" }}>{c.title}</strong>
+                              <span style={{ color: "#6b7280" }}> — {c.artist}</span>
+                              {c.year ? <span style={{ color: "#6b7280" }}> · {c.year}</span> : null}
+                              {m.confirmed ? (
+                                <span style={chipConfirmed}>confirmed</span>
+                              ) : (
+                                <span style={chipUnconfirmed}>unconfirmed</span>
+                              )}
+                              {c.is_1001 ? (
+                                <span style={chip1001} title="On the 1001 list">1001</span>
+                              ) : null}
+                              <span style={{ color: "#9ca3af", marginLeft: 8, fontSize: 12 }}>
+                                (id: {String(c.id)})
+                              </span>
+                            </>
+                          ) : (
+                            <span style={{ color: "#ef4444" }}>Missing collection row</span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
                   )}
                 </div>
 
                 {/* actions */}
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   <button style={btnPrimary} onClick={() => openPicker(r.a.id)}>
-                    Search & Link
+                    Link
                   </button>
-                  {r.m?.collection_id ? (
-                    <>
-                      <button style={btnWarn} onClick={() => unlink(r.a.id)}>
-                        Unlink
-                      </button>
-                      {!r.m?.confirmed ? (
-                        <button style={btnSuccess} onClick={() => confirm(r.a.id)}>
+                  {r.matches.map(({ m }) => (
+                    <div key={`act-${String(m.album_1001_id)}-${String(m.collection_id)}`} style={{ display: "flex", gap: 8 }}>
+                      {!m.confirmed ? (
+                        <button
+                          style={btnSuccess}
+                          onClick={() =>
+                            confirm(m.album_1001_id, m.collection_id as number | string)
+                          }
+                        >
                           Confirm
                         </button>
                       ) : null}
-                      <Link href={`/browse/album-detail/${r.m.collection_id}`} style={btnGhostLink}>
-                        View
-                      </Link>
-                    </>
-                  ) : null}
+                      <button
+                        style={btnWarn}
+                        onClick={() =>
+                          unlink(m.album_1001_id, m.collection_id as number | string)
+                        }
+                      >
+                        Unlink
+                      </button>
+                      {m.collection_id ? (
+                        <Link href={`/browse/album-detail/${m.collection_id}`} style={btnGhostLink}>
+                          View
+                        </Link>
+                      ) : null}
+                    </div>
+                  ))}
                 </div>
               </div>
             ))
@@ -462,14 +474,14 @@ export default function Admin1001ReviewPage() {
         </div>
       </div>
 
-      {/* Picker modal */}
+      {/* Picker (Link) */}
       {pickerOpen && (
         <div
           onClick={closePicker}
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(0,0,0,.4)",
+            background: "rgba(0,0,0,.45)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -481,7 +493,7 @@ export default function Admin1001ReviewPage() {
             style={{
               width: "min(900px, 92vw)",
               maxHeight: "80vh",
-              background: "#fff",
+              background: "#ffffff",
               borderRadius: 12,
               border: "1px solid #e5e7eb",
               overflow: "hidden",
@@ -505,13 +517,15 @@ export default function Admin1001ReviewPage() {
                 onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
                   if (e.key === "Enter") void runPickerSearch();
                 }}
-                placeholder="Search collection by artist / title / year"
+                placeholder="Search collection by artist / title"
                 style={{
                   flex: 1,
                   border: "2px solid #374151",
                   borderRadius: 8,
                   padding: "10px 12px",
                   fontSize: 16,
+                  color: "#111827",
+                  backgroundColor: "#ffffff",
                 }}
               />
               <button onClick={runPickerSearch} disabled={pickerBusy} style={btnPrimary}>
@@ -571,7 +585,7 @@ export default function Admin1001ReviewPage() {
   );
 }
 
-/* --- admin-style buttons --- */
+/** Buttons & chips (admin look, high-contrast) */
 const btnBase: React.CSSProperties = {
   borderRadius: 8,
   padding: "8px 12px",
@@ -584,7 +598,7 @@ const btnBase: React.CSSProperties = {
 const btnPrimary: React.CSSProperties = {
   ...btnBase,
   background: "#3b82f6",
-  color: "#fff",
+  color: "#ffffff",
   borderColor: "#1d4ed8",
 };
 
@@ -598,7 +612,7 @@ const btnSecondary: React.CSSProperties = {
 const btnSuccess: React.CSSProperties = {
   ...btnBase,
   background: "#10b981",
-  color: "#fff",
+  color: "#ffffff",
   borderColor: "#059669",
 };
 
@@ -611,10 +625,41 @@ const btnWarn: React.CSSProperties = {
 
 const btnGhostLink: React.CSSProperties = {
   ...btnBase,
-  background: "#fff",
+  background: "#ffffff",
   color: "#111827",
   borderColor: "#d1d5db",
   textDecoration: "none",
+};
+
+const chipConfirmed: React.CSSProperties = {
+  marginLeft: 8,
+  padding: "2px 6px",
+  fontSize: 10,
+  fontWeight: 800,
+  borderRadius: 999,
+  background: "#10b981",
+  color: "#ffffff",
+};
+
+const chipUnconfirmed: React.CSSProperties = {
+  marginLeft: 8,
+  padding: "2px 6px",
+  fontSize: 10,
+  fontWeight: 800,
+  borderRadius: 999,
+  background: "#fde68a",
+  color: "#92400e",
+};
+
+const chip1001: React.CSSProperties = {
+  marginLeft: 8,
+  padding: "2px 6px",
+  fontSize: 10,
+  fontWeight: 800,
+  borderRadius: 999,
+  background: "#111827",
+  color: "#ffffff",
+  border: "1px solid rgba(0,0,0,.2)",
 };
 
 const th: React.CSSProperties = {
