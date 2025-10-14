@@ -14,6 +14,7 @@ import type { ReactElement, CSSProperties } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { supabase } from "src/lib/supabaseClient";
+import { useRef } from "react";
 
 type Id = number;
 
@@ -59,9 +60,12 @@ export default function Page(): ReactElement {
   const [page, setPage] = useState<number>(1);
   const [loading, setLoading] = useState<boolean>(true);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [linkInputs, setLinkInputs] = useState<Record<Id, string>>({});
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [running, setRunning] = useState<boolean>(false);
+  const [searchInputs, setSearchInputs] = useState<Record<Id, string>>({});
+  const [searchResults, setSearchResults] = useState<Record<Id, CollectionRow[]>>({});
+  const [searchLoading, setSearchLoading] = useState<Record<Id, boolean>>({});
+  const searchTimeouts = useRef<Record<Id, NodeJS.Timeout>>({});
 
   const offset = useMemo(() => (page - 1) * PAGE_SIZE, [page]);
 
@@ -162,37 +166,6 @@ export default function Page(): ReactElement {
     });
   }, [rows, matchesBy, statusFilter]);
 
-  const setLinkInput = (albumId: Id, v: string) =>
-    setLinkInputs((s) => ({ ...s, [albumId]: v }));
-
-  const linkById = async (albumId: Id) => {
-    const raw = (linkInputs[albumId] ?? "").trim();
-    if (!raw) return;
-    const cid = Number(raw);
-    if (!Number.isFinite(cid)) {
-      pushToast({ kind: "err", msg: "Collection ID must be a number" });
-      return;
-    }
-    const { error } = await supabase
-      .from("collection_1001_review")
-      .insert([
-        {
-          album_1001_id: albumId,
-          collection_id: cid,
-          review_status: "linked",
-          confidence: 1.0,
-          notes: "manual link",
-        },
-      ]);
-    if (error) {
-      pushToast({ kind: "err", msg: `Link failed: ${error.message}` });
-      return;
-    }
-    setLinkInputs((s) => ({ ...s, [albumId]: "" }));
-    pushToast({ kind: "ok", msg: "Linked" });
-    void load();
-  };
-
   const updateStatus = async (matchId: Id, review_status: MatchStatus) => {
     const { error } = await supabase
       .from("collection_1001_review")
@@ -213,6 +186,69 @@ export default function Page(): ReactElement {
       return;
     }
     pushToast({ kind: "ok", msg: "Unlinked" });
+    void load();
+  };
+
+  const searchCollection = async (albumId: Id, query: string) => {
+    if (!query.trim() || query.length < 2) {
+      setSearchResults((s) => ({ ...s, [albumId]: [] }));
+      return;
+    }
+
+    setSearchLoading((s) => ({ ...s, [albumId]: true }));
+
+    const { data, error } = await supabase
+      .from("collection")
+      .select("id, artist, title, year, format, image_url")
+      .or(`artist.ilike.%${query}%,title.ilike.%${query}%`)
+      .order("artist", { ascending: true })
+      .limit(20);
+
+    setSearchLoading((s) => ({ ...s, [albumId]: false }));
+
+    if (error) {
+      pushToast({ kind: "err", msg: `Search failed: ${error.message}` });
+      return;
+    }
+
+    setSearchResults((s) => ({ ...s, [albumId]: data || [] }));
+  };
+
+  const handleSearchInput = (albumId: Id, value: string) => {
+    setSearchInputs((s) => ({ ...s, [albumId]: value }));
+
+    // Clear previous timeout
+    if (searchTimeouts.current[albumId]) {
+      clearTimeout(searchTimeouts.current[albumId]);
+    }
+
+    // Debounce search
+    searchTimeouts.current[albumId] = setTimeout(() => {
+      void searchCollection(albumId, value);
+    }, 300);
+  };
+
+  const linkFromSearch = async (albumId: Id, collectionId: Id) => {
+    const { error } = await supabase
+      .from("collection_1001_review")
+      .insert([
+        {
+          album_1001_id: albumId,
+          collection_id: collectionId,
+          review_status: "linked",
+          confidence: 1.0,
+          notes: "manual link via search",
+        },
+      ]);
+
+    if (error) {
+      pushToast({ kind: "err", msg: `Link failed: ${error.message}` });
+      return;
+    }
+
+    setSearchInputs((s) => ({ ...s, [albumId]: "" }));
+    setSearchResults((s) => ({ ...s, [albumId]: [] }));
+    pushToast({ kind: "ok", msg: "Linked" });
     void load();
   };
 
@@ -542,15 +578,14 @@ export default function Page(): ReactElement {
 
                   {/* Actions */}
                   <div>
-                    <div style={{ fontWeight: 700, color: "#111827", marginBottom: 8 }}>Link by Collection ID</div>
-                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <div style={{ fontWeight: 700, color: "#111827", marginBottom: 8 }}>Search & Link Album</div>
+                    <div style={{ position: "relative" }}>
                       <input
-                        value={linkInputs[a.id] ?? ""}
-                        onChange={(e) => setLinkInput(a.id, e.target.value)}
-                        inputMode="numeric"
-                        placeholder="collection id"
+                        value={searchInputs[a.id] ?? ""}
+                        onChange={(e) => handleSearchInput(a.id, e.target.value)}
+                        placeholder="Search your collection..."
                         style={{
-                          width: 150,
+                          width: "100%",
                           padding: "8px 10px",
                           border: "1.5px solid #9ca3af",
                           borderRadius: 6,
@@ -558,9 +593,74 @@ export default function Page(): ReactElement {
                           color: "#111827",
                         }}
                       />
-                      <button onClick={() => void linkById(a.id)} style={btn("#2563eb")} aria-label="Link collection id">
-                        Link
-                      </button>
+                      {searchLoading[a.id] && (
+                        <div style={{ padding: 8, color: "#6b7280", fontSize: 13 }}>Searching...</div>
+                      )}
+                      {searchResults[a.id] && searchResults[a.id].length > 0 && (
+                        <div
+                          style={{
+                            position: "absolute",
+                            top: "100%",
+                            left: 0,
+                            right: 0,
+                            marginTop: 4,
+                            background: "#ffffff",
+                            border: "1px solid #e5e7eb",
+                            borderRadius: 6,
+                            boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
+                            maxHeight: 300,
+                            overflowY: "auto",
+                            zIndex: 10,
+                          }}
+                        >
+                          {searchResults[a.id].map((result) => (
+                            <div
+                              key={result.id}
+                              onClick={() => void linkFromSearch(a.id, result.id)}
+                              style={{
+                                display: "flex",
+                                gap: 8,
+                                padding: 8,
+                                cursor: "pointer",
+                                borderBottom: "1px solid #f3f4f6",
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.background = "#f9fafb";
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.background = "#ffffff";
+                              }}
+                            >
+                              <Image
+                                src={
+                                  result.image_url && result.image_url.trim().toLowerCase() !== "no"
+                                    ? result.image_url
+                                    : "/images/coverplaceholder.png"
+                                }
+                                alt={result.title || "cover"}
+                                width={40}
+                                height={40}
+                                unoptimized
+                                style={{ borderRadius: 4, objectFit: "cover" }}
+                              />
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontWeight: 600, fontSize: 13, color: "#111827", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                  {result.artist || "—"}
+                                </div>
+                                <div style={{ fontSize: 12, color: "#6b7280", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                  {result.title || "—"}
+                                </div>
+                                <div style={{ fontSize: 11, color: "#9ca3af" }}>
+                                  {result.year || "—"} • {result.format || "—"}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {searchInputs[a.id] && searchResults[a.id] && searchResults[a.id].length === 0 && !searchLoading[a.id] && (
+                        <div style={{ padding: 8, color: "#6b7280", fontSize: 13 }}>No matches found</div>
+                      )}
                     </div>
                   </div>
                 </div>
