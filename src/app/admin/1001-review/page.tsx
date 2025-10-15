@@ -69,12 +69,13 @@ export default function Page(): ReactElement {
   const load = useCallback(async () => {
     setLoading(true);
 
-    // Fetch ALL 1001 albums (no limit)
+    // Fetch ALL 1001 albums with explicit limit
     const { data: a1001, error: e1 } = await supabase
       .from("one_thousand_one_albums")
       .select("id, artist, album, year, artist_norm, album_norm")
       .order("artist", { ascending: true })
-      .order("album", { ascending: true });
+      .order("album", { ascending: true })
+      .limit(1001);
 
     if (e1 || !a1001) {
       pushToast({ kind: "err", msg: `Failed loading 1001 list: ${e1?.message ?? "unknown error"}` });
