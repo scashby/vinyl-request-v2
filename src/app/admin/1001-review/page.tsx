@@ -603,7 +603,7 @@ export default function Page(): ReactElement {
               const isUnmatched = matches.length === 0;
               const hasPending = matches.some((m) => m.review_status === "pending" || m.review_status === "linked");
               const allConfirmed = matches.length > 0 && matches.every((m) => m.review_status === "confirmed");
-              const isExpanded = expandedAlbums[album.id] ?? false;
+              const isExpanded = expandedAlbums[album.id] ?? hasPending;
 
               return (
                 <div
