@@ -63,6 +63,7 @@ export default function Page(): ReactElement {
   const [searchResults, setSearchResults] = useState<Record<Id, CollectionRow[]>>({});
   const [searchLoading, setSearchLoading] = useState<Record<Id, boolean>>({});
   const searchTimeouts = useRef<Record<Id, NodeJS.Timeout>>({});
+  const [hasAutoMatchedSession, setHasAutoMatchedSession] = useState(false);
 
   const pushToast = useCallback((t: Toast) => {
     setToasts((ts) => [...ts, t]);
@@ -191,8 +192,9 @@ export default function Page(): ReactElement {
     void load();
   }, [pushToast, load]);
 
-  // Auto-match on page load if there are unmatched albums
+  // Auto-match only once when page first opens
   useEffect(() => {
+    if (hasAutoMatchedSession) return; // Already ran this session
     if (loading || running || rows.length === 0) return;
     
     const unmatched = rows.filter(r => {
@@ -201,12 +203,13 @@ export default function Page(): ReactElement {
     });
 
     if (unmatched.length > 0) {
-      pushToast({ kind: "info", msg: `Found ${unmatched.length} unmatched albums. Running auto-match...` });
+      setHasAutoMatchedSession(true); // Mark as run
+      pushToast({ kind: "info", msg: `Found ${unmatched.length} unmatched albums. Running database-wide auto-match...` });
       setTimeout(() => {
         void runExact();
       }, 500);
     }
-  }, [rows, matchesBy, loading, running, pushToast, runExact]);
+  }, [rows, matchesBy, loading, running, pushToast, runExact, hasAutoMatchedSession]);
 
   const filteredRows = useMemo(() => {
     if (statusFilter === "all") return rows;
