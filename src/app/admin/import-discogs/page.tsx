@@ -1,7 +1,7 @@
-// src/app/admin/import-discogs/page.tsx - FIXED: Handles duplicate release_ids correctly
+// src/app/admin/import-discogs/page.tsx - WITH INCREMENTAL SYNC
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Papa from 'papaparse';
 import { supabase } from 'src/lib/supabaseClient';
 
@@ -62,6 +62,8 @@ type SyncPreview = {
   newItems: ProcessedRow[];
   updateOperations: UpdateOperation[];
   recordsToRemove: ExistingRecord[];
+  isIncrementalSync: boolean;
+  lastImportDate: string | null;
 };
 
 interface SyncDataStorage {
@@ -127,6 +129,25 @@ export default function ImportDiscogsPage() {
   const [showDetails, setShowDetails] = useState<'new' | 'updates' | 'removes' | null>(null);
   const [expandedUpdate, setExpandedUpdate] = useState<number | null>(null);
   const [deselectedRemovals, setDeselectedRemovals] = useState<Set<number>>(new Set());
+  const [lastImportDate, setLastImportDate] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Fetch last import date on component mount
+    const fetchLastImport = async () => {
+      const { data, error } = await supabase
+        .from('import_history')
+        .select('import_date')
+        .eq('status', 'completed')
+        .order('import_date', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (!error && data) {
+        setLastImportDate(data.import_date);
+      }
+    };
+    fetchLastImport();
+  }, []);
 
   const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -174,7 +195,6 @@ export default function ImportDiscogsPage() {
           })));
         }
         
-        // COMBINE genres and styles into unified lists
         const genresFromDiscogs = Array.isArray(data.genres) && data.genres.length > 0 
           ? data.genres.filter(g => g && g.trim()).map(g => g.trim()) 
           : [];
@@ -183,7 +203,6 @@ export default function ImportDiscogsPage() {
           ? data.styles.filter(s => s && s.trim()).map(s => s.trim()) 
           : [];
         
-        // Combine and deduplicate
         const combined = [...genresFromDiscogs, ...stylesFromDiscogs].filter(Boolean);
         const unique = Array.from(new Set(combined));
         
@@ -224,8 +243,26 @@ export default function ImportDiscogsPage() {
             const numericValue = Number(releaseId);
             return !isNaN(numericValue) && numericValue > 0;
           });
+
+          // Filter by last import date if incremental sync is enabled
+          let filteredRows = validRows;
+          let isIncrementalSync = false;
           
-          const processedRows: ProcessedRow[] = validRows.map(row => {
+          if (lastImportDate) {
+            const lastImportTimestamp = new Date(lastImportDate);
+            filteredRows = validRows.filter(row => {
+              const dateAdded = new Date(row['Date Added']);
+              return dateAdded > lastImportTimestamp;
+            });
+            isIncrementalSync = true;
+            
+            if (filteredRows.length < validRows.length) {
+              const skippedCount = validRows.length - filteredRows.length;
+              setStatus(`Incremental sync: Processing ${filteredRows.length} items added after ${lastImportTimestamp.toLocaleDateString()}, skipping ${skippedCount} older items`);
+            }
+          }
+          
+          const processedRows: ProcessedRow[] = filteredRows.map(row => {
             const year = row.Released || 0;
             return {
               artist: row.Artist || 'Unknown Artist',
@@ -270,8 +307,7 @@ export default function ImportDiscogsPage() {
             }
           }
 
-          // FIXED: Create composite key maps to handle duplicates correctly
-          // Key format: "release_id|folder"
+          // Create composite key maps: "release_id|folder"
           const createKey = (releaseId: string, folder: string) => `${releaseId}|${folder}`;
           
           const existingRecordsMap = new Map(
@@ -288,13 +324,13 @@ export default function ImportDiscogsPage() {
             ])
           );
 
-          // Find NEW records (not in database at all with this release_id + folder combo)
+          // Find NEW records
           const newRows = processedRows.filter(row => {
             const key = createKey(row.discogs_release_id, row.folder);
             return !existingRecordsMap.has(key);
           });
 
-          // Find updates with detailed change tracking
+          // Find updates
           const updateOperations: UpdateOperation[] = [];
           for (const csvRow of processedRows) {
             const key = createKey(csvRow.discogs_release_id, csvRow.folder);
@@ -303,9 +339,6 @@ export default function ImportDiscogsPage() {
             if (existingRecord) {
               const changes: string[] = [];
               
-              if (!valuesAreEqual(csvRow.folder, existingRecord.folder)) {
-                changes.push(`Folder: "${existingRecord.folder}" → "${csvRow.folder}"`);
-              }
               if (!valuesAreEqual(csvRow.media_condition, existingRecord.media_condition)) {
                 changes.push(`Condition: "${existingRecord.media_condition}" → "${csvRow.media_condition}"`);
               }
@@ -328,20 +361,33 @@ export default function ImportDiscogsPage() {
             }
           }
           
-          // Find records to remove (in database but not in CSV with matching release_id + folder)
-          const recordsToRemove: ExistingRecord[] = allExisting.filter(
-            existingRecord => {
-              const key = createKey(existingRecord.discogs_release_id, existingRecord.folder || 'Uncategorized');
-              return !csvRecordsMap.has(key);
-            }
-          );
+          // Find records to remove (only if NOT incremental sync)
+          let recordsToRemove: ExistingRecord[] = [];
+          if (!isIncrementalSync) {
+            recordsToRemove = allExisting.filter(
+              existingRecord => {
+                const key = createKey(existingRecord.discogs_release_id, existingRecord.folder || 'Uncategorized');
+                return !csvRecordsMap.has(key);
+              }
+            );
+          }
 
-          setStatus(`Found ${newRows.length} new, ${updateOperations.length} updates, ${recordsToRemove.length} removals`);
+          const syncMessage = isIncrementalSync 
+            ? `Incremental sync: ${newRows.length} new, ${updateOperations.length} updates (changes since ${new Date(lastImportDate!).toLocaleDateString()})`
+            : `Full sync: ${newRows.length} new, ${updateOperations.length} updates, ${recordsToRemove.length} removals`;
+          
+          setStatus(syncMessage);
 
           (window as Window & SyncDataStorage).updateOperations = updateOperations;
           (window as Window & SyncDataStorage).recordsToRemove = recordsToRemove;
 
-          setSyncPreview({ newItems: newRows, updateOperations, recordsToRemove });
+          setSyncPreview({ 
+            newItems: newRows, 
+            updateOperations, 
+            recordsToRemove,
+            isIncrementalSync,
+            lastImportDate
+          });
           setIsProcessing(false);
         },
         error: (error: Error) => {
@@ -370,6 +416,22 @@ export default function ImportDiscogsPage() {
     const updateOperations = (window as Window & SyncDataStorage).updateOperations || [];
     const recordsToRemove = (window as Window & SyncDataStorage).recordsToRemove || [];
     
+    // Create import history record
+    const { data: importRecord, error: importError } = await supabase
+      .from('import_history')
+      .insert([{ 
+        status: 'in_progress',
+        notes: syncPreview.isIncrementalSync ? 'Incremental sync' : 'Full sync'
+      }])
+      .select()
+      .single();
+
+    if (importError) {
+      setStatus(`Failed to create import record: ${importError.message}`);
+      setIsProcessing(false);
+      return;
+    }
+
     setStatus(`Starting enrichment for ${totalItems} new items...`);
 
     try {
@@ -496,8 +558,6 @@ export default function ImportDiscogsPage() {
           setStatus(`Removing ${actualRemovals.length} records...`);
           const idsToDelete = actualRemovals.map(record => record.id);
           await supabase.from('collection').delete().in('id', idsToDelete);
-        } else {
-          setStatus('No records to remove (all deselected)');
         }
       }
       
@@ -531,12 +591,32 @@ export default function ImportDiscogsPage() {
         }
       } catch (matchError) {
         console.warn('1001 matching failed:', matchError);
-        // Don't fail the whole import if matching fails
       }
-      
+
+      // Update import history record
       const removedCount = recordsToRemove.length - deselectedRemovals.size;
+      await supabase
+        .from('import_history')
+        .update({
+          status: 'completed',
+          records_added: allEnriched.length,
+          records_updated: updateOperations.length,
+          records_removed: removedCount
+        })
+        .eq('id', importRecord.id);
+
+      // Update last import date in state
+      setLastImportDate(new Date().toISOString());
+      
       setStatus(`✅ Complete! ${allEnriched.length} new, ${updateOperations.length} updated, ${removedCount} removed, 1001 albums matched`);
     } catch (error) {
+      // Mark import as failed
+      if (importRecord) {
+        await supabase
+          .from('import_history')
+          .update({ status: 'failed', notes: error instanceof Error ? error.message : 'Unknown error' })
+          .eq('id', importRecord.id);
+      }
       setStatus(`❌ Failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsProcessing(false);
@@ -564,7 +644,9 @@ export default function ImportDiscogsPage() {
         fontSize: 16,
         marginBottom: 24
       }}>
-        Enhanced import now combines genres & styles and includes decade classification
+        {lastImportDate 
+          ? `Incremental sync enabled - only processing changes after ${new Date(lastImportDate).toLocaleString()}`
+          : 'First import - will perform full sync and enable incremental updates'}
       </p>
 
       <div style={{
@@ -640,7 +722,7 @@ export default function ImportDiscogsPage() {
             color: '#1f2937',
             marginBottom: 16
           }}>
-            Sync Preview
+            Sync Preview {syncPreview.isIncrementalSync && <span style={{ fontSize: 14, color: '#3b82f6', fontWeight: 'normal' }}>(Incremental)</span>}
           </h2>
           
           <div style={{
@@ -715,38 +797,40 @@ export default function ImportDiscogsPage() {
               )}
             </div>
             
-            <div 
-              onClick={() => setShowDetails(showDetails === 'removes' ? null : 'removes')}
-              style={{
-                background: '#fee2e2',
-                border: '1px solid #dc2626',
-                borderRadius: 8,
-                padding: 16,
-                textAlign: 'center',
-                cursor: syncPreview.recordsToRemove.length > 0 ? 'pointer' : 'default',
-                transition: 'all 0.2s'
-              }}
-              onMouseEnter={e => {
-                if (syncPreview.recordsToRemove.length > 0) {
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(220, 38, 38, 0.3)';
-                }
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = 'none';
-              }}
-            >
-              <div style={{ fontSize: 32, fontWeight: 'bold', color: '#991b1b' }}>
-                {syncPreview.recordsToRemove.length}
-              </div>
-              <div style={{ fontSize: 14, color: '#991b1b', fontWeight: 600 }}>To Remove</div>
-              {syncPreview.recordsToRemove.length > 0 && (
-                <div style={{ fontSize: 11, color: '#dc2626', marginTop: 4 }}>
-                  Click to view →
+            {!syncPreview.isIncrementalSync && (
+              <div 
+                onClick={() => setShowDetails(showDetails === 'removes' ? null : 'removes')}
+                style={{
+                  background: '#fee2e2',
+                  border: '1px solid #dc2626',
+                  borderRadius: 8,
+                  padding: 16,
+                  textAlign: 'center',
+                  cursor: syncPreview.recordsToRemove.length > 0 ? 'pointer' : 'default',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={e => {
+                  if (syncPreview.recordsToRemove.length > 0) {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(220, 38, 38, 0.3)';
+                  }
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              >
+                <div style={{ fontSize: 32, fontWeight: 'bold', color: '#991b1b' }}>
+                  {syncPreview.recordsToRemove.length}
                 </div>
-              )}
-            </div>
+                <div style={{ fontSize: 14, color: '#991b1b', fontWeight: 600 }}>To Remove</div>
+                {syncPreview.recordsToRemove.length > 0 && (
+                  <div style={{ fontSize: 11, color: '#dc2626', marginTop: 4 }}>
+                    Click to view →
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           
           {/* Detailed Views */}
@@ -857,7 +941,7 @@ export default function ImportDiscogsPage() {
             </div>
           )}
 
-          {showDetails === 'removes' && syncPreview.recordsToRemove.length > 0 && (
+          {showDetails === 'removes' && syncPreview.recordsToRemove.length > 0 && !syncPreview.isIncrementalSync && (
             <div style={{
               background: '#fef2f2',
               border: '1px solid #dc2626',
