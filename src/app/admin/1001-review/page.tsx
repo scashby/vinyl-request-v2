@@ -51,13 +51,10 @@ type StatusFilter = "all" | "unlinked" | "linked" | "confirmed" | "rejected" | "
 
 type Toast = { kind: "info" | "ok" | "err"; msg: string };
 
-const PAGE_SIZE = 25;
-
 export default function Page(): ReactElement {
   const [rows, setRows] = useState<A1001[]>([]);
   const [matchesBy, setMatchesBy] = useState<Record<Id, MatchRow[]>>({});
   const [collectionsBy, setCollectionsBy] = useState<Record<Id, CollectionRow>>({});
-  const [page, setPage] = useState<number>(1);
   const [loading, setLoading] = useState<boolean>(true);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -66,8 +63,6 @@ export default function Page(): ReactElement {
   const [searchResults, setSearchResults] = useState<Record<Id, CollectionRow[]>>({});
   const [searchLoading, setSearchLoading] = useState<Record<Id, boolean>>({});
   const searchTimeouts = useRef<Record<Id, NodeJS.Timeout>>({});
-
-  const offset = useMemo(() => (page - 1) * PAGE_SIZE, [page]);
 
   const pushToast = useCallback((t: Toast) => {
     setToasts((ts) => [...ts, t]);
@@ -82,8 +77,7 @@ export default function Page(): ReactElement {
       .from("one_thousand_one_albums")
       .select("id, artist, album, year, artist_norm, album_norm")
       .order("artist", { ascending: true })
-      .order("album", { ascending: true })
-      .range(offset, offset + PAGE_SIZE - 1);
+      .order("album", { ascending: true });
 
     if (e1 || !a1001) {
       pushToast({ kind: "err", msg: `Failed loading 1001 list: ${e1?.message ?? "unknown error"}` });
@@ -146,7 +140,7 @@ export default function Page(): ReactElement {
     }
     setCollectionsBy(cmap);
     setLoading(false);
-  }, [offset, pushToast]);
+  }, [pushToast]);
 
   useEffect(() => {
     void load();
@@ -461,21 +455,7 @@ export default function Page(): ReactElement {
           >
             Same-Artist (0.60, ±1y)
           </button>
-        </div>
-
-        <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
-          <button
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            style={btnOutline()}
-            aria-label="Previous page"
-          >
-            ← Prev
-          </button>
-          <div style={{ alignSelf: "center", color: "#374151", minWidth: 60, textAlign: "center" }}>Page {page}</div>
-          <button onClick={() => setPage((p) => p + 1)} style={btnOutline()} aria-label="Next page">
-            Next →
-          </button>
-        </div>
+        </div>        
       </div>
 
       {/* Grid */}
