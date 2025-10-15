@@ -86,7 +86,7 @@ export default function QueueSection({ eventId }: QueueSectionProps) {
 
       const { data: albums, error: albumError } = await supabase
         .from("collection")
-        .select("id, artist, title, image_url, format, is_1001")
+        .select("id, artist, title, image_url, format")
         .in("id", albumIds);
 
       if (albumError || !albums) {
@@ -103,7 +103,6 @@ export default function QueueSection({ eventId }: QueueSectionProps) {
             title: "",
             image_url: "",
             format: "",
-            is_1001: null,
           };
         return {
           id: req.id,
@@ -186,11 +185,14 @@ export default function QueueSection({ eventId }: QueueSectionProps) {
           <colgroup>
             <col style={{ width: "50px" }} />
             <col style={{ width: "60px" }} />
-            <col style={{ width: "42px" }} />
             <col />
             {queueType === 'side' && <col style={{ width: "60px" }} />}
-            {queueType === 'track' && <col style={{ width: "100px" }} />}
-            {queueType === 'track' && <col style={{ width: "80px" }} />}
+            {queueType === 'track' && (
+              <>
+                <col style={{ width: "100px" }} />
+                <col style={{ width: "80px" }} />
+              </>
+            )}
             <col style={{ width: "60px" }} />
             <col style={{ width: "80px" }} />
           </colgroup>
@@ -198,11 +200,14 @@ export default function QueueSection({ eventId }: QueueSectionProps) {
             <tr>
               <th>#</th>
               <th></th>
-              <th style={{ width: 42 }}></th>
               <th>{queueType === 'track' ? 'Track / Artist' : 'Album / Artist'}</th>
               {queueType === 'side' && <th>Side</th>}
-              {queueType === 'track' && <th>Track #</th>}
-              {queueType === 'track' && <th>Duration</th>}
+              {queueType === 'track' && (
+                <>
+                  <th>Track #</th>
+                  <th>Duration</th>
+                </>
+              )}
               <th>&#x1F44D;</th>
               <th>Votes</th>
             </tr>
@@ -227,28 +232,6 @@ export default function QueueSection({ eventId }: QueueSectionProps) {
                       onClick={() => goToAlbum(item.album.id)}
                       unoptimized
                     />
-                  </td>
-                  <td className="queue-badge" style={{ width: 42, textAlign: 'center' }}>
-                    {item.album.is_1001 ? (
-                      <span
-                        title="On the 1001 Albums list"
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          borderRadius: 999,
-                          padding: '2px 6px',
-                          fontSize: 10,
-                          fontWeight: 700,
-                          lineHeight: 1,
-                          border: '1px solid rgba(0,0,0,0.2)',
-                          background: 'rgba(0,0,0,0.75)',
-                          color: '#fff',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        1001
-                      </span>
-                    ) : null}
                   </td>
                   <td
                     className="queue-meta"
