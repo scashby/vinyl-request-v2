@@ -69,22 +69,31 @@ export default function Page(): ReactElement {
   const load = useCallback(async () => {
     setLoading(true);
 
-    // Fetch ALL 1001 albums with explicit limit
-    const { data: a1001, error: e1 } = await supabase
+    // Fetch albums in two batches to bypass 1000-row limit
+    const { data: batch1, error: e1a } = await supabase
       .from("one_thousand_one_albums")
       .select("id, artist, album, year, artist_norm, album_norm")
       .order("artist", { ascending: true })
       .order("album", { ascending: true })
-      .limit(1001);
+      .range(0, 999);
 
-    if (e1 || !a1001) {
-      pushToast({ kind: "err", msg: `Failed loading 1001 list: ${e1?.message ?? "unknown error"}` });
+    const { data: batch2, error: e1b } = await supabase
+      .from("one_thousand_one_albums")
+      .select("id, artist, album, year, artist_norm, album_norm")
+      .order("artist", { ascending: true })
+      .order("album", { ascending: true })
+      .range(1000, 1999);
+
+    if ((e1a && !batch1) || (e1b && !batch2)) {
+      pushToast({ kind: "err", msg: `Failed loading 1001 list` });
       setRows([]);
       setMatchesBy({});
       setCollectionsBy({});
       setLoading(false);
       return;
     }
+
+    const a1001 = [...(batch1 || []), ...(batch2 || [])];
 
     setRows(a1001);
 
