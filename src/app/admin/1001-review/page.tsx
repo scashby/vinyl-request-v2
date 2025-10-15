@@ -169,8 +169,8 @@ export default function Page(): ReactElement {
   const runFuzzy = useCallback(async (threshold = 0.7, yearSlop = 1) => {
     setRunning(true);
     const { data, error } = await supabase.rpc("match_1001_fuzzy", {
-      threshold,
-      year_slop: yearSlop,
+      threshold: parseFloat(threshold.toString()),
+      year_slop: parseInt(yearSlop.toString()),
     });
     setRunning(false);
     if (error) {
@@ -185,8 +185,8 @@ export default function Page(): ReactElement {
   const runSameArtist = useCallback(async (threshold = 0.6, yearSlop = 1) => {
     setRunning(true);
     const { data, error } = await supabase.rpc("match_1001_same_artist", {
-      threshold,
-      year_slop: yearSlop,
+      threshold: parseFloat(threshold.toString()),
+      year_slop: parseInt(yearSlop.toString()),
     });
     setRunning(false);
     if (error) {
@@ -228,22 +228,29 @@ export default function Page(): ReactElement {
       return true;
     });
 
-    // Sort: pending first, then unmatched, then rest
+    // Sort: pending first, then unmatched, then confirmed last
     return filtered.sort((a, b) => {
       const aMatches = matchesBy[a.id] ?? [];
       const bMatches = matchesBy[b.id] ?? [];
 
       const aHasPending = aMatches.some((m) => m.review_status === "pending" || m.review_status === "linked");
       const bHasPending = bMatches.some((m) => m.review_status === "pending" || m.review_status === "linked");
+      const aUnmatched = aMatches.length === 0;
+      const bUnmatched = bMatches.length === 0;
+      const aConfirmed = aMatches.length > 0 && aMatches.every((m) => m.review_status === "confirmed");
+      const bConfirmed = bMatches.length > 0 && bMatches.every((m) => m.review_status === "confirmed");
 
+      // Pending first
       if (aHasPending && !bHasPending) return -1;
       if (!aHasPending && bHasPending) return 1;
 
-      const aUnmatched = aMatches.length === 0;
-      const bUnmatched = bMatches.length === 0;
-
+      // Then unmatched
       if (aUnmatched && !bUnmatched) return -1;
       if (!aUnmatched && bUnmatched) return 1;
+
+      // Confirmed last
+      if (aConfirmed && !bConfirmed) return 1;
+      if (!aConfirmed && bConfirmed) return -1;
 
       return 0;
     });
@@ -711,6 +718,8 @@ export default function Page(): ReactElement {
                             fontSize: 15,
                             outline: "none",
                             transition: "border-color 0.2s",
+                            color: "#111827",
+                            backgroundColor: "#ffffff",
                           }}
                           onFocus={(e) => {
                             e.currentTarget.style.borderColor = "#3b82f6";
