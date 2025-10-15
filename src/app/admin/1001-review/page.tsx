@@ -152,10 +152,88 @@ export default function Page(): ReactElement {
     void load();
   }, [load]);
 
-  // Filter 1001 rows by match status group
+  const runExact = useCallback(async () => {
+    setRunning(true);
+    const { data, error } = await supabase.rpc("match_1001_exact");
+    setRunning(false);
+    if (error) {
+      pushToast({ kind: "err", msg: `Exact failed: ${error.message}` });
+      return;
+    }
+    const n = Number.isFinite(Number(data)) ? Number(data) : 0;
+    pushToast({ kind: "ok", msg: `Exact added ${n} link(s)` });
+    void load();
+  }, [pushToast, load]);
+
+  const runFuzzy = useCallback(async (threshold = 0.7, yearSlop = 1) => {
+    setRunning(true);
+    const { data, error } = await supabase.rpc("match_1001_fuzzy", {
+      threshold,
+      year_slop: yearSlop,
+    });
+    setRunning(false);
+    if (error) {
+      pushToast({ kind: "err", msg: `Fuzzy failed: ${error.message}` });
+      return;
+    }
+    const n = Number.isFinite(Number(data)) ? Number(data) : 0;
+    pushToast({ kind: "ok", msg: `Fuzzy added ${n} candidate(s)` });
+    void load();
+  }, [pushToast, load]);
+
+  const runSameArtist = useCallback(async (threshold = 0.6, yearSlop = 1) => {
+    setRunning(true);
+    const { data, error } = await supabase.rpc("match_1001_same_artist", {
+      threshold,
+      year_slop: yearSlop,
+    });
+    setRunning(false);
+    if (error) {
+      pushToast({ kind: "err", msg: `Same-artist failed: ${error.message}` });
+      return;
+    }
+    const n = Number.isFinite(Number(data)) ? Number(data) : 0;
+    pushToast({ kind: "ok", msg: `Same-artist added ${n} candidate(s)` });
+    void load();
+  }, [pushToast, load]);
+
+  // Auto-match on page load if there are unmatched albums
+  useEffect(() => {
+    if (loading || running || rows.length === 0) return;
+    
+    const unmatched = rows.filter(r => {
+      const ms = matchesBy[r.id] ?? [];
+      return ms.length === 0;
+    });
+
+    if (unmatched.length > 0) {
+      pushToast({ kind: "info", msg: `Found ${unmatched.length} unmatched albums. Running auto-match...` });
+      setTimeout(() => {
+        void runExact();
+      }, 500);
+    }
+  }, [rows, matchesBy, loading, running, pushToast, runExact]);
+
+  useEffect(() => {
+    if (loading || running) return;
+    
+    // Count unmatched albums
+    const unmatched = rows.filter(r => {
+      const ms = matchesBy[r.id] ?? [];
+      return ms.length === 0;
+    });
+
+    if (unmatched.length > 0 && rows.length > 0) {
+      pushToast({ kind: "info", msg: `Found ${unmatched.length} unmatched albums. Running auto-match...` });
+      setTimeout(() => {
+        void runExact();
+      }, 500);
+    }
+  }, [rows, matchesBy, loading, running, pushToast, runExact]);
+
   const filteredRows = useMemo(() => {
     if (statusFilter === "all") return rows;
-    return rows.filter((r) => {
+    const filtered = rows.filter((r) => {
       const ms = matchesBy[r.id] ?? [];
       if (statusFilter === "unlinked") return ms.length === 0;
       if (statusFilter === "linked") return ms.some((m) => m.review_status === "linked");
@@ -163,6 +241,26 @@ export default function Page(): ReactElement {
       if (statusFilter === "rejected") return ms.some((m) => m.review_status === "rejected");
       if (statusFilter === "pending") return ms.some((m) => m.review_status === "pending");
       return true;
+    });
+
+    // Sort: pending first, then unmatched, then rest
+    return filtered.sort((a, b) => {
+      const aMatches = matchesBy[a.id] ?? [];
+      const bMatches = matchesBy[b.id] ?? [];
+      
+      const aHasPending = aMatches.some(m => m.review_status === "pending");
+      const bHasPending = bMatches.some(m => m.review_status === "pending");
+      
+      if (aHasPending && !bHasPending) return -1;
+      if (!aHasPending && bHasPending) return 1;
+      
+      const aUnmatched = aMatches.length === 0;
+      const bUnmatched = bMatches.length === 0;
+      
+      if (aUnmatched && !bUnmatched) return -1;
+      if (!aUnmatched && bUnmatched) return 1;
+      
+      return 0;
     });
   }, [rows, matchesBy, statusFilter]);
 
@@ -252,51 +350,6 @@ export default function Page(): ReactElement {
     void load();
   };
 
-  const runExact = async () => {
-    setRunning(true);
-    const { data, error } = await supabase.rpc("match_1001_exact");
-    setRunning(false);
-    if (error) {
-      pushToast({ kind: "err", msg: `Exact failed: ${error.message}` });
-      return;
-    }
-    const n = Number.isFinite(Number(data)) ? Number(data) : 0;
-    pushToast({ kind: "ok", msg: `Exact added ${n} link(s)` });
-    void load();
-  };
-
-  const runFuzzy = async (threshold = 0.7, yearSlop = 1) => {
-    setRunning(true);
-    const { data, error } = await supabase.rpc("match_1001_fuzzy", {
-      threshold,
-      year_slop: yearSlop,
-    });
-    setRunning(false);
-    if (error) {
-      pushToast({ kind: "err", msg: `Fuzzy failed: ${error.message}` });
-      return;
-    }
-    const n = Number.isFinite(Number(data)) ? Number(data) : 0;
-    pushToast({ kind: "ok", msg: `Fuzzy added ${n} candidate(s)` });
-    void load();
-  };
-
-  const runSameArtist = async (threshold = 0.6, yearSlop = 1) => {
-    setRunning(true);
-    const { data, error } = await supabase.rpc("match_1001_same_artist", {
-      threshold,
-      year_slop: yearSlop,
-    });
-    setRunning(false);
-    if (error) {
-      pushToast({ kind: "err", msg: `Same-artist failed: ${error.message}` });
-      return;
-    }
-    const n = Number.isFinite(Number(data)) ? Number(data) : 0;
-    pushToast({ kind: "ok", msg: `Same-artist added ${n} candidate(s)` });
-    void load();
-  };
-
   const tone = (s: MatchStatus | string): { bg: string; bd: string; fg: string; label: string } => {
     if (s === "confirmed") return { bg: "#dcfce7", bd: "#86efac", fg: "#065f46", label: "confirmed" };
     if (s === "rejected") return { bg: "#fee2e2", bd: "#fecaca", fg: "#991b1b", label: "rejected" };
@@ -356,26 +409,59 @@ export default function Page(): ReactElement {
           boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
         }}
       >
-        <label style={{ fontWeight: 600, color: "#111827" }}>Status</label>
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-          style={{
-            minWidth: 160,
-            padding: "8px 10px",
-            border: "1.5px solid #9ca3af",
-            borderRadius: 6,
-            background: "#ffffff",
-            color: "#111827",
-          }}
-        >
-          <option value="all">All</option>
-          <option value="unlinked">Unlinked</option>
-          <option value="pending">Pending</option>
-          <option value="linked">Linked</option>
-          <option value="confirmed">Confirmed</option>
-          <option value="rejected">Rejected</option>
-        </select>
+       <div style={{ display: "flex", gap: 4, background: "#f3f4f6", padding: 4, borderRadius: 8 }}>
+          {[
+            { value: "pending", label: "Pending", color: "#f59e0b" },
+            { value: "unlinked", label: "Unmatched", color: "#ef4444" },
+            { value: "linked", label: "Linked", color: "#3b82f6" },
+            { value: "confirmed", label: "Confirmed", color: "#10b981" },
+            { value: "rejected", label: "Rejected", color: "#6b7280" },
+            { value: "all", label: "All", color: "#374151" },
+          ].map((tab) => {
+            const count = rows.filter((r) => {
+              const ms = matchesBy[r.id] ?? [];
+              if (tab.value === "all") return true;
+              if (tab.value === "unlinked") return ms.length === 0;
+              if (tab.value === "pending") return ms.some((m) => m.review_status === "pending");
+              if (tab.value === "linked") return ms.some((m) => m.review_status === "linked");
+              if (tab.value === "confirmed") return ms.some((m) => m.review_status === "confirmed");
+              if (tab.value === "rejected") return ms.some((m) => m.review_status === "rejected");
+              return false;
+            }).length;
+
+            const isActive = statusFilter === tab.value;
+
+            return (
+              <button
+                key={tab.value}
+                onClick={() => setStatusFilter(tab.value as StatusFilter)}
+                style={{
+                  padding: "8px 16px",
+                  border: "none",
+                  borderRadius: 6,
+                  background: isActive ? tab.color : "transparent",
+                  color: isActive ? "#ffffff" : "#374151",
+                  fontWeight: isActive ? 700 : 600,
+                  fontSize: 14,
+                  cursor: "pointer",
+                  transition: "all 0.2s",
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActive) {
+                    e.currentTarget.style.background = "#e5e7eb";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActive) {
+                    e.currentTarget.style.background = "transparent";
+                  }
+                }}
+              >
+                {tab.label} ({count})
+              </button>
+            );
+          })}
+        </div>
 
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <button onClick={() => void runExact()} disabled={running} style={btn("#2563eb", running)}>
