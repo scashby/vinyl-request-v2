@@ -471,7 +471,40 @@ export default function ImportDiscogsPage() {
         await supabase.from('collection').delete().in('id', idsToDelete);
       }
       
-      setStatus(`✅ Complete! ${allEnriched.length} new, ${updateOperations.length} updated, ${recordsToRemove.length} removed`);
+      // Automatic 1001 album matching
+      setStatus('Running automatic 1001 album matching...');
+      
+      try {
+        const { data: exactCount, error: exactError } = await supabase.rpc('match_1001_exact');
+        if (!exactError) {
+          setStatus(`Found ${exactCount || 0} exact 1001 matches...`);
+        }
+        
+        await delay(1000);
+        
+        const { data: fuzzyCount, error: fuzzyError } = await supabase.rpc('match_1001_fuzzy', {
+          threshold: 0.7,
+          year_slop: 1
+        });
+        if (!fuzzyError) {
+          setStatus(`Found ${fuzzyCount || 0} fuzzy 1001 matches...`);
+        }
+        
+        await delay(1000);
+        
+        const { data: sameArtistCount, error: sameArtistError } = await supabase.rpc('match_1001_same_artist', {
+          threshold: 0.6,
+          year_slop: 1
+        });
+        if (!sameArtistError) {
+          setStatus(`Found ${sameArtistCount || 0} same-artist 1001 matches...`);
+        }
+      } catch (matchError) {
+        console.warn('1001 matching failed:', matchError);
+        // Don't fail the whole import if matching fails
+      }
+      
+      setStatus(`✅ Complete! ${allEnriched.length} new, ${updateOperations.length} updated, ${recordsToRemove.length} removed, 1001 albums matched`);
     } catch (error) {
       setStatus(`❌ Failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
