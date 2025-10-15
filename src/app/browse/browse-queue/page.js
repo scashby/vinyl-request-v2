@@ -47,7 +47,7 @@ function BrowseQueueContent() {
       if (albumIds.length) {
         const res = await supabase
           .from("collection")
-          .select("id, artist, title, image_url, year, format")
+          .select("id, artist, title, image_url, year, format, is_1001")
           .in("id", albumIds);
         albums = res.data || [];
       }
@@ -60,6 +60,7 @@ function BrowseQueueContent() {
           artist: req.artist || "",
           title: req.title || "",
           image_url: "",
+          is_1001: null,
         };
 
         return {
@@ -77,7 +78,8 @@ function BrowseQueueContent() {
             id: album.id,
             image_url: album.image_url,
             year: album.year,
-            format: album.format
+            format: album.format,
+            is_1001: album.is_1001,
           },
         };
       });
@@ -196,14 +198,14 @@ function BrowseQueueContent() {
                   </button>
                 )}
 
-                <a
+                
                   href={`/browse/browse-albums?eventId=${eventId}`}
                   style={{ background: "#059669", color: "#fff", padding: "10px 16px", borderRadius: 8, textDecoration: "none", fontSize: 14, fontWeight: 600 }}
                 >
                   📚 Browse Collection
                 </a>
 
-                <a
+                
                   href={`/events/event-detail/${eventId}`}
                   style={{ background: "#9333ea", color: "#fff", padding: "10px 16px", borderRadius: 8, textDecoration: "none", fontSize: 14, fontWeight: 600 }}
                 >
@@ -224,10 +226,15 @@ function BrowseQueueContent() {
               <colgroup>
                 <col style={{ width: "50px" }} />
                 <col style={{ width: "60px" }} />
+                <col style={{ width: "42px" }} />
                 <col />
                 {queueType === 'side' && <col style={{ width: "60px" }} />}
-                {queueType === 'track' && <col style={{ width: "100px" }} />}
-                {queueType === 'track' && <col style={{ width: "80px" }} />}
+                {queueType === 'track' && (
+                  <>
+                    <col style={{ width: "100px" }} />
+                    <col style={{ width: "80px" }} />
+                  </>
+                )}
                 <col style={{ width: "60px" }} />
                 <col style={{ width: "80px" }} />
               </colgroup>
@@ -235,10 +242,15 @@ function BrowseQueueContent() {
                 <tr>
                   <th>#</th>
                   <th><span className="sr-only">Cover</span></th>
+                  <th style={{ width: 42 }}></th>
                   <th>{queueType === 'track' ? 'Track / Artist' : 'Album / Artist'}</th>
                   {queueType === 'side' && <th>Side</th>}
-                  {queueType === 'track' && <th>Track #</th>}
-                  {queueType === 'track' && <th>Duration</th>}
+                  {queueType === 'track' && (
+                    <>
+                      <th>Track #</th>
+                      <th>Duration</th>
+                    </>
+                  )}
                   <th>👍</th>
                   <th>Votes</th>
                 </tr>
@@ -256,6 +268,28 @@ function BrowseQueueContent() {
                         height={48}
                         unoptimized
                       />
+                    </td>
+                    <td className="queue-badge" style={{ width: 42, textAlign: 'center' }}>
+                      {item.collection?.is_1001 ? (
+                        <span
+                          title="On the 1001 Albums list"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            borderRadius: 999,
+                            padding: '2px 6px',
+                            fontSize: 10,
+                            fontWeight: 700,
+                            lineHeight: 1,
+                            border: '1px solid rgba(0,0,0,0.2)',
+                            background: 'rgba(0,0,0,0.75)',
+                            color: '#fff',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          1001
+                        </span>
+                      ) : null}
                     </td>
                     <td>
                       <div className="queue-title">

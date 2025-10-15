@@ -14,7 +14,7 @@ interface Album {
   title: string;
   image_url?: string;
   format?: string;
-  is_1001?: boolean | null; // ← added
+  is_1001?: boolean | null;
 }
 
 interface RequestEntry {
@@ -86,7 +86,7 @@ export default function QueueSection({ eventId }: QueueSectionProps) {
 
       const { data: albums, error: albumError } = await supabase
         .from("collection")
-        .select("id, artist, title, image_url, format, is_1001") // ← added is_1001
+        .select("id, artist, title, image_url, format, is_1001")
         .in("id", albumIds);
 
       if (albumError || !albums) {
@@ -183,11 +183,21 @@ export default function QueueSection({ eventId }: QueueSectionProps) {
         </div>
       ) : (
         <table className="queue-table">
+          <colgroup>
+            <col style={{ width: "50px" }} />
+            <col style={{ width: "60px" }} />
+            <col style={{ width: "42px" }} />
+            <col />
+            {queueType === 'side' && <col style={{ width: "60px" }} />}
+            {queueType === 'track' && <col style={{ width: "100px" }} />}
+            {queueType === 'track' && <col style={{ width: "80px" }} />}
+            <col style={{ width: "60px" }} />
+            <col style={{ width: "80px" }} />
+          </colgroup>
           <thead>
             <tr>
               <th>#</th>
               <th></th>
-              {/* fixed badge column for stable layout */}
               <th style={{ width: 42 }}></th>
               <th>{queueType === 'track' ? 'Track / Artist' : 'Album / Artist'}</th>
               {queueType === 'side' && <th>Side</th>}
@@ -218,7 +228,6 @@ export default function QueueSection({ eventId }: QueueSectionProps) {
                       unoptimized
                     />
                   </td>
-                  {/* badge cell (always rendered, may be empty) */}
                   <td className="queue-badge" style={{ width: 42, textAlign: 'center' }}>
                     {item.album.is_1001 ? (
                       <span

@@ -254,7 +254,7 @@ export default function Page(): ReactElement {
       return;
     }
     pushToast({ kind: "ok", msg: "Updated" });
-    void load();
+    await load(); // Wait for reload to complete
   };
 
   const unlink = async (matchId: Id) => {
@@ -264,7 +264,7 @@ export default function Page(): ReactElement {
       return;
     }
     pushToast({ kind: "ok", msg: "Unlinked" });
-    void load();
+    await load(); // Wait for reload to complete
   };
 
   const searchCollection = async (albumId: Id, query: string) => {
@@ -327,7 +327,7 @@ export default function Page(): ReactElement {
     setSearchInputs((s) => ({ ...s, [albumId]: "" }));
     setSearchResults((s) => ({ ...s, [albumId]: [] }));
     pushToast({ kind: "ok", msg: "Linked" });
-    void load();
+    await load(); // Wait for reload to complete
   };
 
   const tone = (s: MatchStatus | string): { bg: string; bd: string; fg: string; label: string } => {
@@ -375,8 +375,11 @@ export default function Page(): ReactElement {
       </p>
 
       {/* Controls */}
-      <div
+      <div>
         style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 15,
           display: "flex",
           gap: 12,
           alignItems: "center",
@@ -386,79 +389,8 @@ export default function Page(): ReactElement {
           borderRadius: 8,
           padding: 12,
           marginBottom: 16,
-          boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
+          boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
         }}
-      >
-       <div style={{ display: "flex", gap: 4, background: "#f3f4f6", padding: 4, borderRadius: 8 }}>
-          {[
-            { value: "pending", label: "Pending", color: "#f59e0b" },
-            { value: "unlinked", label: "Unmatched", color: "#ef4444" },
-            { value: "linked", label: "Linked", color: "#3b82f6" },
-            { value: "confirmed", label: "Confirmed", color: "#10b981" },
-            { value: "rejected", label: "Rejected", color: "#6b7280" },
-            { value: "all", label: "All", color: "#374151" },
-          ].map((tab) => {
-            const count = rows.filter((r) => {
-              const ms = matchesBy[r.id] ?? [];
-              if (tab.value === "all") return true;
-              if (tab.value === "unlinked") return ms.length === 0;
-              if (tab.value === "pending") return ms.some((m) => m.review_status === "pending");
-              if (tab.value === "linked") return ms.some((m) => m.review_status === "linked");
-              if (tab.value === "confirmed") return ms.some((m) => m.review_status === "confirmed");
-              if (tab.value === "rejected") return ms.some((m) => m.review_status === "rejected");
-              return false;
-            }).length;
-
-            const isActive = statusFilter === tab.value;
-
-            return (
-              <button
-                key={tab.value}
-                onClick={() => setStatusFilter(tab.value as StatusFilter)}
-                style={{
-                  padding: "8px 16px",
-                  border: "none",
-                  borderRadius: 6,
-                  background: isActive ? tab.color : "transparent",
-                  color: isActive ? "#ffffff" : "#374151",
-                  fontWeight: isActive ? 700 : 600,
-                  fontSize: 14,
-                  cursor: "pointer",
-                  transition: "all 0.2s",
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActive) {
-                    e.currentTarget.style.background = "#e5e7eb";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActive) {
-                    e.currentTarget.style.background = "transparent";
-                  }
-                }}
-              >
-                {tab.label} ({count})
-              </button>
-            );
-          })}
-        </div>
-
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <button onClick={() => void runExact()} disabled={running} style={btn("#2563eb", running)}>
-            Run Exact
-          </button>
-          <button onClick={() => void runFuzzy(0.7, 1)} disabled={running} style={btn("#9333ea", running)}>
-            Run Fuzzy (0.70, ±1y)
-          </button>
-          <button
-            onClick={() => void runSameArtist(0.6, 1)}
-            disabled={running}
-            style={btn("#0ea5e9", running)}
-            title="Exact artist, fuzzy title (good for remasters/editions)"
-          >
-            Same-Artist (0.60, ±1y)
-          </button>
-        </div>        
       </div>
 
       {/* Grid */}
