@@ -604,7 +604,11 @@ export default function Page(): ReactElement {
               const hasPending = matches.some((m) => m.review_status === "pending" || m.review_status === "linked");
               const allConfirmed = matches.length > 0 && matches.every((m) => m.review_status === "confirmed");
               const isExpanded = expandedAlbums[album.id] ?? hasPending;
-
+              
+              // Debug logging for Led Zeppelin I
+              if (album.artist === "Led Zeppelin" && album.album === "Led Zeppelin I") {
+                console.log("Led Zep I - Tab:", statusFilter, "hasPending:", hasPending, "expandedAlbums value:", expandedAlbums[album.id], "isExpanded:", isExpanded);
+              }
               return (
                 <div
                   key={album.id}
