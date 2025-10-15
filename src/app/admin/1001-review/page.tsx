@@ -214,23 +214,6 @@ export default function Page(): ReactElement {
     }
   }, [rows, matchesBy, loading, running, pushToast, runExact]);
 
-  useEffect(() => {
-    if (loading || running) return;
-    
-    // Count unmatched albums
-    const unmatched = rows.filter(r => {
-      const ms = matchesBy[r.id] ?? [];
-      return ms.length === 0;
-    });
-
-    if (unmatched.length > 0 && rows.length > 0) {
-      pushToast({ kind: "info", msg: `Found ${unmatched.length} unmatched albums. Running auto-match...` });
-      setTimeout(() => {
-        void runExact();
-      }, 500);
-    }
-  }, [rows, matchesBy, loading, running, pushToast, runExact]);
-
   const filteredRows = useMemo(() => {
     if (statusFilter === "all") return rows;
     const filtered = rows.filter((r) => {
