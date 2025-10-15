@@ -1,4 +1,4 @@
-// src/app/admin/import-discogs/page.tsx - COMPLETE FILE WITH COMBINED GENRES & STYLES
+// src/app/admin/import-discogs/page.tsx - FIXED: Handles duplicate release_ids correctly
 'use client';
 
 import { useState } from 'react';
@@ -126,6 +126,7 @@ export default function ImportDiscogsPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [showDetails, setShowDetails] = useState<'new' | 'updates' | 'removes' | null>(null);
   const [expandedUpdate, setExpandedUpdate] = useState<number | null>(null);
+  const [deselectedRemovals, setDeselectedRemovals] = useState<Set<number>>(new Set());
 
   const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -269,16 +270,36 @@ export default function ImportDiscogsPage() {
             }
           }
 
-          const allExistingIds = new Set(allExisting.map(r => r.discogs_release_id).filter(id => id));
-          const existingRecordsMap = new Map(allExisting.map(record => [record.discogs_release_id, record]));
-          const csvRecordsMap = new Map(processedRows.map(row => [row.discogs_release_id, row]));
+          // FIXED: Create composite key maps to handle duplicates correctly
+          // Key format: "release_id|folder"
+          const createKey = (releaseId: string, folder: string) => `${releaseId}|${folder}`;
+          
+          const existingRecordsMap = new Map(
+            allExisting.map(record => [
+              createKey(record.discogs_release_id, record.folder || 'Uncategorized'),
+              record
+            ])
+          );
+          
+          const csvRecordsMap = new Map(
+            processedRows.map(row => [
+              createKey(row.discogs_release_id, row.folder),
+              row
+            ])
+          );
 
-          const newRows = processedRows.filter(row => !allExistingIds.has(row.discogs_release_id));
+          // Find NEW records (not in database at all with this release_id + folder combo)
+          const newRows = processedRows.filter(row => {
+            const key = createKey(row.discogs_release_id, row.folder);
+            return !existingRecordsMap.has(key);
+          });
 
           // Find updates with detailed change tracking
           const updateOperations: UpdateOperation[] = [];
           for (const csvRow of processedRows) {
-            const existingRecord = existingRecordsMap.get(csvRow.discogs_release_id);
+            const key = createKey(csvRow.discogs_release_id, csvRow.folder);
+            const existingRecord = existingRecordsMap.get(key);
+            
             if (existingRecord) {
               const changes: string[] = [];
               
@@ -307,8 +328,12 @@ export default function ImportDiscogsPage() {
             }
           }
           
+          // Find records to remove (in database but not in CSV with matching release_id + folder)
           const recordsToRemove: ExistingRecord[] = allExisting.filter(
-            existingRecord => !csvRecordsMap.has(existingRecord.discogs_release_id)
+            existingRecord => {
+              const key = createKey(existingRecord.discogs_release_id, existingRecord.folder || 'Uncategorized');
+              return !csvRecordsMap.has(key);
+            }
           );
 
           setStatus(`Found ${newRows.length} new, ${updateOperations.length} updates, ${recordsToRemove.length} removals`);
@@ -464,11 +489,16 @@ export default function ImportDiscogsPage() {
         setStatus(`Completed ${updateCount}/${updateOperations.length} updates`);
       }
       
-      // Process removals
+      // Process removals (excluding deselected ones)
       if (recordsToRemove.length > 0) {
-        setStatus(`Removing ${recordsToRemove.length} records...`);
-        const idsToDelete = recordsToRemove.map(record => record.id);
-        await supabase.from('collection').delete().in('id', idsToDelete);
+        const actualRemovals = recordsToRemove.filter(r => !deselectedRemovals.has(r.id));
+        if (actualRemovals.length > 0) {
+          setStatus(`Removing ${actualRemovals.length} records...`);
+          const idsToDelete = actualRemovals.map(record => record.id);
+          await supabase.from('collection').delete().in('id', idsToDelete);
+        } else {
+          setStatus('No records to remove (all deselected)');
+        }
       }
       
       // Automatic 1001 album matching
@@ -504,7 +534,8 @@ export default function ImportDiscogsPage() {
         // Don't fail the whole import if matching fails
       }
       
-      setStatus(`✅ Complete! ${allEnriched.length} new, ${updateOperations.length} updated, ${recordsToRemove.length} removed, 1001 albums matched`);
+      const removedCount = recordsToRemove.length - deselectedRemovals.size;
+      setStatus(`✅ Complete! ${allEnriched.length} new, ${updateOperations.length} updated, ${removedCount} removed, 1001 albums matched`);
     } catch (error) {
       setStatus(`❌ Failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
@@ -836,40 +867,59 @@ export default function ImportDiscogsPage() {
               maxHeight: 400,
               overflowY: 'auto'
             }}>
-              <h3 style={{ fontSize: 16, fontWeight: 600, color: '#991b1b', marginBottom: 12 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 600, color: '#991b1b', marginBottom: 8 }}>
                 Albums to Remove (Not in CSV)
               </h3>
+              <p style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>
+                ⚠️ Click any item to exclude it from removal
+              </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {syncPreview.recordsToRemove.map((item, idx) => (
-                  <div key={idx} style={{
-                    padding: 10,
-                    background: 'white',
-                    borderRadius: 6,
-                    fontSize: 13,
-                    border: '1px solid #fecaca'
-                  }}>
-                    <div style={{ fontWeight: 600, color: '#1f2937' }}>
-                      {item.artist} - {item.title}
+                {syncPreview.recordsToRemove.map((item, idx) => {
+                  const isDeselected = deselectedRemovals.has(item.id);
+                  return (
+                    <div 
+                      key={idx} 
+                      onClick={() => {
+                        const newSet = new Set(deselectedRemovals);
+                        if (isDeselected) {
+                          newSet.delete(item.id);
+                        } else {
+                          newSet.add(item.id);
+                        }
+                        setDeselectedRemovals(newSet);
+                      }}
+                      style={{
+                        padding: 10,
+                        background: isDeselected ? '#f3f4f6' : 'white',
+                        borderRadius: 6,
+                        fontSize: 13,
+                        border: isDeselected ? '2px solid #10b981' : '1px solid #fecaca',
+                        cursor: 'pointer',
+                        opacity: isDeselected ? 0.6 : 1,
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      <div style={{ 
+                        fontWeight: 600, 
+                        color: '#1f2937',
+                        textDecoration: isDeselected ? 'line-through' : 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8
+                      }}>
+                        {isDeselected && <span style={{ color: '#10b981', fontSize: 16 }}>✓</span>}
+                        {item.artist} - {item.title}
+                      </div>
+                      <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
+                        ID: {item.id} • Folder: {item.folder}
+                        {isDeselected && <span style={{ color: '#10b981', marginLeft: 8 }}>• Will NOT be removed</span>}
+                      </div>
                     </div>
-                    <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
-                      ID: {item.id} • Folder: {item.folder}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
-          
-          <div style={{
-            padding: 12,
-            background: '#f0f9ff',
-            border: '1px solid #bae6fd',
-            borderRadius: 6,
-            fontSize: 13,
-            color: '#0c4a6e'
-          }}>
-            <strong>📊 What&apos;s New:</strong> This import will automatically combine genres & styles from Discogs into a unified list and calculate decade from release year for all items. Click the cards above to review detailed changes before importing.
-          </div>
         </div>
       )}
     </div>
