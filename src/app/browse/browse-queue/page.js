@@ -199,14 +199,14 @@ function BrowseQueueContent() {
                 )}
 
                 
-                  href={`/browse/browse-albums?eventId=${eventId}`}
+                  <a href={`/browse/browse-albums?eventId=${eventId}`}
                   style={{ background: "#059669", color: "#fff", padding: "10px 16px", borderRadius: 8, textDecoration: "none", fontSize: 14, fontWeight: 600 }}
                 >
                   📚 Browse Collection
                 </a>
 
                 
-                  href={`/events/event-detail/${eventId}`}
+                  <a href={`/events/event-detail/${eventId}`}
                   style={{ background: "#9333ea", color: "#fff", padding: "10px 16px", borderRadius: 8, textDecoration: "none", fontSize: 14, fontWeight: 600 }}
                 >
                   📅 Event Details
