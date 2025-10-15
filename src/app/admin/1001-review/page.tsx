@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Admin: 1001 Review - REDESIGNED
+ * Admin: 1001 Review - COMPACT SPREADSHEET DESIGN
  * Exception-focused interface for matching collection albums to 1001 list
  */
 
@@ -228,7 +228,16 @@ export default function Page(): ReactElement {
       return true;
     });
 
-    // Sort: pending first, then unmatched, then confirmed last
+    // For "All Albums" tab, sort alphabetically by artist
+    if (statusFilter === "all") {
+      return filtered.sort((a, b) => {
+        const artistA = (a.artist || "").toLowerCase();
+        const artistB = (b.artist || "").toLowerCase();
+        return artistA.localeCompare(artistB);
+      });
+    }
+
+    // For other tabs, sort: pending first, then unmatched, then confirmed last
     return filtered.sort((a, b) => {
       const aMatches = matchesBy[a.id] ?? [];
       const bMatches = matchesBy[b.id] ?? [];
@@ -364,7 +373,7 @@ export default function Page(): ReactElement {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f3f4f6", padding: "32px 24px" }}>
+    <div style={{ minHeight: "100vh", background: "#f9fafb", padding: "24px 16px" }}>
       {/* Toast Notifications */}
       <div
         style={{
@@ -397,15 +406,14 @@ export default function Page(): ReactElement {
         ))}
       </div>
 
-      <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+      <div style={{ maxWidth: 1400, margin: "0 auto" }}>
         {/* Header */}
-        <div style={{ marginBottom: 32 }}>
-          <h1 style={{ fontSize: 36, fontWeight: 900, color: "#111827", marginBottom: 12, letterSpacing: "-0.02em" }}>
+        <div style={{ marginBottom: 24 }}>
+          <h1 style={{ fontSize: 32, fontWeight: 900, color: "#111827", marginBottom: 8, letterSpacing: "-0.02em" }}>
             1001 Albums Review
           </h1>
-          <p style={{ fontSize: 17, color: "#6b7280", lineHeight: 1.6, maxWidth: 800 }}>
+          <p style={{ fontSize: 15, color: "#6b7280", lineHeight: 1.5 }}>
             Match albums from your collection to the <strong>1001 Albums You Must Hear Before You Die</strong> list.
-            Auto-matching runs on page load. Manually link exceptions below.
           </p>
         </div>
 
@@ -416,15 +424,15 @@ export default function Page(): ReactElement {
             top: 0,
             zIndex: 20,
             background: "#ffffff",
-            borderRadius: 12,
-            padding: 20,
-            marginBottom: 24,
-            boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06)",
+            borderRadius: 8,
+            padding: 16,
+            marginBottom: 16,
+            boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
             border: "1px solid #e5e7eb",
           }}
         >
           {/* Filter Tabs */}
-          <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
             {[
               { value: "unmatched", label: "Need Attention", count: counts.unmatched, color: "#ef4444", bg: "#fef2f2" },
               { value: "pending", label: "Pending Review", count: counts.pending, color: "#f59e0b", bg: "#fffbeb" },
@@ -438,20 +446,20 @@ export default function Page(): ReactElement {
                   onClick={() => setStatusFilter(tab.value as StatusFilter)}
                   style={{
                     flex: "1 1 auto",
-                    minWidth: 140,
-                    padding: "12px 20px",
+                    minWidth: 120,
+                    padding: "10px 16px",
                     border: isActive ? `2px solid ${tab.color}` : "2px solid #e5e7eb",
-                    borderRadius: 10,
+                    borderRadius: 8,
                     background: isActive ? tab.bg : "#ffffff",
                     color: isActive ? tab.color : "#6b7280",
                     fontWeight: 700,
-                    fontSize: 14,
+                    fontSize: 13,
                     cursor: "pointer",
                     transition: "all 0.2s",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    gap: 8,
+                    gap: 6,
                   }}
                 >
                   <span>{tab.label}</span>
@@ -461,7 +469,7 @@ export default function Page(): ReactElement {
                       color: "#ffffff",
                       borderRadius: 999,
                       padding: "2px 8px",
-                      fontSize: 12,
+                      fontSize: 11,
                       fontWeight: 800,
                     }}
                   >
@@ -473,18 +481,18 @@ export default function Page(): ReactElement {
           </div>
 
           {/* Batch Actions */}
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button
               onClick={() => void runExact()}
               disabled={running}
               style={{
-                padding: "10px 18px",
+                padding: "8px 14px",
                 background: running ? "#9ca3af" : "#3b82f6",
                 color: "#ffffff",
                 border: "none",
-                borderRadius: 8,
+                borderRadius: 6,
                 fontWeight: 700,
-                fontSize: 14,
+                fontSize: 13,
                 cursor: running ? "not-allowed" : "pointer",
                 opacity: running ? 0.6 : 1,
               }}
@@ -495,13 +503,13 @@ export default function Page(): ReactElement {
               onClick={() => void runFuzzy(0.7, 1)}
               disabled={running}
               style={{
-                padding: "10px 18px",
+                padding: "8px 14px",
                 background: running ? "#9ca3af" : "#8b5cf6",
                 color: "#ffffff",
                 border: "none",
-                borderRadius: 8,
+                borderRadius: 6,
                 fontWeight: 700,
-                fontSize: 14,
+                fontSize: 13,
                 cursor: running ? "not-allowed" : "pointer",
                 opacity: running ? 0.6 : 1,
               }}
@@ -512,13 +520,13 @@ export default function Page(): ReactElement {
               onClick={() => void runSameArtist(0.6, 1)}
               disabled={running}
               style={{
-                padding: "10px 18px",
+                padding: "8px 14px",
                 background: running ? "#9ca3af" : "#06b6d4",
                 color: "#ffffff",
                 border: "none",
-                borderRadius: 8,
+                borderRadius: 6,
                 fontWeight: 700,
-                fontSize: 14,
+                fontSize: 13,
                 cursor: running ? "not-allowed" : "pointer",
                 opacity: running ? 0.6 : 1,
               }}
@@ -529,16 +537,44 @@ export default function Page(): ReactElement {
           </div>
         </div>
 
-        {/* Albums List */}
+        {/* Table Header */}
+        {!loading && filteredRows.length > 0 && (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "50px 1fr 1fr 70px 120px 100px 150px",
+              gap: 12,
+              padding: "12px 16px",
+              background: "#f9fafb",
+              borderRadius: 8,
+              marginBottom: 8,
+              fontSize: 12,
+              fontWeight: 700,
+              color: "#6b7280",
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+            }}
+          >
+            <div></div>
+            <div>Artist</div>
+            <div>Album</div>
+            <div>Year</div>
+            <div>Status</div>
+            <div>Matches</div>
+            <div>Actions</div>
+          </div>
+        )}
+
+        {/* Albums List - Compact Table */}
         {loading ? (
           <div
             style={{
               background: "#ffffff",
-              borderRadius: 12,
-              padding: 60,
+              borderRadius: 8,
+              padding: 40,
               textAlign: "center",
               color: "#6b7280",
-              fontSize: 16,
+              fontSize: 15,
             }}
           >
             Loading albums...
@@ -547,21 +583,21 @@ export default function Page(): ReactElement {
           <div
             style={{
               background: "#ffffff",
-              borderRadius: 12,
-              padding: 60,
+              borderRadius: 8,
+              padding: 40,
               textAlign: "center",
             }}
           >
-            <div style={{ fontSize: 48, marginBottom: 16 }}>🎉</div>
-            <div style={{ fontSize: 20, fontWeight: 700, color: "#111827", marginBottom: 8 }}>All done!</div>
-            <div style={{ color: "#6b7280", fontSize: 15 }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>🎉</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: "#111827", marginBottom: 6 }}>All done!</div>
+            <div style={{ color: "#6b7280", fontSize: 14 }}>
               {statusFilter === "unmatched"
                 ? "No unmatched albums. Switch to another tab to see matched albums."
                 : "No albums in this category."}
             </div>
           </div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
             {filteredRows.map((album) => {
               const matches = matchesBy[album.id] ?? [];
               const isUnmatched = matches.length === 0;
@@ -577,418 +613,439 @@ export default function Page(): ReactElement {
                   }}
                   style={{
                     background: "#ffffff",
-                    borderRadius: 12,
-                    padding: 24,
                     border: isUnmatched
                       ? "2px solid #fca5a5"
                       : hasPending
                       ? "2px solid #fbbf24"
-                      : "2px solid #e5e7eb",
-                    boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                      : "1px solid #e5e7eb",
+                    borderRadius: 8,
+                    overflow: "hidden",
                   }}
                 >
-                  {/* Album Header */}
-                  <div style={{ display: "flex", gap: 20, marginBottom: isUnmatched || !allConfirmed ? 20 : 0 }}>
-                    {/* 1001 Badge */}
+                  {/* Main Row */}
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "50px 1fr 1fr 70px 120px 100px 150px",
+                      gap: 12,
+                      padding: "12px 16px",
+                      alignItems: "center",
+                      cursor: matches.length > 0 || isUnmatched ? "pointer" : "default",
+                    }}
+                    onClick={() => {
+                      if (matches.length > 0 || isUnmatched) toggleExpanded(album.id);
+                    }}
+                  >
+                    {/* Badge */}
                     <div
                       style={{
-                        width: 80,
-                        height: 80,
+                        width: 40,
+                        height: 40,
                         background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                        borderRadius: 10,
+                        borderRadius: 6,
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
                         flexShrink: 0,
-                        boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
                       }}
                     >
                       <div style={{ textAlign: "center", color: "#ffffff" }}>
-                        <div style={{ fontSize: 24, fontWeight: 900, lineHeight: 1 }}>1001</div>
-                        <div style={{ fontSize: 10, fontWeight: 600, marginTop: 2 }}>ALBUMS</div>
+                        <div style={{ fontSize: 11, fontWeight: 900, lineHeight: 1 }}>1001</div>
                       </div>
                     </div>
 
-                    {/* Album Info */}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
-                        <h3
+                    {/* Artist */}
+                    <div
+                      style={{
+                        fontWeight: 700,
+                        fontSize: 14,
+                        color: "#111827",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {album.artist}
+                    </div>
+
+                    {/* Album */}
+                    <div
+                      style={{
+                        fontSize: 14,
+                        color: "#374151",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {album.album}
+                    </div>
+
+                    {/* Year */}
+                    <div style={{ fontSize: 13, color: "#6b7280" }}>{album.year ?? "—"}</div>
+
+                    {/* Status */}
+                    <div>
+                      {isUnmatched && (
+                        <span
                           style={{
-                            fontSize: 20,
-                            fontWeight: 800,
-                            color: "#111827",
-                            margin: 0,
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
+                            background: "#fee2e2",
+                            color: "#991b1b",
+                            padding: "3px 8px",
+                            borderRadius: 4,
+                            fontSize: 11,
+                            fontWeight: 700,
+                            textTransform: "uppercase",
                           }}
                         >
-                          {album.artist}
-                        </h3>
-                        {isUnmatched && (
-                          <span
-                            style={{
-                              background: "#fee2e2",
-                              color: "#991b1b",
-                              padding: "4px 10px",
-                              borderRadius: 6,
-                              fontSize: 11,
-                              fontWeight: 700,
-                              textTransform: "uppercase",
-                              letterSpacing: "0.05em",
-                            }}
-                          >
-                            Unmatched
-                          </span>
-                        )}
-                        {hasPending && (
-                          <span
-                            style={{
-                              background: "#fef3c7",
-                              color: "#92400e",
-                              padding: "4px 10px",
-                              borderRadius: 6,
-                              fontSize: 11,
-                              fontWeight: 700,
-                              textTransform: "uppercase",
-                              letterSpacing: "0.05em",
-                            }}
-                          >
-                            Needs Review
-                          </span>
-                        )}
-                        {allConfirmed && matches.length > 1 && (
-                          <span
-                            style={{
-                              background: "#d1fae5",
-                              color: "#065f46",
-                              padding: "4px 10px",
-                              borderRadius: 6,
-                              fontSize: 11,
-                              fontWeight: 700,
-                            }}
-                          >
-                            {matches.length} pressings
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ fontSize: 17, fontWeight: 600, color: "#374151", marginBottom: 4 }}>
-                        {album.album}
-                      </div>
-                      <div style={{ fontSize: 14, color: "#9ca3af" }}>{album.year ?? "Year unknown"}</div>
+                          Unmatched
+                        </span>
+                      )}
+                      {hasPending && (
+                        <span
+                          style={{
+                            background: "#fef3c7",
+                            color: "#92400e",
+                            padding: "3px 8px",
+                            borderRadius: 4,
+                            fontSize: 11,
+                            fontWeight: 700,
+                            textTransform: "uppercase",
+                          }}
+                        >
+                          Pending
+                        </span>
+                      )}
+                      {allConfirmed && (
+                        <span
+                          style={{
+                            background: "#d1fae5",
+                            color: "#065f46",
+                            padding: "3px 8px",
+                            borderRadius: 4,
+                            fontSize: 11,
+                            fontWeight: 700,
+                          }}
+                        >
+                          Confirmed
+                        </span>
+                      )}
                     </div>
 
-                    {/* Expand/Collapse for confirmed albums */}
-                    {allConfirmed && (
-                      <button
-                        onClick={() => toggleExpanded(album.id)}
-                        style={{
-                          background: "transparent",
-                          border: "2px solid #e5e7eb",
-                          borderRadius: 8,
-                          padding: "8px 16px",
-                          fontSize: 14,
-                          fontWeight: 700,
-                          color: "#6b7280",
-                          cursor: "pointer",
-                          alignSelf: "flex-start",
-                        }}
-                      >
-                        {isExpanded ? "Collapse" : `Show ${matches.length} match${matches.length > 1 ? "es" : ""}`}
-                      </button>
-                    )}
+                    {/* Matches Count */}
+                    <div style={{ fontSize: 13, color: "#6b7280", fontWeight: 600 }}>
+                      {matches.length > 0 ? `${matches.length} pressing${matches.length > 1 ? "s" : ""}` : "—"}
+                    </div>
+
+                    {/* Expand/Collapse */}
+                    <div style={{ fontSize: 12, color: "#3b82f6", fontWeight: 600 }}>
+                      {(matches.length > 0 || isUnmatched) && (isExpanded ? "▼ Collapse" : "▶ Expand")}
+                    </div>
                   </div>
 
-                  {/* Search Box (for unmatched or expanded confirmed) */}
-                  {(isUnmatched || (allConfirmed && isExpanded)) && (
-                    <div style={{ marginBottom: matches.length > 0 ? 20 : 0 }}>
-                      <label style={{ display: "block", fontSize: 13, fontWeight: 700, color: "#374151", marginBottom: 8 }}>
-                        Search your collection to link:
-                      </label>
-                      <div style={{ position: "relative" }}>
-                        <input
-                          value={searchInputs[album.id] ?? ""}
-                          onChange={(e) => handleSearchInput(album.id, e.target.value)}
-                          placeholder={`Try "${album.artist}" or "${album.album}"`}
-                          style={{
-                            width: "100%",
-                            padding: "12px 16px",
-                            border: "2px solid #d1d5db",
-                            borderRadius: 8,
-                            fontSize: 15,
-                            outline: "none",
-                            transition: "border-color 0.2s",
-                            color: "#111827",
-                            backgroundColor: "#ffffff",
-                          }}
-                          onFocus={(e) => {
-                            e.currentTarget.style.borderColor = "#3b82f6";
-                          }}
-                          onBlur={(e) => {
-                            e.currentTarget.style.borderColor = "#d1d5db";
-                          }}
-                        />
-                        {searchLoading[album.id] && (
-                          <div
-                            style={{
-                              position: "absolute",
-                              top: "100%",
-                              left: 0,
-                              right: 0,
-                              marginTop: 8,
-                              padding: 12,
-                              background: "#f9fafb",
-                              border: "2px solid #e5e7eb",
-                              borderRadius: 8,
-                              color: "#6b7280",
-                              fontSize: 14,
-                            }}
+                  {/* Expanded Details */}
+                  {isExpanded && (
+                    <div
+                      style={{
+                        padding: "16px",
+                        background: "#f9fafb",
+                        borderTop: "1px solid #e5e7eb",
+                      }}
+                    >
+                      {/* Search Box */}
+                      {(isUnmatched || allConfirmed) && (
+                        <div style={{ marginBottom: matches.length > 0 ? 16 : 0 }}>
+                          <label
+                            style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 6 }}
                           >
-                            Searching...
-                          </div>
-                        )}
-                        {searchResults[album.id] && searchResults[album.id].length > 0 && (
-                          <div
-                            style={{
-                              position: "absolute",
-                              top: "100%",
-                              left: 0,
-                              right: 0,
-                              marginTop: 8,
-                              background: "#ffffff",
-                              border: "2px solid #e5e7eb",
-                              borderRadius: 8,
-                              boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)",
-                              maxHeight: 400,
-                              overflowY: "auto",
-                              zIndex: 10,
-                            }}
-                          >
-                            {searchResults[album.id].map((result) => (
+                            Search your collection to link:
+                          </label>
+                          <div style={{ position: "relative" }}>
+                            <input
+                              value={searchInputs[album.id] ?? ""}
+                              onChange={(e) => handleSearchInput(album.id, e.target.value)}
+                              placeholder={`Try "${album.artist}" or "${album.album}"`}
+                              style={{
+                                width: "100%",
+                                padding: "10px 12px",
+                                border: "2px solid #d1d5db",
+                                borderRadius: 6,
+                                fontSize: 14,
+                                outline: "none",
+                                transition: "border-color 0.2s",
+                                color: "#111827",
+                                backgroundColor: "#ffffff",
+                              }}
+                              onFocus={(e) => {
+                                e.currentTarget.style.borderColor = "#3b82f6";
+                              }}
+                              onBlur={(e) => {
+                                e.currentTarget.style.borderColor = "#d1d5db";
+                              }}
+                            />
+                            {searchLoading[album.id] && (
                               <div
-                                key={result.id}
-                                onClick={() => void linkFromSearch(album.id, result.id)}
+                                style={{
+                                  position: "absolute",
+                                  top: "100%",
+                                  left: 0,
+                                  right: 0,
+                                  marginTop: 6,
+                                  padding: 10,
+                                  background: "#f9fafb",
+                                  border: "2px solid #e5e7eb",
+                                  borderRadius: 6,
+                                  color: "#6b7280",
+                                  fontSize: 13,
+                                }}
+                              >
+                                Searching...
+                              </div>
+                            )}
+                            {searchResults[album.id] && searchResults[album.id].length > 0 && (
+                              <div
+                                style={{
+                                  position: "absolute",
+                                  top: "100%",
+                                  left: 0,
+                                  right: 0,
+                                  marginTop: 6,
+                                  background: "#ffffff",
+                                  border: "2px solid #e5e7eb",
+                                  borderRadius: 6,
+                                  boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)",
+                                  maxHeight: 300,
+                                  overflowY: "auto",
+                                  zIndex: 10,
+                                }}
+                              >
+                                {searchResults[album.id].map((result) => (
+                                  <div
+                                    key={result.id}
+                                    onClick={() => void linkFromSearch(album.id, result.id)}
+                                    style={{
+                                      display: "flex",
+                                      gap: 10,
+                                      padding: 10,
+                                      cursor: "pointer",
+                                      borderBottom: "1px solid #f3f4f6",
+                                      transition: "background 0.2s",
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      e.currentTarget.style.background = "#f9fafb";
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      e.currentTarget.style.background = "#ffffff";
+                                    }}
+                                  >
+                                    <Image
+                                      src={
+                                        result.image_url && result.image_url.trim().toLowerCase() !== "no"
+                                          ? result.image_url
+                                          : "/images/coverplaceholder.png"
+                                      }
+                                      alt={result.title || "cover"}
+                                      width={40}
+                                      height={40}
+                                      unoptimized
+                                      style={{ borderRadius: 4, objectFit: "cover", flexShrink: 0 }}
+                                    />
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                      <div
+                                        style={{
+                                          fontWeight: 700,
+                                          fontSize: 13,
+                                          color: "#111827",
+                                          overflow: "hidden",
+                                          textOverflow: "ellipsis",
+                                          whiteSpace: "nowrap",
+                                        }}
+                                      >
+                                        {result.artist || "Unknown Artist"}
+                                      </div>
+                                      <div
+                                        style={{
+                                          fontSize: 12,
+                                          color: "#6b7280",
+                                          overflow: "hidden",
+                                          textOverflow: "ellipsis",
+                                          whiteSpace: "nowrap",
+                                        }}
+                                      >
+                                        {result.title || "Unknown Title"}
+                                      </div>
+                                      <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>
+                                        {result.year || "—"} • {result.format || "—"}
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {searchInputs[album.id] &&
+                              searchResults[album.id] &&
+                              searchResults[album.id].length === 0 &&
+                              !searchLoading[album.id] && (
+                                <div
+                                  style={{
+                                    position: "absolute",
+                                    top: "100%",
+                                    left: 0,
+                                    right: 0,
+                                    marginTop: 6,
+                                    padding: 10,
+                                    background: "#fef2f2",
+                                    border: "2px solid #fecaca",
+                                    borderRadius: 6,
+                                    color: "#991b1b",
+                                    fontSize: 13,
+                                  }}
+                                >
+                                  No matches found. Try different search terms.
+                                </div>
+                              )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Matched Albums */}
+                      {matches.length > 0 && (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                          {matches.map((match) => {
+                            const collection = collectionsBy[match.collection_id];
+                            const isConfirmed = match.review_status === "confirmed";
+                            return (
+                              <div
+                                key={match.id}
                                 style={{
                                   display: "flex",
                                   gap: 12,
                                   padding: 12,
-                                  cursor: "pointer",
-                                  borderBottom: "1px solid #f3f4f6",
-                                  transition: "background 0.2s",
-                                }}
-                                onMouseEnter={(e) => {
-                                  e.currentTarget.style.background = "#f9fafb";
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.currentTarget.style.background = "#ffffff";
+                                  background: isConfirmed ? "#f0fdf4" : "#fffbeb",
+                                  border: `2px solid ${isConfirmed ? "#86efac" : "#fde68a"}`,
+                                  borderRadius: 6,
+                                  alignItems: "center",
                                 }}
                               >
                                 <Image
                                   src={
-                                    result.image_url && result.image_url.trim().toLowerCase() !== "no"
-                                      ? result.image_url
+                                    collection?.image_url && collection.image_url.trim().toLowerCase() !== "no"
+                                      ? collection.image_url
                                       : "/images/coverplaceholder.png"
                                   }
-                                  alt={result.title || "cover"}
+                                  alt={collection?.title || "cover"}
                                   width={50}
                                   height={50}
                                   unoptimized
                                   style={{ borderRadius: 6, objectFit: "cover", flexShrink: 0 }}
                                 />
                                 <div style={{ flex: 1, minWidth: 0 }}>
-                                  <div
-                                    style={{
-                                      fontWeight: 700,
-                                      fontSize: 14,
-                                      color: "#111827",
-                                      overflow: "hidden",
-                                      textOverflow: "ellipsis",
-                                      whiteSpace: "nowrap",
-                                    }}
-                                  >
-                                    {result.artist || "Unknown Artist"}
+                                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
+                                    <div
+                                      style={{
+                                        fontWeight: 700,
+                                        fontSize: 14,
+                                        color: "#111827",
+                                        overflow: "hidden",
+                                        textOverflow: "ellipsis",
+                                        whiteSpace: "nowrap",
+                                      }}
+                                    >
+                                      {collection?.artist || "Unknown"} — {collection?.title || "Unknown"}
+                                    </div>
+                                    <span
+                                      style={{
+                                        background: isConfirmed ? "#10b981" : "#f59e0b",
+                                        color: "#ffffff",
+                                        padding: "2px 6px",
+                                        borderRadius: 4,
+                                        fontSize: 10,
+                                        fontWeight: 700,
+                                        textTransform: "uppercase",
+                                      }}
+                                    >
+                                      {isConfirmed ? "Confirmed" : "Pending"}
+                                    </span>
+                                    {typeof match.confidence === "number" && (
+                                      <span
+                                        style={{
+                                          background: "#eef2ff",
+                                          color: "#4f46e5",
+                                          padding: "2px 6px",
+                                          borderRadius: 4,
+                                          fontSize: 10,
+                                          fontWeight: 700,
+                                        }}
+                                      >
+                                        {(match.confidence * 100).toFixed(0)}%
+                                      </span>
+                                    )}
                                   </div>
-                                  <div
+                                  <div style={{ fontSize: 12, color: "#6b7280" }}>
+                                    {collection?.year || "—"} • {collection?.format || "—"}
+                                  </div>
+                                  {match.notes && (
+                                    <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2, fontStyle: "italic" }}>
+                                      {match.notes}
+                                    </div>
+                                  )}
+                                </div>
+                                {!isConfirmed && (
+                                  <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                                    <button
+                                      onClick={() => void updateStatus(match.id, album.id, "confirmed")}
+                                      style={{
+                                        padding: "6px 12px",
+                                        background: "#10b981",
+                                        color: "#ffffff",
+                                        border: "none",
+                                        borderRadius: 6,
+                                        fontSize: 12,
+                                        fontWeight: 700,
+                                        cursor: "pointer",
+                                      }}
+                                    >
+                                      ✓ Confirm
+                                    </button>
+                                    <button
+                                      onClick={() => void deleteMatch(match.id, album.id)}
+                                      style={{
+                                        padding: "6px 12px",
+                                        background: "#ef4444",
+                                        color: "#ffffff",
+                                        border: "none",
+                                        borderRadius: 6,
+                                        fontSize: 12,
+                                        fontWeight: 700,
+                                        cursor: "pointer",
+                                      }}
+                                    >
+                                      ✕ Remove
+                                    </button>
+                                  </div>
+                                )}
+                                {isConfirmed && (
+                                  <button
+                                    onClick={() => void deleteMatch(match.id, album.id)}
                                     style={{
-                                      fontSize: 13,
+                                      padding: "6px 12px",
+                                      background: "#ffffff",
                                       color: "#6b7280",
-                                      overflow: "hidden",
-                                      textOverflow: "ellipsis",
-                                      whiteSpace: "nowrap",
-                                    }}
-                                  >
-                                    {result.title || "Unknown Title"}
-                                  </div>
-                                  <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 2 }}>
-                                    {result.year || "—"} • {result.format || "—"}
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        {searchInputs[album.id] &&
-                          searchResults[album.id] &&
-                          searchResults[album.id].length === 0 &&
-                          !searchLoading[album.id] && (
-                            <div
-                              style={{
-                                position: "absolute",
-                                top: "100%",
-                                left: 0,
-                                right: 0,
-                                marginTop: 8,
-                                padding: 12,
-                                background: "#fef2f2",
-                                border: "2px solid #fecaca",
-                                borderRadius: 8,
-                                color: "#991b1b",
-                                fontSize: 14,
-                              }}
-                            >
-                              No matches found. Try different search terms.
-                            </div>
-                          )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Matched Albums */}
-                  {matches.length > 0 && (!allConfirmed || isExpanded) && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                      {matches.map((match) => {
-                        const collection = collectionsBy[match.collection_id];
-                        const isConfirmed = match.review_status === "confirmed";
-                        return (
-                          <div
-                            key={match.id}
-                            style={{
-                              display: "flex",
-                              gap: 16,
-                              padding: 16,
-                              background: isConfirmed ? "#f0fdf4" : "#fffbeb",
-                              border: `2px solid ${isConfirmed ? "#86efac" : "#fde68a"}`,
-                              borderRadius: 10,
-                              alignItems: "center",
-                            }}
-                          >
-                            <Image
-                              src={
-                                collection?.image_url && collection.image_url.trim().toLowerCase() !== "no"
-                                  ? collection.image_url
-                                  : "/images/coverplaceholder.png"
-                              }
-                              alt={collection?.title || "cover"}
-                              width={70}
-                              height={70}
-                              unoptimized
-                              style={{ borderRadius: 8, objectFit: "cover", flexShrink: 0 }}
-                            />
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
-                                <div
-                                  style={{
-                                    fontWeight: 700,
-                                    fontSize: 16,
-                                    color: "#111827",
-                                    overflow: "hidden",
-                                    textOverflow: "ellipsis",
-                                    whiteSpace: "nowrap",
-                                  }}
-                                >
-                                  {collection?.artist || "Unknown"} — {collection?.title || "Unknown"}
-                                </div>
-                                <span
-                                  style={{
-                                    background: isConfirmed ? "#10b981" : "#f59e0b",
-                                    color: "#ffffff",
-                                    padding: "3px 8px",
-                                    borderRadius: 6,
-                                    fontSize: 11,
-                                    fontWeight: 700,
-                                    textTransform: "uppercase",
-                                  }}
-                                >
-                                  {isConfirmed ? "Confirmed" : "Pending"}
-                                </span>
-                                {typeof match.confidence === "number" && (
-                                  <span
-                                    style={{
-                                      background: "#eef2ff",
-                                      color: "#4f46e5",
-                                      padding: "3px 8px",
+                                      border: "2px solid #d1d5db",
                                       borderRadius: 6,
-                                      fontSize: 11,
+                                      fontSize: 12,
                                       fontWeight: 700,
+                                      cursor: "pointer",
                                     }}
                                   >
-                                    {(match.confidence * 100).toFixed(0)}% match
-                                  </span>
+                                    Unlink
+                                  </button>
                                 )}
                               </div>
-                              <div style={{ fontSize: 13, color: "#6b7280" }}>
-                                {collection?.year || "—"} • {collection?.format || "—"}
-                              </div>
-                              {match.notes && (
-                                <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 4, fontStyle: "italic" }}>
-                                  {match.notes}
-                                </div>
-                              )}
-                            </div>
-                            {!isConfirmed && (
-                              <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-                                <button
-                                  onClick={() => void updateStatus(match.id, album.id, "confirmed")}
-                                  style={{
-                                    padding: "8px 16px",
-                                    background: "#10b981",
-                                    color: "#ffffff",
-                                    border: "none",
-                                    borderRadius: 8,
-                                    fontSize: 13,
-                                    fontWeight: 700,
-                                    cursor: "pointer",
-                                  }}
-                                >
-                                  ✓ Confirm
-                                </button>
-                                <button
-                                  onClick={() => void deleteMatch(match.id, album.id)}
-                                  style={{
-                                    padding: "8px 16px",
-                                    background: "#ef4444",
-                                    color: "#ffffff",
-                                    border: "none",
-                                    borderRadius: 8,
-                                    fontSize: 13,
-                                    fontWeight: 700,
-                                    cursor: "pointer",
-                                  }}
-                                >
-                                  ✕ Remove
-                                </button>
-                              </div>
-                            )}
-                            {isConfirmed && (
-                              <button
-                                onClick={() => void deleteMatch(match.id, album.id)}
-                                style={{
-                                  padding: "8px 16px",
-                                  background: "#ffffff",
-                                  color: "#6b7280",
-                                  border: "2px solid #d1d5db",
-                                  borderRadius: 8,
-                                  fontSize: 13,
-                                  fontWeight: 700,
-                                  cursor: "pointer",
-                                }}
-                              >
-                                Unlink
-                              </button>
-                            )}
-                          </div>
-                        );
-                      })}
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
