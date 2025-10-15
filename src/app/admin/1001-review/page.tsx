@@ -607,7 +607,7 @@ export default function Page(): ReactElement {
               
               // Debug logging for Led Zeppelin I
               if (album.artist === "Led Zeppelin" && album.album === "Led Zeppelin I") {
-                console.log("Led Zep I - Tab:", statusFilter, "hasPending:", hasPending, "expandedAlbums value:", expandedAlbums[album.id], "isExpanded:", isExpanded);
+                console.log("Led Zep I - Tab:", statusFilter, "matches:", matches, "hasPending:", hasPending, "expandedAlbums value:", expandedAlbums[album.id], "isExpanded:", isExpanded);
               }
               return (
                 <div
