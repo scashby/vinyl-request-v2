@@ -2,19 +2,18 @@
 
 /**
  * Admin: 1001 Review
- * - Lists 1001 albums (paginated)
+ * - Lists ALL 1001 albums (no pagination)
  * - Shows 0..n matched collection rows per 1001 album
- * - Actions: Confirm / Reject / Unlink / Link by Collection ID
+ * - Actions: Confirm / Reject & Remove / Unlink
  * - Buttons: Run Exact, Run Fuzzy (0.70 ±1y), Same-Artist (0.60 ±1y)
  * - Auto-refreshes after actions
  * - ESLint clean: no 'any', no unused, no console
  */
 
 import type { ReactElement, CSSProperties } from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import Image from "next/image";
 import { supabase } from "src/lib/supabaseClient";
-import { useRef } from "react";
 
 type Id = number;
 
@@ -73,7 +72,7 @@ export default function Page(): ReactElement {
   const load = useCallback(async () => {
     setLoading(true);
 
-    // 1) Fetch page of 1001 rows
+    // Fetch ALL 1001 albums
     const { data: a1001, error: e1 } = await supabase
       .from("one_thousand_one_albums")
       .select("id, artist, album, year, artist_norm, album_norm")
@@ -91,7 +90,7 @@ export default function Page(): ReactElement {
 
     setRows(a1001);
 
-    // 2) Fetch matches for those 1001 ids
+    // Fetch matches for those 1001 ids
     const aIds = a1001.map((r) => r.id);
     if (aIds.length === 0) {
       setMatchesBy({});
@@ -122,7 +121,7 @@ export default function Page(): ReactElement {
     }
     setMatchesBy(by);
 
-    // 3) Fetch collection rows referenced by matches
+    // Fetch collection rows referenced by matches
     let cmap: Record<Id, CollectionRow> = {};
     if (cids.size > 0) {
       const { data: crows, error: e3 } = await supabase
@@ -157,7 +156,7 @@ export default function Page(): ReactElement {
     }
     const n = Number.isFinite(Number(data)) ? Number(data) : 0;
     pushToast({ kind: "ok", msg: `Exact added ${n} link(s)` });
-    void load();
+    await load();
   }, [pushToast, load]);
 
   const runFuzzy = useCallback(async (threshold = 0.7, yearSlop = 1) => {
@@ -173,7 +172,7 @@ export default function Page(): ReactElement {
     }
     const n = Number.isFinite(Number(data)) ? Number(data) : 0;
     pushToast({ kind: "ok", msg: `Fuzzy added ${n} candidate(s)` });
-    void load();
+    await load();
   }, [pushToast, load]);
 
   const runSameArtist = useCallback(async (threshold = 0.6, yearSlop = 1) => {
@@ -189,12 +188,12 @@ export default function Page(): ReactElement {
     }
     const n = Number.isFinite(Number(data)) ? Number(data) : 0;
     pushToast({ kind: "ok", msg: `Same-artist added ${n} candidate(s)` });
-    void load();
+    await load();
   }, [pushToast, load]);
 
   // Auto-match only once when page first opens
   useEffect(() => {
-    if (hasAutoMatchedSession) return; // Already ran this session
+    if (hasAutoMatchedSession) return;
     if (loading || running || rows.length === 0) return;
     
     const unmatched = rows.filter(r => {
@@ -203,7 +202,7 @@ export default function Page(): ReactElement {
     });
 
     if (unmatched.length > 0) {
-      setHasAutoMatchedSession(true); // Mark as run
+      setHasAutoMatchedSession(true);
       pushToast({ kind: "info", msg: `Found ${unmatched.length} unmatched albums. Running database-wide auto-match...` });
       setTimeout(() => {
         void runExact();
@@ -254,7 +253,7 @@ export default function Page(): ReactElement {
       return;
     }
     pushToast({ kind: "ok", msg: "Updated" });
-    await load(); // Wait for reload to complete
+    await load();
   };
 
   const unlink = async (matchId: Id) => {
@@ -263,8 +262,8 @@ export default function Page(): ReactElement {
       pushToast({ kind: "err", msg: `Unlink failed: ${error.message}` });
       return;
     }
-    pushToast({ kind: "ok", msg: "Unlinked" });
-    await load(); // Wait for reload to complete
+    pushToast({ kind: "ok", msg: "Removed" });
+    await load();
   };
 
   const searchCollection = async (albumId: Id, query: string) => {
@@ -295,12 +294,10 @@ export default function Page(): ReactElement {
   const handleSearchInput = (albumId: Id, value: string) => {
     setSearchInputs((s) => ({ ...s, [albumId]: value }));
 
-    // Clear previous timeout
     if (searchTimeouts.current[albumId]) {
       clearTimeout(searchTimeouts.current[albumId]);
     }
 
-    // Debounce search
     searchTimeouts.current[albumId] = setTimeout(() => {
       void searchCollection(albumId, value);
     }, 300);
@@ -313,7 +310,7 @@ export default function Page(): ReactElement {
         {
           album_1001_id: albumId,
           collection_id: collectionId,
-          review_status: "linked",
+          review_status: "confirmed",
           confidence: 1.0,
           notes: "manual link via search",
         },
@@ -326,8 +323,8 @@ export default function Page(): ReactElement {
 
     setSearchInputs((s) => ({ ...s, [albumId]: "" }));
     setSearchResults((s) => ({ ...s, [albumId]: [] }));
-    pushToast({ kind: "ok", msg: "Linked" });
-    await load(); // Wait for reload to complete
+    pushToast({ kind: "ok", msg: "Confirmed" });
+    await load();
   };
 
   const tone = (s: MatchStatus | string): { bg: string; bd: string; fg: string; label: string } => {
@@ -371,11 +368,11 @@ export default function Page(): ReactElement {
 
       <h1 style={{ fontSize: 28, fontWeight: 800, color: "#111827", marginBottom: 6 }}>1001 Review</h1>
       <p style={{ color: "#6b7280", marginBottom: 16 }}>
-        Review & curate matches. Linking/confirming updates public badges via <code>collection.is_1001</code>.
+        Review & curate matches. Confirming updates public badges via <code>collection.is_1001</code>. Total albums: {rows.length}
       </p>
 
       {/* Controls */}
-      <div>
+      <div
         style={{
           position: "sticky",
           top: 0,
@@ -391,6 +388,75 @@ export default function Page(): ReactElement {
           marginBottom: 16,
           boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
         }}
+      >
+        <div style={{ display: "flex", gap: 4, background: "#f3f4f6", padding: 4, borderRadius: 8 }}>
+          {[
+            { value: "pending", label: "Pending", color: "#f59e0b" },
+            { value: "unlinked", label: "Unmatched", color: "#ef4444" },
+            { value: "linked", label: "Linked", color: "#3b82f6" },
+            { value: "confirmed", label: "Confirmed", color: "#10b981" },
+            { value: "all", label: "All", color: "#374151" },
+          ].map((tab) => {
+            const count = rows.filter((r) => {
+              const ms = matchesBy[r.id] ?? [];
+              if (tab.value === "all") return true;
+              if (tab.value === "unlinked") return ms.length === 0;
+              if (tab.value === "pending") return ms.some((m) => m.review_status === "pending");
+              if (tab.value === "linked") return ms.some((m) => m.review_status === "linked");
+              if (tab.value === "confirmed") return ms.some((m) => m.review_status === "confirmed");
+              return false;
+            }).length;
+
+            const isActive = statusFilter === tab.value;
+
+            return (
+              <button
+                key={tab.value}
+                onClick={() => setStatusFilter(tab.value as StatusFilter)}
+                style={{
+                  padding: "8px 16px",
+                  border: "none",
+                  borderRadius: 6,
+                  background: isActive ? tab.color : "transparent",
+                  color: isActive ? "#ffffff" : "#374151",
+                  fontWeight: isActive ? 700 : 600,
+                  fontSize: 14,
+                  cursor: "pointer",
+                  transition: "all 0.2s",
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActive) {
+                    e.currentTarget.style.background = "#e5e7eb";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActive) {
+                    e.currentTarget.style.background = "transparent";
+                  }
+                }}
+              >
+                {tab.label} ({count})
+              </button>
+            );
+          })}
+        </div>
+
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <button onClick={() => void runExact()} disabled={running} style={btn("#2563eb", running)}>
+            Run Exact
+          </button>
+          <button onClick={() => void runFuzzy(0.7, 1)} disabled={running} style={btn("#9333ea", running)}>
+            Run Fuzzy (0.70, ±1y)
+          </button>
+          <button
+            onClick={() => void runSameArtist(0.6, 1)}
+            disabled={running}
+            style={btn("#0ea5e9", running)}
+            title="Exact artist, fuzzy title (good for remasters/editions)"
+          >
+            Same-Artist (0.60, ±1y)
+          </button>
+        </div>
       </div>
 
       {/* Grid */}
@@ -534,25 +600,27 @@ export default function Page(): ReactElement {
                                   Notes: <em>{m.notes}</em>
                                 </div>
                               )}
-                              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                                <button
-                                  onClick={() => void updateStatus(m.id, "confirmed")}
-                                  style={btn("#16a34a")}
-                                  aria-label="Confirm match"
-                                >
-                                  ✓ Confirm
-                                </button>
-                                <button
-                                  onClick={() => void updateStatus(m.id, "rejected")}
-                                  style={btn("#dc2626")}
-                                  aria-label="Reject match"
-                                >
-                                  ✕ Reject
-                                </button>
-                                <button onClick={() => void unlink(m.id)} style={btnOutline()} aria-label="Unlink match">
-                                  Unlink
-                                </button>
-                              </div>
+                              {m.review_status !== "confirmed" && (
+                                <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                                  <button
+                                    onClick={() => void updateStatus(m.id, "confirmed")}
+                                    style={btn("#16a34a")}
+                                    aria-label="Confirm match"
+                                  >
+                                    ✓ Confirm
+                                  </button>
+                                  <button
+                                    onClick={() => void unlink(m.id)}
+                                    style={btn("#dc2626")}
+                                    aria-label="Reject and remove"
+                                  >
+                                    ✕ Reject & Remove
+                                  </button>
+                                  <button onClick={() => void unlink(m.id)} style={btnOutline()} aria-label="Unlink match">
+                                    Unlink
+                                  </button>
+                                </div>
+                              )}
                             </div>
                           </div>
                         );
