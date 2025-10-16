@@ -239,8 +239,8 @@ export default function Page(): ReactElement {
 
     // For other tabs, sort: pending first, then unmatched, then confirmed last
     return filtered.sort((a, b) => {
-      const aMatches = matchesBy[a.id] ?? [];
-      const bMatches = matchesBy[b.id] ?? [];
+      const aMatches = (matchesBy[a.id] ?? []).filter(m => m.review_status !== 'rejected');
+      const bMatches = (matchesBy[b.id] ?? []).filter(m => m.review_status !== 'rejected');
 
       const aHasPending = aMatches.some((m) => m.review_status === "pending" || m.review_status === "linked");
       const bHasPending = bMatches.some((m) => m.review_status === "pending" || m.review_status === "linked");
@@ -360,12 +360,18 @@ export default function Page(): ReactElement {
   };
 
   const getCounts = () => {
-    const unmatched = rows.filter((r) => (matchesBy[r.id] ?? []).length === 0).length;
-    const pending = rows.filter((r) =>
-      (matchesBy[r.id] ?? []).some((m) => m.review_status === "pending" || m.review_status === "linked")
-    ).length;
-    const confirmed = rows.filter((r) => (matchesBy[r.id] ?? []).some((m) => m.review_status === "confirmed"))
-      .length;
+    const unmatched = rows.filter((r) => {
+      const ms = (matchesBy[r.id] ?? []).filter(m => m.review_status !== 'rejected');
+      return ms.length === 0;
+    }).length;
+    const pending = rows.filter((r) => {
+      const ms = (matchesBy[r.id] ?? []).filter(m => m.review_status !== 'rejected');
+      return ms.some((m) => m.review_status === "pending" || m.review_status === "linked");
+    }).length;
+    const confirmed = rows.filter((r) => {
+      const ms = (matchesBy[r.id] ?? []).filter(m => m.review_status !== 'rejected');
+      return ms.some((m) => m.review_status === "confirmed");
+    }).length;
     return { unmatched, pending, confirmed };
   };
 
@@ -602,11 +608,11 @@ export default function Page(): ReactElement {
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
             {filteredRows.map((album) => {
-                const matches = (matchesBy[album.id] ?? []).filter(m => m.review_status !== 'rejected');
-                const isUnmatched = matches.length === 0;
-                const hasPending = matches.some((m) => m.review_status === "pending" || m.review_status === "linked");
-                const allConfirmed = matches.length > 0 && matches.every((m) => m.review_status === "confirmed");
-                const isExpanded = expandedAlbums[album.id] ?? hasPending;
+              const matches = (matchesBy[album.id] ?? []).filter(m => m.review_status !== 'rejected');
+              const isUnmatched = matches.length === 0;
+              const hasPending = matches.some((m) => m.review_status === "pending" || m.review_status === "linked");
+              const allConfirmed = matches.length > 0 && matches.every((m) => m.review_status === "confirmed");
+              const isExpanded = expandedAlbums[album.id] ?? hasPending;
               
               return (
                 <div
@@ -800,6 +806,7 @@ export default function Page(): ReactElement {
                                   borderRadius: 6,
                                   color: "#6b7280",
                                   fontSize: 13,
+                                  zIndex: 100,
                                 }}
                               >
                                 Searching...
@@ -819,7 +826,7 @@ export default function Page(): ReactElement {
                                   boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)",
                                   maxHeight: 300,
                                   overflowY: "auto",
-                                  zIndex: 10,
+                                  zIndex: 100,
                                 }}
                               >
                                 {searchResults[album.id].map((result) => (
@@ -902,6 +909,7 @@ export default function Page(): ReactElement {
                                     borderRadius: 6,
                                     color: "#991b1b",
                                     fontSize: 13,
+                                    zIndex: 100,
                                   }}
                                 >
                                   No matches found. Try different search terms.
