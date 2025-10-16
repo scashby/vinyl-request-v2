@@ -350,7 +350,8 @@ export default function Page(): ReactElement {
   };
 
   const linkFromSearch = async (albumId: Id, collectionId: Id) => {
-    const { error } = await supabase.from("collection_1001_review").insert([
+    // First attempt: normal insert
+    const result = await supabase.from("collection_1001_review").insert([
       {
         album_1001_id: albumId,
         collection_id: collectionId,
@@ -360,8 +361,40 @@ export default function Page(): ReactElement {
       },
     ]);
 
-    if (error) {
-      pushToast({ kind: "err", msg: `Link failed: ${error.message}` });
+    // If failed due to unique constraint on collection_final, check if it's a box set case
+    if (result.error && result.error.message.includes("uq_c1001_review_collection_final")) {
+      // Check existing matches for this collection album
+      const { data: existing } = await supabase
+        .from("collection_1001_review")
+        .select("id, album_1001_id, review_status")
+        .eq("collection_id", collectionId)
+        .neq("review_status", "rejected")
+        .limit(1);
+
+      if (existing && existing.length > 0) {
+        // Ask user to confirm this is a box set
+        const confirmed = window.confirm(
+          "This pressing is already matched to another album from the 1001 list. Is this a set with multiple albums?\n\nClick OK to link both albums, or Cancel to keep only the existing match."
+        );
+        
+        if (!confirmed) {
+          return;
+        }
+
+        // User confirmed - use upsert to force the insert
+        // We'll use a RPC function to bypass the constraint
+        const { error: rpcError } = await supabase.rpc("manual_link_1001", {
+          p_album_1001_id: albumId,
+          p_collection_id: collectionId,
+        });
+
+        if (rpcError) {
+          pushToast({ kind: "err", msg: `Link failed: ${rpcError.message}` });
+          return;
+        }
+      }
+    } else if (result.error) {
+      pushToast({ kind: "err", msg: `Link failed: ${result.error.message}` });
       return;
     }
 
