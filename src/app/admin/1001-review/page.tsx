@@ -219,7 +219,7 @@ export default function Page(): ReactElement {
 
   const filteredRows = useMemo(() => {
     const filtered = rows.filter((r) => {
-      const ms = matchesBy[r.id] ?? [];
+      const ms = (matchesBy[r.id] ?? []).filter(m => m.review_status !== 'rejected');
       if (statusFilter === "all") return true;
       if (statusFilter === "unmatched") return ms.length === 0;
       if (statusFilter === "pending")
