@@ -281,13 +281,16 @@ export default function Page(): ReactElement {
     }, 100);
   };
 
-  const deleteMatch = async (matchId: Id, albumId: Id) => {
-    const { error } = await supabase.from("collection_1001_review").delete().eq("id", matchId);
+  const rejectMatch = async (matchId: Id, albumId: Id) => {
+    const { error } = await supabase
+      .from("collection_1001_review")
+      .update({ review_status: 'rejected' })
+      .eq("id", matchId);
     if (error) {
-      pushToast({ kind: "err", msg: `Delete failed: ${error.message}` });
+      pushToast({ kind: "err", msg: `Rejection failed: ${error.message}` });
       return;
     }
-    pushToast({ kind: "ok", msg: "Removed" });
+    pushToast({ kind: "ok", msg: "Rejected" });
     await load();
     setTimeout(() => {
       albumRefs.current[albumId]?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -605,10 +608,6 @@ export default function Page(): ReactElement {
               const allConfirmed = matches.length > 0 && matches.every((m) => m.review_status === "confirmed");
               const isExpanded = expandedAlbums[album.id] ?? hasPending;
               
-              // Debug logging for Led Zeppelin I
-              if (album.artist === "Led Zeppelin" && album.album === "Led Zeppelin I") {
-                console.log("Led Zep I - Tab:", statusFilter, "matches:", matches, "match statuses:", matches.map(m => m.review_status), "hasPending:", hasPending, "expandedAlbums value:", expandedAlbums[album.id], "isExpanded:", isExpanded);
-              }
               return (
                 <div
                   key={album.id}
@@ -1012,7 +1011,7 @@ export default function Page(): ReactElement {
                                       ✓ Confirm
                                     </button>
                                     <button
-                                      onClick={() => void deleteMatch(match.id, album.id)}
+                                      onClick={() => void rejectMatch(match.id, album.id)}
                                       style={{
                                         padding: "6px 12px",
                                         background: "#ef4444",
@@ -1030,7 +1029,7 @@ export default function Page(): ReactElement {
                                 )}
                                 {isConfirmed && (
                                   <button
-                                    onClick={() => void deleteMatch(match.id, album.id)}
+                                    onClick={() => void rejectMatch(match.id, album.id)}
                                     style={{
                                       padding: "6px 12px",
                                       background: "#ffffff",
