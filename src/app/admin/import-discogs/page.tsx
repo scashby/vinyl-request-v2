@@ -134,16 +134,21 @@ export default function ImportDiscogsPage() {
   useEffect(() => {
     // Fetch last import date on component mount
     const fetchLastImport = async () => {
-      const { data, error } = await supabase
-        .from('import_history')
-        .select('import_date')
-        .eq('status', 'completed')
-        .order('import_date', { ascending: false })
-        .limit(1)
-        .single();
+      try {
+        const { data, error } = await supabase
+          .from('import_history')
+          .select('import_date')
+          .eq('status', 'completed')
+          .order('import_date', { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
-      if (!error && data) {
-        setLastImportDate(data.import_date);
+        if (!error && data) {
+          setLastImportDate(data.import_date);
+        }
+      } catch (err) {
+        console.log('Import history table not ready yet:', err);
+        setLastImportDate(null);
       }
     };
     fetchLastImport();
