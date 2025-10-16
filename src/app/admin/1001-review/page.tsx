@@ -602,11 +602,11 @@ export default function Page(): ReactElement {
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
             {filteredRows.map((album) => {
-              const matches = matchesBy[album.id] ?? [];
-              const isUnmatched = matches.length === 0;
-              const hasPending = matches.some((m) => m.review_status === "pending" || m.review_status === "linked");
-              const allConfirmed = matches.length > 0 && matches.every((m) => m.review_status === "confirmed");
-              const isExpanded = expandedAlbums[album.id] ?? hasPending;
+                const matches = (matchesBy[album.id] ?? []).filter(m => m.review_status !== 'rejected');
+                const isUnmatched = matches.length === 0;
+                const hasPending = matches.some((m) => m.review_status === "pending" || m.review_status === "linked");
+                const allConfirmed = matches.length > 0 && matches.every((m) => m.review_status === "confirmed");
+                const isExpanded = expandedAlbums[album.id] ?? hasPending;
               
               return (
                 <div
