@@ -257,7 +257,7 @@ export default function ImportDiscogsPage() {
             const lastImportTimestamp = new Date(lastImportDate);
             filteredRows = validRows.filter(row => {
               const dateAdded = new Date(row['Date Added']);
-              return dateAdded > lastImportTimestamp;
+              return dateAdded.toDateString() >= lastImportTimestamp.toDateString();
             });
             isIncrementalSync = true;
             
