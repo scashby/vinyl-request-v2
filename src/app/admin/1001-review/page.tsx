@@ -198,6 +198,21 @@ export default function Page(): ReactElement {
     await load();
   }, [pushToast, load]);
 
+  const runFuzzyArtist = useCallback(async (threshold = 0.7) => {
+    setRunning(true);
+    const { data, error } = await supabase.rpc("match_1001_fuzzy_artist", {
+      threshold: parseFloat(threshold.toString()),
+    });
+    setRunning(false);
+    if (error) {
+      pushToast({ kind: "err", msg: `Fuzzy artist match failed: ${error.message}` });
+      return;
+    }
+    const n = Number.isFinite(Number(data)) ? Number(data) : 0;
+    pushToast({ kind: "ok", msg: `Found ${n} fuzzy artist match${n !== 1 ? "es" : ""}` });
+    await load();
+  }, [pushToast, load]);
+
   // Auto-match only once when page first opens
   useEffect(() => {
     if (hasAutoMatchedSession) return;
@@ -542,6 +557,24 @@ export default function Page(): ReactElement {
               title="Exact artist match, fuzzy title match"
             >
               Same-Artist (0.60, ±1y)
+            </button>
+            <button
+              onClick={() => void runFuzzyArtist(0.7)}
+              disabled={running}
+              style={{
+                padding: "8px 14px",
+                background: running ? "#9ca3af" : "#ec4899",
+                color: "#ffffff",
+                border: "none",
+                borderRadius: 6,
+                fontWeight: 700,
+                fontSize: 13,
+                cursor: running ? "not-allowed" : "pointer",
+                opacity: running ? 0.6 : 1,
+              }}
+              title="Fuzzy match on both artist and title"
+            >
+              Fuzzy Artist (0.70)
             </button>
           </div>
         </div>
