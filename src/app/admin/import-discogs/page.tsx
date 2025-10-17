@@ -1,4 +1,4 @@
-// src/app/admin/import-discogs/page.tsx - COMPLETE REBUILD
+// src/app/admin/import-discogs/page.tsx - FIXED WITH COMPOSITE KEYS
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -96,6 +96,7 @@ function sanitizeMediaCondition(condition: string | null | undefined): string {
 
 function sanitizeFolder(folder: string | null | undefined): string {
   if (!folder || folder.trim() === '') return 'Uncategorized';
+  // Normalize folder name - trim, lowercase for comparison
   return folder.trim();
 }
 
@@ -331,32 +332,62 @@ export default function ImportDiscogsPage() {
 
           console.log(`📀 Found ${allExisting.length} existing records in database`);
 
-          // SIMPLE MATCHING: Only use release_id (no composite keys!)
-          const existingReleaseIds = new Map(
-            allExisting.map(record => [record.discogs_release_id, record])
+          // COMPOSITE KEY: release_id + folder (to handle multiple copies)
+          const createKey = (releaseId: string, folder: string) => {
+            const normalizedFolder = sanitizeFolder(folder);
+            return `${releaseId}|${normalizedFolder}`;
+          };
+          
+          const existingRecordsMap = new Map(
+            allExisting.map(record => [
+              createKey(record.discogs_release_id, record.folder || ''),
+              record
+            ])
           );
           
+          // Create map from FULL CSV for removal checking (not filtered rows)
+          const fullCsvMap = new Map(
+            validRows.map(row => {
+              const folder = sanitizeFolder(row.CollectionFolder);
+              const releaseId = String(row.release_id);
+              return [createKey(releaseId, folder), true];
+            })
+          );
+
+          console.log(`🔑 Generated ${existingRecordsMap.size} existing composite keys`);
+          console.log(`🔑 Generated ${fullCsvMap.size} CSV composite keys`);
+          
+          // Sample keys for debugging
+          const sampleExisting = Array.from(existingRecordsMap.keys()).slice(0, 5);
+          const sampleCsv = Array.from(fullCsvMap.keys()).slice(0, 5);
+          console.log('Sample existing keys:', sampleExisting);
+          console.log('Sample CSV keys:', sampleCsv);
 
           console.log(`🆕 Checking for new records...`);
           
-          // Find NEW records (in CSV but not in database)
-          const newRows = processedRows.filter(row => !existingReleaseIds.has(row.discogs_release_id));
+          // Find NEW records (in filtered CSV but not in database)
+          const newRows = processedRows.filter(row => {
+            const key = createKey(row.discogs_release_id, row.folder);
+            const exists = existingRecordsMap.has(key);
+            if (!exists) {
+              console.log(`  NEW: ${key} (${row.artist} - ${row.title})`);
+            }
+            return !exists;
+          });
 
           console.log(`✨ Found ${newRows.length} new items to add`);
 
-          // Find updates (in both CSV and database, but with changes)
+          // Find updates (in both filtered CSV and database, but with changes)
           console.log(`🔄 Checking for updates...`);
           const updateOperations: UpdateOperation[] = [];
           
           for (const csvRow of processedRows) {
-            const existingRecord = existingReleaseIds.get(csvRow.discogs_release_id);
+            const key = createKey(csvRow.discogs_release_id, csvRow.folder);
+            const existingRecord = existingRecordsMap.get(key);
             
             if (existingRecord) {
               const changes: string[] = [];
               
-              if (!valuesAreEqual(csvRow.folder, existingRecord.folder)) {
-                changes.push(`Folder: "${existingRecord.folder}" → "${csvRow.folder}"`);
-              }
               if (!valuesAreEqual(csvRow.media_condition, existingRecord.media_condition)) {
                 changes.push(`Condition: "${existingRecord.media_condition}" → "${csvRow.media_condition}"`);
               }
@@ -386,15 +417,16 @@ export default function ImportDiscogsPage() {
           
           if (syncMode === 'full') {
             console.log(`🗑️  Checking for records to remove (full sync mode)...`);
+            console.log(`   Comparing ${allExisting.length} DB records against ${fullCsvMap.size} CSV keys`);
             
-            // Use ALL validRows (not filtered) for removal check in full sync
-            const fullCsvReleaseIds = new Set(
-              validRows.map(row => String(row.release_id))
-            );
-            
-            recordsToRemove = allExisting.filter(
-              existingRecord => !fullCsvReleaseIds.has(existingRecord.discogs_release_id)
-            );
+            recordsToRemove = allExisting.filter(existingRecord => {
+              const key = createKey(existingRecord.discogs_release_id, existingRecord.folder || '');
+              const inCsv = fullCsvMap.has(key);
+              if (!inCsv) {
+                console.log(`  TO REMOVE: ${key} (${existingRecord.artist} - ${existingRecord.title})`);
+              }
+              return !inCsv;
+            });
             
             console.log(`🚫 Found ${recordsToRemove.length} items to remove`);
           } else {
