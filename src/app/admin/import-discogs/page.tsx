@@ -1,4 +1,4 @@
-// src/app/admin/import-discogs/page.tsx - REBUILT WITH PROPER INCREMENTAL SYNC
+// src/app/admin/import-discogs/page.tsx - COMPLETE REBUILD
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -135,7 +135,6 @@ export default function ImportDiscogsPage() {
   const [forceFullSync, setForceFullSync] = useState(false);
 
   useEffect(() => {
-    // Fetch last import date on component mount
     const fetchLastImport = async () => {
       try {
         const { data, error } = await supabase
@@ -267,7 +266,6 @@ export default function ImportDiscogsPage() {
             
             filteredRows = validRows.filter(row => {
               const dateAdded = new Date(row['Date Added']).getTime();
-              // Only include items added AFTER last import (not on the same day)
               return dateAdded > lastImportTimestamp;
             });
             
@@ -333,23 +331,16 @@ export default function ImportDiscogsPage() {
 
           console.log(`📀 Found ${allExisting.length} existing records in database`);
 
-          // Create composite key maps: "release_id|folder"
-          const createKey = (releaseId: string, folder: string) => `${releaseId}|${folder}`;
-          
-          const existingRecordsMap = new Map(
-            allExisting.map(record => [
-              createKey(record.discogs_release_id, record.folder || 'Uncategorized'),
-              record
-            ])
+          // SIMPLE MATCHING: Only use release_id (no composite keys!)
+          const existingReleaseIds = new Map(
+            allExisting.map(record => [record.discogs_release_id, record])
           );
+          
 
           console.log(`🆕 Checking for new records...`);
           
           // Find NEW records (in CSV but not in database)
-          const newRows = processedRows.filter(row => {
-            const key = createKey(row.discogs_release_id, row.folder);
-            return !existingRecordsMap.has(key);
-          });
+          const newRows = processedRows.filter(row => !existingReleaseIds.has(row.discogs_release_id));
 
           console.log(`✨ Found ${newRows.length} new items to add`);
 
@@ -358,12 +349,14 @@ export default function ImportDiscogsPage() {
           const updateOperations: UpdateOperation[] = [];
           
           for (const csvRow of processedRows) {
-            const key = createKey(csvRow.discogs_release_id, csvRow.folder);
-            const existingRecord = existingRecordsMap.get(key);
+            const existingRecord = existingReleaseIds.get(csvRow.discogs_release_id);
             
             if (existingRecord) {
               const changes: string[] = [];
               
+              if (!valuesAreEqual(csvRow.folder, existingRecord.folder)) {
+                changes.push(`Folder: "${existingRecord.folder}" → "${csvRow.folder}"`);
+              }
               if (!valuesAreEqual(csvRow.media_condition, existingRecord.media_condition)) {
                 changes.push(`Condition: "${existingRecord.media_condition}" → "${csvRow.media_condition}"`);
               }
@@ -394,23 +387,13 @@ export default function ImportDiscogsPage() {
           if (syncMode === 'full') {
             console.log(`🗑️  Checking for records to remove (full sync mode)...`);
             
-            // In full sync: if validRows is the COMPLETE CSV, then we can safely check removals
-            // We need to check against the FULL validRows, not the filtered ones
-            const fullCsvMap = new Map(
-              validRows.map(row => {
-                const folder = sanitizeFolder(row.CollectionFolder);
-                return [
-                  createKey(String(row.release_id), folder),
-                  true
-                ];
-              })
+            // Use ALL validRows (not filtered) for removal check in full sync
+            const fullCsvReleaseIds = new Set(
+              validRows.map(row => String(row.release_id))
             );
             
             recordsToRemove = allExisting.filter(
-              existingRecord => {
-                const key = createKey(existingRecord.discogs_release_id, existingRecord.folder || 'Uncategorized');
-                return !fullCsvMap.has(key);
-              }
+              existingRecord => !fullCsvReleaseIds.has(existingRecord.discogs_release_id)
             );
             
             console.log(`🚫 Found ${recordsToRemove.length} items to remove`);
@@ -954,7 +937,7 @@ export default function ImportDiscogsPage() {
                       {item.artist} - {item.title}
                     </div>
                     <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
-                      {item.year} • {item.format} • {item.folder}
+                      Release ID: {item.discogs_release_id} • {item.year} • {item.format} • {item.folder}
                     </div>
                   </div>
                 ))}
@@ -1089,7 +1072,7 @@ export default function ImportDiscogsPage() {
                         {item.artist} - {item.title}
                       </div>
                       <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
-                        ID: {item.id} • Folder: {item.folder}
+                        Release ID: {item.discogs_release_id} • ID: {item.id} • Folder: {item.folder}
                         {isDeselected && <span style={{ color: '#10b981', marginLeft: 8 }}>• Will NOT be removed</span>}
                       </div>
                     </div>
