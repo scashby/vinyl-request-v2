@@ -1,4 +1,4 @@
-// src/app/admin/import-discogs/page.tsx - WITH INCREMENTAL SYNC
+// src/app/admin/import-discogs/page.tsx - REBUILT WITH PROPER INCREMENTAL SYNC
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -62,8 +62,10 @@ type SyncPreview = {
   newItems: ProcessedRow[];
   updateOperations: UpdateOperation[];
   recordsToRemove: ExistingRecord[];
-  isIncrementalSync: boolean;
+  syncMode: 'incremental' | 'full';
   lastImportDate: string | null;
+  csvRowCount: number;
+  filteredCsvRowCount: number;
 };
 
 interface SyncDataStorage {
@@ -130,6 +132,7 @@ export default function ImportDiscogsPage() {
   const [expandedUpdate, setExpandedUpdate] = useState<number | null>(null);
   const [deselectedRemovals, setDeselectedRemovals] = useState<Set<number>>(new Set());
   const [lastImportDate, setLastImportDate] = useState<string | null>(null);
+  const [forceFullSync, setForceFullSync] = useState(false);
 
   useEffect(() => {
     // Fetch last import date on component mount
@@ -249,22 +252,37 @@ export default function ImportDiscogsPage() {
             return !isNaN(numericValue) && numericValue > 0;
           });
 
-          // Filter by last import date if incremental sync is enabled
-          let filteredRows = validRows;
-          let isIncrementalSync = false;
+          console.log(`📊 Total valid CSV rows: ${validRows.length}`);
+
+          // Determine sync mode
+          const syncMode: 'incremental' | 'full' = (lastImportDate && !forceFullSync) ? 'incremental' : 'full';
+          console.log(`🔄 Sync mode: ${syncMode}`);
           
-          if (lastImportDate) {
-            const lastImportTimestamp = new Date(lastImportDate);
-            filteredRows = validRows.filter(row => {
-              const dateAdded = new Date(row['Date Added']);
-              return dateAdded.toDateString() >= lastImportTimestamp.toDateString();
-            });
-            isIncrementalSync = true;
+          // Filter rows for incremental sync
+          let filteredRows = validRows;
+          
+          if (syncMode === 'incremental' && lastImportDate) {
+            const lastImportTimestamp = new Date(lastImportDate).getTime();
+            console.log(`📅 Last import: ${new Date(lastImportDate).toLocaleString()}`);
             
-            if (filteredRows.length < validRows.length) {
-              const skippedCount = validRows.length - filteredRows.length;
-              setStatus(`Incremental sync: Processing ${filteredRows.length} items added after ${lastImportTimestamp.toLocaleDateString()}, skipping ${skippedCount} older items`);
+            filteredRows = validRows.filter(row => {
+              const dateAdded = new Date(row['Date Added']).getTime();
+              // Only include items added AFTER last import (not on the same day)
+              return dateAdded > lastImportTimestamp;
+            });
+            
+            console.log(`✅ Filtered to ${filteredRows.length} items added after last import`);
+            console.log(`⏭️  Skipped ${validRows.length - filteredRows.length} older items`);
+            
+            if (filteredRows.length === 0) {
+              setStatus('No new items found since last import. Use "Force Full Sync" to re-process everything.');
+              setIsProcessing(false);
+              return;
             }
+            
+            setStatus(`Incremental sync: Found ${filteredRows.length} new items (${validRows.length - filteredRows.length} older items skipped)`);
+          } else {
+            setStatus(`Full sync: Processing all ${validRows.length} items`);
           }
           
           const processedRows: ProcessedRow[] = filteredRows.map(row => {
@@ -286,9 +304,10 @@ export default function ImportDiscogsPage() {
             };
           });
 
-          const releaseIds = processedRows.map(r => r.discogs_release_id);
-          setStatus(`Checking existing entries for ${releaseIds.length} items...`);
+          console.log(`🔍 Fetching all existing records from database...`);
+          setStatus(`Checking existing database records...`);
           
+          // Fetch ALL existing records
           let allExisting: ExistingRecord[] = [];
           let start = 0;
           const pageSize = 1000;
@@ -312,6 +331,8 @@ export default function ImportDiscogsPage() {
             }
           }
 
+          console.log(`📀 Found ${allExisting.length} existing records in database`);
+
           // Create composite key maps: "release_id|folder"
           const createKey = (releaseId: string, folder: string) => `${releaseId}|${folder}`;
           
@@ -321,22 +342,21 @@ export default function ImportDiscogsPage() {
               record
             ])
           );
-          
-          const csvRecordsMap = new Map(
-            processedRows.map(row => [
-              createKey(row.discogs_release_id, row.folder),
-              row
-            ])
-          );
 
-          // Find NEW records
+          console.log(`🆕 Checking for new records...`);
+          
+          // Find NEW records (in CSV but not in database)
           const newRows = processedRows.filter(row => {
             const key = createKey(row.discogs_release_id, row.folder);
             return !existingRecordsMap.has(key);
           });
 
-          // Find updates
+          console.log(`✨ Found ${newRows.length} new items to add`);
+
+          // Find updates (in both CSV and database, but with changes)
+          console.log(`🔄 Checking for updates...`);
           const updateOperations: UpdateOperation[] = [];
+          
           for (const csvRow of processedRows) {
             const key = createKey(csvRow.discogs_release_id, csvRow.folder);
             const existingRecord = existingRecordsMap.get(key);
@@ -365,22 +385,44 @@ export default function ImportDiscogsPage() {
               }
             }
           }
+
+          console.log(`🔧 Found ${updateOperations.length} items to update`);
           
-          // Find records to remove (only if NOT incremental sync)
+          // Find records to remove (only in FULL sync mode)
           let recordsToRemove: ExistingRecord[] = [];
-          if (!isIncrementalSync) {
+          
+          if (syncMode === 'full') {
+            console.log(`🗑️  Checking for records to remove (full sync mode)...`);
+            
+            // In full sync: if validRows is the COMPLETE CSV, then we can safely check removals
+            // We need to check against the FULL validRows, not the filtered ones
+            const fullCsvMap = new Map(
+              validRows.map(row => {
+                const folder = sanitizeFolder(row.CollectionFolder);
+                return [
+                  createKey(String(row.release_id), folder),
+                  true
+                ];
+              })
+            );
+            
             recordsToRemove = allExisting.filter(
               existingRecord => {
                 const key = createKey(existingRecord.discogs_release_id, existingRecord.folder || 'Uncategorized');
-                return !csvRecordsMap.has(key);
+                return !fullCsvMap.has(key);
               }
             );
+            
+            console.log(`🚫 Found ${recordsToRemove.length} items to remove`);
+          } else {
+            console.log(`⏭️  Skipping removal check (incremental sync mode)`);
           }
 
-          const syncMessage = isIncrementalSync 
+          const syncMessage = syncMode === 'incremental'
             ? `Incremental sync: ${newRows.length} new, ${updateOperations.length} updates (changes since ${new Date(lastImportDate!).toLocaleDateString()})`
             : `Full sync: ${newRows.length} new, ${updateOperations.length} updates, ${recordsToRemove.length} removals`;
           
+          console.log(`📊 ${syncMessage}`);
           setStatus(syncMessage);
 
           (window as Window & SyncDataStorage).updateOperations = updateOperations;
@@ -390,8 +432,10 @@ export default function ImportDiscogsPage() {
             newItems: newRows, 
             updateOperations, 
             recordsToRemove,
-            isIncrementalSync,
-            lastImportDate
+            syncMode,
+            lastImportDate,
+            csvRowCount: validRows.length,
+            filteredCsvRowCount: filteredRows.length
           });
           setIsProcessing(false);
         },
@@ -426,7 +470,7 @@ export default function ImportDiscogsPage() {
       .from('import_history')
       .insert([{ 
         status: 'in_progress',
-        notes: syncPreview.isIncrementalSync ? 'Incremental sync' : 'Full sync'
+        notes: syncPreview.syncMode === 'incremental' ? 'Incremental sync' : 'Full sync'
       }])
       .select()
       .single();
@@ -556,8 +600,8 @@ export default function ImportDiscogsPage() {
         setStatus(`Completed ${updateCount}/${updateOperations.length} updates`);
       }
       
-      // Process removals (excluding deselected ones)
-      if (recordsToRemove.length > 0) {
+      // Process removals (excluding deselected ones, only in full sync)
+      if (syncPreview.syncMode === 'full' && recordsToRemove.length > 0) {
         const actualRemovals = recordsToRemove.filter(r => !deselectedRemovals.has(r.id));
         if (actualRemovals.length > 0) {
           setStatus(`Removing ${actualRemovals.length} records...`);
@@ -599,7 +643,10 @@ export default function ImportDiscogsPage() {
       }
 
       // Update import history record
-      const removedCount = recordsToRemove.length - deselectedRemovals.size;
+      const removedCount = syncPreview.syncMode === 'full' 
+        ? (recordsToRemove.length - deselectedRemovals.size) 
+        : 0;
+        
       await supabase
         .from('import_history')
         .update({
@@ -647,12 +694,48 @@ export default function ImportDiscogsPage() {
       <p style={{
         color: '#6b7280',
         fontSize: 16,
-        marginBottom: 24
+        marginBottom: 16
       }}>
         {lastImportDate 
-          ? `Incremental sync enabled - only processing changes after ${new Date(lastImportDate).toLocaleString()}`
-          : 'First import - will perform full sync and enable incremental updates'}
+          ? `Last import: ${new Date(lastImportDate).toLocaleString()}`
+          : 'First import - will perform full sync'}
       </p>
+
+      {lastImportDate && (
+        <div style={{
+          background: forceFullSync ? '#fef3c7' : '#dbeafe',
+          border: `2px solid ${forceFullSync ? '#f59e0b' : '#3b82f6'}`,
+          borderRadius: 8,
+          padding: 12,
+          marginBottom: 16,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12
+        }}>
+          <input
+            type="checkbox"
+            id="forceFullSync"
+            checked={forceFullSync}
+            onChange={(e) => setForceFullSync(e.target.checked)}
+            style={{
+              width: 18,
+              height: 18,
+              cursor: 'pointer'
+            }}
+          />
+          <label 
+            htmlFor="forceFullSync"
+            style={{
+              fontSize: 14,
+              color: '#1f2937',
+              cursor: 'pointer',
+              fontWeight: 500
+            }}
+          >
+            Force Full Sync (check for removals and re-process all items)
+          </label>
+        </div>
+      )}
 
       <div style={{
         background: 'white',
@@ -725,10 +808,16 @@ export default function ImportDiscogsPage() {
             fontSize: 24,
             fontWeight: 600,
             color: '#1f2937',
-            marginBottom: 16
+            marginBottom: 8
           }}>
-            Sync Preview {syncPreview.isIncrementalSync && <span style={{ fontSize: 14, color: '#3b82f6', fontWeight: 'normal' }}>(Incremental)</span>}
+            Sync Preview
           </h2>
+          <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 16 }}>
+            Mode: <strong>{syncPreview.syncMode === 'incremental' ? 'Incremental' : 'Full Sync'}</strong>
+            {syncPreview.syncMode === 'incremental' && (
+              <> • Processing {syncPreview.filteredCsvRowCount} of {syncPreview.csvRowCount} CSV rows</>
+            )}
+          </p>
           
           <div style={{
             display: 'grid',
@@ -802,7 +891,7 @@ export default function ImportDiscogsPage() {
               )}
             </div>
             
-            {!syncPreview.isIncrementalSync && (
+            {syncPreview.syncMode === 'full' && (
               <div 
                 onClick={() => setShowDetails(showDetails === 'removes' ? null : 'removes')}
                 style={{
@@ -946,7 +1035,7 @@ export default function ImportDiscogsPage() {
             </div>
           )}
 
-          {showDetails === 'removes' && syncPreview.recordsToRemove.length > 0 && !syncPreview.isIncrementalSync && (
+          {showDetails === 'removes' && syncPreview.recordsToRemove.length > 0 && syncPreview.syncMode === 'full' && (
             <div style={{
               background: '#fef2f2',
               border: '1px solid #dc2626',
