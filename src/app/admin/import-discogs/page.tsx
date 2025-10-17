@@ -1,4 +1,4 @@
-// src/app/admin/import-discogs/page.tsx - FIXED WITH COMPOSITE KEYS
+// src/app/admin/import-discogs/page.tsx - WITH FULL OVERRIDE CONTROLS
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -96,7 +96,6 @@ function sanitizeMediaCondition(condition: string | null | undefined): string {
 
 function sanitizeFolder(folder: string | null | undefined): string {
   if (!folder || folder.trim() === '') return 'Uncategorized';
-  // Normalize folder name - trim, lowercase for comparison
   return folder.trim();
 }
 
@@ -134,6 +133,16 @@ export default function ImportDiscogsPage() {
   const [deselectedRemovals, setDeselectedRemovals] = useState<Set<number>>(new Set());
   const [lastImportDate, setLastImportDate] = useState<string | null>(null);
   const [forceFullSync, setForceFullSync] = useState(false);
+  
+  // Override controls
+  const [skipEnrichment, setSkipEnrichment] = useState(false);
+  const [skip1001Matching, setSkip1001Matching] = useState(false);
+  const [skipRemovals, setSkipRemovals] = useState(false);
+  const [skipUpdates, setSkipUpdates] = useState(false);
+  const [dryRun, setDryRun] = useState(false);
+  const [batchSize, setBatchSize] = useState(25);
+  const [apiDelay, setApiDelay] = useState(2000);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   useEffect(() => {
     const fetchLastImport = async () => {
@@ -473,30 +482,39 @@ export default function ImportDiscogsPage() {
     }
     
     setIsProcessing(true);
-    const BATCH_SIZE = 25;
+    const BATCH_SIZE = batchSize;
     const totalItems = syncPreview.newItems.length;
     let allEnriched: ProcessedRow[] = [];
     
-    const updateOperations = (window as Window & SyncDataStorage).updateOperations || [];
-    const recordsToRemove = (window as Window & SyncDataStorage).recordsToRemove || [];
+    const updateOperations = skipUpdates ? [] : ((window as Window & SyncDataStorage).updateOperations || []);
+    const recordsToRemove = skipRemovals ? [] : ((window as Window & SyncDataStorage).recordsToRemove || []);
+    
+    if (dryRun) {
+      setStatus(`🔍 DRY RUN MODE - No changes will be made to the database`);
+      await delay(1000);
+    }
     
     // Create import history record
-    const { data: importRecord, error: importError } = await supabase
-      .from('import_history')
-      .insert([{ 
-        status: 'in_progress',
-        notes: syncPreview.syncMode === 'incremental' ? 'Incremental sync' : 'Full sync'
-      }])
-      .select()
-      .single();
+    let importRecord = null;
+    if (!dryRun) {
+      const { data, error: importError } = await supabase
+        .from('import_history')
+        .insert([{ 
+          status: 'in_progress',
+          notes: syncPreview.syncMode === 'incremental' ? 'Incremental sync' : 'Full sync'
+        }])
+        .select()
+        .single();
 
-    if (importError) {
-      setStatus(`Failed to create import record: ${importError.message}`);
-      setIsProcessing(false);
-      return;
+      if (importError) {
+        setStatus(`Failed to create import record: ${importError.message}`);
+        setIsProcessing(false);
+        return;
+      }
+      importRecord = data;
     }
 
-    setStatus(`Starting enrichment for ${totalItems} new items...`);
+    setStatus(`Starting ${skipEnrichment ? 'import' : 'enrichment'} for ${totalItems} new items...`);
 
     try {
       // Process new items
@@ -512,39 +530,50 @@ export default function ImportDiscogsPage() {
         for (let i = 0; i < currentBatch.length; i++) {
           const row = currentBatch[i];
           const globalIndex = batchStart + i + 1;
-          setStatus(`Batch ${batchNumber}: Enriching ${globalIndex}/${totalItems}: ${row.artist} - ${row.title}`);
           
-          try {
-            const { image_url, tracklists, genres, styles } = await fetchDiscogsData(row.discogs_release_id);
-            batchEnriched.push({ 
-              ...row, 
-              image_url, 
-              tracklists,
-              discogs_genres: genres,
-              discogs_styles: styles
-            });
-          } catch (error) {
-            console.warn(`Failed to enrich ${row.discogs_release_id}:`, error);
+          if (skipEnrichment) {
+            setStatus(`Batch ${batchNumber}: Importing ${globalIndex}/${totalItems}: ${row.artist} - ${row.title}`);
             batchEnriched.push({ ...row });
+          } else {
+            setStatus(`Batch ${batchNumber}: Enriching ${globalIndex}/${totalItems}: ${row.artist} - ${row.title}`);
+            
+            try {
+              const { image_url, tracklists, genres, styles } = await fetchDiscogsData(row.discogs_release_id);
+              batchEnriched.push({ 
+                ...row, 
+                image_url, 
+                tracklists,
+                discogs_genres: genres,
+                discogs_styles: styles
+              });
+            } catch (error) {
+              console.warn(`Failed to enrich ${row.discogs_release_id}:`, error);
+              batchEnriched.push({ ...row });
+            }
+            
+            if (i < currentBatch.length - 1) await delay(apiDelay);
           }
-          
-          if (i < currentBatch.length - 1) await delay(2000);
         }
         
         let batchInsertCount = 0;
-        for (const item of batchEnriched) {
-          try {
-            const { error: insertError } = await supabase
-              .from('collection')
-              .insert([item]);
+        if (!dryRun) {
+          for (const item of batchEnriched) {
+            try {
+              const { error: insertError } = await supabase
+                .from('collection')
+                .insert([item]);
 
-            if (!insertError) batchInsertCount++;
-          } catch (error) {
-            console.error(`Error inserting ${item.artist} - ${item.title}:`, error);
+              if (!insertError) batchInsertCount++;
+            } catch (error) {
+              console.error(`Error inserting ${item.artist} - ${item.title}:`, error);
+            }
           }
+        } else {
+          batchInsertCount = batchEnriched.length;
+          console.log('DRY RUN: Would have inserted:', batchEnriched);
         }
         
-        setStatus(`Batch ${batchNumber} complete: ${batchInsertCount}/${batchEnriched.length} inserted`);
+        setStatus(`Batch ${batchNumber} complete: ${batchInsertCount}/${batchEnriched.length} ${dryRun ? 'would be' : ''} inserted`);
         allEnriched = allEnriched.concat(batchEnriched);
         
         if (batchEnd < totalItems) {
@@ -572,7 +601,7 @@ export default function ImportDiscogsPage() {
           const needsGenres = !genres || genres.length === 0;
           const needsStyles = !styles || styles.length === 0;
           
-          if (needsImage || needsTracklists || needsGenres || needsStyles) {
+          if (!skipEnrichment && (needsImage || needsTracklists || needsGenres || needsStyles)) {
             try {
               const discogsData = await fetchDiscogsData(csvRow.discogs_release_id);
               
@@ -583,7 +612,7 @@ export default function ImportDiscogsPage() {
                 styles = discogsData.styles;
               }
               
-              await delay(2000);
+              await delay(apiDelay);
             } catch (error) {
               console.warn(`Failed to enrich ${csvRow.discogs_release_id}:`, error);
             }
@@ -600,85 +629,109 @@ export default function ImportDiscogsPage() {
             decade: csvRow.decade
           };
           
-          try {
-            const { error: updateError } = await supabase
-              .from('collection')
-              .update(updateData)
-              .eq('id', existingRecord.id);
+          if (!dryRun) {
+            try {
+              const { error: updateError } = await supabase
+                .from('collection')
+                .update(updateData)
+                .eq('id', existingRecord.id);
 
-            if (!updateError) updateCount++;
-          } catch (error) {
-            console.error(`Error updating ${csvRow.discogs_release_id}:`, error);
+              if (!updateError) updateCount++;
+            } catch (error) {
+              console.error(`Error updating ${csvRow.discogs_release_id}:`, error);
+            }
+          } else {
+            updateCount++;
+            console.log('DRY RUN: Would have updated:', updateData);
           }
         }
         
-        setStatus(`Completed ${updateCount}/${updateOperations.length} updates`);
+        setStatus(`Completed ${updateCount}/${updateOperations.length} ${dryRun ? 'simulated' : ''} updates`);
+      } else if (skipUpdates && (window as Window & SyncDataStorage).updateOperations?.length) {
+        setStatus(`Skipped ${(window as Window & SyncDataStorage).updateOperations?.length} updates (override enabled)`);
       }
       
       // Process removals (excluding deselected ones, only in full sync)
       if (syncPreview.syncMode === 'full' && recordsToRemove.length > 0) {
         const actualRemovals = recordsToRemove.filter(r => !deselectedRemovals.has(r.id));
         if (actualRemovals.length > 0) {
-          setStatus(`Removing ${actualRemovals.length} records...`);
-          const idsToDelete = actualRemovals.map(record => record.id);
-          await supabase.from('collection').delete().in('id', idsToDelete);
+          setStatus(`${dryRun ? 'Would remove' : 'Removing'} ${actualRemovals.length} records...`);
+          if (!dryRun) {
+            const idsToDelete = actualRemovals.map(record => record.id);
+            await supabase.from('collection').delete().in('id', idsToDelete);
+          } else {
+            console.log('DRY RUN: Would have deleted:', actualRemovals);
+          }
         }
+      } else if (skipRemovals && (window as Window & SyncDataStorage).recordsToRemove?.length) {
+        setStatus(`Skipped ${(window as Window & SyncDataStorage).recordsToRemove?.length} removals (override enabled)`);
       }
       
       // Automatic 1001 album matching
-      setStatus('Running automatic 1001 album matching...');
-      
-      try {
-        const { data: exactCount, error: exactError } = await supabase.rpc('match_1001_exact');
-        if (!exactError) {
-          setStatus(`Found ${exactCount || 0} exact 1001 matches...`);
+      if (!skip1001Matching) {
+        setStatus('Running automatic 1001 album matching...');
+        
+        try {
+          if (!dryRun) {
+            const { data: exactCount, error: exactError } = await supabase.rpc('match_1001_exact');
+            if (!exactError) {
+              setStatus(`Found ${exactCount || 0} exact 1001 matches...`);
+            }
+            
+            await delay(1000);
+            
+            const { data: fuzzyCount, error: fuzzyError } = await supabase.rpc('match_1001_fuzzy', {
+              threshold: 0.7,
+              year_slop: 1
+            });
+            if (!fuzzyError) {
+              setStatus(`Found ${fuzzyCount || 0} fuzzy 1001 matches...`);
+            }
+            
+            await delay(1000);
+            
+            const { data: sameArtistCount, error: sameArtistError } = await supabase.rpc('match_1001_same_artist', {
+              threshold: 0.6,
+              year_slop: 1
+            });
+            if (!sameArtistError) {
+              setStatus(`Found ${sameArtistCount || 0} same-artist 1001 matches...`);
+            }
+          } else {
+            setStatus('DRY RUN: Skipped 1001 matching');
+          }
+        } catch (matchError) {
+          console.warn('1001 matching failed:', matchError);
         }
-        
-        await delay(1000);
-        
-        const { data: fuzzyCount, error: fuzzyError } = await supabase.rpc('match_1001_fuzzy', {
-          threshold: 0.7,
-          year_slop: 1
-        });
-        if (!fuzzyError) {
-          setStatus(`Found ${fuzzyCount || 0} fuzzy 1001 matches...`);
-        }
-        
-        await delay(1000);
-        
-        const { data: sameArtistCount, error: sameArtistError } = await supabase.rpc('match_1001_same_artist', {
-          threshold: 0.6,
-          year_slop: 1
-        });
-        if (!sameArtistError) {
-          setStatus(`Found ${sameArtistCount || 0} same-artist 1001 matches...`);
-        }
-      } catch (matchError) {
-        console.warn('1001 matching failed:', matchError);
+      } else {
+        setStatus('Skipped 1001 matching (override enabled)');
       }
 
       // Update import history record
-      const removedCount = syncPreview.syncMode === 'full' 
-        ? (recordsToRemove.length - deselectedRemovals.size) 
-        : 0;
-        
-      await supabase
-        .from('import_history')
-        .update({
-          status: 'completed',
-          records_added: allEnriched.length,
-          records_updated: updateOperations.length,
-          records_removed: removedCount
-        })
-        .eq('id', importRecord.id);
+      if (!dryRun && importRecord) {
+        const removedCount = syncPreview.syncMode === 'full' 
+          ? (recordsToRemove.length - deselectedRemovals.size) 
+          : 0;
+          
+        await supabase
+          .from('import_history')
+          .update({
+            status: 'completed',
+            records_added: allEnriched.length,
+            records_updated: updateOperations.length,
+            records_removed: removedCount
+          })
+          .eq('id', importRecord.id);
 
-      // Update last import date in state
-      setLastImportDate(new Date().toISOString());
+        // Update last import date in state
+        setLastImportDate(new Date().toISOString());
+      }
       
-      setStatus(`✅ Complete! ${allEnriched.length} new, ${updateOperations.length} updated, ${removedCount} removed, 1001 albums matched`);
+      const removedCount = recordsToRemove.length - deselectedRemovals.size;
+      setStatus(`${dryRun ? '🔍 DRY RUN - ' : '✅ '}Complete! ${allEnriched.length} new, ${updateOperations.length} updated, ${removedCount} removed${skip1001Matching ? '' : ', 1001 albums matched'}`);
     } catch (error) {
       // Mark import as failed
-      if (importRecord) {
+      if (!dryRun && importRecord) {
         await supabase
           .from('import_history')
           .update({ status: 'failed', notes: error instanceof Error ? error.message : 'Unknown error' })
@@ -716,6 +769,7 @@ export default function ImportDiscogsPage() {
           : 'First import - will perform full sync'}
       </p>
 
+      {/* Basic Controls */}
       {lastImportDate && (
         <div style={{
           background: forceFullSync ? '#fef3c7' : '#dbeafe',
@@ -752,6 +806,210 @@ export default function ImportDiscogsPage() {
         </div>
       )}
 
+      {/* Advanced Override Controls */}
+      <div style={{
+        background: 'white',
+        border: '2px solid #8b5cf6',
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 16
+      }}>
+        <div 
+          onClick={() => setShowAdvanced(!showAdvanced)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            cursor: 'pointer',
+            marginBottom: showAdvanced ? 16 : 0
+          }}
+        >
+          <h3 style={{ fontSize: 16, fontWeight: 600, color: '#8b5cf6', margin: 0 }}>
+            ⚙️ Advanced Override Controls
+          </h3>
+          <span style={{ fontSize: 20, color: '#8b5cf6' }}>
+            {showAdvanced ? '▼' : '▶'}
+          </span>
+        </div>
+
+        {showAdvanced && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {/* Dry Run */}
+            <div style={{
+              background: dryRun ? '#fef3c7' : '#f9fafb',
+              border: `1px solid ${dryRun ? '#f59e0b' : '#e5e7eb'}`,
+              borderRadius: 8,
+              padding: 12,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12
+            }}>
+              <input
+                type="checkbox"
+                id="dryRun"
+                checked={dryRun}
+                onChange={(e) => setDryRun(e.target.checked)}
+                style={{ width: 18, height: 18, cursor: 'pointer' }}
+              />
+              <label htmlFor="dryRun" style={{ fontSize: 14, color: '#1f2937', cursor: 'pointer', flex: 1 }}>
+                <strong>Dry Run Mode</strong> - Preview what would happen without making any changes
+              </label>
+            </div>
+
+            {/* Skip Enrichment */}
+            <div style={{
+              background: '#f9fafb',
+              border: '1px solid #e5e7eb',
+              borderRadius: 8,
+              padding: 12,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12
+            }}>
+              <input
+                type="checkbox"
+                id="skipEnrichment"
+                checked={skipEnrichment}
+                onChange={(e) => setSkipEnrichment(e.target.checked)}
+                style={{ width: 18, height: 18, cursor: 'pointer' }}
+              />
+              <label htmlFor="skipEnrichment" style={{ fontSize: 14, color: '#1f2937', cursor: 'pointer', flex: 1 }}>
+                Skip Discogs API Enrichment (no images, tracklists, or genres fetched)
+              </label>
+            </div>
+
+            {/* Skip 1001 Matching */}
+            <div style={{
+              background: '#f9fafb',
+              border: '1px solid #e5e7eb',
+              borderRadius: 8,
+              padding: 12,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12
+            }}>
+              <input
+                type="checkbox"
+                id="skip1001"
+                checked={skip1001Matching}
+                onChange={(e) => setSkip1001Matching(e.target.checked)}
+                style={{ width: 18, height: 18, cursor: 'pointer' }}
+              />
+              <label htmlFor="skip1001" style={{ fontSize: 14, color: '#1f2937', cursor: 'pointer', flex: 1 }}>
+                Skip 1001 Album Matching
+              </label>
+            </div>
+
+            {/* Skip Removals */}
+            <div style={{
+              background: '#f9fafb',
+              border: '1px solid #e5e7eb',
+              borderRadius: 8,
+              padding: 12,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12
+            }}>
+              <input
+                type="checkbox"
+                id="skipRemovals"
+                checked={skipRemovals}
+                onChange={(e) => setSkipRemovals(e.target.checked)}
+                style={{ width: 18, height: 18, cursor: 'pointer' }}
+              />
+              <label htmlFor="skipRemovals" style={{ fontSize: 14, color: '#1f2937', cursor: 'pointer', flex: 1 }}>
+                Skip Removals (don&apos;t delete albums not in CSV, even in full sync)
+              </label>
+            </div>
+
+            {/* Skip Updates */}
+            <div style={{
+              background: '#f9fafb',
+              border: '1px solid #e5e7eb',
+              borderRadius: 8,
+              padding: 12,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12
+            }}>
+              <input
+                type="checkbox"
+                id="skipUpdates"
+                checked={skipUpdates}
+                onChange={(e) => setSkipUpdates(e.target.checked)}
+                style={{ width: 18, height: 18, cursor: 'pointer' }}
+              />
+              <label htmlFor="skipUpdates" style={{ fontSize: 14, color: '#1f2937', cursor: 'pointer', flex: 1 }}>
+                Skip Updates (only add new items, don&apos;t update existing)
+              </label>
+            </div>
+
+            {/* Batch Size */}
+            <div style={{
+              background: '#f9fafb',
+              border: '1px solid #e5e7eb',
+              borderRadius: 8,
+              padding: 12,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12
+            }}>
+              <label htmlFor="batchSize" style={{ fontSize: 14, color: '#1f2937', minWidth: 120 }}>
+                Batch Size:
+              </label>
+              <input
+                type="number"
+                id="batchSize"
+                value={batchSize}
+                onChange={(e) => setBatchSize(Number(e.target.value))}
+                min="1"
+                max="100"
+                style={{
+                  padding: '6px 12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: 6,
+                  fontSize: 14,
+                  width: 80
+                }}
+              />
+              <span style={{ fontSize: 12, color: '#6b7280' }}>items per batch (default: 25)</span>
+            </div>
+
+            {/* API Delay */}
+            <div style={{
+              background: '#f9fafb',
+              border: '1px solid #e5e7eb',
+              borderRadius: 8,
+              padding: 12,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12
+            }}>
+              <label htmlFor="apiDelay" style={{ fontSize: 14, color: '#1f2937', minWidth: 120 }}>
+                API Delay:
+              </label>
+              <input
+                type="number"
+                id="apiDelay"
+                value={apiDelay}
+                onChange={(e) => setApiDelay(Number(e.target.value))}
+                min="500"
+                max="10000"
+                step="500"
+                style={{
+                  padding: '6px 12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: 6,
+                  fontSize: 14,
+                  width: 80
+                }}
+              />
+              <span style={{ fontSize: 12, color: '#6b7280' }}>ms between API calls (default: 2000)</span>
+            </div>
+          </div>
+        )}
+      </div>
+
       <div style={{
         background: 'white',
         border: '1px solid #e5e7eb',
@@ -781,7 +1039,7 @@ export default function ImportDiscogsPage() {
             style={{
               marginLeft: 16,
               padding: '12px 24px',
-              background: isProcessing ? '#9ca3af' : 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+              background: isProcessing ? '#9ca3af' : dryRun ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
               color: 'white',
               border: 'none',
               borderRadius: 8,
@@ -791,19 +1049,19 @@ export default function ImportDiscogsPage() {
               boxShadow: isProcessing ? 'none' : '0 4px 6px rgba(59, 130, 246, 0.2)'
             }}
           >
-            {isProcessing ? 'Processing...' : '⚡ Enrich & Import'}
+            {isProcessing ? 'Processing...' : dryRun ? '🔍 Preview Changes' : '⚡ Enrich & Import'}
           </button>
         )}
       </div>
 
       {status && (
         <div style={{
-          background: status.includes('✅') ? '#dcfce7' : status.includes('❌') ? '#fee2e2' : '#dbeafe',
-          border: `1px solid ${status.includes('✅') ? '#16a34a' : status.includes('❌') ? '#dc2626' : '#3b82f6'}`,
+          background: status.includes('✅') ? '#dcfce7' : status.includes('❌') ? '#fee2e2' : status.includes('DRY RUN') ? '#fef3c7' : '#dbeafe',
+          border: `1px solid ${status.includes('✅') ? '#16a34a' : status.includes('❌') ? '#dc2626' : status.includes('DRY RUN') ? '#f59e0b' : '#3b82f6'}`,
           borderRadius: 8,
           padding: 16,
           marginBottom: 24,
-          color: status.includes('✅') ? '#15803d' : status.includes('❌') ? '#991b1b' : '#1e40af',
+          color: status.includes('✅') ? '#15803d' : status.includes('❌') ? '#991b1b' : status.includes('DRY RUN') ? '#d97706' : '#1e40af',
           fontSize: 14,
           fontWeight: 500
         }}>
@@ -876,13 +1134,14 @@ export default function ImportDiscogsPage() {
             <div 
               onClick={() => setShowDetails(showDetails === 'updates' ? null : 'updates')}
               style={{
-                background: '#fef3c7',
-                border: '1px solid #f59e0b',
+                background: skipUpdates ? '#f3f4f6' : '#fef3c7',
+                border: `1px solid ${skipUpdates ? '#9ca3af' : '#f59e0b'}`,
                 borderRadius: 8,
                 padding: 16,
                 textAlign: 'center',
                 cursor: syncPreview.updateOperations.length > 0 ? 'pointer' : 'default',
-                transition: 'all 0.2s'
+                transition: 'all 0.2s',
+                opacity: skipUpdates ? 0.5 : 1
               }}
               onMouseEnter={e => {
                 if (syncPreview.updateOperations.length > 0) {
@@ -895,12 +1154,14 @@ export default function ImportDiscogsPage() {
                 e.currentTarget.style.boxShadow = 'none';
               }}
             >
-              <div style={{ fontSize: 32, fontWeight: 'bold', color: '#d97706' }}>
+              <div style={{ fontSize: 32, fontWeight: 'bold', color: skipUpdates ? '#6b7280' : '#d97706' }}>
                 {syncPreview.updateOperations.length}
               </div>
-              <div style={{ fontSize: 14, color: '#d97706', fontWeight: 600 }}>Updates</div>
+              <div style={{ fontSize: 14, color: skipUpdates ? '#6b7280' : '#d97706', fontWeight: 600 }}>
+                Updates {skipUpdates && '(Skipped)'}
+              </div>
               {syncPreview.updateOperations.length > 0 && (
-                <div style={{ fontSize: 11, color: '#f59e0b', marginTop: 4 }}>
+                <div style={{ fontSize: 11, color: skipUpdates ? '#9ca3af' : '#f59e0b', marginTop: 4 }}>
                   Click to view changes →
                 </div>
               )}
@@ -910,13 +1171,14 @@ export default function ImportDiscogsPage() {
               <div 
                 onClick={() => setShowDetails(showDetails === 'removes' ? null : 'removes')}
                 style={{
-                  background: '#fee2e2',
-                  border: '1px solid #dc2626',
+                  background: skipRemovals ? '#f3f4f6' : '#fee2e2',
+                  border: `1px solid ${skipRemovals ? '#9ca3af' : '#dc2626'}`,
                   borderRadius: 8,
                   padding: 16,
                   textAlign: 'center',
                   cursor: syncPreview.recordsToRemove.length > 0 ? 'pointer' : 'default',
-                  transition: 'all 0.2s'
+                  transition: 'all 0.2s',
+                  opacity: skipRemovals ? 0.5 : 1
                 }}
                 onMouseEnter={e => {
                   if (syncPreview.recordsToRemove.length > 0) {
@@ -929,12 +1191,14 @@ export default function ImportDiscogsPage() {
                   e.currentTarget.style.boxShadow = 'none';
                 }}
               >
-                <div style={{ fontSize: 32, fontWeight: 'bold', color: '#991b1b' }}>
+                <div style={{ fontSize: 32, fontWeight: 'bold', color: skipRemovals ? '#6b7280' : '#991b1b' }}>
                   {syncPreview.recordsToRemove.length}
                 </div>
-                <div style={{ fontSize: 14, color: '#991b1b', fontWeight: 600 }}>To Remove</div>
+                <div style={{ fontSize: 14, color: skipRemovals ? '#6b7280' : '#991b1b', fontWeight: 600 }}>
+                  To Remove {skipRemovals && '(Skipped)'}
+                </div>
                 {syncPreview.recordsToRemove.length > 0 && (
-                  <div style={{ fontSize: 11, color: '#dc2626', marginTop: 4 }}>
+                  <div style={{ fontSize: 11, color: skipRemovals ? '#9ca3af' : '#dc2626', marginTop: 4 }}>
                     Click to view →
                   </div>
                 )}
@@ -942,7 +1206,7 @@ export default function ImportDiscogsPage() {
             )}
           </div>
           
-          {/* Detailed Views */}
+          {/* Detailed Views - keeping same as before */}
           {showDetails === 'new' && syncPreview.newItems.length > 0 && (
             <div style={{
               background: '#f0fdf4',
