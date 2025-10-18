@@ -1,4 +1,4 @@
-// src/app/admin/organize/page.tsx - COMPLETE FILE - Fixed to parse JSON genre strings
+// src/app/admin/organize/page.tsx - COMPLETE FILE with Tag Filtering
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -20,6 +20,7 @@ type Row = {
   apple_music_genres: string | string[] | null;
   decade: number | null;
   folder: string;
+  custom_tags: string[] | null;
 };
 
 type LyricSearchResult = {
@@ -30,6 +31,13 @@ type LyricSearchResult = {
   track_position: string | null;
   genius_url: string | null;
   image_url: string | null;
+};
+
+type TagDefinition = {
+  id: string;
+  name: string;
+  category: string;
+  color: string;
 };
 
 function parseGenres(value: string | string[] | null): string[] {
@@ -52,6 +60,7 @@ export default function FlexibleOrganizePage() {
   const [selectedFolders, setSelectedFolders] = useState<string[]>([]);
   const [selectedGenresStyles, setSelectedGenresStyles] = useState<string[]>([]);
   const [selectedDecades, setSelectedDecades] = useState<number[]>([]);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [yearRangeStart, setYearRangeStart] = useState<string>('');
   const [yearRangeEnd, setYearRangeEnd] = useState<string>('');
   const [artistSearch, setArtistSearch] = useState<string>('');
@@ -60,10 +69,23 @@ export default function FlexibleOrganizePage() {
   const [availableFolders, setAvailableFolders] = useState<string[]>([]);
   const [availableGenresStyles, setAvailableGenresStyles] = useState<string[]>([]);
   const [availableDecades, setAvailableDecades] = useState<number[]>([]);
+  const [tagDefinitions, setTagDefinitions] = useState<TagDefinition[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
     
+    // Load tag definitions
+    const { data: tagDefs } = await supabase
+      .from('tag_definitions')
+      .select('*')
+      .order('category', { ascending: true })
+      .order('name', { ascending: true });
+    
+    if (tagDefs) {
+      setTagDefinitions(tagDefs as TagDefinition[]);
+    }
+    
+    // Load albums with tags
     let allRows: Row[] = [];
     let from = 0;
     const batchSize = 1000;
@@ -72,7 +94,7 @@ export default function FlexibleOrganizePage() {
     while (keepGoing) {
       const { data: batch, error } = await supabase
         .from('collection')
-        .select('id,artist,title,year,master_release_date,format,image_url,discogs_genres,discogs_styles,spotify_genres,apple_music_genres,decade,folder')
+        .select('id,artist,title,year,master_release_date,format,image_url,discogs_genres,discogs_styles,spotify_genres,apple_music_genres,decade,folder,custom_tags')
         .order('artist', { ascending: true })
         .range(from, from + batchSize - 1);
       
@@ -95,31 +117,12 @@ export default function FlexibleOrganizePage() {
     
     const genresStyles = new Set<string>();
     
-    // Debug: Check first album with data
-    const sampleWithSpotify = allRows.find(r => r.spotify_genres);
-    if (sampleWithSpotify) {
-      console.log('Sample album with Spotify data:', {
-        artist: sampleWithSpotify.artist,
-        title: sampleWithSpotify.title,
-        spotify_genres_raw: sampleWithSpotify.spotify_genres,
-        spotify_genres_type: typeof sampleWithSpotify.spotify_genres,
-        spotify_genres_parsed: parseGenres(sampleWithSpotify.spotify_genres),
-        apple_music_genres_raw: sampleWithSpotify.apple_music_genres,
-        apple_music_genres_type: typeof sampleWithSpotify.apple_music_genres,
-        apple_music_genres_parsed: parseGenres(sampleWithSpotify.apple_music_genres)
-      });
-    }
-    
     allRows.forEach(r => {
       parseGenres(r.discogs_genres).forEach(g => genresStyles.add(g));
       parseGenres(r.discogs_styles).forEach(s => genresStyles.add(s));
       parseGenres(r.spotify_genres).forEach(g => genresStyles.add(g));
       parseGenres(r.apple_music_genres).forEach(g => genresStyles.add(g));
     });
-    
-    console.log('Total unique genres/styles found:', genresStyles.size);
-    console.log('Has "classic rock"?', genresStyles.has('classic rock'));
-    console.log('Has "Classic Rock"?', genresStyles.has('Classic Rock'));
     
     setAvailableGenresStyles(Array.from(genresStyles).sort());
     
@@ -206,6 +209,12 @@ export default function FlexibleOrganizePage() {
         if (!selectedDecades.includes(originalDecade)) return false;
       }
       
+      // Tag filtering - album must have ALL selected tags
+      if (selectedTags.length > 0) {
+        if (!row.custom_tags || row.custom_tags.length === 0) return false;
+        if (!selectedTags.every(tag => row.custom_tags?.includes(tag))) return false;
+      }
+      
       if (yearRangeStart || yearRangeEnd) {
         const originalYear = row.master_release_date || row.year;
         const albumYear = parseInt(originalYear || '0');
@@ -219,12 +228,13 @@ export default function FlexibleOrganizePage() {
       
       return true;
     });
-  }, [rows, selectedFolders, selectedGenresStyles, selectedDecades, yearRangeStart, yearRangeEnd, artistSearch, titleSearch]);
+  }, [rows, selectedFolders, selectedGenresStyles, selectedDecades, selectedTags, yearRangeStart, yearRangeEnd, artistSearch, titleSearch]);
 
   const clearAllFilters = () => {
     setSelectedFolders([]);
     setSelectedGenresStyles([]);
     setSelectedDecades([]);
+    setSelectedTags([]);
     setYearRangeStart('');
     setYearRangeEnd('');
     setArtistSearch('');
@@ -232,7 +242,8 @@ export default function FlexibleOrganizePage() {
   };
 
   const hasActiveFilters = selectedFolders.length > 0 || selectedGenresStyles.length > 0 || 
-                          selectedDecades.length > 0 || yearRangeStart || yearRangeEnd || artistSearch || titleSearch;
+                          selectedDecades.length > 0 || selectedTags.length > 0 || 
+                          yearRangeStart || yearRangeEnd || artistSearch || titleSearch;
 
   const toggleFolder = (folder: string) => {
     setSelectedFolders(prev => 
@@ -257,6 +268,26 @@ export default function FlexibleOrganizePage() {
         : [...prev, decade]
     );
   };
+
+  const toggleTag = (tagName: string) => {
+    setSelectedTags(prev => 
+      prev.includes(tagName) 
+        ? prev.filter(t => t !== tagName)
+        : [...prev, tagName]
+    );
+  };
+
+  // Group tags by category for better UI
+  const tagsByCategory = useMemo(() => {
+    const grouped: Record<string, TagDefinition[]> = {};
+    tagDefinitions.forEach(tag => {
+      if (!grouped[tag.category]) {
+        grouped[tag.category] = [];
+      }
+      grouped[tag.category].push(tag);
+    });
+    return grouped;
+  }, [tagDefinitions]);
 
   return (
     <div style={{
@@ -288,108 +319,127 @@ export default function FlexibleOrganizePage() {
             fontSize: 16,
             margin: 0
           }}>
-            Organize by metadata or search lyrics content
+            Organize by metadata, tags, or search lyrics content
           </p>
         </div>
         
-        <button
-          onClick={async () => {
-            setLoading(true);
-            setEnrichStatus('Starting enrichment...');
-            
-            let totalUpdated = 0;
-            let totalScanned = 0;
-            let cursor: number | null = 0;
-            
-            try {
-              while (cursor !== null) {
-                setEnrichStatus(`Enriching batch... (${totalUpdated} updated / ${totalScanned} scanned so far)`);
-                
-                const res = await fetch('/api/enrich', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ cursor, limit: 80 })
-                });
-                
-                if (!res.ok) {
-                  throw new Error(`HTTP ${res.status}`);
-                }
-                
-                const result = await res.json();
-                totalUpdated += result.updated || 0;
-                totalScanned += result.scanned || 0;
-                cursor = result.nextCursor;
-                
-                setEnrichStatus(`Processed batch: ${result.updated} updated, ${result.scanned} scanned. Total: ${totalUpdated} updated / ${totalScanned} scanned`);
-                
-                if (cursor !== null) {
-                  await new Promise(resolve => setTimeout(resolve, 1000));
-                }
-              }
-              
-              setEnrichStatus(`✅ Enrichment complete! Updated ${totalUpdated} items out of ${totalScanned} scanned`);
-              await load();
-              
-              setTimeout(() => setEnrichStatus(''), 5000);
-              
-            } catch (err) {
-              setEnrichStatus(`❌ Enrichment failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
-              setTimeout(() => setEnrichStatus(''), 10000);
-            } finally {
-              setLoading(false);
-            }
-          }}
-          disabled={loading}
-          style={{
-            background: loading ? '#9ca3af' : '#059669',
-            border: 'none',
-            borderRadius: 6,
-            padding: '8px 16px',
-            fontSize: 14,
-            fontWeight: 600,
-            color: 'white',
-            cursor: loading ? 'not-allowed' : 'pointer'
-          }}
-        >
-          {loading ? 'Enriching...' : 'Enrich Missing Metadata'}
-        </button>
-
-        {enrichStatus && (
-          <div style={{
-            marginTop: 12,
-            padding: 12,
-            background: enrichStatus.includes('❌') ? '#fee2e2' : 
-                       enrichStatus.includes('✅') ? '#dcfce7' : '#dbeafe',
-            border: `1px solid ${enrichStatus.includes('❌') ? '#dc2626' : 
-                                 enrichStatus.includes('✅') ? '#16a34a' : '#3b82f6'}`,
-            borderRadius: 6,
-            fontSize: 14,
-            color: enrichStatus.includes('❌') ? '#991b1b' : 
-                   enrichStatus.includes('✅') ? '#15803d' : '#1e40af',
-            fontWeight: 500
-          }}>
-            {enrichStatus}
-          </div>
-        )}
-        
-        {hasActiveFilters && (
-          <button
-            onClick={clearAllFilters}
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <Link
+            href="/admin/manage-tags"
             style={{
-              background: '#ef4444',
+              background: '#8b5cf6',
               border: 'none',
               borderRadius: 6,
               padding: '8px 16px',
               fontSize: 14,
               fontWeight: 600,
               color: 'white',
-              cursor: 'pointer'
+              textDecoration: 'none',
+              display: 'inline-block'
             }}
           >
-            Clear All Filters
+            🏷️ Manage Tags
+          </Link>
+
+          <button
+            onClick={async () => {
+              setLoading(true);
+              setEnrichStatus('Starting enrichment...');
+              
+              let totalUpdated = 0;
+              let totalScanned = 0;
+              let cursor: number | null = 0;
+              
+              try {
+                while (cursor !== null) {
+                  setEnrichStatus(`Enriching batch... (${totalUpdated} updated / ${totalScanned} scanned so far)`);
+                  
+                  const res = await fetch('/api/enrich', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ cursor, limit: 80 })
+                  });
+                  
+                  if (!res.ok) {
+                    throw new Error(`HTTP ${res.status}`);
+                  }
+                  
+                  const result = await res.json();
+                  totalUpdated += result.updated || 0;
+                  totalScanned += result.scanned || 0;
+                  cursor = result.nextCursor;
+                  
+                  setEnrichStatus(`Processed batch: ${result.updated} updated, ${result.scanned} scanned. Total: ${totalUpdated} updated / ${totalScanned} scanned`);
+                  
+                  if (cursor !== null) {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                  }
+                }
+                
+                setEnrichStatus(`✅ Enrichment complete! Updated ${totalUpdated} items out of ${totalScanned} scanned`);
+                await load();
+                
+                setTimeout(() => setEnrichStatus(''), 5000);
+                
+              } catch (err) {
+                setEnrichStatus(`❌ Enrichment failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+                setTimeout(() => setEnrichStatus(''), 10000);
+              } finally {
+                setLoading(false);
+              }
+            }}
+            disabled={loading}
+            style={{
+              background: loading ? '#9ca3af' : '#059669',
+              border: 'none',
+              borderRadius: 6,
+              padding: '8px 16px',
+              fontSize: 14,
+              fontWeight: 600,
+              color: 'white',
+              cursor: loading ? 'not-allowed' : 'pointer'
+            }}
+          >
+            {loading ? 'Enriching...' : 'Enrich Missing Metadata'}
           </button>
-        )}
+
+          {hasActiveFilters && (
+            <button
+              onClick={clearAllFilters}
+              style={{
+                background: '#ef4444',
+                border: 'none',
+                borderRadius: 6,
+                padding: '8px 16px',
+                fontSize: 14,
+                fontWeight: 600,
+                color: 'white',
+                cursor: 'pointer'
+              }}
+            >
+              Clear All Filters
+            </button>
+          )}
+        </div>
       </div>
+
+      {enrichStatus && (
+        <div style={{
+          marginBottom: 24,
+          padding: 12,
+          background: enrichStatus.includes('❌') ? '#fee2e2' : 
+                     enrichStatus.includes('✅') ? '#dcfce7' : '#dbeafe',
+          border: `1px solid ${enrichStatus.includes('❌') ? '#dc2626' : 
+                               enrichStatus.includes('✅') ? '#16a34a' : '#3b82f6'}`,
+          borderRadius: 6,
+          fontSize: 14,
+          color: enrichStatus.includes('❌') ? '#991b1b' : 
+                 enrichStatus.includes('✅') ? '#15803d' : '#1e40af',
+          fontWeight: 500
+        }}>
+          {enrichStatus}
+        </div>
+      )}
 
       <div style={{
         background: 'linear-gradient(135deg, #7c3aed 0%, #a855f7 100%)',
@@ -879,6 +929,109 @@ export default function FlexibleOrganizePage() {
               ))}
             </div>
           </div>
+
+          {/* NEW: TAG FILTERING SECTION */}
+          <div style={{
+            border: '2px solid #8b5cf6',
+            borderRadius: 8,
+            padding: 16,
+            background: 'linear-gradient(to bottom, #faf5ff, #f9fafb)',
+            gridColumn: 'span 3'
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: 12
+            }}>
+              <h4 style={{
+                fontSize: 16,
+                fontWeight: 600,
+                color: '#7c3aed',
+                margin: 0
+              }}>
+                🏷️ Custom Tags ({selectedTags.length} selected)
+              </h4>
+              <span style={{
+                fontSize: 12,
+                color: '#6b7280',
+                fontStyle: 'italic'
+              }}>
+                Albums must have ALL selected tags
+              </span>
+            </div>
+            
+            {Object.keys(tagsByCategory).length === 0 ? (
+              <div style={{
+                padding: 20,
+                textAlign: 'center',
+                color: '#6b7280',
+                fontSize: 14
+              }}>
+                No tags defined yet. <Link href="/admin/manage-tags" style={{ color: '#8b5cf6' }}>Create tags →</Link>
+              </div>
+            ) : (
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                gap: 16
+              }}>
+                {Object.entries(tagsByCategory).map(([category, tags]) => (
+                  <div key={category}>
+                    <div style={{
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      marginBottom: 8,
+                      letterSpacing: '0.5px'
+                    }}>
+                      {category}
+                    </div>
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 6
+                    }}>
+                      {tags.map(tag => (
+                        <label key={tag.id} style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          cursor: 'pointer',
+                          padding: '4px 8px',
+                          borderRadius: 4,
+                          fontSize: 13,
+                          color: '#374151',
+                          transition: 'all 0.2s',
+                          background: selectedTags.includes(tag.name) ? `${tag.color}20` : 'transparent'
+                        }}>
+                          <input
+                            type="checkbox"
+                            checked={selectedTags.includes(tag.name)}
+                            onChange={() => toggleTag(tag.name)}
+                            style={{
+                              transform: 'scale(1.1)',
+                              accentColor: tag.color
+                            }}
+                          />
+                          <span style={{
+                            display: 'inline-block',
+                            width: 10,
+                            height: 10,
+                            borderRadius: '50%',
+                            background: tag.color,
+                            flexShrink: 0
+                          }} />
+                          {tag.name}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
         
         <div style={{
@@ -997,6 +1150,44 @@ export default function FlexibleOrganizePage() {
                   )}
                   {album.folder && <span>• {album.folder}</span>}
                 </div>
+                
+                {/* Show tags on album cards */}
+                {album.custom_tags && album.custom_tags.length > 0 && (
+                  <div style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: 4,
+                    marginTop: 4
+                  }}>
+                    {album.custom_tags.slice(0, 3).map(tagName => {
+                      const tagDef = tagDefinitions.find(t => t.name === tagName);
+                      return (
+                        <span
+                          key={tagName}
+                          style={{
+                            fontSize: 10,
+                            padding: '2px 6px',
+                            borderRadius: 3,
+                            background: tagDef?.color || '#6b7280',
+                            color: 'white',
+                            fontWeight: 500
+                          }}
+                        >
+                          {tagName}
+                        </span>
+                      );
+                    })}
+                    {album.custom_tags.length > 3 && (
+                      <span style={{
+                        fontSize: 10,
+                        padding: '2px 6px',
+                        color: '#6b7280'
+                      }}>
+                        +{album.custom_tags.length - 3}
+                      </span>
+                    )}
+                  </div>
+                )}
               </Link>
             ))}
           </div>
