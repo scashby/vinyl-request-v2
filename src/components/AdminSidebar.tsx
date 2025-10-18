@@ -1,4 +1,4 @@
-// Updated src/components/AdminSidebar.tsx - Added diagnostics and enrichment
+// src/components/AdminSidebar.tsx - COMPLETE NEW FILE
 
 "use client";
 
@@ -49,44 +49,164 @@ export default function AdminSidebar() {
         </ul>
       </div>
 
-      {/* Audio & Live Features */}
+      {/* Collection Management */}
       <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
-        <h4 className="text-sm font-semibold text-purple-800 mb-2">🎵 Audio & Live</h4>
+        <h4 className="text-sm font-semibold text-purple-800 mb-2">🎵 Collection</h4>
         <div className="space-y-2">
           <Link 
-            href="/admin/audio-recognition"
+            href="/admin/edit-collection"
             className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
-              pathname === "/admin/audio-recognition" 
+              pathname === "/admin/edit-collection" 
                 ? "bg-purple-700 text-white" 
                 : "bg-purple-600 text-white hover:bg-purple-700"
             }`}
           >
-            🎧 Audio Recognition
+            📚 Browse & Edit
           </Link>
           <Link 
-            href="/admin/audio-debug"
+            href="/admin/import-discogs"
             className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
-              pathname === "/admin/audio-debug" 
+              pathname === "/admin/import-discogs" 
                 ? "bg-purple-700 text-white" 
                 : "bg-purple-600 text-white hover:bg-purple-700"
             }`}
           >
-            🛠️ Audio Debug
+            📥 Import from Discogs
           </Link>
-          <a 
-            href="/tv-display"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block w-full text-center bg-gray-600 text-white py-1.5 px-2 rounded text-xs font-medium hover:bg-gray-700 transition-colors"
+          <Link 
+            href="/admin/manage-tags"
+            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+              pathname === "/admin/manage-tags" 
+                ? "bg-purple-700 text-white" 
+                : "bg-purple-600 text-white hover:bg-purple-700"
+            }`}
           >
-            📺 TV Display
-          </a>
+            🏷️ Manage Tags
+          </Link>
+        </div>
+      </div>
+
+      {/* Merchandise */}
+      <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+        <h4 className="text-sm font-semibold text-emerald-800 mb-2">💰 Merchandise</h4>
+        <div className="space-y-2">
+          <Link 
+            href="/admin/sale-items"
+            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+              pathname === "/admin/sale-items" 
+                ? "bg-emerald-700 text-white" 
+                : "bg-emerald-600 text-white hover:bg-emerald-700"
+            }`}
+          >
+            💿 Sale Items
+          </Link>
+          <div className="pt-2 border-t border-emerald-300">
+            <div className="text-xs text-emerald-700 font-semibold mb-1 px-1">External:</div>
+            <div className="grid grid-cols-2 gap-1 text-xs">
+              <a 
+                href="https://admin.shopify.com/store/kstusk-d1?ui_locales=en"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-center bg-emerald-700 text-white py-1 px-1 rounded font-medium hover:bg-emerald-800 transition-colors"
+              >
+                🛍️ Shopify
+              </a>
+              <a 
+                href="https://www.discogs.com/seller/socialblunders/profile"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-center bg-emerald-700 text-white py-1 px-1 rounded font-medium hover:bg-emerald-800 transition-colors"
+              >
+                💿 Discogs
+              </a>
+              <a 
+                href="https://www.moo.com/us/account/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-center bg-emerald-700 text-white py-1 px-1 rounded font-medium hover:bg-emerald-800 transition-colors"
+              >
+                🐄 Moo
+              </a>
+              <a 
+                href="https://www.vistaprint.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-center bg-emerald-700 text-white py-1 px-1 rounded font-medium hover:bg-emerald-800 transition-colors"
+              >
+                🖨️ Vista
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Data Quality */}
+      <div className="mb-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+        <h4 className="text-sm font-semibold text-indigo-800 mb-2">🔧 Data Quality</h4>
+        <div className="space-y-2">
+          <Link 
+            href="/admin/diagnostics"
+            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+              pathname === "/admin/diagnostics" 
+                ? "bg-indigo-700 text-white" 
+                : "bg-indigo-600 text-white hover:bg-indigo-700"
+            }`}
+          >
+            🔍 Diagnostics
+          </Link>
+          <Link 
+            href="/admin/enrich-sources"
+            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+              pathname === "/admin/enrich-sources" 
+                ? "bg-indigo-700 text-white" 
+                : "bg-indigo-600 text-white hover:bg-indigo-700"
+            }`}
+          >
+            🎵 Multi-Source Enrich
+          </Link>
+          <Link 
+            href="/admin/media-grading"
+            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+              pathname === "/admin/media-grading" 
+                ? "bg-indigo-700 text-white" 
+                : "bg-indigo-600 text-white hover:bg-indigo-700"
+            }`}
+          >
+            🎯 Media Grading
+          </Link>
+        </div>
+      </div>
+
+      {/* Advanced Tools */}
+      <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+        <h4 className="text-sm font-semibold text-amber-800 mb-2">🔍 Advanced Tools</h4>
+        <div className="space-y-2">
+          <Link 
+            href="/admin/organize"
+            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+              pathname === "/admin/organize" 
+                ? "bg-amber-700 text-white" 
+                : "bg-amber-600 text-white hover:bg-amber-700"
+            }`}
+          >
+            🗂️ Advanced Search
+          </Link>
+          <Link 
+            href="/admin/specialized-searches"
+            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+              pathname === "/admin/specialized-searches" 
+                ? "bg-amber-700 text-white" 
+                : "bg-amber-600 text-white hover:bg-amber-700"
+            }`}
+          >
+            🔎 Specialized Searches
+          </Link>
         </div>
       </div>
 
       {/* Event Management */}
       <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
-        <h4 className="text-sm font-semibold text-orange-800 mb-2">📅 Event Management</h4>
+        <h4 className="text-sm font-semibold text-orange-800 mb-2">📅 Events</h4>
         <div className="space-y-2">
           <Link 
             href="/admin/manage-events"
@@ -106,7 +226,7 @@ export default function AdminSidebar() {
                 : "bg-red-600 text-white hover:bg-red-700"
             }`}
           >
-            🎧 Manage DJ Sets
+            🎧 DJ Sets
           </Link>
           <Link 
             href="/admin/edit-queue"
@@ -116,114 +236,7 @@ export default function AdminSidebar() {
                 : "bg-orange-600 text-white hover:bg-orange-700"
             }`}
           >
-            🎵 Manage Queues
-          </Link>
-        </div>
-      </div>
-
-      {/* Editing & Data */}
-      <div className="mb-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
-        <h4 className="text-sm font-semibold text-indigo-800 mb-2">🧰 Editing & Data</h4>
-        <div className="space-y-2">
-          <Link 
-            href="/admin/edit-collection"
-            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
-              pathname === "/admin/edit-collection" 
-                ? "bg-indigo-700 text-white" 
-                : "bg-indigo-600 text-white hover:bg-indigo-700"
-            }`}
-          >
-            📚 Edit Collection
-          </Link>
-          <Link 
-            href="/admin/diagnostics"
-            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
-              pathname === "/admin/diagnostics" 
-                ? "bg-indigo-700 text-white" 
-                : "bg-indigo-600 text-white hover:bg-indigo-700"
-            }`}
-          >
-            🔍 Data Diagnostics
-          </Link>
-          <Link 
-            href="/admin/add-album"
-            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
-              pathname === "/admin/add-album" 
-                ? "bg-indigo-700 text-white" 
-                : "bg-indigo-600 text-white hover:bg-indigo-700"
-            }`}
-          >
-            ➕ Add Album
-          </Link>
-          <Link 
-            href="/admin/media-grading"
-            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
-              pathname === "/admin/media-grading" 
-                ? "bg-indigo-700 text-white" 
-                : "bg-indigo-600 text-white hover:bg-indigo-700"
-            }`}
-          >
-            🎯 Media Grading
-          </Link>
-          <Link 
-            href="/admin/organize"
-            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
-              pathname === "/admin/organize" 
-                ? "bg-indigo-700 text-white" 
-                : "bg-indigo-600 text-white hover:bg-indigo-700"
-            }`}
-          >
-            🗂️ Organize
-          </Link>
-          <Link 
-            href="/admin/enrich-sources"
-            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
-              pathname === "/admin/enrich-sources" 
-                ? "bg-indigo-700 text-white" 
-                : "bg-indigo-600 text-white hover:bg-indigo-700"
-            }`}
-          >
-            🎵 Multi-Source Enrich
-          </Link>
-          <Link 
-            href="/admin/add-customer-vinyl"
-            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
-              pathname === "/admin/add-customer-vinyl" 
-                ? "bg-indigo-700 text-white" 
-                : "bg-indigo-600 text-white hover:bg-indigo-700"
-            }`}
-          >
-            💿 Add Customer Vinyl
-          </Link>
-          <Link 
-            href="/admin/import-discogs"
-            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
-              pathname === "/admin/import-discogs" 
-                ? "bg-green-700 text-white" 
-                : "bg-green-600 text-white hover:bg-green-700"
-            }`}
-          >
-            📥 Import Discogs
-          </Link>
-          <Link 
-            href="/admin/cd-only-checker"
-            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
-              pathname === "/admin/cd-only-checker" 
-                ? "bg-red-700 text-white" 
-                : "bg-red-600 text-white hover:bg-red-700"
-            }`}
-          >
-            💿 CD-Only Finder
-          </Link>
-          <Link
-            href="/admin/1001-review"
-            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
-              pathname === "/admin/1001-review"
-                ? "bg-indigo-700 text-white"
-                : "bg-indigo-600 text-white hover:bg-indigo-700"
-            }`}
-          >
-            ✅ 1001 Review
+            🎵 Queues
           </Link>
         </div>
       </div>
@@ -240,7 +253,7 @@ export default function AdminSidebar() {
                 : "bg-green-600 text-white hover:bg-green-700"
             }`}
           >
-            📄 Edit About Page
+            📄 About Page
           </Link>
           <Link 
             href="/admin/most-wanted"
@@ -301,6 +314,46 @@ export default function AdminSidebar() {
           >
             🟩 Supabase
           </a>
+          <a 
+            href="https://business.facebook.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-center bg-blue-600 text-white py-1 px-1 rounded font-medium hover:bg-blue-700 transition-colors"
+          >
+            📘 FB
+          </a>
+          <a 
+            href="https://login.buffer.com/login"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-center bg-sky-600 text-white py-1 px-1 rounded font-medium hover:bg-sky-700 transition-colors"
+          >
+            📱 Buffer
+          </a>
+          <a 
+            href="https://admin.google.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-center bg-red-500 text-white py-1 px-1 rounded font-medium hover:bg-red-600 transition-colors"
+          >
+            🔍 Google
+          </a>
+          <a 
+            href="https://login.squarespace.com/api/1/login/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-center bg-gray-800 text-white py-1 px-1 rounded font-medium hover:bg-gray-900 transition-colors"
+          >
+            ⬛ Square
+          </a>
+          <a 
+            href="https://app.dub.co/login"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-center bg-violet-600 text-white py-1 px-1 rounded font-medium hover:bg-violet-700 transition-colors"
+          >
+            🔗 Dub
+          </a>
         </div>
       </div>
 
@@ -308,8 +361,7 @@ export default function AdminSidebar() {
       <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
         <h4 className="text-sm font-semibold text-gray-800 mb-2">📊 Status</h4>
         <div className="space-y-1 text-xs text-gray-600">
-          <div>🎧 Audio system: Active</div>
-          <div>🗳️ Voting systems: Live</div>
+          <div>🗳️ Voting: Active</div>
           <div>💡 Suggestions: Active</div>
           <div>💸 Venmo: @deadwaxdialogues</div>
         </div>
