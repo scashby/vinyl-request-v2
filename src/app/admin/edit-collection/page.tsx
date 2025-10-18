@@ -1,7 +1,7 @@
-// src/app/admin/edit-collection/page.tsx - SIMPLE DAILY BROWSER
+// src/app/admin/edit-collection/page.tsx - WITH TAG EDITING
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { supabase } from '../../../lib/supabaseClient';
@@ -13,23 +13,31 @@ type Album = {
   year: string | null;
   folder: string;
   image_url: string | null;
+  custom_tags: string[];
+};
+
+type TagDefinition = {
+  id: number;
+  tag_name: string;
+  category: 'theme' | 'mood' | 'occasion' | 'special';
+  color: string;
+  description: string;
 };
 
 export default function BrowseCollection() {
   const [albums, setAlbums] = useState<Album[]>([]);
+  const [tagDefinitions, setTagDefinitions] = useState<TagDefinition[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedAlbum, setSelectedAlbum] = useState<Album | null>(null);
+  const [savingTags, setSavingTags] = useState(false);
 
-  useEffect(() => {
-    loadAlbums();
-  }, []);
-
-  async function loadAlbums() {
+  const loadAlbums = useCallback(async () => {
     setLoading(true);
     
     const { data, error } = await supabase
       .from('collection')
-      .select('id, artist, title, year, folder, image_url')
+      .select('id, artist, title, year, folder, image_url, custom_tags')
       .order('artist', { ascending: true })
       .order('title', { ascending: true });
     
@@ -40,7 +48,26 @@ export default function BrowseCollection() {
     }
     
     setLoading(false);
-  }
+  }, []);
+
+  const loadTagDefinitions = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('tag_definitions')
+      .select('*')
+      .order('category', { ascending: true })
+      .order('tag_name', { ascending: true });
+    
+    if (error) {
+      console.error('Error loading tag definitions:', error);
+    } else {
+      setTagDefinitions(data || []);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadAlbums();
+    loadTagDefinitions();
+  }, [loadAlbums, loadTagDefinitions]);
 
   const filteredAlbums = albums.filter(album => {
     if (!searchTerm) return true;
@@ -50,6 +77,70 @@ export default function BrowseCollection() {
       album.title.toLowerCase().includes(term)
     );
   });
+
+  const openTagEditor = (album: Album) => {
+    setSelectedAlbum(album);
+  };
+
+  const closeTagEditor = () => {
+    setSelectedAlbum(null);
+  };
+
+  const toggleTag = (tagName: string) => {
+    if (!selectedAlbum) return;
+    
+    const currentTags = selectedAlbum.custom_tags || [];
+    const newTags = currentTags.includes(tagName)
+      ? currentTags.filter(t => t !== tagName)
+      : [...currentTags, tagName];
+    
+    setSelectedAlbum({
+      ...selectedAlbum,
+      custom_tags: newTags
+    });
+  };
+
+  const saveTags = async () => {
+    if (!selectedAlbum) return;
+    
+    setSavingTags(true);
+    
+    const { error } = await supabase
+      .from('collection')
+      .update({ custom_tags: selectedAlbum.custom_tags })
+      .eq('id', selectedAlbum.id);
+    
+    if (error) {
+      console.error('Error saving tags:', error);
+      alert('Error saving tags: ' + error.message);
+    } else {
+      // Update local state
+      setAlbums(albums.map(a => 
+        a.id === selectedAlbum.id ? selectedAlbum : a
+      ));
+      closeTagEditor();
+    }
+    
+    setSavingTags(false);
+  };
+
+  const getTagColor = (tagName: string): string => {
+    const tagDef = tagDefinitions.find(t => t.tag_name === tagName);
+    return tagDef?.color || '#3b82f6';
+  };
+
+  const categoryColors = {
+    theme: '#f97316',
+    mood: '#8b5cf6',
+    occasion: '#14b8a6',
+    special: '#eab308'
+  };
+
+  const groupedTags = tagDefinitions.reduce((acc, tag) => {
+    if (!acc[tag.category]) acc[tag.category] = [];
+    acc[tag.category].push(tag);
+    return acc;
+  }, {} as Record<string, TagDefinition[]>);
 
   return (
     <div style={{
@@ -76,7 +167,7 @@ export default function BrowseCollection() {
           fontSize: 16,
           margin: 0
         }}>
-          {albums.length} albums in your collection
+          {albums.length} albums • Click any album to edit tags
         </p>
       </div>
 
@@ -145,6 +236,23 @@ export default function BrowseCollection() {
           >
             {loading ? 'Loading...' : 'Refresh'}
           </button>
+
+          <Link
+            href="/admin/manage-tags"
+            style={{
+              padding: '12px 20px',
+              background: '#7c3aed',
+              color: 'white',
+              border: 'none',
+              borderRadius: 6,
+              fontSize: 14,
+              fontWeight: 600,
+              textDecoration: 'none',
+              display: 'inline-block'
+            }}
+          >
+            🏷️ Manage Tags
+          </Link>
         </div>
 
         {searchTerm && (
@@ -201,9 +309,8 @@ export default function BrowseCollection() {
             gap: 16
           }}>
             {filteredAlbums.map(album => (
-              <Link
+              <div
                 key={album.id}
-                href={`/admin/edit-entry/${album.id}`}
                 style={{
                   border: '1px solid #e5e7eb',
                   borderRadius: 8,
@@ -212,32 +319,68 @@ export default function BrowseCollection() {
                   flexDirection: 'column',
                   gap: 8,
                   background: '#f9fafb',
-                  textDecoration: 'none',
-                  transition: 'all 0.2s'
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.boxShadow = 'none';
-                  e.currentTarget.style.transform = 'translateY(0)';
+                  position: 'relative'
                 }}
               >
-                <Image
-                  src={album.image_url || '/images/placeholder.png'}
-                  alt={album.title}
-                  width={180}
-                  height={180}
+                {/* Edit Entry Link */}
+                <Link
+                  href={`/admin/edit-entry/${album.id}`}
                   style={{
-                    width: '100%',
-                    height: 'auto',
-                    aspectRatio: '1',
-                    objectFit: 'cover',
-                    borderRadius: 6
+                    position: 'absolute',
+                    top: 8,
+                    right: 8,
+                    padding: '4px 8px',
+                    background: 'rgba(59, 130, 246, 0.9)',
+                    color: 'white',
+                    borderRadius: 4,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    textDecoration: 'none',
+                    zIndex: 10
                   }}
-                  unoptimized
-                />
+                >
+                  ✏️
+                </Link>
+
+                {/* Album Image */}
+                <div
+                  onClick={() => openTagEditor(album)}
+                  style={{
+                    cursor: 'pointer',
+                    position: 'relative'
+                  }}
+                >
+                  <Image
+                    src={album.image_url || '/images/placeholder.png'}
+                    alt={album.title}
+                    width={180}
+                    height={180}
+                    style={{
+                      width: '100%',
+                      height: 'auto',
+                      aspectRatio: '1',
+                      objectFit: 'cover',
+                      borderRadius: 6
+                    }}
+                    unoptimized
+                  />
+                  {/* Tag indicator overlay */}
+                  <div style={{
+                    position: 'absolute',
+                    bottom: 4,
+                    left: 4,
+                    background: 'rgba(0, 0, 0, 0.7)',
+                    color: 'white',
+                    padding: '2px 6px',
+                    borderRadius: 4,
+                    fontSize: 10,
+                    fontWeight: 600
+                  }}>
+                    🏷️ {album.custom_tags?.length || 0}
+                  </div>
+                </div>
+
+                {/* Album Info */}
                 <div style={{
                   fontSize: 13,
                   fontWeight: 600,
@@ -267,11 +410,245 @@ export default function BrowseCollection() {
                   {album.year && <span>{album.year}</span>}
                   {album.folder && <span>• {album.folder}</span>}
                 </div>
-              </Link>
+
+                {/* Tags Display */}
+                {album.custom_tags && album.custom_tags.length > 0 && (
+                  <div style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: 4,
+                    marginTop: 4
+                  }}>
+                    {album.custom_tags.slice(0, 3).map(tag => (
+                      <span
+                        key={tag}
+                        style={{
+                          padding: '2px 6px',
+                          background: getTagColor(tag),
+                          color: 'white',
+                          borderRadius: 3,
+                          fontSize: 10,
+                          fontWeight: 600
+                        }}
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                    {album.custom_tags.length > 3 && (
+                      <span style={{
+                        padding: '2px 6px',
+                        background: '#e5e7eb',
+                        color: '#6b7280',
+                        borderRadius: 3,
+                        fontSize: 10,
+                        fontWeight: 600
+                      }}>
+                        +{album.custom_tags.length - 3}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* Tag Editor Modal */}
+      {selectedAlbum && (
+        <div
+          onClick={closeTagEditor}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 50,
+            padding: 24
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: 'white',
+              borderRadius: 12,
+              padding: 32,
+              maxWidth: 600,
+              width: '100%',
+              maxHeight: '90vh',
+              overflow: 'auto',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+            }}
+          >
+            {/* Header */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 16,
+              marginBottom: 24,
+              paddingBottom: 16,
+              borderBottom: '2px solid #e5e7eb'
+            }}>
+              <Image
+                src={selectedAlbum.image_url || '/images/placeholder.png'}
+                alt={selectedAlbum.title}
+                width={80}
+                height={80}
+                style={{
+                  borderRadius: 8,
+                  objectFit: 'cover'
+                }}
+                unoptimized
+              />
+              <div style={{ flex: 1 }}>
+                <h2 style={{
+                  fontSize: 20,
+                  fontWeight: 600,
+                  color: '#1f2937',
+                  margin: '0 0 4px 0'
+                }}>
+                  {selectedAlbum.title}
+                </h2>
+                <div style={{
+                  fontSize: 14,
+                  color: '#6b7280',
+                  marginBottom: 8
+                }}>
+                  {selectedAlbum.artist}
+                </div>
+                <div style={{
+                  fontSize: 12,
+                  color: '#9ca3af'
+                }}>
+                  {selectedAlbum.custom_tags?.length || 0} tags selected
+                </div>
+              </div>
+            </div>
+
+            {/* Tag Categories */}
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 20,
+              marginBottom: 24
+            }}>
+              {Object.entries(groupedTags).map(([category, tags]) => (
+                <div key={category}>
+                  <h3 style={{
+                    fontSize: 14,
+                    fontWeight: 600,
+                    color: categoryColors[category as keyof typeof categoryColors],
+                    margin: '0 0 12px 0',
+                    textTransform: 'capitalize'
+                  }}>
+                    {category}
+                  </h3>
+                  <div style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: 8
+                  }}>
+                    {tags.map(tag => {
+                      const isSelected = selectedAlbum.custom_tags?.includes(tag.tag_name);
+                      return (
+                        <button
+                          key={tag.id}
+                          onClick={() => toggleTag(tag.tag_name)}
+                          style={{
+                            padding: '8px 12px',
+                            background: isSelected ? tag.color : 'white',
+                            color: isSelected ? 'white' : '#1f2937',
+                            border: isSelected ? 'none' : `2px solid ${tag.color}`,
+                            borderRadius: 6,
+                            fontSize: 13,
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          {isSelected ? '✓ ' : ''}{tag.tag_name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {tagDefinitions.length === 0 && (
+              <div style={{
+                padding: 20,
+                background: '#fef3c7',
+                border: '1px solid #f59e0b',
+                borderRadius: 8,
+                textAlign: 'center',
+                marginBottom: 24
+              }}>
+                <div style={{ fontSize: 14, color: '#92400e', marginBottom: 8 }}>
+                  No tags defined yet
+                </div>
+                <Link
+                  href="/admin/manage-tags"
+                  style={{
+                    color: '#d97706',
+                    fontWeight: 600,
+                    fontSize: 14
+                  }}
+                >
+                  Create tags in Tag Management →
+                </Link>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div style={{
+              display: 'flex',
+              gap: 12,
+              justifyContent: 'flex-end',
+              paddingTop: 16,
+              borderTop: '1px solid #e5e7eb'
+            }}>
+              <button
+                onClick={closeTagEditor}
+                disabled={savingTags}
+                style={{
+                  padding: '10px 20px',
+                  background: '#f3f4f6',
+                  color: '#374151',
+                  border: 'none',
+                  borderRadius: 6,
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: savingTags ? 'not-allowed' : 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveTags}
+                disabled={savingTags}
+                style={{
+                  padding: '10px 20px',
+                  background: savingTags ? '#9ca3af' : '#10b981',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 6,
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: savingTags ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {savingTags ? 'Saving...' : 'Save Tags'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
