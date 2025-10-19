@@ -35,7 +35,7 @@ type Album = {
 
 type TagDefinition = {
   id: string;
-  name: string;
+  tag_name: string;
   category: string;
   color: string;
 };
@@ -522,7 +522,7 @@ export default function EditCollectionPage() {
                   gap: 4
                 }}>
                   {album.custom_tags.slice(0, 3).map(tagName => {
-                    const tagDef = tagDefinitions.find(t => t.name === tagName);
+                    const tagDef = tagDefinitions.find(t => t.tag_name === tagName);
                     return (
                       <span
                         key={tagName}
@@ -712,12 +712,12 @@ export default function EditCollectionPage() {
                       <div style={{ color: '#9ca3af', fontSize: 13 }}>No tags in this category</div>
                     ) : (
                       tags.map(tag => {
-                        const isSelected = albumTags.includes(tag.name);
+                        const isSelected = albumTags.includes(tag.tag_name);
                         console.log('Rendering tag:', JSON.stringify(tag, null, 2));
                         return (
                           <button
                             key={tag.id}
-                            onClick={() => toggleTag(tag.name)}
+                            onClick={() => toggleTag(tag.tag_name)}
                             style={{
                               padding: '8px 16px',
                               borderRadius: 6,
@@ -732,7 +732,7 @@ export default function EditCollectionPage() {
                               minWidth: 60
                             }}
                           >
-                            {isSelected && '✓ '}{tag.name || '[NO NAME]'}
+                            {isSelected && '✓ '}{tag.tag_name}
                           </button>
                         );
                       })
