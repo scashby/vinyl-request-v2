@@ -1,7 +1,7 @@
-// src/app/admin/edit-collection/page.tsx - WITH TAG EDITING
+// src/app/admin/edit-collection/page.tsx - WITH SALE FUNCTIONALITY
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { supabase } from '../../../lib/supabaseClient';
@@ -11,492 +11,570 @@ type Album = {
   artist: string;
   title: string;
   year: string | null;
-  folder: string;
+  format: string;
   image_url: string | null;
-  custom_tags: string[];
+  folder: string;
+  for_sale: boolean;
+  sale_price: number | null;
+  sale_platform: string | null;
+  custom_tags: string[] | null;
 };
 
 type TagDefinition = {
-  id: number;
-  tag_name: string;
-  category: 'theme' | 'mood' | 'occasion' | 'special';
+  id: string;
+  name: string;
+  category: string;
   color: string;
-  description: string;
 };
 
-export default function BrowseCollection() {
+const PLATFORMS = [
+  { value: 'discogs', label: 'Discogs' },
+  { value: 'shopify', label: 'Shopify Store' },
+  { value: 'ebay', label: 'eBay' },
+  { value: 'reverb', label: 'Reverb LP' },
+  { value: 'other', label: 'Other' }
+];
+
+export default function EditCollectionPage() {
   const [albums, setAlbums] = useState<Album[]>([]);
-  const [tagDefinitions, setTagDefinitions] = useState<TagDefinition[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedAlbum, setSelectedAlbum] = useState<Album | null>(null);
+  const [searchArtist, setSearchArtist] = useState('');
+  const [searchTitle, setSearchTitle] = useState('');
+  const [tagDefinitions, setTagDefinitions] = useState<TagDefinition[]>([]);
+  const [editingTagsFor, setEditingTagsFor] = useState<number | null>(null);
+  const [albumTags, setAlbumTags] = useState<string[]>([]);
   const [savingTags, setSavingTags] = useState(false);
+  
+  // Sale modal state
+  const [saleModalAlbum, setSaleModalAlbum] = useState<Album | null>(null);
+  const [salePrice, setSalePrice] = useState('');
+  const [salePlatform, setSalePlatform] = useState('');
+  const [saleQuantity, setSaleQuantity] = useState('1');
+  const [saleNotes, setSaleNotes] = useState('');
+  const [savingSale, setSavingSale] = useState(false);
 
   const loadAlbums = useCallback(async () => {
     setLoading(true);
     
+    // Load tag definitions
+    const { data: tagDefs } = await supabase
+      .from('tag_definitions')
+      .select('*')
+      .order('category', { ascending: true });
+    
+    if (tagDefs) {
+      setTagDefinitions(tagDefs as TagDefinition[]);
+    }
+
+    // Load albums
     const { data, error } = await supabase
       .from('collection')
-      .select('id, artist, title, year, folder, image_url, custom_tags')
+      .select('id,artist,title,year,format,image_url,folder,for_sale,sale_price,sale_platform,custom_tags')
       .order('artist', { ascending: true })
-      .order('title', { ascending: true });
-    
-    if (error) {
-      console.error('Error loading albums:', error);
-    } else {
-      setAlbums(data || []);
+      .limit(1000);
+
+    if (!error && data) {
+      setAlbums(data as Album[]);
     }
     
     setLoading(false);
   }, []);
 
-  const loadTagDefinitions = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('tag_definitions')
-      .select('*')
-      .order('category', { ascending: true })
-      .order('tag_name', { ascending: true });
-    
-    if (error) {
-      console.error('Error loading tag definitions:', error);
-    } else {
-      setTagDefinitions(data || []);
-    }
-  }, []);
-
   useEffect(() => {
     loadAlbums();
-    loadTagDefinitions();
-  }, [loadAlbums, loadTagDefinitions]);
+  }, [loadAlbums]);
 
   const filteredAlbums = albums.filter(album => {
-    if (!searchTerm) return true;
-    const term = searchTerm.toLowerCase();
-    return (
-      album.artist.toLowerCase().includes(term) ||
-      album.title.toLowerCase().includes(term)
-    );
+    if (searchArtist && !album.artist.toLowerCase().includes(searchArtist.toLowerCase())) {
+      return false;
+    }
+    if (searchTitle && !album.title.toLowerCase().includes(searchTitle.toLowerCase())) {
+      return false;
+    }
+    return true;
   });
 
   const openTagEditor = (album: Album) => {
-    setSelectedAlbum(album);
-  };
-
-  const closeTagEditor = () => {
-    setSelectedAlbum(null);
+    setEditingTagsFor(album.id);
+    setAlbumTags(album.custom_tags || []);
   };
 
   const toggleTag = (tagName: string) => {
-    if (!selectedAlbum) return;
-    
-    const currentTags = selectedAlbum.custom_tags || [];
-    const newTags = currentTags.includes(tagName)
-      ? currentTags.filter(t => t !== tagName)
-      : [...currentTags, tagName];
-    
-    setSelectedAlbum({
-      ...selectedAlbum,
-      custom_tags: newTags
-    });
+    setAlbumTags(prev =>
+      prev.includes(tagName)
+        ? prev.filter(t => t !== tagName)
+        : [...prev, tagName]
+    );
   };
 
   const saveTags = async () => {
-    if (!selectedAlbum) return;
+    if (!editingTagsFor) return;
     
     setSavingTags(true);
     
     const { error } = await supabase
       .from('collection')
-      .update({ custom_tags: selectedAlbum.custom_tags })
-      .eq('id', selectedAlbum.id);
-    
-    if (error) {
-      console.error('Error saving tags:', error);
-      alert('Error saving tags: ' + error.message);
-    } else {
-      // Update local state
-      setAlbums(albums.map(a => 
-        a.id === selectedAlbum.id ? selectedAlbum : a
-      ));
-      closeTagEditor();
+      .update({ custom_tags: albumTags })
+      .eq('id', editingTagsFor);
+
+    if (!error) {
+      await loadAlbums();
+      setEditingTagsFor(null);
     }
     
     setSavingTags(false);
   };
 
-  const getTagColor = (tagName: string): string => {
-    const tagDef = tagDefinitions.find(t => t.tag_name === tagName);
-    return tagDef?.color || '#3b82f6';
+  const openSaleModal = (album: Album) => {
+    setSaleModalAlbum(album);
+    setSalePrice(album.sale_price?.toString() || '');
+    setSalePlatform(album.sale_platform || '');
+    setSaleQuantity('1');
+    setSaleNotes('');
   };
 
-  const categoryColors = {
-    theme: '#f97316',
-    mood: '#8b5cf6',
-    occasion: '#14b8a6',
-    special: '#eab308'
+  const closeSaleModal = () => {
+    setSaleModalAlbum(null);
+    setSalePrice('');
+    setSalePlatform('');
+    setSaleQuantity('1');
+    setSaleNotes('');
   };
 
-  const groupedTags = tagDefinitions.reduce((acc, tag) => {
+  const markForSale = async () => {
+    if (!saleModalAlbum) return;
+    
+    setSavingSale(true);
+    
+    const { error } = await supabase
+      .from('collection')
+      .update({
+        for_sale: true,
+        sale_price: salePrice ? parseFloat(salePrice) : null,
+        sale_platform: salePlatform || null,
+        sale_quantity: parseInt(saleQuantity) || 1,
+        sale_notes: saleNotes || null
+      })
+      .eq('id', saleModalAlbum.id);
+
+    if (!error) {
+      await loadAlbums();
+      closeSaleModal();
+    }
+    
+    setSavingSale(false);
+  };
+
+  const removeFromSale = async (albumId: number, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!confirm('Remove this item from sale?')) return;
+    
+    const { error } = await supabase
+      .from('collection')
+      .update({
+        for_sale: false,
+        sale_price: null,
+        sale_platform: null,
+        sale_quantity: null,
+        sale_notes: null
+      })
+      .eq('id', albumId);
+
+    if (!error) {
+      await loadAlbums();
+    }
+  };
+
+  const tagsByCategory = tagDefinitions.reduce((acc, tag) => {
     if (!acc[tag.category]) acc[tag.category] = [];
     acc[tag.category].push(tag);
     return acc;
   }, {} as Record<string, TagDefinition[]>);
+
+  const editingAlbum = albums.find(a => a.id === editingTagsFor);
 
   return (
     <div style={{
       padding: 24,
       background: '#f8fafc',
       minHeight: '100vh',
-      maxWidth: 1600,
+      maxWidth: 1400,
       margin: '0 auto'
     }}>
-      {/* Header */}
       <div style={{
-        marginBottom: 32
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 32,
+        flexWrap: 'wrap',
+        gap: 16
       }}>
-        <h1 style={{
-          fontSize: 32,
-          fontWeight: 'bold',
-          color: '#1f2937',
-          margin: '0 0 8px 0'
-        }}>
-          Browse Collection
-        </h1>
-        <p style={{
-          color: '#6b7280',
-          fontSize: 16,
-          margin: 0
-        }}>
-          {albums.length} albums • Click any album to edit tags
-        </p>
-      </div>
-
-      {/* Search Bar */}
-      <div style={{
-        background: 'white',
-        border: '1px solid #e5e7eb',
-        borderRadius: 12,
-        padding: 24,
-        marginBottom: 24,
-        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
-      }}>
-        <div style={{
-          display: 'flex',
-          gap: 16,
-          alignItems: 'center',
-          flexWrap: 'wrap'
-        }}>
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            placeholder="Search by artist or title..."
-            style={{
-              flex: '1 1 300px',
-              padding: '12px 16px',
-              border: '1px solid #d1d5db',
-              borderRadius: 6,
-              fontSize: 14,
-              backgroundColor: 'white',
-              color: '#1f2937'
-            }}
-          />
-          
-          {searchTerm && (
-            <button
-              onClick={() => setSearchTerm('')}
-              style={{
-                padding: '12px 20px',
-                background: '#ef4444',
-                color: 'white',
-                border: 'none',
-                borderRadius: 6,
-                fontSize: 14,
-                fontWeight: 600,
-                cursor: 'pointer'
-              }}
-            >
-              Clear
-            </button>
-          )}
-
-          <button
-            onClick={loadAlbums}
-            disabled={loading}
-            style={{
-              padding: '12px 20px',
-              background: loading ? '#9ca3af' : '#3b82f6',
-              color: 'white',
-              border: 'none',
-              borderRadius: 6,
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: loading ? 'not-allowed' : 'pointer'
-            }}
-          >
-            {loading ? 'Loading...' : 'Refresh'}
-          </button>
-
-          <Link
-            href="/admin/manage-tags"
-            style={{
-              padding: '12px 20px',
-              background: '#7c3aed',
-              color: 'white',
-              border: 'none',
-              borderRadius: 6,
-              fontSize: 14,
-              fontWeight: 600,
-              textDecoration: 'none',
-              display: 'inline-block'
-            }}
-          >
-            🏷️ Manage Tags
-          </Link>
+        <div>
+          <h1 style={{
+            fontSize: 32,
+            fontWeight: 'bold',
+            color: '#1f2937',
+            margin: '0 0 8px 0'
+          }}>
+            📚 Browse & Edit Collection
+          </h1>
+          <p style={{
+            color: '#6b7280',
+            fontSize: 16,
+            margin: 0
+          }}>
+            Your daily collection browser - {filteredAlbums.length} albums
+          </p>
         </div>
 
-        {searchTerm && (
-          <div style={{
-            marginTop: 16,
-            padding: 12,
-            background: '#f0f9ff',
-            border: '1px solid #bae6fd',
+        <Link
+          href="/admin/manage-tags"
+          style={{
+            background: '#8b5cf6',
+            color: 'white',
+            padding: '8px 16px',
             borderRadius: 6,
             fontSize: 14,
-            color: '#0c4a6e',
-            fontWeight: 600
-          }}>
-            📊 Showing {filteredAlbums.length} of {albums.length} albums
-          </div>
-        )}
+            fontWeight: 600,
+            textDecoration: 'none'
+          }}
+        >
+          🏷️ Manage Tags
+        </Link>
       </div>
 
-      {/* Album Grid */}
       <div style={{
         background: 'white',
         border: '1px solid #e5e7eb',
         borderRadius: 12,
         padding: 20,
+        marginBottom: 24,
         boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
       }}>
-        {loading ? (
-          <div style={{
-            color: '#6b7280',
-            textAlign: 'center',
-            padding: 40,
-            fontSize: 16
-          }}>
-            Loading albums...
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+          gap: 16
+        }}>
+          <div>
+            <label style={{
+              display: 'block',
+              fontSize: 14,
+              fontWeight: 600,
+              color: '#374151',
+              marginBottom: 6
+            }}>
+              Search Artist
+            </label>
+            <input
+              type="text"
+              value={searchArtist}
+              onChange={e => setSearchArtist(e.target.value)}
+              placeholder="Type artist name..."
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                border: '1px solid #d1d5db',
+                borderRadius: 6,
+                fontSize: 14
+              }}
+            />
           </div>
-        ) : filteredAlbums.length === 0 ? (
-          <div style={{
-            color: '#6b7280',
-            textAlign: 'center',
-            padding: 40
-          }}>
-            <div style={{ fontSize: 48, marginBottom: 16 }}>🔍</div>
-            <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>
-              No albums found
-            </div>
-            <div style={{ fontSize: 14 }}>
-              {searchTerm ? 'Try a different search term' : 'Your collection is empty'}
-            </div>
+
+          <div>
+            <label style={{
+              display: 'block',
+              fontSize: 14,
+              fontWeight: 600,
+              color: '#374151',
+              marginBottom: 6
+            }}>
+              Search Title
+            </label>
+            <input
+              type="text"
+              value={searchTitle}
+              onChange={e => setSearchTitle(e.target.value)}
+              placeholder="Type album title..."
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                border: '1px solid #d1d5db',
+                borderRadius: 6,
+                fontSize: 14
+              }}
+            />
           </div>
-        ) : (
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-            gap: 16
-          }}>
-            {filteredAlbums.map(album => (
-              <div
-                key={album.id}
-                style={{
-                  border: '1px solid #e5e7eb',
-                  borderRadius: 8,
-                  padding: 12,
+        </div>
+      </div>
+
+      {loading ? (
+        <div style={{
+          background: 'white',
+          border: '1px solid #e5e7eb',
+          borderRadius: 12,
+          padding: 40,
+          textAlign: 'center',
+          color: '#6b7280'
+        }}>
+          Loading albums...
+        </div>
+      ) : (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+          gap: 16
+        }}>
+          {filteredAlbums.map(album => (
+            <div
+              key={album.id}
+              style={{
+                background: 'white',
+                border: '1px solid #e5e7eb',
+                borderRadius: 8,
+                padding: 12,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 8,
+                position: 'relative',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
+                e.currentTarget.style.transform = 'translateY(-2px)';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.boxShadow = 'none';
+                e.currentTarget.style.transform = 'translateY(0)';
+              }}
+            >
+              {/* Sale Badge */}
+              {album.for_sale && (
+                <div style={{
+                  position: 'absolute',
+                  top: 8,
+                  right: 8,
+                  background: '#10b981',
+                  color: 'white',
+                  padding: '4px 8px',
+                  borderRadius: 4,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  zIndex: 1,
                   display: 'flex',
-                  flexDirection: 'column',
-                  gap: 8,
-                  background: '#f9fafb',
-                  position: 'relative'
+                  alignItems: 'center',
+                  gap: 4
+                }}>
+                  💰 ${album.sale_price?.toFixed(2) || '—'}
+                </div>
+              )}
+
+              {/* Album Cover - clickable for tags */}
+              <div
+                onClick={() => openTagEditor(album)}
+                style={{
+                  position: 'relative',
+                  cursor: 'pointer',
+                  borderRadius: 6,
+                  overflow: 'hidden'
                 }}
               >
-                {/* Edit Entry Link */}
-                <Link
-                  href={`/admin/edit-entry/${album.id}`}
+                <Image
+                  src={album.image_url || '/images/placeholder.png'}
+                  alt={album.title}
+                  width={180}
+                  height={180}
                   style={{
-                    position: 'absolute',
-                    top: 8,
-                    right: 8,
-                    padding: '4px 8px',
-                    background: 'rgba(59, 130, 246, 0.9)',
-                    color: 'white',
-                    borderRadius: 4,
-                    fontSize: 11,
-                    fontWeight: 600,
-                    textDecoration: 'none',
-                    zIndex: 10
+                    width: '100%',
+                    height: 'auto',
+                    aspectRatio: '1',
+                    objectFit: 'cover'
                   }}
-                >
-                  ✏️
-                </Link>
-
-                {/* Album Image */}
-                <div
-                  onClick={() => openTagEditor(album)}
-                  style={{
-                    cursor: 'pointer',
-                    position: 'relative'
-                  }}
-                >
-                  <Image
-                    src={album.image_url || '/images/placeholder.png'}
-                    alt={album.title}
-                    width={180}
-                    height={180}
-                    style={{
-                      width: '100%',
-                      height: 'auto',
-                      aspectRatio: '1',
-                      objectFit: 'cover',
-                      borderRadius: 6
-                    }}
-                    unoptimized
-                  />
-                  {/* Tag indicator overlay */}
-                  <div style={{
-                    position: 'absolute',
-                    bottom: 4,
-                    left: 4,
-                    background: 'rgba(0, 0, 0, 0.7)',
-                    color: 'white',
-                    padding: '2px 6px',
-                    borderRadius: 4,
-                    fontSize: 10,
-                    fontWeight: 600
-                  }}>
-                    🏷️ {album.custom_tags?.length || 0}
-                  </div>
-                </div>
-
-                {/* Album Info */}
-                <div style={{
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: '#1f2937',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap'
-                }}>
-                  {album.title}
-                </div>
-                <div style={{
-                  fontSize: 12,
-                  color: '#6b7280',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap'
-                }}>
-                  {album.artist}
-                </div>
-                <div style={{
-                  fontSize: 11,
-                  color: '#9ca3af',
-                  display: 'flex',
-                  gap: 4,
-                  flexWrap: 'wrap'
-                }}>
-                  {album.year && <span>{album.year}</span>}
-                  {album.folder && <span>• {album.folder}</span>}
-                </div>
-
-                {/* Tags Display */}
+                  unoptimized
+                />
+                
+                {/* Tag count overlay */}
                 {album.custom_tags && album.custom_tags.length > 0 && (
                   <div style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: 4,
-                    marginTop: 4
+                    position: 'absolute',
+                    bottom: 8,
+                    left: 8,
+                    background: 'rgba(139, 92, 246, 0.9)',
+                    color: 'white',
+                    padding: '4px 8px',
+                    borderRadius: 4,
+                    fontSize: 11,
+                    fontWeight: 600
                   }}>
-                    {album.custom_tags.slice(0, 3).map(tag => (
-                      <span
-                        key={tag}
-                        style={{
-                          padding: '2px 6px',
-                          background: getTagColor(tag),
-                          color: 'white',
-                          borderRadius: 3,
-                          fontSize: 10,
-                          fontWeight: 600
-                        }}
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                    {album.custom_tags.length > 3 && (
-                      <span style={{
-                        padding: '2px 6px',
-                        background: '#e5e7eb',
-                        color: '#6b7280',
-                        borderRadius: 3,
-                        fontSize: 10,
-                        fontWeight: 600
-                      }}>
-                        +{album.custom_tags.length - 3}
-                      </span>
-                    )}
+                    🏷️ {album.custom_tags.length}
                   </div>
                 )}
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+
+              {/* Album Info */}
+              <div style={{
+                fontSize: 13,
+                fontWeight: 600,
+                color: '#1f2937',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+              }}>
+                {album.title}
+              </div>
+              <div style={{
+                fontSize: 12,
+                color: '#6b7280',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+              }}>
+                {album.artist}
+              </div>
+
+              {/* Tags Preview */}
+              {album.custom_tags && album.custom_tags.length > 0 && (
+                <div style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: 4
+                }}>
+                  {album.custom_tags.slice(0, 3).map(tagName => {
+                    const tagDef = tagDefinitions.find(t => t.name === tagName);
+                    return (
+                      <span
+                        key={tagName}
+                        style={{
+                          fontSize: 10,
+                          padding: '2px 6px',
+                          borderRadius: 3,
+                          background: tagDef?.color || '#6b7280',
+                          color: 'white',
+                          fontWeight: 500
+                        }}
+                      >
+                        {tagName}
+                      </span>
+                    );
+                  })}
+                  {album.custom_tags.length > 3 && (
+                    <span style={{
+                      fontSize: 10,
+                      padding: '2px 6px',
+                      color: '#6b7280'
+                    }}>
+                      +{album.custom_tags.length - 3}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div style={{
+                display: 'flex',
+                gap: 6,
+                marginTop: 4
+              }}>
+                <Link
+                  href={`/admin/edit-entry/${album.id}`}
+                  style={{
+                    flex: 1,
+                    padding: '6px',
+                    background: '#3b82f6',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: 4,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    textAlign: 'center',
+                    textDecoration: 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  ✏️ Edit
+                </Link>
+                
+                {album.for_sale ? (
+                  <button
+                    onClick={(e) => removeFromSale(album.id, e)}
+                    style={{
+                      flex: 1,
+                      padding: '6px',
+                      background: '#ef4444',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: 4,
+                      fontSize: 11,
+                      fontWeight: 600,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    🚫 Unsell
+                  </button>
+                ) : (
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      openSaleModal(album);
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: '6px',
+                      background: '#10b981',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: 4,
+                      fontSize: 11,
+                      fontWeight: 600,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    💰 Sell
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Tag Editor Modal */}
-      {selectedAlbum && (
-        <div
-          onClick={closeTagEditor}
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0, 0, 0, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 50,
-            padding: 24
-          }}
-        >
-          <div
-            onClick={e => e.stopPropagation()}
-            style={{
-              background: 'white',
-              borderRadius: 12,
-              padding: 32,
-              maxWidth: 600,
-              width: '100%',
-              maxHeight: '90vh',
-              overflow: 'auto',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
-            }}
-          >
-            {/* Header */}
+      {editingTagsFor && editingAlbum && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: 20
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: 12,
+            maxWidth: 800,
+            width: '100%',
+            maxHeight: '90vh',
+            overflow: 'auto',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
+          }}>
             <div style={{
+              padding: 24,
+              borderBottom: '1px solid #e5e7eb',
               display: 'flex',
-              alignItems: 'flex-start',
-              gap: 16,
-              marginBottom: 24,
-              paddingBottom: 16,
-              borderBottom: '2px solid #e5e7eb'
+              alignItems: 'center',
+              gap: 16
             }}>
               <Image
-                src={selectedAlbum.image_url || '/images/placeholder.png'}
-                alt={selectedAlbum.title}
+                src={editingAlbum.image_url || '/images/placeholder.png'}
+                alt={editingAlbum.title}
                 width={80}
                 height={80}
                 style={{
@@ -506,120 +584,88 @@ export default function BrowseCollection() {
                 unoptimized
               />
               <div style={{ flex: 1 }}>
-                <h2 style={{
-                  fontSize: 20,
-                  fontWeight: 600,
-                  color: '#1f2937',
-                  margin: '0 0 4px 0'
-                }}>
-                  {selectedAlbum.title}
-                </h2>
                 <div style={{
-                  fontSize: 14,
-                  color: '#6b7280',
-                  marginBottom: 8
+                  fontSize: 20,
+                  fontWeight: 'bold',
+                  color: '#1f2937',
+                  marginBottom: 4
                 }}>
-                  {selectedAlbum.artist}
+                  {editingAlbum.title}
                 </div>
                 <div style={{
-                  fontSize: 12,
-                  color: '#9ca3af'
+                  fontSize: 16,
+                  color: '#6b7280'
                 }}>
-                  {selectedAlbum.custom_tags?.length || 0} tags selected
+                  {editingAlbum.artist}
                 </div>
               </div>
             </div>
 
-            {/* Tag Categories */}
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 20,
-              marginBottom: 24
-            }}>
-              {Object.entries(groupedTags).map(([category, tags]) => (
-                <div key={category}>
-                  <h3 style={{
-                    fontSize: 14,
+            <div style={{ padding: 24 }}>
+              <h3 style={{
+                fontSize: 18,
+                fontWeight: 600,
+                color: '#1f2937',
+                marginBottom: 16
+              }}>
+                Select Tags
+              </h3>
+
+              {Object.entries(tagsByCategory).map(([category, tags]) => (
+                <div key={category} style={{ marginBottom: 20 }}>
+                  <div style={{
+                    fontSize: 13,
                     fontWeight: 600,
-                    color: categoryColors[category as keyof typeof categoryColors],
-                    margin: '0 0 12px 0',
-                    textTransform: 'capitalize'
+                    color: '#6b7280',
+                    textTransform: 'uppercase',
+                    marginBottom: 8,
+                    letterSpacing: '0.5px'
                   }}>
                     {category}
-                  </h3>
+                  </div>
                   <div style={{
                     display: 'flex',
                     flexWrap: 'wrap',
                     gap: 8
                   }}>
-                    {tags.map(tag => {
-                      const isSelected = selectedAlbum.custom_tags?.includes(tag.tag_name);
-                      return (
-                        <button
-                          key={tag.id}
-                          onClick={() => toggleTag(tag.tag_name)}
-                          style={{
-                            padding: '8px 12px',
-                            background: isSelected ? tag.color : 'white',
-                            color: isSelected ? 'white' : '#1f2937',
-                            border: isSelected ? 'none' : `2px solid ${tag.color}`,
-                            borderRadius: 6,
-                            fontSize: 13,
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            transition: 'all 0.2s'
-                          }}
-                        >
-                          {isSelected ? '✓ ' : ''}{tag.tag_name}
-                        </button>
-                      );
-                    })}
+                    {tags.map(tag => (
+                      <button
+                        key={tag.id}
+                        onClick={() => toggleTag(tag.name)}
+                        style={{
+                          padding: '8px 16px',
+                          borderRadius: 6,
+                          border: `2px solid ${tag.color}`,
+                          background: albumTags.includes(tag.name) ? tag.color : 'white',
+                          color: albumTags.includes(tag.name) ? 'white' : tag.color,
+                          fontSize: 14,
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        {albumTags.includes(tag.name) ? '✓ ' : ''}{tag.name}
+                      </button>
+                    ))}
                   </div>
                 </div>
               ))}
             </div>
 
-            {tagDefinitions.length === 0 && (
-              <div style={{
-                padding: 20,
-                background: '#fef3c7',
-                border: '1px solid #f59e0b',
-                borderRadius: 8,
-                textAlign: 'center',
-                marginBottom: 24
-              }}>
-                <div style={{ fontSize: 14, color: '#92400e', marginBottom: 8 }}>
-                  No tags defined yet
-                </div>
-                <Link
-                  href="/admin/manage-tags"
-                  style={{
-                    color: '#d97706',
-                    fontWeight: 600,
-                    fontSize: 14
-                  }}
-                >
-                  Create tags in Tag Management →
-                </Link>
-              </div>
-            )}
-
-            {/* Actions */}
             <div style={{
+              padding: 24,
+              borderTop: '1px solid #e5e7eb',
               display: 'flex',
-              gap: 12,
               justifyContent: 'flex-end',
-              paddingTop: 16,
-              borderTop: '1px solid #e5e7eb'
+              gap: 12
             }}>
               <button
-                onClick={closeTagEditor}
+                onClick={() => setEditingTagsFor(null)}
                 disabled={savingTags}
                 style={{
                   padding: '10px 20px',
-                  background: '#f3f4f6',
-                  color: '#374151',
+                  background: '#6b7280',
+                  color: 'white',
                   border: 'none',
                   borderRadius: 6,
                   fontSize: 14,
@@ -644,6 +690,201 @@ export default function BrowseCollection() {
                 }}
               >
                 {savingTags ? 'Saving...' : 'Save Tags'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sale Modal */}
+      {saleModalAlbum && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: 20
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: 12,
+            maxWidth: 500,
+            width: '100%',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
+          }}>
+            <div style={{
+              padding: 24,
+              borderBottom: '1px solid #e5e7eb'
+            }}>
+              <div style={{
+                fontSize: 20,
+                fontWeight: 'bold',
+                color: '#1f2937',
+                marginBottom: 4
+              }}>
+                💰 Mark for Sale
+              </div>
+              <div style={{
+                fontSize: 14,
+                color: '#6b7280'
+              }}>
+                {saleModalAlbum.artist} - {saleModalAlbum.title}
+              </div>
+            </div>
+
+            <div style={{ padding: 24 }}>
+              <div style={{ marginBottom: 16 }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: '#374151',
+                  marginBottom: 6
+                }}>
+                  Sale Price (USD)
+                </label>
+                <input
+                  type="number"
+                  value={salePrice}
+                  onChange={e => setSalePrice(e.target.value)}
+                  placeholder="0.00"
+                  step="0.01"
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: 6,
+                    fontSize: 14
+                  }}
+                />
+              </div>
+
+              <div style={{ marginBottom: 16 }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: '#374151',
+                  marginBottom: 6
+                }}>
+                  Platform
+                </label>
+                <select
+                  value={salePlatform}
+                  onChange={e => setSalePlatform(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: 6,
+                    fontSize: 14,
+                    backgroundColor: 'white'
+                  }}
+                >
+                  <option value="">Select platform...</option>
+                  {PLATFORMS.map(p => (
+                    <option key={p.value} value={p.value}>{p.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ marginBottom: 16 }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: '#374151',
+                  marginBottom: 6
+                }}>
+                  Quantity
+                </label>
+                <input
+                  type="number"
+                  value={saleQuantity}
+                  onChange={e => setSaleQuantity(e.target.value)}
+                  min="1"
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: 6,
+                    fontSize: 14
+                  }}
+                />
+              </div>
+
+              <div style={{ marginBottom: 0 }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: '#374151',
+                  marginBottom: 6
+                }}>
+                  Notes (Optional)
+                </label>
+                <textarea
+                  value={saleNotes}
+                  onChange={e => setSaleNotes(e.target.value)}
+                  placeholder="Condition, special details..."
+                  rows={3}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: 6,
+                    fontSize: 14,
+                    resize: 'vertical',
+                    fontFamily: 'inherit'
+                  }}
+                />
+              </div>
+            </div>
+
+            <div style={{
+              padding: 24,
+              borderTop: '1px solid #e5e7eb',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: 12
+            }}>
+              <button
+                onClick={closeSaleModal}
+                disabled={savingSale}
+                style={{
+                  padding: '10px 20px',
+                  background: '#6b7280',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 6,
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: savingSale ? 'not-allowed' : 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={markForSale}
+                disabled={savingSale}
+                style={{
+                  padding: '10px 20px',
+                  background: savingSale ? '#9ca3af' : '#10b981',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 6,
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: savingSale ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {savingSale ? 'Saving...' : 'Mark for Sale'}
               </button>
             </div>
           </div>

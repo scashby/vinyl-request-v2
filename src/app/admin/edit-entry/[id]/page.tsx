@@ -1,4 +1,4 @@
-// src/app/admin/edit-entry/[id]/page.tsx - COMPLETE FILE
+// src/app/admin/edit-entry/[id]/page.tsx - COMPLETE FILE WITH SALE FUNCTIONALITY
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -53,6 +53,11 @@ type CollectionEntry = {
   apple_music_release_date: string | null;
   apple_music_track_count: number | null;
   apple_music_artwork_url: string | null;
+  for_sale: boolean;
+  sale_price: number | null;
+  sale_platform: string | null;
+  sale_quantity: number | null;
+  sale_notes: string | null;
   [key: string]: unknown;
 };
 
@@ -72,6 +77,14 @@ type DiscogsMasterData = {
   main_release?: number;
   [key: string]: unknown;
 };
+
+const PLATFORMS = [
+  { value: 'discogs', label: 'Discogs' },
+  { value: 'shopify', label: 'Shopify Store' },
+  { value: 'ebay', label: 'eBay' },
+  { value: 'reverb', label: 'Reverb LP' },
+  { value: 'other', label: 'Other' }
+];
 
 function calculateDecade(year: string | null): number | null {
   if (!year) return null;
@@ -124,6 +137,13 @@ export default function EditEntryPage() {
   const [enrichingGenius, setEnrichingGenius] = useState(false);
   const [fetchingAppleLyrics, setFetchingAppleLyrics] = useState(false);
 
+  // Sale state
+  const [forSale, setForSale] = useState(false);
+  const [salePrice, setSalePrice] = useState('');
+  const [salePlatform, setSalePlatform] = useState('');
+  const [saleQuantity, setSaleQuantity] = useState('1');
+  const [saleNotes, setSaleNotes] = useState('');
+
   useEffect(() => {
     fetchEntry(id).then((data) => {
       setEntry(data);
@@ -133,6 +153,13 @@ export default function EditEntryPage() {
         try { tl = JSON.parse(data.tracklists); } catch { tl = []; }
       }
       setTracks(Array.isArray(tl) ? (tl as Partial<Track>[]).map(cleanTrack) : []);
+      
+      // Load sale data
+      setForSale(data.for_sale || false);
+      setSalePrice(data.sale_price?.toString() || '');
+      setSalePlatform(data.sale_platform || '');
+      setSaleQuantity(data.sale_quantity?.toString() || '1');
+      setSaleNotes(data.sale_notes || '');
     });
   }, [id]);
 
@@ -445,6 +472,11 @@ export default function EditEntryPage() {
       apple_music_release_date: entry.apple_music_release_date || null,
       apple_music_track_count: entry.apple_music_track_count || null,
       apple_music_artwork_url: entry.apple_music_artwork_url || null,
+      for_sale: forSale,
+      sale_price: forSale && salePrice ? parseFloat(salePrice) : null,
+      sale_platform: forSale && salePlatform ? salePlatform : null,
+      sale_quantity: forSale && saleQuantity ? parseInt(saleQuantity) : null,
+      sale_notes: forSale && saleNotes ? saleNotes : null
     };
     
     const { error } = await supabase.from('collection').update(update).eq('id', entry.id);
@@ -588,6 +620,179 @@ export default function EditEntryPage() {
           </div>
           <button type="button" onClick={addTrack} style={{ ...buttonStyle, marginTop: 12, width: '100%', background: '#f0f9ff', color: '#0369a1', border: '1px solid #0369a1' }}>+ Add Track</button>
         </div>
+      </div>
+
+      {/* SALE SECTION */}
+      <div style={{
+        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+        border: '2px solid #10b981',
+        borderRadius: 12,
+        padding: 24,
+        marginTop: 32
+      }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 16
+        }}>
+          <div>
+            <h3 style={{
+              fontSize: 18,
+              fontWeight: 'bold',
+              color: 'white',
+              margin: '0 0 4px 0'
+            }}>
+              💰 Merchandise / Sale Information
+            </h3>
+            <p style={{
+              fontSize: 14,
+              color: 'rgba(255, 255, 255, 0.9)',
+              margin: 0
+            }}>
+              List this item for sale on various platforms
+            </p>
+          </div>
+          
+          <label style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            cursor: 'pointer',
+            background: 'rgba(255, 255, 255, 0.2)',
+            padding: '12px 20px',
+            borderRadius: 8,
+            color: 'white',
+            fontWeight: 600,
+            fontSize: 16
+          }}>
+            <input
+              type="checkbox"
+              checked={forSale}
+              onChange={e => setForSale(e.target.checked)}
+              style={{
+                transform: 'scale(1.5)',
+                accentColor: 'white'
+              }}
+            />
+            Mark for Sale
+          </label>
+        </div>
+
+        {forSale && (
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.95)',
+            borderRadius: 8,
+            padding: 20
+          }}>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: 16,
+              marginBottom: 16
+            }}>
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: '#374151',
+                  marginBottom: 6
+                }}>
+                  Sale Price (USD) *
+                </label>
+                <input
+                  type="number"
+                  value={salePrice}
+                  onChange={e => setSalePrice(e.target.value)}
+                  placeholder="0.00"
+                  step="0.01"
+                  style={inputStyle}
+                />
+              </div>
+
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: '#374151',
+                  marginBottom: 6
+                }}>
+                  Platform
+                </label>
+                <select
+                  value={salePlatform}
+                  onChange={e => setSalePlatform(e.target.value)}
+                  style={{
+                    ...inputStyle,
+                    backgroundColor: 'white',
+                    color: '#1f2937'
+                  }}
+                >
+                  <option value="">Select platform...</option>
+                  {PLATFORMS.map(p => (
+                    <option key={p.value} value={p.value}>{p.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: '#374151',
+                  marginBottom: 6
+                }}>
+                  Quantity
+                </label>
+                <input
+                  type="number"
+                  value={saleQuantity}
+                  onChange={e => setSaleQuantity(e.target.value)}
+                  min="1"
+                  style={inputStyle}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label style={{
+                display: 'block',
+                fontSize: 14,
+                fontWeight: 600,
+                color: '#374151',
+                marginBottom: 6
+              }}>
+                Sale Notes (Optional)
+              </label>
+              <textarea
+                value={saleNotes}
+                onChange={e => setSaleNotes(e.target.value)}
+                placeholder="Condition details, special information, etc..."
+                rows={3}
+                style={{
+                  ...inputStyle,
+                  resize: 'vertical',
+                  fontFamily: 'inherit'
+                }}
+              />
+            </div>
+
+            <div style={{
+              marginTop: 12,
+              padding: 12,
+              background: '#dbeafe',
+              border: '1px solid #3b82f6',
+              borderRadius: 6,
+              fontSize: 13,
+              color: '#1e40af'
+            }}>
+              💡 <strong>Tip:</strong> This item will appear in the <a href="/admin/sale-items" style={{ color: '#1e40af', fontWeight: 600 }}>Sale Items</a> management page
+            </div>
+          </div>
+        )}
       </div>
 
       <div style={{ marginTop: 32, paddingTop: 24, borderTop: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
