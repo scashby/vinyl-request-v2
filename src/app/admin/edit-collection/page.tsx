@@ -303,7 +303,9 @@ export default function EditCollectionPage() {
               padding: '12px 16px',
               border: '1px solid #d1d5db',
               borderRadius: 6,
-              fontSize: 15
+              fontSize: 15,
+              color: '#1f2937',
+              backgroundColor: 'white'
             }}
           />
           {searchQuery && (
