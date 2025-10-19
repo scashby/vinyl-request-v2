@@ -713,7 +713,7 @@ export default function EditCollectionPage() {
                     ) : (
                       tags.map(tag => {
                         const isSelected = albumTags.includes(tag.name);
-                        console.log('Rendering tag:', tag);
+                        console.log('Rendering tag:', JSON.stringify(tag, null, 2));
                         return (
                           <button
                             key={tag.id}
