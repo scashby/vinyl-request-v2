@@ -56,6 +56,7 @@ export default function EditCollectionPage() {
   const [editingTagsFor, setEditingTagsFor] = useState<number | null>(null);
   const [albumTags, setAlbumTags] = useState<string[]>([]);
   const [savingTags, setSavingTags] = useState(false);
+  const [newTagInput, setNewTagInput] = useState('');
   
   // Sale modal state
   const [saleModalAlbum, setSaleModalAlbum] = useState<Album | null>(null);
@@ -147,6 +148,18 @@ export default function EditCollectionPage() {
         ? prev.filter(t => t !== tagName)
         : [...prev, tagName]
     );
+  };
+
+  const addCustomTag = () => {
+    const trimmed = newTagInput.trim();
+    if (trimmed && !albumTags.includes(trimmed)) {
+      setAlbumTags(prev => [...prev, trimmed]);
+      setNewTagInput('');
+    }
+  };
+
+  const removeTag = (tagName: string) => {
+    setAlbumTags(prev => prev.filter(t => t !== tagName));
   };
 
   const saveTags = async () => {
@@ -682,13 +695,117 @@ export default function EditCollectionPage() {
             </div>
 
             <div style={{ padding: 24 }}>
+              {/* Current Tags Section */}
+              {albumTags.length > 0 && (
+                <div style={{ marginBottom: 24 }}>
+                  <h3 style={{
+                    fontSize: 18,
+                    fontWeight: 600,
+                    color: '#1f2937',
+                    marginBottom: 12
+                  }}>
+                    Current Tags ({albumTags.length})
+                  </h3>
+                  <div style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: 8,
+                    padding: 16,
+                    background: '#f3f4f6',
+                    borderRadius: 8
+                  }}>
+                    {albumTags.map(tagName => {
+                      const tagDef = tagDefinitions.find(t => t.tag_name === tagName);
+                      return (
+                        <div
+                          key={tagName}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            padding: '6px 12px',
+                            borderRadius: 6,
+                            background: tagDef?.color || '#6b7280',
+                            color: 'white',
+                            fontSize: 14,
+                            fontWeight: 600
+                          }}
+                        >
+                          <span>{tagName}</span>
+                          <button
+                            onClick={() => removeTag(tagName)}
+                            style={{
+                              background: 'rgba(255,255,255,0.3)',
+                              border: 'none',
+                              borderRadius: 4,
+                              color: 'white',
+                              cursor: 'pointer',
+                              padding: '2px 6px',
+                              fontSize: 12,
+                              fontWeight: 'bold'
+                            }}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Add Custom Tag */}
+              <div style={{ marginBottom: 24 }}>
+                <h3 style={{
+                  fontSize: 18,
+                  fontWeight: 600,
+                  color: '#1f2937',
+                  marginBottom: 12
+                }}>
+                  Add Custom Tag
+                </h3>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input
+                    type="text"
+                    value={newTagInput}
+                    onChange={e => setNewTagInput(e.target.value)}
+                    onKeyPress={e => e.key === 'Enter' && addCustomTag()}
+                    placeholder="Type tag name and press Enter..."
+                    style={{
+                      flex: 1,
+                      padding: '10px 12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: 6,
+                      fontSize: 14
+                    }}
+                  />
+                  <button
+                    onClick={addCustomTag}
+                    disabled={!newTagInput.trim()}
+                    style={{
+                      padding: '10px 20px',
+                      background: newTagInput.trim() ? '#10b981' : '#9ca3af',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: 6,
+                      fontSize: 14,
+                      fontWeight: 600,
+                      cursor: newTagInput.trim() ? 'pointer' : 'not-allowed'
+                    }}
+                  >
+                    + Add
+                  </button>
+                </div>
+              </div>
+
+              {/* Quick Select from Pre-defined Tags */}
               <h3 style={{
                 fontSize: 18,
                 fontWeight: 600,
                 color: '#1f2937',
                 marginBottom: 16
               }}>
-                Select Tags
+                Quick Select
               </h3>
 
               {Object.entries(tagsByCategory).map(([category, tags]) => (
@@ -713,7 +830,6 @@ export default function EditCollectionPage() {
                     ) : (
                       tags.map(tag => {
                         const isSelected = albumTags.includes(tag.tag_name);
-                        console.log('Rendering tag:', JSON.stringify(tag, null, 2));
                         return (
                           <button
                             key={tag.id}
