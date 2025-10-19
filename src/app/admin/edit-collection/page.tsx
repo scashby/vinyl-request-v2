@@ -26,6 +26,11 @@ type Album = {
   spotify_label: string | null;
   apple_music_label: string | null;
   decade: number | null;
+  tracklists: string | null;
+  discogs_source: string | null;
+  discogs_notes: string | null;
+  sale_notes: string | null;
+  pricing_notes: string | null;
 };
 
 type TagDefinition = {
@@ -76,7 +81,7 @@ export default function EditCollectionPage() {
     // Load albums
     const { data, error } = await supabase
       .from('collection')
-      .select('id,artist,title,year,format,image_url,folder,for_sale,sale_price,sale_platform,custom_tags,media_condition,discogs_genres,discogs_styles,spotify_genres,apple_music_genres,spotify_label,apple_music_label,decade')
+      .select('id,artist,title,year,format,image_url,folder,for_sale,sale_price,sale_platform,custom_tags,media_condition,discogs_genres,discogs_styles,spotify_genres,apple_music_genres,spotify_label,apple_music_label,decade,tracklists,discogs_source,discogs_notes,sale_notes,pricing_notes')
       .order('artist', { ascending: true })
       .limit(1000);
 
@@ -104,6 +109,13 @@ export default function EditCollectionPage() {
     const year = album.year?.toLowerCase() || '';
     const decade = album.decade?.toString() || '';
     const condition = album.media_condition?.toLowerCase() || '';
+    const tracklists = album.tracklists?.toLowerCase() || '';
+    
+    // Notes and source fields
+    const discogsSource = album.discogs_source?.toLowerCase() || '';
+    const discogsNotes = album.discogs_notes?.toLowerCase() || '';
+    const saleNotes = album.sale_notes?.toLowerCase() || '';
+    const pricingNotes = album.pricing_notes?.toLowerCase() || '';
     
     // Array fields - custom tags
     const tags = album.custom_tags?.map(t => t.toLowerCase()).join(' ') || '';
@@ -119,7 +131,7 @@ export default function EditCollectionPage() {
     const appleMusicLabel = album.apple_music_label?.toLowerCase() || '';
     
     // Combine everything into one searchable string
-    const searchableText = `${artist} ${title} ${format} ${folder} ${year} ${decade} ${condition} ${tags} ${discogsGenres} ${discogsStyles} ${spotifyGenres} ${appleMusicGenres} ${spotifyLabel} ${appleMusicLabel}`;
+    const searchableText = `${artist} ${title} ${format} ${folder} ${year} ${decade} ${condition} ${tracklists} ${discogsSource} ${discogsNotes} ${saleNotes} ${pricingNotes} ${tags} ${discogsGenres} ${discogsStyles} ${spotifyGenres} ${appleMusicGenres} ${spotifyLabel} ${appleMusicLabel}`;
     
     return searchableText.includes(query);
   });
@@ -297,7 +309,7 @@ export default function EditCollectionPage() {
             type="text"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Search across artist, title, format, year, condition, tags, genres, styles, labels..."
+            placeholder="Search everything: artist, title, tracks, format, year, tags, genres, styles, labels, notes..."
             style={{
               width: '100%',
               padding: '12px 16px',
