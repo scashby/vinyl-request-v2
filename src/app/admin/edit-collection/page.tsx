@@ -19,6 +19,13 @@ type Album = {
   sale_platform: string | null;
   custom_tags: string[] | null;
   media_condition: string | null;
+  discogs_genres: string[] | null;
+  discogs_styles: string[] | null;
+  spotify_genres: string[] | null;
+  apple_music_genres: string[] | null;
+  spotify_label: string | null;
+  apple_music_label: string | null;
+  decade: number | null;
 };
 
 type TagDefinition = {
@@ -69,7 +76,7 @@ export default function EditCollectionPage() {
     // Load albums
     const { data, error } = await supabase
       .from('collection')
-      .select('id,artist,title,year,format,image_url,folder,for_sale,sale_price,sale_platform,custom_tags,media_condition')
+      .select('id,artist,title,year,format,image_url,folder,for_sale,sale_price,sale_platform,custom_tags,media_condition,discogs_genres,discogs_styles,spotify_genres,apple_music_genres,spotify_label,apple_music_label,decade')
       .order('artist', { ascending: true })
       .limit(1000);
 
@@ -88,13 +95,33 @@ export default function EditCollectionPage() {
     if (!searchQuery) return true;
     
     const query = searchQuery.toLowerCase();
+    
+    // Basic fields
     const artist = album.artist.toLowerCase();
     const title = album.title.toLowerCase();
-    const combined = `${artist} ${title}`;
+    const format = album.format?.toLowerCase() || '';
+    const folder = album.folder?.toLowerCase() || '';
+    const year = album.year?.toLowerCase() || '';
+    const decade = album.decade?.toString() || '';
+    const condition = album.media_condition?.toLowerCase() || '';
     
-    return artist.includes(query) || 
-           title.includes(query) || 
-           combined.includes(query);
+    // Array fields - custom tags
+    const tags = album.custom_tags?.map(t => t.toLowerCase()).join(' ') || '';
+    
+    // Array fields - genres and styles from multiple sources
+    const discogsGenres = album.discogs_genres?.map(g => g.toLowerCase()).join(' ') || '';
+    const discogsStyles = album.discogs_styles?.map(s => s.toLowerCase()).join(' ') || '';
+    const spotifyGenres = album.spotify_genres?.map(g => g.toLowerCase()).join(' ') || '';
+    const appleMusicGenres = album.apple_music_genres?.map(g => g.toLowerCase()).join(' ') || '';
+    
+    // Labels
+    const spotifyLabel = album.spotify_label?.toLowerCase() || '';
+    const appleMusicLabel = album.apple_music_label?.toLowerCase() || '';
+    
+    // Combine everything into one searchable string
+    const searchableText = `${artist} ${title} ${format} ${folder} ${year} ${decade} ${condition} ${tags} ${discogsGenres} ${discogsStyles} ${spotifyGenres} ${appleMusicGenres} ${spotifyLabel} ${appleMusicLabel}`;
+    
+    return searchableText.includes(query);
   });
 
   const openTagEditor = (album: Album) => {
@@ -270,7 +297,7 @@ export default function EditCollectionPage() {
             type="text"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Search by artist, album title, or both..."
+            placeholder="Search across artist, title, format, year, condition, tags, genres, styles, labels..."
             style={{
               width: '100%',
               padding: '12px 16px',
