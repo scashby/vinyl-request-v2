@@ -39,8 +39,7 @@ const PLATFORMS = [
 export default function EditCollectionPage() {
   const [albums, setAlbums] = useState<Album[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchArtist, setSearchArtist] = useState('');
-  const [searchTitle, setSearchTitle] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [tagDefinitions, setTagDefinitions] = useState<TagDefinition[]>([]);
   const [editingTagsFor, setEditingTagsFor] = useState<number | null>(null);
   const [albumTags, setAlbumTags] = useState<string[]>([]);
@@ -86,13 +85,16 @@ export default function EditCollectionPage() {
   }, [loadAlbums]);
 
   const filteredAlbums = albums.filter(album => {
-    if (searchArtist && !album.artist.toLowerCase().includes(searchArtist.toLowerCase())) {
-      return false;
-    }
-    if (searchTitle && !album.title.toLowerCase().includes(searchTitle.toLowerCase())) {
-      return false;
-    }
-    return true;
+    if (!searchQuery) return true;
+    
+    const query = searchQuery.toLowerCase();
+    const artist = album.artist.toLowerCase();
+    const title = album.title.toLowerCase();
+    const combined = `${artist} ${title}`;
+    
+    return artist.includes(query) || 
+           title.includes(query) || 
+           combined.includes(query);
   });
 
   const openTagEditor = (album: Album) => {
@@ -254,60 +256,38 @@ export default function EditCollectionPage() {
         marginBottom: 24,
         boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
       }}>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-          gap: 16
-        }}>
-          <div>
-            <label style={{
-              display: 'block',
-              fontSize: 14,
-              fontWeight: 600,
-              color: '#374151',
-              marginBottom: 6
+        <div>
+          <label style={{
+            display: 'block',
+            fontSize: 14,
+            fontWeight: 600,
+            color: '#374151',
+            marginBottom: 6
+          }}>
+            Search Collection
+          </label>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Search by artist, album title, or both..."
+            style={{
+              width: '100%',
+              padding: '12px 16px',
+              border: '1px solid #d1d5db',
+              borderRadius: 6,
+              fontSize: 15
+            }}
+          />
+          {searchQuery && (
+            <div style={{
+              marginTop: 8,
+              fontSize: 13,
+              color: '#6b7280'
             }}>
-              Search Artist
-            </label>
-            <input
-              type="text"
-              value={searchArtist}
-              onChange={e => setSearchArtist(e.target.value)}
-              placeholder="Type artist name..."
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                border: '1px solid #d1d5db',
-                borderRadius: 6,
-                fontSize: 14
-              }}
-            />
-          </div>
-
-          <div>
-            <label style={{
-              display: 'block',
-              fontSize: 14,
-              fontWeight: 600,
-              color: '#374151',
-              marginBottom: 6
-            }}>
-              Search Title
-            </label>
-            <input
-              type="text"
-              value={searchTitle}
-              onChange={e => setSearchTitle(e.target.value)}
-              placeholder="Type album title..."
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                border: '1px solid #d1d5db',
-                borderRadius: 6,
-                fontSize: 14
-              }}
-            />
-          </div>
+              Found {filteredAlbums.length} album{filteredAlbums.length !== 1 ? 's' : ''}
+            </div>
+          )}
         </div>
       </div>
 
