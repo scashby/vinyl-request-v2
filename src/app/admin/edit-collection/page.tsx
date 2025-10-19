@@ -708,25 +708,29 @@ export default function EditCollectionPage() {
                     flexWrap: 'wrap',
                     gap: 8
                   }}>
-                    {tags.map(tag => (
-                      <button
-                        key={tag.id}
-                        onClick={() => toggleTag(tag.name)}
-                        style={{
-                          padding: '8px 16px',
-                          borderRadius: 6,
-                          border: `2px solid ${tag.color}`,
-                          background: albumTags.includes(tag.name) ? tag.color : 'white',
-                          color: albumTags.includes(tag.name) ? 'white' : tag.color,
-                          fontSize: 14,
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          transition: 'all 0.2s'
-                        }}
-                      >
-                        {albumTags.includes(tag.name) ? '✓ ' : ''}{tag.name}
-                      </button>
-                    ))}
+                    {tags.map(tag => {
+                      const isSelected = albumTags.includes(tag.name);
+                      return (
+                        <button
+                          key={tag.id}
+                          onClick={() => toggleTag(tag.name)}
+                          style={{
+                            padding: '8px 16px',
+                            borderRadius: 6,
+                            border: `2px solid ${tag.color}`,
+                            background: isSelected ? tag.color : 'white',
+                            color: isSelected ? 'white' : tag.color,
+                            fontSize: 14,
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          {isSelected && '✓ '}{tag.name}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               ))}
