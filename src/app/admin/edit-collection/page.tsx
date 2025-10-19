@@ -93,8 +93,7 @@ export default function EditCollectionPage() {
     const { data, error } = await supabase
       .from('collection')
       .select('id,artist,title,year,format,image_url,folder,for_sale,sale_price,sale_platform,custom_tags,media_condition,discogs_genres,discogs_styles,spotify_genres,apple_music_genres,apple_music_genre,spotify_label,apple_music_label,decade,tracklists,discogs_source,discogs_notes,sale_notes,pricing_notes,is_1001,steves_top_200,this_weeks_top_10,inner_circle_preferred,discogs_master_id,discogs_release_id,master_release_id,spotify_id,apple_music_id')
-      .order('artist', { ascending: true })
-      .limit(1000);
+      .order('artist', { ascending: true });
 
     if (!error && data) {
       setAlbums(data as Album[]);
@@ -862,7 +861,9 @@ export default function EditCollectionPage() {
                       padding: '10px 12px',
                       border: '1px solid #d1d5db',
                       borderRadius: 6,
-                      fontSize: 14
+                      fontSize: 14,
+                      color: '#1f2937',
+                      backgroundColor: 'white'
                     }}
                   />
                   <button
@@ -1138,7 +1139,9 @@ export default function EditCollectionPage() {
                     borderRadius: 6,
                     fontSize: 14,
                     resize: 'vertical',
-                    fontFamily: 'inherit'
+                    fontFamily: 'inherit',
+                    color: '#1f2937',
+                    backgroundColor: 'white'
                   }}
                 />
               </div>

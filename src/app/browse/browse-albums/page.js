@@ -110,8 +110,7 @@ function BrowseAlbumsContent() {
         steves_top_200: album.steves_top_200,
         this_weeks_top_10: album.this_weeks_top_10,
         inner_circle_preferred: album.inner_circle_preferred,
-        is_1001: album.is_1001, // keep this so AlbumCard can show the 1001 badge
-        // Add all searchable text fields
+        is_1001: album.is_1001,
         tracklists: album.tracklists,
         media_condition: album.media_condition,
         discogs_notes: album.discogs_notes,
@@ -159,7 +158,6 @@ function BrowseAlbumsContent() {
       
       const searchLower = searchTerm.toLowerCase();
 
-      // Helper to search in arrays
       const searchInArray = (arr) => {
         if (!Array.isArray(arr)) return false;
         return arr.some(item => (item || '').toLowerCase().includes(searchLower));
@@ -198,7 +196,6 @@ function BrowseAlbumsContent() {
              matchesStevesTop200 && matchesThisWeeksTop10 && matchesInnerCirclePreferred;
     });
     
-    // Sort albums
     fa = [...fa].sort((a, b) => {
       let va, vb;
       
@@ -219,7 +216,6 @@ function BrowseAlbumsContent() {
   }, [albums, searchTerm, mediaFilter, allowedFormats, normalizedFormats, sortField, sortAsc, 
       showJustAdded, showStevesTop200, showThisWeeksTop10, showInnerCirclePreferred]);
 
-  // Count special albums
   const justAddedCount = albums.filter(album => album.justAdded).length;
   const stevesTop200Count = albums.filter(album => album.steves_top_200).length;
   const thisWeeksTop10Count = albums.filter(album => album.this_weeks_top_10).length;
@@ -261,7 +257,6 @@ function BrowseAlbumsContent() {
       </header>
 
       <main className="browse-collection-body">
-        {/* FIXED Search Filter Bar */}
         <div style={{
           background: '#ffffff',
           padding: '16px 20px',
@@ -270,7 +265,6 @@ function BrowseAlbumsContent() {
           boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
           border: '2px solid #e5e7eb'
         }}>
-          {/* Main controls row */}
           <div style={{
             display: 'flex',
             flexWrap: 'wrap',
@@ -278,7 +272,6 @@ function BrowseAlbumsContent() {
             alignItems: 'center',
             marginBottom: '12px'
           }}>
-            {/* Search Input */}
             <input
               type="text"
               placeholder="Search by artist or title"
@@ -293,12 +286,11 @@ function BrowseAlbumsContent() {
                 fontSize: '16px',
                 outline: 'none',
                 backgroundColor: '#ffffff',
-                color: '#000000',
+                color: '#1f2937',
                 fontFamily: 'system-ui, sans-serif'
               }}
             />
 
-            {/* Media Type Filter */}
             <select
               value={mediaFilter}
               onChange={(e) => setMediaFilter(e.target.value)}
@@ -310,24 +302,23 @@ function BrowseAlbumsContent() {
                 borderRadius: '6px',
                 fontSize: '16px',
                 backgroundColor: '#ffffff',
-                color: '#000000',
+                color: '#1f2937',
                 outline: 'none',
                 fontFamily: 'system-ui, sans-serif'
               }}
             >
-              <option value="" style={{ color: '#000000', backgroundColor: '#ffffff' }}>All Media Types</option>
+              <option value="" style={{ color: '#1f2937', backgroundColor: '#ffffff' }}>All Media Types</option>
               {normalizedDropdown.map((format) => (
                 <option 
                   key={format} 
                   value={format.trim().toLowerCase()}
-                  style={{ color: '#000000', backgroundColor: '#ffffff' }}
+                  style={{ color: '#1f2937', backgroundColor: '#ffffff' }}
                 >
                   {format}
                 </option>
               ))}
             </select>
 
-            {/* Sort Field */}
             <select 
               value={sortField} 
               onChange={e => setSortField(e.target.value)}
@@ -339,18 +330,17 @@ function BrowseAlbumsContent() {
                 borderRadius: '6px',
                 fontSize: '16px',
                 backgroundColor: '#ffffff',
-                color: '#000000',
+                color: '#1f2937',
                 outline: 'none',
                 fontFamily: 'system-ui, sans-serif'
               }}
             >
-              <option value="artist" style={{ color: '#000000', backgroundColor: '#ffffff' }}>Artist</option>
-              <option value="date_added" style={{ color: '#000000', backgroundColor: '#ffffff' }}>Date Added</option>
-              <option value="title" style={{ color: '#000000', backgroundColor: '#ffffff' }}>Title</option>
-              <option value="year" style={{ color: '#000000', backgroundColor: '#ffffff' }}>Year</option>
+              <option value="artist" style={{ color: '#1f2937', backgroundColor: '#ffffff' }}>Artist</option>
+              <option value="date_added" style={{ color: '#1f2937', backgroundColor: '#ffffff' }}>Date Added</option>
+              <option value="title" style={{ color: '#1f2937', backgroundColor: '#ffffff' }}>Title</option>
+              <option value="year" style={{ color: '#1f2937', backgroundColor: '#ffffff' }}>Year</option>
             </select>
 
-            {/* Sort Direction */}
             <button
               onClick={() => setSortAsc(a => !a)}
               style={{
@@ -362,7 +352,7 @@ function BrowseAlbumsContent() {
                 fontSize: '16px',
                 fontWeight: '600',
                 cursor: 'pointer',
-                color: '#000000',
+                color: '#1f2937',
                 whiteSpace: 'nowrap',
                 fontFamily: 'system-ui, sans-serif'
               }}
@@ -370,7 +360,6 @@ function BrowseAlbumsContent() {
               Sort: {sortAsc ? 'A→Z' : 'Z→A'}
             </button>
 
-            {/* Suggest Album Button */}
             {!hasNoResults && !showSuggestionBox && (
               <button
                 onClick={() => setShowSuggestionBox(true)}
@@ -378,7 +367,7 @@ function BrowseAlbumsContent() {
                   flex: '0 0 auto',
                   background: '#3b82f6',
                   color: '#ffffff',
-                  border: '2px solid #1d4ed8',  // ← FIXED QUOTING HERE
+                  border: '2px solid #1d4ed8',
                   borderRadius: '6px',
                   padding: '10px 16px',
                   fontSize: '16px',
@@ -393,21 +382,19 @@ function BrowseAlbumsContent() {
             )}
           </div>
 
-          {/* Filter badges row - ALWAYS SHOW ALL BADGES */}
           <div style={{
             display: 'flex',
             flexWrap: 'wrap',
             gap: '8px',
             alignItems: 'center'
           }}>
-            {/* Just Added Filter */}
             <label style={{ 
               display: 'flex', 
               alignItems: 'center', 
               gap: '6px',
               fontSize: '14px',
               fontWeight: '600',
-              color: '#000000',
+              color: '#1f2937',
               cursor: justAddedCount > 0 ? 'pointer' : 'not-allowed',
               background: justAddedCount > 0 ? '#dcfce7' : '#f3f4f6',
               padding: '6px 10px',
@@ -429,14 +416,13 @@ function BrowseAlbumsContent() {
               ✨ Just Added ({justAddedCount})
             </label>
 
-            {/* Steve's Top 200 Filter */}
             <label style={{ 
               display: 'flex', 
               alignItems: 'center', 
               gap: '6px',
               fontSize: '14px',
               fontWeight: '600',
-              color: '#000000',
+              color: '#1f2937',
               cursor: stevesTop200Count > 0 ? 'pointer' : 'not-allowed',
               background: stevesTop200Count > 0 ? '#fecaca' : '#f3f4f6',
               padding: '6px 10px',
@@ -458,14 +444,13 @@ function BrowseAlbumsContent() {
               🏆 Steve&apos;s Top 200 ({stevesTop200Count})
             </label>
 
-            {/* This Week's Top 10 Filter */}
             <label style={{ 
               display: 'flex', 
               alignItems: 'center', 
               gap: '6px',
               fontSize: '14px',
               fontWeight: '600',
-              color: '#000000',
+              color: '#1f2937',
               cursor: thisWeeksTop10Count > 0 ? 'pointer' : 'not-allowed',
               background: thisWeeksTop10Count > 0 ? '#e9d5ff' : '#f3f4f6',
               padding: '6px 10px',
@@ -487,14 +472,13 @@ function BrowseAlbumsContent() {
               📈 This Week&apos;s Top 10 ({thisWeeksTop10Count})
             </label>
 
-            {/* Inner Circle Preferred Filter */}
             <label style={{ 
               display: 'flex', 
               alignItems: 'center', 
               gap: '6px',
               fontSize: '14px',
               fontWeight: '600',
-              color: '#000000',
+              color: '#1f2937',
               cursor: innerCirclePreferredCount > 0 ? 'pointer' : 'not-allowed',
               background: innerCirclePreferredCount > 0 ? '#fed7aa' : '#f3f4f6',
               padding: '6px 10px',
@@ -518,7 +502,6 @@ function BrowseAlbumsContent() {
           </div>
         </div>
 
-        {/* Results Count */}
         <div style={{ 
           fontSize: '14px', 
           color: '#666',
@@ -532,7 +515,6 @@ function BrowseAlbumsContent() {
           )}
         </div>
 
-        {/* Album Suggestion Box */}
         {(hasNoResults || showSuggestionBox) && (
           <div style={{ marginBottom: '30px' }}>
             <AlbumSuggestionBox 
@@ -545,7 +527,6 @@ function BrowseAlbumsContent() {
           </div>
         )}
 
-        {/* Album Grid */}
         <section className="album-grid">
           {filteredAlbums.map((album) => (
             <AlbumCard
@@ -559,7 +540,6 @@ function BrowseAlbumsContent() {
           ))}
         </section>
 
-        {/* Empty States */}
         {filteredAlbums.length === 0 && !hasSearchQuery && (
           <div style={{
             textAlign: 'center',

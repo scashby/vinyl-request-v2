@@ -556,9 +556,10 @@ export default function MultiSourceEnrichment() {
                 minWidth: 150
               }}
             >
+              <option value="" style={{ color: '#1f2937', backgroundColor: '#ffffff' }}>All Folders</option>
               <option value="">All Folders</option>
               {folders.map(folder => (
-                <option key={folder} value={folder}>{folder}</option>
+                <option key={folder} value={folder} style={{ color: '#1f2937', backgroundColor: '#ffffff' }}>{folder}</option>
               ))}
             </select>
           </div>
