@@ -18,6 +18,7 @@ type Album = {
   sale_price: number | null;
   sale_platform: string | null;
   custom_tags: string[] | null;
+  media_condition: string | null;
 };
 
 type TagDefinition = {
@@ -69,7 +70,7 @@ export default function EditCollectionPage() {
     // Load albums
     const { data, error } = await supabase
       .from('collection')
-      .select('id,artist,title,year,format,image_url,folder,for_sale,sale_price,sale_platform,custom_tags')
+      .select('id,artist,title,year,format,image_url,folder,for_sale,sale_price,sale_platform,custom_tags,media_condition')
       .order('artist', { ascending: true })
       .limit(1000);
 
@@ -432,6 +433,64 @@ export default function EditCollectionPage() {
                 whiteSpace: 'nowrap'
               }}>
                 {album.artist}
+              </div>
+
+              {/* NEW: Format, Folder, Year, Condition */}
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 4,
+                fontSize: 11,
+                color: '#6b7280',
+                borderTop: '1px solid #f3f4f6',
+                paddingTop: 8
+              }}>
+                {album.format && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4
+                  }}>
+                    <span style={{ fontWeight: 600, color: '#3b82f6' }}>💿</span>
+                    <span style={{ fontWeight: 600 }}>{album.format}</span>
+                  </div>
+                )}
+                {album.folder && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4
+                  }}>
+                    <span style={{ fontWeight: 600, color: '#8b5cf6' }}>📁</span>
+                    <span>{album.folder}</span>
+                  </div>
+                )}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8
+                }}>
+                  {album.year && (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4
+                    }}>
+                      <span style={{ fontWeight: 600, color: '#f59e0b' }}>📅</span>
+                      <span>{album.year}</span>
+                    </div>
+                  )}
+                  {album.media_condition && (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4
+                    }}>
+                      <span style={{ fontWeight: 600, color: '#10b981' }}>✓</span>
+                      <span style={{ fontWeight: 600 }}>{album.media_condition}</span>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Tags Preview */}
