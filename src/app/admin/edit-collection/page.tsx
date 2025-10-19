@@ -1052,7 +1052,9 @@ export default function EditCollectionPage() {
                     padding: '10px 12px',
                     border: '1px solid #d1d5db',
                     borderRadius: 6,
-                    fontSize: 14
+                    fontSize: 14,
+                    color: '#1f2937',
+                    backgroundColor: 'white'
                   }}
                 />
               </div>
@@ -1076,7 +1078,8 @@ export default function EditCollectionPage() {
                     border: '1px solid #d1d5db',
                     borderRadius: 6,
                     fontSize: 14,
-                    backgroundColor: 'white'
+                    backgroundColor: 'white',
+                    color: '#1f2937'
                   }}
                 >
                   <option value="">Select platform...</option>
@@ -1106,7 +1109,9 @@ export default function EditCollectionPage() {
                     padding: '10px 12px',
                     border: '1px solid #d1d5db',
                     borderRadius: 6,
-                    fontSize: 14
+                    fontSize: 14,
+                    color: '#1f2937',
+                    backgroundColor: 'white'
                   }}
                 />
               </div>
