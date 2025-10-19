@@ -25,12 +25,22 @@ type Album = {
   apple_music_genres: string[] | null;
   spotify_label: string | null;
   apple_music_label: string | null;
+  apple_music_genre: string | null;
   decade: number | null;
   tracklists: string | null;
   discogs_source: string | null;
   discogs_notes: string | null;
   sale_notes: string | null;
   pricing_notes: string | null;
+  is_1001: boolean;
+  steves_top_200: boolean;
+  this_weeks_top_10: boolean;
+  inner_circle_preferred: boolean;
+  discogs_master_id: string | null;
+  discogs_release_id: string | null;
+  master_release_id: string | null;
+  spotify_id: string | null;
+  apple_music_id: string | null;
 };
 
 type TagDefinition = {
@@ -79,10 +89,10 @@ export default function EditCollectionPage() {
       setTagDefinitions(tagDefs as TagDefinition[]);
     }
 
-    // Load albums
+    // Load albums - SELECT ALL TEXT/ARRAY/BOOLEAN FIELDS FROM SCHEMA
     const { data, error } = await supabase
       .from('collection')
-      .select('id,artist,title,year,format,image_url,folder,for_sale,sale_price,sale_platform,custom_tags,media_condition,discogs_genres,discogs_styles,spotify_genres,apple_music_genres,spotify_label,apple_music_label,decade,tracklists,discogs_source,discogs_notes,sale_notes,pricing_notes')
+      .select('id,artist,title,year,format,image_url,folder,for_sale,sale_price,sale_platform,custom_tags,media_condition,discogs_genres,discogs_styles,spotify_genres,apple_music_genres,apple_music_genre,spotify_label,apple_music_label,decade,tracklists,discogs_source,discogs_notes,sale_notes,pricing_notes,is_1001,steves_top_200,this_weeks_top_10,inner_circle_preferred,discogs_master_id,discogs_release_id,master_release_id,spotify_id,apple_music_id')
       .order('artist', { ascending: true })
       .limit(1000);
 
@@ -102,7 +112,7 @@ export default function EditCollectionPage() {
     
     const query = searchQuery.toLowerCase();
     
-    // Basic fields
+    // ALL TEXT FIELDS FROM SCHEMA
     const artist = album.artist.toLowerCase();
     const title = album.title.toLowerCase();
     const format = album.format?.toLowerCase() || '';
@@ -111,28 +121,42 @@ export default function EditCollectionPage() {
     const decade = album.decade?.toString() || '';
     const condition = album.media_condition?.toLowerCase() || '';
     const tracklists = album.tracklists?.toLowerCase() || '';
-    
-    // Notes and source fields
     const discogsSource = album.discogs_source?.toLowerCase() || '';
     const discogsNotes = album.discogs_notes?.toLowerCase() || '';
     const saleNotes = album.sale_notes?.toLowerCase() || '';
     const pricingNotes = album.pricing_notes?.toLowerCase() || '';
+    const salePlatform = album.sale_platform?.toLowerCase() || '';
     
-    // Array fields - custom tags
+    // ALL ID FIELDS (in case someone searches by ID)
+    const discogsMasterId = album.discogs_master_id?.toLowerCase() || '';
+    const discogsReleaseId = album.discogs_release_id?.toLowerCase() || '';
+    const masterReleaseId = album.master_release_id?.toLowerCase() || '';
+    const spotifyId = album.spotify_id?.toLowerCase() || '';
+    const appleMusicId = album.apple_music_id?.toLowerCase() || '';
+    
+    // ALL ARRAY FIELDS
     const tags = album.custom_tags?.map(t => t.toLowerCase()).join(' ') || '';
-    
-    // Array fields - genres and styles from multiple sources
     const discogsGenres = album.discogs_genres?.map(g => g.toLowerCase()).join(' ') || '';
     const discogsStyles = album.discogs_styles?.map(s => s.toLowerCase()).join(' ') || '';
     const spotifyGenres = album.spotify_genres?.map(g => g.toLowerCase()).join(' ') || '';
     const appleMusicGenres = album.apple_music_genres?.map(g => g.toLowerCase()).join(' ') || '';
     
-    // Labels
+    // ALL LABEL FIELDS
     const spotifyLabel = album.spotify_label?.toLowerCase() || '';
     const appleMusicLabel = album.apple_music_label?.toLowerCase() || '';
+    const appleMusicGenre = album.apple_music_genre?.toLowerCase() || '';
     
-    // Combine everything into one searchable string
-    const searchableText = `${artist} ${title} ${format} ${folder} ${year} ${decade} ${condition} ${tracklists} ${discogsSource} ${discogsNotes} ${saleNotes} ${pricingNotes} ${tags} ${discogsGenres} ${discogsStyles} ${spotifyGenres} ${appleMusicGenres} ${spotifyLabel} ${appleMusicLabel}`;
+    // ALL BOOLEAN BADGE FIELDS - convert to searchable keywords
+    const badges = [];
+    if (album.is_1001) badges.push('1001', '1001 albums', 'thousand and one', '1001albums');
+    if (album.steves_top_200) badges.push('top 200', 'steves top 200', 'top200', 'steve');
+    if (album.this_weeks_top_10) badges.push('top 10', 'top10', 'this week', 'weekly');
+    if (album.inner_circle_preferred) badges.push('inner circle', 'preferred', 'innercircle');
+    if (album.for_sale) badges.push('for sale', 'selling', 'available');
+    const badgeText = badges.join(' ');
+    
+    // COMBINE ABSOLUTELY EVERYTHING
+    const searchableText = `${artist} ${title} ${format} ${folder} ${year} ${decade} ${condition} ${tracklists} ${discogsSource} ${discogsNotes} ${saleNotes} ${pricingNotes} ${salePlatform} ${tags} ${discogsGenres} ${discogsStyles} ${spotifyGenres} ${appleMusicGenres} ${appleMusicGenre} ${spotifyLabel} ${appleMusicLabel} ${badgeText} ${discogsMasterId} ${discogsReleaseId} ${masterReleaseId} ${spotifyId} ${appleMusicId}`;
     
     return searchableText.includes(query);
   });
@@ -160,6 +184,33 @@ export default function EditCollectionPage() {
 
   const removeTag = (tagName: string) => {
     setAlbumTags(prev => prev.filter(t => t !== tagName));
+  };
+
+  const exportResults = () => {
+    const csv = [
+      ['Artist', 'Title', 'Year', 'Format', 'Folder', 'Condition', 'Tags'].join(','),
+      ...filteredAlbums.map(album => [
+        `"${album.artist}"`,
+        `"${album.title}"`,
+        album.year || '',
+        album.format,
+        album.folder,
+        album.media_condition || '',
+        `"${(album.custom_tags || []).join(', ')}"`
+      ].join(','))
+    ].join('\n');
+    
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `collection-search-${Date.now()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const printResults = () => {
+    window.print();
   };
 
   const saveTags = async () => {
@@ -337,9 +388,44 @@ export default function EditCollectionPage() {
             <div style={{
               marginTop: 8,
               fontSize: 13,
-              color: '#6b7280'
+              color: '#6b7280',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
             }}>
-              Found {filteredAlbums.length} album{filteredAlbums.length !== 1 ? 's' : ''}
+              <span>Found {filteredAlbums.length} album{filteredAlbums.length !== 1 ? 's' : ''}</span>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  onClick={exportResults}
+                  style={{
+                    padding: '6px 12px',
+                    background: '#10b981',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: 4,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  📥 Export CSV
+                </button>
+                <button
+                  onClick={printResults}
+                  style={{
+                    padding: '6px 12px',
+                    background: '#3b82f6',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: 4,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  🖨️ Print
+                </button>
+              </div>
             </div>
           )}
         </div>
