@@ -701,36 +701,42 @@ export default function EditCollectionPage() {
                     marginBottom: 8,
                     letterSpacing: '0.5px'
                   }}>
-                    {category}
+                    {category} ({tags.length} tags)
                   </div>
                   <div style={{
                     display: 'flex',
                     flexWrap: 'wrap',
                     gap: 8
                   }}>
-                    {tags.map(tag => {
-                      const isSelected = albumTags.includes(tag.name);
-                      return (
-                        <button
-                          key={tag.id}
-                          onClick={() => toggleTag(tag.name)}
-                          style={{
-                            padding: '8px 16px',
-                            borderRadius: 6,
-                            border: `2px solid ${tag.color}`,
-                            background: isSelected ? tag.color : 'white',
-                            color: isSelected ? 'white' : tag.color,
-                            fontSize: 14,
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            transition: 'all 0.2s',
-                            whiteSpace: 'nowrap'
-                          }}
-                        >
-                          {isSelected && '✓ '}{tag.name}
-                        </button>
-                      );
-                    })}
+                    {tags.length === 0 ? (
+                      <div style={{ color: '#9ca3af', fontSize: 13 }}>No tags in this category</div>
+                    ) : (
+                      tags.map(tag => {
+                        const isSelected = albumTags.includes(tag.name);
+                        console.log('Rendering tag:', tag);
+                        return (
+                          <button
+                            key={tag.id}
+                            onClick={() => toggleTag(tag.name)}
+                            style={{
+                              padding: '8px 16px',
+                              borderRadius: 6,
+                              border: `2px solid ${tag.color}`,
+                              background: isSelected ? tag.color : 'white',
+                              color: isSelected ? 'white' : tag.color,
+                              fontSize: 14,
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              transition: 'all 0.2s',
+                              whiteSpace: 'nowrap',
+                              minWidth: 60
+                            }}
+                          >
+                            {isSelected && '✓ '}{tag.name || '[NO NAME]'}
+                          </button>
+                        );
+                      })
+                    )}
                   </div>
                 </div>
               ))}
