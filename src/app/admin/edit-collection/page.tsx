@@ -320,24 +320,24 @@ export default function EditCollectionPage() {
     }
     
     // Array fields
-    if (album.custom_tags?.some(t => t.toLowerCase().includes(q))) {
-      const matchedTags = album.custom_tags.filter(t => t.toLowerCase().includes(q));
+    if (album.custom_tags?.some(t => t && typeof t === 'string' && t.toLowerCase().includes(q))) {
+      const matchedTags = album.custom_tags.filter(t => t && typeof t === 'string' && t.toLowerCase().includes(q));
       matches.push(`Tags: ${matchedTags.join(', ')}`);
     }
-    if (album.discogs_genres?.some(g => g.toLowerCase().includes(q))) {
-      const matchedGenres = album.discogs_genres.filter(g => g.toLowerCase().includes(q));
+    if (album.discogs_genres?.some(g => g && typeof g === 'string' && g.toLowerCase().includes(q))) {
+      const matchedGenres = album.discogs_genres.filter(g => g && typeof g === 'string' && g.toLowerCase().includes(q));
       matches.push(`Genre: ${matchedGenres.join(', ')}`);
     }
-    if (album.discogs_styles?.some(s => s.toLowerCase().includes(q))) {
-      const matchedStyles = album.discogs_styles.filter(s => s.toLowerCase().includes(q));
+    if (album.discogs_styles?.some(s => s && typeof s === 'string' && s.toLowerCase().includes(q))) {
+      const matchedStyles = album.discogs_styles.filter(s => s && typeof s === 'string' && s.toLowerCase().includes(q));
       matches.push(`Style: ${matchedStyles.join(', ')}`);
     }
-    if (album.spotify_genres?.some(g => g.toLowerCase().includes(q))) {
-      const matchedGenres = album.spotify_genres.filter(g => g.toLowerCase().includes(q));
+    if (album.spotify_genres?.some(g => g && typeof g === 'string' && g.toLowerCase().includes(q))) {
+      const matchedGenres = album.spotify_genres.filter(g => g && typeof g === 'string' && g.toLowerCase().includes(q));
       matches.push(`Spotify Genre: ${matchedGenres.join(', ')}`);
     }
-    if (album.apple_music_genres?.some(g => g.toLowerCase().includes(q))) {
-      const matchedGenres = album.apple_music_genres.filter(g => g.toLowerCase().includes(q));
+    if (album.apple_music_genres?.some(g => g && typeof g === 'string' && g.toLowerCase().includes(q))) {
+      const matchedGenres = album.apple_music_genres.filter(g => g && typeof g === 'string' && g.toLowerCase().includes(q));
       matches.push(`Apple Music Genre: ${matchedGenres.join(', ')}`);
     }
     
