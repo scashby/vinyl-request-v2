@@ -1,4 +1,4 @@
-// src/app/admin/edit-collection/page.tsx - WITH SALE FUNCTIONALITY
+// src/app/admin/edit-collection/page.tsx - COMPLETE SEARCH FIX
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
@@ -41,6 +41,36 @@ type Album = {
   master_release_id: string | null;
   spotify_id: string | null;
   apple_music_id: string | null;
+  sides: number | null;
+  is_box_set: boolean;
+  parent_id: number | null;
+  blocked: boolean;
+  blocked_sides: string | null;
+  child_album_ids: string | null;
+  sell_price: string | null;
+  date_added: string | null;
+  master_release_date: string | null;
+  spotify_url: string | null;
+  spotify_popularity: number | null;
+  spotify_release_date: string | null;
+  spotify_total_tracks: number | null;
+  spotify_image_url: string | null;
+  apple_music_url: string | null;
+  apple_music_release_date: string | null;
+  apple_music_track_count: number | null;
+  apple_music_artwork_url: string | null;
+  last_enriched_at: string | null;
+  enrichment_sources: string | null;
+  artist_norm: string | null;
+  album_norm: string | null;
+  artist_album_norm: string | null;
+  year_int: number | null;
+  sale_quantity: number | null;
+  wholesale_cost: number | null;
+  discogs_price_min: number | null;
+  discogs_price_median: number | null;
+  discogs_price_max: number | null;
+  discogs_price_updated_at: string | null;
 };
 
 type TagDefinition = {
@@ -89,10 +119,10 @@ export default function EditCollectionPage() {
       setTagDefinitions(tagDefs as TagDefinition[]);
     }
 
-    // Load albums - SELECT ALL TEXT/ARRAY/BOOLEAN FIELDS FROM SCHEMA
+    // Load albums - SELECT ALL FIELDS
     const { data, error } = await supabase
       .from('collection')
-      .select('id,artist,title,year,format,image_url,folder,for_sale,sale_price,sale_platform,custom_tags,media_condition,discogs_genres,discogs_styles,spotify_genres,apple_music_genres,apple_music_genre,spotify_label,apple_music_label,decade,tracklists,discogs_source,discogs_notes,sale_notes,pricing_notes,is_1001,steves_top_200,this_weeks_top_10,inner_circle_preferred,discogs_master_id,discogs_release_id,master_release_id,spotify_id,apple_music_id')
+      .select('*')
       .order('artist', { ascending: true });
 
     if (!error && data) {
@@ -111,51 +141,99 @@ export default function EditCollectionPage() {
     
     const query = searchQuery.toLowerCase();
     
-    // ALL TEXT FIELDS FROM SCHEMA
-    const artist = album.artist.toLowerCase();
-    const title = album.title.toLowerCase();
-    const format = album.format?.toLowerCase() || '';
-    const folder = album.folder?.toLowerCase() || '';
-    const year = album.year?.toLowerCase() || '';
-    const decade = album.decade?.toString() || '';
-    const condition = album.media_condition?.toLowerCase() || '';
-    const tracklists = album.tracklists?.toLowerCase() || '';
-    const discogsSource = album.discogs_source?.toLowerCase() || '';
-    const discogsNotes = album.discogs_notes?.toLowerCase() || '';
-    const saleNotes = album.sale_notes?.toLowerCase() || '';
-    const pricingNotes = album.pricing_notes?.toLowerCase() || '';
-    const salePlatform = album.sale_platform?.toLowerCase() || '';
+    // Convert ALL fields to searchable strings - handling nulls, numbers, booleans, arrays
+    const searchableFields = [
+      // Core text fields
+      album.artist,
+      album.title,
+      album.format,
+      album.folder,
+      album.year,
+      album.media_condition,
+      album.tracklists,
+      album.blocked_sides,
+      album.child_album_ids,
+      album.sell_price,
+      album.date_added,
+      
+      // Notes and descriptions
+      album.discogs_source,
+      album.discogs_notes,
+      album.sale_notes,
+      album.pricing_notes,
+      album.sale_platform,
+      
+      // ID fields
+      album.discogs_master_id,
+      album.discogs_release_id,
+      album.master_release_id,
+      album.spotify_id,
+      album.apple_music_id,
+      
+      // URL fields
+      album.image_url,
+      album.spotify_url,
+      album.spotify_image_url,
+      album.apple_music_url,
+      album.apple_music_artwork_url,
+      
+      // Label fields
+      album.spotify_label,
+      album.apple_music_label,
+      album.apple_music_genre,
+      
+      // Normalized fields
+      album.artist_norm,
+      album.album_norm,
+      album.artist_album_norm,
+      
+      // Date fields
+      album.master_release_date,
+      album.spotify_release_date,
+      album.apple_music_release_date,
+      album.last_enriched_at,
+      album.discogs_price_updated_at,
+      
+      // Other text fields
+      album.enrichment_sources,
+      
+      // Number fields - convert to string
+      album.decade?.toString(),
+      album.sides?.toString(),
+      album.parent_id?.toString(),
+      album.spotify_popularity?.toString(),
+      album.spotify_total_tracks?.toString(),
+      album.apple_music_track_count?.toString(),
+      album.year_int?.toString(),
+      album.sale_quantity?.toString(),
+      album.wholesale_cost?.toString(),
+      album.discogs_price_min?.toString(),
+      album.discogs_price_median?.toString(),
+      album.discogs_price_max?.toString(),
+      
+      // Array fields - join to string
+      album.custom_tags?.join(' '),
+      album.discogs_genres?.join(' '),
+      album.discogs_styles?.join(' '),
+      album.spotify_genres?.join(' '),
+      album.apple_music_genres?.join(' '),
+      
+      // Boolean fields - convert to searchable keywords
+      album.is_1001 ? '1001 albums thousand and one 1001albums' : '',
+      album.steves_top_200 ? 'top 200 steves top 200 top200 steve' : '',
+      album.this_weeks_top_10 ? 'top 10 top10 this week weekly' : '',
+      album.inner_circle_preferred ? 'inner circle preferred innercircle' : '',
+      album.for_sale ? 'for sale selling available' : '',
+      album.is_box_set ? 'box set boxset' : '',
+      album.blocked ? 'blocked' : '',
+    ];
     
-    // ALL ID FIELDS (in case someone searches by ID)
-    const discogsMasterId = album.discogs_master_id?.toLowerCase() || '';
-    const discogsReleaseId = album.discogs_release_id?.toLowerCase() || '';
-    const masterReleaseId = album.master_release_id?.toLowerCase() || '';
-    const spotifyId = album.spotify_id?.toLowerCase() || '';
-    const appleMusicId = album.apple_music_id?.toLowerCase() || '';
-    
-    // ALL ARRAY FIELDS
-    const tags = album.custom_tags?.map(t => t.toLowerCase()).join(' ') || '';
-    const discogsGenres = album.discogs_genres?.map(g => g.toLowerCase()).join(' ') || '';
-    const discogsStyles = album.discogs_styles?.map(s => s.toLowerCase()).join(' ') || '';
-    const spotifyGenres = album.spotify_genres?.map(g => g.toLowerCase()).join(' ') || '';
-    const appleMusicGenres = album.apple_music_genres?.map(g => g.toLowerCase()).join(' ') || '';
-    
-    // ALL LABEL FIELDS
-    const spotifyLabel = album.spotify_label?.toLowerCase() || '';
-    const appleMusicLabel = album.apple_music_label?.toLowerCase() || '';
-    const appleMusicGenre = album.apple_music_genre?.toLowerCase() || '';
-    
-    // ALL BOOLEAN BADGE FIELDS - convert to searchable keywords
-    const badges = [];
-    if (album.is_1001) badges.push('1001', '1001 albums', 'thousand and one', '1001albums');
-    if (album.steves_top_200) badges.push('top 200', 'steves top 200', 'top200', 'steve');
-    if (album.this_weeks_top_10) badges.push('top 10', 'top10', 'this week', 'weekly');
-    if (album.inner_circle_preferred) badges.push('inner circle', 'preferred', 'innercircle');
-    if (album.for_sale) badges.push('for sale', 'selling', 'available');
-    const badgeText = badges.join(' ');
-    
-    // COMBINE ABSOLUTELY EVERYTHING
-    const searchableText = `${artist} ${title} ${format} ${folder} ${year} ${decade} ${condition} ${tracklists} ${discogsSource} ${discogsNotes} ${saleNotes} ${pricingNotes} ${salePlatform} ${tags} ${discogsGenres} ${discogsStyles} ${spotifyGenres} ${appleMusicGenres} ${appleMusicGenre} ${spotifyLabel} ${appleMusicLabel} ${badgeText} ${discogsMasterId} ${discogsReleaseId} ${masterReleaseId} ${spotifyId} ${appleMusicId}`;
+    // Combine all fields into one searchable string, handling nulls
+    const searchableText = searchableFields
+      .filter(field => field != null)
+      .map(field => String(field))
+      .join(' ')
+      .toLowerCase();
     
     return searchableText.includes(query);
   });
@@ -189,11 +267,11 @@ export default function EditCollectionPage() {
     const csv = [
       ['Artist', 'Title', 'Year', 'Format', 'Folder', 'Condition', 'Tags'].join(','),
       ...filteredAlbums.map(album => [
-        `"${album.artist}"`,
-        `"${album.title}"`,
+        `"${album.artist || ''}"`,
+        `"${album.title || ''}"`,
         album.year || '',
-        album.format,
-        album.folder,
+        album.format || '',
+        album.folder || '',
         album.media_condition || '',
         `"${(album.custom_tags || []).join(', ')}"`
       ].join(','))
@@ -503,7 +581,7 @@ export default function EditCollectionPage() {
               >
                 <Image
                   src={album.image_url || '/images/placeholder.png'}
-                  alt={album.title}
+                  alt={album.title || 'Album'}
                   width={180}
                   height={180}
                   style={{
@@ -542,7 +620,7 @@ export default function EditCollectionPage() {
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap'
               }}>
-                {album.title}
+                {album.title || 'Untitled'}
               </div>
               <div style={{
                 fontSize: 12,
@@ -551,10 +629,10 @@ export default function EditCollectionPage() {
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap'
               }}>
-                {album.artist}
+                {album.artist || 'Unknown Artist'}
               </div>
 
-              {/* NEW: Format, Folder, Year, Condition */}
+              {/* Format, Folder, Year, Condition */}
               <div style={{
                 display: 'flex',
                 flexDirection: 'column',
@@ -752,7 +830,7 @@ export default function EditCollectionPage() {
             }}>
               <Image
                 src={editingAlbum.image_url || '/images/placeholder.png'}
-                alt={editingAlbum.title}
+                alt={editingAlbum.title || 'Album'}
                 width={80}
                 height={80}
                 style={{
@@ -768,13 +846,13 @@ export default function EditCollectionPage() {
                   color: '#1f2937',
                   marginBottom: 4
                 }}>
-                  {editingAlbum.title}
+                  {editingAlbum.title || 'Untitled'}
                 </div>
                 <div style={{
                   fontSize: 16,
                   color: '#6b7280'
                 }}>
-                  {editingAlbum.artist}
+                  {editingAlbum.artist || 'Unknown Artist'}
                 </div>
               </div>
             </div>
@@ -1027,7 +1105,7 @@ export default function EditCollectionPage() {
                 fontSize: 14,
                 color: '#6b7280'
               }}>
-                {saleModalAlbum.artist} - {saleModalAlbum.title}
+                {saleModalAlbum.artist || 'Unknown Artist'} - {saleModalAlbum.title || 'Untitled'}
               </div>
             </div>
 
