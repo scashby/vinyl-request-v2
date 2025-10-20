@@ -1,4 +1,4 @@
-// src/app/admin/edit-collection/page.tsx - COMPLETE SEARCH FIX
+// src/app/admin/edit-collection/page.tsx - COMPLETE WORKING FILE
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
@@ -274,6 +274,7 @@ export default function EditCollectionPage() {
     
     // Tracklists - parse JSON and extract track titles
     if (album.tracklists?.toLowerCase().includes(q)) {
+      let foundTrack = false;
       try {
         const tracks = JSON.parse(album.tracklists);
         if (Array.isArray(tracks)) {
@@ -283,16 +284,16 @@ export default function EditCollectionPage() {
             .slice(0, 2);
           if (matchingTracks.length > 0) {
             matches.push(`Tracks: ${matchingTracks.join(', ')}`);
+            foundTrack = true;
           }
         }
       } catch {
-        // If not JSON, treat as plain text
-        const trackText = album.tracklists.toLowerCase();
-        const lines = trackText.split('\n');
-        const matchingLines = lines.filter(line => line.includes(q)).slice(0, 2);
-        if (matchingLines.length > 0) {
-          matches.push(`Track: ${matchingLines.join('; ')}`);
-        }
+        // Not JSON or parse failed
+      }
+      
+      // If we didn't find parsed tracks but the field contains the query, note it
+      if (!foundTrack) {
+        matches.push(`Track data (check album details)`);
       }
     }
     
@@ -313,12 +314,17 @@ export default function EditCollectionPage() {
       const matchedGenres = album.spotify_genres.filter(g => g.toLowerCase().includes(q));
       matches.push(`Spotify Genre: ${matchedGenres.join(', ')}`);
     }
+    if (album.apple_music_genres?.some(g => g.toLowerCase().includes(q))) {
+      const matchedGenres = album.apple_music_genres.filter(g => g.toLowerCase().includes(q));
+      matches.push(`Apple Music Genre: ${matchedGenres.join(', ')}`);
+    }
     
     // Labels
     if (album.spotify_label?.toLowerCase().includes(q)) matches.push(`Label: ${album.spotify_label}`);
     if (album.apple_music_label?.toLowerCase().includes(q)) matches.push(`Label: ${album.apple_music_label}`);
+    if (album.apple_music_genre?.toLowerCase().includes(q)) matches.push(`Genre: ${album.apple_music_genre}`);
     
-    // Notes - show readable snippet
+    // Notes
     if (album.discogs_notes?.toLowerCase().includes(q)) {
       const snippet = album.discogs_notes.length > 60 
         ? album.discogs_notes.substring(0, 60) + '...' 
@@ -331,12 +337,20 @@ export default function EditCollectionPage() {
         : album.sale_notes;
       matches.push(`Sale Notes: ${snippet}`);
     }
+    if (album.pricing_notes?.toLowerCase().includes(q)) {
+      matches.push(`Pricing notes`);
+    }
+    
+    // Check other text fields that might match
+    if (album.discogs_source?.toLowerCase().includes(q)) matches.push(`Discogs source data`);
+    if (album.blocked_sides?.toLowerCase().includes(q)) matches.push(`Blocked sides info`);
+    if (album.enrichment_sources?.toLowerCase().includes(q)) matches.push(`Enrichment data`);
     
     // Boolean badges
-    if (album.is_1001 && ('1001'.includes(q) || 'albums'.includes(q))) matches.push('Badge: 1001 Albums');
-    if (album.steves_top_200 && ('top 200'.includes(q) || 'steve'.includes(q))) matches.push("Badge: Steve's Top 200");
-    if (album.this_weeks_top_10 && ('top 10'.includes(q) || 'week'.includes(q))) matches.push("Badge: This Week's Top 10");
-    if (album.inner_circle_preferred && ('inner circle'.includes(q) || 'preferred'.includes(q))) matches.push('Badge: Inner Circle');
+    if (album.is_1001 && ('1001'.includes(q) || 'albums'.includes(q) || 'thousand'.includes(q))) matches.push('Badge: 1001 Albums');
+    if (album.steves_top_200 && ('top'.includes(q) || '200'.includes(q) || 'steve'.includes(q))) matches.push("Badge: Steve's Top 200");
+    if (album.this_weeks_top_10 && ('top'.includes(q) || '10'.includes(q) || 'week'.includes(q))) matches.push("Badge: This Week's Top 10");
+    if (album.inner_circle_preferred && ('inner'.includes(q) || 'circle'.includes(q) || 'preferred'.includes(q))) matches.push('Badge: Inner Circle');
     if (album.for_sale && ('sale'.includes(q) || 'selling'.includes(q))) matches.push('Badge: For Sale');
     
     return matches.slice(0, 3); // Limit to 3 matches shown
@@ -971,35 +985,35 @@ export default function EditCollectionPage() {
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
           }}>
             <div style={{
-              padding: 24,
+              padding: '12px 20px',
               borderBottom: '1px solid #e5e7eb',
               display: 'flex',
               alignItems: 'center',
-              gap: 16,
+              gap: 12,
               flexShrink: 0
             }}>
               <Image
                 src={editingAlbum.image_url || '/images/placeholder.png'}
                 alt={editingAlbum.title || 'Album'}
-                width={80}
-                height={80}
+                width={60}
+                height={60}
                 style={{
-                  borderRadius: 8,
+                  borderRadius: 6,
                   objectFit: 'cover'
                 }}
                 unoptimized
               />
               <div style={{ flex: 1 }}>
                 <div style={{
-                  fontSize: 20,
+                  fontSize: 18,
                   fontWeight: 'bold',
                   color: '#1f2937',
-                  marginBottom: 4
+                  marginBottom: 2
                 }}>
                   {editingAlbum.title || 'Untitled'}
                 </div>
                 <div style={{
-                  fontSize: 16,
+                  fontSize: 14,
                   color: '#6b7280'
                 }}>
                   {editingAlbum.artist || 'Unknown Artist'}
@@ -1008,28 +1022,28 @@ export default function EditCollectionPage() {
             </div>
 
             <div style={{
-              padding: '16px 24px',
+              padding: '12px 20px',
               flex: 1,
               overflowY: 'auto'
             }}>
               {/* Current Tags Section */}
               {albumTags.length > 0 && (
-                <div style={{ marginBottom: 16 }}>
+                <div style={{ marginBottom: 12 }}>
                   <h3 style={{
-                    fontSize: 16,
+                    fontSize: 14,
                     fontWeight: 600,
                     color: '#1f2937',
-                    marginBottom: 8
+                    marginBottom: 6
                   }}>
                     Current Tags ({albumTags.length})
                   </h3>
                   <div style={{
                     display: 'flex',
                     flexWrap: 'wrap',
-                    gap: 6,
-                    padding: 12,
+                    gap: 4,
+                    padding: 8,
                     background: '#f3f4f6',
-                    borderRadius: 6
+                    borderRadius: 4
                   }}>
                     {albumTags.map(tagName => {
                       const tagDef = tagDefinitions.find(t => t.tag_name === tagName);
@@ -1039,12 +1053,12 @@ export default function EditCollectionPage() {
                           style={{
                             display: 'flex',
                             alignItems: 'center',
-                            gap: 8,
-                            padding: '6px 12px',
-                            borderRadius: 6,
+                            gap: 4,
+                            padding: '3px 8px',
+                            borderRadius: 3,
                             background: tagDef?.color || '#6b7280',
                             color: 'white',
-                            fontSize: 14,
+                            fontSize: 12,
                             fontWeight: 600
                           }}
                         >
@@ -1054,11 +1068,11 @@ export default function EditCollectionPage() {
                             style={{
                               background: 'rgba(255,255,255,0.3)',
                               border: 'none',
-                              borderRadius: 4,
+                              borderRadius: 3,
                               color: 'white',
                               cursor: 'pointer',
-                              padding: '2px 6px',
-                              fontSize: 12,
+                              padding: '1px 4px',
+                              fontSize: 11,
                               fontWeight: 'bold'
                             }}
                           >
@@ -1072,16 +1086,16 @@ export default function EditCollectionPage() {
               )}
 
               {/* Add Custom Tag */}
-              <div style={{ marginBottom: 16 }}>
+              <div style={{ marginBottom: 12 }}>
                 <h3 style={{
-                  fontSize: 16,
+                  fontSize: 14,
                   fontWeight: 600,
                   color: '#1f2937',
-                  marginBottom: 8
+                  marginBottom: 6
                 }}>
                   Add Custom Tag
                 </h3>
-                <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 6 }}>
                   <input
                     type="text"
                     value={newTagInput}
@@ -1090,10 +1104,10 @@ export default function EditCollectionPage() {
                     placeholder="Type tag name and press Enter..."
                     style={{
                       flex: 1,
-                      padding: '10px 12px',
+                      padding: '6px 10px',
                       border: '1px solid #d1d5db',
-                      borderRadius: 6,
-                      fontSize: 14,
+                      borderRadius: 4,
+                      fontSize: 13,
                       color: '#1f2937',
                       backgroundColor: 'white'
                     }}
@@ -1102,12 +1116,12 @@ export default function EditCollectionPage() {
                     onClick={addCustomTag}
                     disabled={!newTagInput.trim()}
                     style={{
-                      padding: '10px 20px',
+                      padding: '6px 12px',
                       background: newTagInput.trim() ? '#10b981' : '#9ca3af',
                       color: 'white',
                       border: 'none',
-                      borderRadius: 6,
-                      fontSize: 14,
+                      borderRadius: 4,
+                      fontSize: 13,
                       fontWeight: 600,
                       cursor: newTagInput.trim() ? 'pointer' : 'not-allowed'
                     }}
@@ -1119,66 +1133,71 @@ export default function EditCollectionPage() {
 
               {/* Quick Select from Pre-defined Tags */}
               <h3 style={{
-                fontSize: 16,
+                fontSize: 14,
                 fontWeight: 600,
                 color: '#1f2937',
-                marginBottom: 12
+                marginBottom: 8
               }}>
                 Quick Select
               </h3>
 
-              {Object.entries(tagsByCategory).map(([category, tags]) => (
-                <div key={category} style={{ marginBottom: 16 }}>
-                  <div style={{
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: '#6b7280',
-                    textTransform: 'uppercase',
-                    marginBottom: 6,
-                    letterSpacing: '0.5px'
-                  }}>
-                    {category} ({tags.length} tags)
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(2, 1fr)',
+                gap: 12
+              }}>
+                {Object.entries(tagsByCategory).map(([category, tags]) => (
+                  <div key={category}>
+                    <div style={{
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: '#6b7280',
+                      textTransform: 'uppercase',
+                      marginBottom: 4,
+                      letterSpacing: '0.5px'
+                    }}>
+                      {category}
+                    </div>
+                    <div style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: 4
+                    }}>
+                      {tags.length === 0 ? (
+                        <div style={{ color: '#9ca3af', fontSize: 11 }}>No tags</div>
+                      ) : (
+                        tags.map(tag => {
+                          const isSelected = albumTags.includes(tag.tag_name);
+                          return (
+                            <button
+                              key={tag.id}
+                              onClick={() => toggleTag(tag.tag_name)}
+                              style={{
+                                padding: '4px 8px',
+                                borderRadius: 3,
+                                border: `1.5px solid ${tag.color}`,
+                                background: isSelected ? tag.color : 'white',
+                                color: isSelected ? 'white' : tag.color,
+                                fontSize: 11,
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                                whiteSpace: 'nowrap'
+                              }}
+                            >
+                              {isSelected && '✓ '}{tag.tag_name}
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
                   </div>
-                  <div style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: 6
-                  }}>
-                    {tags.length === 0 ? (
-                      <div style={{ color: '#9ca3af', fontSize: 13 }}>No tags in this category</div>
-                    ) : (
-                      tags.map(tag => {
-                        const isSelected = albumTags.includes(tag.tag_name);
-                        return (
-                          <button
-                            key={tag.id}
-                            onClick={() => toggleTag(tag.tag_name)}
-                            style={{
-                              padding: '8px 16px',
-                              borderRadius: 6,
-                              border: `2px solid ${tag.color}`,
-                              background: isSelected ? tag.color : 'white',
-                              color: isSelected ? 'white' : tag.color,
-                              fontSize: 14,
-                              fontWeight: 600,
-                              cursor: 'pointer',
-                              transition: 'all 0.2s',
-                              whiteSpace: 'nowrap',
-                              minWidth: 60
-                            }}
-                          >
-                            {isSelected && '✓ '}{tag.tag_name}
-                          </button>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
 
             <div style={{
-              padding: '16px 24px',
+              padding: '12px 20px',
               borderTop: '1px solid #e5e7eb',
               display: 'flex',
               justifyContent: 'flex-end',
@@ -1190,12 +1209,12 @@ export default function EditCollectionPage() {
                 onClick={() => setEditingTagsFor(null)}
                 disabled={savingTags}
                 style={{
-                  padding: '10px 20px',
+                  padding: '6px 14px',
                   background: '#6b7280',
                   color: 'white',
                   border: 'none',
-                  borderRadius: 6,
-                  fontSize: 14,
+                  borderRadius: 4,
+                  fontSize: 13,
                   fontWeight: 600,
                   cursor: savingTags ? 'not-allowed' : 'pointer'
                 }}
@@ -1206,12 +1225,12 @@ export default function EditCollectionPage() {
                 onClick={saveTags}
                 disabled={savingTags}
                 style={{
-                  padding: '10px 20px',
+                  padding: '6px 14px',
                   background: savingTags ? '#9ca3af' : '#10b981',
                   color: 'white',
                   border: 'none',
-                  borderRadius: 6,
-                  fontSize: 14,
+                  borderRadius: 4,
+                  fontSize: 13,
                   fontWeight: 600,
                   cursor: savingTags ? 'not-allowed' : 'pointer'
                 }}
