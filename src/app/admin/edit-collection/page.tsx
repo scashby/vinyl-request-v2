@@ -272,14 +272,28 @@ export default function EditCollectionPage() {
     if (album.year?.toLowerCase().includes(q)) matches.push(`Year: ${album.year}`);
     if (album.media_condition?.toLowerCase().includes(q)) matches.push(`Condition: ${album.media_condition}`);
     
-    // Tracklists - show snippet
+    // Tracklists - parse JSON and extract track titles
     if (album.tracklists?.toLowerCase().includes(q)) {
-      const trackText = album.tracklists.toLowerCase();
-      const index = trackText.indexOf(q);
-      const start = Math.max(0, index - 30);
-      const end = Math.min(trackText.length, index + q.length + 30);
-      const snippet = album.tracklists.substring(start, end);
-      matches.push(`Track: ...${snippet}...`);
+      try {
+        const tracks = JSON.parse(album.tracklists);
+        if (Array.isArray(tracks)) {
+          const matchingTracks = tracks
+            .filter(t => t.title?.toLowerCase().includes(q))
+            .map(t => t.title)
+            .slice(0, 2);
+          if (matchingTracks.length > 0) {
+            matches.push(`Tracks: ${matchingTracks.join(', ')}`);
+          }
+        }
+      } catch {
+        // If not JSON, treat as plain text
+        const trackText = album.tracklists.toLowerCase();
+        const lines = trackText.split('\n');
+        const matchingLines = lines.filter(line => line.includes(q)).slice(0, 2);
+        if (matchingLines.length > 0) {
+          matches.push(`Track: ${matchingLines.join('; ')}`);
+        }
+      }
     }
     
     // Array fields
@@ -304,9 +318,19 @@ export default function EditCollectionPage() {
     if (album.spotify_label?.toLowerCase().includes(q)) matches.push(`Label: ${album.spotify_label}`);
     if (album.apple_music_label?.toLowerCase().includes(q)) matches.push(`Label: ${album.apple_music_label}`);
     
-    // Notes
-    if (album.discogs_notes?.toLowerCase().includes(q)) matches.push(`Notes: ${album.discogs_notes.substring(0, 50)}...`);
-    if (album.sale_notes?.toLowerCase().includes(q)) matches.push(`Sale Notes: ${album.sale_notes.substring(0, 50)}...`);
+    // Notes - show readable snippet
+    if (album.discogs_notes?.toLowerCase().includes(q)) {
+      const snippet = album.discogs_notes.length > 60 
+        ? album.discogs_notes.substring(0, 60) + '...' 
+        : album.discogs_notes;
+      matches.push(`Notes: ${snippet}`);
+    }
+    if (album.sale_notes?.toLowerCase().includes(q)) {
+      const snippet = album.sale_notes.length > 60 
+        ? album.sale_notes.substring(0, 60) + '...' 
+        : album.sale_notes;
+      matches.push(`Sale Notes: ${snippet}`);
+    }
     
     // Boolean badges
     if (album.is_1001 && ('1001'.includes(q) || 'albums'.includes(q))) matches.push('Badge: 1001 Albums');
