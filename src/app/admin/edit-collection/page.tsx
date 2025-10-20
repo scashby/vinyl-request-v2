@@ -1,4 +1,4 @@
-// src/app/admin/edit-collection/page.tsx - COMPLETE WORKING FILE
+// src/app/admin/edit-collection/page.tsx - COMPLETE TYPE-SAFE VERSION
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
@@ -89,6 +89,63 @@ const PLATFORMS = [
   { value: 'other', label: 'Other' }
 ];
 
+// ========================================
+// HELPER FUNCTIONS FOR TYPE SAFETY
+// ========================================
+
+/**
+ * Safely converts any value to a lowercase searchable string
+ * Returns empty string for null/undefined, handles arrays and objects
+ */
+function toSafeSearchString(value: unknown): string {
+  if (value === null || value === undefined) {
+    return '';
+  }
+  
+  if (typeof value === 'string') {
+    return value.toLowerCase();
+  }
+  
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value).toLowerCase();
+  }
+  
+  if (Array.isArray(value)) {
+    // Filter to only string elements, then join
+    return value
+      .filter(item => typeof item === 'string')
+      .join(' ')
+      .toLowerCase();
+  }
+  
+  // For objects or other types, try toString
+  try {
+    return String(value).toLowerCase();
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Safely extracts string elements from an array field
+ * Returns empty array if not an array or contains non-strings
+ */
+function toSafeStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  
+  return value.filter(item => typeof item === 'string' && item.length > 0);
+}
+
+/**
+ * Checks if a value contains a search query (case-insensitive)
+ */
+function safeIncludes(value: unknown, query: string): boolean {
+  const searchStr = toSafeSearchString(value);
+  return searchStr.includes(query.toLowerCase());
+}
+
 export default function EditCollectionPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -123,7 +180,7 @@ export default function EditCollectionPage() {
       setTagDefinitions(tagDefs as TagDefinition[]);
     }
 
-    // Load albums with pagination - ALL FIELDS
+    // Load albums with pagination
     let allRows: Album[] = [];
     let from = 0;
     const batchSize = 1000;
@@ -161,82 +218,82 @@ export default function EditCollectionPage() {
     
     const query = searchQuery.toLowerCase();
     
-    // Convert ALL fields to searchable strings - handling nulls, numbers, booleans, arrays
-    const searchableFields = [
+    // Build comprehensive searchable text using safe helper functions
+    const searchParts: string[] = [
       // Core text fields
-      album.artist,
-      album.title,
-      album.format,
-      album.folder,
-      album.year,
-      album.media_condition,
-      album.tracklists,
-      album.blocked_sides,
-      album.child_album_ids,
-      album.sell_price,
-      album.date_added,
+      toSafeSearchString(album.artist),
+      toSafeSearchString(album.title),
+      toSafeSearchString(album.format),
+      toSafeSearchString(album.folder),
+      toSafeSearchString(album.year),
+      toSafeSearchString(album.media_condition),
+      toSafeSearchString(album.tracklists),
+      toSafeSearchString(album.blocked_sides),
+      toSafeSearchString(album.child_album_ids),
+      toSafeSearchString(album.sell_price),
+      toSafeSearchString(album.date_added),
       
       // Notes and descriptions
-      album.discogs_source,
-      album.discogs_notes,
-      album.sale_notes,
-      album.pricing_notes,
-      album.sale_platform,
+      toSafeSearchString(album.discogs_source),
+      toSafeSearchString(album.discogs_notes),
+      toSafeSearchString(album.sale_notes),
+      toSafeSearchString(album.pricing_notes),
+      toSafeSearchString(album.sale_platform),
       
       // ID fields
-      album.discogs_master_id,
-      album.discogs_release_id,
-      album.master_release_id,
-      album.spotify_id,
-      album.apple_music_id,
+      toSafeSearchString(album.discogs_master_id),
+      toSafeSearchString(album.discogs_release_id),
+      toSafeSearchString(album.master_release_id),
+      toSafeSearchString(album.spotify_id),
+      toSafeSearchString(album.apple_music_id),
       
       // URL fields
-      album.image_url,
-      album.spotify_url,
-      album.spotify_image_url,
-      album.apple_music_url,
-      album.apple_music_artwork_url,
+      toSafeSearchString(album.image_url),
+      toSafeSearchString(album.spotify_url),
+      toSafeSearchString(album.spotify_image_url),
+      toSafeSearchString(album.apple_music_url),
+      toSafeSearchString(album.apple_music_artwork_url),
       
       // Label fields
-      album.spotify_label,
-      album.apple_music_label,
-      album.apple_music_genre,
+      toSafeSearchString(album.spotify_label),
+      toSafeSearchString(album.apple_music_label),
+      toSafeSearchString(album.apple_music_genre),
       
       // Normalized fields
-      album.artist_norm,
-      album.album_norm,
-      album.artist_album_norm,
+      toSafeSearchString(album.artist_norm),
+      toSafeSearchString(album.album_norm),
+      toSafeSearchString(album.artist_album_norm),
       
       // Date fields
-      album.master_release_date,
-      album.spotify_release_date,
-      album.apple_music_release_date,
-      album.last_enriched_at,
-      album.discogs_price_updated_at,
+      toSafeSearchString(album.master_release_date),
+      toSafeSearchString(album.spotify_release_date),
+      toSafeSearchString(album.apple_music_release_date),
+      toSafeSearchString(album.last_enriched_at),
+      toSafeSearchString(album.discogs_price_updated_at),
       
       // Other text fields
-      album.enrichment_sources,
+      toSafeSearchString(album.enrichment_sources),
       
-      // Number fields - convert to string
-      album.decade?.toString(),
-      album.sides?.toString(),
-      album.parent_id?.toString(),
-      album.spotify_popularity?.toString(),
-      album.spotify_total_tracks?.toString(),
-      album.apple_music_track_count?.toString(),
-      album.year_int?.toString(),
-      album.sale_quantity?.toString(),
-      album.wholesale_cost?.toString(),
-      album.discogs_price_min?.toString(),
-      album.discogs_price_median?.toString(),
-      album.discogs_price_max?.toString(),
+      // Number fields
+      toSafeSearchString(album.decade),
+      toSafeSearchString(album.sides),
+      toSafeSearchString(album.parent_id),
+      toSafeSearchString(album.spotify_popularity),
+      toSafeSearchString(album.spotify_total_tracks),
+      toSafeSearchString(album.apple_music_track_count),
+      toSafeSearchString(album.year_int),
+      toSafeSearchString(album.sale_quantity),
+      toSafeSearchString(album.wholesale_cost),
+      toSafeSearchString(album.discogs_price_min),
+      toSafeSearchString(album.discogs_price_median),
+      toSafeSearchString(album.discogs_price_max),
       
-      // Array fields - join to string
-      album.custom_tags?.join(' '),
-      album.discogs_genres?.join(' '),
-      album.discogs_styles?.join(' '),
-      album.spotify_genres?.join(' '),
-      album.apple_music_genres?.join(' '),
+      // Array fields - safely handled
+      toSafeSearchString(album.custom_tags),
+      toSafeSearchString(album.discogs_genres),
+      toSafeSearchString(album.discogs_styles),
+      toSafeSearchString(album.spotify_genres),
+      toSafeSearchString(album.apple_music_genres),
       
       // Boolean fields - convert to searchable keywords
       album.is_1001 ? '1001 albums thousand and one 1001albums' : '',
@@ -248,12 +305,10 @@ export default function EditCollectionPage() {
       album.blocked ? 'blocked' : '',
     ];
     
-    // Combine all fields into one searchable string, handling nulls
-    const searchableText = searchableFields
-      .filter(field => field != null)
-      .map(field => String(field))
-      .join(' ')
-      .toLowerCase();
+    // Combine all parts and search
+    const searchableText = searchParts
+      .filter(part => part.length > 0)
+      .join(' ');
     
     return searchableText.includes(query);
   });
@@ -264,22 +319,22 @@ export default function EditCollectionPage() {
     const q = query.toLowerCase();
     const matches: string[] = [];
     
-    // Check each field type and add to matches
-    if (album.artist?.toLowerCase().includes(q)) matches.push(`Artist: ${album.artist}`);
-    if (album.title?.toLowerCase().includes(q)) matches.push(`Title: ${album.title}`);
-    if (album.format?.toLowerCase().includes(q)) matches.push(`Format: ${album.format}`);
-    if (album.folder?.toLowerCase().includes(q)) matches.push(`Folder: ${album.folder}`);
-    if (album.year?.toLowerCase().includes(q)) matches.push(`Year: ${album.year}`);
-    if (album.media_condition?.toLowerCase().includes(q)) matches.push(`Condition: ${album.media_condition}`);
+    // Check core fields
+    if (safeIncludes(album.artist, q)) matches.push(`Artist: ${album.artist}`);
+    if (safeIncludes(album.title, q)) matches.push(`Title: ${album.title}`);
+    if (safeIncludes(album.format, q)) matches.push(`Format: ${album.format}`);
+    if (safeIncludes(album.folder, q)) matches.push(`Folder: ${album.folder}`);
+    if (safeIncludes(album.year, q)) matches.push(`Year: ${album.year}`);
+    if (safeIncludes(album.media_condition, q)) matches.push(`Condition: ${album.media_condition}`);
     
-    // Tracklists - parse JSON and extract track titles
-    if (album.tracklists?.toLowerCase().includes(q)) {
+    // Tracklists - safely parse
+    if (album.tracklists && safeIncludes(album.tracklists, q)) {
       let foundTrack = false;
       try {
         const tracks = JSON.parse(album.tracklists);
         if (Array.isArray(tracks)) {
           const matchingTracks = tracks
-            .filter(t => t.title && typeof t.title === 'string' && t.title.toLowerCase().includes(q))
+            .filter(t => t && typeof t === 'object' && typeof t.title === 'string' && safeIncludes(t.title, q))
             .map(t => t.title)
             .slice(0, 2);
           if (matchingTracks.length > 0) {
@@ -288,26 +343,27 @@ export default function EditCollectionPage() {
           }
         }
       } catch {
-        // Not JSON - try to extract track names from raw text
-        const lines = album.tracklists.split('\n');
-        const matchingLines = lines
-          .filter(line => line && typeof line === 'string' && line.toLowerCase().includes(q))
-          .map(line => {
-            // Try to extract just the track title (remove position, duration, etc)
-            const cleaned = line.replace(/^[A-Z0-9]+\s*[-\s]*/i, '').replace(/\s*\d+:\d+\s*$/, '').trim();
-            return cleaned.substring(0, 50);
-          })
-          .filter(line => line.length > 0)
-          .slice(0, 2);
-        
-        if (matchingLines.length > 0) {
-          matches.push(`Tracks: ${matchingLines.join(', ')}`);
-          foundTrack = true;
+        // Not JSON - try text extraction
+        if (typeof album.tracklists === 'string') {
+          const lines = album.tracklists.split('\n');
+          const matchingLines = lines
+            .filter(line => typeof line === 'string' && line.length > 0 && safeIncludes(line, q))
+            .map(line => {
+              const cleaned = line.replace(/^[A-Z0-9]+\s*[-\s]*/i, '').replace(/\s*\d+:\d+\s*$/, '').trim();
+              return cleaned.substring(0, 50);
+            })
+            .filter(line => line.length > 0)
+            .slice(0, 2);
+          
+          if (matchingLines.length > 0) {
+            matches.push(`Tracks: ${matchingLines.join(', ')}`);
+            foundTrack = true;
+          }
         }
       }
       
-      // If still can't find the track, show a raw snippet
-      if (!foundTrack) {
+      // Fallback: show snippet
+      if (!foundTrack && typeof album.tracklists === 'string') {
         const trackText = album.tracklists.toLowerCase();
         const index = trackText.indexOf(q);
         if (index !== -1) {
@@ -319,68 +375,85 @@ export default function EditCollectionPage() {
       }
     }
     
-    // Array fields
-    if (album.custom_tags?.some(t => t && typeof t === 'string' && t.toLowerCase().includes(q))) {
-      const matchedTags = album.custom_tags.filter(t => t && typeof t === 'string' && t.toLowerCase().includes(q));
-      matches.push(`Tags: ${matchedTags.join(', ')}`);
+    // Array fields - safely check
+    const customTags = toSafeStringArray(album.custom_tags);
+    if (customTags.some(t => safeIncludes(t, q))) {
+      const matched = customTags.filter(t => safeIncludes(t, q));
+      matches.push(`Tags: ${matched.join(', ')}`);
     }
-    if (album.discogs_genres?.some(g => g && typeof g === 'string' && g.toLowerCase().includes(q))) {
-      const matchedGenres = album.discogs_genres.filter(g => g && typeof g === 'string' && g.toLowerCase().includes(q));
-      matches.push(`Genre: ${matchedGenres.join(', ')}`);
+    
+    const discogsGenres = toSafeStringArray(album.discogs_genres);
+    if (discogsGenres.some(g => safeIncludes(g, q))) {
+      const matched = discogsGenres.filter(g => safeIncludes(g, q));
+      matches.push(`Genre: ${matched.join(', ')}`);
     }
-    if (album.discogs_styles?.some(s => s && typeof s === 'string' && s.toLowerCase().includes(q))) {
-      const matchedStyles = album.discogs_styles.filter(s => s && typeof s === 'string' && s.toLowerCase().includes(q));
-      matches.push(`Style: ${matchedStyles.join(', ')}`);
+    
+    const discogsStyles = toSafeStringArray(album.discogs_styles);
+    if (discogsStyles.some(s => safeIncludes(s, q))) {
+      const matched = discogsStyles.filter(s => safeIncludes(s, q));
+      matches.push(`Style: ${matched.join(', ')}`);
     }
-    if (album.spotify_genres?.some(g => g && typeof g === 'string' && g.toLowerCase().includes(q))) {
-      const matchedGenres = album.spotify_genres.filter(g => g && typeof g === 'string' && g.toLowerCase().includes(q));
-      matches.push(`Spotify Genre: ${matchedGenres.join(', ')}`);
+    
+    const spotifyGenres = toSafeStringArray(album.spotify_genres);
+    if (spotifyGenres.some(g => safeIncludes(g, q))) {
+      const matched = spotifyGenres.filter(g => safeIncludes(g, q));
+      matches.push(`Spotify Genre: ${matched.join(', ')}`);
     }
-    if (album.apple_music_genres?.some(g => g && typeof g === 'string' && g.toLowerCase().includes(q))) {
-      const matchedGenres = album.apple_music_genres.filter(g => g && typeof g === 'string' && g.toLowerCase().includes(q));
-      matches.push(`Apple Music Genre: ${matchedGenres.join(', ')}`);
+    
+    const appleMusicGenres = toSafeStringArray(album.apple_music_genres);
+    if (appleMusicGenres.some(g => safeIncludes(g, q))) {
+      const matched = appleMusicGenres.filter(g => safeIncludes(g, q));
+      matches.push(`Apple Music Genre: ${matched.join(', ')}`);
     }
     
     // Labels
-    if (album.spotify_label?.toLowerCase().includes(q)) matches.push(`Label: ${album.spotify_label}`);
-    if (album.apple_music_label?.toLowerCase().includes(q)) matches.push(`Label: ${album.apple_music_label}`);
-    if (album.apple_music_genre?.toLowerCase().includes(q)) matches.push(`Genre: ${album.apple_music_genre}`);
+    if (safeIncludes(album.spotify_label, q)) matches.push(`Label: ${album.spotify_label}`);
+    if (safeIncludes(album.apple_music_label, q)) matches.push(`Label: ${album.apple_music_label}`);
+    if (safeIncludes(album.apple_music_genre, q)) matches.push(`Genre: ${album.apple_music_genre}`);
     
-    // Notes
-    if (album.discogs_notes?.toLowerCase().includes(q)) {
-      const snippet = album.discogs_notes.length > 60 
+    // Notes - safely truncate
+    if (album.discogs_notes && safeIncludes(album.discogs_notes, q)) {
+      const snippet = typeof album.discogs_notes === 'string' && album.discogs_notes.length > 60 
         ? album.discogs_notes.substring(0, 60) + '...' 
         : album.discogs_notes;
       matches.push(`Notes: ${snippet}`);
     }
-    if (album.sale_notes?.toLowerCase().includes(q)) {
-      const snippet = album.sale_notes.length > 60 
+    if (album.sale_notes && safeIncludes(album.sale_notes, q)) {
+      const snippet = typeof album.sale_notes === 'string' && album.sale_notes.length > 60 
         ? album.sale_notes.substring(0, 60) + '...' 
         : album.sale_notes;
       matches.push(`Sale Notes: ${snippet}`);
     }
-    if (album.pricing_notes?.toLowerCase().includes(q)) {
-      matches.push(`Pricing notes`);
-    }
+    if (safeIncludes(album.pricing_notes, q)) matches.push(`Pricing notes`);
     
-    // Check other text fields that might match
-    if (album.discogs_source?.toLowerCase().includes(q)) matches.push(`Discogs source data`);
-    if (album.blocked_sides?.toLowerCase().includes(q)) matches.push(`Blocked sides info`);
-    if (album.enrichment_sources?.toLowerCase().includes(q)) matches.push(`Enrichment data`);
+    // Other fields
+    if (safeIncludes(album.discogs_source, q)) matches.push(`Discogs source data`);
+    if (safeIncludes(album.blocked_sides, q)) matches.push(`Blocked sides info`);
+    if (safeIncludes(album.enrichment_sources, q)) matches.push(`Enrichment data`);
     
     // Boolean badges
-    if (album.is_1001 && ('1001'.includes(q) || 'albums'.includes(q) || 'thousand'.includes(q))) matches.push('Badge: 1001 Albums');
-    if (album.steves_top_200 && ('top'.includes(q) || '200'.includes(q) || 'steve'.includes(q))) matches.push("Badge: Steve's Top 200");
-    if (album.this_weeks_top_10 && ('top'.includes(q) || '10'.includes(q) || 'week'.includes(q))) matches.push("Badge: This Week's Top 10");
-    if (album.inner_circle_preferred && ('inner'.includes(q) || 'circle'.includes(q) || 'preferred'.includes(q))) matches.push('Badge: Inner Circle');
-    if (album.for_sale && ('sale'.includes(q) || 'selling'.includes(q))) matches.push('Badge: For Sale');
+    if (album.is_1001 && ('1001'.includes(q) || 'albums'.includes(q) || 'thousand'.includes(q))) {
+      matches.push('Badge: 1001 Albums');
+    }
+    if (album.steves_top_200 && ('top'.includes(q) || '200'.includes(q) || 'steve'.includes(q))) {
+      matches.push("Badge: Steve's Top 200");
+    }
+    if (album.this_weeks_top_10 && ('top'.includes(q) || '10'.includes(q) || 'week'.includes(q))) {
+      matches.push("Badge: This Week's Top 10");
+    }
+    if (album.inner_circle_preferred && ('inner'.includes(q) || 'circle'.includes(q) || 'preferred'.includes(q))) {
+      matches.push('Badge: Inner Circle');
+    }
+    if (album.for_sale && ('sale'.includes(q) || 'selling'.includes(q))) {
+      matches.push('Badge: For Sale');
+    }
     
-    return matches.slice(0, 3); // Limit to 3 matches shown
+    return matches.slice(0, 3);
   };
 
   const openTagEditor = (album: Album) => {
     setEditingTagsFor(album.id);
-    setAlbumTags(album.custom_tags || []);
+    setAlbumTags(toSafeStringArray(album.custom_tags));
   };
 
   const toggleTag = (tagName: string) => {
@@ -424,7 +497,7 @@ export default function EditCollectionPage() {
         album.format || '',
         album.folder || '',
         album.media_condition || '',
-        `"${(album.custom_tags || []).join(', ')}"`
+        `"${toSafeStringArray(album.custom_tags).join(', ')}"`
       ].join(','))
     ].join('\n');
     
@@ -676,308 +749,271 @@ export default function EditCollectionPage() {
           gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
           gap: 16
         }}>
-          {filteredAlbums.map(album => (
-            <div
-              key={album.id}
-              style={{
-                background: 'white',
-                border: '1px solid #e5e7eb',
-                borderRadius: 8,
-                padding: 12,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 8,
-                position: 'relative',
-                transition: 'all 0.2s'
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
-                e.currentTarget.style.transform = 'translateY(-2px)';
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.boxShadow = 'none';
-                e.currentTarget.style.transform = 'translateY(0)';
-              }}
-            >
-              {/* Sale Badge */}
-              {album.for_sale && (
-                <div style={{
-                  position: 'absolute',
-                  top: 8,
-                  right: 8,
-                  background: '#10b981',
-                  color: 'white',
-                  padding: '4px 8px',
-                  borderRadius: 4,
-                  fontSize: 11,
-                  fontWeight: 600,
-                  zIndex: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 4
-                }}>
-                  💰 ${album.sale_price?.toFixed(2) || '—'}
-                </div>
-              )}
-
-              {/* Album Cover - clickable for tags */}
+          {filteredAlbums.map(album => {
+            const safeTags = toSafeStringArray(album.custom_tags);
+            return (
               <div
-                onClick={() => openTagEditor(album)}
+                key={album.id}
                 style={{
+                  background: 'white',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: 8,
+                  padding: 12,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 8,
                   position: 'relative',
-                  cursor: 'pointer',
-                  borderRadius: 6,
-                  overflow: 'hidden'
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.boxShadow = 'none';
+                  e.currentTarget.style.transform = 'translateY(0)';
                 }}
               >
-                <Image
-                  src={album.image_url || '/images/placeholder.png'}
-                  alt={album.title || 'Album'}
-                  width={180}
-                  height={180}
-                  style={{
-                    width: '100%',
-                    height: 'auto',
-                    aspectRatio: '1',
-                    objectFit: 'cover'
-                  }}
-                  unoptimized
-                />
-                
-                {/* Tag count overlay */}
-                {album.custom_tags && album.custom_tags.length > 0 && (
+                {album.for_sale && (
                   <div style={{
                     position: 'absolute',
-                    bottom: 8,
-                    left: 8,
-                    background: 'rgba(139, 92, 246, 0.9)',
+                    top: 8,
+                    right: 8,
+                    background: '#10b981',
                     color: 'white',
                     padding: '4px 8px',
                     borderRadius: 4,
                     fontSize: 11,
-                    fontWeight: 600
-                  }}>
-                    🏷️ {album.custom_tags.length}
-                  </div>
-                )}
-              </div>
-
-              {/* Album Info */}
-              <div style={{
-                fontSize: 13,
-                fontWeight: 600,
-                color: '#1f2937',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap'
-              }}>
-                {album.title || 'Untitled'}
-              </div>
-              <div style={{
-                fontSize: 12,
-                color: '#6b7280',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap'
-              }}>
-                {album.artist || 'Unknown Artist'}
-              </div>
-
-              {/* Format, Folder, Year, Condition */}
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 4,
-                fontSize: 11,
-                color: '#6b7280',
-                borderTop: '1px solid #f3f4f6',
-                paddingTop: 8
-              }}>
-                {album.format && (
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 4
-                  }}>
-                    <span style={{ fontWeight: 600, color: '#3b82f6' }}>💿</span>
-                    <span style={{ fontWeight: 600 }}>{album.format}</span>
-                  </div>
-                )}
-                {album.folder && (
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 4
-                  }}>
-                    <span style={{ fontWeight: 600, color: '#8b5cf6' }}>📁</span>
-                    <span>{album.folder}</span>
-                  </div>
-                )}
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8
-                }}>
-                  {album.year && (
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 4
-                    }}>
-                      <span style={{ fontWeight: 600, color: '#f59e0b' }}>📅</span>
-                      <span>{album.year}</span>
-                    </div>
-                  )}
-                  {album.media_condition && (
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 4
-                    }}>
-                      <span style={{ fontWeight: 600, color: '#10b981' }}>✓</span>
-                      <span style={{ fontWeight: 600 }}>{album.media_condition}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Tags Preview */}
-              {album.custom_tags && album.custom_tags.length > 0 && (
-                <div style={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  gap: 4
-                }}>
-                  {album.custom_tags.slice(0, 3).map(tagName => {
-                    const tagDef = tagDefinitions.find(t => t.tag_name === tagName);
-                    return (
-                      <span
-                        key={tagName}
-                        style={{
-                          fontSize: 10,
-                          padding: '2px 6px',
-                          borderRadius: 3,
-                          background: tagDef?.color || '#6b7280',
-                          color: 'white',
-                          fontWeight: 500
-                        }}
-                      >
-                        {tagName}
-                      </span>
-                    );
-                  })}
-                  {album.custom_tags.length > 3 && (
-                    <span style={{
-                      fontSize: 10,
-                      padding: '2px 6px',
-                      color: '#6b7280'
-                    }}>
-                      +{album.custom_tags.length - 3}
-                    </span>
-                  )}
-                </div>
-              )}
-
-              {/* Match Info */}
-              {searchQuery && getMatchInfo(album, searchQuery).length > 0 && (
-                <div style={{
-                  borderTop: '1px solid #e5e7eb',
-                  paddingTop: 8,
-                  marginTop: 4
-                }}>
-                  <div style={{
-                    fontSize: 10,
                     fontWeight: 600,
-                    color: '#059669',
-                    marginBottom: 4
+                    zIndex: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4
                   }}>
-                    ✓ Matches:
+                    💰 ${album.sale_price?.toFixed(2) || '—'}
                   </div>
-                  {getMatchInfo(album, searchQuery).map((match, idx) => (
-                    <div
-                      key={idx}
-                      style={{
-                        fontSize: 10,
-                        color: '#6b7280',
-                        marginBottom: 2,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap'
-                      }}
-                    >
-                      {match}
-                    </div>
-                  ))}
-                </div>
-              )}
+                )}
 
-              {/* Action Buttons */}
-              <div style={{
-                display: 'flex',
-                gap: 6,
-                marginTop: 4
-              }}>
-                <Link
-                  href={`/admin/edit-entry/${album.id}`}
+                <div
+                  onClick={() => openTagEditor(album)}
                   style={{
-                    flex: 1,
-                    padding: '6px',
-                    background: '#3b82f6',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: 4,
-                    fontSize: 11,
-                    fontWeight: 600,
-                    textAlign: 'center',
-                    textDecoration: 'none',
-                    cursor: 'pointer'
+                    position: 'relative',
+                    cursor: 'pointer',
+                    borderRadius: 6,
+                    overflow: 'hidden'
                   }}
                 >
-                  ✏️ Edit
-                </Link>
-                
-                {album.for_sale ? (
-                  <button
-                    onClick={(e) => removeFromSale(album.id, e)}
+                  <Image
+                    src={album.image_url || '/images/placeholder.png'}
+                    alt={album.title || 'Album'}
+                    width={180}
+                    height={180}
                     style={{
-                      flex: 1,
-                      padding: '6px',
-                      background: '#ef4444',
+                      width: '100%',
+                      height: 'auto',
+                      aspectRatio: '1',
+                      objectFit: 'cover'
+                    }}
+                    unoptimized
+                  />
+                  
+                  {safeTags.length > 0 && (
+                    <div style={{
+                      position: 'absolute',
+                      bottom: 8,
+                      left: 8,
+                      background: 'rgba(139, 92, 246, 0.9)',
                       color: 'white',
-                      border: 'none',
+                      padding: '4px 8px',
                       borderRadius: 4,
                       fontSize: 11,
-                      fontWeight: 600,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    🚫 Unsell
-                  </button>
-                ) : (
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      openSaleModal(album);
-                    }}
-                    style={{
-                      flex: 1,
-                      padding: '6px',
-                      background: '#10b981',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: 4,
-                      fontSize: 11,
-                      fontWeight: 600,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    💰 Sell
-                  </button>
+                      fontWeight: 600
+                    }}>
+                      🏷️ {safeTags.length}
+                    </div>
+                  )}
+                </div>
+
+                <div style={{
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: '#1f2937',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap'
+                }}>
+                  {album.title || 'Untitled'}
+                </div>
+                <div style={{
+                  fontSize: 12,
+                  color: '#6b7280',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap'
+                }}>
+                  {album.artist || 'Unknown Artist'}
+                </div>
+
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 4,
+                  fontSize: 11,
+                  color: '#6b7280',
+                  borderTop: '1px solid #f3f4f6',
+                  paddingTop: 8
+                }}>
+                  {album.format && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span style={{ fontWeight: 600, color: '#3b82f6' }}>💿</span>
+                      <span style={{ fontWeight: 600 }}>{album.format}</span>
+                    </div>
+                  )}
+                  {album.folder && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span style={{ fontWeight: 600, color: '#8b5cf6' }}>📁</span>
+                      <span>{album.folder}</span>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {album.year && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <span style={{ fontWeight: 600, color: '#f59e0b' }}>📅</span>
+                        <span>{album.year}</span>
+                      </div>
+                    )}
+                    {album.media_condition && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <span style={{ fontWeight: 600, color: '#10b981' }}>✓</span>
+                        <span style={{ fontWeight: 600 }}>{album.media_condition}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {safeTags.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                    {safeTags.slice(0, 3).map(tagName => {
+                      const tagDef = tagDefinitions.find(t => t.tag_name === tagName);
+                      return (
+                        <span
+                          key={tagName}
+                          style={{
+                            fontSize: 10,
+                            padding: '2px 6px',
+                            borderRadius: 3,
+                            background: tagDef?.color || '#6b7280',
+                            color: 'white',
+                            fontWeight: 500
+                          }}
+                        >
+                          {tagName}
+                        </span>
+                      );
+                    })}
+                    {safeTags.length > 3 && (
+                      <span style={{ fontSize: 10, padding: '2px 6px', color: '#6b7280' }}>
+                        +{safeTags.length - 3}
+                      </span>
+                    )}
+                  </div>
                 )}
+
+                {searchQuery && getMatchInfo(album, searchQuery).length > 0 && (
+                  <div style={{
+                    borderTop: '1px solid #e5e7eb',
+                    paddingTop: 8,
+                    marginTop: 4
+                  }}>
+                    <div style={{
+                      fontSize: 10,
+                      fontWeight: 600,
+                      color: '#059669',
+                      marginBottom: 4
+                    }}>
+                      ✓ Matches:
+                    </div>
+                    {getMatchInfo(album, searchQuery).map((match, idx) => (
+                      <div
+                        key={idx}
+                        style={{
+                          fontSize: 10,
+                          color: '#6b7280',
+                          marginBottom: 2,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        {match}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+                  <Link
+                    href={`/admin/edit-entry/${album.id}`}
+                    style={{
+                      flex: 1,
+                      padding: '6px',
+                      background: '#3b82f6',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: 4,
+                      fontSize: 11,
+                      fontWeight: 600,
+                      textAlign: 'center',
+                      textDecoration: 'none',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    ✏️ Edit
+                  </Link>
+                  
+                  {album.for_sale ? (
+                    <button
+                      onClick={(e) => removeFromSale(album.id, e)}
+                      style={{
+                        flex: 1,
+                        padding: '6px',
+                        background: '#ef4444',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: 4,
+                        fontSize: 11,
+                        fontWeight: 600,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      🚫 Unsell
+                    </button>
+                  ) : (
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        openSaleModal(album);
+                      }}
+                      style={{
+                        flex: 1,
+                        padding: '6px',
+                        background: '#10b981',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: 4,
+                        fontSize: 11,
+                        fontWeight: 600,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      💰 Sell
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -1019,44 +1055,23 @@ export default function EditCollectionPage() {
                 alt={editingAlbum.title || 'Album'}
                 width={60}
                 height={60}
-                style={{
-                  borderRadius: 6,
-                  objectFit: 'cover'
-                }}
+                style={{ borderRadius: 6, objectFit: 'cover' }}
                 unoptimized
               />
               <div style={{ flex: 1 }}>
-                <div style={{
-                  fontSize: 18,
-                  fontWeight: 'bold',
-                  color: '#1f2937',
-                  marginBottom: 2
-                }}>
+                <div style={{ fontSize: 18, fontWeight: 'bold', color: '#1f2937', marginBottom: 2 }}>
                   {editingAlbum.title || 'Untitled'}
                 </div>
-                <div style={{
-                  fontSize: 14,
-                  color: '#6b7280'
-                }}>
+                <div style={{ fontSize: 14, color: '#6b7280' }}>
                   {editingAlbum.artist || 'Unknown Artist'}
                 </div>
               </div>
             </div>
 
-            <div style={{
-              padding: '12px 20px',
-              flex: 1,
-              overflowY: 'auto'
-            }}>
-              {/* Current Tags Section */}
+            <div style={{ padding: '12px 20px', flex: 1, overflowY: 'auto' }}>
               {albumTags.length > 0 && (
                 <div style={{ marginBottom: 12 }}>
-                  <h3 style={{
-                    fontSize: 14,
-                    fontWeight: 600,
-                    color: '#1f2937',
-                    marginBottom: 6
-                  }}>
+                  <h3 style={{ fontSize: 14, fontWeight: 600, color: '#1f2937', marginBottom: 6 }}>
                     Current Tags ({albumTags.length})
                   </h3>
                   <div style={{
@@ -1107,14 +1122,8 @@ export default function EditCollectionPage() {
                 </div>
               )}
 
-              {/* Add Custom Tag */}
               <div style={{ marginBottom: 12 }}>
-                <h3 style={{
-                  fontSize: 14,
-                  fontWeight: 600,
-                  color: '#1f2937',
-                  marginBottom: 6
-                }}>
+                <h3 style={{ fontSize: 14, fontWeight: 600, color: '#1f2937', marginBottom: 6 }}>
                   Add Custom Tag
                 </h3>
                 <div style={{ display: 'flex', gap: 6 }}>
@@ -1153,21 +1162,11 @@ export default function EditCollectionPage() {
                 </div>
               </div>
 
-              {/* Quick Select from Pre-defined Tags */}
-              <h3 style={{
-                fontSize: 14,
-                fontWeight: 600,
-                color: '#1f2937',
-                marginBottom: 8
-              }}>
+              <h3 style={{ fontSize: 14, fontWeight: 600, color: '#1f2937', marginBottom: 8 }}>
                 Quick Select
               </h3>
 
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(2, 1fr)',
-                gap: 12
-              }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
                 {Object.entries(tagsByCategory).map(([category, tags]) => (
                   <div key={category}>
                     <div style={{
@@ -1180,11 +1179,7 @@ export default function EditCollectionPage() {
                     }}>
                       {category}
                     </div>
-                    <div style={{
-                      display: 'flex',
-                      flexWrap: 'wrap',
-                      gap: 4
-                    }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                       {tags.length === 0 ? (
                         <div style={{ color: '#9ca3af', fontSize: 11 }}>No tags</div>
                       ) : (
@@ -1286,22 +1281,11 @@ export default function EditCollectionPage() {
             width: '100%',
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
           }}>
-            <div style={{
-              padding: 24,
-              borderBottom: '1px solid #e5e7eb'
-            }}>
-              <div style={{
-                fontSize: 20,
-                fontWeight: 'bold',
-                color: '#1f2937',
-                marginBottom: 4
-              }}>
+            <div style={{ padding: 24, borderBottom: '1px solid #e5e7eb' }}>
+              <div style={{ fontSize: 20, fontWeight: 'bold', color: '#1f2937', marginBottom: 4 }}>
                 💰 Mark for Sale
               </div>
-              <div style={{
-                fontSize: 14,
-                color: '#6b7280'
-              }}>
+              <div style={{ fontSize: 14, color: '#6b7280' }}>
                 {saleModalAlbum.artist || 'Unknown Artist'} - {saleModalAlbum.title || 'Untitled'}
               </div>
             </div>
