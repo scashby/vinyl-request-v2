@@ -351,7 +351,8 @@ export default function EditCollectionPage() {
               // Check each property in the track object
               for (const [key, value] of Object.entries(track)) {
                 if (value && typeof value === 'string' && value.toLowerCase().includes(q)) {
-                  matches.push(`🔍 Track field "${key}": ${value.substring(0, 100)}`);
+                  const trackTitle = track.title || track.position || 'Unknown track';
+                  matches.push(`🔍 Track "${trackTitle}" - field "${key}": ${value.substring(0, 100)}`);
                   foundTrack = true;
                   break;
                 }
