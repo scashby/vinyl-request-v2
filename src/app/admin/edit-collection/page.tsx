@@ -1,4 +1,4 @@
-// src/app/admin/edit-collection/page.tsx - COMPLETE TYPE-SAFE VERSION
+// src/app/admin/edit-collection/page.tsx - TYPE-SAFE WITH DEBUG
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
@@ -327,19 +327,38 @@ export default function EditCollectionPage() {
     if (safeIncludes(album.year, q)) matches.push(`Year: ${album.year}`);
     if (safeIncludes(album.media_condition, q)) matches.push(`Condition: ${album.media_condition}`);
     
-    // Tracklists - safely parse
+    // Tracklists - ENHANCED DEBUG VERSION
     if (album.tracklists && safeIncludes(album.tracklists, q)) {
       let foundTrack = false;
       try {
         const tracks = JSON.parse(album.tracklists);
         if (Array.isArray(tracks)) {
+          // Check track titles first
           const matchingTracks = tracks
             .filter(t => t && typeof t === 'object' && typeof t.title === 'string' && safeIncludes(t.title, q))
             .map(t => t.title)
             .slice(0, 2);
           if (matchingTracks.length > 0) {
-            matches.push(`Tracks: ${matchingTracks.join(', ')}`);
+            matches.push(`Track titles: ${matchingTracks.join(', ')}`);
             foundTrack = true;
+          }
+          
+          // Check OTHER track properties (not just title) - THIS IS THE DEBUG PART
+          if (!foundTrack) {
+            for (const track of tracks) {
+              if (!track || typeof track !== 'object') continue;
+              
+              // Check each property in the track object
+              for (const [key, value] of Object.entries(track)) {
+                if (value && typeof value === 'string' && value.toLowerCase().includes(q)) {
+                  matches.push(`🔍 Track field "${key}": ${value.substring(0, 100)}`);
+                  foundTrack = true;
+                  break;
+                }
+              }
+              
+              if (foundTrack) break;
+            }
           }
         }
       } catch {
@@ -349,28 +368,28 @@ export default function EditCollectionPage() {
           const matchingLines = lines
             .filter(line => typeof line === 'string' && line.length > 0 && safeIncludes(line, q))
             .map(line => {
-              const cleaned = line.replace(/^[A-Z0-9]+\s*[-\s]*/i, '').replace(/\s*\d+:\d+\s*$/, '').trim();
-              return cleaned.substring(0, 50);
+              const cleaned = line.replace(/^[A-Z0-9]+\s*[-–\s]*/i, '').replace(/\s*\d+:\d+\s*$/,'').trim();
+              return cleaned.length > 0 ? cleaned.substring(0, 100) : line.substring(0, 100);
             })
             .filter(line => line.length > 0)
             .slice(0, 2);
           
           if (matchingLines.length > 0) {
-            matches.push(`Tracks: ${matchingLines.join(', ')}`);
+            matches.push(`Track text: ${matchingLines.join(' | ')}`);
             foundTrack = true;
           }
         }
       }
       
-      // Fallback: show snippet
+      // Fallback: show raw data snippet
       if (!foundTrack && typeof album.tracklists === 'string') {
         const trackText = album.tracklists.toLowerCase();
         const index = trackText.indexOf(q);
         if (index !== -1) {
-          const start = Math.max(0, index - 30);
-          const end = Math.min(trackText.length, index + q.length + 50);
+          const start = Math.max(0, index - 60);
+          const end = Math.min(trackText.length, index + q.length + 100);
           const snippet = album.tracklists.substring(start, end).trim();
-          matches.push(`Track excerpt: "${snippet}"`);
+          matches.push(`🔍 RAW: ...${snippet}...`);
         }
       }
     }
@@ -385,13 +404,13 @@ export default function EditCollectionPage() {
     const discogsGenres = toSafeStringArray(album.discogs_genres);
     if (discogsGenres.some(g => safeIncludes(g, q))) {
       const matched = discogsGenres.filter(g => safeIncludes(g, q));
-      matches.push(`Genre: ${matched.join(', ')}`);
+      matches.push(`Discogs Genre: ${matched.join(', ')}`);
     }
     
     const discogsStyles = toSafeStringArray(album.discogs_styles);
     if (discogsStyles.some(s => safeIncludes(s, q))) {
       const matched = discogsStyles.filter(s => safeIncludes(s, q));
-      matches.push(`Style: ${matched.join(', ')}`);
+      matches.push(`Discogs Style: ${matched.join(', ')}`);
     }
     
     const spotifyGenres = toSafeStringArray(album.spotify_genres);
@@ -407,11 +426,11 @@ export default function EditCollectionPage() {
     }
     
     // Labels
-    if (safeIncludes(album.spotify_label, q)) matches.push(`Label: ${album.spotify_label}`);
-    if (safeIncludes(album.apple_music_label, q)) matches.push(`Label: ${album.apple_music_label}`);
-    if (safeIncludes(album.apple_music_genre, q)) matches.push(`Genre: ${album.apple_music_genre}`);
+    if (safeIncludes(album.spotify_label, q)) matches.push(`Spotify Label: ${album.spotify_label}`);
+    if (safeIncludes(album.apple_music_label, q)) matches.push(`Apple Music Label: ${album.apple_music_label}`);
+    if (safeIncludes(album.apple_music_genre, q)) matches.push(`Apple Genre: ${album.apple_music_genre}`);
     
-    // Notes - safely truncate
+    // Notes
     if (album.discogs_notes && safeIncludes(album.discogs_notes, q)) {
       const snippet = typeof album.discogs_notes === 'string' && album.discogs_notes.length > 100 
         ? album.discogs_notes.substring(0, 100) + '...' 
@@ -427,15 +446,13 @@ export default function EditCollectionPage() {
     if (safeIncludes(album.pricing_notes, q)) matches.push(`Pricing notes match`);
     
     // Other fields
-    if (safeIncludes(album.discogs_source, q)) matches.push(`Discogs metadata match`);
-    if (safeIncludes(album.blocked_sides, q)) matches.push(`Blocked sides: ${album.blocked_sides}`);
-    if (safeIncludes(album.enrichment_sources, q)) matches.push(`Enrichment source match`);
-    
-    // Check IDs and other string fields
-    if (safeIncludes(album.discogs_master_id, q)) matches.push(`Discogs Master ID: ${album.discogs_master_id}`);
-    if (safeIncludes(album.discogs_release_id, q)) matches.push(`Discogs Release ID: ${album.discogs_release_id}`);
-    if (safeIncludes(album.spotify_id, q)) matches.push(`Spotify ID match`);
-    if (safeIncludes(album.child_album_ids, q)) matches.push(`Child album IDs match`);
+    if (safeIncludes(album.discogs_source, q)) matches.push(`Discogs metadata`);
+    if (safeIncludes(album.blocked_sides, q)) matches.push(`Blocked: ${album.blocked_sides}`);
+    if (safeIncludes(album.enrichment_sources, q)) matches.push(`Enrichment source`);
+    if (safeIncludes(album.discogs_master_id, q)) matches.push(`Master ID: ${album.discogs_master_id}`);
+    if (safeIncludes(album.discogs_release_id, q)) matches.push(`Release ID: ${album.discogs_release_id}`);
+    if (safeIncludes(album.spotify_id, q)) matches.push(`Spotify ID`);
+    if (safeIncludes(album.child_album_ids, q)) matches.push(`Child albums`);
     
     // Boolean badges
     if (album.is_1001 && ('1001'.includes(q) || 'albums'.includes(q) || 'thousand'.includes(q))) {
@@ -454,7 +471,7 @@ export default function EditCollectionPage() {
       matches.push('Badge: For Sale');
     }
     
-    return matches.slice(0, 7); // Show up to 7 matches for maximum clarity
+    return matches.slice(0, 7);
   };
 
   const openTagEditor = (album: Album) => {
