@@ -1,4 +1,4 @@
-// src/app/api/enrich-sources/batch/route.ts - COMPLETE FILE
+// src/app/api/enrich-sources/batch/route.ts - WITH DISCOGS TRACKLIST SUPPORT
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -20,6 +20,12 @@ type AlbumResult = {
   albumId: number;
   artist: string;
   title: string;
+  discogsTracklist?: {
+    success: boolean;
+    data?: { totalTracks?: number; tracksWithArtists?: number };
+    error?: string;
+    skipped?: boolean;
+  };
   spotify?: {
     success: boolean;
     data?: ServiceData;
@@ -56,6 +62,7 @@ type Track = {
   title?: string;
   duration?: string;
   type_?: string;
+  artist?: string;
   lyrics_url?: string;
   lyrics?: string;
   lyrics_source?: 'apple_music' | 'genius';
@@ -87,7 +94,6 @@ async function enrichAppleLyrics(albumId: number, appleMusicId: string, tracklis
     return { success: false, error: 'No tracks found' };
   }
 
-  // Fetch Apple Music tracks
   const tracksRes = await fetch(
     `https://api.music.apple.com/v1/catalog/us/albums/${appleMusicId}/tracks`,
     { headers: { 'Authorization': `Bearer ${APPLE_MUSIC_TOKEN}` }}
@@ -151,7 +157,6 @@ async function enrichAppleLyrics(albumId: number, appleMusicId: string, tracklis
     })
   );
 
-  // Update database
   const { error: updateError } = await supabase
     .from('collection')
     .update({ tracklists: JSON.stringify(enrichedTracks) })
@@ -169,7 +174,6 @@ async function enrichAppleLyrics(albumId: number, appleMusicId: string, tracklis
 
 async function callService(endpoint: string, albumId: number) {
   try {
-    // Build the URL - handle both local and production
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 
                     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
     
@@ -236,6 +240,21 @@ function needsAppleMusicLyrics(tracklists: string | null, appleMusicId: string |
   }
 }
 
+function needsDiscogsTracklist(tracklists: string | null, discogsReleaseId: string | null): boolean {
+  if (!discogsReleaseId) return false;
+  if (!tracklists) return true;
+
+  try {
+    const tracks = typeof tracklists === 'string' ? JSON.parse(tracklists) : tracklists;
+    if (!Array.isArray(tracks) || tracks.length === 0) return true;
+
+    const hasArtistData = tracks.some((t: { artist?: string }) => t.artist);
+    return !hasArtistData;
+  } catch {
+    return true;
+  }
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -243,18 +262,18 @@ export async function POST(req: Request) {
     const limit = body.limit || 20;
     const folder = body.folder;
     const services = body.services || {
+      discogsTracklist: true,
       spotify: true,
       appleMusic: true,
       genius: true,
       appleLyrics: true
     };
 
-    // Query more albums to account for filtering
     const queryLimit = limit * 3;
 
     let query = supabase
       .from('collection')
-      .select('id, artist, title, tracklists, spotify_id, apple_music_id, folder')
+      .select('id, artist, title, tracklists, spotify_id, apple_music_id, discogs_release_id, folder')
       .gt('id', cursor)
       .order('id', { ascending: true })
       .limit(queryLimit);
@@ -282,6 +301,7 @@ export async function POST(req: Request) {
     }
 
     const albumsNeedingEnrichment = albums.filter(album => 
+      needsDiscogsTracklist(album.tracklists, album.discogs_release_id) ||
       !album.spotify_id || 
       !album.apple_music_id || 
       needsAppleMusicLyrics(album.tracklists, album.apple_music_id)
@@ -314,6 +334,23 @@ export async function POST(req: Request) {
         artist: album.artist,
         title: album.title
       };
+
+      // Enrich Discogs Tracklist FIRST (for per-track artists)
+      if (needsDiscogsTracklist(album.tracklists, album.discogs_release_id) && services.discogsTracklist) {
+        const discogsResult = await callService('discogs-tracklist', album.id);
+        albumResult.discogsTracklist = {
+          success: discogsResult.success,
+          data: discogsResult.data as { totalTracks?: number; tracksWithArtists?: number },
+          error: discogsResult.error,
+          skipped: discogsResult.skipped
+        };
+        await sleep(1000);
+      } else if (album.tracklists) {
+        albumResult.discogsTracklist = {
+          success: true,
+          skipped: true
+        };
+      }
 
       // Enrich Spotify
       if (!album.spotify_id && services.spotify) {
@@ -363,7 +400,7 @@ export async function POST(req: Request) {
         };
       }
 
-      // Enrich Apple Music lyrics - call Apple Music API directly
+      // Enrich Apple Music lyrics
       const newlyAddedAppleMusicId = albumResult.appleMusic?.data?.apple_music_id;
       const finalAppleMusicId = (typeof newlyAddedAppleMusicId === 'string' ? newlyAddedAppleMusicId : null) || album.apple_music_id;
       
