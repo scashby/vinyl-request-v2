@@ -279,7 +279,7 @@ export default function EditCollectionPage() {
         const tracks = JSON.parse(album.tracklists);
         if (Array.isArray(tracks)) {
           const matchingTracks = tracks
-            .filter(t => t.title?.toLowerCase().includes(q))
+            .filter(t => t.title && typeof t.title === 'string' && t.title.toLowerCase().includes(q))
             .map(t => t.title)
             .slice(0, 2);
           if (matchingTracks.length > 0) {
@@ -291,7 +291,7 @@ export default function EditCollectionPage() {
         // Not JSON - try to extract track names from raw text
         const lines = album.tracklists.split('\n');
         const matchingLines = lines
-          .filter(line => line.toLowerCase().includes(q))
+          .filter(line => line && typeof line === 'string' && line.toLowerCase().includes(q))
           .map(line => {
             // Try to extract just the track title (remove position, duration, etc)
             const cleaned = line.replace(/^[A-Z0-9]+\s*[-\s]*/i, '').replace(/\s*\d+:\d+\s*$/, '').trim();
