@@ -1,4 +1,4 @@
-// src/app/admin/edit-entry/[id]/page.tsx - COMPLETE FILE WITH SALE FUNCTIONALITY
+// src/app/admin/edit-entry/[id]/page.tsx - COMPLETE FILE WITH TRACK ARTIST SUPPORT
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -10,6 +10,7 @@ type Track = {
   position: string; 
   title: string; 
   duration: string;
+  artist?: string; // ADDED: Track-level artist
   lyrics_url?: string;
   lyrics?: string;
   lyrics_source?: 'apple_music' | 'genius';
@@ -64,7 +65,7 @@ type CollectionEntry = {
 type DiscogsData = {
   year?: string | number;
   images?: { uri: string }[];
-  tracklist?: { position?: string; title?: string; duration?: string }[];
+  tracklist?: { position?: string; title?: string; duration?: string; artists?: Array<{ name: string }> }[];
   genres?: string[];
   styles?: string[];
   master_id?: number;
@@ -115,6 +116,7 @@ function cleanTrack(track: Partial<Track>): Track {
     position: track.position || '',
     title: track.title || '',
     duration: track.duration || '',
+    artist: track.artist || undefined,
     lyrics_url: track.lyrics_url,
     lyrics: track.lyrics,
     lyrics_source: track.lyrics_source
@@ -137,7 +139,6 @@ export default function EditEntryPage() {
   const [enrichingGenius, setEnrichingGenius] = useState(false);
   const [fetchingAppleLyrics, setFetchingAppleLyrics] = useState(false);
 
-  // Sale state
   const [forSale, setForSale] = useState(false);
   const [salePrice, setSalePrice] = useState('');
   const [salePlatform, setSalePlatform] = useState('');
@@ -154,7 +155,6 @@ export default function EditEntryPage() {
       }
       setTracks(Array.isArray(tl) ? (tl as Partial<Track>[]).map(cleanTrack) : []);
       
-      // Load sale data
       setForSale(data.for_sale || false);
       setSalePrice(data.sale_price?.toString() || '');
       setSalePlatform(data.sale_platform || '');
@@ -216,7 +216,18 @@ export default function EditEntryPage() {
 
       if (!tracks || tracks.length === 0) {
         if (data.tracklist && data.tracklist.length > 0) {
-          const newTracks = data.tracklist.map(cleanTrack);
+          const newTracks = data.tracklist.map(track => {
+            let trackArtist = undefined;
+            if (track.artists && track.artists.length > 0) {
+              trackArtist = track.artists.map(a => a.name).join(', ');
+            }
+            return cleanTrack({
+              position: track.position,
+              title: track.title,
+              duration: track.duration,
+              artist: trackArtist
+            });
+          });
           setTracks(newTracks);
           handleChange('tracklists', JSON.stringify(newTracks));
           updated = true;
@@ -423,7 +434,7 @@ export default function EditEntryPage() {
   }
 
   function addTrack() {
-    setTracks((tks) => [...tks, { position: '', title: '', duration: '' }]);
+    setTracks((tks) => [...tks, { position: '', title: '', duration: '', artist: undefined }]);
   }
   
   function removeTrack(i: number) {
@@ -596,6 +607,7 @@ export default function EditEntryPage() {
               <thead style={{ background: '#f9fafb', position: 'sticky', top: 0 }}>
                 <tr>
                   <th style={{ padding: '12px 8px', textAlign: 'left', fontWeight: '600', borderBottom: '1px solid #e5e7eb' }}>Pos</th>
+                  <th style={{ padding: '12px 8px', textAlign: 'left', fontWeight: '600', borderBottom: '1px solid #e5e7eb' }}>Artist</th>
                   <th style={{ padding: '12px 8px', textAlign: 'left', fontWeight: '600', borderBottom: '1px solid #e5e7eb' }}>Title</th>
                   <th style={{ padding: '12px 8px', textAlign: 'left', fontWeight: '600', borderBottom: '1px solid #e5e7eb' }}>Time</th>
                   <th style={{ padding: '12px 8px', textAlign: 'center', fontWeight: '600', borderBottom: '1px solid #e5e7eb' }}>Lyrics</th>
@@ -606,6 +618,7 @@ export default function EditEntryPage() {
                 {tracks.map((t, i) => (
                   <tr key={i} style={{ borderBottom: i < tracks.length - 1 ? '1px solid #f3f4f6' : 'none' }}>
                     <td style={{ padding: '8px' }}><input value={t.position} onChange={e => handleTrackChange(i, 'position', e.target.value)} style={{ ...inputStyle, width: 50, padding: '4px 6px', fontSize: '12px', textAlign: 'center' }} placeholder="A1" /></td>
+                    <td style={{ padding: '8px' }}><input value={t.artist || ''} onChange={e => handleTrackChange(i, 'artist', e.target.value)} style={{ ...inputStyle, padding: '4px 6px', fontSize: '12px' }} placeholder="Track artist" /></td>
                     <td style={{ padding: '8px' }}><input value={t.title} onChange={e => handleTrackChange(i, 'title', e.target.value)} style={{ ...inputStyle, padding: '4px 6px', fontSize: '12px' }} placeholder="Track title" /></td>
                     <td style={{ padding: '8px' }}><input value={t.duration} onChange={e => handleTrackChange(i, 'duration', e.target.value)} style={{ ...inputStyle, width: 70, padding: '4px 6px', fontSize: '12px', textAlign: 'center' }} placeholder="3:45" /></td>
                     <td style={{ padding: '8px', textAlign: 'center' }}>
@@ -622,7 +635,6 @@ export default function EditEntryPage() {
         </div>
       </div>
 
-      {/* SALE SECTION */}
       <div style={{
         background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
         border: '2px solid #10b981',
