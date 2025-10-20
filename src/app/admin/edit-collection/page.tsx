@@ -119,11 +119,12 @@ export default function EditCollectionPage() {
       setTagDefinitions(tagDefs as TagDefinition[]);
     }
 
-    // Load albums - SELECT ALL FIELDS
+    // Load albums - SELECT ALL FIELDS with no limit
     const { data, error } = await supabase
       .from('collection')
       .select('*')
-      .order('artist', { ascending: true });
+      .order('artist', { ascending: true })
+      .limit(10000);
 
     if (!error && data) {
       setAlbums(data as Album[]);
