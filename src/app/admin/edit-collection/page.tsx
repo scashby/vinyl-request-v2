@@ -831,10 +831,11 @@ export default function EditCollectionPage() {
           <div style={{
             background: 'white',
             borderRadius: 12,
-            maxWidth: 800,
+            maxWidth: 1000,
             width: '100%',
-            maxHeight: '90vh',
-            overflow: 'auto',
+            maxHeight: '95vh',
+            display: 'flex',
+            flexDirection: 'column',
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
           }}>
             <div style={{
@@ -842,7 +843,8 @@ export default function EditCollectionPage() {
               borderBottom: '1px solid #e5e7eb',
               display: 'flex',
               alignItems: 'center',
-              gap: 16
+              gap: 16,
+              flexShrink: 0
             }}>
               <Image
                 src={editingAlbum.image_url || '/images/placeholder.png'}
@@ -873,25 +875,29 @@ export default function EditCollectionPage() {
               </div>
             </div>
 
-            <div style={{ padding: 24 }}>
+            <div style={{
+              padding: '16px 24px',
+              flex: 1,
+              overflowY: 'auto'
+            }}>
               {/* Current Tags Section */}
               {albumTags.length > 0 && (
-                <div style={{ marginBottom: 24 }}>
+                <div style={{ marginBottom: 16 }}>
                   <h3 style={{
-                    fontSize: 18,
+                    fontSize: 16,
                     fontWeight: 600,
                     color: '#1f2937',
-                    marginBottom: 12
+                    marginBottom: 8
                   }}>
                     Current Tags ({albumTags.length})
                   </h3>
                   <div style={{
                     display: 'flex',
                     flexWrap: 'wrap',
-                    gap: 8,
-                    padding: 16,
+                    gap: 6,
+                    padding: 12,
                     background: '#f3f4f6',
-                    borderRadius: 8
+                    borderRadius: 6
                   }}>
                     {albumTags.map(tagName => {
                       const tagDef = tagDefinitions.find(t => t.tag_name === tagName);
@@ -934,12 +940,12 @@ export default function EditCollectionPage() {
               )}
 
               {/* Add Custom Tag */}
-              <div style={{ marginBottom: 24 }}>
+              <div style={{ marginBottom: 16 }}>
                 <h3 style={{
-                  fontSize: 18,
+                  fontSize: 16,
                   fontWeight: 600,
                   color: '#1f2937',
-                  marginBottom: 12
+                  marginBottom: 8
                 }}>
                   Add Custom Tag
                 </h3>
@@ -981,22 +987,22 @@ export default function EditCollectionPage() {
 
               {/* Quick Select from Pre-defined Tags */}
               <h3 style={{
-                fontSize: 18,
+                fontSize: 16,
                 fontWeight: 600,
                 color: '#1f2937',
-                marginBottom: 16
+                marginBottom: 12
               }}>
                 Quick Select
               </h3>
 
               {Object.entries(tagsByCategory).map(([category, tags]) => (
-                <div key={category} style={{ marginBottom: 20 }}>
+                <div key={category} style={{ marginBottom: 16 }}>
                   <div style={{
-                    fontSize: 13,
+                    fontSize: 12,
                     fontWeight: 600,
                     color: '#6b7280',
                     textTransform: 'uppercase',
-                    marginBottom: 8,
+                    marginBottom: 6,
                     letterSpacing: '0.5px'
                   }}>
                     {category} ({tags.length} tags)
@@ -1004,7 +1010,7 @@ export default function EditCollectionPage() {
                   <div style={{
                     display: 'flex',
                     flexWrap: 'wrap',
-                    gap: 8
+                    gap: 6
                   }}>
                     {tags.length === 0 ? (
                       <div style={{ color: '#9ca3af', fontSize: 13 }}>No tags in this category</div>
@@ -1040,11 +1046,13 @@ export default function EditCollectionPage() {
             </div>
 
             <div style={{
-              padding: 24,
+              padding: '16px 24px',
               borderTop: '1px solid #e5e7eb',
               display: 'flex',
               justifyContent: 'flex-end',
-              gap: 12
+              gap: 12,
+              flexShrink: 0,
+              background: 'white'
             }}>
               <button
                 onClick={() => setEditingTagsFor(null)}
