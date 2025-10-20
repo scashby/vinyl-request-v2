@@ -367,10 +367,10 @@ export default function EditCollectionPage() {
         const trackText = album.tracklists.toLowerCase();
         const index = trackText.indexOf(q);
         if (index !== -1) {
-          const start = Math.max(0, index - 20);
-          const end = Math.min(trackText.length, index + q.length + 30);
+          const start = Math.max(0, index - 30);
+          const end = Math.min(trackText.length, index + q.length + 50);
           const snippet = album.tracklists.substring(start, end).trim();
-          matches.push(`Track: "${snippet}"`);
+          matches.push(`Track excerpt: "${snippet}"`);
         }
       }
     }
@@ -413,23 +413,29 @@ export default function EditCollectionPage() {
     
     // Notes - safely truncate
     if (album.discogs_notes && safeIncludes(album.discogs_notes, q)) {
-      const snippet = typeof album.discogs_notes === 'string' && album.discogs_notes.length > 60 
-        ? album.discogs_notes.substring(0, 60) + '...' 
+      const snippet = typeof album.discogs_notes === 'string' && album.discogs_notes.length > 100 
+        ? album.discogs_notes.substring(0, 100) + '...' 
         : album.discogs_notes;
-      matches.push(`Notes: ${snippet}`);
+      matches.push(`Discogs Notes: ${snippet}`);
     }
     if (album.sale_notes && safeIncludes(album.sale_notes, q)) {
-      const snippet = typeof album.sale_notes === 'string' && album.sale_notes.length > 60 
-        ? album.sale_notes.substring(0, 60) + '...' 
+      const snippet = typeof album.sale_notes === 'string' && album.sale_notes.length > 100 
+        ? album.sale_notes.substring(0, 100) + '...' 
         : album.sale_notes;
       matches.push(`Sale Notes: ${snippet}`);
     }
-    if (safeIncludes(album.pricing_notes, q)) matches.push(`Pricing notes`);
+    if (safeIncludes(album.pricing_notes, q)) matches.push(`Pricing notes match`);
     
     // Other fields
-    if (safeIncludes(album.discogs_source, q)) matches.push(`Discogs source data`);
-    if (safeIncludes(album.blocked_sides, q)) matches.push(`Blocked sides info`);
-    if (safeIncludes(album.enrichment_sources, q)) matches.push(`Enrichment data`);
+    if (safeIncludes(album.discogs_source, q)) matches.push(`Discogs metadata match`);
+    if (safeIncludes(album.blocked_sides, q)) matches.push(`Blocked sides: ${album.blocked_sides}`);
+    if (safeIncludes(album.enrichment_sources, q)) matches.push(`Enrichment source match`);
+    
+    // Check IDs and other string fields
+    if (safeIncludes(album.discogs_master_id, q)) matches.push(`Discogs Master ID: ${album.discogs_master_id}`);
+    if (safeIncludes(album.discogs_release_id, q)) matches.push(`Discogs Release ID: ${album.discogs_release_id}`);
+    if (safeIncludes(album.spotify_id, q)) matches.push(`Spotify ID match`);
+    if (safeIncludes(album.child_album_ids, q)) matches.push(`Child album IDs match`);
     
     // Boolean badges
     if (album.is_1001 && ('1001'.includes(q) || 'albums'.includes(q) || 'thousand'.includes(q))) {
@@ -448,7 +454,7 @@ export default function EditCollectionPage() {
       matches.push('Badge: For Sale');
     }
     
-    return matches.slice(0, 3);
+    return matches.slice(0, 7); // Show up to 7 matches for maximum clarity
   };
 
   const openTagEditor = (album: Album) => {
@@ -939,10 +945,9 @@ export default function EditCollectionPage() {
                         style={{
                           fontSize: 10,
                           color: '#6b7280',
-                          marginBottom: 2,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap'
+                          marginBottom: 3,
+                          lineHeight: '1.4',
+                          wordBreak: 'break-word'
                         }}
                       >
                         {match}
