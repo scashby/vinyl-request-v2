@@ -119,17 +119,32 @@ export default function EditCollectionPage() {
       setTagDefinitions(tagDefs as TagDefinition[]);
     }
 
-    // Load albums - SELECT ALL FIELDS with no limit
-    const { data, error } = await supabase
-      .from('collection')
-      .select('*')
-      .order('artist', { ascending: true })
-      .limit(10000);
-
-    if (!error && data) {
-      setAlbums(data as Album[]);
+    // Load albums with pagination - ALL FIELDS
+    let allRows: Album[] = [];
+    let from = 0;
+    const batchSize = 1000;
+    let keepGoing = true;
+    
+    while (keepGoing) {
+      const { data: batch, error } = await supabase
+        .from('collection')
+        .select('*')
+        .order('artist', { ascending: true })
+        .range(from, from + batchSize - 1);
+      
+      if (error) {
+        console.error('Error loading albums:', error);
+        break;
+      }
+      
+      if (!batch || batch.length === 0) break;
+      
+      allRows = allRows.concat(batch as Album[]);
+      keepGoing = batch.length === batchSize;
+      from += batchSize;
     }
     
+    setAlbums(allRows);
     setLoading(false);
   }, []);
 
