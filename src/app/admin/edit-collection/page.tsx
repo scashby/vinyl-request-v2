@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '../../../lib/supabaseClient';
 
 type Album = {
@@ -89,9 +90,12 @@ const PLATFORMS = [
 ];
 
 export default function EditCollectionPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  
   const [albums, setAlbums] = useState<Album[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
   const [tagDefinitions, setTagDefinitions] = useState<TagDefinition[]>([]);
   const [editingTagsFor, setEditingTagsFor] = useState<number | null>(null);
   const [albumTags, setAlbumTags] = useState<string[]>([]);
@@ -254,6 +258,66 @@ export default function EditCollectionPage() {
     return searchableText.includes(query);
   });
 
+  const getMatchInfo = (album: Album, query: string): string[] => {
+    if (!query) return [];
+    
+    const q = query.toLowerCase();
+    const matches: string[] = [];
+    
+    // Check each field type and add to matches
+    if (album.artist?.toLowerCase().includes(q)) matches.push(`Artist: ${album.artist}`);
+    if (album.title?.toLowerCase().includes(q)) matches.push(`Title: ${album.title}`);
+    if (album.format?.toLowerCase().includes(q)) matches.push(`Format: ${album.format}`);
+    if (album.folder?.toLowerCase().includes(q)) matches.push(`Folder: ${album.folder}`);
+    if (album.year?.toLowerCase().includes(q)) matches.push(`Year: ${album.year}`);
+    if (album.media_condition?.toLowerCase().includes(q)) matches.push(`Condition: ${album.media_condition}`);
+    
+    // Tracklists - show snippet
+    if (album.tracklists?.toLowerCase().includes(q)) {
+      const trackText = album.tracklists.toLowerCase();
+      const index = trackText.indexOf(q);
+      const start = Math.max(0, index - 30);
+      const end = Math.min(trackText.length, index + q.length + 30);
+      const snippet = album.tracklists.substring(start, end);
+      matches.push(`Track: ...${snippet}...`);
+    }
+    
+    // Array fields
+    if (album.custom_tags?.some(t => t.toLowerCase().includes(q))) {
+      const matchedTags = album.custom_tags.filter(t => t.toLowerCase().includes(q));
+      matches.push(`Tags: ${matchedTags.join(', ')}`);
+    }
+    if (album.discogs_genres?.some(g => g.toLowerCase().includes(q))) {
+      const matchedGenres = album.discogs_genres.filter(g => g.toLowerCase().includes(q));
+      matches.push(`Genre: ${matchedGenres.join(', ')}`);
+    }
+    if (album.discogs_styles?.some(s => s.toLowerCase().includes(q))) {
+      const matchedStyles = album.discogs_styles.filter(s => s.toLowerCase().includes(q));
+      matches.push(`Style: ${matchedStyles.join(', ')}`);
+    }
+    if (album.spotify_genres?.some(g => g.toLowerCase().includes(q))) {
+      const matchedGenres = album.spotify_genres.filter(g => g.toLowerCase().includes(q));
+      matches.push(`Spotify Genre: ${matchedGenres.join(', ')}`);
+    }
+    
+    // Labels
+    if (album.spotify_label?.toLowerCase().includes(q)) matches.push(`Label: ${album.spotify_label}`);
+    if (album.apple_music_label?.toLowerCase().includes(q)) matches.push(`Label: ${album.apple_music_label}`);
+    
+    // Notes
+    if (album.discogs_notes?.toLowerCase().includes(q)) matches.push(`Notes: ${album.discogs_notes.substring(0, 50)}...`);
+    if (album.sale_notes?.toLowerCase().includes(q)) matches.push(`Sale Notes: ${album.sale_notes.substring(0, 50)}...`);
+    
+    // Boolean badges
+    if (album.is_1001 && ('1001'.includes(q) || 'albums'.includes(q))) matches.push('Badge: 1001 Albums');
+    if (album.steves_top_200 && ('top 200'.includes(q) || 'steve'.includes(q))) matches.push("Badge: Steve's Top 200");
+    if (album.this_weeks_top_10 && ('top 10'.includes(q) || 'week'.includes(q))) matches.push("Badge: This Week's Top 10");
+    if (album.inner_circle_preferred && ('inner circle'.includes(q) || 'preferred'.includes(q))) matches.push('Badge: Inner Circle');
+    if (album.for_sale && ('sale'.includes(q) || 'selling'.includes(q))) matches.push('Badge: For Sale');
+    
+    return matches.slice(0, 3); // Limit to 3 matches shown
+  };
+
   const openTagEditor = (album: Album) => {
     setEditingTagsFor(album.id);
     setAlbumTags(album.custom_tags || []);
@@ -277,6 +341,17 @@ export default function EditCollectionPage() {
 
   const removeTag = (tagName: string) => {
     setAlbumTags(prev => prev.filter(t => t !== tagName));
+  };
+
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    const params = new URLSearchParams(searchParams.toString());
+    if (value) {
+      params.set('q', value);
+    } else {
+      params.delete('q');
+    }
+    router.replace(`?${params.toString()}`, { scroll: false });
   };
 
   const exportResults = () => {
@@ -465,7 +540,7 @@ export default function EditCollectionPage() {
           <input
             type="text"
             value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
+            onChange={e => handleSearchChange(e.target.value)}
             placeholder="Search everything: artist, title, tracks, format, year, tags, genres, styles, labels, notes..."
             style={{
               width: '100%',
@@ -740,6 +815,39 @@ export default function EditCollectionPage() {
                       +{album.custom_tags.length - 3}
                     </span>
                   )}
+                </div>
+              )}
+
+              {/* Match Info */}
+              {searchQuery && getMatchInfo(album, searchQuery).length > 0 && (
+                <div style={{
+                  borderTop: '1px solid #e5e7eb',
+                  paddingTop: 8,
+                  marginTop: 4
+                }}>
+                  <div style={{
+                    fontSize: 10,
+                    fontWeight: 600,
+                    color: '#059669',
+                    marginBottom: 4
+                  }}>
+                    ✓ Matches:
+                  </div>
+                  {getMatchInfo(album, searchQuery).map((match, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        fontSize: 10,
+                        color: '#6b7280',
+                        marginBottom: 2,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      {match}
+                    </div>
+                  ))}
                 </div>
               )}
 
