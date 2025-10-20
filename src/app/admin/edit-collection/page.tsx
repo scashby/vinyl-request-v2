@@ -288,12 +288,34 @@ export default function EditCollectionPage() {
           }
         }
       } catch {
-        // Not JSON or parse failed
+        // Not JSON - try to extract track names from raw text
+        const lines = album.tracklists.split('\n');
+        const matchingLines = lines
+          .filter(line => line.toLowerCase().includes(q))
+          .map(line => {
+            // Try to extract just the track title (remove position, duration, etc)
+            const cleaned = line.replace(/^[A-Z0-9]+\s*[-\s]*/i, '').replace(/\s*\d+:\d+\s*$/, '').trim();
+            return cleaned.substring(0, 50);
+          })
+          .filter(line => line.length > 0)
+          .slice(0, 2);
+        
+        if (matchingLines.length > 0) {
+          matches.push(`Tracks: ${matchingLines.join(', ')}`);
+          foundTrack = true;
+        }
       }
       
-      // If we didn't find parsed tracks but the field contains the query, note it
+      // If still can't find the track, show a raw snippet
       if (!foundTrack) {
-        matches.push(`Track data (check album details)`);
+        const trackText = album.tracklists.toLowerCase();
+        const index = trackText.indexOf(q);
+        if (index !== -1) {
+          const start = Math.max(0, index - 20);
+          const end = Math.min(trackText.length, index + q.length + 30);
+          const snippet = album.tracklists.substring(start, end).trim();
+          matches.push(`Track: "${snippet}"`);
+        }
       }
     }
     
