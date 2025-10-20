@@ -1,4 +1,4 @@
-// src/app/admin/import-discogs/page.tsx - WITH FULL OVERRIDE CONTROLS
+// src/app/admin/import-discogs/page.tsx - WITH FULL OVERRIDE CONTROLS AND TRACK ARTIST SUPPORT
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -115,6 +115,8 @@ type DiscogsTrack = {
   type_?: string;
   title?: string;
   duration?: string;
+  artists?: Array<{ name: string; id?: number; join?: string }>;
+  extraartists?: Array<{ name: string; role?: string; id?: number }>;
 };
 
 type DiscogsResponse = {
@@ -134,7 +136,6 @@ export default function ImportDiscogsPage() {
   const [lastImportDate, setLastImportDate] = useState<string | null>(null);
   const [forceFullSync, setForceFullSync] = useState(false);
   
-  // Override controls
   const [skipEnrichment, setSkipEnrichment] = useState(false);
   const [skip1001Matching, setSkip1001Matching] = useState(false);
   const [skipRemovals, setSkipRemovals] = useState(false);
@@ -204,12 +205,20 @@ export default function ImportDiscogsPage() {
         
         let tracklistsStr = null;
         if (Array.isArray(data.tracklist) && data.tracklist.length > 0) {
-          tracklistsStr = JSON.stringify(data.tracklist.map((track: DiscogsTrack) => ({
-            position: track.position || '',
-            type_: track.type_ || 'track',
-            title: track.title || '',
-            duration: track.duration || ''
-          })));
+          tracklistsStr = JSON.stringify(data.tracklist.map((track: DiscogsTrack) => {
+            let trackArtist = null;
+            if (track.artists && track.artists.length > 0) {
+              trackArtist = track.artists.map(a => a.name).join(', ');
+            }
+            
+            return {
+              position: track.position || '',
+              type_: track.type_ || 'track',
+              title: track.title || '',
+              duration: track.duration || '',
+              artist: trackArtist
+            };
+          }));
         }
         
         const genresFromDiscogs = Array.isArray(data.genres) && data.genres.length > 0 
@@ -263,11 +272,9 @@ export default function ImportDiscogsPage() {
 
           console.log(`📊 Total valid CSV rows: ${validRows.length}`);
 
-          // Determine sync mode
           const syncMode: 'incremental' | 'full' = (lastImportDate && !forceFullSync) ? 'incremental' : 'full';
           console.log(`🔄 Sync mode: ${syncMode}`);
           
-          // Filter rows for incremental sync
           let filteredRows = validRows;
           
           if (syncMode === 'incremental' && lastImportDate) {
@@ -315,7 +322,6 @@ export default function ImportDiscogsPage() {
           console.log(`🔍 Fetching all existing records from database...`);
           setStatus(`Checking existing database records...`);
           
-          // Fetch ALL existing records
           let allExisting: ExistingRecord[] = [];
           let start = 0;
           const pageSize = 1000;
@@ -341,7 +347,6 @@ export default function ImportDiscogsPage() {
 
           console.log(`📀 Found ${allExisting.length} existing records in database`);
 
-          // COMPOSITE KEY: release_id + folder (to handle multiple copies)
           const createKey = (releaseId: string, folder: string) => {
             const normalizedFolder = sanitizeFolder(folder);
             return `${releaseId}|${normalizedFolder}`;
@@ -354,7 +359,6 @@ export default function ImportDiscogsPage() {
             ])
           );
           
-          // Create map from FULL CSV for removal checking (not filtered rows)
           const fullCsvMap = new Map(
             validRows.map(row => {
               const folder = sanitizeFolder(row.CollectionFolder);
@@ -366,7 +370,6 @@ export default function ImportDiscogsPage() {
           console.log(`🔑 Generated ${existingRecordsMap.size} existing composite keys`);
           console.log(`🔑 Generated ${fullCsvMap.size} CSV composite keys`);
           
-          // Sample keys for debugging
           const sampleExisting = Array.from(existingRecordsMap.keys()).slice(0, 5);
           const sampleCsv = Array.from(fullCsvMap.keys()).slice(0, 5);
           console.log('Sample existing keys:', sampleExisting);
@@ -374,7 +377,6 @@ export default function ImportDiscogsPage() {
 
           console.log(`🆕 Checking for new records...`);
           
-          // Find NEW records (in filtered CSV but not in database)
           const newRows = processedRows.filter(row => {
             const key = createKey(row.discogs_release_id, row.folder);
             const exists = existingRecordsMap.has(key);
@@ -386,7 +388,6 @@ export default function ImportDiscogsPage() {
 
           console.log(`✨ Found ${newRows.length} new items to add`);
 
-          // Find updates (in both filtered CSV and database, but with changes)
           console.log(`🔄 Checking for updates...`);
           const updateOperations: UpdateOperation[] = [];
           
@@ -421,7 +422,6 @@ export default function ImportDiscogsPage() {
 
           console.log(`🔧 Found ${updateOperations.length} items to update`);
           
-          // Find records to remove (only in FULL sync mode)
           let recordsToRemove: ExistingRecord[] = [];
           
           if (syncMode === 'full') {
@@ -494,7 +494,6 @@ export default function ImportDiscogsPage() {
       await delay(1000);
     }
     
-    // Create import history record
     let importRecord = null;
     if (!dryRun) {
       const { data, error: importError } = await supabase
@@ -517,7 +516,6 @@ export default function ImportDiscogsPage() {
     setStatus(`Starting ${skipEnrichment ? 'import' : 'enrichment'} for ${totalItems} new items...`);
 
     try {
-      // Process new items
       for (let batchStart = 0; batchStart < totalItems; batchStart += BATCH_SIZE) {
         const batchEnd = Math.min(batchStart + BATCH_SIZE, totalItems);
         const currentBatch = syncPreview.newItems.slice(batchStart, batchEnd);
@@ -582,7 +580,6 @@ export default function ImportDiscogsPage() {
         }
       }
       
-      // Process updates
       if (updateOperations.length > 0) {
         setStatus(`Processing ${updateOperations.length} updates...`);
         
@@ -651,7 +648,6 @@ export default function ImportDiscogsPage() {
         setStatus(`Skipped ${(window as Window & SyncDataStorage).updateOperations?.length} updates (override enabled)`);
       }
       
-      // Process removals (excluding deselected ones, only in full sync)
       if (syncPreview.syncMode === 'full' && recordsToRemove.length > 0) {
         const actualRemovals = recordsToRemove.filter(r => !deselectedRemovals.has(r.id));
         if (actualRemovals.length > 0) {
@@ -667,7 +663,6 @@ export default function ImportDiscogsPage() {
         setStatus(`Skipped ${(window as Window & SyncDataStorage).recordsToRemove?.length} removals (override enabled)`);
       }
       
-      // Automatic 1001 album matching
       if (!skip1001Matching) {
         setStatus('Running automatic 1001 album matching...');
         
@@ -707,7 +702,6 @@ export default function ImportDiscogsPage() {
         setStatus('Skipped 1001 matching (override enabled)');
       }
 
-      // Update import history record
       if (!dryRun && importRecord) {
         const removedCount = syncPreview.syncMode === 'full' 
           ? (recordsToRemove.length - deselectedRemovals.size) 
@@ -723,14 +717,12 @@ export default function ImportDiscogsPage() {
           })
           .eq('id', importRecord.id);
 
-        // Update last import date in state
         setLastImportDate(new Date().toISOString());
       }
       
       const removedCount = recordsToRemove.length - deselectedRemovals.size;
       setStatus(`${dryRun ? '🔍 DRY RUN - ' : '✅ '}Complete! ${allEnriched.length} new, ${updateOperations.length} updated, ${removedCount} removed${skip1001Matching ? '' : ', 1001 albums matched'}`);
     } catch (error) {
-      // Mark import as failed
       if (!dryRun && importRecord) {
         await supabase
           .from('import_history')
@@ -769,7 +761,6 @@ export default function ImportDiscogsPage() {
           : 'First import - will perform full sync'}
       </p>
 
-      {/* Basic Controls */}
       {lastImportDate && (
         <div style={{
           background: forceFullSync ? '#fef3c7' : '#dbeafe',
@@ -806,7 +797,6 @@ export default function ImportDiscogsPage() {
         </div>
       )}
 
-      {/* Advanced Override Controls */}
       <div style={{
         background: 'white',
         border: '2px solid #8b5cf6',
@@ -834,7 +824,6 @@ export default function ImportDiscogsPage() {
 
         {showAdvanced && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {/* Dry Run */}
             <div style={{
               background: dryRun ? '#fef3c7' : '#f9fafb',
               border: `1px solid ${dryRun ? '#f59e0b' : '#e5e7eb'}`,
@@ -856,7 +845,6 @@ export default function ImportDiscogsPage() {
               </label>
             </div>
 
-            {/* Skip Enrichment */}
             <div style={{
               background: '#f9fafb',
               border: '1px solid #e5e7eb',
@@ -878,7 +866,6 @@ export default function ImportDiscogsPage() {
               </label>
             </div>
 
-            {/* Skip 1001 Matching */}
             <div style={{
               background: '#f9fafb',
               border: '1px solid #e5e7eb',
@@ -900,7 +887,6 @@ export default function ImportDiscogsPage() {
               </label>
             </div>
 
-            {/* Skip Removals */}
             <div style={{
               background: '#f9fafb',
               border: '1px solid #e5e7eb',
@@ -922,7 +908,6 @@ export default function ImportDiscogsPage() {
               </label>
             </div>
 
-            {/* Skip Updates */}
             <div style={{
               background: '#f9fafb',
               border: '1px solid #e5e7eb',
@@ -944,7 +929,6 @@ export default function ImportDiscogsPage() {
               </label>
             </div>
 
-            {/* Batch Size */}
             <div style={{
               background: '#f9fafb',
               border: '1px solid #e5e7eb',
@@ -975,7 +959,6 @@ export default function ImportDiscogsPage() {
               <span style={{ fontSize: 12, color: '#6b7280' }}>items per batch (default: 25)</span>
             </div>
 
-            {/* API Delay */}
             <div style={{
               background: '#f9fafb',
               border: '1px solid #e5e7eb',
@@ -1206,7 +1189,6 @@ export default function ImportDiscogsPage() {
             )}
           </div>
           
-          {/* Detailed Views - keeping same as before */}
           {showDetails === 'new' && syncPreview.newItems.length > 0 && (
             <div style={{
               background: '#f0fdf4',
