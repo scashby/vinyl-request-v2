@@ -1,7 +1,7 @@
-// src/app/admin/enrich-sources/page.tsx - UPDATED API paths from enrich-multi-* to enrich-sources/*
+// src/app/admin/enrich-sources/page.tsx - COMPLETE FILE with browser console logging
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 
@@ -12,6 +12,41 @@ type Album = {
   image_url: string | null;
   spotify_id: string | null;
   apple_music_id: string | null;
+};
+
+type AlbumResult = {
+  albumId: number;
+  artist: string;
+  title: string;
+  spotify?: {
+    success: boolean;
+    data?: { spotify_id?: string; genres?: string[] };
+    error?: string;
+    skipped?: boolean;
+  };
+  appleMusic?: {
+    success: boolean;
+    data?: { apple_music_id?: string; genres?: string[] };
+    error?: string;
+    skipped?: boolean;
+  };
+  genius?: {
+    success: boolean;
+    enrichedCount?: number;
+    failedCount?: number;
+    enrichedTracks?: Array<{ position: string; title: string; lyrics_url: string }>;
+    failedTracks?: Array<{ position: string; title: string; error: string }>;
+    error?: string;
+    skipped?: boolean;
+  };
+  appleLyrics?: {
+    success: boolean;
+    lyricsFound?: number;
+    lyricsMissing?: number;
+    missingTracks?: string[];
+    error?: string;
+    skipped?: boolean;
+  };
 };
 
 export default function MultiSourceEnrichment() {
@@ -30,12 +65,64 @@ export default function MultiSourceEnrichment() {
   });
   const [enriching, setEnriching] = useState(false);
   const [status, setStatus] = useState('');
-  const [progress, setProgress] = useState({ current: 0, total: 0 });
-  const [lastEnriched, setLastEnriched] = useState(null);
   const [batchSize, setBatchSize] = useState('all');
   const [folderFilter, setFolderFilter] = useState('');
   const [folders, setFolders] = useState([]);
-  const [totalEnriched, setTotalEnriched] = useState(0);
+  const [selectedServices, setSelectedServices] = useState({
+    spotify: true,
+    appleMusic: true,
+    genius: true,
+    appleLyrics: true
+  });
+  const [enrichmentResults, setEnrichmentResults] = useState<AlbumResult[]>([]);
+  const [expandedAlbum, setExpandedAlbum] = useState<number | null>(null);
+  
+  // Calculate how many albums will actually be processed based on selected services
+  const albumsToEnrich = useMemo(() => {
+    console.log('🔢 Calculating albumsToEnrich with:', {
+      selectedServices,
+      stats: {
+        needsAppleLyrics: stats.needsAppleLyrics,
+        needsEnrichment: stats.needsEnrichment,
+        unenriched: stats.unenriched,
+        spotifyOnly: stats.spotifyOnly,
+        appleOnly: stats.appleOnly
+      }
+    });
+    
+    const servicesSelected = {
+      spotify: selectedServices.spotify,
+      appleMusic: selectedServices.appleMusic,
+      genius: selectedServices.genius,
+      appleLyrics: selectedServices.appleLyrics
+    };
+    
+    const count = Object.values(servicesSelected).filter(Boolean).length;
+    console.log('Services selected count:', count);
+    
+    // If nothing selected, return 0
+    if (count === 0) {
+      console.log('No services selected, returning 0');
+      return 0;
+    }
+    
+    // If only Apple Lyrics is selected
+    if (servicesSelected.appleLyrics && !servicesSelected.spotify && !servicesSelected.appleMusic && !servicesSelected.genius) {
+      console.log('Only Apple Lyrics selected, returning needsAppleLyrics:', stats.needsAppleLyrics);
+      return stats.needsAppleLyrics;
+    }
+    
+    // If only streaming services (no lyrics)
+    if ((servicesSelected.spotify || servicesSelected.appleMusic) && !servicesSelected.genius && !servicesSelected.appleLyrics) {
+      const total = stats.unenriched + stats.spotifyOnly + stats.appleOnly;
+      console.log('Only streaming services selected, returning:', total);
+      return total;
+    }
+    
+    // For any other combination, return total needing enrichment
+    console.log('Mixed services or all services, returning needsEnrichment:', stats.needsEnrichment);
+    return stats.needsEnrichment;
+  }, [selectedServices, stats.needsAppleLyrics, stats.needsEnrichment, stats.unenriched, stats.spotifyOnly, stats.appleOnly]);
   
   // Modal state
   const [showModal, setShowModal] = useState(false);
@@ -49,7 +136,6 @@ export default function MultiSourceEnrichment() {
 
   async function loadStatsAndFolders() {
     try {
-      // UPDATED: Changed from /api/enrich-multi-stats to /api/enrich-sources/stats
       const res = await fetch('/api/enrich-sources/stats');
       const data = await res.json();
       if (data.success) {
@@ -70,7 +156,6 @@ export default function MultiSourceEnrichment() {
     setLoadingModal(true);
 
     try {
-      // UPDATED: Changed from /api/enrich-multi-albums to /api/enrich-sources/albums
       const res = await fetch(`/api/enrich-sources/albums?category=${category}`);
       const data = await res.json();
       if (data.success) {
@@ -84,56 +169,111 @@ export default function MultiSourceEnrichment() {
   }
 
   async function enrichAll() {
-    if (!confirm(`This will enrich ${stats.needsEnrichment} albums${folderFilter ? ` in folder "${folderFilter}"` : ' (all folders)'}. This may take a while and consume API quota. Continue?`)) {
+    const selectedCount = Object.values(selectedServices).filter(Boolean).length;
+    if (selectedCount === 0) {
+      alert('Please select at least one service to enrich');
+      return;
+    }
+
+    const serviceNames = [];
+    if (selectedServices.spotify) serviceNames.push('Spotify');
+    if (selectedServices.appleMusic) serviceNames.push('Apple Music');
+    if (selectedServices.genius) serviceNames.push('Genius');
+    if (selectedServices.appleLyrics) serviceNames.push('Apple Lyrics');
+
+    if (!confirm(`This will enrich ${albumsToEnrich} albums with: ${serviceNames.join(', ')}${folderFilter ? `\nFolder: "${folderFilter}"` : ' (all folders)'}\n\nThis may take a while and consume API quota. Continue?`)) {
       return;
     }
 
     setEnriching(true);
-    setProgress({ current: 0, total: 0 });
-    setTotalEnriched(0);
+    setEnrichmentResults([]);
     setStatus('Starting enrichment...');
     
     let cursor = 0;
     let totalProcessed = 0;
-    let enrichedCount = 0;
     const limit = batchSize === 'all' ? 10000 : parseInt(batchSize);
+    const allResults: AlbumResult[] = [];
+
+    console.log('🎵 ========================================');
+    console.log('🎵 STARTING MULTI-SOURCE ENRICHMENT');
+    console.log('🎵 ========================================');
+    console.log('Selected services:', selectedServices);
+    console.log('Batch size:', batchSize, '(limit:', limit, ')');
+    console.log('Folder filter:', folderFilter || 'none');
+    console.log('Albums needing enrichment:', stats.needsEnrichment);
 
     try {
       while (true) {
         setStatus(`Processing${folderFilter ? ` folder "${folderFilter}"` : ''} from ID ${cursor}...`);
         
-        // UPDATED: Changed from /api/enrich-multi-batch to /api/enrich-sources/batch
+        console.log(`🔄 Starting batch from cursor ${cursor}, limit ${limit}`);
+        
         const res = await fetch('/api/enrich-sources/batch', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
             cursor, 
             limit,
-            folder: folderFilter || undefined
+            folder: folderFilter || undefined,
+            services: selectedServices
           })
         });
 
         const result = await res.json();
         
+        console.log(`📊 Batch result:`, {
+          success: result.success,
+          processed: result.processed,
+          hasMore: result.hasMore,
+          nextCursor: result.nextCursor,
+          resultsCount: result.results?.length || 0
+        });
+        
+        // Log each album's enrichment results
+        if (result.results && result.results.length > 0) {
+          result.results.forEach(albumResult => {
+            console.group(`🎵 Album #${albumResult.albumId}: ${albumResult.artist} - ${albumResult.title}`);
+            if (albumResult.spotify) {
+              console.log('Spotify:', albumResult.spotify);
+            }
+            if (albumResult.appleMusic) {
+              console.log('Apple Music:', albumResult.appleMusic);
+            }
+            if (albumResult.genius) {
+              console.log('Genius:', albumResult.genius);
+            }
+            if (albumResult.appleLyrics) {
+              console.log('Apple Lyrics:', albumResult.appleLyrics);
+              if (!albumResult.appleLyrics.success) {
+                console.error('❌ Apple Lyrics failed:', albumResult.appleLyrics.error);
+              }
+            }
+            console.groupEnd();
+          });
+        }
+        
         if (!result.success) {
           setStatus(`❌ Error: ${result.error}`);
+          console.error('❌ Batch failed:', result.error);
           break;
         }
 
         totalProcessed += result.processed;
-        enrichedCount += result.enriched;
         
-        setProgress({ current: totalProcessed, total: totalProcessed });
-        setTotalEnriched(enrichedCount);
-        
-        if (result.lastAlbum) {
-          setLastEnriched(result.lastAlbum);
+        // Accumulate detailed results
+        if (result.results && result.results.length > 0) {
+          allResults.push(...result.results);
+          setEnrichmentResults([...allResults]);
         }
 
-        setStatus(`Processed ${totalProcessed} albums, enriched ${enrichedCount}...`);
+        setStatus(`Processed ${totalProcessed} albums...`);
 
         if (!result.hasMore) {
-          setStatus(`✅ Complete! Processed ${totalProcessed} albums, enriched ${enrichedCount}`);
+          setStatus(`✅ Complete! Processed ${totalProcessed} albums. See detailed results below.`);
+          console.log('✅ ========================================');
+          console.log('✅ ENRICHMENT COMPLETE');
+          console.log('✅ Total albums processed:', totalProcessed);
+          console.log('✅ ========================================');
           await loadStatsAndFolders();
           break;
         }
@@ -143,21 +283,32 @@ export default function MultiSourceEnrichment() {
       }
     } catch (error) {
       setStatus(`❌ Error: ${error.message}`);
+      console.error('❌ Fatal error:', error);
     } finally {
       setEnriching(false);
     }
   }
 
+  const getResultIcon = (result?: { success: boolean; error?: string; skipped?: boolean }) => {
+    if (!result) return '⚪';
+    if (result.skipped) return '⏭️';
+    if (result.success) return '✅';
+    return '❌';
+  };
+
   return (
-    <div style={{ padding: 24, maxWidth: 1400, margin: '0 auto' }}>
-      <h1 style={{ fontSize: 32, fontWeight: 'bold', marginBottom: 8 }}>
+    <div style={{ padding: 24, maxWidth: 1400, margin: '0 auto', background: '#f8fafc', minHeight: '100vh' }}>
+      <h1 style={{ fontSize: 32, fontWeight: 'bold', marginBottom: 8, color: '#1f2937' }}>
         🎵 Multi-Source Metadata Enrichment
       </h1>
-      <p style={{ color: '#6b7280', marginBottom: 24 }}>
+      <p style={{ color: '#6b7280', marginBottom: 8 }}>
         Enrich your entire collection with data from Spotify, Apple Music, and lyrics databases
       </p>
+      <p style={{ color: '#9ca3af', fontSize: 13, marginBottom: 24, fontStyle: 'italic' }}>
+        💡 Tip: Open browser DevTools Console (F12) to see detailed enrichment logs for each album
+      </p>
 
-      {/* Overview Stats */}
+      {/* Collection Overview */}
       <div style={{ marginBottom: 32 }}>
         <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 16, color: '#1f2937' }}>
           📊 Collection Overview
@@ -192,7 +343,7 @@ export default function MultiSourceEnrichment() {
         </div>
       </div>
 
-      {/* Service Breakdown */}
+      {/* Streaming Services */}
       <div style={{ marginBottom: 32 }}>
         <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 16, color: '#1f2937' }}>
           🎵 Streaming Services
@@ -233,7 +384,7 @@ export default function MultiSourceEnrichment() {
         </div>
       </div>
 
-      {/* Lyrics Stats */}
+      {/* Lyrics Enrichment */}
       <div style={{ marginBottom: 32 }}>
         <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 16, color: '#1f2937' }}>
           📝 Lyrics Enrichment
@@ -267,9 +418,9 @@ export default function MultiSourceEnrichment() {
           <ClickableStatCard 
             label="📝 Any Lyrics" 
             value={stats.anyLyrics} 
-            color="#7c3aed"
+            color="#8b5cf6"
             description="Has any lyrics data"
-            onClick={() => showAlbumsForCategory('with-lyrics', '📝 Albums with Lyrics')}
+            onClick={() => showAlbumsForCategory('with-lyrics', '📝 Albums with Any Lyrics')}
           />
         </div>
       </div>
@@ -286,23 +437,71 @@ export default function MultiSourceEnrichment() {
           ⚡ Start Enrichment
         </h2>
         
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
+            Select Services to Enrich:
+          </div>
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, cursor: 'pointer', padding: '8px 12px', background: '#f3f4f6', borderRadius: 6 }}>
+              <input 
+                type="checkbox" 
+                checked={selectedServices.spotify}
+                onChange={e => setSelectedServices(prev => ({ ...prev, spotify: e.target.checked }))}
+                disabled={enriching}
+                style={{ width: 16, height: 16 }}
+              />
+              <span style={{ fontWeight: 600, color: '#1f2937' }}>Spotify</span>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, cursor: 'pointer', padding: '8px 12px', background: '#f3f4f6', borderRadius: 6 }}>
+              <input 
+                type="checkbox" 
+                checked={selectedServices.appleMusic}
+                onChange={e => setSelectedServices(prev => ({ ...prev, appleMusic: e.target.checked }))}
+                disabled={enriching}
+                style={{ width: 16, height: 16 }}
+              />
+              <span style={{ fontWeight: 600, color: '#1f2937' }}>Apple Music</span>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, cursor: 'pointer', padding: '8px 12px', background: '#f3f4f6', borderRadius: 6 }}>
+              <input 
+                type="checkbox" 
+                checked={selectedServices.genius}
+                onChange={e => setSelectedServices(prev => ({ ...prev, genius: e.target.checked }))}
+                disabled={enriching}
+                style={{ width: 16, height: 16 }}
+              />
+              <span style={{ fontWeight: 600, color: '#1f2937' }}>Genius Lyrics</span>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, cursor: 'pointer', padding: '8px 12px', background: '#f3f4f6', borderRadius: 6 }}>
+              <input 
+                type="checkbox" 
+                checked={selectedServices.appleLyrics}
+                onChange={e => setSelectedServices(prev => ({ ...prev, appleLyrics: e.target.checked }))}
+                disabled={enriching}
+                style={{ width: 16, height: 16 }}
+              />
+              <span style={{ fontWeight: 600, color: '#1f2937' }}>Apple Lyrics</span>
+            </label>
+          </div>
+        </div>
+        
         <div style={{ display: 'flex', gap: 16, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
           <button
             onClick={enrichAll}
-            disabled={enriching || stats.needsEnrichment === 0}
+            disabled={enriching || albumsToEnrich === 0 || Object.values(selectedServices).every(v => !v)}
             style={{
               padding: '12px 24px',
-              background: enriching || stats.needsEnrichment === 0 ? '#9ca3af' : 'linear-gradient(135deg, #7c3aed, #a855f7)',
+              background: (enriching || albumsToEnrich === 0 || Object.values(selectedServices).every(v => !v)) ? '#9ca3af' : 'linear-gradient(135deg, #7c3aed, #a855f7)',
               color: 'white',
               border: 'none',
               borderRadius: 8,
               fontSize: 16,
               fontWeight: 600,
-              cursor: enriching || stats.needsEnrichment === 0 ? 'not-allowed' : 'pointer',
+              cursor: (enriching || stats.needsEnrichment === 0 || Object.values(selectedServices).every(v => !v)) ? 'not-allowed' : 'pointer',
               boxShadow: enriching ? 'none' : '0 4px 12px rgba(124, 58, 237, 0.3)'
             }}
           >
-            {enriching ? '⚡ Enriching...' : `⚡ Enrich ${stats.needsEnrichment} Albums`}
+            {enriching ? '⚡ Enriching...' : `⚡ Enrich ${albumsToEnrich} Albums`}
           </button>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -376,37 +575,6 @@ export default function MultiSourceEnrichment() {
           </button>
         </div>
 
-        {/* Progress Bar */}
-        {enriching && (
-          <div style={{ marginBottom: 16 }}>
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              marginBottom: 8,
-              fontSize: 14,
-              color: '#6b7280'
-            }}>
-              <span>Processed: {progress.current} albums</span>
-              <span>{totalEnriched} enriched</span>
-            </div>
-            <div style={{
-              width: '100%',
-              height: 24,
-              background: '#e5e7eb',
-              borderRadius: 12,
-              overflow: 'hidden',
-              position: 'relative'
-            }}>
-              <div style={{
-                width: '100%',
-                height: '100%',
-                background: 'linear-gradient(135deg, #7c3aed, #a855f7)',
-                opacity: 0.8
-              }} />
-            </div>
-          </div>
-        )}
-
         {/* Status */}
         {status && (
           <div style={{
@@ -424,58 +592,190 @@ export default function MultiSourceEnrichment() {
             {status}
           </div>
         )}
+      </div>
 
-        {/* Last Enriched */}
-        {lastEnriched && (
-          <div style={{
-            marginTop: 16,
-            padding: 12,
-            background: '#f9fafb',
-            border: '1px solid #e5e7eb',
-            borderRadius: 6
-          }}>
-            <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>
-              Last enriched:
-            </div>
-            <div style={{ fontWeight: 600, color: '#1f2937' }}>
-              {lastEnriched.artist} - {lastEnriched.title}
-            </div>
-            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
-              {lastEnriched.spotify && '✓ Spotify'} 
-              {lastEnriched.appleMusic && ' • ✓ Apple Music'}
-              {lastEnriched.appleLyrics && ' • ✓ Apple Lyrics'}
-              {lastEnriched.lyrics && ' • ✓ Genius Lyrics'}
-            </div>
+      {/* Detailed Results */}
+      {enrichmentResults.length > 0 && (
+        <div style={{
+          background: 'white',
+          border: '1px solid #e5e7eb',
+          borderRadius: 12,
+          padding: 24,
+          marginBottom: 24
+        }}>
+          <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 16, color: '#1f2937' }}>
+            📋 Detailed Results ({enrichmentResults.length} albums)
+          </h2>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {enrichmentResults.map((result) => (
+              <div key={result.albumId} style={{
+                border: '1px solid #e5e7eb',
+                borderRadius: 8,
+                overflow: 'hidden'
+              }}>
+                {/* Album Header */}
+                <div
+                  onClick={() => setExpandedAlbum(expandedAlbum === result.albumId ? null : result.albumId)}
+                  style={{
+                    padding: 16,
+                    background: '#f9fafb',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 600, color: '#1f2937', marginBottom: 4 }}>
+                      #{result.albumId}: {result.artist} - {result.title}
+                    </div>
+                    <div style={{ fontSize: 13, color: '#6b7280', display: 'flex', gap: 12 }}>
+                      <span>{getResultIcon(result.spotify)} Spotify</span>
+                      <span>{getResultIcon(result.appleMusic)} Apple Music</span>
+                      <span>{getResultIcon(result.genius)} Genius</span>
+                      <span>{getResultIcon(result.appleLyrics)} Apple Lyrics</span>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 20, color: '#6b7280' }}>
+                    {expandedAlbum === result.albumId ? '▼' : '▶'}
+                  </div>
+                </div>
+
+                {/* Expanded Details */}
+                {expandedAlbum === result.albumId && (
+                  <div style={{ padding: 16, background: 'white', fontSize: 13 }}>
+                    {/* Spotify Details */}
+                    {result.spotify && (
+                      <div style={{ marginBottom: 12, padding: 12, background: '#f0fdf4', borderRadius: 6 }}>
+                        <div style={{ fontWeight: 600, color: '#15803d', marginBottom: 6 }}>
+                          {getResultIcon(result.spotify)} Spotify
+                        </div>
+                        {result.spotify.skipped ? (
+                          <div style={{ color: '#6b7280', fontSize: 12 }}>Already had Spotify ID</div>
+                        ) : result.spotify.success ? (
+                          <div style={{ color: '#15803d', fontSize: 12 }}>
+                            ✓ ID: {result.spotify.data?.spotify_id}
+                            {result.spotify.data?.genres && result.spotify.data.genres.length > 0 && (
+                              <div>Genres: {result.spotify.data.genres.join(', ')}</div>
+                            )}
+                          </div>
+                        ) : (
+                          <div style={{ color: '#dc2626', fontSize: 12 }}>✗ {result.spotify.error}</div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Apple Music Details */}
+                    {result.appleMusic && (
+                      <div style={{ marginBottom: 12, padding: 12, background: '#fef3c7', borderRadius: 6 }}>
+                        <div style={{ fontWeight: 600, color: '#d97706', marginBottom: 6 }}>
+                          {getResultIcon(result.appleMusic)} Apple Music
+                        </div>
+                        {result.appleMusic.skipped ? (
+                          <div style={{ color: '#6b7280', fontSize: 12 }}>Already had Apple Music ID</div>
+                        ) : result.appleMusic.success ? (
+                          <div style={{ color: '#92400e', fontSize: 12 }}>
+                            ✓ ID: {result.appleMusic.data?.apple_music_id}
+                            {result.appleMusic.data?.genres && result.appleMusic.data.genres.length > 0 && (
+                              <div>Genres: {result.appleMusic.data.genres.join(', ')}</div>
+                            )}
+                          </div>
+                        ) : (
+                          <div style={{ color: '#dc2626', fontSize: 12 }}>✗ {result.appleMusic.error}</div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Genius Details */}
+                    {result.genius && (
+                      <div style={{ marginBottom: 12, padding: 12, background: '#ede9fe', borderRadius: 6 }}>
+                        <div style={{ fontWeight: 600, color: '#7c3aed', marginBottom: 6 }}>
+                          {getResultIcon(result.genius)} Genius Lyrics URLs
+                        </div>
+                        {result.genius.skipped ? (
+                          <div style={{ color: '#6b7280', fontSize: 12 }}>All tracks already had lyrics URLs</div>
+                        ) : result.genius.success ? (
+                          <div style={{ fontSize: 12 }}>
+                            <div style={{ color: '#7c3aed', marginBottom: 4 }}>
+                              ✓ Enriched: {result.genius.enrichedCount} tracks
+                            </div>
+                            {result.genius.failedCount > 0 && (
+                              <div style={{ color: '#dc2626' }}>
+                                ✗ Failed: {result.genius.failedCount} tracks
+                                {result.genius.failedTracks && result.genius.failedTracks.length > 0 && (
+                                  <div style={{ marginTop: 4, paddingLeft: 8 }}>
+                                    {result.genius.failedTracks.slice(0, 3).map((t, i) => (
+                                      <div key={i}>• {t.position} {t.title}: {t.error}</div>
+                                    ))}
+                                    {result.genius.failedTracks.length > 3 && (
+                                      <div>... and {result.genius.failedTracks.length - 3} more</div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div style={{ color: '#dc2626', fontSize: 12 }}>✗ {result.genius.error}</div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Apple Lyrics Details */}
+                    {result.appleLyrics && (
+                      <div style={{ padding: 12, background: '#fce7f3', borderRadius: 6 }}>
+                        <div style={{ fontWeight: 600, color: '#be185d', marginBottom: 6 }}>
+                          {getResultIcon(result.appleLyrics)} Apple Music Full Lyrics
+                        </div>
+                        {result.appleLyrics.success ? (
+                          <div style={{ fontSize: 12 }}>
+                            <div style={{ color: '#be185d', marginBottom: 4 }}>
+                              ✓ Found: {result.appleLyrics.lyricsFound} tracks
+                            </div>
+                            {result.appleLyrics.lyricsMissing > 0 && (
+                              <div style={{ color: '#6b7280' }}>
+                                Missing: {result.appleLyrics.lyricsMissing} tracks
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div>
+                            <div style={{ color: '#dc2626', fontSize: 12, marginBottom: 4 }}>
+                              ✗ {result.appleLyrics.error}
+                            </div>
+                            <div style={{ fontSize: 11, color: '#9ca3af', fontStyle: 'italic' }}>
+                              Check browser console (F12) for detailed error info
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #e5e7eb' }}>
+                      <Link
+                        href={`/admin/edit-entry/${result.albumId}`}
+                        style={{
+                          display: 'inline-block',
+                          padding: '6px 12px',
+                          background: '#3b82f6',
+                          color: 'white',
+                          borderRadius: 6,
+                          fontSize: 12,
+                          fontWeight: 600,
+                          textDecoration: 'none'
+                        }}
+                      >
+                        Edit Album →
+                      </Link>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
-        )}
-      </div>
-
-      {/* Info */}
-      <div style={{
-        background: '#f0f9ff',
-        border: '1px solid #bae6fd',
-        borderRadius: 8,
-        padding: 16,
-        fontSize: 14,
-        color: '#0c4a6e',
-        marginBottom: 24
-      }}>
-        <div style={{ fontWeight: 600, marginBottom: 8 }}>
-          💡 How Enrichment Works
         </div>
-        <div style={{ marginBottom: 8 }}>
-          This process will enrich ALL albums that are missing:
-        </div>
-        <ul style={{ margin: '0 0 0 20px', padding: 0 }}>
-          <li>Spotify ID or metadata</li>
-          <li>Apple Music ID or metadata</li>
-          <li>Apple Music lyrics (for albums that have Apple Music IDs)</li>
-          <li>Genius lyrics links</li>
-        </ul>
-        <div style={{ marginTop: 8, fontStyle: 'italic' }}>
-          The &quot;Needs Enrichment&quot; count now includes albums that have Apple Music IDs but are missing lyrics!
-        </div>
-      </div>
+      )}
 
       {/* Modal */}
       {showModal && (
@@ -587,35 +887,6 @@ export default function MultiSourceEnrichment() {
                       marginBottom: 8
                     }}>
                       {album.artist}
-                    </div>
-                    <div style={{
-                      display: 'flex',
-                      gap: 4,
-                      marginBottom: 8,
-                      fontSize: 10
-                    }}>
-                      {album.spotify_id && (
-                        <span style={{
-                          background: '#dcfce7',
-                          color: '#15803d',
-                          padding: '2px 6px',
-                          borderRadius: 4,
-                          fontWeight: 600
-                        }}>
-                          Spotify
-                        </span>
-                      )}
-                      {album.apple_music_id && (
-                        <span style={{
-                          background: '#fce7f3',
-                          color: '#be185d',
-                          padding: '2px 6px',
-                          borderRadius: 4,
-                          fontWeight: 600
-                        }}>
-                          Apple
-                        </span>
-                      )}
                     </div>
                     <Link
                       href={`/admin/edit-entry/${album.id}`}
