@@ -154,7 +154,22 @@ export default function MultiSourceEnrichment() {
       const res = await fetch('/api/enrich-sources/stats');
       const data = await res.json();
       if (data.success) {
-        setStats(data.stats);
+        // Merge with defaults to handle missing fields from API
+        setStats({
+          total: data.stats.total || 0,
+          needsEnrichment: data.stats.needsEnrichment || 0,
+          fullyEnriched: data.stats.fullyEnriched || 0,
+          bothServices: data.stats.bothServices || 0,
+          unenriched: data.stats.unenriched || 0,
+          spotifyOnly: data.stats.spotifyOnly || 0,
+          appleOnly: data.stats.appleOnly || 0,
+          geniusLyrics: data.stats.geniusLyrics || 0,
+          appleLyrics: data.stats.appleLyrics || 0,
+          needsAppleLyrics: data.stats.needsAppleLyrics || 0,
+          anyLyrics: data.stats.anyLyrics || 0,
+          discogsTracklist: data.stats.discogsTracklist || 0,
+          needsDiscogsTracklist: data.stats.needsDiscogsTracklist || 0
+        });
         if (data.folders) {
           setFolders(data.folders);
         }
