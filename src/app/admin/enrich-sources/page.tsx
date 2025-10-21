@@ -1,4 +1,4 @@
-// src/app/admin/enrich-sources/page.tsx - COMPLETE FILE with browser console logging and emoji UI
+// src/app/admin/enrich-sources/page.tsx - COMPLETE FILE with Discogs Tracklist, console logging and emoji UI
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
@@ -18,6 +18,13 @@ type AlbumResult = {
   albumId: number;
   artist: string;
   title: string;
+  discogsTracklist?: {
+    success: boolean;
+    data?: { totalTracks?: number; tracksWithArtists?: number };
+    error?: string;
+    skipped?: boolean;
+    details?: unknown;
+  };
   spotify?: {
     success: boolean;
     data?: { spotify_id?: string; genres?: string[] };
@@ -65,7 +72,9 @@ export default function MultiSourceEnrichment() {
     geniusLyrics: 0,
     appleLyrics: 0,
     needsAppleLyrics: 0,
-    anyLyrics: 0
+    anyLyrics: 0,
+    discogsTracklist: 0,
+    needsDiscogsTracklist: 0
   });
   const [enriching, setEnriching] = useState(false);
   const [status, setStatus] = useState('');
@@ -73,6 +82,7 @@ export default function MultiSourceEnrichment() {
   const [folderFilter, setFolderFilter] = useState('');
   const [folders, setFolders] = useState([]);
   const [selectedServices, setSelectedServices] = useState({
+    discogsTracklist: true,
     spotify: true,
     appleMusic: true,
     genius: true,
@@ -95,6 +105,7 @@ export default function MultiSourceEnrichment() {
     });
     
     const servicesSelected = {
+      discogsTracklist: selectedServices.discogsTracklist,
       spotify: selectedServices.spotify,
       appleMusic: selectedServices.appleMusic,
       genius: selectedServices.genius,
@@ -111,13 +122,13 @@ export default function MultiSourceEnrichment() {
     }
     
     // If only Apple Lyrics is selected
-    if (servicesSelected.appleLyrics && !servicesSelected.spotify && !servicesSelected.appleMusic && !servicesSelected.genius) {
+    if (servicesSelected.appleLyrics && !servicesSelected.spotify && !servicesSelected.appleMusic && !servicesSelected.genius && !servicesSelected.discogsTracklist) {
       console.log('Only Apple Lyrics selected, returning needsAppleLyrics:', stats.needsAppleLyrics);
       return stats.needsAppleLyrics;
     }
     
     // If only streaming services (no lyrics)
-    if ((servicesSelected.spotify || servicesSelected.appleMusic) && !servicesSelected.genius && !servicesSelected.appleLyrics) {
+    if ((servicesSelected.spotify || servicesSelected.appleMusic) && !servicesSelected.genius && !servicesSelected.appleLyrics && !servicesSelected.discogsTracklist) {
       const total = stats.unenriched + stats.spotifyOnly + stats.appleOnly;
       console.log('Only streaming services selected, returning:', total);
       return total;
@@ -180,6 +191,7 @@ export default function MultiSourceEnrichment() {
     }
 
     const serviceNames = [];
+    if (selectedServices.discogsTracklist) serviceNames.push('Discogs Tracklist');
     if (selectedServices.spotify) serviceNames.push('Spotify');
     if (selectedServices.appleMusic) serviceNames.push('Apple Music');
     if (selectedServices.genius) serviceNames.push('Genius');
@@ -237,6 +249,12 @@ export default function MultiSourceEnrichment() {
         if (result.results && result.results.length > 0) {
           result.results.forEach(albumResult => {
             console.group(`🎵 Album #${albumResult.albumId}: ${albumResult.artist} - ${albumResult.title}`);
+            if (albumResult.discogsTracklist) {
+              console.log('Discogs Tracklist:', albumResult.discogsTracklist);
+              if (albumResult.discogsTracklist.details) {
+                console.log('Discogs details:', albumResult.discogsTracklist.details);
+              }
+            }
             if (albumResult.spotify) {
               console.log('Spotify:', albumResult.spotify);
               if (albumResult.spotify.details) {
@@ -318,7 +336,7 @@ export default function MultiSourceEnrichment() {
         🎵 Multi-Source Metadata Enrichment
       </h1>
       <p style={{ color: '#6b7280', marginBottom: 8 }}>
-        Enrich your entire collection with data from Spotify, Apple Music, and lyrics databases
+        Enrich your entire collection with data from Discogs, Spotify, Apple Music, and lyrics databases
       </p>
       <p style={{ color: '#9ca3af', fontSize: 13, marginBottom: 24, fontStyle: 'italic' }}>
         💡 Tip: Open browser DevTools Console (F12) to see detailed enrichment logs for each album
@@ -400,6 +418,33 @@ export default function MultiSourceEnrichment() {
         </div>
       </div>
 
+      {/* Track Metadata */}
+      <div style={{ marginBottom: 32 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 16, color: '#1f2937' }}>
+          🎼 Track Metadata
+        </h2>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: 16
+        }}>
+          <ClickableStatCard 
+            label="✅ Discogs Track Data" 
+            value={stats.discogsTracklist} 
+            color="#10b981"
+            description="Has track artist info"
+            onClick={() => showAlbumsForCategory('has-discogs-tracklist', '✅ Albums with Discogs Track Artists')}
+          />
+          <ClickableStatCard 
+            label="⚠️ Need Track Artists" 
+            value={stats.needsDiscogsTracklist} 
+            color="#f59e0b"
+            description="Missing track artist data"
+            onClick={() => showAlbumsForCategory('needs-discogs-tracklist', '⚠️ Albums Needing Track Artist Data')}
+          />
+        </div>
+      </div>
+
       {/* Lyrics Enrichment */}
       <div style={{ marginBottom: 32 }}>
         <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 16, color: '#1f2937' }}>
@@ -461,6 +506,16 @@ export default function MultiSourceEnrichment() {
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, cursor: 'pointer', padding: '8px 12px', background: '#f3f4f6', borderRadius: 6 }}>
               <input 
                 type="checkbox" 
+                checked={selectedServices.discogsTracklist}
+                onChange={e => setSelectedServices(prev => ({ ...prev, discogsTracklist: e.target.checked }))}
+                disabled={enriching}
+                style={{ width: 16, height: 16 }}
+              />
+              <span style={{ fontWeight: 600, color: '#1f2937' }}>Discogs Tracklist</span>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, cursor: 'pointer', padding: '8px 12px', background: '#f3f4f6', borderRadius: 6 }}>
+              <input 
+                type="checkbox" 
                 checked={selectedServices.spotify}
                 onChange={e => setSelectedServices(prev => ({ ...prev, spotify: e.target.checked }))}
                 disabled={enriching}
@@ -507,13 +562,13 @@ export default function MultiSourceEnrichment() {
             disabled={enriching || albumsToEnrich === 0 || Object.values(selectedServices).every(v => !v)}
             style={{
               padding: '12px 24px',
-              background: (enriching || stats.needsEnrichment === 0 || Object.values(selectedServices).every(v => !v)) ? '#9ca3af' : 'linear-gradient(135deg, #7c3aed, #a855f7)',
+              background: (enriching || albumsToEnrich === 0 || Object.values(selectedServices).every(v => !v)) ? '#9ca3af' : 'linear-gradient(135deg, #7c3aed, #a855f7)',
               color: 'white',
               border: 'none',
               borderRadius: 8,
               fontSize: 16,
               fontWeight: 600,
-              cursor: (enriching || stats.needsEnrichment === 0 || Object.values(selectedServices).every(v => !v)) ? 'not-allowed' : 'pointer',
+              cursor: (enriching || albumsToEnrich === 0 || Object.values(selectedServices).every(v => !v)) ? 'not-allowed' : 'pointer',
               boxShadow: enriching ? 'none' : '0 4px 12px rgba(124, 58, 237, 0.3)'
             }}
           >
@@ -647,6 +702,7 @@ export default function MultiSourceEnrichment() {
                       #{result.albumId}: {result.artist} - {result.title}
                     </div>
                     <div style={{ fontSize: 13, color: '#6b7280', display: 'flex', gap: 12 }}>
+                      <span>{getResultIcon(result.discogsTracklist)} Discogs</span>
                       <span>{getResultIcon(result.spotify)} Spotify</span>
                       <span>{getResultIcon(result.appleMusic)} Apple Music</span>
                       <span>{getResultIcon(result.genius)} Genius</span>
@@ -661,6 +717,24 @@ export default function MultiSourceEnrichment() {
                 {/* Expanded Details */}
                 {expandedAlbum === result.albumId && (
                   <div style={{ padding: 16, background: 'white', fontSize: 13 }}>
+                    {/* Discogs Tracklist Details */}
+                    {result.discogsTracklist && (
+                      <div style={{ marginBottom: 12, padding: 12, background: '#fef9e7', borderRadius: 6 }}>
+                        <div style={{ fontWeight: 600, color: '#854d0e', marginBottom: 6 }}>
+                          {getResultIcon(result.discogsTracklist)} Discogs Tracklist
+                        </div>
+                        {result.discogsTracklist.skipped ? (
+                          <div style={{ color: '#6b7280', fontSize: 12 }}>Already had track artists</div>
+                        ) : result.discogsTracklist.success ? (
+                          <div style={{ color: '#854d0e', fontSize: 12 }}>
+                            ✓ Enriched: {result.discogsTracklist.data?.tracksWithArtists || 0} of {result.discogsTracklist.data?.totalTracks || 0} tracks with artist info
+                          </div>
+                        ) : (
+                          <div style={{ color: '#dc2626', fontSize: 12 }}>✗ {result.discogsTracklist.error}</div>
+                        )}
+                      </div>
+                    )}
+
                     {/* Spotify Details */}
                     {result.spotify && (
                       <div style={{ marginBottom: 12, padding: 12, background: '#f0fdf4', borderRadius: 6 }}>
