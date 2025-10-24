@@ -513,39 +513,39 @@ export default function EditEntryPage() {
   }, {} as Record<string, Track[]>);
 
   const inputStyle = { 
-    padding: '10px 14px', 
+    padding: '8px 12px', 
     border: '1px solid #d1d5db', 
-    borderRadius: '8px', 
-    fontSize: '15px', 
+    borderRadius: '6px', 
+    fontSize: '14px', 
     width: '100%', 
     boxSizing: 'border-box' as const,
     transition: 'border-color 0.2s, box-shadow 0.2s'
   };
   
   const buttonStyle = { 
-    padding: '10px 18px', 
-    fontSize: '14px', 
+    padding: '8px 14px', 
+    fontSize: '13px', 
     border: 'none', 
-    borderRadius: '8px', 
+    borderRadius: '6px', 
     fontWeight: '600', 
     cursor: 'pointer', 
     transition: 'all 0.2s' 
   };
 
   return (
-    <div style={{ maxWidth: 1400, margin: '32px auto', padding: 40, background: '#fff', borderRadius: 16, color: "#222", boxShadow: '0 4px 6px rgba(0, 0, 0, 0.07)' }}>
+    <div style={{ maxWidth: 1400, margin: '24px auto', padding: 24, background: '#fff', borderRadius: 12, color: "#222", boxShadow: '0 4px 6px rgba(0, 0, 0, 0.07)' }}>
       {/* Header */}
-      <div style={{ marginBottom: 40, paddingBottom: 24, borderBottom: '2px solid #e5e7eb' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 24, flexWrap: 'wrap' }}>
+      <div style={{ marginBottom: 24, paddingBottom: 16, borderBottom: '2px solid #e5e7eb' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
           <div>
-            <h2 style={{ color: "#111", margin: 0, fontSize: '28px', fontWeight: '700' }}>Edit Entry #{entry.id}</h2>
-            <p style={{ color: "#6b7280", margin: '10px 0 0 0', fontSize: '16px' }}>{entry.artist} - {entry.title}</p>
+            <h2 style={{ color: "#111", margin: 0, fontSize: '24px', fontWeight: '700' }}>Edit Entry #{entry.id}</h2>
+            <p style={{ color: "#6b7280", margin: '6px 0 0 0', fontSize: '15px' }}>{entry.artist} - {entry.title}</p>
           </div>
 
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {hasMissingDiscogs && (
               <button onClick={fetchDiscogsMetadata} disabled={fetchingDiscogs} style={{ ...buttonStyle, background: fetchingDiscogs ? '#9ca3af' : '#f59e0b', color: 'white' }}>
-                {fetchingDiscogs ? '⏳ Fetching...' : '🔄 Update from Discogs'}
+                {fetchingDiscogs ? '⏳ Fetching...' : '🔄 Update Discogs'}
               </button>
             )}
             {missingSpotify && (
@@ -555,17 +555,17 @@ export default function EditEntryPage() {
             )}
             {missingAppleMusic && (
               <button onClick={enrichAppleMusic} disabled={enrichingAppleMusic} style={{ ...buttonStyle, background: enrichingAppleMusic ? '#9ca3af' : '#FA57C1', color: 'white' }}>
-                {enrichingAppleMusic ? '⏳ Searching...' : '🍎 Add Apple Music'}
+                {enrichingAppleMusic ? '⏳ Searching...' : '🍎 Add Apple'}
               </button>
             )}
             {canFetchGenius && (
               <button onClick={enrichGenius} disabled={enrichingGenius} style={{ ...buttonStyle, background: enrichingGenius ? '#9ca3af' : '#7c3aed', color: 'white' }}>
-                {enrichingGenius ? '⏳ Searching...' : '📝 Add Genius Links'}
+                {enrichingGenius ? '⏳ Searching...' : '📝 Add Genius'}
               </button>
             )}
             {canFetchAppleLyrics && !hasAppleLyrics && (
               <button onClick={fetchAppleMusicLyrics} disabled={fetchingAppleLyrics} style={{ ...buttonStyle, background: fetchingAppleLyrics ? '#9ca3af' : '#ec4899', color: 'white' }}>
-                {fetchingAppleLyrics ? '⏳ Fetching...' : '🍎 Fetch Apple Lyrics'}
+                {fetchingAppleLyrics ? '⏳ Fetching...' : '🍎 Fetch Lyrics'}
               </button>
             )}
           </div>
@@ -573,8 +573,8 @@ export default function EditEntryPage() {
 
         {/* Enrichment Status */}
         {(entry.spotify_id || entry.apple_music_id || hasAppleLyrics) && (
-          <div style={{ marginTop: 20, padding: 16, background: '#f0fdf4', border: '1px solid #16a34a', borderRadius: 10, display: 'flex', gap: 14, alignItems: 'center', fontSize: 14, flexWrap: 'wrap' }}>
-            <span style={{ fontWeight: 700, color: '#15803d' }}>✅ Connected Services:</span>
+          <div style={{ marginTop: 12, padding: 12, background: '#f0fdf4', border: '1px solid #16a34a', borderRadius: 8, display: 'flex', gap: 10, alignItems: 'center', fontSize: 13, flexWrap: 'wrap' }}>
+            <span style={{ fontWeight: 700, color: '#15803d' }}>✅ Connected:</span>
             {entry.spotify_id && (
               <a href={entry.spotify_url || `https://open.spotify.com/album/${entry.spotify_id}`} target="_blank" rel="noopener noreferrer" style={{ padding: '6px 12px', background: '#dcfce7', color: '#15803d', borderRadius: 6, textDecoration: 'none', fontWeight: 600, fontSize: '13px' }}>
                 🎵 Spotify
@@ -601,12 +601,12 @@ export default function EditEntryPage() {
         {/* Status Message */}
         {status && (
           <div style={{ 
-            marginTop: 20, 
-            padding: 16, 
+            marginTop: 12, 
+            padding: 12, 
             background: status.includes('❌') ? '#fee2e2' : status.includes('✅') ? '#dcfce7' : '#dbeafe', 
             border: `2px solid ${status.includes('❌') ? '#dc2626' : status.includes('✅') ? '#16a34a' : '#3b82f6'}`, 
-            borderRadius: 10, 
-            fontSize: 15, 
+            borderRadius: 8, 
+            fontSize: 14, 
             color: status.includes('❌') ? '#991b1b' : status.includes('✅') ? '#15803d' : '#1e40af', 
             fontWeight: 600 
           }}>
@@ -616,28 +616,28 @@ export default function EditEntryPage() {
       </div>
 
       {/* Two-Column Layout for Metadata */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 40, marginBottom: 40 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 24 }}>
         
         {/* Left Column */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           
           {/* Basic Information */}
           <div>
-            <h3 style={{ fontSize: '20px', fontWeight: '700', marginBottom: 20, color: '#111', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: 14, color: '#111', display: 'flex', alignItems: 'center', gap: 8 }}>
               📀 Basic Information
             </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
-                <label style={{ display: 'block', marginBottom: 8, fontWeight: '600', color: "#374151", fontSize: '14px' }}>Artist</label>
+                <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>Artist</label>
                 <input style={inputStyle} value={entry.artist || ''} onChange={e => handleChange('artist', e.target.value)} placeholder="Enter artist name" />
               </div>
               <div>
-                <label style={{ display: 'block', marginBottom: 8, fontWeight: '600', color: "#374151", fontSize: '14px' }}>Title</label>
+                <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>Title</label>
                 <input style={inputStyle} value={entry.title || ''} onChange={e => handleChange('title', e.target.value)} placeholder="Enter album title" />
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
-                  <label style={{ display: 'block', marginBottom: 8, fontWeight: '600', color: "#374151", fontSize: '14px' }}>This Release Year</label>
+                  <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>This Release Year</label>
                   <input 
                     style={inputStyle} 
                     value={entry.year || ''} 
@@ -650,10 +650,10 @@ export default function EditEntryPage() {
                     }} 
                     placeholder="1969" 
                   />
-                  <div style={{ fontSize: '12px', color: '#6b7280', marginTop: 6 }}>Year of this pressing</div>
+                  <div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>Year of this pressing</div>
                 </div>
                 <div>
-                  <label style={{ display: 'block', marginBottom: 8, fontWeight: '600', color: "#374151", fontSize: '14px' }}>Master Release Year</label>
+                  <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>Master Release Year</label>
                   <input 
                     style={inputStyle} 
                     value={entry.master_release_date || ''} 
@@ -664,40 +664,40 @@ export default function EditEntryPage() {
                     }} 
                     placeholder="1967" 
                   />
-                  <div style={{ fontSize: '12px', color: '#6b7280', marginTop: 6 }}>Original first release</div>
+                  <div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>Original first release</div>
                 </div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
-                  <label style={{ display: 'block', marginBottom: 8, fontWeight: '600', color: "#374151", fontSize: '14px' }}>Folder</label>
+                  <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>Folder</label>
                   <input style={inputStyle} value={entry.folder || ''} onChange={e => handleChange('folder', e.target.value)} placeholder="Collection folder" />
                 </div>
                 <div>
-                  <label style={{ display: 'block', marginBottom: 8, fontWeight: '600', color: "#374151", fontSize: '14px' }}>Format</label>
+                  <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>Format</label>
                   <input style={inputStyle} value={entry.format || ''} onChange={e => handleChange('format', e.target.value)} placeholder="Vinyl, LP" />
                 </div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
-                  <label style={{ display: 'block', marginBottom: 8, fontWeight: '600', color: "#374151", fontSize: '14px' }}>Media Condition</label>
+                  <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>Media Condition</label>
                   <input style={inputStyle} value={entry.media_condition || ''} onChange={e => handleChange('media_condition', e.target.value)} placeholder="VG+, NM" />
                 </div>
                 <div>
-                  <label style={{ display: 'block', marginBottom: 8, fontWeight: '600', color: "#374151", fontSize: '14px' }}>💰 Sell Price</label>
+                  <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>💰 Sell Price</label>
                   <input style={inputStyle} value={entry.sell_price || ''} onChange={e => handleChange('sell_price', e.target.value)} placeholder="$25.00" />
                 </div>
               </div>
               <div>
-                <label style={{ display: 'block', marginBottom: 8, fontWeight: '600', color: "#374151", fontSize: '14px' }}>Cover Image URL</label>
+                <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>Cover Image URL</label>
                 <input style={inputStyle} value={entry.image_url || ''} onChange={e => handleChange('image_url', e.target.value)} placeholder="Cover image URL" />
                 {entry.image_url && (
-                  <div style={{ marginTop: 16, padding: 16, background: '#f9fafb', borderRadius: 12, display: 'flex', justifyContent: 'center' }}>
+                  <div style={{ marginTop: 12, padding: 12, background: '#f9fafb', borderRadius: 10, display: 'flex', justifyContent: 'center' }}>
                     <Image 
                       src={entry.image_url} 
                       alt="Album cover" 
-                      width={200} 
-                      height={200} 
-                      style={{ borderRadius: 12, objectFit: 'cover', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }} 
+                      width={160} 
+                      height={160} 
+                      style={{ borderRadius: 10, objectFit: 'cover', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }} 
                       unoptimized 
                     />
                   </div>
@@ -708,12 +708,12 @@ export default function EditEntryPage() {
 
           {/* Metadata Section */}
           <div>
-            <h3 style={{ fontSize: '20px', fontWeight: '700', marginBottom: 20, color: '#111', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: 14, color: '#111', display: 'flex', alignItems: 'center', gap: 8 }}>
               🏷️ Metadata
             </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
-                <label style={{ display: 'block', marginBottom: 8, fontWeight: '600', color: "#374151", fontSize: '14px' }}>
+                <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>
                   Genres {!entry.discogs_genres || entry.discogs_genres.length === 0 ? '⚠️' : '✅'}
                 </label>
                 <input 
@@ -722,10 +722,10 @@ export default function EditEntryPage() {
                   onChange={e => handleChange('discogs_genres', e.target.value.split(',').map(s => s.trim()).filter(Boolean))} 
                   placeholder="Rock, Jazz, Blues" 
                 />
-                <div style={{ fontSize: '12px', color: '#6b7280', marginTop: 6 }}>Comma-separated</div>
+                <div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>Comma-separated</div>
               </div>
               <div>
-                <label style={{ display: 'block', marginBottom: 8, fontWeight: '600', color: "#374151", fontSize: '14px' }}>
+                <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>
                   Styles {!entry.discogs_styles || entry.discogs_styles.length === 0 ? '⚠️' : '✅'}
                 </label>
                 <input 
@@ -734,10 +734,10 @@ export default function EditEntryPage() {
                   onChange={e => handleChange('discogs_styles', e.target.value.split(',').map(s => s.trim()).filter(Boolean))} 
                   placeholder="Progressive Rock, Psychedelic" 
                 />
-                <div style={{ fontSize: '12px', color: '#6b7280', marginTop: 6 }}>Comma-separated</div>
+                <div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>Comma-separated</div>
               </div>
               <div>
-                <label style={{ display: 'block', marginBottom: 8, fontWeight: '600', color: "#374151", fontSize: '14px' }}>
+                <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>
                   Decade {!entry.decade ? '⚠️' : '✅'}
                 </label>
                 <input 
@@ -748,16 +748,16 @@ export default function EditEntryPage() {
                   type="number" 
                   step="10" 
                 />
-                <div style={{ fontSize: '12px', color: '#6b7280', marginTop: 6 }}>Auto-calculated from release year</div>
+                <div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>Auto-calculated from release year</div>
               </div>
             </div>
           </div>
 
           {/* Badges & Blocking */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-            <div style={{ padding: 20, background: '#f0f9ff', borderRadius: 12, border: '2px solid #0369a1' }}>
-              <h4 style={{ fontSize: '16px', fontWeight: '700', margin: '0 0 16px 0', color: '#0c4a6e' }}>🏆 Badges</h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div style={{ padding: 14, background: '#f0f9ff', borderRadius: 10, border: '2px solid #0369a1' }}>
+              <h4 style={{ fontSize: '15px', fontWeight: '700', margin: '0 0 12px 0', color: '#0c4a6e' }}>🏆 Badges</h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: '14px' }}>
                   <input 
                     type="checkbox" 
@@ -788,9 +788,9 @@ export default function EditEntryPage() {
               </div>
             </div>
 
-            <div style={{ padding: 20, background: '#fef3c7', borderRadius: 12, border: '2px solid #f59e0b' }}>
-              <h4 style={{ fontSize: '16px', fontWeight: '700', margin: '0 0 16px 0', color: '#92400e' }}>🚫 Blocking</h4>
-              <label style={{ display: 'flex', alignItems: 'center', marginBottom: 16, cursor: 'pointer', fontSize: '14px' }}>
+            <div style={{ padding: 14, background: '#fef3c7', borderRadius: 10, border: '2px solid #f59e0b' }}>
+              <h4 style={{ fontSize: '15px', fontWeight: '700', margin: '0 0 12px 0', color: '#92400e' }}>🚫 Blocking</h4>
+              <label style={{ display: 'flex', alignItems: 'center', marginBottom: 12, cursor: 'pointer', fontSize: '13px' }}>
                 <input 
                   type="checkbox" 
                   checked={!!entry.blocked} 
@@ -836,21 +836,21 @@ export default function EditEntryPage() {
 
         {/* Right Column - Streaming Services */}
         <div>
-          <h3 style={{ fontSize: '20px', fontWeight: '700', marginBottom: 20, color: '#111', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: 14, color: '#111', display: 'flex', alignItems: 'center', gap: 8 }}>
             🎵 Streaming Services
           </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             
             {/* Spotify */}
-            <div style={{ padding: 24, background: '#dcfce7', border: '2px solid #16a34a', borderRadius: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-                <div style={{ fontSize: '32px' }}>🎵</div>
-                <h4 style={{ fontSize: '18px', fontWeight: '700', margin: 0, color: '#15803d' }}>Spotify</h4>
-                {!entry.spotify_id && <span style={{ fontSize: '20px' }}>⚠️</span>}
+            <div style={{ padding: 16, background: '#dcfce7', border: '2px solid #16a34a', borderRadius: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+                <div style={{ fontSize: '28px' }}>🎵</div>
+                <h4 style={{ fontSize: '16px', fontWeight: '700', margin: 0, color: '#15803d' }}>Spotify</h4>
+                {!entry.spotify_id && <span style={{ fontSize: '18px' }}>⚠️</span>}
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div>
-                  <label style={{ display: 'block', marginBottom: 8, fontSize: '14px', fontWeight: '600', color: "#15803d" }}>
+                  <label style={{ display: 'block', marginBottom: 6, fontSize: '13px', fontWeight: '600', color: "#15803d" }}>
                     Spotify ID
                   </label>
                   <input 
@@ -861,7 +861,7 @@ export default function EditEntryPage() {
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', marginBottom: 8, fontSize: '14px', fontWeight: '600', color: "#15803d" }}>URL</label>
+                  <label style={{ display: 'block', marginBottom: 6, fontSize: '13px', fontWeight: '600', color: "#15803d" }}>URL</label>
                   <input 
                     style={inputStyle} 
                     value={entry.spotify_url || ''} 
@@ -870,7 +870,7 @@ export default function EditEntryPage() {
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', marginBottom: 8, fontSize: '14px', fontWeight: '600', color: "#15803d" }}>Genres</label>
+                  <label style={{ display: 'block', marginBottom: 6, fontSize: '13px', fontWeight: '600', color: "#15803d" }}>Genres</label>
                   <input 
                     style={inputStyle} 
                     value={entry.spotify_genres?.join(', ') || ''} 
@@ -882,15 +882,15 @@ export default function EditEntryPage() {
             </div>
 
             {/* Apple Music */}
-            <div style={{ padding: 24, background: '#fce7f3', border: '2px solid #ec4899', borderRadius: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-                <div style={{ fontSize: '32px' }}>🍎</div>
-                <h4 style={{ fontSize: '18px', fontWeight: '700', margin: 0, color: '#be185d' }}>Apple Music</h4>
-                {!entry.apple_music_id && <span style={{ fontSize: '20px' }}>⚠️</span>}
+            <div style={{ padding: 16, background: '#fce7f3', border: '2px solid #ec4899', borderRadius: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+                <div style={{ fontSize: '28px' }}>🍎</div>
+                <h4 style={{ fontSize: '16px', fontWeight: '700', margin: 0, color: '#be185d' }}>Apple Music</h4>
+                {!entry.apple_music_id && <span style={{ fontSize: '18px' }}>⚠️</span>}
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div>
-                  <label style={{ display: 'block', marginBottom: 8, fontSize: '14px', fontWeight: '600', color: "#be185d" }}>
+                  <label style={{ display: 'block', marginBottom: 6, fontSize: '13px', fontWeight: '600', color: "#be185d" }}>
                     Apple Music ID
                   </label>
                   <input 
@@ -901,7 +901,7 @@ export default function EditEntryPage() {
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', marginBottom: 8, fontSize: '14px', fontWeight: '600', color: "#be185d" }}>URL</label>
+                  <label style={{ display: 'block', marginBottom: 6, fontSize: '13px', fontWeight: '600', color: "#be185d" }}>URL</label>
                   <input 
                     style={inputStyle} 
                     value={entry.apple_music_url || ''} 
@@ -910,7 +910,7 @@ export default function EditEntryPage() {
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', marginBottom: 8, fontSize: '14px', fontWeight: '600', color: "#be185d" }}>Genres</label>
+                  <label style={{ display: 'block', marginBottom: 6, fontSize: '13px', fontWeight: '600', color: "#be185d" }}>Genres</label>
                   <input 
                     style={inputStyle} 
                     value={entry.apple_music_genres?.join(', ') || ''} 
@@ -925,12 +925,12 @@ export default function EditEntryPage() {
       </div>
 
       {/* Tracklist Section - Full Width */}
-      <div style={{ marginTop: 40, paddingTop: 40, borderTop: '2px solid #e5e7eb' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-          <h3 style={{ fontSize: '22px', fontWeight: '700', margin: 0, color: '#111', display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div style={{ marginTop: 24, paddingTop: 24, borderTop: '2px solid #e5e7eb' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <h3 style={{ fontSize: '20px', fontWeight: '700', margin: 0, color: '#111', display: 'flex', alignItems: 'center', gap: 8 }}>
             🎼 Tracklist
-            {tracks.length === 0 ? <span style={{ fontSize: '24px' }}>⚠️</span> : <span style={{ fontSize: '20px' }}>✅</span>}
-            <span style={{ fontSize: '16px', fontWeight: '500', color: '#6b7280', marginLeft: 8 }}>
+            {tracks.length === 0 ? <span style={{ fontSize: '20px' }}>⚠️</span> : <span style={{ fontSize: '18px' }}>✅</span>}
+            <span style={{ fontSize: '14px', fontWeight: '500', color: '#6b7280', marginLeft: 6 }}>
               ({tracks.length} tracks)
             </span>
           </h3>
@@ -963,52 +963,52 @@ export default function EditEntryPage() {
             </p>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             {Object.entries(tracksBySide).map(([side, sideTracks]) => (
               <div key={side}>
                 <div style={{ 
                   display: 'flex', 
                   alignItems: 'center', 
-                  gap: 12, 
-                  marginBottom: 16,
-                  paddingBottom: 12,
+                  gap: 10, 
+                  marginBottom: 12,
+                  paddingBottom: 8,
                   borderBottom: '2px solid #e5e7eb'
                 }}>
                   <h4 style={{ 
-                    fontSize: '18px', 
+                    fontSize: '16px', 
                     fontWeight: '700', 
                     margin: 0, 
                     color: '#374151',
                     background: '#f3f4f6',
-                    padding: '8px 16px',
-                    borderRadius: '8px'
+                    padding: '6px 12px',
+                    borderRadius: '6px'
                   }}>
                     Side {side}
                   </h4>
-                  <span style={{ fontSize: '14px', color: '#6b7280', fontWeight: '500' }}>
+                  <span style={{ fontSize: '13px', color: '#6b7280', fontWeight: '500' }}>
                     {sideTracks.length} {sideTracks.length === 1 ? 'track' : 'tracks'}
                   </span>
                 </div>
                 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {sideTracks.map((track) => {
                     const globalIdx = tracks.indexOf(track);
                     return (
                       <div 
                         key={globalIdx}
                         style={{ 
-                          padding: 20, 
+                          padding: 12, 
                           background: '#f9fafb', 
-                          borderRadius: 12, 
-                          border: '2px solid #e5e7eb',
+                          borderRadius: 8, 
+                          border: '1px solid #e5e7eb',
                           display: 'grid',
-                          gridTemplateColumns: '80px 140px 1fr 100px 80px 40px',
-                          gap: 16,
+                          gridTemplateColumns: '70px 130px 1fr 90px 70px 36px',
+                          gap: 10,
                           alignItems: 'center'
                         }}
                       >
                         <div>
-                          <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#6b7280', marginBottom: 6 }}>
+                          <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#6b7280', marginBottom: 4 }}>
                             Position
                           </label>
                           <input 
@@ -1018,87 +1018,88 @@ export default function EditEntryPage() {
                               ...inputStyle, 
                               textAlign: 'center',
                               fontWeight: '600',
-                              fontSize: '14px'
+                              fontSize: '13px',
+                              padding: '6px 8px'
                             }} 
                             placeholder="A1" 
                           />
                         </div>
 
                         <div>
-                          <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#6b7280', marginBottom: 6 }}>
+                          <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#6b7280', marginBottom: 4 }}>
                             Track Artist
                           </label>
                           <input 
                             value={track.artist || ''} 
                             onChange={e => handleTrackChange(globalIdx, 'artist', e.target.value)} 
-                            style={inputStyle} 
+                            style={{...inputStyle, padding: '6px 8px', fontSize: '13px'}} 
                             placeholder="Optional" 
                           />
                         </div>
 
                         <div>
-                          <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#6b7280', marginBottom: 6 }}>
+                          <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#6b7280', marginBottom: 4 }}>
                             Track Title
                           </label>
                           <input 
                             value={track.title} 
                             onChange={e => handleTrackChange(globalIdx, 'title', e.target.value)} 
-                            style={inputStyle} 
+                            style={{...inputStyle, padding: '6px 8px', fontSize: '13px'}} 
                             placeholder="Enter track title" 
                           />
                         </div>
 
                         <div>
-                          <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#6b7280', marginBottom: 6 }}>
+                          <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#6b7280', marginBottom: 4 }}>
                             Duration
                           </label>
                           <input 
                             value={track.duration} 
                             onChange={e => handleTrackChange(globalIdx, 'duration', e.target.value)} 
-                            style={{ ...inputStyle, textAlign: 'center' }} 
+                            style={{ ...inputStyle, textAlign: 'center', padding: '6px 8px', fontSize: '13px' }} 
                             placeholder="3:45" 
                           />
                         </div>
 
                         <div style={{ textAlign: 'center' }}>
-                          <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#6b7280', marginBottom: 6 }}>
+                          <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#6b7280', marginBottom: 4 }}>
                             Lyrics
                           </label>
-                          <div style={{ display: 'flex', justifyContent: 'center', gap: 8, alignItems: 'center', minHeight: 42 }}>
+                          <div style={{ display: 'flex', justifyContent: 'center', gap: 6, alignItems: 'center', minHeight: 32 }}>
                             {track.lyrics && track.lyrics_source === 'apple_music' && (
-                              <span style={{ fontSize: 24 }} title="Has Apple Music lyrics">🍎</span>
+                              <span style={{ fontSize: 20 }} title="Has Apple Music lyrics">🍎</span>
                             )}
                             {track.lyrics_url && (
                               <a 
                                 href={track.lyrics_url} 
                                 target="_blank" 
                                 rel="noopener noreferrer" 
-                                style={{ fontSize: 24, textDecoration: 'none' }} 
+                                style={{ fontSize: 20, textDecoration: 'none' }} 
                                 title="View on Genius"
                               >
                                 📝
                               </a>
                             )}
                             {!track.lyrics && !track.lyrics_url && (
-                              <span style={{ fontSize: 18, color: '#d1d5db' }}>—</span>
+                              <span style={{ fontSize: 16, color: '#d1d5db' }}>—</span>
                             )}
                           </div>
                         </div>
 
-                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-end', height: '100%', paddingBottom: 8 }}>
+                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-end', height: '100%', paddingBottom: 4 }}>
                           <button 
                             type="button" 
                             onClick={() => removeTrack(globalIdx)} 
                             style={{ 
                               color: "#dc2626", 
                               background: '#fee2e2', 
-                              border: '2px solid #dc2626', 
-                              fontSize: 20, 
+                              border: '1px solid #dc2626', 
+                              fontSize: 18, 
                               cursor: 'pointer', 
-                              padding: '8px', 
-                              borderRadius: '8px',
-                              width: 40,
-                              height: 40,
+                              padding: '6px', 
+                              borderRadius: '6px',
+                              width: 32,
+                              height: 32,
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
@@ -1124,26 +1125,26 @@ export default function EditEntryPage() {
         background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
         border: '2px solid #10b981',
         borderRadius: 12,
-        padding: 32,
-        marginTop: 40
+        padding: 20,
+        marginTop: 24
       }}>
         <div style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          marginBottom: 20
+          marginBottom: 16
         }}>
           <div>
             <h3 style={{
-              fontSize: 20,
+              fontSize: 18,
               fontWeight: 'bold',
               color: 'white',
-              margin: '0 0 6px 0'
+              margin: '0 0 4px 0'
             }}>
               💰 Merchandise / Sale Information
             </h3>
             <p style={{
-              fontSize: 15,
+              fontSize: 14,
               color: 'rgba(255, 255, 255, 0.9)',
               margin: 0
             }}>
@@ -1154,14 +1155,14 @@ export default function EditEntryPage() {
           <label style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 14,
+            gap: 12,
             cursor: 'pointer',
             background: 'rgba(255, 255, 255, 0.2)',
-            padding: '14px 24px',
-            borderRadius: 10,
+            padding: '10px 18px',
+            borderRadius: 8,
             color: 'white',
             fontWeight: 700,
-            fontSize: 17
+            fontSize: 15
           }}>
             <input
               type="checkbox"
@@ -1180,14 +1181,14 @@ export default function EditEntryPage() {
         {forSale && (
           <div style={{
             background: 'rgba(255, 255, 255, 0.95)',
-            borderRadius: 10,
-            padding: 24
+            borderRadius: 8,
+            padding: 18
           }}>
             <div style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-              gap: 20,
-              marginBottom: 20
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: 14,
+              marginBottom: 14
             }}>
               <div>
                 <label style={{
@@ -1295,21 +1296,21 @@ export default function EditEntryPage() {
 
       {/* Footer Actions */}
       <div style={{ 
-        marginTop: 40, 
-        paddingTop: 32, 
+        marginTop: 24, 
+        paddingTop: 20, 
         borderTop: '2px solid #e5e7eb', 
         display: 'flex', 
         alignItems: 'center', 
         justifyContent: 'space-between' 
       }}>
-        <div style={{ display: 'flex', gap: 16 }}>
+        <div style={{ display: 'flex', gap: 12 }}>
           <button 
             onClick={handleSave} 
             disabled={saving} 
             style={{ 
               ...buttonStyle, 
-              padding: '14px 32px', 
-              fontSize: '16px', 
+              padding: '12px 24px', 
+              fontSize: '15px', 
               background: saving ? '#9ca3af' : '#2563eb', 
               color: 'white', 
               cursor: saving ? 'not-allowed' : 'pointer',
@@ -1322,8 +1323,8 @@ export default function EditEntryPage() {
             onClick={() => router.push('/admin/edit-collection')} 
             style={{ 
               ...buttonStyle, 
-              padding: '14px 32px', 
-              fontSize: '16px', 
+              padding: '12px 24px', 
+              fontSize: '15px', 
               background: '#f3f4f6', 
               color: '#374151',
               border: '2px solid #d1d5db'
