@@ -681,10 +681,10 @@ export default function EditCollectionPage() {
       {/* Hidden Print Checklist View */}
       <div id="print-checklist" style={{ display: 'none' }}>
         <div style={{
-          padding: '15px',
+          padding: '12mm',
           fontFamily: 'Arial, sans-serif',
           fontSize: '9pt',
-          lineHeight: '1.3',
+          lineHeight: '1.2',
           color: '#000',
           background: '#fff'
         }}>
@@ -692,68 +692,87 @@ export default function EditCollectionPage() {
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            marginBottom: '8px',
-            paddingBottom: '4px',
+            marginBottom: '6mm',
+            paddingBottom: '2mm',
             borderBottom: '2px solid #000'
           }}>
-            <h1 style={{ fontSize: '14pt', fontWeight: 'bold', margin: 0, color: '#000' }}>
-              Collection Checklist
+            <h1 style={{ fontSize: '16pt', fontWeight: 'bold', margin: 0, color: '#000' }}>
+              {sortedTags[0] || 'Collection Checklist'}
             </h1>
             <div style={{ fontSize: '9pt', color: '#333' }}>
               {new Date().toLocaleDateString()} • {filteredAlbums.length} albums
             </div>
           </div>
 
-          {searchQuery && (
-            <p style={{ fontSize: '8pt', color: '#333', margin: '3px 0 6px 0', fontStyle: 'italic' }}>
-              Search: &quot;{searchQuery}&quot;
-            </p>
-          )}
+          {(() => {
+            const byFormat: Record<string, Album[]> = {};
+            filteredAlbums.forEach(album => {
+              const fmt = album.format?.includes('LP') || album.format?.includes('Vinyl') || album.format?.includes('12"') || album.format?.includes('10"') || album.format?.includes('7"') 
+                ? 'Vinyl' 
+                : album.format?.includes('CD') 
+                ? 'CDs' 
+                : album.format?.includes('Cass') 
+                ? 'Cassettes' 
+                : 'Other';
+              if (!byFormat[fmt]) byFormat[fmt] = [];
+              byFormat[fmt].push(album);
+            });
 
-          <div style={{ columnCount: 2, columnGap: '20px' }}>
-            {sortedTags.map(tagName => {
-              const albumsWithTag = albumsByTag[tagName];
-              const sortedAlbums = [...albumsWithTag].sort((a, b) => {
-                const artistCompare = (a.artist || '').localeCompare(b.artist || '');
-                if (artistCompare !== 0) return artistCompare;
+            const formatOrder = ['Vinyl', 'CDs', 'Cassettes', 'Other'];
+            
+            return formatOrder.filter(fmt => byFormat[fmt]).map(formatName => {
+              const albums = byFormat[formatName].sort((a, b) => {
+                const artistCmp = (a.artist || '').localeCompare(b.artist || '');
+                if (artistCmp !== 0) return artistCmp;
                 return (a.title || '').localeCompare(b.title || '');
               });
 
               return (
-                <div key={tagName} style={{ marginBottom: '8px', breakInside: 'avoid' }}>
+                <div key={formatName} style={{ marginBottom: '6mm' }}>
                   <h2 style={{
-                    fontSize: '11pt',
+                    fontSize: '12pt',
                     fontWeight: 'bold',
-                    margin: '0 0 3px 0',
-                    padding: '2px 0',
+                    margin: '0 0 2mm 0',
+                    padding: '1mm 0',
                     borderBottom: '1.5px solid #000',
                     color: '#000'
                   }}>
-                    {tagName} ({sortedAlbums.length})
+                    {formatName} ({albums.length})
                   </h2>
                   
-                  {sortedAlbums.map((album) => (
-                    <div key={album.id} style={{ 
-                      display: 'flex', 
-                      gap: '5px', 
-                      alignItems: 'flex-start',
-                      marginBottom: '2px',
-                      fontSize: '9pt',
-                      color: '#000',
-                      lineHeight: '1.2'
-                    }}>
-                      <span style={{ fontSize: '11pt', minWidth: '12px', marginTop: '1px' }}>☐</span>
-                      <span style={{ flex: 1 }}>
-                        <strong>{album.artist || 'Unknown'}</strong> - {album.title || 'Untitled'}
-                        {album.folder && <span style={{ fontWeight: 'bold' }}> • {album.folder}</span>}
-                        {album.format && <span style={{ color: '#666', fontSize: '8pt' }}> ({album.format})</span>}
-                      </span>
-                    </div>
-                  ))}
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1fr',
+                    gap: '3mm 6mm'
+                  }}>
+                    {albums.map((album) => {
+                      const truncate = (str: string, max: number) => 
+                        str.length > max ? str.substring(0, max) + '…' : str;
+                      
+                      const artist = truncate(album.artist || 'Unknown', 30);
+                      const title = truncate(album.title || 'Untitled', 35);
+                      const folder = album.folder ? ` [${album.folder}]` : '';
+
+                      return (
+                        <div key={album.id} style={{ 
+                          display: 'flex',
+                          gap: '2mm',
+                          alignItems: 'flex-start',
+                          fontSize: '9pt',
+                          color: '#000'
+                        }}>
+                          <span style={{ fontSize: '11pt', minWidth: '3mm' }}>☐</span>
+                          <span style={{ flex: 1 }}>
+                            <strong>{artist}</strong> - {title}{folder && <span style={{ fontWeight: 'bold', color: '#333' }}>{folder}</span>}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               );
-            })}
-          </div>
+            });
+          })()}
         </div>
       </div>
 
