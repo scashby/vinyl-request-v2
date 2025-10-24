@@ -640,24 +640,6 @@ export default function EditCollectionPage() {
 
   const editingAlbum = albums.find(a => a.id === editingTagsFor);
 
-  // Group albums by tags for print view
-  const albumsByTag = filteredAlbums.reduce((acc, album) => {
-    const tags = toSafeStringArray(album.custom_tags);
-    if (tags.length === 0) {
-      if (!acc['Untagged']) acc['Untagged'] = [];
-      acc['Untagged'].push(album);
-    } else {
-      tags.forEach(tag => {
-        if (!acc[tag]) acc[tag] = [];
-        acc[tag].push(album);
-      });
-    }
-    return acc;
-  }, {} as Record<string, Album[]>);
-
-  // Sort tags alphabetically
-  const sortedTags = Object.keys(albumsByTag).sort();
-
   return (
     <>
       <style jsx global>{`
@@ -679,102 +661,136 @@ export default function EditCollectionPage() {
       `}</style>
 
       {/* Hidden Print Checklist View */}
-      <div id="print-checklist" style={{ display: 'none' }}>
-        <div style={{
-          padding: '12mm',
-          fontFamily: 'Arial, sans-serif',
-          fontSize: '9pt',
-          lineHeight: '1.2',
-          color: '#000',
-          background: '#fff'
-        }}>
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '6mm',
-            paddingBottom: '2mm',
-            borderBottom: '2px solid #000'
-          }}>
-            <h1 style={{ fontSize: '16pt', fontWeight: 'bold', margin: 0, color: '#000' }}>
-              {sortedTags[0] || 'Collection Checklist'}
-            </h1>
-            <div style={{ fontSize: '9pt', color: '#333' }}>
-              {new Date().toLocaleDateString()} • {filteredAlbums.length} albums
-            </div>
-          </div>
-
-          {(() => {
-            const byFormat: Record<string, Album[]> = {};
-            filteredAlbums.forEach(album => {
-              const fmt = album.format?.includes('LP') || album.format?.includes('Vinyl') || album.format?.includes('12"') || album.format?.includes('10"') || album.format?.includes('7"') 
-                ? 'Vinyl' 
-                : album.format?.includes('CD') 
-                ? 'CDs' 
-                : album.format?.includes('Cass') 
-                ? 'Cassettes' 
-                : 'Other';
-              if (!byFormat[fmt]) byFormat[fmt] = [];
-              byFormat[fmt].push(album);
-            });
-
-            const formatOrder = ['Vinyl', 'CDs', 'Cassettes', 'Other'];
-            
-            return formatOrder.filter(fmt => byFormat[fmt]).map(formatName => {
-              const albums = byFormat[formatName].sort((a, b) => {
-                const artistCmp = (a.artist || '').localeCompare(b.artist || '');
-                if (artistCmp !== 0) return artistCmp;
-                return (a.title || '').localeCompare(b.title || '');
-              });
-
-              return (
-                <div key={formatName} style={{ marginBottom: '6mm' }}>
-                  <h2 style={{
-                    fontSize: '12pt',
-                    fontWeight: 'bold',
-                    margin: '0 0 2mm 0',
-                    padding: '1mm 0',
-                    borderBottom: '1.5px solid #000',
-                    color: '#000'
-                  }}>
-                    {formatName} ({albums.length})
-                  </h2>
-                  
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 1fr',
-                    gap: '3mm 6mm'
-                  }}>
-                    {albums.map((album) => {
-                      const truncate = (str: string, max: number) => 
-                        str.length > max ? str.substring(0, max) + '…' : str;
-                      
-                      const artist = truncate(album.artist || 'Unknown', 30);
-                      const title = truncate(album.title || 'Untitled', 35);
-                      const folder = album.folder ? ` [${album.folder}]` : '';
-
-                      return (
-                        <div key={album.id} style={{ 
-                          display: 'flex',
-                          gap: '2mm',
-                          alignItems: 'flex-start',
-                          fontSize: '9pt',
-                          color: '#000'
-                        }}>
-                          <span style={{ fontSize: '11pt', minWidth: '3mm' }}>☐</span>
-                          <span style={{ flex: 1 }}>
-                            <strong>{artist}</strong> - {title}{folder && <span style={{ fontWeight: 'bold', color: '#333' }}>{folder}</span>}
-                          </span>
-                        </div>
-                      );
-                    })}
+            <div id="print-checklist" style={{ display: 'none' }}>
+              <div style={{
+                padding: '8mm',
+                fontFamily: 'Arial, sans-serif',
+                fontSize: '8pt',
+                lineHeight: '1.1',
+                color: '#000',
+                background: '#fff'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '3mm',
+                  paddingBottom: '1mm',
+                  borderBottom: '1.5px solid #000'
+                }}>
+                  <h1 style={{ fontSize: '14pt', fontWeight: 'bold', margin: 0, color: '#000' }}>
+                    Collection Checklist
+                  </h1>
+                  <div style={{ fontSize: '8pt', color: '#333' }}>
+                    {new Date().toLocaleDateString()} • {filteredAlbums.length} albums
                   </div>
                 </div>
-              );
-            });
-          })()}
-        </div>
-      </div>
+
+                {(() => {
+                  const byFormat: Record<string, Album[]> = {};
+                  filteredAlbums.forEach(album => {
+                    const fmt = album.format?.includes('LP') || album.format?.includes('Vinyl') || album.format?.includes('12"') || album.format?.includes('10"') || album.format?.includes('7"') 
+                      ? 'Vinyl' 
+                      : album.format?.includes('CD') 
+                      ? 'CDs' 
+                      : album.format?.includes('Cass') 
+                      ? 'Cassettes' 
+                      : 'Other';
+                    if (!byFormat[fmt]) byFormat[fmt] = [];
+                    byFormat[fmt].push(album);
+                  });
+
+                  const formatOrder = ['Vinyl', 'CDs', 'Cassettes', 'Other'];
+                  
+                  return formatOrder.filter(fmt => byFormat[fmt]).map(formatName => {
+                    const albums = byFormat[formatName].sort((a, b) => {
+                      const artistCmp = (a.artist || '').localeCompare(b.artist || '');
+                      if (artistCmp !== 0) return artistCmp;
+                      return (a.title || '').localeCompare(b.title || '');
+                    });
+
+                    const midpoint = Math.ceil(albums.length / 2);
+                    const leftColumn = albums.slice(0, midpoint);
+                    const rightColumn = albums.slice(midpoint);
+
+                    return (
+                      <div key={formatName} style={{ marginBottom: '3mm', pageBreakInside: 'avoid' }}>
+                        <h2 style={{
+                          fontSize: '11pt',
+                          fontWeight: 'bold',
+                          margin: '0 0 1mm 0',
+                          padding: '0.5mm 0',
+                          borderBottom: '1px solid #000',
+                          color: '#000'
+                        }}>
+                          {formatName} ({albums.length})
+                        </h2>
+                        
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: '1fr 1fr',
+                          gap: '4mm',
+                          marginTop: '1.5mm'
+                        }}>
+                          <div>
+                            {leftColumn.map((album) => {
+                              const truncate = (str: string, max: number) => 
+                                str.length > max ? str.substring(0, max) + '…' : str;
+                              
+                              const artist = truncate(album.artist || 'Unknown', 28);
+                              const title = truncate(album.title || 'Untitled', 32);
+
+                              return (
+                                <div key={album.id} style={{ 
+                                  display: 'flex',
+                                  gap: '1.5mm',
+                                  alignItems: 'flex-start',
+                                  fontSize: '8pt',
+                                  color: '#000',
+                                  marginBottom: '0.8mm',
+                                  pageBreakInside: 'avoid'
+                                }}>
+                                  <span style={{ fontSize: '10pt', minWidth: '2.5mm', flexShrink: 0 }}>☐</span>
+                                  <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    <strong>{artist}</strong> - {title}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                          <div>
+                            {rightColumn.map((album) => {
+                              const truncate = (str: string, max: number) => 
+                                str.length > max ? str.substring(0, max) + '…' : str;
+                              
+                              const artist = truncate(album.artist || 'Unknown', 28);
+                              const title = truncate(album.title || 'Untitled', 32);
+
+                              return (
+                                <div key={album.id} style={{ 
+                                  display: 'flex',
+                                  gap: '1.5mm',
+                                  alignItems: 'flex-start',
+                                  fontSize: '8pt',
+                                  color: '#000',
+                                  marginBottom: '0.8mm',
+                                  pageBreakInside: 'avoid'
+                                }}>
+                                  <span style={{ fontSize: '10pt', minWidth: '2.5mm', flexShrink: 0 }}>☐</span>
+                                  <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    <strong>{artist}</strong> - {title}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            </div>
 
       {/* Regular page content */}
       <div style={{
