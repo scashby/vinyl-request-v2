@@ -1,4 +1,4 @@
-// src/app/admin/edit-entry/[id]/page.tsx - COMPLETE FILE WITH TRACK ARTIST SUPPORT
+// src/app/admin/edit-entry/[id]/page.tsx - IMPROVED LAYOUT VERSION
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -10,7 +10,7 @@ type Track = {
   position: string; 
   title: string; 
   duration: string;
-  artist?: string; // ADDED: Track-level artist
+  artist?: string;
   lyrics_url?: string;
   lyrics?: string;
   lyrics_source?: 'apple_music' | 'genius';
@@ -418,7 +418,7 @@ export default function EditEntryPage() {
   }
 
   if (!entry) {
-    return <div style={{ maxWidth: 750, margin: '32px auto', padding: 24, background: '#fff', borderRadius: 8, color: "#222", textAlign: 'center' }}>Loading...</div>;
+    return <div style={{ maxWidth: 1200, margin: '32px auto', padding: 24, background: '#fff', borderRadius: 8, color: "#222", textAlign: 'center' }}>Loading...</div>;
   }
 
   function handleChange(field: string, value: unknown) {
@@ -503,162 +503,647 @@ export default function EditEntryPage() {
   }
 
   const sides = Array.from(new Set(tracks.map(t => t.position?.[0]).filter(Boolean)));
+  
+  // Group tracks by side
+  const tracksBySide = tracks.reduce((acc, track) => {
+    const side = track.position?.[0] || 'Unknown';
+    if (!acc[side]) acc[side] = [];
+    acc[side].push(track);
+    return acc;
+  }, {} as Record<string, Track[]>);
 
-  const inputStyle = { padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px', width: '100%', boxSizing: 'border-box' as const };
-  const buttonStyle = { padding: '8px 16px', fontSize: '13px', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s' };
+  const inputStyle = { 
+    padding: '10px 14px', 
+    border: '1px solid #d1d5db', 
+    borderRadius: '8px', 
+    fontSize: '15px', 
+    width: '100%', 
+    boxSizing: 'border-box' as const,
+    transition: 'border-color 0.2s, box-shadow 0.2s'
+  };
+  
+  const buttonStyle = { 
+    padding: '10px 18px', 
+    fontSize: '14px', 
+    border: 'none', 
+    borderRadius: '8px', 
+    fontWeight: '600', 
+    cursor: 'pointer', 
+    transition: 'all 0.2s' 
+  };
 
   return (
-    <div style={{ maxWidth: 1600, margin: '32px auto', padding: 32, background: '#fff', borderRadius: 12, color: "#222", boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)' }}>
-      <div style={{ marginBottom: 32, paddingBottom: 16, borderBottom: '1px solid #e5e7eb' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
+    <div style={{ maxWidth: 1400, margin: '32px auto', padding: 40, background: '#fff', borderRadius: 16, color: "#222", boxShadow: '0 4px 6px rgba(0, 0, 0, 0.07)' }}>
+      {/* Header */}
+      <div style={{ marginBottom: 40, paddingBottom: 24, borderBottom: '2px solid #e5e7eb' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 24, flexWrap: 'wrap' }}>
           <div>
-            <h2 style={{ color: "#222", margin: 0, fontSize: '24px', fontWeight: '600' }}>Edit Entry #{entry.id}</h2>
-            <p style={{ color: "#6b7280", margin: '8px 0 0 0', fontSize: '14px' }}>{entry.artist} - {entry.title}</p>
+            <h2 style={{ color: "#111", margin: 0, fontSize: '28px', fontWeight: '700' }}>Edit Entry #{entry.id}</h2>
+            <p style={{ color: "#6b7280", margin: '10px 0 0 0', fontSize: '16px' }}>{entry.artist} - {entry.title}</p>
           </div>
 
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            {hasMissingDiscogs && <button onClick={fetchDiscogsMetadata} disabled={fetchingDiscogs} style={{ ...buttonStyle, background: fetchingDiscogs ? '#9ca3af' : '#f59e0b', color: 'white' }}>{fetchingDiscogs ? '⏳ Discogs...' : '🔄 Fetch Discogs'}</button>}
-            {missingSpotify && <button onClick={enrichSpotify} disabled={enrichingSpotify} style={{ ...buttonStyle, background: enrichingSpotify ? '#9ca3af' : '#1DB954', color: 'white' }}>{enrichingSpotify ? '⏳ Spotify...' : '🎵 Add Spotify'}</button>}
-            {missingAppleMusic && <button onClick={enrichAppleMusic} disabled={enrichingAppleMusic} style={{ ...buttonStyle, background: enrichingAppleMusic ? '#9ca3af' : '#FA57C1', color: 'white' }}>{enrichingAppleMusic ? '⏳ Apple...' : '🍎 Add Apple'}</button>}
-            {canFetchGenius && <button onClick={enrichGenius} disabled={enrichingGenius} style={{ ...buttonStyle, background: enrichingGenius ? '#9ca3af' : '#7c3aed', color: 'white' }}>{enrichingGenius ? '⏳ Genius...' : '📝 Add Genius'}</button>}
-            {canFetchAppleLyrics && !hasAppleLyrics && <button onClick={fetchAppleMusicLyrics} disabled={fetchingAppleLyrics} style={{ ...buttonStyle, background: fetchingAppleLyrics ? '#9ca3af' : '#ec4899', color: 'white' }}>{fetchingAppleLyrics ? '⏳ Lyrics...' : '🍎 Fetch Lyrics'}</button>}
+            {hasMissingDiscogs && (
+              <button onClick={fetchDiscogsMetadata} disabled={fetchingDiscogs} style={{ ...buttonStyle, background: fetchingDiscogs ? '#9ca3af' : '#f59e0b', color: 'white' }}>
+                {fetchingDiscogs ? '⏳ Fetching...' : '🔄 Update from Discogs'}
+              </button>
+            )}
+            {missingSpotify && (
+              <button onClick={enrichSpotify} disabled={enrichingSpotify} style={{ ...buttonStyle, background: enrichingSpotify ? '#9ca3af' : '#1DB954', color: 'white' }}>
+                {enrichingSpotify ? '⏳ Searching...' : '🎵 Add Spotify'}
+              </button>
+            )}
+            {missingAppleMusic && (
+              <button onClick={enrichAppleMusic} disabled={enrichingAppleMusic} style={{ ...buttonStyle, background: enrichingAppleMusic ? '#9ca3af' : '#FA57C1', color: 'white' }}>
+                {enrichingAppleMusic ? '⏳ Searching...' : '🍎 Add Apple Music'}
+              </button>
+            )}
+            {canFetchGenius && (
+              <button onClick={enrichGenius} disabled={enrichingGenius} style={{ ...buttonStyle, background: enrichingGenius ? '#9ca3af' : '#7c3aed', color: 'white' }}>
+                {enrichingGenius ? '⏳ Searching...' : '📝 Add Genius Links'}
+              </button>
+            )}
+            {canFetchAppleLyrics && !hasAppleLyrics && (
+              <button onClick={fetchAppleMusicLyrics} disabled={fetchingAppleLyrics} style={{ ...buttonStyle, background: fetchingAppleLyrics ? '#9ca3af' : '#ec4899', color: 'white' }}>
+                {fetchingAppleLyrics ? '⏳ Fetching...' : '🍎 Fetch Apple Lyrics'}
+              </button>
+            )}
           </div>
         </div>
 
+        {/* Enrichment Status */}
         {(entry.spotify_id || entry.apple_music_id || hasAppleLyrics) && (
-          <div style={{ marginTop: 16, padding: 12, background: '#f0fdf4', border: '1px solid #16a34a', borderRadius: 6, display: 'flex', gap: 12, alignItems: 'center', fontSize: 13, flexWrap: 'wrap' }}>
-            <span style={{ fontWeight: 600, color: '#15803d' }}>✅ Enriched:</span>
-            {entry.spotify_id && <a href={entry.spotify_url || `https://open.spotify.com/album/${entry.spotify_id}`} target="_blank" rel="noopener noreferrer" style={{ padding: '4px 8px', background: '#dcfce7', color: '#15803d', borderRadius: 4, textDecoration: 'none', fontWeight: 600 }}>Spotify</a>}
-            {entry.apple_music_id && <a href={entry.apple_music_url || `https://music.apple.com/album/${entry.apple_music_id}`} target="_blank" rel="noopener noreferrer" style={{ padding: '4px 8px', background: '#fce7f3', color: '#be185d', borderRadius: 4, textDecoration: 'none', fontWeight: 600 }}>Apple Music</a>}
-            {hasAppleLyrics && <span style={{ padding: '4px 8px', background: '#fce7f3', color: '#be185d', borderRadius: 4, fontWeight: 600 }}>🍎 {appleLyricsCount} lyrics</span>}
-            {geniusLyricsCount > 0 && <span style={{ padding: '4px 8px', background: '#e9d5ff', color: '#7c3aed', borderRadius: 4, fontWeight: 600 }}>📝 {geniusLyricsCount} links</span>}
+          <div style={{ marginTop: 20, padding: 16, background: '#f0fdf4', border: '1px solid #16a34a', borderRadius: 10, display: 'flex', gap: 14, alignItems: 'center', fontSize: 14, flexWrap: 'wrap' }}>
+            <span style={{ fontWeight: 700, color: '#15803d' }}>✅ Connected Services:</span>
+            {entry.spotify_id && (
+              <a href={entry.spotify_url || `https://open.spotify.com/album/${entry.spotify_id}`} target="_blank" rel="noopener noreferrer" style={{ padding: '6px 12px', background: '#dcfce7', color: '#15803d', borderRadius: 6, textDecoration: 'none', fontWeight: 600, fontSize: '13px' }}>
+                🎵 Spotify
+              </a>
+            )}
+            {entry.apple_music_id && (
+              <a href={entry.apple_music_url || `https://music.apple.com/album/${entry.apple_music_id}`} target="_blank" rel="noopener noreferrer" style={{ padding: '6px 12px', background: '#fce7f3', color: '#be185d', borderRadius: 6, textDecoration: 'none', fontWeight: 600, fontSize: '13px' }}>
+                🍎 Apple Music
+              </a>
+            )}
+            {hasAppleLyrics && (
+              <span style={{ padding: '6px 12px', background: '#fce7f3', color: '#be185d', borderRadius: 6, fontWeight: 600, fontSize: '13px' }}>
+                📝 {appleLyricsCount} Apple Lyrics
+              </span>
+            )}
+            {geniusLyricsCount > 0 && (
+              <span style={{ padding: '6px 12px', background: '#e9d5ff', color: '#7c3aed', borderRadius: 6, fontWeight: 600, fontSize: '13px' }}>
+                🔗 {geniusLyricsCount} Genius Links
+              </span>
+            )}
           </div>
         )}
 
-        {status && <div style={{ marginTop: 16, padding: 12, background: status.includes('❌') ? '#fee2e2' : status.includes('✅') ? '#dcfce7' : '#dbeafe', border: `1px solid ${status.includes('❌') ? '#dc2626' : status.includes('✅') ? '#16a34a' : '#3b82f6'}`, borderRadius: 6, fontSize: 14, color: status.includes('❌') ? '#991b1b' : status.includes('✅') ? '#15803d' : '#1e40af', fontWeight: 500 }}>{status}</div>}
+        {/* Status Message */}
+        {status && (
+          <div style={{ 
+            marginTop: 20, 
+            padding: 16, 
+            background: status.includes('❌') ? '#fee2e2' : status.includes('✅') ? '#dcfce7' : '#dbeafe', 
+            border: `2px solid ${status.includes('❌') ? '#dc2626' : status.includes('✅') ? '#16a34a' : '#3b82f6'}`, 
+            borderRadius: 10, 
+            fontSize: 15, 
+            color: status.includes('❌') ? '#991b1b' : status.includes('✅') ? '#15803d' : '#1e40af', 
+            fontWeight: 600 
+          }}>
+            {status}
+          </div>
+        )}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1.5fr', gap: 32, alignItems: 'flex-start' }}>
+      {/* Two-Column Layout for Metadata */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 40, marginBottom: 40 }}>
         
-        <div style={{ color: "#222" }}>
-          <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: 16, color: '#374151' }}>Basic Information</h3>
+        {/* Left Column */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
           
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div><label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>Artist</label><input style={inputStyle} value={entry.artist || ''} onChange={e => handleChange('artist', e.target.value)} placeholder="Enter artist name" /></div>
-            <div><label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>Title</label><input style={inputStyle} value={entry.title || ''} onChange={e => handleChange('title', e.target.value)} placeholder="Enter album title" /></div>
-            <div><label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>This Release Year</label><input style={inputStyle} value={entry.year || ''} onChange={e => { handleChange('year', e.target.value); if (!entry.master_release_date) { const decade = calculateDecade(e.target.value); if (decade) handleChange('decade', decade); }}} placeholder="e.g. 1969" /><div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>Year of this pressing</div></div>
-            <div><label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>Master Release Year</label><input style={inputStyle} value={entry.master_release_date || ''} onChange={e => { handleChange('master_release_date', e.target.value); const decade = calculateDecade(e.target.value); if (decade) handleChange('decade', decade); }} placeholder="e.g. 1967" /><div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>Original first release</div></div>
-            <div><label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>Folder</label><input style={inputStyle} value={entry.folder || ''} onChange={e => handleChange('folder', e.target.value)} placeholder="Collection folder" /></div>
-            <div><label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>Format</label><input style={inputStyle} value={entry.format || ''} onChange={e => handleChange('format', e.target.value)} placeholder="e.g. Vinyl, LP" /></div>
-            <div><label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>Media Condition</label><input style={inputStyle} value={entry.media_condition || ''} onChange={e => handleChange('media_condition', e.target.value)} placeholder="e.g. VG+, NM" /></div>
-            <div><label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>💰 Sell Price</label><input style={inputStyle} value={entry.sell_price || ''} onChange={e => handleChange('sell_price', e.target.value)} placeholder="e.g. $25.00" /></div>
-            <div><label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>Image URL</label><input style={inputStyle} value={entry.image_url || ''} onChange={e => handleChange('image_url', e.target.value)} placeholder="Cover image URL" />{entry.image_url && <div style={{ padding: 12, background: '#f9fafb', borderRadius: 8, display: 'flex', justifyContent: 'center', marginTop: 12 }}><Image src={entry.image_url} alt="cover" width={120} height={120} style={{ borderRadius: 8, objectFit: 'cover', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }} unoptimized /></div>}</div>
+          {/* Basic Information */}
+          <div>
+            <h3 style={{ fontSize: '20px', fontWeight: '700', marginBottom: 20, color: '#111', display: 'flex', alignItems: 'center', gap: 8 }}>
+              📀 Basic Information
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: 8, fontWeight: '600', color: "#374151", fontSize: '14px' }}>Artist</label>
+                <input style={inputStyle} value={entry.artist || ''} onChange={e => handleChange('artist', e.target.value)} placeholder="Enter artist name" />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: 8, fontWeight: '600', color: "#374151", fontSize: '14px' }}>Title</label>
+                <input style={inputStyle} value={entry.title || ''} onChange={e => handleChange('title', e.target.value)} placeholder="Enter album title" />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: 8, fontWeight: '600', color: "#374151", fontSize: '14px' }}>This Release Year</label>
+                  <input 
+                    style={inputStyle} 
+                    value={entry.year || ''} 
+                    onChange={e => { 
+                      handleChange('year', e.target.value); 
+                      if (!entry.master_release_date) { 
+                        const decade = calculateDecade(e.target.value); 
+                        if (decade) handleChange('decade', decade); 
+                      }
+                    }} 
+                    placeholder="1969" 
+                  />
+                  <div style={{ fontSize: '12px', color: '#6b7280', marginTop: 6 }}>Year of this pressing</div>
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: 8, fontWeight: '600', color: "#374151", fontSize: '14px' }}>Master Release Year</label>
+                  <input 
+                    style={inputStyle} 
+                    value={entry.master_release_date || ''} 
+                    onChange={e => { 
+                      handleChange('master_release_date', e.target.value); 
+                      const decade = calculateDecade(e.target.value); 
+                      if (decade) handleChange('decade', decade); 
+                    }} 
+                    placeholder="1967" 
+                  />
+                  <div style={{ fontSize: '12px', color: '#6b7280', marginTop: 6 }}>Original first release</div>
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: 8, fontWeight: '600', color: "#374151", fontSize: '14px' }}>Folder</label>
+                  <input style={inputStyle} value={entry.folder || ''} onChange={e => handleChange('folder', e.target.value)} placeholder="Collection folder" />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: 8, fontWeight: '600', color: "#374151", fontSize: '14px' }}>Format</label>
+                  <input style={inputStyle} value={entry.format || ''} onChange={e => handleChange('format', e.target.value)} placeholder="Vinyl, LP" />
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: 8, fontWeight: '600', color: "#374151", fontSize: '14px' }}>Media Condition</label>
+                  <input style={inputStyle} value={entry.media_condition || ''} onChange={e => handleChange('media_condition', e.target.value)} placeholder="VG+, NM" />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: 8, fontWeight: '600', color: "#374151", fontSize: '14px' }}>💰 Sell Price</label>
+                  <input style={inputStyle} value={entry.sell_price || ''} onChange={e => handleChange('sell_price', e.target.value)} placeholder="$25.00" />
+                </div>
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: 8, fontWeight: '600', color: "#374151", fontSize: '14px' }}>Cover Image URL</label>
+                <input style={inputStyle} value={entry.image_url || ''} onChange={e => handleChange('image_url', e.target.value)} placeholder="Cover image URL" />
+                {entry.image_url && (
+                  <div style={{ marginTop: 16, padding: 16, background: '#f9fafb', borderRadius: 12, display: 'flex', justifyContent: 'center' }}>
+                    <Image 
+                      src={entry.image_url} 
+                      alt="Album cover" 
+                      width={200} 
+                      height={200} 
+                      style={{ borderRadius: 12, objectFit: 'cover', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }} 
+                      unoptimized 
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Metadata Section */}
+          <div>
+            <h3 style={{ fontSize: '20px', fontWeight: '700', marginBottom: 20, color: '#111', display: 'flex', alignItems: 'center', gap: 8 }}>
+              🏷️ Metadata
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: 8, fontWeight: '600', color: "#374151", fontSize: '14px' }}>
+                  Genres {!entry.discogs_genres || entry.discogs_genres.length === 0 ? '⚠️' : '✅'}
+                </label>
+                <input 
+                  style={inputStyle} 
+                  value={entry.discogs_genres?.join(', ') || ''} 
+                  onChange={e => handleChange('discogs_genres', e.target.value.split(',').map(s => s.trim()).filter(Boolean))} 
+                  placeholder="Rock, Jazz, Blues" 
+                />
+                <div style={{ fontSize: '12px', color: '#6b7280', marginTop: 6 }}>Comma-separated</div>
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: 8, fontWeight: '600', color: "#374151", fontSize: '14px' }}>
+                  Styles {!entry.discogs_styles || entry.discogs_styles.length === 0 ? '⚠️' : '✅'}
+                </label>
+                <input 
+                  style={inputStyle} 
+                  value={entry.discogs_styles?.join(', ') || ''} 
+                  onChange={e => handleChange('discogs_styles', e.target.value.split(',').map(s => s.trim()).filter(Boolean))} 
+                  placeholder="Progressive Rock, Psychedelic" 
+                />
+                <div style={{ fontSize: '12px', color: '#6b7280', marginTop: 6 }}>Comma-separated</div>
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: 8, fontWeight: '600', color: "#374151", fontSize: '14px' }}>
+                  Decade {!entry.decade ? '⚠️' : '✅'}
+                </label>
+                <input 
+                  style={inputStyle} 
+                  value={entry.decade || ''} 
+                  onChange={e => handleChange('decade', parseInt(e.target.value) || null)} 
+                  placeholder="1970" 
+                  type="number" 
+                  step="10" 
+                />
+                <div style={{ fontSize: '12px', color: '#6b7280', marginTop: 6 }}>Auto-calculated from release year</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Badges & Blocking */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <div style={{ padding: 20, background: '#f0f9ff', borderRadius: 12, border: '2px solid #0369a1' }}>
+              <h4 style={{ fontSize: '16px', fontWeight: '700', margin: '0 0 16px 0', color: '#0c4a6e' }}>🏆 Badges</h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: '14px' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={!!entry.steves_top_200} 
+                    onChange={e => handleChange('steves_top_200', e.target.checked)} 
+                    style={{ marginRight: 10, width: 18, height: 18, cursor: 'pointer' }} 
+                  />
+                  <span style={{ fontWeight: '600', color: '#dc2626' }}>⭐ Top 200</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: '14px' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={!!entry.this_weeks_top_10} 
+                    onChange={e => handleChange('this_weeks_top_10', e.target.checked)} 
+                    style={{ marginRight: 10, width: 18, height: 18, cursor: 'pointer' }} 
+                  />
+                  <span style={{ fontWeight: '600', color: '#ea580c' }}>🔥 Top 10</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: '14px' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={!!entry.inner_circle_preferred} 
+                    onChange={e => handleChange('inner_circle_preferred', e.target.checked)} 
+                    style={{ marginRight: 10, width: 18, height: 18, cursor: 'pointer' }} 
+                  />
+                  <span style={{ fontWeight: '600', color: '#7c3aed' }}>💎 Inner Circle</span>
+                </label>
+              </div>
+            </div>
+
+            <div style={{ padding: 20, background: '#fef3c7', borderRadius: 12, border: '2px solid #f59e0b' }}>
+              <h4 style={{ fontSize: '16px', fontWeight: '700', margin: '0 0 16px 0', color: '#92400e' }}>🚫 Blocking</h4>
+              <label style={{ display: 'flex', alignItems: 'center', marginBottom: 16, cursor: 'pointer', fontSize: '14px' }}>
+                <input 
+                  type="checkbox" 
+                  checked={!!entry.blocked} 
+                  onChange={e => handleChange('blocked', e.target.checked)} 
+                  style={{ marginRight: 10, width: 18, height: 18, cursor: 'pointer' }} 
+                />
+                <strong>Block Entire Album</strong>
+              </label>
+              {sides.length > 0 && (
+                <div>
+                  <div style={{ fontWeight: '600', marginBottom: 10, fontSize: '13px' }}>Block Individual Sides:</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {sides.map(side => (
+                      <label 
+                        key={side} 
+                        style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          padding: '8px 12px', 
+                          background: blockedSides.includes(side) ? '#fee2e2' : '#fff', 
+                          border: '2px solid #d1d5db', 
+                          borderRadius: '8px', 
+                          cursor: 'pointer', 
+                          fontSize: '13px',
+                          fontWeight: '600'
+                        }}
+                      >
+                        <input 
+                          type="checkbox" 
+                          checked={blockedSides.includes(side)} 
+                          onChange={() => handleBlockSide(side)} 
+                          style={{ marginRight: 8, width: 16, height: 16 }} 
+                        />
+                        Side {side}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
-        <div style={{ color: "#222" }}>
-          <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: 16, color: '#374151' }}>🎵 Streaming</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={{ padding: 16, background: '#dcfce7', border: '1px solid #16a34a', borderRadius: 8 }}>
-              <h4 style={{ fontSize: '16px', fontWeight: '600', margin: '0 0 12px 0', color: '#15803d' }}>Spotify</h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <div><label style={{ display: 'block', marginBottom: 6, fontSize: '13px', fontWeight: '500', color: "#15803d" }}>Spotify ID {!entry.spotify_id && '⚠️'}</label><input style={{...inputStyle, fontSize: '13px'}} value={entry.spotify_id || ''} onChange={e => handleChange('spotify_id', e.target.value)} placeholder="e.g. 4aawyAB9vmqN3uQ7FjRGTy" /></div>
-                <div><label style={{ display: 'block', marginBottom: 6, fontSize: '13px', fontWeight: '500', color: "#15803d" }}>URL</label><input style={{...inputStyle, fontSize: '13px'}} value={entry.spotify_url || ''} onChange={e => handleChange('spotify_url', e.target.value)} placeholder="https://open.spotify.com/album/..." /></div>
-                <div><label style={{ display: 'block', marginBottom: 6, fontSize: '13px', fontWeight: '500', color: "#15803d" }}>Genres</label><input style={{...inputStyle, fontSize: '13px'}} value={entry.spotify_genres?.join(', ') || ''} onChange={e => handleChange('spotify_genres', e.target.value.split(',').map(s => s.trim()).filter(Boolean))} placeholder="classic rock" /></div>
+        {/* Right Column - Streaming Services */}
+        <div>
+          <h3 style={{ fontSize: '20px', fontWeight: '700', marginBottom: 20, color: '#111', display: 'flex', alignItems: 'center', gap: 8 }}>
+            🎵 Streaming Services
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            
+            {/* Spotify */}
+            <div style={{ padding: 24, background: '#dcfce7', border: '2px solid #16a34a', borderRadius: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+                <div style={{ fontSize: '32px' }}>🎵</div>
+                <h4 style={{ fontSize: '18px', fontWeight: '700', margin: 0, color: '#15803d' }}>Spotify</h4>
+                {!entry.spotify_id && <span style={{ fontSize: '20px' }}>⚠️</span>}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: 8, fontSize: '14px', fontWeight: '600', color: "#15803d" }}>
+                    Spotify ID
+                  </label>
+                  <input 
+                    style={inputStyle} 
+                    value={entry.spotify_id || ''} 
+                    onChange={e => handleChange('spotify_id', e.target.value)} 
+                    placeholder="e.g. 4aawyAB9vmqN3uQ7FjRGTy" 
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: 8, fontSize: '14px', fontWeight: '600', color: "#15803d" }}>URL</label>
+                  <input 
+                    style={inputStyle} 
+                    value={entry.spotify_url || ''} 
+                    onChange={e => handleChange('spotify_url', e.target.value)} 
+                    placeholder="https://open.spotify.com/album/..." 
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: 8, fontSize: '14px', fontWeight: '600', color: "#15803d" }}>Genres</label>
+                  <input 
+                    style={inputStyle} 
+                    value={entry.spotify_genres?.join(', ') || ''} 
+                    onChange={e => handleChange('spotify_genres', e.target.value.split(',').map(s => s.trim()).filter(Boolean))} 
+                    placeholder="classic rock, psychedelic rock" 
+                  />
+                </div>
               </div>
             </div>
-            <div style={{ padding: 16, background: '#fce7f3', border: '1px solid #ec4899', borderRadius: 8 }}>
-              <h4 style={{ fontSize: '16px', fontWeight: '600', margin: '0 0 12px 0', color: '#be185d' }}>Apple Music</h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <div><label style={{ display: 'block', marginBottom: 6, fontSize: '13px', fontWeight: '500', color: "#be185d" }}>Apple ID {!entry.apple_music_id && '⚠️'}</label><input style={{...inputStyle, fontSize: '13px'}} value={entry.apple_music_id || ''} onChange={e => handleChange('apple_music_id', e.target.value)} placeholder="e.g. 1440857781" /></div>
-                <div><label style={{ display: 'block', marginBottom: 6, fontSize: '13px', fontWeight: '500', color: "#be185d" }}>URL</label><input style={{...inputStyle, fontSize: '13px'}} value={entry.apple_music_url || ''} onChange={e => handleChange('apple_music_url', e.target.value)} placeholder="https://music.apple.com/..." /></div>
-                <div><label style={{ display: 'block', marginBottom: 6, fontSize: '13px', fontWeight: '500', color: "#be185d" }}>Genres</label><input style={{...inputStyle, fontSize: '13px'}} value={entry.apple_music_genres?.join(', ') || ''} onChange={e => handleChange('apple_music_genres', e.target.value.split(',').map(s => s.trim()).filter(Boolean))} placeholder="Rock, Psychedelic" /></div>
-              </div>
-            </div>
-          </div>
-        </div>
 
-        <div style={{ color: "#222" }}>
-          <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: 16, color: '#374151' }}>Metadata</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div><label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>Genres {!entry.discogs_genres || entry.discogs_genres.length === 0 ? '⚠️' : '✓'}</label><input style={inputStyle} value={entry.discogs_genres?.join(', ') || ''} onChange={e => handleChange('discogs_genres', e.target.value.split(',').map(s => s.trim()).filter(Boolean))} placeholder="Rock, Jazz" /><div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>Comma-separated</div></div>
-            <div><label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>Styles {!entry.discogs_styles || entry.discogs_styles.length === 0 ? '⚠️' : '✓'}</label><input style={inputStyle} value={entry.discogs_styles?.join(', ') || ''} onChange={e => handleChange('discogs_styles', e.target.value.split(',').map(s => s.trim()).filter(Boolean))} placeholder="Progressive Rock" /><div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>Comma-separated</div></div>
-            <div><label style={{ display: 'block', marginBottom: 6, fontWeight: '500', color: "#374151" }}>Decade {!entry.decade ? '⚠️' : '✓'}</label><input style={inputStyle} value={entry.decade || ''} onChange={e => handleChange('decade', parseInt(e.target.value) || null)} placeholder="1970" type="number" step="10" /><div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>Auto-calculated</div></div>
-            <div style={{ padding: 16, background: '#f0f9ff', borderRadius: 8, border: '1px solid #0369a1' }}>
-              <h4 style={{ fontSize: '16px', fontWeight: '600', margin: '0 0 12px 0', color: '#0c4a6e' }}>🏆 Badges</h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}><input type="checkbox" checked={!!entry.steves_top_200} onChange={e => handleChange('steves_top_200', e.target.checked)} style={{ marginRight: 8 }} /><span style={{ fontWeight: '600', color: '#dc2626' }}>⭐ Top 200</span></label>
-                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}><input type="checkbox" checked={!!entry.this_weeks_top_10} onChange={e => handleChange('this_weeks_top_10', e.target.checked)} style={{ marginRight: 8 }} /><span style={{ fontWeight: '600', color: '#ea580c' }}>🔥 Top 10</span></label>
-                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}><input type="checkbox" checked={!!entry.inner_circle_preferred} onChange={e => handleChange('inner_circle_preferred', e.target.checked)} style={{ marginRight: 8 }} /><span style={{ fontWeight: '600', color: '#7c3aed' }}>💎 Inner Circle</span></label>
+            {/* Apple Music */}
+            <div style={{ padding: 24, background: '#fce7f3', border: '2px solid #ec4899', borderRadius: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+                <div style={{ fontSize: '32px' }}>🍎</div>
+                <h4 style={{ fontSize: '18px', fontWeight: '700', margin: 0, color: '#be185d' }}>Apple Music</h4>
+                {!entry.apple_music_id && <span style={{ fontSize: '20px' }}>⚠️</span>}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: 8, fontSize: '14px', fontWeight: '600', color: "#be185d" }}>
+                    Apple Music ID
+                  </label>
+                  <input 
+                    style={inputStyle} 
+                    value={entry.apple_music_id || ''} 
+                    onChange={e => handleChange('apple_music_id', e.target.value)} 
+                    placeholder="e.g. 1440857781" 
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: 8, fontSize: '14px', fontWeight: '600', color: "#be185d" }}>URL</label>
+                  <input 
+                    style={inputStyle} 
+                    value={entry.apple_music_url || ''} 
+                    onChange={e => handleChange('apple_music_url', e.target.value)} 
+                    placeholder="https://music.apple.com/..." 
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: 8, fontSize: '14px', fontWeight: '600', color: "#be185d" }}>Genres</label>
+                  <input 
+                    style={inputStyle} 
+                    value={entry.apple_music_genres?.join(', ') || ''} 
+                    onChange={e => handleChange('apple_music_genres', e.target.value.split(',').map(s => s.trim()).filter(Boolean))} 
+                    placeholder="Rock, Psychedelic" 
+                  />
+                </div>
               </div>
             </div>
-            <div style={{ padding: 16, background: '#fef3c7', borderRadius: 8, border: '1px solid #f59e0b' }}>
-              <h4 style={{ fontSize: '16px', fontWeight: '600', margin: '0 0 12px 0', color: '#92400e' }}>Blocking</h4>
-              <label style={{ display: 'flex', alignItems: 'center', marginBottom: 12, cursor: 'pointer' }}><input type="checkbox" checked={!!entry.blocked} onChange={e => handleChange('blocked', e.target.checked)} style={{ marginRight: 8 }} /><strong>Block Album</strong></label>
-              {sides.length > 0 && <div><div style={{ fontWeight: '600', marginBottom: 8 }}>Block Sides:</div><div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>{sides.map(side => <label key={side} style={{ display: 'flex', alignItems: 'center', padding: '6px 12px', background: blockedSides.includes(side) ? '#fee2e2' : '#fff', border: '1px solid #d1d5db', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}><input type="checkbox" checked={blockedSides.includes(side)} onChange={() => handleBlockSide(side)} style={{ marginRight: 6 }} />Side {side}</label>)}</div></div>}
-            </div>
           </div>
-        </div>
-
-        <div style={{ color: "#222" }}>
-          <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: 16, color: '#374151' }}>Tracklist {!tracks || tracks.length === 0 ? '⚠️' : '✓'}</h3>
-          <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden', maxHeight: 600, overflowY: 'auto' }}>
-            <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
-              <thead style={{ background: '#f9fafb', position: 'sticky', top: 0 }}>
-                <tr>
-                  <th style={{ padding: '12px 8px', textAlign: 'left', fontWeight: '600', borderBottom: '1px solid #e5e7eb' }}>Pos</th>
-                  <th style={{ padding: '12px 8px', textAlign: 'left', fontWeight: '600', borderBottom: '1px solid #e5e7eb' }}>Artist</th>
-                  <th style={{ padding: '12px 8px', textAlign: 'left', fontWeight: '600', borderBottom: '1px solid #e5e7eb' }}>Title</th>
-                  <th style={{ padding: '12px 8px', textAlign: 'left', fontWeight: '600', borderBottom: '1px solid #e5e7eb' }}>Time</th>
-                  <th style={{ padding: '12px 8px', textAlign: 'center', fontWeight: '600', borderBottom: '1px solid #e5e7eb' }}>Lyrics</th>
-                  <th style={{ padding: '12px 8px', width: 40, borderBottom: '1px solid #e5e7eb' }}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {tracks.map((t, i) => (
-                  <tr key={i} style={{ borderBottom: i < tracks.length - 1 ? '1px solid #f3f4f6' : 'none' }}>
-                    <td style={{ padding: '8px' }}><input value={t.position} onChange={e => handleTrackChange(i, 'position', e.target.value)} style={{ ...inputStyle, width: 50, padding: '4px 6px', fontSize: '12px', textAlign: 'center' }} placeholder="A1" /></td>
-                    <td style={{ padding: '8px' }}><input value={t.artist || ''} onChange={e => handleTrackChange(i, 'artist', e.target.value)} style={{ ...inputStyle, padding: '4px 6px', fontSize: '12px' }} placeholder="Track artist" /></td>
-                    <td style={{ padding: '8px' }}><input value={t.title} onChange={e => handleTrackChange(i, 'title', e.target.value)} style={{ ...inputStyle, padding: '4px 6px', fontSize: '12px' }} placeholder="Track title" /></td>
-                    <td style={{ padding: '8px' }}><input value={t.duration} onChange={e => handleTrackChange(i, 'duration', e.target.value)} style={{ ...inputStyle, width: 70, padding: '4px 6px', fontSize: '12px', textAlign: 'center' }} placeholder="3:45" /></td>
-                    <td style={{ padding: '8px', textAlign: 'center' }}>
-                      {t.lyrics && t.lyrics_source === 'apple_music' && <span style={{ fontSize: 16 }} title="Has Apple lyrics">🍎</span>}
-                      {t.lyrics_url && <a href={t.lyrics_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 16, textDecoration: 'none', marginLeft: t.lyrics ? 4 : 0 }} title="Genius">📝</a>}
-                    </td>
-                    <td style={{ padding: '8px', textAlign: 'center' }}><button type="button" onClick={() => removeTrack(i)} style={{ color: "#dc2626", background: 'none', border: 'none', fontSize: 16, cursor: 'pointer', padding: '4px', borderRadius: '4px' }} title="Remove">×</button></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <button type="button" onClick={addTrack} style={{ ...buttonStyle, marginTop: 12, width: '100%', background: '#f0f9ff', color: '#0369a1', border: '1px solid #0369a1' }}>+ Add Track</button>
         </div>
       </div>
 
+      {/* Tracklist Section - Full Width */}
+      <div style={{ marginTop: 40, paddingTop: 40, borderTop: '2px solid #e5e7eb' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+          <h3 style={{ fontSize: '22px', fontWeight: '700', margin: 0, color: '#111', display: 'flex', alignItems: 'center', gap: 10 }}>
+            🎼 Tracklist
+            {tracks.length === 0 ? <span style={{ fontSize: '24px' }}>⚠️</span> : <span style={{ fontSize: '20px' }}>✅</span>}
+            <span style={{ fontSize: '16px', fontWeight: '500', color: '#6b7280', marginLeft: 8 }}>
+              ({tracks.length} tracks)
+            </span>
+          </h3>
+          <button 
+            type="button" 
+            onClick={addTrack} 
+            style={{ 
+              ...buttonStyle, 
+              background: '#2563eb', 
+              color: 'white',
+              fontSize: '15px',
+              padding: '12px 20px'
+            }}
+          >
+            + Add Track
+          </button>
+        </div>
+
+        {tracks.length === 0 ? (
+          <div style={{ 
+            padding: 60, 
+            textAlign: 'center', 
+            background: '#f9fafb', 
+            borderRadius: 12, 
+            border: '2px dashed #d1d5db' 
+          }}>
+            <div style={{ fontSize: '48px', marginBottom: 16 }}>🎵</div>
+            <p style={{ fontSize: '16px', color: '#6b7280', margin: 0 }}>
+              No tracks yet. Click &quot;Add Track&quot; or fetch from Discogs to get started.
+            </p>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
+            {Object.entries(tracksBySide).map(([side, sideTracks]) => (
+              <div key={side}>
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: 12, 
+                  marginBottom: 16,
+                  paddingBottom: 12,
+                  borderBottom: '2px solid #e5e7eb'
+                }}>
+                  <h4 style={{ 
+                    fontSize: '18px', 
+                    fontWeight: '700', 
+                    margin: 0, 
+                    color: '#374151',
+                    background: '#f3f4f6',
+                    padding: '8px 16px',
+                    borderRadius: '8px'
+                  }}>
+                    Side {side}
+                  </h4>
+                  <span style={{ fontSize: '14px', color: '#6b7280', fontWeight: '500' }}>
+                    {sideTracks.length} {sideTracks.length === 1 ? 'track' : 'tracks'}
+                  </span>
+                </div>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  {sideTracks.map((track) => {
+                    const globalIdx = tracks.indexOf(track);
+                    return (
+                      <div 
+                        key={globalIdx}
+                        style={{ 
+                          padding: 20, 
+                          background: '#f9fafb', 
+                          borderRadius: 12, 
+                          border: '2px solid #e5e7eb',
+                          display: 'grid',
+                          gridTemplateColumns: '80px 140px 1fr 100px 80px 40px',
+                          gap: 16,
+                          alignItems: 'center'
+                        }}
+                      >
+                        <div>
+                          <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#6b7280', marginBottom: 6 }}>
+                            Position
+                          </label>
+                          <input 
+                            value={track.position} 
+                            onChange={e => handleTrackChange(globalIdx, 'position', e.target.value)} 
+                            style={{ 
+                              ...inputStyle, 
+                              textAlign: 'center',
+                              fontWeight: '600',
+                              fontSize: '14px'
+                            }} 
+                            placeholder="A1" 
+                          />
+                        </div>
+
+                        <div>
+                          <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#6b7280', marginBottom: 6 }}>
+                            Track Artist
+                          </label>
+                          <input 
+                            value={track.artist || ''} 
+                            onChange={e => handleTrackChange(globalIdx, 'artist', e.target.value)} 
+                            style={inputStyle} 
+                            placeholder="Optional" 
+                          />
+                        </div>
+
+                        <div>
+                          <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#6b7280', marginBottom: 6 }}>
+                            Track Title
+                          </label>
+                          <input 
+                            value={track.title} 
+                            onChange={e => handleTrackChange(globalIdx, 'title', e.target.value)} 
+                            style={inputStyle} 
+                            placeholder="Enter track title" 
+                          />
+                        </div>
+
+                        <div>
+                          <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#6b7280', marginBottom: 6 }}>
+                            Duration
+                          </label>
+                          <input 
+                            value={track.duration} 
+                            onChange={e => handleTrackChange(globalIdx, 'duration', e.target.value)} 
+                            style={{ ...inputStyle, textAlign: 'center' }} 
+                            placeholder="3:45" 
+                          />
+                        </div>
+
+                        <div style={{ textAlign: 'center' }}>
+                          <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#6b7280', marginBottom: 6 }}>
+                            Lyrics
+                          </label>
+                          <div style={{ display: 'flex', justifyContent: 'center', gap: 8, alignItems: 'center', minHeight: 42 }}>
+                            {track.lyrics && track.lyrics_source === 'apple_music' && (
+                              <span style={{ fontSize: 24 }} title="Has Apple Music lyrics">🍎</span>
+                            )}
+                            {track.lyrics_url && (
+                              <a 
+                                href={track.lyrics_url} 
+                                target="_blank" 
+                                rel="noopener noreferrer" 
+                                style={{ fontSize: 24, textDecoration: 'none' }} 
+                                title="View on Genius"
+                              >
+                                📝
+                              </a>
+                            )}
+                            {!track.lyrics && !track.lyrics_url && (
+                              <span style={{ fontSize: 18, color: '#d1d5db' }}>—</span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-end', height: '100%', paddingBottom: 8 }}>
+                          <button 
+                            type="button" 
+                            onClick={() => removeTrack(globalIdx)} 
+                            style={{ 
+                              color: "#dc2626", 
+                              background: '#fee2e2', 
+                              border: '2px solid #dc2626', 
+                              fontSize: 20, 
+                              cursor: 'pointer', 
+                              padding: '8px', 
+                              borderRadius: '8px',
+                              width: 40,
+                              height: 40,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontWeight: 'bold'
+                            }} 
+                            title="Remove track"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Sale Information Section */}
       <div style={{
         background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
         border: '2px solid #10b981',
         borderRadius: 12,
-        padding: 24,
-        marginTop: 32
+        padding: 32,
+        marginTop: 40
       }}>
         <div style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          marginBottom: 16
+          marginBottom: 20
         }}>
           <div>
             <h3 style={{
-              fontSize: 18,
+              fontSize: 20,
               fontWeight: 'bold',
               color: 'white',
-              margin: '0 0 4px 0'
+              margin: '0 0 6px 0'
             }}>
               💰 Merchandise / Sale Information
             </h3>
             <p style={{
-              fontSize: 14,
+              fontSize: 15,
               color: 'rgba(255, 255, 255, 0.9)',
               margin: 0
             }}>
@@ -669,14 +1154,14 @@ export default function EditEntryPage() {
           <label style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 12,
+            gap: 14,
             cursor: 'pointer',
             background: 'rgba(255, 255, 255, 0.2)',
-            padding: '12px 20px',
-            borderRadius: 8,
+            padding: '14px 24px',
+            borderRadius: 10,
             color: 'white',
-            fontWeight: 600,
-            fontSize: 16
+            fontWeight: 700,
+            fontSize: 17
           }}>
             <input
               type="checkbox"
@@ -684,7 +1169,8 @@ export default function EditEntryPage() {
               onChange={e => setForSale(e.target.checked)}
               style={{
                 transform: 'scale(1.5)',
-                accentColor: 'white'
+                accentColor: 'white',
+                cursor: 'pointer'
               }}
             />
             Mark for Sale
@@ -694,22 +1180,22 @@ export default function EditEntryPage() {
         {forSale && (
           <div style={{
             background: 'rgba(255, 255, 255, 0.95)',
-            borderRadius: 8,
-            padding: 20
+            borderRadius: 10,
+            padding: 24
           }}>
             <div style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-              gap: 16,
-              marginBottom: 16
+              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+              gap: 20,
+              marginBottom: 20
             }}>
               <div>
                 <label style={{
                   display: 'block',
                   fontSize: 14,
-                  fontWeight: 600,
+                  fontWeight: 700,
                   color: '#374151',
-                  marginBottom: 6
+                  marginBottom: 8
                 }}>
                   Sale Price (USD) *
                 </label>
@@ -727,9 +1213,9 @@ export default function EditEntryPage() {
                 <label style={{
                   display: 'block',
                   fontSize: 14,
-                  fontWeight: 600,
+                  fontWeight: 700,
                   color: '#374151',
-                  marginBottom: 6
+                  marginBottom: 8
                 }}>
                   Platform
                 </label>
@@ -753,9 +1239,9 @@ export default function EditEntryPage() {
                 <label style={{
                   display: 'block',
                   fontSize: 14,
-                  fontWeight: 600,
+                  fontWeight: 700,
                   color: '#374151',
-                  marginBottom: 6
+                  marginBottom: 8
                 }}>
                   Quantity
                 </label>
@@ -773,9 +1259,9 @@ export default function EditEntryPage() {
               <label style={{
                 display: 'block',
                 fontSize: 14,
-                fontWeight: 600,
+                fontWeight: 700,
                 color: '#374151',
-                marginBottom: 6
+                marginBottom: 8
               }}>
                 Sale Notes (Optional)
               </label>
@@ -793,24 +1279,58 @@ export default function EditEntryPage() {
             </div>
 
             <div style={{
-              marginTop: 12,
-              padding: 12,
+              marginTop: 16,
+              padding: 14,
               background: '#dbeafe',
-              border: '1px solid #3b82f6',
-              borderRadius: 6,
-              fontSize: 13,
+              border: '2px solid #3b82f6',
+              borderRadius: 8,
+              fontSize: 14,
               color: '#1e40af'
             }}>
-              💡 <strong>Tip:</strong> This item will appear in the <a href="/admin/sale-items" style={{ color: '#1e40af', fontWeight: 600 }}>Sale Items</a> management page
+              💡 <strong>Tip:</strong> This item will appear in the <a href="/admin/sale-items" style={{ color: '#1e40af', fontWeight: 700, textDecoration: 'underline' }}>Sale Items</a> management page
             </div>
           </div>
         )}
       </div>
 
-      <div style={{ marginTop: 32, paddingTop: 24, borderTop: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', gap: 12 }}>
-          <button onClick={handleSave} disabled={saving} style={{ ...buttonStyle, padding: '12px 24px', fontSize: '14px', background: saving ? '#9ca3af' : '#2563eb', color: 'white', cursor: saving ? 'not-allowed' : 'pointer' }}>{saving ? 'Saving...' : 'Save Changes'}</button>
-          <button onClick={() => router.push('/admin/edit-collection')} style={{ ...buttonStyle, padding: '12px 24px', fontSize: '14px', background: '#f3f4f6', color: '#374151' }}>Back</button>
+      {/* Footer Actions */}
+      <div style={{ 
+        marginTop: 40, 
+        paddingTop: 32, 
+        borderTop: '2px solid #e5e7eb', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'space-between' 
+      }}>
+        <div style={{ display: 'flex', gap: 16 }}>
+          <button 
+            onClick={handleSave} 
+            disabled={saving} 
+            style={{ 
+              ...buttonStyle, 
+              padding: '14px 32px', 
+              fontSize: '16px', 
+              background: saving ? '#9ca3af' : '#2563eb', 
+              color: 'white', 
+              cursor: saving ? 'not-allowed' : 'pointer',
+              fontWeight: '700'
+            }}
+          >
+            {saving ? '💾 Saving...' : '💾 Save Changes'}
+          </button>
+          <button 
+            onClick={() => router.push('/admin/edit-collection')} 
+            style={{ 
+              ...buttonStyle, 
+              padding: '14px 32px', 
+              fontSize: '16px', 
+              background: '#f3f4f6', 
+              color: '#374151',
+              border: '2px solid #d1d5db'
+            }}
+          >
+            ← Back to Collection
+          </button>
         </div>
       </div>
     </div>
