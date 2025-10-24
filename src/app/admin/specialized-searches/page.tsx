@@ -308,7 +308,7 @@ function CDOnlyTab() {
             <h3 style={{ fontSize: 16, fontWeight: 600, color: '#065f46', marginBottom: 8 }}>✅ Scan Complete</h3>
             <p style={{ color: '#065f46', fontSize: 14, margin: 0 }}>
               Found <strong>{stats.cdOnly}</strong> CD-only releases • {stats.errors} errors
-              {filteredResults.length < results.length && <> • Showing <strong>{filteredResults.length}</strong> filtered</>}
+              {filteredResults.length < results.length ? <> • Showing <strong>{filteredResults.length}</strong> filtered</> : null}
             </p>
           </div>
 
@@ -340,8 +340,7 @@ function CDOnlyTab() {
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 16 }}>
             {filteredResults.map((album) => (
-              <div key={album.id} onClick={() => setSelectedIds(s => { const n = new Set(s); n.has(album.id) ? n.delete(album.id) : n.add(album.id); return n; })} style={{ background: 'white', border: selectedIds.has(album.id) ? '2px solid #8b5cf6' : '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden', cursor: 'pointer', position: 'relative' }}>
-                {selectedIds.has(album.id) && <div style={{ position: 'absolute', top: 8, right: 8, background: '#8b5cf6', color: 'white', borderRadius: '50%', width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 'bold', zIndex: 10 }}>✓</div>}
+              <div key={album.id} onClick={() => setSelectedIds(s => { const n = new Set(s); if (n.has(album.id)) { n.delete(album.id); } else { n.add(album.id); } return n; })} style={{ background: 'white', border: selectedIds.has(album.id) ? '2px solid #8b5cf6' : '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden', cursor: 'pointer', position: 'relative' }}>
                 {album.cd_only_tagged && <div style={{ position: 'absolute', top: 8, left: 8, background: '#10b981', color: 'white', borderRadius: 4, padding: '2px 6px', fontSize: 10, fontWeight: 'bold', zIndex: 10 }}>🏷️</div>}
                 {album.image_url && <Image src={album.image_url} alt={`${album.artist} - ${album.title}`} width={180} height={180} style={{ objectFit: 'cover', width: '100%', height: 180 }} unoptimized />}
                 <div style={{ padding: 12 }}>
@@ -430,14 +429,14 @@ function Thousand1AlbumsTab() {
     await load();
   }, [pushToast, load]);
 
-  const updateStatus = useCallback(async (matchId: number, _albumId: number, newStatus: string) => {
+  const updateStatus = useCallback(async (matchId: number, newStatus: string) => {
     const { error } = await supabase.from("collection_1001_review").update({ review_status: newStatus }).eq("id", matchId);
     if (error) { pushToast({ kind: "err", msg: `Update failed: ${error.message}` }); return; }
     pushToast({ kind: "ok", msg: "Status updated" });
     await load();
   }, [pushToast, load]);
 
-  const rejectMatch = useCallback(async (matchId: number, _albumId: number) => {
+  const rejectMatch = useCallback(async (matchId: number) => {
     const { error } = await supabase.from("collection_1001_review").delete().eq("id", matchId);
     if (error) { pushToast({ kind: "err", msg: `Delete failed: ${error.message}` }); return; }
     pushToast({ kind: "ok", msg: "Match removed" });
@@ -556,11 +555,11 @@ function Thousand1AlbumsTab() {
                               </div>
                               {!isConfirmed && (
                                 <div style={{ display: 'flex', gap: 6 }}>
-                                  <button onClick={() => updateStatus(match.id, album.id, "confirmed")} style={{ padding: '6px 12px', background: '#10b981', color: 'white', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>✓</button>
-                                  <button onClick={() => rejectMatch(match.id, album.id)} style={{ padding: '6px 12px', background: '#ef4444', color: 'white', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>✕</button>
+                                  <button onClick={() => updateStatus(match.id, "confirmed")} style={{ padding: '6px 12px', background: '#10b981', color: 'white', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>✓</button>
+                                  <button onClick={() => rejectMatch(match.id)} style={{ padding: '6px 12px', background: '#ef4444', color: 'white', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>✕</button>
                                 </div>
                               )}
-                              {isConfirmed && <button onClick={() => rejectMatch(match.id, album.id)} style={{ padding: '6px 12px', background: 'white', color: '#6b7280', border: '2px solid #d1d5db', borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Unlink</button>}
+                              {isConfirmed && <button onClick={() => rejectMatch(match.id)} style={{ padding: '6px 12px', background: 'white', color: '#6b7280', border: '2px solid #d1d5db', borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Unlink</button>}
                             </div>
                           );
                         })}
