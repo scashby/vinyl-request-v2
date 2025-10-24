@@ -67,6 +67,26 @@ type CDOnlyAlbum = {
   cd_only_tagged?: boolean;
 };
 
+type DiscogsFormat = {
+  name: string;
+  qty?: string;
+  descriptions?: string[];
+};
+
+type DiscogsRelease = {
+  formats?: DiscogsFormat[];
+  master_id?: number;
+};
+
+type DiscogsSearchResult = {
+  master_id?: number;
+  format?: string[];
+};
+
+type DiscogsSearchResponse = {
+  results?: DiscogsSearchResult[];
+};
+
 function CDOnlyTab() {
   const [view, setView] = useState<'scanner' | 'results'>('scanner');
   const [scanning, setScanning] = useState(false);
@@ -75,7 +95,6 @@ function CDOnlyTab() {
   const [stats, setStats] = useState({ total: 0, scanned: 0, cdOnly: 0, errors: 0 });
   const [status, setStatus] = useState('');
   const [progress, setProgress] = useState(0);
-  const [errors, setErrors] = useState<Array<{album: string, error: string}>>([]);
   
   const [artistFilter, setArtistFilter] = useState('');
   const [yearFilter, setYearFilter] = useState('');
@@ -83,17 +102,17 @@ function CDOnlyTab() {
   const [availableGenres, setAvailableGenres] = useState<string[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
-  useEffect(() => {
-    applyFilters();
-  }, [results, artistFilter, yearFilter, genreFilter]);
-
-  const applyFilters = () => {
+  const applyFilters = useCallback(() => {
     let filtered = [...results];
     if (artistFilter) filtered = filtered.filter(a => a.artist.toLowerCase().includes(artistFilter.toLowerCase()));
     if (yearFilter) filtered = filtered.filter(a => a.year && a.year.includes(yearFilter));
     if (genreFilter) filtered = filtered.filter(a => a.discogs_genres && a.discogs_genres.some(g => g.toLowerCase().includes(genreFilter.toLowerCase())));
     setFilteredResults(filtered);
-  };
+  }, [results, artistFilter, yearFilter, genreFilter]);
+
+  useEffect(() => {
+    applyFilters();
+  }, [applyFilters]);
 
   const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -110,12 +129,12 @@ function CDOnlyTab() {
       
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       
-      const releaseData = await response.json();
+      const releaseData: DiscogsRelease = await response.json();
       const masterId = releaseData.master_id;
 
       if (!masterId) {
         const availableFormats = new Set<string>();
-        releaseData.formats?.forEach((f: any) => { if (f.name) availableFormats.add(f.name.toLowerCase()); });
+        releaseData.formats?.forEach((f: DiscogsFormat) => { if (f.name) availableFormats.add(f.name.toLowerCase()); });
         const formatArray = Array.from(availableFormats);
         const hasCD = formatArray.some(f => f.includes('cd'));
         const hasVinyl = formatArray.some(f => f.includes('vinyl') || f.includes('lp') || f.includes('12"'));
@@ -128,11 +147,11 @@ function CDOnlyTab() {
       
       if (!searchResponse.ok) throw new Error(`Search failed: ${searchResponse.status}`);
       
-      const searchData = await searchResponse.json();
+      const searchData: DiscogsSearchResponse = await searchResponse.json();
       const availableFormats = new Set<string>();
       let releaseCount = 0;
       
-      searchData.results?.forEach((result: any) => {
+      searchData.results?.forEach((result: DiscogsSearchResult) => {
         if (result.master_id === masterId) {
           releaseCount++;
           result.format?.forEach((format: string) => availableFormats.add(format.toLowerCase()));
@@ -144,7 +163,7 @@ function CDOnlyTab() {
       const hasVinyl = formatArray.some(f => f.includes('vinyl') || f.includes('lp') || f.includes('12"'));
       
       return { ...album, available_formats: formatArray, has_vinyl: !hasCD || hasVinyl, format_check_method: `Master (${releaseCount} releases)` };
-    } catch (error) {
+    } catch {
       return { ...album, available_formats: ['Error'], has_vinyl: false, format_check_method: 'Error' };
     }
   };
@@ -202,7 +221,6 @@ function CDOnlyTab() {
       
       const cdOnly = results.filter(r => !r.has_vinyl);
       setResults(cdOnly);
-      setErrors(errorList);
       setStats({ total: cdAlbums.length, scanned: cdAlbums.length, cdOnly: cdOnly.length, errors: errorList.length });
       setStatus(`✅ Complete! Found ${cdOnly.length} CD-only albums`);
       setProgress(100);
@@ -360,7 +378,6 @@ function Thousand1AlbumsTab() {
   const [running, setRunning] = useState(false);
   const [searchInputs, setSearchInputs] = useState<Record<number, string>>({});
   const [searchResults, setSearchResults] = useState<Record<number, CollectionRow[]>>({});
-  const [searchLoading, setSearchLoading] = useState<Record<number, boolean>>({});
   const searchTimeouts = useRef<Record<number, NodeJS.Timeout>>({});
   const [expandedAlbums, setExpandedAlbums] = useState<Record<number, boolean>>({});
   const [toasts, setToasts] = useState<Array<{kind: 'info'|'ok'|'err'; msg: string}>>([]);
@@ -413,14 +430,14 @@ function Thousand1AlbumsTab() {
     await load();
   }, [pushToast, load]);
 
-  const updateStatus = useCallback(async (matchId: number, albumId: number, newStatus: string) => {
+  const updateStatus = useCallback(async (matchId: number, _albumId: number, newStatus: string) => {
     const { error } = await supabase.from("collection_1001_review").update({ review_status: newStatus }).eq("id", matchId);
     if (error) { pushToast({ kind: "err", msg: `Update failed: ${error.message}` }); return; }
     pushToast({ kind: "ok", msg: "Status updated" });
     await load();
   }, [pushToast, load]);
 
-  const rejectMatch = useCallback(async (matchId: number, albumId: number) => {
+  const rejectMatch = useCallback(async (matchId: number, _albumId: number) => {
     const { error } = await supabase.from("collection_1001_review").delete().eq("id", matchId);
     if (error) { pushToast({ kind: "err", msg: `Delete failed: ${error.message}` }); return; }
     pushToast({ kind: "ok", msg: "Match removed" });
@@ -441,10 +458,8 @@ function Thousand1AlbumsTab() {
     if (searchTimeouts.current[albumId]) clearTimeout(searchTimeouts.current[albumId]);
     if (!term.trim()) { setSearchResults(s => ({ ...s, [albumId]: [] })); return; }
     searchTimeouts.current[albumId] = setTimeout(async () => {
-      setSearchLoading(s => ({ ...s, [albumId]: true }));
       const { data } = await supabase.from("collection").select("id, artist, title, year, format, image_url").or(`artist.ilike.%${term}%,title.ilike.%${term}%`).limit(10);
       setSearchResults(s => ({ ...s, [albumId]: data || [] }));
-      setSearchLoading(s => ({ ...s, [albumId]: false }));
     }, 300);
   }, []);
 

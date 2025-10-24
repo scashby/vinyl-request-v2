@@ -1,1339 +1,601 @@
-// src/app/admin/edit-entry/[id]/page.tsx - IMPROVED LAYOUT VERSION
+// src/app/admin/specialized-searches/page.tsx
+// COMPLETE VERSION: Original functionality + New features
 "use client";
 
-import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { supabase } from 'lib/supabaseClient'
+import { useState, useEffect, useCallback, useRef } from 'react';
+import Link from 'next/link';
 import Image from 'next/image';
+import { supabase } from 'src/lib/supabaseClient';
 
-type Track = { 
-  position: string; 
-  title: string; 
-  duration: string;
-  artist?: string;
-  lyrics_url?: string;
-  lyrics?: string;
-  lyrics_source?: 'apple_music' | 'genius';
-};
+type TabType = 'cd-only' | '1001-albums';
 
-type CollectionEntry = {
-  id: string;
-  artist: string | null;
-  title: string | null;
+export default function SpecializedSearchesPage() {
+  const [activeTab, setActiveTab] = useState<TabType>('cd-only');
+
+  return (
+    <div style={{ padding: 24, background: '#f8fafc', minHeight: '100vh', maxWidth: 1400, margin: '0 auto' }}>
+      <div style={{ marginBottom: 32 }}>
+        <h1 style={{ fontSize: 32, fontWeight: 'bold', color: '#1f2937', margin: '0 0 8px 0' }}>
+          🔎 Specialized Searches
+        </h1>
+        <p style={{ color: '#6b7280', fontSize: 16, margin: 0 }}>
+          Advanced tools for managing your collection
+        </p>
+      </div>
+
+      <div style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: 12, boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)', overflow: 'hidden', marginBottom: 24 }}>
+        <div style={{ display: 'flex', borderBottom: '1px solid #e5e7eb' }}>
+          <button onClick={() => setActiveTab('cd-only')} style={{ flex: 1, padding: '16px 24px', background: activeTab === 'cd-only' ? '#8b5cf6' : 'white', color: activeTab === 'cd-only' ? 'white' : '#6b7280', border: 'none', fontSize: 16, fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s', borderBottom: activeTab === 'cd-only' ? '3px solid #7c3aed' : 'none' }}>
+            💿 CD-Only Releases
+          </button>
+          <button onClick={() => setActiveTab('1001-albums')} style={{ flex: 1, padding: '16px 24px', background: activeTab === '1001-albums' ? '#8b5cf6' : 'white', color: activeTab === '1001-albums' ? 'white' : '#6b7280', border: 'none', fontSize: 16, fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s', borderBottom: activeTab === '1001-albums' ? '3px solid #7c3aed' : 'none' }}>
+            📖 1001 Albums
+          </button>
+        </div>
+
+        <div style={{ padding: 32 }}>
+          {activeTab === 'cd-only' && <CDOnlyTab />}
+          {activeTab === '1001-albums' && <Thousand1AlbumsTab />}
+        </div>
+      </div>
+
+      <div style={{ textAlign: 'center' }}>
+        <Link href="/admin/admin-dashboard" style={{ display: 'inline-block', padding: '12px 24px', background: '#6b7280', color: 'white', borderRadius: 8, textDecoration: 'none', fontWeight: 600, fontSize: 14 }}>
+          ← Back to Dashboard
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// CD-ONLY TAB - ORIGINAL + NEW FEATURES
+// ============================================================================
+
+type CDOnlyAlbum = {
+  id: number;
+  artist: string;
+  title: string;
   year: string | null;
-  folder: string | null;
-  format: string | null;
   image_url: string | null;
-  media_condition: string | null;
-  sell_price: string | null;
-  steves_top_200: boolean | null;
-  this_weeks_top_10: boolean | null;
-  inner_circle_preferred: boolean | null;
-  blocked: boolean | null;
-  blocked_sides: string[] | null;
-  tracklists: string | null;
   discogs_release_id: string | null;
   discogs_genres: string[] | null;
-  discogs_styles: string[] | null;
-  decade: number | null;
-  master_release_id: string | null;
-  master_release_date: string | null;
-  spotify_id: string | null;
-  spotify_url: string | null;
-  spotify_popularity: number | null;
-  spotify_genres: string[] | null;
-  spotify_label: string | null;
-  spotify_release_date: string | null;
-  spotify_total_tracks: number | null;
-  spotify_image_url: string | null;
-  apple_music_id: string | null;
-  apple_music_url: string | null;
-  apple_music_genre: string | null;
-  apple_music_genres: string[] | null;
-  apple_music_label: string | null;
-  apple_music_release_date: string | null;
-  apple_music_track_count: number | null;
-  apple_music_artwork_url: string | null;
-  for_sale: boolean;
-  sale_price: number | null;
-  sale_platform: string | null;
-  sale_quantity: number | null;
-  sale_notes: string | null;
-  [key: string]: unknown;
+  folder: string | null;
+  has_vinyl: boolean | null;
+  available_formats?: string[];
+  format_check_method?: string;
+  cd_only_tagged?: boolean;
 };
 
-type DiscogsData = {
-  year?: string | number;
-  images?: { uri: string }[];
-  tracklist?: { position?: string; title?: string; duration?: string; artists?: Array<{ name: string }> }[];
-  genres?: string[];
-  styles?: string[];
+type DiscogsFormat = {
+  name: string;
+  qty?: string;
+  descriptions?: string[];
+};
+
+type DiscogsRelease = {
+  formats?: DiscogsFormat[];
   master_id?: number;
-  master_url?: string;
-  [key: string]: unknown;
 };
 
-type DiscogsMasterData = {
-  year?: string | number;
-  main_release?: number;
-  [key: string]: unknown;
+type DiscogsSearchResult = {
+  master_id?: number;
+  format?: string[];
 };
 
-const PLATFORMS = [
-  { value: 'discogs', label: 'Discogs' },
-  { value: 'shopify', label: 'Shopify Store' },
-  { value: 'ebay', label: 'eBay' },
-  { value: 'reverb', label: 'Reverb LP' },
-  { value: 'other', label: 'Other' }
-];
+type DiscogsSearchResponse = {
+  results?: DiscogsSearchResult[];
+};
 
-function calculateDecade(year: string | null): number | null {
-  if (!year) return null;
-  const yearNum = parseInt(year, 10);
-  if (isNaN(yearNum)) return null;
-  return Math.floor(yearNum / 10) * 10;
-}
-
-async function fetchDiscogsRelease(releaseId: string): Promise<DiscogsData> {
-  const res = await fetch(`/api/discogsProxy?releaseId=${releaseId}`);
-  if (!res.ok) throw new Error('Discogs fetch failed');
-  return await res.json() as DiscogsData;
-}
-
-async function fetchDiscogsMaster(masterId: string): Promise<DiscogsMasterData> {
-  const res = await fetch(`https://api.discogs.com/masters/${masterId}`, {
-    headers: {
-      'User-Agent': 'DeadwaxDialogues/1.0',
-      'Authorization': `Discogs token=${process.env.NEXT_PUBLIC_DISCOGS_TOKEN}`
-    }
-  });
-  if (!res.ok) throw new Error('Discogs master fetch failed');
-  return await res.json() as DiscogsMasterData;
-}
-
-function cleanTrack(track: Partial<Track>): Track {
-  return {
-    position: track.position || '',
-    title: track.title || '',
-    duration: track.duration || '',
-    artist: track.artist || undefined,
-    lyrics_url: track.lyrics_url,
-    lyrics: track.lyrics,
-    lyrics_source: track.lyrics_source
-  };
-}
-
-export default function EditEntryPage() {
-  const params = useParams();
-  const id = params.id as string;
-  const router = useRouter();
-  const [entry, setEntry] = useState<CollectionEntry | null>(null);
+function CDOnlyTab() {
+  const [view, setView] = useState<'scanner' | 'results'>('scanner');
+  const [scanning, setScanning] = useState(false);
+  const [results, setResults] = useState<CDOnlyAlbum[]>([]);
+  const [filteredResults, setFilteredResults] = useState<CDOnlyAlbum[]>([]);
+  const [stats, setStats] = useState({ total: 0, scanned: 0, cdOnly: 0, errors: 0 });
   const [status, setStatus] = useState('');
-  const [blockedSides, setBlockedSides] = useState<string[]>([]);
-  const [saving, setSaving] = useState(false);
-  const [tracks, setTracks] = useState<Track[]>([]);
+  const [progress, setProgress] = useState(0);
   
-  const [fetchingDiscogs, setFetchingDiscogs] = useState(false);
-  const [enrichingSpotify, setEnrichingSpotify] = useState(false);
-  const [enrichingAppleMusic, setEnrichingAppleMusic] = useState(false);
-  const [enrichingGenius, setEnrichingGenius] = useState(false);
-  const [fetchingAppleLyrics, setFetchingAppleLyrics] = useState(false);
+  const [artistFilter, setArtistFilter] = useState('');
+  const [yearFilter, setYearFilter] = useState('');
+  const [genreFilter, setGenreFilter] = useState('');
+  const [availableGenres, setAvailableGenres] = useState<string[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
-  const [forSale, setForSale] = useState(false);
-  const [salePrice, setSalePrice] = useState('');
-  const [salePlatform, setSalePlatform] = useState('');
-  const [saleQuantity, setSaleQuantity] = useState('1');
-  const [saleNotes, setSaleNotes] = useState('');
+  const applyFilters = useCallback(() => {
+    let filtered = [...results];
+    if (artistFilter) filtered = filtered.filter(a => a.artist.toLowerCase().includes(artistFilter.toLowerCase()));
+    if (yearFilter) filtered = filtered.filter(a => a.year && a.year.includes(yearFilter));
+    if (genreFilter) filtered = filtered.filter(a => a.discogs_genres && a.discogs_genres.some(g => g.toLowerCase().includes(genreFilter.toLowerCase())));
+    setFilteredResults(filtered);
+  }, [results, artistFilter, yearFilter, genreFilter]);
 
   useEffect(() => {
-    fetchEntry(id).then((data) => {
-      setEntry(data);
-      setBlockedSides(Array.isArray(data?.blocked_sides) ? data.blocked_sides : []);
-      let tl: unknown[] = [];
-      if (data?.tracklists) {
-        try { tl = JSON.parse(data.tracklists); } catch { tl = []; }
-      }
-      setTracks(Array.isArray(tl) ? (tl as Partial<Track>[]).map(cleanTrack) : []);
-      
-      setForSale(data.for_sale || false);
-      setSalePrice(data.sale_price?.toString() || '');
-      setSalePlatform(data.sale_platform || '');
-      setSaleQuantity(data.sale_quantity?.toString() || '1');
-      setSaleNotes(data.sale_notes || '');
-    });
-  }, [id]);
+    applyFilters();
+  }, [applyFilters]);
 
-  async function fetchEntry(rowId: string): Promise<CollectionEntry> {
-    const { data } = await supabase.from('collection').select('*').eq('id', rowId).single();
-    return data as CollectionEntry;
-  }
+  const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-  const missingSpotify = !entry?.spotify_id;
-  const missingAppleMusic = !entry?.apple_music_id;
-  const canFetchGenius = tracks.length > 0;
-  const canFetchAppleLyrics = entry?.apple_music_id && tracks.length > 0;
-  
-  const missingDiscogsFields = [
-    { field: 'discogs_genres', label: 'Genres', isEmpty: !entry?.discogs_genres || entry.discogs_genres.length === 0 },
-    { field: 'discogs_styles', label: 'Styles', isEmpty: !entry?.discogs_styles || entry.discogs_styles.length === 0 },
-    { field: 'decade', label: 'Decade', isEmpty: !entry?.decade },
-    { field: 'tracklists', label: 'Tracklist', isEmpty: !tracks || tracks.length === 0 },
-    { field: 'image_url', label: 'Image', isEmpty: !entry?.image_url },
-    { field: 'master_release_date', label: 'Master Release Date', isEmpty: !entry?.master_release_date }
-  ];
-  const hasMissingDiscogs = missingDiscogsFields.some(f => f.isEmpty);
-  
-  const hasAppleLyrics = tracks.some(t => t.lyrics && t.lyrics_source === 'apple_music');
-  const appleLyricsCount = tracks.filter(t => t.lyrics && t.lyrics_source === 'apple_music').length;
-  const geniusLyricsCount = tracks.filter(t => t.lyrics_url).length;
-
-  async function fetchDiscogsMetadata() {
-    if (!entry?.discogs_release_id) {
-      setStatus('No Discogs Release ID');
-      return;
+  const checkAlbumFormats = async (album: CDOnlyAlbum): Promise<CDOnlyAlbum> => {
+    if (!album.discogs_release_id) {
+      return { ...album, available_formats: ['Unknown'], has_vinyl: false, format_check_method: 'No release ID' };
     }
 
-    setFetchingDiscogs(true);
-    setStatus('Fetching from Discogs...');
-
     try {
-      const data = await fetchDiscogsRelease(entry.discogs_release_id);
-      let updated = false;
-
-      if (!entry.discogs_genres || entry.discogs_genres.length === 0) {
-        if (data.genres && data.genres.length > 0) {
-          handleChange('discogs_genres', data.genres);
-          updated = true;
-        }
-      }
-
-      if (!entry.discogs_styles || entry.discogs_styles.length === 0) {
-        if (data.styles && data.styles.length > 0) {
-          handleChange('discogs_styles', data.styles);
-          updated = true;
-        }
-      }
-
-      if (!tracks || tracks.length === 0) {
-        if (data.tracklist && data.tracklist.length > 0) {
-          const newTracks = data.tracklist.map(track => {
-            let trackArtist = undefined;
-            if (track.artists && track.artists.length > 0) {
-              trackArtist = track.artists.map(a => a.name).join(', ');
-            }
-            return cleanTrack({
-              position: track.position,
-              title: track.title,
-              duration: track.duration,
-              artist: trackArtist
-            });
-          });
-          setTracks(newTracks);
-          handleChange('tracklists', JSON.stringify(newTracks));
-          updated = true;
-        }
-      }
-
-      if (!entry.image_url && data.images?.[0]?.uri) {
-        handleChange('image_url', data.images[0].uri);
-        updated = true;
-      }
-
-      if (!entry.master_release_date) {
-        if (data.master_id || data.master_url) {
-          const masterId = data.master_id || data.master_url?.split('/').pop();
-          if (masterId) {
-            try {
-              const masterData = await fetchDiscogsMaster(String(masterId));
-              if (masterData.year) {
-                handleChange('master_release_id', String(masterId));
-                handleChange('master_release_date', String(masterData.year));
-                const decade = calculateDecade(String(masterData.year));
-                if (decade) handleChange('decade', decade);
-                updated = true;
-              }
-            } catch (err) {
-              console.warn('Could not fetch master:', err);
-            }
-          }
-        }
-      }
-
-      if (!entry.decade) {
-        const yearToUse = entry.master_release_date || entry.year;
-        if (yearToUse) {
-          const decade = calculateDecade(yearToUse);
-          if (decade) {
-            handleChange('decade', decade);
-            updated = true;
-          }
-        }
-      }
-
-      setStatus(updated ? '✅ Updated from Discogs' : 'ℹ️ No updates needed');
-    } catch (err) {
-      setStatus(`❌ ${err instanceof Error ? err.message : 'Error'}`);
-    } finally {
-      setFetchingDiscogs(false);
-    }
-  }
-
-  async function enrichSpotify() {
-    if (!entry || entry.spotify_id) return;
-
-    setEnrichingSpotify(true);
-    setStatus('Searching Spotify...');
-
-    try {
-      const res = await fetch('/api/enrich-sources/spotify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ albumId: parseInt(entry.id) })
+      const DISCOGS_TOKEN = process.env.NEXT_PUBLIC_DISCOGS_TOKEN;
+      const response = await fetch(`https://api.discogs.com/releases/${album.discogs_release_id}`, {
+        headers: { 'Authorization': `Discogs token=${DISCOGS_TOKEN}`, 'User-Agent': 'DeadwaxDialogues/1.0' }
       });
-
-      const result = await res.json();
       
-      if (result.success && !result.skipped) {
-        const updatedEntry = await fetchEntry(id);
-        setEntry(updatedEntry);
-        setStatus('✅ Added Spotify');
-      } else {
-        setStatus(`❌ ${result.error || 'Not found'}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      
+      const releaseData: DiscogsRelease = await response.json();
+      const masterId = releaseData.master_id;
+
+      if (!masterId) {
+        const availableFormats = new Set<string>();
+        releaseData.formats?.forEach((f: DiscogsFormat) => { if (f.name) availableFormats.add(f.name.toLowerCase()); });
+        const formatArray = Array.from(availableFormats);
+        const hasCD = formatArray.some(f => f.includes('cd'));
+        const hasVinyl = formatArray.some(f => f.includes('vinyl') || f.includes('lp') || f.includes('12"'));
+        return { ...album, available_formats: formatArray, has_vinyl: !hasCD || hasVinyl, format_check_method: 'Single release' };
       }
-    } catch (err) {
-      setStatus(`❌ ${err instanceof Error ? err.message : 'Error'}`);
-    } finally {
-      setEnrichingSpotify(false);
-    }
-  }
 
-  async function enrichAppleMusic() {
-    if (!entry || entry.apple_music_id) return;
-
-    setEnrichingAppleMusic(true);
-    setStatus('Searching Apple Music...');
-
-    try {
-      const res = await fetch('/api/enrich-sources/apple-music', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ albumId: parseInt(entry.id) })
-      });
-
-      const result = await res.json();
+      const searchQuery = encodeURIComponent(`${album.artist} ${album.title}`);
+      const searchUrl = `https://api.discogs.com/database/search?q=${searchQuery}&type=release&per_page=100&token=${DISCOGS_TOKEN}`;
+      const searchResponse = await fetch(searchUrl, { headers: { 'User-Agent': 'DeadwaxDialogues/1.0' }});
       
-      if (result.success && !result.skipped) {
-        const updatedEntry = await fetchEntry(id);
-        setEntry(updatedEntry);
-        setStatus('✅ Added Apple Music');
-      } else {
-        setStatus(`❌ ${result.error || 'Not found'}`);
-      }
-    } catch (err) {
-      setStatus(`❌ ${err instanceof Error ? err.message : 'Error'}`);
-    } finally {
-      setEnrichingAppleMusic(false);
-    }
-  }
-
-  async function enrichGenius() {
-    if (!entry || !tracks || tracks.length === 0) return;
-
-    setEnrichingGenius(true);
-    setStatus('Searching Genius...');
-
-    try {
-      const res = await fetch('/api/enrich-sources/genius', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ albumId: parseInt(entry.id) })
-      });
-
-      const result = await res.json();
+      if (!searchResponse.ok) throw new Error(`Search failed: ${searchResponse.status}`);
       
-      if (result.success && result.data?.enrichedCount > 0) {
-        const updatedEntry = await fetchEntry(id);
-        setEntry(updatedEntry);
-        if (updatedEntry.tracklists) {
-          try {
-            const tl = JSON.parse(updatedEntry.tracklists);
-            setTracks(Array.isArray(tl) ? (tl as Partial<Track>[]).map(cleanTrack) : []);
-          } catch {
-            // Keep existing
-          }
+      const searchData: DiscogsSearchResponse = await response.json();
+      const availableFormats = new Set<string>();
+      let releaseCount = 0;
+      
+      searchData.results?.forEach((result: DiscogsSearchResult) => {
+        if (result.master_id === masterId) {
+          releaseCount++;
+          result.format?.forEach((format: string) => availableFormats.add(format.toLowerCase()));
         }
-        setStatus(`✅ Added ${result.data.enrichedCount} Genius links`);
-      } else {
-        setStatus('ℹ️ No new links found');
-      }
-    } catch (err) {
-      setStatus(`❌ ${err instanceof Error ? err.message : 'Error'}`);
-    } finally {
-      setEnrichingGenius(false);
-    }
-  }
-
-  async function fetchAppleMusicLyrics() {
-    if (!entry?.apple_music_id) {
-      setStatus('No Apple Music ID');
-      return;
-    }
-
-    setFetchingAppleLyrics(true);
-    setStatus('Fetching Apple lyrics...');
-
-    try {
-      const res = await fetch('/api/enrich-sources/apple-lyrics', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ albumId: parseInt(entry.id) })
       });
+      
+      const formatArray = Array.from(availableFormats);
+      const hasCD = formatArray.some(f => f.includes('cd'));
+      const hasVinyl = formatArray.some(f => f.includes('vinyl') || f.includes('lp') || f.includes('12"'));
+      
+      return { ...album, available_formats: formatArray, has_vinyl: !hasCD || hasVinyl, format_check_method: `Master (${releaseCount} releases)` };
+    } catch {
+      return { ...album, available_formats: ['Error'], has_vinyl: false, format_check_method: 'Error' };
+    }
+  };
 
-      const result = await res.json();
-
-      if (!result.success) {
-        setStatus(`❌ ${result.error}`);
+  const runCDOnlyCheck = async () => {
+    setScanning(true);
+    setStatus('Fetching CD collection...');
+    setProgress(0);
+    setView('scanner');
+    
+    try {
+      const { data: cdAlbums, error } = await supabase
+        .from('collection')
+        .select('id, artist, title, year, discogs_release_id, image_url, discogs_genres, folder, notes')
+        .or('format.ilike.%CD%,folder.eq.CDs')
+        .not('discogs_release_id', 'is', null);
+      
+      if (error) throw new Error(error.message);
+      if (!cdAlbums || cdAlbums.length === 0) {
+        setStatus('No CDs found');
+        setScanning(false);
         return;
       }
-
-      const updatedEntry = await fetchEntry(id);
-      setEntry(updatedEntry);
       
-      if (updatedEntry.tracklists) {
-        try {
-          const tl = JSON.parse(updatedEntry.tracklists);
-          setTracks(Array.isArray(tl) ? (tl as Partial<Track>[]).map(cleanTrack) : []);
-        } catch {
-          // Keep existing
+      setStatus(`Checking ${cdAlbums.length} CDs...`);
+      const results: CDOnlyAlbum[] = [];
+      const errorList: Array<{album: string, error: string}> = [];
+      
+      for (let i = 0; i < cdAlbums.length; i++) {
+        const album = cdAlbums[i];
+        setStatus(`Checking ${i + 1}/${cdAlbums.length}: ${album.artist} - ${album.title}`);
+        setProgress(((i + 1) / cdAlbums.length) * 100);
+        
+        const result = await checkAlbumFormats({
+          id: album.id,
+          artist: album.artist,
+          title: album.title,
+          year: album.year,
+          discogs_release_id: album.discogs_release_id,
+          image_url: album.image_url,
+          discogs_genres: album.discogs_genres,
+          folder: album.folder,
+          has_vinyl: null,
+          cd_only_tagged: album.notes?.includes('[CD-ONLY]') || false
+        });
+        
+        if (result.available_formats?.includes('Error')) {
+          errorList.push({ album: `${result.artist} - ${result.title}`, error: 'Discogs API error' });
+        } else {
+          results.push(result);
         }
+        
+        if (i < cdAlbums.length - 1) await delay(1000);
       }
-
-      const { stats } = result;
-      setStatus(`✅ ${stats.lyricsFound}/${stats.totalTracks} lyrics`);
+      
+      const cdOnly = results.filter(r => !r.has_vinyl);
+      setResults(cdOnly);
+      setStats({ total: cdAlbums.length, scanned: cdAlbums.length, cdOnly: cdOnly.length, errors: errorList.length });
+      setStatus(`✅ Complete! Found ${cdOnly.length} CD-only albums`);
+      setProgress(100);
+      setView('results');
+      
+      const genres = new Set<string>();
+      cdOnly.forEach(album => { album.discogs_genres?.forEach(g => genres.add(g)); });
+      setAvailableGenres(Array.from(genres).sort());
     } catch (err) {
-      setStatus(`❌ ${err instanceof Error ? err.message : 'Error'}`);
+      setStatus(`❌ Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
-      setFetchingAppleLyrics(false);
+      setScanning(false);
     }
-  }
-
-  if (!entry) {
-    return <div style={{ maxWidth: 1200, margin: '32px auto', padding: 24, background: '#fff', borderRadius: 8, color: "#222", textAlign: 'center' }}>Loading...</div>;
-  }
-
-  function handleChange(field: string, value: unknown) {
-    setEntry((e) => ({ ...(e as CollectionEntry), [field]: value }));
-  }
-
-  function handleBlockSide(side: string) {
-    setBlockedSides((bs) => bs.includes(side) ? bs.filter((s) => s !== side) : [...bs, side]);
-  }
-
-  function handleTrackChange(i: number, key: keyof Track, value: string) {
-    setTracks((tks) => tks.map((t, j) => j === i ? { ...t, [key]: value } : t));
-  }
-
-  function addTrack() {
-    setTracks((tks) => [...tks, { position: '', title: '', duration: '', artist: undefined }]);
-  }
-  
-  function removeTrack(i: number) {
-    setTracks((tks) => tks.filter((_, j) => j !== i));
-  }
-
-  async function handleSave() {
-    if (!entry) return;
-    setSaving(true);
-    setStatus('Saving...');
-    
-    const update = {
-      artist: entry.artist || '',
-      title: entry.title || '',
-      year: entry.year || '',
-      folder: entry.folder || '',
-      format: entry.format || '',
-      image_url: entry.image_url || '',
-      media_condition: entry.media_condition || '',
-      sell_price: entry.sell_price || null,
-      steves_top_200: !!entry.steves_top_200,
-      this_weeks_top_10: !!entry.this_weeks_top_10,
-      inner_circle_preferred: !!entry.inner_circle_preferred,
-      blocked_sides: blockedSides || [],
-      blocked: !!entry.blocked,
-      tracklists: JSON.stringify(tracks),
-      discogs_release_id: entry.discogs_release_id || '',
-      discogs_genres: entry.discogs_genres || null,
-      discogs_styles: entry.discogs_styles || null,
-      decade: entry.decade || null,
-      master_release_id: entry.master_release_id || null,
-      master_release_date: entry.master_release_date || null,
-      spotify_id: entry.spotify_id || null,
-      spotify_url: entry.spotify_url || null,
-      spotify_popularity: entry.spotify_popularity || null,
-      spotify_genres: entry.spotify_genres || null,
-      spotify_label: entry.spotify_label || null,
-      spotify_release_date: entry.spotify_release_date || null,
-      spotify_total_tracks: entry.spotify_total_tracks || null,
-      spotify_image_url: entry.spotify_image_url || null,
-      apple_music_id: entry.apple_music_id || null,
-      apple_music_url: entry.apple_music_url || null,
-      apple_music_genre: entry.apple_music_genre || null,
-      apple_music_genres: entry.apple_music_genres || null,
-      apple_music_label: entry.apple_music_label || null,
-      apple_music_release_date: entry.apple_music_release_date || null,
-      apple_music_track_count: entry.apple_music_track_count || null,
-      apple_music_artwork_url: entry.apple_music_artwork_url || null,
-      for_sale: forSale,
-      sale_price: forSale && salePrice ? parseFloat(salePrice) : null,
-      sale_platform: forSale && salePlatform ? salePlatform : null,
-      sale_quantity: forSale && saleQuantity ? parseInt(saleQuantity) : null,
-      sale_notes: forSale && saleNotes ? saleNotes : null
-    };
-    
-    const { error } = await supabase.from('collection').update(update).eq('id', entry.id);
-    
-    if (error) {
-      setStatus(`Error: ${error.message}`);
-      setSaving(false);
-    } else {
-      setStatus('✅ Saved!');
-      setSaving(false);
-      setTimeout(() => router.push('/admin/edit-collection'), 1000);
-    }
-  }
-
-  const sides = Array.from(new Set(tracks.map(t => t.position?.[0]).filter(Boolean)));
-  
-  // Group tracks by side
-  const tracksBySide = tracks.reduce((acc, track) => {
-    const side = track.position?.[0] || 'Unknown';
-    if (!acc[side]) acc[side] = [];
-    acc[side].push(track);
-    return acc;
-  }, {} as Record<string, Track[]>);
-
-  const inputStyle = { 
-    padding: '8px 12px', 
-    border: '1px solid #d1d5db', 
-    borderRadius: '6px', 
-    fontSize: '14px', 
-    width: '100%', 
-    boxSizing: 'border-box' as const,
-    transition: 'border-color 0.2s, box-shadow 0.2s'
   };
-  
-  const buttonStyle = { 
-    padding: '8px 14px', 
-    fontSize: '13px', 
-    border: 'none', 
-    borderRadius: '6px', 
-    fontWeight: '600', 
-    cursor: 'pointer', 
-    transition: 'all 0.2s' 
+
+  const exportToCSV = () => {
+    const headers = ['Artist', 'Title', 'Year', 'Formats', 'Check Method'];
+    const rows = filteredResults.map(a => [a.artist, a.title, a.year || '', (a.available_formats || []).join('; '), a.format_check_method || '']);
+    const csvContent = [headers.join(','), ...rows.map(row => row.map(cell => `"${cell}"`).join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `cd-only-releases-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const tagSelected = async () => {
+    if (selectedIds.size === 0) return;
+    try {
+      for (const id of Array.from(selectedIds)) {
+        const { data: album } = await supabase.from('collection').select('notes').eq('id', id).single();
+        if (!album) continue;
+        const currentNotes = album.notes || '';
+        if (currentNotes.includes('[CD-ONLY]')) continue;
+        const newNotes = currentNotes ? `[CD-ONLY] ${currentNotes}` : '[CD-ONLY]';
+        await supabase.from('collection').update({ notes: newNotes }).eq('id', id);
+      }
+      setResults(results.map(a => selectedIds.has(a.id) ? { ...a, cd_only_tagged: true } : a));
+      setSelectedIds(new Set());
+    } catch (err) {
+      console.error('Error tagging:', err);
+    }
   };
 
   return (
-    <div style={{ maxWidth: 1400, margin: '24px auto', padding: 24, background: '#fff', borderRadius: 12, color: "#222", boxShadow: '0 4px 6px rgba(0, 0, 0, 0.07)' }}>
-      {/* Header */}
-      <div style={{ marginBottom: 24, paddingBottom: 16, borderBottom: '2px solid #e5e7eb' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
-          <div>
-            <h2 style={{ color: "#111", margin: 0, fontSize: '24px', fontWeight: '700' }}>Edit Entry #{entry.id}</h2>
-            <p style={{ color: "#6b7280", margin: '6px 0 0 0', fontSize: '15px' }}>{entry.artist} - {entry.title}</p>
+    <div>
+      {view === 'scanner' && (
+        <>
+          <div style={{ textAlign: 'center', marginBottom: 32 }}>
+            <div style={{ fontSize: 64, marginBottom: 16 }}>💿</div>
+            <h2 style={{ fontSize: 24, fontWeight: 600, color: '#1f2937', marginBottom: 12 }}>CD-Only Release Finder</h2>
+            <p style={{ color: '#6b7280', fontSize: 16, maxWidth: 600, margin: '0 auto 24px' }}>
+              Comprehensively checks Discogs to find albums never released on vinyl
+            </p>
           </div>
 
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {hasMissingDiscogs && (
-              <button onClick={fetchDiscogsMetadata} disabled={fetchingDiscogs} style={{ ...buttonStyle, background: fetchingDiscogs ? '#9ca3af' : '#f59e0b', color: 'white' }}>
-                {fetchingDiscogs ? '⏳ Fetching...' : '🔄 Update Discogs'}
+          {!scanning && results.length === 0 && (
+            <div style={{ textAlign: 'center' }}>
+              <button onClick={runCDOnlyCheck} style={{ padding: '16px 32px', background: '#8b5cf6', color: 'white', border: 'none', borderRadius: 8, fontSize: 16, fontWeight: 600, cursor: 'pointer' }}>
+                🚀 Start Comprehensive Scan
               </button>
-            )}
-            {missingSpotify && (
-              <button onClick={enrichSpotify} disabled={enrichingSpotify} style={{ ...buttonStyle, background: enrichingSpotify ? '#9ca3af' : '#1DB954', color: 'white' }}>
-                {enrichingSpotify ? '⏳ Searching...' : '🎵 Add Spotify'}
-              </button>
-            )}
-            {missingAppleMusic && (
-              <button onClick={enrichAppleMusic} disabled={enrichingAppleMusic} style={{ ...buttonStyle, background: enrichingAppleMusic ? '#9ca3af' : '#FA57C1', color: 'white' }}>
-                {enrichingAppleMusic ? '⏳ Searching...' : '🍎 Add Apple'}
-              </button>
-            )}
-            {canFetchGenius && (
-              <button onClick={enrichGenius} disabled={enrichingGenius} style={{ ...buttonStyle, background: enrichingGenius ? '#9ca3af' : '#7c3aed', color: 'white' }}>
-                {enrichingGenius ? '⏳ Searching...' : '📝 Add Genius'}
-              </button>
-            )}
-            {canFetchAppleLyrics && !hasAppleLyrics && (
-              <button onClick={fetchAppleMusicLyrics} disabled={fetchingAppleLyrics} style={{ ...buttonStyle, background: fetchingAppleLyrics ? '#9ca3af' : '#ec4899', color: 'white' }}>
-                {fetchingAppleLyrics ? '⏳ Fetching...' : '🍎 Fetch Lyrics'}
-              </button>
-            )}
-          </div>
-        </div>
+            </div>
+          )}
 
-        {/* Enrichment Status */}
-        {(entry.spotify_id || entry.apple_music_id || hasAppleLyrics) && (
-          <div style={{ marginTop: 12, padding: 12, background: '#f0fdf4', border: '1px solid #16a34a', borderRadius: 8, display: 'flex', gap: 10, alignItems: 'center', fontSize: 13, flexWrap: 'wrap' }}>
-            <span style={{ fontWeight: 700, color: '#15803d' }}>✅ Connected:</span>
-            {entry.spotify_id && (
-              <a href={entry.spotify_url || `https://open.spotify.com/album/${entry.spotify_id}`} target="_blank" rel="noopener noreferrer" style={{ padding: '6px 12px', background: '#dcfce7', color: '#15803d', borderRadius: 6, textDecoration: 'none', fontWeight: 600, fontSize: '13px' }}>
-                🎵 Spotify
-              </a>
-            )}
-            {entry.apple_music_id && (
-              <a href={entry.apple_music_url || `https://music.apple.com/album/${entry.apple_music_id}`} target="_blank" rel="noopener noreferrer" style={{ padding: '6px 12px', background: '#fce7f3', color: '#be185d', borderRadius: 6, textDecoration: 'none', fontWeight: 600, fontSize: '13px' }}>
-                🍎 Apple Music
-              </a>
-            )}
-            {hasAppleLyrics && (
-              <span style={{ padding: '6px 12px', background: '#fce7f3', color: '#be185d', borderRadius: 6, fontWeight: 600, fontSize: '13px' }}>
-                📝 {appleLyricsCount} Apple Lyrics
-              </span>
-            )}
-            {geniusLyricsCount > 0 && (
-              <span style={{ padding: '6px 12px', background: '#e9d5ff', color: '#7c3aed', borderRadius: 6, fontWeight: 600, fontSize: '13px' }}>
-                🔗 {geniusLyricsCount} Genius Links
-              </span>
-            )}
-          </div>
-        )}
+          {scanning && (
+            <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: 8, padding: 20, marginBottom: 24 }}>
+              <div style={{ fontSize: 48, marginBottom: 12, textAlign: 'center' }}>🔍</div>
+              <div style={{ fontSize: 16, fontWeight: 600, color: '#92400e', marginBottom: 8, textAlign: 'center' }}>{status}</div>
+              <div style={{ width: '100%', height: 8, background: '#e9ecef', borderRadius: 4, overflow: 'hidden', marginBottom: 8 }}>
+                <div style={{ width: `${progress}%`, height: '100%', background: '#8b5cf6', transition: 'width 0.3s' }} />
+              </div>
+              <p style={{ color: '#78350f', fontSize: 14, margin: 0, textAlign: 'center' }}>{Math.round(progress)}% complete</p>
+            </div>
+          )}
+        </>
+      )}
 
-        {/* Status Message */}
-        {status && (
-          <div style={{ 
-            marginTop: 12, 
-            padding: 12, 
-            background: status.includes('❌') ? '#fee2e2' : status.includes('✅') ? '#dcfce7' : '#dbeafe', 
-            border: `2px solid ${status.includes('❌') ? '#dc2626' : status.includes('✅') ? '#16a34a' : '#3b82f6'}`, 
-            borderRadius: 8, 
-            fontSize: 14, 
-            color: status.includes('❌') ? '#991b1b' : status.includes('✅') ? '#15803d' : '#1e40af', 
-            fontWeight: 600 
-          }}>
-            {status}
+      {view === 'results' && (
+        <>
+          <div style={{ background: '#f0fdf4', border: '1px solid #10b981', borderRadius: 8, padding: 20, marginBottom: 24 }}>
+            <h3 style={{ fontSize: 16, fontWeight: 600, color: '#065f46', marginBottom: 8 }}>✅ Scan Complete</h3>
+            <p style={{ color: '#065f46', fontSize: 14, margin: 0 }}>
+              Found <strong>{stats.cdOnly}</strong> CD-only releases • {stats.errors} errors
+              {filteredResults.length < results.length && <> • Showing <strong>{filteredResults.length}</strong> filtered</>}
+            </p>
           </div>
-        )}
+
+          <div style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: 8, padding: 20, marginBottom: 24 }}>
+            <div style={{ marginBottom: 20 }}>
+              <h3 style={{ fontSize: 14, fontWeight: 600, color: '#1f2937', marginBottom: 12 }}>🔍 Filters</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+                <input type="text" placeholder="Filter by artist..." value={artistFilter} onChange={(e) => setArtistFilter(e.target.value)} style={{ padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 14 }} />
+                <input type="text" placeholder="Filter by year..." value={yearFilter} onChange={(e) => setYearFilter(e.target.value)} style={{ padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 14 }} />
+                <select value={genreFilter} onChange={(e) => setGenreFilter(e.target.value)} style={{ padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 14 }}>
+                  <option value="">All Genres</option>
+                  {availableGenres.map(g => <option key={g} value={g}>{g}</option>)}
+                </select>
+                <button onClick={() => { setArtistFilter(''); setYearFilter(''); setGenreFilter(''); }} style={{ padding: '8px 12px', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 14, cursor: 'pointer' }}>Clear</button>
+              </div>
+            </div>
+
+            <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 16 }}>
+              <h3 style={{ fontSize: 14, fontWeight: 600, color: '#1f2937', marginBottom: 12 }}>⚡ Quick Actions</h3>
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                <button onClick={() => setSelectedIds(new Set(filteredResults.map(a => a.id)))} style={{ padding: '8px 16px', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 14, cursor: 'pointer' }}>Select All</button>
+                <button onClick={() => setSelectedIds(new Set())} style={{ padding: '8px 16px', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 14, cursor: 'pointer' }}>Clear</button>
+                <button onClick={tagSelected} disabled={selectedIds.size === 0} style={{ padding: '8px 16px', background: selectedIds.size === 0 ? '#f3f4f6' : '#8b5cf6', color: selectedIds.size === 0 ? '#9ca3af' : 'white', border: 'none', borderRadius: 6, fontSize: 14, cursor: selectedIds.size === 0 ? 'not-allowed' : 'pointer' }}>🏷️ Tag ({selectedIds.size})</button>
+                <button onClick={exportToCSV} style={{ padding: '8px 16px', background: '#10b981', color: 'white', border: 'none', borderRadius: 6, fontSize: 14, cursor: 'pointer' }}>📥 Export CSV</button>
+                <button onClick={() => { setView('scanner'); setResults([]); setSelectedIds(new Set()); }} style={{ padding: '8px 16px', background: '#6b7280', color: 'white', border: 'none', borderRadius: 6, fontSize: 14, cursor: 'pointer' }}>🔄 New Scan</button>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 16 }}>
+            {filteredResults.map((album) => {
+              const isSelected = selectedIds.has(album.id);
+              return (
+                <div 
+                  key={album.id} 
+                  onClick={() => {
+                    const newSet = new Set(selectedIds);
+                    if (isSelected) {
+                      newSet.delete(album.id);
+                    } else {
+                      newSet.add(album.id);
+                    }
+                    setSelectedIds(newSet);
+                  }} 
+                  style={{ background: 'white', border: isSelected ? '2px solid #8b5cf6' : '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden', cursor: 'pointer', position: 'relative' }}
+                >
+                  {isSelected && <div style={{ position: 'absolute', top: 8, right: 8, background: '#8b5cf6', color: 'white', borderRadius: '50%', width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 'bold', zIndex: 10 }}>✓</div>}
+                  {album.cd_only_tagged && <div style={{ position: 'absolute', top: 8, left: 8, background: '#10b981', color: 'white', borderRadius: 4, padding: '2px 6px', fontSize: 10, fontWeight: 'bold', zIndex: 10 }}>🏷️</div>}
+                  {album.image_url && <Image src={album.image_url} alt={`${album.artist} - ${album.title}`} width={180} height={180} style={{ objectFit: 'cover', width: '100%', height: 180 }} unoptimized />}
+                  <div style={{ padding: 12 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: '#1f2937', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{album.artist}</div>
+                    <div style={{ fontSize: 12, color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 4 }}>{album.title}</div>
+                    {album.year && <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>{album.year}</div>}
+                    <div style={{ marginTop: 8, padding: '4px 8px', background: '#fef3c7', color: '#92400e', fontSize: 11, fontWeight: 600, borderRadius: 4, textAlign: 'center' }}>💿 CD Only</div>
+                    {album.format_check_method && <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 4 }}>{album.format_check_method}</div>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// 1001 ALBUMS TAB - ORIGINAL + NEW FEATURES
+// ============================================================================
+
+type A1001 = { id: number; artist: string; album: string; year: number | null; artist_norm: string | null; album_norm: string | null; };
+type MatchRow = { id: number; album_1001_id: number; collection_id: number; review_status: string; confidence: number | null; notes: string | null; };
+type CollectionRow = { id: number; artist: string | null; title: string | null; year: number | null; format: string | null; image_url: string | null; };
+type StatusFilter = "unmatched" | "pending" | "confirmed" | "all" | "overview";
+
+function Thousand1AlbumsTab() {
+  const [view, setView] = useState<StatusFilter>('overview');
+  const [rows, setRows] = useState<A1001[]>([]);
+  const [matchesBy, setMatchesBy] = useState<Record<number, MatchRow[]>>({});
+  const [collectionsBy, setCollectionsBy] = useState<Record<number, CollectionRow>>({});
+  const [loading, setLoading] = useState(true);
+  const [running, setRunning] = useState(false);
+  const [searchInputs, setSearchInputs] = useState<Record<number, string>>({});
+  const [searchResults, setSearchResults] = useState<Record<number, CollectionRow[]>>({});
+  const searchTimeouts = useRef<Record<number, NodeJS.Timeout>>({});
+  const [expandedAlbums, setExpandedAlbums] = useState<Record<number, boolean>>({});
+  const [toasts, setToasts] = useState<Array<{kind: 'info'|'ok'|'err'; msg: string}>>([]);
+
+  const pushToast = useCallback((t: {kind: 'info'|'ok'|'err'; msg: string}) => {
+    setToasts(ts => [...ts, t]);
+    setTimeout(() => setToasts(ts => ts.slice(1)), 3500);
+  }, []);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const { data: batch1 } = await supabase.from("one_thousand_one_albums").select("id, artist, album, year, artist_norm, album_norm").order("artist", { ascending: true }).range(0, 999);
+    const { data: batch2 } = await supabase.from("one_thousand_one_albums").select("id, artist, album, year, artist_norm, album_norm").order("artist", { ascending: true }).range(1000, 1999);
+    const a1001 = [...(batch1 || []), ...(batch2 || [])];
+    setRows(a1001);
+    const aIds = a1001.map(r => r.id);
+    if (aIds.length === 0) { setMatchesBy({}); setCollectionsBy({}); setLoading(false); return; }
+    const { data: mrows } = await supabase.from("collection_1001_review").select("id, album_1001_id, collection_id, review_status, confidence, notes").in("album_1001_id", aIds);
+    const by: Record<number, MatchRow[]> = {};
+    const cids = new Set<number>();
+    (mrows || []).forEach(m => { if (!by[m.album_1001_id]) by[m.album_1001_id] = []; by[m.album_1001_id].push(m); cids.add(m.collection_id); });
+    setMatchesBy(by);
+    let cmap: Record<number, CollectionRow> = {};
+    if (cids.size > 0) {
+      const { data: crows } = await supabase.from("collection").select("id, artist, title, year, format, image_url").in("id", Array.from(cids));
+      if (crows) cmap = crows.reduce<Record<number, CollectionRow>>((acc, r) => { acc[r.id] = r; return acc; }, {});
+    }
+    setCollectionsBy(cmap);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const runExact = useCallback(async () => {
+    setRunning(true);
+    const { data, error } = await supabase.rpc("match_1001_exact");
+    setRunning(false);
+    if (error) { pushToast({ kind: "err", msg: `Exact match failed: ${error.message}` }); return; }
+    const n = Number.isFinite(Number(data)) ? Number(data) : 0;
+    pushToast({ kind: "ok", msg: `Found ${n} exact match${n !== 1 ? "es" : ""}` });
+    await load();
+  }, [pushToast, load]);
+
+  const runFuzzy = useCallback(async () => {
+    setRunning(true);
+    const { data, error } = await supabase.rpc("match_1001_fuzzy", { threshold: 0.7, year_slop: 1 });
+    setRunning(false);
+    if (error) { pushToast({ kind: "err", msg: `Fuzzy match failed: ${error.message}` }); return; }
+    pushToast({ kind: "ok", msg: `Found ${data || 0} fuzzy matches` });
+    await load();
+  }, [pushToast, load]);
+
+  const updateStatus = useCallback(async (matchId: number, newStatus: string) => {
+    const { error } = await supabase.from("collection_1001_review").update({ review_status: newStatus }).eq("id", matchId);
+    if (error) { pushToast({ kind: "err", msg: `Update failed: ${error.message}` }); return; }
+    pushToast({ kind: "ok", msg: "Status updated" });
+    await load();
+  }, [pushToast, load]);
+
+  const rejectMatch = useCallback(async (matchId: number) => {
+    const { error } = await supabase.from("collection_1001_review").delete().eq("id", matchId);
+    if (error) { pushToast({ kind: "err", msg: `Delete failed: ${error.message}` }); return; }
+    pushToast({ kind: "ok", msg: "Match removed" });
+    await load();
+  }, [pushToast, load]);
+
+  const linkManually = useCallback(async (albumId: number, collectionId: number) => {
+    const { error } = await supabase.from("collection_1001_review").insert([{ album_1001_id: albumId, collection_id: collectionId, review_status: "pending", confidence: 1.0 }]);
+    if (error) { pushToast({ kind: "err", msg: `Link failed: ${error.message}` }); return; }
+    pushToast({ kind: "ok", msg: "Linked!" });
+    setSearchInputs(s => ({ ...s, [albumId]: "" }));
+    setSearchResults(s => ({ ...s, [albumId]: [] }));
+    await load();
+  }, [pushToast, load]);
+
+  const handleSearch = useCallback((albumId: number, term: string) => {
+    setSearchInputs(s => ({ ...s, [albumId]: term }));
+    if (searchTimeouts.current[albumId]) clearTimeout(searchTimeouts.current[albumId]);
+    if (!term.trim()) { setSearchResults(s => ({ ...s, [albumId]: [] })); return; }
+    searchTimeouts.current[albumId] = setTimeout(async () => {
+      const { data } = await supabase.from("collection").select("id, artist, title, year, format, image_url").or(`artist.ilike.%${term}%,title.ilike.%${term}%`).limit(10);
+      setSearchResults(s => ({ ...s, [albumId]: data || [] }));
+    }, 300);
+  }, []);
+
+  const stats = { total: rows.length, unmatched: rows.filter(r => !matchesBy[r.id] || matchesBy[r.id].length === 0).length, pending: rows.filter(r => matchesBy[r.id]?.some(m => m.review_status === "pending")).length, confirmed: rows.filter(r => matchesBy[r.id]?.some(m => m.review_status === "confirmed")).length };
+
+  const filteredRows = rows.filter(r => {
+    const matches = matchesBy[r.id] || [];
+    if (view === "unmatched") return matches.length === 0;
+    if (view === "pending") return matches.some(m => m.review_status === "pending");
+    if (view === "confirmed") return matches.some(m => m.review_status === "confirmed");
+    return view === "all";
+  });
+
+  if (loading) return <div style={{ textAlign: 'center', padding: 40 }}>Loading...</div>;
+
+  return (
+    <div>
+      <div style={{ marginBottom: 24, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {(['overview', 'unmatched', 'pending', 'confirmed', 'all'] as StatusFilter[]).map(v => (
+          <button key={v} onClick={() => setView(v)} style={{ padding: '8px 16px', background: view === v ? '#8b5cf6' : 'white', color: view === v ? 'white' : '#6b7280', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+            {v === 'overview' && `📊 Overview`}
+            {v === 'unmatched' && `❓ Unmatched (${stats.unmatched})`}
+            {v === 'pending' && `⏳ Pending (${stats.pending})`}
+            {v === 'confirmed' && `✅ Confirmed (${stats.confirmed})`}
+            {v === 'all' && `🔢 All (${stats.total})`}
+          </button>
+        ))}
       </div>
 
-      {/* Two-Column Layout for Metadata */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 24 }}>
-        
-        {/* Left Column */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          
-          {/* Basic Information */}
-          <div>
-            <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: 14, color: '#111', display: 'flex', alignItems: 'center', gap: 8 }}>
-              📀 Basic Information
-            </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div>
-                <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>Artist</label>
-                <input style={inputStyle} value={entry.artist || ''} onChange={e => handleChange('artist', e.target.value)} placeholder="Enter artist name" />
-              </div>
-              <div>
-                <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>Title</label>
-                <input style={inputStyle} value={entry.title || ''} onChange={e => handleChange('title', e.target.value)} placeholder="Enter album title" />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>This Release Year</label>
-                  <input 
-                    style={inputStyle} 
-                    value={entry.year || ''} 
-                    onChange={e => { 
-                      handleChange('year', e.target.value); 
-                      if (!entry.master_release_date) { 
-                        const decade = calculateDecade(e.target.value); 
-                        if (decade) handleChange('decade', decade); 
-                      }
-                    }} 
-                    placeholder="1969" 
-                  />
-                  <div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>Year of this pressing</div>
+      {view === 'overview' && (
+        <div style={{ background: '#f0fdf4', border: '1px solid #10b981', borderRadius: 8, padding: 32, textAlign: 'center' }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>📊</div>
+          <h3 style={{ fontSize: 20, fontWeight: 600, color: '#065f46', marginBottom: 12 }}>Collection Progress</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
+            <div><div style={{ fontSize: 32, fontWeight: 'bold', color: '#8b5cf6' }}>{stats.total}</div><div style={{ fontSize: 12, color: '#6b7280' }}>Total</div></div>
+            <div><div style={{ fontSize: 32, fontWeight: 'bold', color: '#10b981' }}>{stats.confirmed}</div><div style={{ fontSize: 12, color: '#6b7280' }}>Confirmed</div></div>
+            <div><div style={{ fontSize: 32, fontWeight: 'bold', color: '#f59e0b' }}>{stats.pending}</div><div style={{ fontSize: 12, color: '#6b7280' }}>Pending</div></div>
+            <div><div style={{ fontSize: 32, fontWeight: 'bold', color: '#ef4444' }}>{stats.unmatched}</div><div style={{ fontSize: 12, color: '#6b7280' }}>Unmatched</div></div>
+          </div>
+          <p style={{ color: '#065f46', fontSize: 14, marginBottom: 24 }}>
+            {Math.round((stats.confirmed / stats.total) * 100)}% complete
+          </p>
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+            <button onClick={runExact} disabled={running} style={{ padding: '12px 24px', background: running ? '#9ca3af' : '#10b981', color: 'white', border: 'none', borderRadius: 6, fontSize: 14, fontWeight: 600, cursor: running ? 'not-allowed' : 'pointer' }}>🎯 Run Exact Match</button>
+            <button onClick={runFuzzy} disabled={running} style={{ padding: '12px 24px', background: running ? '#9ca3af' : '#8b5cf6', color: 'white', border: 'none', borderRadius: 6, fontSize: 14, fontWeight: 600, cursor: running ? 'not-allowed' : 'pointer' }}>🔍 Run Fuzzy Match</button>
+          </div>
+        </div>
+      )}
+
+      {view !== 'overview' && (
+        <div>
+          {filteredRows.map(album => {
+            const matches = matchesBy[album.id] || [];
+            const isExpanded = expandedAlbums[album.id];
+            return (
+              <div key={album.id} style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: 8, padding: 16, marginBottom: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }} onClick={() => setExpandedAlbums(e => ({ ...e, [album.id]: !e[album.id] }))}>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: '#1f2937' }}>{album.artist} — {album.album}</div>
+                    <div style={{ fontSize: 12, color: '#6b7280' }}>{album.year || '—'} • {matches.length} match{matches.length !== 1 ? 'es' : ''}</div>
+                  </div>
+                  <div style={{ fontSize: 20 }}>{isExpanded ? '▼' : '▶'}</div>
                 </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>Master Release Year</label>
-                  <input 
-                    style={inputStyle} 
-                    value={entry.master_release_date || ''} 
-                    onChange={e => { 
-                      handleChange('master_release_date', e.target.value); 
-                      const decade = calculateDecade(e.target.value); 
-                      if (decade) handleChange('decade', decade); 
-                    }} 
-                    placeholder="1967" 
-                  />
-                  <div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>Original first release</div>
-                </div>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>Folder</label>
-                  <input style={inputStyle} value={entry.folder || ''} onChange={e => handleChange('folder', e.target.value)} placeholder="Collection folder" />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>Format</label>
-                  <input style={inputStyle} value={entry.format || ''} onChange={e => handleChange('format', e.target.value)} placeholder="Vinyl, LP" />
-                </div>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>Media Condition</label>
-                  <input style={inputStyle} value={entry.media_condition || ''} onChange={e => handleChange('media_condition', e.target.value)} placeholder="VG+, NM" />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>💰 Sell Price</label>
-                  <input style={inputStyle} value={entry.sell_price || ''} onChange={e => handleChange('sell_price', e.target.value)} placeholder="$25.00" />
-                </div>
-              </div>
-              <div>
-                <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>Cover Image URL</label>
-                <input style={inputStyle} value={entry.image_url || ''} onChange={e => handleChange('image_url', e.target.value)} placeholder="Cover image URL" />
-                {entry.image_url && (
-                  <div style={{ marginTop: 12, padding: 12, background: '#f9fafb', borderRadius: 10, display: 'flex', justifyContent: 'center' }}>
-                    <Image 
-                      src={entry.image_url} 
-                      alt="Album cover" 
-                      width={160} 
-                      height={160} 
-                      style={{ borderRadius: 10, objectFit: 'cover', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }} 
-                      unoptimized 
-                    />
+
+                {isExpanded && (
+                  <div style={{ marginTop: 16 }}>
+                    {matches.length === 0 && (
+                      <div style={{ position: 'relative' }}>
+                        <input type="text" placeholder="Search collection to link..." value={searchInputs[album.id] || ''} onChange={(e) => handleSearch(album.id, e.target.value)} style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 14 }} />
+                        {searchResults[album.id] && searchResults[album.id].length > 0 && (
+                          <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 6, background: 'white', border: '1px solid #e5e7eb', borderRadius: 6, maxHeight: 300, overflow: 'auto', zIndex: 100 }}>
+                            {searchResults[album.id].map(result => (
+                              <div key={result.id} onClick={() => linkManually(album.id, result.id)} style={{ display: 'flex', gap: 12, padding: 12, cursor: 'pointer', borderBottom: '1px solid #f3f4f6' }}>
+                                <Image src={result.image_url && result.image_url.toLowerCase() !== 'no' ? result.image_url : '/images/coverplaceholder.png'} alt={result.title || 'cover'} width={40} height={40} unoptimized style={{ borderRadius: 4, objectFit: 'cover' }} />
+                                <div style={{ flex: 1 }}><div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{result.artist} — {result.title}</div><div style={{ fontSize: 11, color: '#9ca3af' }}>{result.year || '—'} • {result.format || '—'}</div></div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {matches.length > 0 && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        {matches.map(match => {
+                          const collection = collectionsBy[match.collection_id];
+                          const isConfirmed = match.review_status === "confirmed";
+                          return (
+                            <div key={match.id} style={{ display: 'flex', gap: 12, padding: 12, background: isConfirmed ? '#f0fdf4' : '#fffbeb', border: `2px solid ${isConfirmed ? '#86efac' : '#fde68a'}`, borderRadius: 6, alignItems: 'center' }}>
+                              <Image src={collection?.image_url && collection.image_url.toLowerCase() !== "no" ? collection.image_url : "/images/coverplaceholder.png"} alt={collection?.title || "cover"} width={50} height={50} unoptimized style={{ borderRadius: 6, objectFit: "cover" }} />
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>{collection?.artist} — {collection?.title}</div>
+                                <div style={{ fontSize: 12, color: '#6b7280' }}>{collection?.year || '—'} • {collection?.format || '—'}</div>
+                              </div>
+                              {!isConfirmed && (
+                                <div style={{ display: 'flex', gap: 6 }}>
+                                  <button onClick={() => updateStatus(match.id, "confirmed")} style={{ padding: '6px 12px', background: '#10b981', color: 'white', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>✓</button>
+                                  <button onClick={() => rejectMatch(match.id)} style={{ padding: '6px 12px', background: '#ef4444', color: 'white', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>✕</button>
+                                </div>
+                              )}
+                              {isConfirmed && <button onClick={() => rejectMatch(match.id)} style={{ padding: '6px 12px', background: 'white', color: '#6b7280', border: '2px solid #d1d5db', borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Unlink</button>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-            </div>
-          </div>
-
-          {/* Metadata Section */}
-          <div>
-            <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: 14, color: '#111', display: 'flex', alignItems: 'center', gap: 8 }}>
-              🏷️ Metadata
-            </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div>
-                <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>
-                  Genres {!entry.discogs_genres || entry.discogs_genres.length === 0 ? '⚠️' : '✅'}
-                </label>
-                <input 
-                  style={inputStyle} 
-                  value={entry.discogs_genres?.join(', ') || ''} 
-                  onChange={e => handleChange('discogs_genres', e.target.value.split(',').map(s => s.trim()).filter(Boolean))} 
-                  placeholder="Rock, Jazz, Blues" 
-                />
-                <div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>Comma-separated</div>
-              </div>
-              <div>
-                <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>
-                  Styles {!entry.discogs_styles || entry.discogs_styles.length === 0 ? '⚠️' : '✅'}
-                </label>
-                <input 
-                  style={inputStyle} 
-                  value={entry.discogs_styles?.join(', ') || ''} 
-                  onChange={e => handleChange('discogs_styles', e.target.value.split(',').map(s => s.trim()).filter(Boolean))} 
-                  placeholder="Progressive Rock, Psychedelic" 
-                />
-                <div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>Comma-separated</div>
-              </div>
-              <div>
-                <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>
-                  Decade {!entry.decade ? '⚠️' : '✅'}
-                </label>
-                <input 
-                  style={inputStyle} 
-                  value={entry.decade || ''} 
-                  onChange={e => handleChange('decade', parseInt(e.target.value) || null)} 
-                  placeholder="1970" 
-                  type="number" 
-                  step="10" 
-                />
-                <div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>Auto-calculated from release year</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Badges & Blocking */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div style={{ padding: 14, background: '#f0f9ff', borderRadius: 10, border: '2px solid #0369a1' }}>
-              <h4 style={{ fontSize: '15px', fontWeight: '700', margin: '0 0 12px 0', color: '#0c4a6e' }}>🏆 Badges</h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: '14px' }}>
-                  <input 
-                    type="checkbox" 
-                    checked={!!entry.steves_top_200} 
-                    onChange={e => handleChange('steves_top_200', e.target.checked)} 
-                    style={{ marginRight: 10, width: 18, height: 18, cursor: 'pointer' }} 
-                  />
-                  <span style={{ fontWeight: '600', color: '#dc2626' }}>⭐ Top 200</span>
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: '14px' }}>
-                  <input 
-                    type="checkbox" 
-                    checked={!!entry.this_weeks_top_10} 
-                    onChange={e => handleChange('this_weeks_top_10', e.target.checked)} 
-                    style={{ marginRight: 10, width: 18, height: 18, cursor: 'pointer' }} 
-                  />
-                  <span style={{ fontWeight: '600', color: '#ea580c' }}>🔥 Top 10</span>
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: '14px' }}>
-                  <input 
-                    type="checkbox" 
-                    checked={!!entry.inner_circle_preferred} 
-                    onChange={e => handleChange('inner_circle_preferred', e.target.checked)} 
-                    style={{ marginRight: 10, width: 18, height: 18, cursor: 'pointer' }} 
-                  />
-                  <span style={{ fontWeight: '600', color: '#7c3aed' }}>💎 Inner Circle</span>
-                </label>
-              </div>
-            </div>
-
-            <div style={{ padding: 14, background: '#fef3c7', borderRadius: 10, border: '2px solid #f59e0b' }}>
-              <h4 style={{ fontSize: '15px', fontWeight: '700', margin: '0 0 12px 0', color: '#92400e' }}>🚫 Blocking</h4>
-              <label style={{ display: 'flex', alignItems: 'center', marginBottom: 12, cursor: 'pointer', fontSize: '13px' }}>
-                <input 
-                  type="checkbox" 
-                  checked={!!entry.blocked} 
-                  onChange={e => handleChange('blocked', e.target.checked)} 
-                  style={{ marginRight: 10, width: 18, height: 18, cursor: 'pointer' }} 
-                />
-                <strong>Block Entire Album</strong>
-              </label>
-              {sides.length > 0 && (
-                <div>
-                  <div style={{ fontWeight: '600', marginBottom: 10, fontSize: '13px' }}>Block Individual Sides:</div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                    {sides.map(side => (
-                      <label 
-                        key={side} 
-                        style={{ 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          padding: '8px 12px', 
-                          background: blockedSides.includes(side) ? '#fee2e2' : '#fff', 
-                          border: '2px solid #d1d5db', 
-                          borderRadius: '8px', 
-                          cursor: 'pointer', 
-                          fontSize: '13px',
-                          fontWeight: '600'
-                        }}
-                      >
-                        <input 
-                          type="checkbox" 
-                          checked={blockedSides.includes(side)} 
-                          onChange={() => handleBlockSide(side)} 
-                          style={{ marginRight: 8, width: 16, height: 16 }} 
-                        />
-                        Side {side}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
+            );
+          })}
         </div>
+      )}
 
-        {/* Right Column - Streaming Services */}
-        <div>
-          <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: 14, color: '#111', display: 'flex', alignItems: 'center', gap: 8 }}>
-            🎵 Streaming Services
-          </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            
-            {/* Spotify */}
-            <div style={{ padding: 16, background: '#dcfce7', border: '2px solid #16a34a', borderRadius: 10 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-                <div style={{ fontSize: '28px' }}>🎵</div>
-                <h4 style={{ fontSize: '16px', fontWeight: '700', margin: 0, color: '#15803d' }}>Spotify</h4>
-                {!entry.spotify_id && <span style={{ fontSize: '18px' }}>⚠️</span>}
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: 6, fontSize: '13px', fontWeight: '600', color: "#15803d" }}>
-                    Spotify ID
-                  </label>
-                  <input 
-                    style={inputStyle} 
-                    value={entry.spotify_id || ''} 
-                    onChange={e => handleChange('spotify_id', e.target.value)} 
-                    placeholder="e.g. 4aawyAB9vmqN3uQ7FjRGTy" 
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: 6, fontSize: '13px', fontWeight: '600', color: "#15803d" }}>URL</label>
-                  <input 
-                    style={inputStyle} 
-                    value={entry.spotify_url || ''} 
-                    onChange={e => handleChange('spotify_url', e.target.value)} 
-                    placeholder="https://open.spotify.com/album/..." 
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: 6, fontSize: '13px', fontWeight: '600', color: "#15803d" }}>Genres</label>
-                  <input 
-                    style={inputStyle} 
-                    value={entry.spotify_genres?.join(', ') || ''} 
-                    onChange={e => handleChange('spotify_genres', e.target.value.split(',').map(s => s.trim()).filter(Boolean))} 
-                    placeholder="classic rock, psychedelic rock" 
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Apple Music */}
-            <div style={{ padding: 16, background: '#fce7f3', border: '2px solid #ec4899', borderRadius: 10 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-                <div style={{ fontSize: '28px' }}>🍎</div>
-                <h4 style={{ fontSize: '16px', fontWeight: '700', margin: 0, color: '#be185d' }}>Apple Music</h4>
-                {!entry.apple_music_id && <span style={{ fontSize: '18px' }}>⚠️</span>}
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: 6, fontSize: '13px', fontWeight: '600', color: "#be185d" }}>
-                    Apple Music ID
-                  </label>
-                  <input 
-                    style={inputStyle} 
-                    value={entry.apple_music_id || ''} 
-                    onChange={e => handleChange('apple_music_id', e.target.value)} 
-                    placeholder="e.g. 1440857781" 
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: 6, fontSize: '13px', fontWeight: '600', color: "#be185d" }}>URL</label>
-                  <input 
-                    style={inputStyle} 
-                    value={entry.apple_music_url || ''} 
-                    onChange={e => handleChange('apple_music_url', e.target.value)} 
-                    placeholder="https://music.apple.com/..." 
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: 6, fontSize: '13px', fontWeight: '600', color: "#be185d" }}>Genres</label>
-                  <input 
-                    style={inputStyle} 
-                    value={entry.apple_music_genres?.join(', ') || ''} 
-                    onChange={e => handleChange('apple_music_genres', e.target.value.split(',').map(s => s.trim()).filter(Boolean))} 
-                    placeholder="Rock, Psychedelic" 
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
+      {toasts.length > 0 && (
+        <div style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 1000 }}>
+          {toasts.map((t, i) => (
+            <div key={i} style={{ background: t.kind === 'err' ? '#fee' : t.kind === 'ok' ? '#d1fae5' : '#e0e7ff', border: '1px solid', borderColor: t.kind === 'err' ? '#fca5a5' : t.kind === 'ok' ? '#6ee7b7' : '#c7d2fe', borderRadius: 8, padding: '12px 16px', marginBottom: 8, fontSize: 14 }}>{t.msg}</div>
+          ))}
         </div>
-      </div>
-
-      {/* Tracklist Section - Full Width */}
-      <div style={{ marginTop: 24, paddingTop: 24, borderTop: '2px solid #e5e7eb' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <h3 style={{ fontSize: '20px', fontWeight: '700', margin: 0, color: '#111', display: 'flex', alignItems: 'center', gap: 8 }}>
-            🎼 Tracklist
-            {tracks.length === 0 ? <span style={{ fontSize: '20px' }}>⚠️</span> : <span style={{ fontSize: '18px' }}>✅</span>}
-            <span style={{ fontSize: '14px', fontWeight: '500', color: '#6b7280', marginLeft: 6 }}>
-              ({tracks.length} tracks)
-            </span>
-          </h3>
-          <button 
-            type="button" 
-            onClick={addTrack} 
-            style={{ 
-              ...buttonStyle, 
-              background: '#2563eb', 
-              color: 'white',
-              fontSize: '15px',
-              padding: '12px 20px'
-            }}
-          >
-            + Add Track
-          </button>
-        </div>
-
-        {tracks.length === 0 ? (
-          <div style={{ 
-            padding: 60, 
-            textAlign: 'center', 
-            background: '#f9fafb', 
-            borderRadius: 12, 
-            border: '2px dashed #d1d5db' 
-          }}>
-            <div style={{ fontSize: '48px', marginBottom: 16 }}>🎵</div>
-            <p style={{ fontSize: '16px', color: '#6b7280', margin: 0 }}>
-              No tracks yet. Click &quot;Add Track&quot; or fetch from Discogs to get started.
-            </p>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-            {Object.entries(tracksBySide).map(([side, sideTracks]) => (
-              <div key={side}>
-                <div style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: 10, 
-                  marginBottom: 12,
-                  paddingBottom: 8,
-                  borderBottom: '2px solid #e5e7eb'
-                }}>
-                  <h4 style={{ 
-                    fontSize: '16px', 
-                    fontWeight: '700', 
-                    margin: 0, 
-                    color: '#374151',
-                    background: '#f3f4f6',
-                    padding: '6px 12px',
-                    borderRadius: '6px'
-                  }}>
-                    Side {side}
-                  </h4>
-                  <span style={{ fontSize: '13px', color: '#6b7280', fontWeight: '500' }}>
-                    {sideTracks.length} {sideTracks.length === 1 ? 'track' : 'tracks'}
-                  </span>
-                </div>
-                
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {sideTracks.map((track) => {
-                    const globalIdx = tracks.indexOf(track);
-                    return (
-                      <div 
-                        key={globalIdx}
-                        style={{ 
-                          padding: 12, 
-                          background: '#f9fafb', 
-                          borderRadius: 8, 
-                          border: '1px solid #e5e7eb',
-                          display: 'grid',
-                          gridTemplateColumns: '70px 130px 1fr 90px 70px 36px',
-                          gap: 10,
-                          alignItems: 'center'
-                        }}
-                      >
-                        <div>
-                          <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#6b7280', marginBottom: 4 }}>
-                            Position
-                          </label>
-                          <input 
-                            value={track.position} 
-                            onChange={e => handleTrackChange(globalIdx, 'position', e.target.value)} 
-                            style={{ 
-                              ...inputStyle, 
-                              textAlign: 'center',
-                              fontWeight: '600',
-                              fontSize: '13px',
-                              padding: '6px 8px'
-                            }} 
-                            placeholder="A1" 
-                          />
-                        </div>
-
-                        <div>
-                          <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#6b7280', marginBottom: 4 }}>
-                            Track Artist
-                          </label>
-                          <input 
-                            value={track.artist || ''} 
-                            onChange={e => handleTrackChange(globalIdx, 'artist', e.target.value)} 
-                            style={{...inputStyle, padding: '6px 8px', fontSize: '13px'}} 
-                            placeholder="Optional" 
-                          />
-                        </div>
-
-                        <div>
-                          <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#6b7280', marginBottom: 4 }}>
-                            Track Title
-                          </label>
-                          <input 
-                            value={track.title} 
-                            onChange={e => handleTrackChange(globalIdx, 'title', e.target.value)} 
-                            style={{...inputStyle, padding: '6px 8px', fontSize: '13px'}} 
-                            placeholder="Enter track title" 
-                          />
-                        </div>
-
-                        <div>
-                          <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#6b7280', marginBottom: 4 }}>
-                            Duration
-                          </label>
-                          <input 
-                            value={track.duration} 
-                            onChange={e => handleTrackChange(globalIdx, 'duration', e.target.value)} 
-                            style={{ ...inputStyle, textAlign: 'center', padding: '6px 8px', fontSize: '13px' }} 
-                            placeholder="3:45" 
-                          />
-                        </div>
-
-                        <div style={{ textAlign: 'center' }}>
-                          <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#6b7280', marginBottom: 4 }}>
-                            Lyrics
-                          </label>
-                          <div style={{ display: 'flex', justifyContent: 'center', gap: 6, alignItems: 'center', minHeight: 32 }}>
-                            {track.lyrics && track.lyrics_source === 'apple_music' && (
-                              <span style={{ fontSize: 20 }} title="Has Apple Music lyrics">🍎</span>
-                            )}
-                            {track.lyrics_url && (
-                              <a 
-                                href={track.lyrics_url} 
-                                target="_blank" 
-                                rel="noopener noreferrer" 
-                                style={{ fontSize: 20, textDecoration: 'none' }} 
-                                title="View on Genius"
-                              >
-                                📝
-                              </a>
-                            )}
-                            {!track.lyrics && !track.lyrics_url && (
-                              <span style={{ fontSize: 16, color: '#d1d5db' }}>—</span>
-                            )}
-                          </div>
-                        </div>
-
-                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-end', height: '100%', paddingBottom: 4 }}>
-                          <button 
-                            type="button" 
-                            onClick={() => removeTrack(globalIdx)} 
-                            style={{ 
-                              color: "#dc2626", 
-                              background: '#fee2e2', 
-                              border: '1px solid #dc2626', 
-                              fontSize: 18, 
-                              cursor: 'pointer', 
-                              padding: '6px', 
-                              borderRadius: '6px',
-                              width: 32,
-                              height: 32,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontWeight: 'bold'
-                            }} 
-                            title="Remove track"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Sale Information Section */}
-      <div style={{
-        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-        border: '2px solid #10b981',
-        borderRadius: 12,
-        padding: 20,
-        marginTop: 24
-      }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: 16
-        }}>
-          <div>
-            <h3 style={{
-              fontSize: 18,
-              fontWeight: 'bold',
-              color: 'white',
-              margin: '0 0 4px 0'
-            }}>
-              💰 Merchandise / Sale Information
-            </h3>
-            <p style={{
-              fontSize: 14,
-              color: 'rgba(255, 255, 255, 0.9)',
-              margin: 0
-            }}>
-              List this item for sale on various platforms
-            </p>
-          </div>
-          
-          <label style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 12,
-            cursor: 'pointer',
-            background: 'rgba(255, 255, 255, 0.2)',
-            padding: '10px 18px',
-            borderRadius: 8,
-            color: 'white',
-            fontWeight: 700,
-            fontSize: 15
-          }}>
-            <input
-              type="checkbox"
-              checked={forSale}
-              onChange={e => setForSale(e.target.checked)}
-              style={{
-                transform: 'scale(1.5)',
-                accentColor: 'white',
-                cursor: 'pointer'
-              }}
-            />
-            Mark for Sale
-          </label>
-        </div>
-
-        {forSale && (
-          <div style={{
-            background: 'rgba(255, 255, 255, 0.95)',
-            borderRadius: 8,
-            padding: 18
-          }}>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-              gap: 14,
-              marginBottom: 14
-            }}>
-              <div>
-                <label style={{
-                  display: 'block',
-                  fontSize: 14,
-                  fontWeight: 700,
-                  color: '#374151',
-                  marginBottom: 8
-                }}>
-                  Sale Price (USD) *
-                </label>
-                <input
-                  type="number"
-                  value={salePrice}
-                  onChange={e => setSalePrice(e.target.value)}
-                  placeholder="0.00"
-                  step="0.01"
-                  style={inputStyle}
-                />
-              </div>
-
-              <div>
-                <label style={{
-                  display: 'block',
-                  fontSize: 14,
-                  fontWeight: 700,
-                  color: '#374151',
-                  marginBottom: 8
-                }}>
-                  Platform
-                </label>
-                <select
-                  value={salePlatform}
-                  onChange={e => setSalePlatform(e.target.value)}
-                  style={{
-                    ...inputStyle,
-                    backgroundColor: 'white',
-                    color: '#1f2937'
-                  }}
-                >
-                  <option value="">Select platform...</option>
-                  {PLATFORMS.map(p => (
-                    <option key={p.value} value={p.value}>{p.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label style={{
-                  display: 'block',
-                  fontSize: 14,
-                  fontWeight: 700,
-                  color: '#374151',
-                  marginBottom: 8
-                }}>
-                  Quantity
-                </label>
-                <input
-                  type="number"
-                  value={saleQuantity}
-                  onChange={e => setSaleQuantity(e.target.value)}
-                  min="1"
-                  style={inputStyle}
-                />
-              </div>
-            </div>
-
-            <div>
-              <label style={{
-                display: 'block',
-                fontSize: 14,
-                fontWeight: 700,
-                color: '#374151',
-                marginBottom: 8
-              }}>
-                Sale Notes (Optional)
-              </label>
-              <textarea
-                value={saleNotes}
-                onChange={e => setSaleNotes(e.target.value)}
-                placeholder="Condition details, special information, etc..."
-                rows={3}
-                style={{
-                  ...inputStyle,
-                  resize: 'vertical',
-                  fontFamily: 'inherit'
-                }}
-              />
-            </div>
-
-            <div style={{
-              marginTop: 16,
-              padding: 14,
-              background: '#dbeafe',
-              border: '2px solid #3b82f6',
-              borderRadius: 8,
-              fontSize: 14,
-              color: '#1e40af'
-            }}>
-              💡 <strong>Tip:</strong> This item will appear in the <a href="/admin/sale-items" style={{ color: '#1e40af', fontWeight: 700, textDecoration: 'underline' }}>Sale Items</a> management page
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Footer Actions */}
-      <div style={{ 
-        marginTop: 24, 
-        paddingTop: 20, 
-        borderTop: '2px solid #e5e7eb', 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'space-between' 
-      }}>
-        <div style={{ display: 'flex', gap: 12 }}>
-          <button 
-            onClick={handleSave} 
-            disabled={saving} 
-            style={{ 
-              ...buttonStyle, 
-              padding: '12px 24px', 
-              fontSize: '15px', 
-              background: saving ? '#9ca3af' : '#2563eb', 
-              color: 'white', 
-              cursor: saving ? 'not-allowed' : 'pointer',
-              fontWeight: '700'
-            }}
-          >
-            {saving ? '💾 Saving...' : '💾 Save Changes'}
-          </button>
-          <button 
-            onClick={() => router.push('/admin/edit-collection')} 
-            style={{ 
-              ...buttonStyle, 
-              padding: '12px 24px', 
-              fontSize: '15px', 
-              background: '#f3f4f6', 
-              color: '#374151',
-              border: '2px solid #d1d5db'
-            }}
-          >
-            ← Back to Collection
-          </button>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
