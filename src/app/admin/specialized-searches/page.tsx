@@ -2,7 +2,7 @@
 // COMPLETE VERSION: Original functionality + New features
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { supabase } from 'src/lib/supabaseClient';
@@ -360,206 +360,972 @@ function CDOnlyTab() {
 }
 
 // ============================================================================
-// 1001 ALBUMS TAB - ORIGINAL + NEW FEATURES
+// 1001 ALBUMS TAB - COMPLETE WORKING VERSION
 // ============================================================================
 
-type A1001 = { id: number; artist: string; album: string; year: number | null; artist_norm: string | null; album_norm: string | null; };
-type MatchRow = { id: number; album_1001_id: number; collection_id: number; review_status: string; confidence: number | null; notes: string | null; };
-type CollectionRow = { id: number; artist: string | null; title: string | null; year: number | null; format: string | null; image_url: string | null; };
-type StatusFilter = "unmatched" | "pending" | "confirmed" | "all" | "overview";
+type Id = number;
+
+type A1001 = {
+  id: Id;
+  artist: string;
+  album: string;
+  year: number | null;
+  artist_norm: string | null;
+  album_norm: string | null;
+};
+
+type MatchStatus = "pending" | "linked" | "confirmed";
+
+type MatchRow = {
+  id: Id;
+  album_1001_id: Id;
+  collection_id: Id;
+  review_status: MatchStatus | string;
+  confidence: number | null;
+  notes: string | null;
+};
+
+type CollectionRow = {
+  id: Id;
+  artist: string | null;
+  title: string | null;
+  year: number | null;
+  format: string | null;
+  image_url: string | null;
+};
+
+type StatusFilter = "unmatched" | "pending" | "confirmed" | "all";
+
+type Toast = { kind: "info" | "ok" | "err"; msg: string };
 
 function Thousand1AlbumsTab() {
-  const [view, setView] = useState<StatusFilter>('overview');
   const [rows, setRows] = useState<A1001[]>([]);
-  const [matchesBy, setMatchesBy] = useState<Record<number, MatchRow[]>>({});
-  const [collectionsBy, setCollectionsBy] = useState<Record<number, CollectionRow>>({});
-  const [loading, setLoading] = useState(true);
-  const [running, setRunning] = useState(false);
-  const [searchInputs, setSearchInputs] = useState<Record<number, string>>({});
-  const [searchResults, setSearchResults] = useState<Record<number, CollectionRow[]>>({});
-  const searchTimeouts = useRef<Record<number, NodeJS.Timeout>>({});
-  const [expandedAlbums, setExpandedAlbums] = useState<Record<number, boolean>>({});
-  const [toasts, setToasts] = useState<Array<{kind: 'info'|'ok'|'err'; msg: string}>>([]);
+  const [matchesBy, setMatchesBy] = useState<Record<Id, MatchRow[]>>({});
+  const [collectionsBy, setCollectionsBy] = useState<Record<Id, CollectionRow>>({});
+  const [loading, setLoading] = useState<boolean>(true);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("unmatched");
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const [running, setRunning] = useState<boolean>(false);
+  const [searchInputs, setSearchInputs] = useState<Record<Id, string>>({});
+  const [searchResults, setSearchResults] = useState<Record<Id, CollectionRow[]>>({});
+  const [searchLoading, setSearchLoading] = useState<Record<Id, boolean>>({});
+  const searchTimeouts = useRef<Record<Id, NodeJS.Timeout>>({});
+  const [hasAutoMatchedSession, setHasAutoMatchedSession] = useState(false);
+  const albumRefs = useRef<Record<Id, HTMLDivElement | null>>({});
+  const [expandedAlbums, setExpandedAlbums] = useState<Record<Id, boolean>>({});
 
-  const pushToast = useCallback((t: {kind: 'info'|'ok'|'err'; msg: string}) => {
-    setToasts(ts => [...ts, t]);
-    setTimeout(() => setToasts(ts => ts.slice(1)), 3500);
+  const pushToast = useCallback((t: Toast) => {
+    setToasts((ts) => [...ts, t]);
+    window.setTimeout(() => setToasts((ts) => ts.slice(1)), 3500);
   }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data: batch1 } = await supabase.from("one_thousand_one_albums").select("id, artist, album, year, artist_norm, album_norm").order("artist", { ascending: true }).range(0, 999);
-    const { data: batch2 } = await supabase.from("one_thousand_one_albums").select("id, artist, album, year, artist_norm, album_norm").order("artist", { ascending: true }).range(1000, 1999);
+
+    // Fetch albums in two batches to bypass 1000-row limit
+    const { data: batch1, error: e1a } = await supabase
+      .from("one_thousand_one_albums")
+      .select("id, artist, album, year, artist_norm, album_norm")
+      .order("artist", { ascending: true })
+      .order("album", { ascending: true })
+      .range(0, 999);
+
+    const { data: batch2, error: e1b } = await supabase
+      .from("one_thousand_one_albums")
+      .select("id, artist, album, year, artist_norm, album_norm")
+      .order("artist", { ascending: true })
+      .order("album", { ascending: true })
+      .range(1000, 1999);
+
+    if ((e1a && !batch1) || (e1b && !batch2)) {
+      pushToast({ kind: "err", msg: `Failed loading 1001 list` });
+      setRows([]);
+      setMatchesBy({});
+      setCollectionsBy({});
+      setLoading(false);
+      return;
+    }
+
     const a1001 = [...(batch1 || []), ...(batch2 || [])];
+
     setRows(a1001);
-    const aIds = a1001.map(r => r.id);
-    if (aIds.length === 0) { setMatchesBy({}); setCollectionsBy({}); setLoading(false); return; }
-    const { data: mrows } = await supabase.from("collection_1001_review").select("id, album_1001_id, collection_id, review_status, confidence, notes").in("album_1001_id", aIds);
-    const by: Record<number, MatchRow[]> = {};
-    const cids = new Set<number>();
-    (mrows || []).forEach(m => { if (!by[m.album_1001_id]) by[m.album_1001_id] = []; by[m.album_1001_id].push(m); cids.add(m.collection_id); });
+
+    // Fetch matches
+    const aIds = a1001.map((r) => r.id);
+    if (aIds.length === 0) {
+      setMatchesBy({});
+      setCollectionsBy({});
+      setLoading(false);
+      return;
+    }
+
+    const { data: mrows, error: e2 } = await supabase
+      .from("collection_1001_review")
+      .select("id, album_1001_id, collection_id, review_status, confidence, notes")
+      .in("album_1001_id", aIds);
+
+    if (e2 || !mrows) {
+      pushToast({ kind: "err", msg: `Failed loading matches: ${e2?.message ?? "unknown error"}` });
+      setMatchesBy({});
+      setCollectionsBy({});
+      setLoading(false);
+      return;
+    }
+
+    const by: Record<Id, MatchRow[]> = {};
+    const cids = new Set<Id>();
+    for (const m of mrows) {
+      if (!by[m.album_1001_id]) by[m.album_1001_id] = [];
+      by[m.album_1001_id].push(m);
+      cids.add(m.collection_id);
+    }
     setMatchesBy(by);
-    let cmap: Record<number, CollectionRow> = {};
+
+    // Fetch collection rows
+    let cmap: Record<Id, CollectionRow> = {};
     if (cids.size > 0) {
-      const { data: crows } = await supabase.from("collection").select("id, artist, title, year, format, image_url").in("id", Array.from(cids));
-      if (crows) cmap = crows.reduce<Record<number, CollectionRow>>((acc, r) => { acc[r.id] = r; return acc; }, {});
+      const { data: crows, error: e3 } = await supabase
+        .from("collection")
+        .select("id, artist, title, year, format, image_url")
+        .in("id", Array.from(cids));
+
+      if (e3) {
+        pushToast({ kind: "err", msg: `Failed loading collection rows: ${e3.message}` });
+      } else if (crows) {
+        cmap = crows.reduce<Record<Id, CollectionRow>>((acc, r) => {
+          acc[r.id] = r;
+          return acc;
+        }, {});
+      }
     }
     setCollectionsBy(cmap);
     setLoading(false);
-  }, []);
+  }, [pushToast]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   const runExact = useCallback(async () => {
     setRunning(true);
     const { data, error } = await supabase.rpc("match_1001_exact");
     setRunning(false);
-    if (error) { pushToast({ kind: "err", msg: `Exact match failed: ${error.message}` }); return; }
+    if (error) {
+      pushToast({ kind: "err", msg: `Exact match failed: ${error.message}` });
+      return;
+    }
     const n = Number.isFinite(Number(data)) ? Number(data) : 0;
     pushToast({ kind: "ok", msg: `Found ${n} exact match${n !== 1 ? "es" : ""}` });
     await load();
   }, [pushToast, load]);
 
-  const runFuzzy = useCallback(async () => {
+  const runFuzzy = useCallback(async (threshold = 0.7, yearSlop = 1) => {
     setRunning(true);
-    const { data, error } = await supabase.rpc("match_1001_fuzzy", { threshold: 0.7, year_slop: 1 });
+    const { data, error } = await supabase.rpc("match_1001_fuzzy", {
+      threshold: parseFloat(threshold.toString()),
+      year_slop: parseInt(yearSlop.toString()),
+    });
     setRunning(false);
-    if (error) { pushToast({ kind: "err", msg: `Fuzzy match failed: ${error.message}` }); return; }
-    pushToast({ kind: "ok", msg: `Found ${data || 0} fuzzy matches` });
+    if (error) {
+      pushToast({ kind: "err", msg: `Fuzzy match failed: ${error.message}` });
+      return;
+    }
+    const n = Number.isFinite(Number(data)) ? Number(data) : 0;
+    pushToast({ kind: "ok", msg: `Found ${n} fuzzy match${n !== 1 ? "es" : ""}` });
     await load();
   }, [pushToast, load]);
 
-  const updateStatus = useCallback(async (matchId: number, newStatus: string) => {
-    const { error } = await supabase.from("collection_1001_review").update({ review_status: newStatus }).eq("id", matchId);
-    if (error) { pushToast({ kind: "err", msg: `Update failed: ${error.message}` }); return; }
-    pushToast({ kind: "ok", msg: "Status updated" });
+  const runSameArtist = useCallback(async (threshold = 0.6, yearSlop = 1) => {
+    setRunning(true);
+    const { data, error } = await supabase.rpc("match_1001_same_artist", {
+      threshold: parseFloat(threshold.toString()),
+      year_slop: parseInt(yearSlop.toString()),
+    });
+    setRunning(false);
+    if (error) {
+      pushToast({ kind: "err", msg: `Same-artist match failed: ${error.message}` });
+      return;
+    }
+    const n = Number.isFinite(Number(data)) ? Number(data) : 0;
+    pushToast({ kind: "ok", msg: `Found ${n} same-artist match${n !== 1 ? "es" : ""}` });
     await load();
   }, [pushToast, load]);
 
-  const rejectMatch = useCallback(async (matchId: number) => {
-    const { error } = await supabase.from("collection_1001_review").delete().eq("id", matchId);
-    if (error) { pushToast({ kind: "err", msg: `Delete failed: ${error.message}` }); return; }
-    pushToast({ kind: "ok", msg: "Match removed" });
+  const runFuzzyArtist = useCallback(async (threshold = 0.7) => {
+    setRunning(true);
+    const { data, error } = await supabase.rpc("match_1001_fuzzy_artist", {
+      threshold: parseFloat(threshold.toString()),
+    });
+    setRunning(false);
+    if (error) {
+      pushToast({ kind: "err", msg: `Fuzzy artist match failed: ${error.message}` });
+      return;
+    }
+    const n = Number.isFinite(Number(data)) ? Number(data) : 0;
+    pushToast({ kind: "ok", msg: `Found ${n} fuzzy artist match${n !== 1 ? "es" : ""}` });
     await load();
   }, [pushToast, load]);
 
-  const linkManually = useCallback(async (albumId: number, collectionId: number) => {
-    const { error } = await supabase.from("collection_1001_review").insert([{ album_1001_id: albumId, collection_id: collectionId, review_status: "pending", confidence: 1.0 }]);
-    if (error) { pushToast({ kind: "err", msg: `Link failed: ${error.message}` }); return; }
-    pushToast({ kind: "ok", msg: "Linked!" });
-    setSearchInputs(s => ({ ...s, [albumId]: "" }));
-    setSearchResults(s => ({ ...s, [albumId]: [] }));
-    await load();
-  }, [pushToast, load]);
+  // Auto-match only once when page first opens
+  useEffect(() => {
+    if (hasAutoMatchedSession) return;
+    if (loading || running || rows.length === 0) return;
 
-  const handleSearch = useCallback((albumId: number, term: string) => {
-    setSearchInputs(s => ({ ...s, [albumId]: term }));
-    if (searchTimeouts.current[albumId]) clearTimeout(searchTimeouts.current[albumId]);
-    if (!term.trim()) { setSearchResults(s => ({ ...s, [albumId]: [] })); return; }
-    searchTimeouts.current[albumId] = setTimeout(async () => {
-      const { data } = await supabase.from("collection").select("id, artist, title, year, format, image_url").or(`artist.ilike.%${term}%,title.ilike.%${term}%`).limit(10);
-      setSearchResults(s => ({ ...s, [albumId]: data || [] }));
+    const unmatched = rows.filter((r) => {
+      const ms = matchesBy[r.id] ?? [];
+      return ms.length === 0;
+    });
+
+    if (unmatched.length > 0) {
+      setHasAutoMatchedSession(true);
+      pushToast({ kind: "info", msg: `Found ${unmatched.length} unmatched albums. Running auto-match...` });
+      setTimeout(() => {
+        void runExact();
+      }, 500);
+    }
+  }, [rows, matchesBy, loading, running, pushToast, runExact, hasAutoMatchedSession]);
+
+  const filteredRows = useMemo(() => {
+    const filtered = rows.filter((r) => {
+      const ms = (matchesBy[r.id] ?? []).filter(m => m.review_status !== 'rejected');
+      if (statusFilter === "all") return true;
+      if (statusFilter === "unmatched") return ms.length === 0;
+      if (statusFilter === "pending")
+        return ms.some((m) => m.review_status === "pending" || m.review_status === "linked");
+      if (statusFilter === "confirmed") return ms.some((m) => m.review_status === "confirmed");
+      return true;
+    });
+
+    // For "All Albums" tab, sort alphabetically by artist
+    if (statusFilter === "all") {
+      return filtered.sort((a, b) => {
+        const artistA = (a.artist || "").toLowerCase();
+        const artistB = (b.artist || "").toLowerCase();
+        return artistA.localeCompare(artistB);
+      });
+    }
+
+    // For other tabs, sort: pending first, then unmatched, then confirmed last
+    return filtered.sort((a, b) => {
+      const aMatches = (matchesBy[a.id] ?? []).filter(m => m.review_status !== 'rejected');
+      const bMatches = (matchesBy[b.id] ?? []).filter(m => m.review_status !== 'rejected');
+
+      const aHasPending = aMatches.some((m) => m.review_status === "pending" || m.review_status === "linked");
+      const bHasPending = bMatches.some((m) => m.review_status === "pending" || m.review_status === "linked");
+      const aUnmatched = aMatches.length === 0;
+      const bUnmatched = bMatches.length === 0;
+      const aConfirmed = aMatches.length > 0 && aMatches.every((m) => m.review_status === "confirmed");
+      const bConfirmed = bMatches.length > 0 && bMatches.every((m) => m.review_status === "confirmed");
+
+      // Pending first
+      if (aHasPending && !bHasPending) return -1;
+      if (!aHasPending && bHasPending) return 1;
+
+      // Then unmatched
+      if (aUnmatched && !bUnmatched) return -1;
+      if (!aUnmatched && bUnmatched) return 1;
+
+      // Confirmed last
+      if (aConfirmed && !bConfirmed) return 1;
+      if (!aConfirmed && bConfirmed) return -1;
+
+      return 0;
+    });
+  }, [rows, matchesBy, statusFilter]);
+
+  const updateStatus = async (matchId: Id, albumId: Id, review_status: MatchStatus) => {
+    const { error } = await supabase
+      .from("collection_1001_review")
+      .update({ review_status })
+      .eq("id", matchId);
+    if (error) {
+      pushToast({ kind: "err", msg: `Update failed: ${error.message}` });
+      return;
+    }
+    pushToast({ kind: "ok", msg: "Confirmed!" });
+    await load();
+    setTimeout(() => {
+      albumRefs.current[albumId]?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 100);
+  };
+
+  const rejectMatch = async (matchId: Id, albumId: Id) => {
+    const { error } = await supabase
+      .from("collection_1001_review")
+      .update({ review_status: 'rejected' })
+      .eq("id", matchId);
+    if (error) {
+      pushToast({ kind: "err", msg: `Rejection failed: ${error.message}` });
+      return;
+    }
+    pushToast({ kind: "ok", msg: "Rejected" });
+    await load();
+    setTimeout(() => {
+      albumRefs.current[albumId]?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 100);
+  };
+
+  const searchCollection = async (albumId: Id, query: string) => {
+    if (!query.trim() || query.length < 2) {
+      setSearchResults((s) => ({ ...s, [albumId]: [] }));
+      return;
+    }
+
+    setSearchLoading((s) => ({ ...s, [albumId]: true }));
+
+    const { data, error } = await supabase
+      .from("collection")
+      .select("id, artist, title, year, format, image_url")
+      .or(`artist.ilike.%${query}%,title.ilike.%${query}%`)
+      .order("artist", { ascending: true })
+      .limit(20);
+
+    setSearchLoading((s) => ({ ...s, [albumId]: false }));
+
+    if (error) {
+      pushToast({ kind: "err", msg: `Search failed: ${error.message}` });
+      return;
+    }
+
+    setSearchResults((s) => ({ ...s, [albumId]: data || [] }));
+  };
+
+  const handleSearchInput = (albumId: Id, value: string) => {
+    setSearchInputs((s) => ({ ...s, [albumId]: value }));
+
+    if (searchTimeouts.current[albumId]) {
+      clearTimeout(searchTimeouts.current[albumId]);
+    }
+
+    searchTimeouts.current[albumId] = setTimeout(() => {
+      void searchCollection(albumId, value);
     }, 300);
-  }, []);
+  };
 
-  const stats = { total: rows.length, unmatched: rows.filter(r => !matchesBy[r.id] || matchesBy[r.id].length === 0).length, pending: rows.filter(r => matchesBy[r.id]?.some(m => m.review_status === "pending")).length, confirmed: rows.filter(r => matchesBy[r.id]?.some(m => m.review_status === "confirmed")).length };
+  const linkFromSearch = async (albumId: Id, collectionId: Id) => {
+    // First attempt: normal insert
+    const result = await supabase.from("collection_1001_review").insert([
+      {
+        album_1001_id: albumId,
+        collection_id: collectionId,
+        review_status: "confirmed",
+        confidence: 1.0,
+        notes: "manual link via search",
+      },
+    ]);
 
-  const filteredRows = rows.filter(r => {
-    const matches = matchesBy[r.id] || [];
-    if (view === "unmatched") return matches.length === 0;
-    if (view === "pending") return matches.some(m => m.review_status === "pending");
-    if (view === "confirmed") return matches.some(m => m.review_status === "confirmed");
-    return view === "all";
-  });
+    // If failed due to unique constraint on collection_final, check if it's a box set case
+    if (result.error && result.error.message.includes("uq_c1001_review_collection_final")) {
+      // Check existing matches for this collection album
+      const { data: existing } = await supabase
+        .from("collection_1001_review")
+        .select("id, album_1001_id, review_status")
+        .eq("collection_id", collectionId)
+        .neq("review_status", "rejected")
+        .limit(1);
 
-  if (loading) return <div style={{ textAlign: 'center', padding: 40 }}>Loading...</div>;
+      if (existing && existing.length > 0) {
+        // Ask user to confirm this is a box set
+        const confirmed = window.confirm(
+          "This pressing is already matched to another album from the 1001 list. Is this a set with multiple albums?\n\nClick OK to link both albums, or Cancel to keep only the existing match."
+        );
+        
+        if (!confirmed) {
+          return;
+        }
+
+        // User confirmed - use upsert to force the insert
+        // We'll use a RPC function to bypass the constraint
+        const { error: rpcError } = await supabase.rpc("manual_link_1001", {
+          p_album_1001_id: albumId,
+          p_collection_id: collectionId,
+        });
+
+        if (rpcError) {
+          pushToast({ kind: "err", msg: `Link failed: ${rpcError.message}` });
+          return;
+        }
+      }
+    } else if (result.error) {
+      pushToast({ kind: "err", msg: `Link failed: ${result.error.message}` });
+      return;
+    }
+
+    setSearchInputs((s) => ({ ...s, [albumId]: "" }));
+    setSearchResults((s) => ({ ...s, [albumId]: [] }));
+    pushToast({ kind: "ok", msg: "Linked & Confirmed!" });
+    await load();
+    setTimeout(() => {
+      albumRefs.current[albumId]?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 100);
+  };
+
+  const getCounts = () => {
+    const unmatched = rows.filter((r) => {
+      const ms = (matchesBy[r.id] ?? []).filter(m => m.review_status !== 'rejected');
+      return ms.length === 0;
+    }).length;
+    const pending = rows.filter((r) => {
+      const ms = (matchesBy[r.id] ?? []).filter(m => m.review_status !== 'rejected');
+      return ms.some((m) => m.review_status === "pending" || m.review_status === "linked");
+    }).length;
+    const confirmed = rows.filter((r) => {
+      const ms = (matchesBy[r.id] ?? []).filter(m => m.review_status !== 'rejected');
+      return ms.some((m) => m.review_status === "confirmed");
+    }).length;
+    return { unmatched, pending, confirmed };
+  };
+
+  const counts = getCounts();
+
+  const toggleExpanded = (albumId: Id) => {
+    setExpandedAlbums((prev) => ({ ...prev, [albumId]: !prev[albumId] }));
+  };
+
+  if (loading) {
+    return (
+      <div style={{ textAlign: 'center', padding: 60, background: '#f9fafb', borderRadius: 8 }}>
+        <div style={{ fontSize: 40, marginBottom: 16 }}>⏳</div>
+        <div style={{ fontSize: 16, color: '#6b7280', fontWeight: 600 }}>Loading 1001 Albums data...</div>
+      </div>
+    );
+  }
 
   return (
     <div>
-      <div style={{ marginBottom: 24, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        {(['overview', 'unmatched', 'pending', 'confirmed', 'all'] as StatusFilter[]).map(v => (
-          <button key={v} onClick={() => setView(v)} style={{ padding: '8px 16px', background: view === v ? '#8b5cf6' : 'white', color: view === v ? 'white' : '#6b7280', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
-            {v === 'overview' && `📊 Overview`}
-            {v === 'unmatched' && `❓ Unmatched (${stats.unmatched})`}
-            {v === 'pending' && `⏳ Pending (${stats.pending})`}
-            {v === 'confirmed' && `✅ Confirmed (${stats.confirmed})`}
-            {v === 'all' && `🔢 All (${stats.total})`}
-          </button>
+      {/* Toast Notifications */}
+      <div style={{ position: "fixed", top: 20, right: 20, zIndex: 50, display: "flex", flexDirection: "column", gap: 12, maxWidth: 400 }}>
+        {toasts.map((t, i) => (
+          <div
+            key={`${t.kind}-${i}-${t.msg}`}
+            style={{
+              background: t.kind === "err" ? "#fee2e2" : t.kind === "ok" ? "#d1fae5" : "#dbeafe",
+              border: `2px solid ${t.kind === "err" ? "#f87171" : t.kind === "ok" ? "#34d399" : "#60a5fa"}`,
+              color: t.kind === "err" ? "#991b1b" : t.kind === "ok" ? "#065f46" : "#1e40af",
+              borderRadius: 10,
+              padding: "14px 18px",
+              fontWeight: 600,
+              fontSize: 14,
+              boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)",
+            }}
+          >
+            {t.msg}
+          </div>
         ))}
       </div>
 
-      {view === 'overview' && (
-        <div style={{ background: '#f0fdf4', border: '1px solid #10b981', borderRadius: 8, padding: 32, textAlign: 'center' }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>📊</div>
-          <h3 style={{ fontSize: 20, fontWeight: 600, color: '#065f46', marginBottom: 12 }}>Collection Progress</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
-            <div><div style={{ fontSize: 32, fontWeight: 'bold', color: '#8b5cf6' }}>{stats.total}</div><div style={{ fontSize: 12, color: '#6b7280' }}>Total</div></div>
-            <div><div style={{ fontSize: 32, fontWeight: 'bold', color: '#10b981' }}>{stats.confirmed}</div><div style={{ fontSize: 12, color: '#6b7280' }}>Confirmed</div></div>
-            <div><div style={{ fontSize: 32, fontWeight: 'bold', color: '#f59e0b' }}>{stats.pending}</div><div style={{ fontSize: 12, color: '#6b7280' }}>Pending</div></div>
-            <div><div style={{ fontSize: 32, fontWeight: 'bold', color: '#ef4444' }}>{stats.unmatched}</div><div style={{ fontSize: 12, color: '#6b7280' }}>Unmatched</div></div>
-          </div>
-          <p style={{ color: '#065f46', fontSize: 14, marginBottom: 24 }}>
-            {Math.round((stats.confirmed / stats.total) * 100)}% complete
-          </p>
-          <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-            <button onClick={runExact} disabled={running} style={{ padding: '12px 24px', background: running ? '#9ca3af' : '#10b981', color: 'white', border: 'none', borderRadius: 6, fontSize: 14, fontWeight: 600, cursor: running ? 'not-allowed' : 'pointer' }}>🎯 Run Exact Match</button>
-            <button onClick={runFuzzy} disabled={running} style={{ padding: '12px 24px', background: running ? '#9ca3af' : '#8b5cf6', color: 'white', border: 'none', borderRadius: 6, fontSize: 14, fontWeight: 600, cursor: running ? 'not-allowed' : 'pointer' }}>🔍 Run Fuzzy Match</button>
+      {/* Filter Tabs */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+        {[
+          { value: "unmatched", label: "Need Attention", count: counts.unmatched, color: "#ef4444", bg: "#fef2f2" },
+          { value: "pending", label: "Pending Review", count: counts.pending, color: "#f59e0b", bg: "#fffbeb" },
+          { value: "confirmed", label: "Confirmed", count: counts.confirmed, color: "#10b981", bg: "#f0fdf4" },
+          { value: "all", label: "All Albums", count: rows.length, color: "#6b7280", bg: "#f9fafb" },
+        ].map((tab) => {
+          const isActive = statusFilter === tab.value;
+          return (
+            <button
+              key={tab.value}
+              onClick={() => setStatusFilter(tab.value as StatusFilter)}
+              style={{
+                flex: "1 1 auto",
+                minWidth: 120,
+                padding: "10px 16px",
+                border: isActive ? `2px solid ${tab.color}` : "2px solid #e5e7eb",
+                borderRadius: 8,
+                background: isActive ? tab.bg : "#ffffff",
+                color: isActive ? tab.color : "#6b7280",
+                fontWeight: 700,
+                fontSize: 13,
+                cursor: "pointer",
+                transition: "all 0.2s",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 6,
+              }}
+            >
+              <span>{tab.label}</span>
+              <span
+                style={{
+                  background: isActive ? tab.color : "#d1d5db",
+                  color: "#ffffff",
+                  borderRadius: 999,
+                  padding: "2px 8px",
+                  fontSize: 11,
+                  fontWeight: 800,
+                }}
+              >
+                {tab.count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Batch Actions */}
+      <div style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: 8, padding: 16, marginBottom: 16 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#6b7280', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Matching Actions</div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button
+            onClick={() => void runExact()}
+            disabled={running}
+            style={{
+              padding: "8px 14px",
+              background: running ? "#9ca3af" : "#3b82f6",
+              color: "#ffffff",
+              border: "none",
+              borderRadius: 6,
+              fontWeight: 700,
+              fontSize: 13,
+              cursor: running ? "not-allowed" : "pointer",
+              opacity: running ? 0.6 : 1,
+            }}
+          >
+            {running ? "Running..." : "Run Exact Match"}
+          </button>
+          <button
+            onClick={() => void runFuzzy(0.7, 1)}
+            disabled={running}
+            style={{
+              padding: "8px 14px",
+              background: running ? "#9ca3af" : "#8b5cf6",
+              color: "#ffffff",
+              border: "none",
+              borderRadius: 6,
+              fontWeight: 700,
+              fontSize: 13,
+              cursor: running ? "not-allowed" : "pointer",
+              opacity: running ? 0.6 : 1,
+            }}
+          >
+            Run Fuzzy (0.70, ±1y)
+          </button>
+          <button
+            onClick={() => void runSameArtist(0.6, 1)}
+            disabled={running}
+            style={{
+              padding: "8px 14px",
+              background: running ? "#9ca3af" : "#06b6d4",
+              color: "#ffffff",
+              border: "none",
+              borderRadius: 6,
+              fontWeight: 700,
+              fontSize: 13,
+              cursor: running ? "not-allowed" : "pointer",
+              opacity: running ? 0.6 : 1,
+            }}
+            title="Exact artist match, fuzzy title match"
+          >
+            Same-Artist (0.60, ±1y)
+          </button>
+          <button
+            onClick={() => void runFuzzyArtist(0.7)}
+            disabled={running}
+            style={{
+              padding: "8px 14px",
+              background: running ? "#9ca3af" : "#ec4899",
+              color: "#ffffff",
+              border: "none",
+              borderRadius: 6,
+              fontWeight: 700,
+              fontSize: 13,
+              cursor: running ? "not-allowed" : "pointer",
+              opacity: running ? 0.6 : 1,
+            }}
+            title="Fuzzy match on both artist and title"
+          >
+            Fuzzy Artist (0.70)
+          </button>
+        </div>
+      </div>
+
+      {/* Albums List */}
+      {filteredRows.length === 0 ? (
+        <div style={{ background: "#ffffff", borderRadius: 8, padding: 40, textAlign: "center" }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>🎉</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: "#111827", marginBottom: 6 }}>All done!</div>
+          <div style={{ color: "#6b7280", fontSize: 14 }}>
+            {statusFilter === "unmatched"
+              ? "No unmatched albums. Switch to another tab to see matched albums."
+              : "No albums in this category."}
           </div>
         </div>
-      )}
-
-      {view !== 'overview' && (
-        <div>
-          {filteredRows.map(album => {
-            const matches = matchesBy[album.id] || [];
-            const isExpanded = expandedAlbums[album.id];
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {filteredRows.map((album) => {
+            const matches = (matchesBy[album.id] ?? []).filter(m => m.review_status !== 'rejected');
+            const isUnmatched = matches.length === 0;
+            const hasPending = matches.some((m) => m.review_status === "pending" || m.review_status === "linked");
+            const allConfirmed = matches.length > 0 && matches.every((m) => m.review_status === "confirmed");
+            const isExpanded = expandedAlbums[album.id] ?? hasPending;
+            
             return (
-              <div key={album.id} style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: 8, padding: 16, marginBottom: 12 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }} onClick={() => setExpandedAlbums(e => ({ ...e, [album.id]: !e[album.id] }))}>
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: '#1f2937' }}>{album.artist} — {album.album}</div>
-                    <div style={{ fontSize: 12, color: '#6b7280' }}>{album.year || '—'} • {matches.length} match{matches.length !== 1 ? 'es' : ''}</div>
+              <div
+                key={album.id}
+                ref={(el) => {
+                  albumRefs.current[album.id] = el;
+                }}
+                style={{
+                  background: "#ffffff",
+                  border: isUnmatched
+                    ? "2px solid #fca5a5"
+                    : hasPending
+                    ? "2px solid #fbbf24"
+                    : "1px solid #e5e7eb",
+                  borderRadius: 8,
+                  overflow: "hidden",
+                }}
+              >
+                {/* Main Row */}
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "12px 16px",
+                    cursor: matches.length > 0 || isUnmatched ? "pointer" : "default",
+                  }}
+                  onClick={() => {
+                    if (matches.length > 0 || isUnmatched) toggleExpanded(album.id);
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
+                      <div
+                        style={{
+                          width: 32,
+                          height: 32,
+                          background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                          borderRadius: 6,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                        }}
+                      >
+                        <div style={{ fontSize: 10, fontWeight: 900, color: '#ffffff' }}>1001</div>
+                      </div>
+                      <div style={{ fontWeight: 700, fontSize: 14, color: "#111827", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {album.artist} — {album.album}
+                      </div>
+                      {isUnmatched && (
+                        <span style={{ background: "#fee2e2", color: "#991b1b", padding: "3px 8px", borderRadius: 4, fontSize: 11, fontWeight: 700, textTransform: "uppercase", flexShrink: 0 }}>
+                          Unmatched
+                        </span>
+                      )}
+                      {hasPending && (
+                        <span style={{ background: "#fef3c7", color: "#92400e", padding: "3px 8px", borderRadius: 4, fontSize: 11, fontWeight: 700, textTransform: "uppercase", flexShrink: 0 }}>
+                          Pending
+                        </span>
+                      )}
+                      {allConfirmed && (
+                        <span style={{ background: "#d1fae5", color: "#065f46", padding: "3px 8px", borderRadius: 4, fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
+                          Confirmed
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: 12, color: "#6b7280", paddingLeft: 44 }}>
+                      {album.year ?? "—"} • {matches.length > 0 ? `${matches.length} pressing${matches.length > 1 ? "s" : ""}` : "No matches"}
+                    </div>
                   </div>
-                  <div style={{ fontSize: 20 }}>{isExpanded ? '▼' : '▶'}</div>
+                  <div style={{ fontSize: 12, color: "#3b82f6", fontWeight: 600, flexShrink: 0, marginLeft: 16 }}>
+                    {(matches.length > 0 || isUnmatched) && (isExpanded ? "▼ Collapse" : "▶ Expand")}
+                  </div>
                 </div>
 
+                {/* Expanded Details */}
                 {isExpanded && (
-                  <div style={{ marginTop: 16 }}>
-                    {matches.length === 0 && (
-                      <div style={{ position: 'relative' }}>
-                        <input type="text" placeholder="Search collection to link..." value={searchInputs[album.id] || ''} onChange={(e) => handleSearch(album.id, e.target.value)} style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 14 }} />
-                        {searchResults[album.id] && searchResults[album.id].length > 0 && (
-                          <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 6, background: 'white', border: '1px solid #e5e7eb', borderRadius: 6, maxHeight: 300, overflow: 'auto', zIndex: 100 }}>
-                            {searchResults[album.id].map(result => (
-                              <div key={result.id} onClick={() => linkManually(album.id, result.id)} style={{ display: 'flex', gap: 12, padding: 12, cursor: 'pointer', borderBottom: '1px solid #f3f4f6' }}>
-                                <Image src={result.image_url && result.image_url.toLowerCase() !== 'no' ? result.image_url : '/images/coverplaceholder.png'} alt={result.title || 'cover'} width={40} height={40} unoptimized style={{ borderRadius: 4, objectFit: 'cover' }} />
-                                <div style={{ flex: 1 }}><div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{result.artist} — {result.title}</div><div style={{ fontSize: 11, color: '#9ca3af' }}>{result.year || '—'} • {result.format || '—'}</div></div>
+                  <div style={{ padding: "16px", background: "#f9fafb", borderTop: "1px solid #e5e7eb" }}>
+                    {/* Search Box */}
+                    {(isUnmatched || allConfirmed) && (
+                      <div style={{ marginBottom: matches.length > 0 ? 16 : 0 }}>
+                        <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 6 }}>
+                          Search your collection to link:
+                        </label>
+                        <div style={{ position: "relative" }}>
+                          <input
+                            value={searchInputs[album.id] ?? ""}
+                            onChange={(e) => handleSearchInput(album.id, e.target.value)}
+                            placeholder={`Try "${album.artist}" or "${album.album}"`}
+                            style={{
+                              width: "100%",
+                              padding: "10px 12px",
+                              border: "2px solid #d1d5db",
+                              borderRadius: 6,
+                              fontSize: 14,
+                              outline: "none",
+                              transition: "border-color 0.2s",
+                              color: "#111827",
+                              backgroundColor: "#ffffff",
+                            }}
+                            onFocus={(e) => {
+                              e.currentTarget.style.borderColor = "#3b82f6";
+                            }}
+                            onBlur={(e) => {
+                              e.currentTarget.style.borderColor = "#d1d5db";
+                            }}
+                          />
+                          {searchLoading[album.id] && (
+                            <div
+                              style={{
+                                position: "absolute",
+                                top: "100%",
+                                left: 0,
+                                right: 0,
+                                marginTop: 6,
+                                padding: 10,
+                                background: "#f9fafb",
+                                border: "2px solid #e5e7eb",
+                                borderRadius: 6,
+                                color: "#6b7280",
+                                fontSize: 13,
+                                zIndex: 100,
+                              }}
+                            >
+                              Searching...
+                            </div>
+                          )}
+                          {searchResults[album.id] && searchResults[album.id].length > 0 && (
+                            <div
+                              style={{
+                                position: "absolute",
+                                top: "100%",
+                                left: 0,
+                                right: 0,
+                                marginTop: 6,
+                                background: "#ffffff",
+                                border: "2px solid #e5e7eb",
+                                borderRadius: 6,
+                                boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)",
+                                maxHeight: 300,
+                                overflowY: "auto",
+                                zIndex: 100,
+                              }}
+                            >
+                              {searchResults[album.id].map((result) => (
+                                <div
+                                  key={result.id}
+                                  onClick={() => void linkFromSearch(album.id, result.id)}
+                                  style={{
+                                    display: "flex",
+                                    gap: 10,
+                                    padding: 10,
+                                    cursor: "pointer",
+                                    borderBottom: "1px solid #f3f4f6",
+                                    transition: "background 0.2s",
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = "#f9fafb";
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = "#ffffff";
+                                  }}
+                                >
+                                  <Image
+                                    src={
+                                      result.image_url && result.image_url.trim().toLowerCase() !== "no"
+                                        ? result.image_url
+                                        : "/images/coverplaceholder.png"
+                                    }
+                                    alt={result.title || "cover"}
+                                    width={40}
+                                    height={40}
+                                    unoptimized
+                                    style={{ borderRadius: 4, objectFit: "cover", flexShrink: 0 }}
+                                  />
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div
+                                      style={{
+                                        fontWeight: 700,
+                                        fontSize: 13,
+                                        color: "#111827",
+                                        overflow: "hidden",
+                                        textOverflow: "ellipsis",
+                                        whiteSpace: "nowrap",
+                                      }}
+                                    >
+                                      {result.artist || "Unknown Artist"}
+                                    </div>
+                                    <div
+                                      style={{
+                                        fontSize: 12,
+                                        color: "#6b7280",
+                                        overflow: "hidden",
+                                        textOverflow: "ellipsis",
+                                        whiteSpace: "nowrap",
+                                      }}
+                                    >
+                                      {result.title || "Unknown Title"}
+                                    </div>
+                                    <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>
+                                      {result.year || "—"} • {result.format || "—"}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {searchInputs[album.id] &&
+                            searchResults[album.id] &&
+                            searchResults[album.id].length === 0 &&
+                            !searchLoading[album.id] && (
+                              <div
+                                style={{
+                                  position: "absolute",
+                                  top: "100%",
+                                  left: 0,
+                                  right: 0,
+                                  marginTop: 6,
+                                  padding: 10,
+                                  background: "#fef2f2",
+                                  border: "2px solid #fecaca",
+                                  borderRadius: 6,
+                                  color: "#991b1b",
+                                  fontSize: 13,
+                                  zIndex: 100,
+                                }}
+                              >
+                                No matches found. Try different search terms.
                               </div>
-                            ))}
-                          </div>
-                        )}
+                            )}
+                        </div>
                       </div>
                     )}
 
+                    {/* Matched Albums */}
                     {matches.length > 0 && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                        {matches.map(match => {
+                      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                        {matches.map((match) => {
                           const collection = collectionsBy[match.collection_id];
                           const isConfirmed = match.review_status === "confirmed";
                           return (
-                            <div key={match.id} style={{ display: 'flex', gap: 12, padding: 12, background: isConfirmed ? '#f0fdf4' : '#fffbeb', border: `2px solid ${isConfirmed ? '#86efac' : '#fde68a'}`, borderRadius: 6, alignItems: 'center' }}>
-                              <Image src={collection?.image_url && collection.image_url.toLowerCase() !== "no" ? collection.image_url : "/images/coverplaceholder.png"} alt={collection?.title || "cover"} width={50} height={50} unoptimized style={{ borderRadius: 6, objectFit: "cover" }} />
-                              <div style={{ flex: 1 }}>
-                                <div style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>{collection?.artist} — {collection?.title}</div>
-                                <div style={{ fontSize: 12, color: '#6b7280' }}>{collection?.year || '—'} • {collection?.format || '—'}</div>
+                            <div
+                              key={match.id}
+                              style={{
+                                display: "flex",
+                                gap: 12,
+                                padding: 12,
+                                background: isConfirmed ? "#f0fdf4" : "#fffbeb",
+                                border: `2px solid ${isConfirmed ? "#86efac" : "#fde68a"}`,
+                                borderRadius: 6,
+                                alignItems: "center",
+                              }}
+                            >
+                              <Image
+                                src={
+                                  collection?.image_url && collection.image_url.trim().toLowerCase() !== "no"
+                                    ? collection.image_url
+                                    : "/images/coverplaceholder.png"
+                                }
+                                alt={collection?.title || "cover"}
+                                width={50}
+                                height={50}
+                                unoptimized
+                                style={{ borderRadius: 6, objectFit: "cover", flexShrink: 0 }}
+                              />
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
+                                  <div
+                                    style={{
+                                      fontWeight: 700,
+                                      fontSize: 14,
+                                      color: "#111827",
+                                      overflow: "hidden",
+                                      textOverflow: "ellipsis",
+                                      whiteSpace: "nowrap",
+                                    }}
+                                  >
+                                    {collection?.artist || "Unknown"} — {collection?.title || "Unknown"}
+                                  </div>
+                                  <span
+                                    style={{
+                                      background: isConfirmed ? "#10b981" : "#f59e0b",
+                                      color: "#ffffff",
+                                      padding: "2px 6px",
+                                      borderRadius: 4,
+                                      fontSize: 10,
+                                      fontWeight: 700,
+                                      textTransform: "uppercase",
+                                    }}
+                                  >
+                                    {isConfirmed ? "Confirmed" : "Pending"}
+                                  </span>
+                                  {typeof match.confidence === "number" && (
+                                    <span
+                                      style={{
+                                        background: "#eef2ff",
+                                        color: "#4f46e5",
+                                        padding: "2px 6px",
+                                        borderRadius: 4,
+                                        fontSize: 10,
+                                        fontWeight: 700,
+                                      }}
+                                    >
+                                      {(match.confidence * 100).toFixed(0)}%
+                                    </span>
+                                  )}
+                                </div>
+                                <div style={{ fontSize: 12, color: "#6b7280" }}>
+                                  {collection?.year || "—"} • {collection?.format || "—"}
+                                </div>
+                                {match.notes && (
+                                  <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2, fontStyle: "italic" }}>
+                                    {match.notes}
+                                  </div>
+                                )}
                               </div>
                               {!isConfirmed && (
-                                <div style={{ display: 'flex', gap: 6 }}>
-                                  <button onClick={() => updateStatus(match.id, "confirmed")} style={{ padding: '6px 12px', background: '#10b981', color: 'white', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>✓</button>
-                                  <button onClick={() => rejectMatch(match.id)} style={{ padding: '6px 12px', background: '#ef4444', color: 'white', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>✕</button>
+                                <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                                  <button
+                                    onClick={() => void updateStatus(match.id, album.id, "confirmed")}
+                                    style={{
+                                      padding: "6px 12px",
+                                      background: "#10b981",
+                                      color: "#ffffff",
+                                      border: "none",
+                                      borderRadius: 6,
+                                      fontSize: 12,
+                                      fontWeight: 700,
+                                      cursor: "pointer",
+                                    }}
+                                  >
+                                    ✓ Confirm
+                                  </button>
+                                  <button
+                                    onClick={() => void rejectMatch(match.id, album.id)}
+                                    style={{
+                                      padding: "6px 12px",
+                                      background: "#ef4444",
+                                      color: "#ffffff",
+                                      border: "none",
+                                      borderRadius: 6,
+                                      fontSize: 12,
+                                      fontWeight: 700,
+                                      cursor: "pointer",
+                                    }}
+                                  >
+                                    ✕ Remove
+                                  </button>
                                 </div>
                               )}
-                              {isConfirmed && <button onClick={() => rejectMatch(match.id)} style={{ padding: '6px 12px', background: 'white', color: '#6b7280', border: '2px solid #d1d5db', borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Unlink</button>}
+                              {isConfirmed && (
+                                <button
+                                  onClick={() => void rejectMatch(match.id, album.id)}
+                                  style={{
+                                    padding: "6px 12px",
+                                    background: "#ffffff",
+                                    color: "#6b7280",
+                                    border: "2px solid #d1d5db",
+                                    borderRadius: 6,
+                                    fontSize: 12,
+                                    fontWeight: 700,
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  Unlink
+                                </button>
+                              )}
                             </div>
                           );
                         })}
@@ -570,14 +1336,6 @@ function Thousand1AlbumsTab() {
               </div>
             );
           })}
-        </div>
-      )}
-
-      {toasts.length > 0 && (
-        <div style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 1000 }}>
-          {toasts.map((t, i) => (
-            <div key={i} style={{ background: t.kind === 'err' ? '#fee' : t.kind === 'ok' ? '#d1fae5' : '#e0e7ff', border: '1px solid', borderColor: t.kind === 'err' ? '#fca5a5' : t.kind === 'ok' ? '#6ee7b7' : '#c7d2fe', borderRadius: 8, padding: '12px 16px', marginBottom: 8, fontSize: 14 }}>{t.msg}</div>
-          ))}
         </div>
       )}
     </div>
