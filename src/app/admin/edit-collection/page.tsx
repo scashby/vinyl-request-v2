@@ -681,40 +681,30 @@ export default function EditCollectionPage() {
       {/* Hidden Print Checklist View */}
       <div id="print-checklist" style={{ display: 'none' }}>
         <div style={{
-          padding: '20px',
+          padding: '8px',
           fontFamily: 'Arial, sans-serif',
-          fontSize: '11pt',
-          lineHeight: '1.4',
+          fontSize: '6pt',
+          lineHeight: '0.9',
           color: '#000'
         }}>
           <div style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            marginBottom: '15px',
-            paddingBottom: '8px',
-            borderBottom: '3px solid #000'
+            marginBottom: '3px',
+            paddingBottom: '1px',
+            borderBottom: '1px solid #000'
           }}>
-            <h1 style={{
-              fontSize: '16pt',
-              fontWeight: 'bold',
-              margin: 0
-            }}>
+            <h1 style={{ fontSize: '11pt', fontWeight: 'bold', margin: 0 }}>
               Collection Checklist
             </h1>
-            <div style={{ textAlign: 'right', fontSize: '10pt', color: '#666' }}>
-              <div>{new Date().toLocaleDateString()}</div>
-              <div>{filteredAlbums.length} albums</div>
+            <div style={{ fontSize: '7pt', color: '#666' }}>
+              {new Date().toLocaleDateString()} • {filteredAlbums.length} albums
             </div>
           </div>
 
           {searchQuery && (
-            <p style={{
-              fontSize: '10pt',
-              color: '#555',
-              marginBottom: '15px',
-              fontStyle: 'italic'
-            }}>
+            <p style={{ fontSize: '6pt', color: '#555', margin: '1px 0 2px 0', fontStyle: 'italic' }}>
               Search: &quot;{searchQuery}&quot;
             </p>
           )}
@@ -728,72 +718,32 @@ export default function EditCollectionPage() {
             });
 
             return (
-              <div key={tagName} style={{
-                marginBottom: '20px',
-                pageBreakInside: 'avoid'
-              }}>
+              <div key={tagName} style={{ marginBottom: '3px', pageBreakInside: 'avoid' }}>
                 <h2 style={{
-                  fontSize: '13pt',
+                  fontSize: '8pt',
                   fontWeight: 'bold',
-                  marginBottom: '8px',
-                  paddingBottom: '4px',
-                  borderBottom: '2px solid #333',
-                  display: 'flex',
-                  justifyContent: 'space-between'
+                  margin: 0,
+                  padding: 0,
+                  borderBottom: '1px solid #000'
                 }}>
-                  <span>{tagName}</span>
-                  <span style={{ fontSize: '11pt', fontWeight: 'normal', color: '#666' }}>
-                    ({sortedAlbums.length} albums)
-                  </span>
+                  {tagName} ({sortedAlbums.length})
                 </h2>
                 
-                <table style={{
-                  width: '100%',
-                  borderCollapse: 'collapse',
-                  marginBottom: '10px'
-                }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '6pt', margin: 0 }}>
                   <tbody>
                     {sortedAlbums.map((album) => (
-                      <tr key={album.id} style={{
-                        borderBottom: '1px solid #ddd'
-                      }}>
-                        <td style={{
-                          width: '30px',
-                          padding: '8px 0',
-                          textAlign: 'center',
-                          fontSize: '16pt'
-                        }}>
+                      <tr key={album.id}>
+                        <td style={{ width: '12px', padding: 0, textAlign: 'center', fontSize: '8pt' }}>
                           ☐
                         </td>
-                        <td style={{
-                          padding: '8px 10px',
-                          width: '35%'
-                        }}>
-                          <div style={{ fontWeight: 'bold', fontSize: '11pt' }}>
-                            {album.artist || 'Unknown Artist'}
-                          </div>
-                          <div style={{ fontSize: '10pt', color: '#333' }}>
-                            {album.title || 'Untitled'}
-                          </div>
+                        <td style={{ padding: '0 2px', width: '45%' }}>
+                          <strong>{album.artist || 'Unknown'}</strong> - {album.title || 'Untitled'}
                         </td>
-                        <td style={{
-                          padding: '8px 10px',
-                          fontSize: '12pt',
-                          fontWeight: 'bold',
-                          color: '#000',
-                          width: '25%'
-                        }}>
-                          {album.folder && (
-                            <>📁 {album.folder}</>
-                          )}
+                        <td style={{ padding: '0 2px', fontWeight: 'bold', fontSize: '6.5pt', width: '18%' }}>
+                          {album.folder || ''}
                         </td>
-                        <td style={{
-                          padding: '8px 10px',
-                          fontSize: '9pt',
-                          color: '#666',
-                          width: '20%'
-                        }}>
-                          {album.format}
+                        <td style={{ padding: '0 2px', color: '#666', fontSize: '5.5pt', width: '12%' }}>
+                          {album.format || ''}
                         </td>
                       </tr>
                     ))}
