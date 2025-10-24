@@ -687,37 +687,40 @@ export default function EditCollectionPage() {
           lineHeight: '1.4',
           color: '#000'
         }}>
-          <h1 style={{
-            fontSize: '18pt',
-            fontWeight: 'bold',
-            marginBottom: '8px',
-            borderBottom: '2px solid #000',
-            paddingBottom: '6px'
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '15px',
+            paddingBottom: '8px',
+            borderBottom: '3px solid #000'
           }}>
-            Collection Checklist
-          </h1>
-          
+            <h1 style={{
+              fontSize: '16pt',
+              fontWeight: 'bold',
+              margin: 0
+            }}>
+              Collection Checklist
+            </h1>
+            <div style={{ textAlign: 'right', fontSize: '10pt', color: '#666' }}>
+              <div>{new Date().toLocaleDateString()}</div>
+              <div>{filteredAlbums.length} albums</div>
+            </div>
+          </div>
+
           {searchQuery && (
             <p style={{
               fontSize: '10pt',
               color: '#555',
-              marginBottom: '12px'
+              marginBottom: '15px',
+              fontStyle: 'italic'
             }}>
-              Search: &quot;{searchQuery}&quot; • {filteredAlbums.length} albums found
+              Search: &quot;{searchQuery}&quot;
             </p>
           )}
-          
-          <p style={{
-            fontSize: '9pt',
-            color: '#666',
-            marginBottom: '20px'
-          }}>
-            Generated: {new Date().toLocaleDateString()} • Total Albums: {filteredAlbums.length}
-          </p>
 
           {sortedTags.map(tagName => {
             const albumsWithTag = albumsByTag[tagName];
-            // Sort albums alphabetically by artist, then title
             const sortedAlbums = [...albumsWithTag].sort((a, b) => {
               const artistCompare = (a.artist || '').localeCompare(b.artist || '');
               if (artistCompare !== 0) return artistCompare;
@@ -726,66 +729,71 @@ export default function EditCollectionPage() {
 
             return (
               <div key={tagName} style={{
-                marginBottom: '24px',
+                marginBottom: '20px',
                 pageBreakInside: 'avoid'
               }}>
                 <h2 style={{
-                  fontSize: '14pt',
+                  fontSize: '13pt',
                   fontWeight: 'bold',
                   marginBottom: '8px',
                   paddingBottom: '4px',
-                  borderBottom: '1px solid #333'
+                  borderBottom: '2px solid #333',
+                  display: 'flex',
+                  justifyContent: 'space-between'
                 }}>
-                  {tagName} ({sortedAlbums.length})
+                  <span>{tagName}</span>
+                  <span style={{ fontSize: '11pt', fontWeight: 'normal', color: '#666' }}>
+                    ({sortedAlbums.length} albums)
+                  </span>
                 </h2>
                 
                 <table style={{
                   width: '100%',
                   borderCollapse: 'collapse',
-                  fontSize: '9pt'
+                  marginBottom: '10px'
                 }}>
                   <tbody>
-                    {sortedAlbums.map((album, idx) => (
+                    {sortedAlbums.map((album) => (
                       <tr key={album.id} style={{
-                        borderBottom: idx < sortedAlbums.length - 1 ? '1px solid #ddd' : 'none'
+                        borderBottom: '1px solid #ddd'
                       }}>
                         <td style={{
-                          width: '20px',
-                          padding: '4px 8px 4px 0',
-                          verticalAlign: 'top'
+                          width: '30px',
+                          padding: '8px 0',
+                          textAlign: 'center',
+                          fontSize: '16pt'
                         }}>
                           ☐
                         </td>
                         <td style={{
-                          padding: '4px 8px',
-                          verticalAlign: 'top'
+                          padding: '8px 10px',
+                          width: '35%'
                         }}>
-                          <div style={{ fontWeight: 'bold' }}>
+                          <div style={{ fontWeight: 'bold', fontSize: '11pt' }}>
                             {album.artist || 'Unknown Artist'}
                           </div>
-                          <div style={{ color: '#333' }}>
+                          <div style={{ fontSize: '10pt', color: '#333' }}>
                             {album.title || 'Untitled'}
                           </div>
                         </td>
                         <td style={{
-                          width: '120px',
-                          padding: '4px 8px',
-                          color: '#555',
-                          fontSize: '8pt',
-                          verticalAlign: 'top'
+                          padding: '8px 10px',
+                          fontSize: '12pt',
+                          fontWeight: 'bold',
+                          color: '#000',
+                          width: '25%'
                         }}>
-                          {album.format && <div>{album.format}</div>}
-                          {album.year && <div>{album.year}</div>}
+                          {album.folder && (
+                            <>📁 {album.folder}</>
+                          )}
                         </td>
                         <td style={{
-                          width: '80px',
-                          padding: '4px 8px',
-                          color: '#555',
-                          fontSize: '8pt',
-                          verticalAlign: 'top',
-                          textAlign: 'right'
+                          padding: '8px 10px',
+                          fontSize: '9pt',
+                          color: '#666',
+                          width: '20%'
                         }}>
-                          {album.folder && <div>{album.folder}</div>}
+                          {album.format}
                         </td>
                       </tr>
                     ))}
