@@ -1,4 +1,4 @@
-// src/app/admin/edit-collection/page.tsx - TYPE-SAFE WITH PRINT CHECKLIST
+// src/app/admin/edit-collection/page.tsx
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
@@ -89,14 +89,6 @@ const PLATFORMS = [
   { value: 'other', label: 'Other' }
 ];
 
-// ========================================
-// HELPER FUNCTIONS FOR TYPE SAFETY
-// ========================================
-
-/**
- * Safely converts any value to a lowercase searchable string
- * Returns empty string for null/undefined, handles arrays and objects
- */
 function toSafeSearchString(value: unknown): string {
   if (value === null || value === undefined) {
     return '';
@@ -111,14 +103,12 @@ function toSafeSearchString(value: unknown): string {
   }
   
   if (Array.isArray(value)) {
-    // Filter to only string elements, then join
     return value
       .filter(item => typeof item === 'string')
       .join(' ')
       .toLowerCase();
   }
   
-  // For objects or other types, try toString
   try {
     return String(value).toLowerCase();
   } catch {
@@ -126,10 +116,6 @@ function toSafeSearchString(value: unknown): string {
   }
 }
 
-/**
- * Safely extracts string elements from an array field
- * Returns empty array if not an array or contains non-strings
- */
 function toSafeStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) {
     return [];
@@ -138,9 +124,6 @@ function toSafeStringArray(value: unknown): string[] {
   return value.filter(item => typeof item === 'string' && item.length > 0);
 }
 
-/**
- * Checks if a value contains a search query (case-insensitive)
- */
 function safeIncludes(value: unknown, query: string): boolean {
   const searchStr = toSafeSearchString(value);
   return searchStr.includes(query.toLowerCase());
@@ -159,7 +142,6 @@ export default function EditCollectionPage() {
   const [savingTags, setSavingTags] = useState(false);
   const [newTagInput, setNewTagInput] = useState('');
   
-  // Sale modal state
   const [saleModalAlbum, setSaleModalAlbum] = useState<Album | null>(null);
   const [salePrice, setSalePrice] = useState('');
   const [salePlatform, setSalePlatform] = useState('');
@@ -170,7 +152,6 @@ export default function EditCollectionPage() {
   const loadAlbums = useCallback(async () => {
     setLoading(true);
     
-    // Load tag definitions
     const { data: tagDefs } = await supabase
       .from('tag_definitions')
       .select('*')
@@ -180,7 +161,6 @@ export default function EditCollectionPage() {
       setTagDefinitions(tagDefs as TagDefinition[]);
     }
 
-    // Load albums with pagination
     let allRows: Album[] = [];
     let from = 0;
     const batchSize = 1000;
@@ -218,9 +198,7 @@ export default function EditCollectionPage() {
     
     const query = searchQuery.toLowerCase();
     
-    // Build comprehensive searchable text using safe helper functions
     const searchParts: string[] = [
-      // Core text fields
       toSafeSearchString(album.artist),
       toSafeSearchString(album.title),
       toSafeSearchString(album.format),
@@ -232,49 +210,33 @@ export default function EditCollectionPage() {
       toSafeSearchString(album.child_album_ids),
       toSafeSearchString(album.sell_price),
       toSafeSearchString(album.date_added),
-      
-      // Notes and descriptions
       toSafeSearchString(album.discogs_source),
       toSafeSearchString(album.discogs_notes),
       toSafeSearchString(album.sale_notes),
       toSafeSearchString(album.pricing_notes),
       toSafeSearchString(album.sale_platform),
-      
-      // ID fields
       toSafeSearchString(album.discogs_master_id),
       toSafeSearchString(album.discogs_release_id),
       toSafeSearchString(album.master_release_id),
       toSafeSearchString(album.spotify_id),
       toSafeSearchString(album.apple_music_id),
-      
-      // URL fields
       toSafeSearchString(album.image_url),
       toSafeSearchString(album.spotify_url),
       toSafeSearchString(album.spotify_image_url),
       toSafeSearchString(album.apple_music_url),
       toSafeSearchString(album.apple_music_artwork_url),
-      
-      // Label fields
       toSafeSearchString(album.spotify_label),
       toSafeSearchString(album.apple_music_label),
       toSafeSearchString(album.apple_music_genre),
-      
-      // Normalized fields
       toSafeSearchString(album.artist_norm),
       toSafeSearchString(album.album_norm),
       toSafeSearchString(album.artist_album_norm),
-      
-      // Date fields
       toSafeSearchString(album.master_release_date),
       toSafeSearchString(album.spotify_release_date),
       toSafeSearchString(album.apple_music_release_date),
       toSafeSearchString(album.last_enriched_at),
       toSafeSearchString(album.discogs_price_updated_at),
-      
-      // Other text fields
       toSafeSearchString(album.enrichment_sources),
-      
-      // Number fields
       toSafeSearchString(album.decade),
       toSafeSearchString(album.sides),
       toSafeSearchString(album.parent_id),
@@ -287,15 +249,11 @@ export default function EditCollectionPage() {
       toSafeSearchString(album.discogs_price_min),
       toSafeSearchString(album.discogs_price_median),
       toSafeSearchString(album.discogs_price_max),
-      
-      // Array fields - safely handled
       toSafeSearchString(album.custom_tags),
       toSafeSearchString(album.discogs_genres),
       toSafeSearchString(album.discogs_styles),
       toSafeSearchString(album.spotify_genres),
       toSafeSearchString(album.apple_music_genres),
-      
-      // Boolean fields - convert to searchable keywords
       album.is_1001 ? '1001 albums thousand and one 1001albums' : '',
       album.steves_top_200 ? 'top 200 steves top 200 top200 steve' : '',
       album.this_weeks_top_10 ? 'top 10 top10 this week weekly' : '',
@@ -305,7 +263,6 @@ export default function EditCollectionPage() {
       album.blocked ? 'blocked' : '',
     ];
     
-    // Combine all parts and search
     const searchableText = searchParts
       .filter(part => part.length > 0)
       .join(' ');
@@ -319,7 +276,6 @@ export default function EditCollectionPage() {
     const q = query.toLowerCase();
     const matches: string[] = [];
     
-    // Check core fields
     if (safeIncludes(album.artist, q)) matches.push(`Artist: ${album.artist}`);
     if (safeIncludes(album.title, q)) matches.push(`Title: ${album.title}`);
     if (safeIncludes(album.format, q)) matches.push(`Format: ${album.format}`);
@@ -327,13 +283,11 @@ export default function EditCollectionPage() {
     if (safeIncludes(album.year, q)) matches.push(`Year: ${album.year}`);
     if (safeIncludes(album.media_condition, q)) matches.push(`Condition: ${album.media_condition}`);
     
-    // Tracklists - ENHANCED DEBUG VERSION
     if (album.tracklists && safeIncludes(album.tracklists, q)) {
       let foundTrack = false;
       try {
         const tracks = JSON.parse(album.tracklists);
         if (Array.isArray(tracks)) {
-          // Check track titles first
           const matchingTracks = tracks
             .filter(t => t && typeof t === 'object' && typeof t.title === 'string' && safeIncludes(t.title, q))
             .map(t => t.title)
@@ -343,12 +297,10 @@ export default function EditCollectionPage() {
             foundTrack = true;
           }
           
-          // Check OTHER track properties (not just title) - THIS IS THE DEBUG PART
           if (!foundTrack) {
             for (const track of tracks) {
               if (!track || typeof track !== 'object') continue;
               
-              // Check each property in the track object
               for (const [key, value] of Object.entries(track)) {
                 if (value && typeof value === 'string' && value.toLowerCase().includes(q)) {
                   const trackTitle = track.title || track.position || 'Unknown track';
@@ -363,7 +315,6 @@ export default function EditCollectionPage() {
           }
         }
       } catch {
-        // Not JSON - try text extraction
         if (typeof album.tracklists === 'string') {
           const lines = album.tracklists.split('\n');
           const matchingLines = lines
@@ -382,7 +333,6 @@ export default function EditCollectionPage() {
         }
       }
       
-      // Fallback: show raw data snippet
       if (!foundTrack && typeof album.tracklists === 'string') {
         const trackText = album.tracklists.toLowerCase();
         const index = trackText.indexOf(q);
@@ -395,7 +345,6 @@ export default function EditCollectionPage() {
       }
     }
     
-    // Array fields - safely check
     const customTags = toSafeStringArray(album.custom_tags);
     if (customTags.some(t => safeIncludes(t, q))) {
       const matched = customTags.filter(t => safeIncludes(t, q));
@@ -426,12 +375,10 @@ export default function EditCollectionPage() {
       matches.push(`Apple Music Genre: ${matched.join(', ')}`);
     }
     
-    // Labels
     if (safeIncludes(album.spotify_label, q)) matches.push(`Spotify Label: ${album.spotify_label}`);
     if (safeIncludes(album.apple_music_label, q)) matches.push(`Apple Music Label: ${album.apple_music_label}`);
     if (safeIncludes(album.apple_music_genre, q)) matches.push(`Apple Genre: ${album.apple_music_genre}`);
     
-    // Notes
     if (album.discogs_notes && safeIncludes(album.discogs_notes, q)) {
       const snippet = typeof album.discogs_notes === 'string' && album.discogs_notes.length > 100 
         ? album.discogs_notes.substring(0, 100) + '...' 
@@ -446,7 +393,6 @@ export default function EditCollectionPage() {
     }
     if (safeIncludes(album.pricing_notes, q)) matches.push(`Pricing notes match`);
     
-    // Other fields
     if (safeIncludes(album.discogs_source, q)) matches.push(`Discogs metadata`);
     if (safeIncludes(album.blocked_sides, q)) matches.push(`Blocked: ${album.blocked_sides}`);
     if (safeIncludes(album.enrichment_sources, q)) matches.push(`Enrichment source`);
@@ -455,7 +401,6 @@ export default function EditCollectionPage() {
     if (safeIncludes(album.spotify_id, q)) matches.push(`Spotify ID`);
     if (safeIncludes(album.child_album_ids, q)) matches.push(`Child albums`);
     
-    // Boolean badges
     if (album.is_1001 && ('1001'.includes(q) || 'albums'.includes(q) || 'thousand'.includes(q))) {
       matches.push('Badge: 1001 Albums');
     }
@@ -629,55 +574,47 @@ export default function EditCollectionPage() {
   return (
     <>
       <style jsx global>{`
-        #print-checklist {
-          display: none;
-        }
-        
         @media print {
           @page {
             size: letter;
             margin: 0.5in;
           }
           
-          body * {
-            visibility: hidden;
-          }
-          
-          #print-checklist,
-          #print-checklist * {
-            visibility: visible;
+          body > *:not(#print-checklist) {
+            display: none !important;
           }
           
           #print-checklist {
-            display: block;
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
+            display: block !important;
+          }
+        }
+        
+        @media screen {
+          #print-checklist {
+            display: none;
           }
         }
       `}</style>
 
-      {/* Hidden Print Checklist View */}
       <div id="print-checklist">
         <div style={{
           fontFamily: 'Arial, sans-serif',
           fontSize: '9pt',
-          lineHeight: '1.15',
+          lineHeight: '1.2',
           color: '#000'
         }}>
           <div style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            marginBottom: '8px',
-            paddingBottom: '4px',
+            marginBottom: '12px',
+            paddingBottom: '6px',
             borderBottom: '2px solid #000'
           }}>
-            <h1 style={{ fontSize: '16pt', fontWeight: 'bold', margin: 0 }}>
+            <h1 style={{ fontSize: '18pt', fontWeight: 'bold', margin: 0 }}>
               Collection Checklist
             </h1>
-            <div style={{ fontSize: '9pt' }}>
+            <div style={{ fontSize: '10pt' }}>
               {new Date().toLocaleDateString()} • {filteredAlbums.length} albums
             </div>
           </div>
@@ -710,18 +647,22 @@ export default function EditCollectionPage() {
               const rightColumn = albums.slice(midpoint);
 
               return (
-                <div key={formatName} style={{ marginBottom: '12px' }}>
+                <div key={formatName} style={{ marginBottom: '16px', breakInside: 'avoid' }}>
                   <h2 style={{
-                    fontSize: '12pt',
+                    fontSize: '13pt',
                     fontWeight: 'bold',
-                    margin: '0 0 6px 0',
-                    padding: '2px 0',
+                    margin: '0 0 8px 0',
+                    padding: '3px 0',
                     borderBottom: '1.5px solid #000'
                   }}>
                     {formatName} ({albums.length})
                   </h2>
                   
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <table style={{ 
+                    width: '100%', 
+                    borderCollapse: 'collapse',
+                    fontSize: '9pt'
+                  }}>
                     <tbody>
                       {Array.from({ length: Math.max(leftColumn.length, rightColumn.length) }).map((_, idx) => {
                         const leftAlbum = leftColumn[idx];
@@ -731,30 +672,34 @@ export default function EditCollectionPage() {
                           str.length > max ? str.substring(0, max) + '…' : str;
 
                         return (
-                          <tr key={idx}>
+                          <tr key={idx} style={{ pageBreakInside: 'avoid' }}>
                             <td style={{ 
-                              padding: '1px 8px 1px 0',
+                              padding: '2px 10px 2px 0',
                               width: '50%',
-                              fontSize: '9pt',
-                              verticalAlign: 'top'
+                              verticalAlign: 'top',
+                              lineHeight: '1.3'
                             }}>
                               {leftAlbum && (
                                 <span>
-                                  <span style={{ marginRight: '4px' }}>☐</span>
-                                  <strong>{truncate(leftAlbum.artist || 'Unknown', 30)}</strong> - {truncate(leftAlbum.title || 'Untitled', 35)}
+                                  <span style={{ marginRight: '6px' }}>☐</span>
+                                  <strong>{truncate(leftAlbum.artist || 'Unknown', 28)}</strong>
+                                  {' - '}
+                                  {truncate(leftAlbum.title || 'Untitled', 32)}
                                 </span>
                               )}
                             </td>
                             <td style={{ 
-                              padding: '1px 0 1px 8px',
+                              padding: '2px 0 2px 10px',
                               width: '50%',
-                              fontSize: '9pt',
-                              verticalAlign: 'top'
+                              verticalAlign: 'top',
+                              lineHeight: '1.3'
                             }}>
                               {rightAlbum && (
                                 <span>
-                                  <span style={{ marginRight: '4px' }}>☐</span>
-                                  <strong>{truncate(rightAlbum.artist || 'Unknown', 30)}</strong> - {truncate(rightAlbum.title || 'Untitled', 35)}
+                                  <span style={{ marginRight: '6px' }}>☐</span>
+                                  <strong>{truncate(rightAlbum.artist || 'Unknown', 28)}</strong>
+                                  {' - '}
+                                  {truncate(rightAlbum.title || 'Untitled', 32)}
                                 </span>
                               )}
                             </td>
@@ -770,7 +715,6 @@ export default function EditCollectionPage() {
         </div>
       </div>
 
-      {/* Regular page content */}
       <div style={{
         padding: 24,
         background: '#f8fafc',
@@ -1178,7 +1122,6 @@ export default function EditCollectionPage() {
           </div>
         )}
 
-        {/* Tag Editor Modal */}
         {editingTagsFor && editingAlbum && (
           <div style={{
             position: 'fixed',
@@ -1420,7 +1363,6 @@ export default function EditCollectionPage() {
           </div>
         )}
 
-        {/* Sale Modal */}
         {saleModalAlbum && (
           <div style={{
             position: 'fixed',
