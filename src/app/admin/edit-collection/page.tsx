@@ -535,21 +535,7 @@ export default function EditCollectionPage() {
   };
 
   const printResults = () => {
-    // Show the print view
-    const printView = document.getElementById('print-checklist');
-    if (printView) {
-      printView.style.display = 'block';
-    }
-    
-    // Trigger print
-    setTimeout(() => {
-      window.print();
-      
-      // Hide the print view again after printing
-      if (printView) {
-        printView.style.display = 'none';
-      }
-    }, 100);
+    window.print();
   };
 
   const saveTags = async () => {
@@ -644,13 +630,20 @@ export default function EditCollectionPage() {
     <>
       <style jsx global>{`
         @media print {
+          @page {
+            size: letter;
+            margin: 0.5in;
+          }
+          
           body * {
             visibility: hidden;
           }
+          
           #print-checklist,
           #print-checklist * {
             visibility: visible;
           }
+          
           #print-checklist {
             position: absolute;
             left: 0;
@@ -661,136 +654,116 @@ export default function EditCollectionPage() {
       `}</style>
 
       {/* Hidden Print Checklist View */}
-            <div id="print-checklist" style={{ display: 'none' }}>
-              <div style={{
-                padding: '8mm',
-                fontFamily: 'Arial, sans-serif',
-                fontSize: '8pt',
-                lineHeight: '1.1',
-                color: '#000',
-                background: '#fff'
-              }}>
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: '3mm',
-                  paddingBottom: '1mm',
-                  borderBottom: '1.5px solid #000'
-                }}>
-                  <h1 style={{ fontSize: '14pt', fontWeight: 'bold', margin: 0, color: '#000' }}>
-                    Collection Checklist
-                  </h1>
-                  <div style={{ fontSize: '8pt', color: '#333' }}>
-                    {new Date().toLocaleDateString()} • {filteredAlbums.length} albums
-                  </div>
-                </div>
-
-                {(() => {
-                  const byFormat: Record<string, Album[]> = {};
-                  filteredAlbums.forEach(album => {
-                    const fmt = album.format?.includes('LP') || album.format?.includes('Vinyl') || album.format?.includes('12"') || album.format?.includes('10"') || album.format?.includes('7"') 
-                      ? 'Vinyl' 
-                      : album.format?.includes('CD') 
-                      ? 'CDs' 
-                      : album.format?.includes('Cass') 
-                      ? 'Cassettes' 
-                      : 'Other';
-                    if (!byFormat[fmt]) byFormat[fmt] = [];
-                    byFormat[fmt].push(album);
-                  });
-
-                  const formatOrder = ['Vinyl', 'CDs', 'Cassettes', 'Other'];
-                  
-                  return formatOrder.filter(fmt => byFormat[fmt]).map(formatName => {
-                    const albums = byFormat[formatName].sort((a, b) => {
-                      const artistCmp = (a.artist || '').localeCompare(b.artist || '');
-                      if (artistCmp !== 0) return artistCmp;
-                      return (a.title || '').localeCompare(b.title || '');
-                    });
-
-                    const midpoint = Math.ceil(albums.length / 2);
-                    const leftColumn = albums.slice(0, midpoint);
-                    const rightColumn = albums.slice(midpoint);
-
-                    return (
-                      <div key={formatName} style={{ marginBottom: '3mm', pageBreakInside: 'avoid' }}>
-                        <h2 style={{
-                          fontSize: '11pt',
-                          fontWeight: 'bold',
-                          margin: '0 0 1mm 0',
-                          padding: '0.5mm 0',
-                          borderBottom: '1px solid #000',
-                          color: '#000'
-                        }}>
-                          {formatName} ({albums.length})
-                        </h2>
-                        
-                        <div style={{
-                          display: 'grid',
-                          gridTemplateColumns: '1fr 1fr',
-                          gap: '4mm',
-                          marginTop: '1.5mm'
-                        }}>
-                          <div>
-                            {leftColumn.map((album) => {
-                              const truncate = (str: string, max: number) => 
-                                str.length > max ? str.substring(0, max) + '…' : str;
-                              
-                              const artist = truncate(album.artist || 'Unknown', 28);
-                              const title = truncate(album.title || 'Untitled', 32);
-
-                              return (
-                                <div key={album.id} style={{ 
-                                  display: 'flex',
-                                  gap: '1.5mm',
-                                  alignItems: 'flex-start',
-                                  fontSize: '8pt',
-                                  color: '#000',
-                                  marginBottom: '0.8mm',
-                                  pageBreakInside: 'avoid'
-                                }}>
-                                  <span style={{ fontSize: '10pt', minWidth: '2.5mm', flexShrink: 0 }}>☐</span>
-                                  <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                    <strong>{artist}</strong> - {title}
-                                  </span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                          <div>
-                            {rightColumn.map((album) => {
-                              const truncate = (str: string, max: number) => 
-                                str.length > max ? str.substring(0, max) + '…' : str;
-                              
-                              const artist = truncate(album.artist || 'Unknown', 28);
-                              const title = truncate(album.title || 'Untitled', 32);
-
-                              return (
-                                <div key={album.id} style={{ 
-                                  display: 'flex',
-                                  gap: '1.5mm',
-                                  alignItems: 'flex-start',
-                                  fontSize: '8pt',
-                                  color: '#000',
-                                  marginBottom: '0.8mm',
-                                  pageBreakInside: 'avoid'
-                                }}>
-                                  <span style={{ fontSize: '10pt', minWidth: '2.5mm', flexShrink: 0 }}>☐</span>
-                                  <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                    <strong>{artist}</strong> - {title}
-                                  </span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  });
-                })()}
-              </div>
+      <div id="print-checklist" style={{ display: 'none' }}>
+        <div style={{
+          fontFamily: 'Arial, sans-serif',
+          fontSize: '9pt',
+          lineHeight: '1.15',
+          color: '#000'
+        }}>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '8px',
+            paddingBottom: '4px',
+            borderBottom: '2px solid #000'
+          }}>
+            <h1 style={{ fontSize: '16pt', fontWeight: 'bold', margin: 0 }}>
+              Collection Checklist
+            </h1>
+            <div style={{ fontSize: '9pt' }}>
+              {new Date().toLocaleDateString()} • {filteredAlbums.length} albums
             </div>
+          </div>
+
+          {(() => {
+            const byFormat: Record<string, Album[]> = {};
+            filteredAlbums.forEach(album => {
+              const fmt = album.format?.includes('LP') || album.format?.includes('Vinyl') || album.format?.includes('12"') || album.format?.includes('10"') || album.format?.includes('7"') 
+                ? 'Vinyl' 
+                : album.format?.includes('CD') 
+                ? 'CDs' 
+                : album.format?.includes('Cass') 
+                ? 'Cassettes' 
+                : 'Other';
+              if (!byFormat[fmt]) byFormat[fmt] = [];
+              byFormat[fmt].push(album);
+            });
+
+            const formatOrder = ['Vinyl', 'CDs', 'Cassettes', 'Other'];
+            
+            return formatOrder.filter(fmt => byFormat[fmt]).map(formatName => {
+              const albums = byFormat[formatName].sort((a, b) => {
+                const artistCmp = (a.artist || '').localeCompare(b.artist || '');
+                if (artistCmp !== 0) return artistCmp;
+                return (a.title || '').localeCompare(b.title || '');
+              });
+
+              const midpoint = Math.ceil(albums.length / 2);
+              const leftColumn = albums.slice(0, midpoint);
+              const rightColumn = albums.slice(midpoint);
+
+              return (
+                <div key={formatName} style={{ marginBottom: '12px' }}>
+                  <h2 style={{
+                    fontSize: '12pt',
+                    fontWeight: 'bold',
+                    margin: '0 0 6px 0',
+                    padding: '2px 0',
+                    borderBottom: '1.5px solid #000'
+                  }}>
+                    {formatName} ({albums.length})
+                  </h2>
+                  
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <tbody>
+                      {Array.from({ length: Math.max(leftColumn.length, rightColumn.length) }).map((_, idx) => {
+                        const leftAlbum = leftColumn[idx];
+                        const rightAlbum = rightColumn[idx];
+                        
+                        const truncate = (str: string, max: number) => 
+                          str.length > max ? str.substring(0, max) + '…' : str;
+
+                        return (
+                          <tr key={idx}>
+                            <td style={{ 
+                              padding: '1px 8px 1px 0',
+                              width: '50%',
+                              fontSize: '9pt',
+                              verticalAlign: 'top'
+                            }}>
+                              {leftAlbum && (
+                                <span>
+                                  <span style={{ marginRight: '4px' }}>☐</span>
+                                  <strong>{truncate(leftAlbum.artist || 'Unknown', 30)}</strong> - {truncate(leftAlbum.title || 'Untitled', 35)}
+                                </span>
+                              )}
+                            </td>
+                            <td style={{ 
+                              padding: '1px 0 1px 8px',
+                              width: '50%',
+                              fontSize: '9pt',
+                              verticalAlign: 'top'
+                            }}>
+                              {rightAlbum && (
+                                <span>
+                                  <span style={{ marginRight: '4px' }}>☐</span>
+                                  <strong>{truncate(rightAlbum.artist || 'Unknown', 30)}</strong> - {truncate(rightAlbum.title || 'Untitled', 35)}
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            });
+          })()}
+        </div>
+      </div>
 
       {/* Regular page content */}
       <div style={{
