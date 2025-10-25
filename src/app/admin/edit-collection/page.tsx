@@ -629,6 +629,10 @@ export default function EditCollectionPage() {
   return (
     <>
       <style jsx global>{`
+        #print-checklist {
+          display: none;
+        }
+        
         @media print {
           @page {
             size: letter;
@@ -645,6 +649,7 @@ export default function EditCollectionPage() {
           }
           
           #print-checklist {
+            display: block;
             position: absolute;
             left: 0;
             top: 0;
@@ -654,7 +659,7 @@ export default function EditCollectionPage() {
       `}</style>
 
       {/* Hidden Print Checklist View */}
-      <div id="print-checklist" style={{ display: 'none' }}>
+      <div id="print-checklist">
         <div style={{
           fontFamily: 'Arial, sans-serif',
           fontSize: '9pt',
@@ -1030,12 +1035,6 @@ export default function EditCollectionPage() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                         <span style={{ fontWeight: 600, color: '#3b82f6' }}>💿</span>
                         <span style={{ fontWeight: 600 }}>{album.format}</span>
-                      </div>
-                    )}
-                    {album.folder && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <span style={{ fontWeight: 600, color: '#8b5cf6' }}>📁</span>
-                        <span>{album.folder}</span>
                       </div>
                     )}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
