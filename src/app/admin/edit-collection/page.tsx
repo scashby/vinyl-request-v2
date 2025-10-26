@@ -574,29 +574,32 @@ export default function EditCollectionPage() {
   return (
     <>
       <style jsx global>{`
+        .screen-only {
+          display: block;
+        }
+        
+        .print-only {
+          display: none !important;
+        }
+        
         @media print {
           @page {
             size: letter;
             margin: 0.5in;
           }
           
-          body > *:not(#print-checklist) {
+          .screen-only {
             display: none !important;
           }
           
-          #print-checklist {
+          .print-only {
             display: block !important;
-          }
-        }
-        
-        @media screen {
-          #print-checklist {
-            display: none;
           }
         }
       `}</style>
 
-      <div id="print-checklist">
+      {/* Print-only content */}
+      <div className="print-only">
         <div style={{
           fontFamily: 'Arial, sans-serif',
           fontSize: '9pt',
@@ -715,7 +718,8 @@ export default function EditCollectionPage() {
         </div>
       </div>
 
-      <div style={{
+      {/* Screen-only content */}
+      <div className="screen-only" style={{
         padding: 24,
         background: '#f8fafc',
         minHeight: '100vh',
