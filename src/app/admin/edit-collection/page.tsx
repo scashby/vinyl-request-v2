@@ -588,12 +588,38 @@ export default function EditCollectionPage() {
             margin: 0.5in;
           }
           
+          body * {
+            visibility: hidden;
+          }
+          
+          .print-only,
+          .print-only * {
+            visibility: visible !important;
+          }
+          
+          .print-only {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            display: block !important;
+          }
+          
           .screen-only {
             display: none !important;
           }
           
-          .print-only {
-            display: block !important;
+          /* Hide common admin navigation/sidebar elements */
+          nav,
+          aside,
+          header:not(.print-only *),
+          .sidebar,
+          .navigation,
+          .admin-nav,
+          [role="navigation"],
+          [role="banner"] {
+            display: none !important;
+            visibility: hidden !important;
           }
         }
       `}</style>
