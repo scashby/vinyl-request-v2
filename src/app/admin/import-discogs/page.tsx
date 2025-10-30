@@ -1,4 +1,4 @@
-// src/app/admin/import-discogs/page.tsx - Always show removals with individual deselect
+// src/app/admin/import-discogs/page.tsx - WITH FORCE FULL SYNC OPTION RESTORED
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -62,6 +62,7 @@ type SyncPreview = {
   newItems: ProcessedRow[];
   updateOperations: UpdateOperation[];
   recordsToRemove: ExistingRecord[];
+  syncMode: 'incremental' | 'full';
   lastImportDate: string | null;
   csvRowCount: number;
   newItemsSinceLastImport: number;
@@ -133,6 +134,7 @@ export default function ImportDiscogsPage() {
   const [expandedUpdate, setExpandedUpdate] = useState<number | null>(null);
   const [deselectedRemovals, setDeselectedRemovals] = useState<Set<number>>(new Set());
   const [lastImportDate, setLastImportDate] = useState<string | null>(null);
+  const [forceFullSync, setForceFullSync] = useState(false);
   
   const [skipEnrichment, setSkipEnrichment] = useState(false);
   const [skip1001Matching, setSkip1001Matching] = useState(false);
@@ -269,6 +271,9 @@ export default function ImportDiscogsPage() {
           });
 
           console.log(`📊 Total valid CSV rows: ${validRows.length}`);
+
+          const syncMode: 'incremental' | 'full' = (lastImportDate && !forceFullSync) ? 'incremental' : 'full';
+          console.log(`🔄 Sync mode: ${syncMode}`);
           
           // Count how many items were added since last import (for info only)
           let newItemsSinceLastImport = 0;
@@ -403,22 +408,29 @@ export default function ImportDiscogsPage() {
 
           console.log(`🔧 Found ${updateOperations.length} items to update`);
           
-          // ALWAYS check for removals
-          console.log(`🗑️  Checking for records to remove...`);
-          console.log(`   Comparing ${allExisting.length} DB records against ${fullCsvMap.size} CSV keys`);
+          let recordsToRemove: ExistingRecord[] = [];
           
-          const recordsToRemove = allExisting.filter(existingRecord => {
-            const key = createKey(existingRecord.discogs_release_id, existingRecord.folder || '');
-            const inCsv = fullCsvMap.has(key);
-            if (!inCsv) {
-              console.log(`  TO REMOVE: ${key} (${existingRecord.artist} - ${existingRecord.title})`);
-            }
-            return !inCsv;
-          });
-          
-          console.log(`🚫 Found ${recordsToRemove.length} items to remove`);
+          if (syncMode === 'full') {
+            console.log(`🗑️  Checking for records to remove (full sync mode)...`);
+            console.log(`   Comparing ${allExisting.length} DB records against ${fullCsvMap.size} CSV keys`);
+            
+            recordsToRemove = allExisting.filter(existingRecord => {
+              const key = createKey(existingRecord.discogs_release_id, existingRecord.folder || '');
+              const inCsv = fullCsvMap.has(key);
+              if (!inCsv) {
+                console.log(`  TO REMOVE: ${key} (${existingRecord.artist} - ${existingRecord.title})`);
+              }
+              return !inCsv;
+            });
+            
+            console.log(`🚫 Found ${recordsToRemove.length} items to remove`);
+          } else {
+            console.log(`⏭️  Skipping removal check (incremental sync mode)`);
+          }
 
-          const syncMessage = `Sync preview: ${newRows.length} new, ${updateOperations.length} updates, ${recordsToRemove.length} to remove${lastImportDate && newItemsSinceLastImport > 0 ? ` (${newItemsSinceLastImport} items added to Discogs since ${new Date(lastImportDate).toLocaleDateString()})` : ''}`;
+          const syncMessage = syncMode === 'incremental'
+            ? `Incremental sync: ${newRows.length} new, ${updateOperations.length} updates${newItemsSinceLastImport > 0 ? ` (${newItemsSinceLastImport} items added to Discogs since ${new Date(lastImportDate!).toLocaleDateString()})` : ''}`
+            : `Full sync: ${newRows.length} new, ${updateOperations.length} updates, ${recordsToRemove.length} removals`;
           
           console.log(`📊 ${syncMessage}`);
           setStatus(syncMessage);
@@ -430,6 +442,7 @@ export default function ImportDiscogsPage() {
             newItems: newRows, 
             updateOperations, 
             recordsToRemove,
+            syncMode,
             lastImportDate,
             csvRowCount: validRows.length,
             newItemsSinceLastImport
@@ -473,7 +486,7 @@ export default function ImportDiscogsPage() {
         .from('import_history')
         .insert([{ 
           status: 'in_progress',
-          notes: 'Discogs sync'
+          notes: syncPreview.syncMode === 'incremental' ? 'Incremental sync' : 'Full sync'
         }])
         .select()
         .single();
@@ -621,7 +634,7 @@ export default function ImportDiscogsPage() {
         setStatus(`Skipped ${(window as Window & SyncDataStorage).updateOperations?.length} updates (override enabled)`);
       }
       
-      if (recordsToRemove.length > 0) {
+      if (syncPreview.syncMode === 'full' && recordsToRemove.length > 0) {
         const actualRemovals = recordsToRemove.filter(r => !deselectedRemovals.has(r.id));
         if (actualRemovals.length > 0) {
           setStatus(`${dryRun ? 'Would remove' : 'Removing'} ${actualRemovals.length} records...`);
@@ -676,7 +689,9 @@ export default function ImportDiscogsPage() {
       }
 
       if (!dryRun && importRecord) {
-        const removedCount = recordsToRemove.length - deselectedRemovals.size;
+        const removedCount = syncPreview.syncMode === 'full' 
+          ? (recordsToRemove.length - deselectedRemovals.size) 
+          : 0;
           
         await supabase
           .from('import_history')
@@ -729,8 +744,44 @@ export default function ImportDiscogsPage() {
       }}>
         {lastImportDate 
           ? `Last import: ${new Date(lastImportDate).toLocaleString()}`
-          : 'First import - syncing all albums'}
+          : 'First import - will perform full sync'}
       </p>
+
+      {lastImportDate && (
+        <div style={{
+          background: forceFullSync ? '#fef3c7' : '#dbeafe',
+          border: `2px solid ${forceFullSync ? '#f59e0b' : '#3b82f6'}`,
+          borderRadius: 8,
+          padding: 12,
+          marginBottom: 16,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12
+        }}>
+          <input
+            type="checkbox"
+            id="forceFullSync"
+            checked={forceFullSync}
+            onChange={(e) => setForceFullSync(e.target.checked)}
+            style={{
+              width: 18,
+              height: 18,
+              cursor: 'pointer'
+            }}
+          />
+          <label 
+            htmlFor="forceFullSync"
+            style={{
+              fontSize: 14,
+              color: '#1f2937',
+              cursor: 'pointer',
+              fontWeight: 500
+            }}
+          >
+            Force Full Sync (check for removals and re-process all items)
+          </label>
+        </div>
+      )}
 
       <div style={{
         background: 'white',
@@ -839,7 +890,7 @@ export default function ImportDiscogsPage() {
                 style={{ width: 18, height: 18, cursor: 'pointer' }}
               />
               <label htmlFor="skipRemovals" style={{ fontSize: 14, color: '#1f2937', cursor: 'pointer', flex: 1 }}>
-                Skip Removals (don&apos;t delete any albums, additions only)
+                Skip Removals (don&apos;t delete albums not in CSV, even in full sync)
               </label>
             </div>
 
@@ -967,7 +1018,7 @@ export default function ImportDiscogsPage() {
               boxShadow: isProcessing ? 'none' : '0 4px 6px rgba(59, 130, 246, 0.2)'
             }}
           >
-            {isProcessing ? 'Processing...' : dryRun ? '🔍 Preview Changes' : '⚡ Sync Collection'}
+            {isProcessing ? 'Processing...' : dryRun ? '🔍 Preview Changes' : '⚡ Enrich & Import'}
           </button>
         )}
       </div>
@@ -1004,10 +1055,11 @@ export default function ImportDiscogsPage() {
             Sync Preview
           </h2>
           <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 16 }}>
-            CSV has {syncPreview.csvRowCount} total records
-            {syncPreview.lastImportDate && syncPreview.newItemsSinceLastImport > 0 && (
+            Mode: <strong>{syncPreview.syncMode === 'incremental' ? 'Incremental' : 'Full Sync'}</strong>
+            {syncPreview.syncMode === 'incremental' && syncPreview.newItemsSinceLastImport > 0 && (
               <> • {syncPreview.newItemsSinceLastImport} items added to Discogs since last import</>
             )}
+            {' '}• CSV has {syncPreview.csvRowCount} total records
           </p>
           
           <div style={{
@@ -1085,41 +1137,43 @@ export default function ImportDiscogsPage() {
               )}
             </div>
             
-            <div 
-              onClick={() => setShowDetails(showDetails === 'removes' ? null : 'removes')}
-              style={{
-                background: skipRemovals ? '#f3f4f6' : '#fee2e2',
-                border: `1px solid ${skipRemovals ? '#9ca3af' : '#dc2626'}`,
-                borderRadius: 8,
-                padding: 16,
-                textAlign: 'center',
-                cursor: syncPreview.recordsToRemove.length > 0 ? 'pointer' : 'default',
-                transition: 'all 0.2s',
-                opacity: skipRemovals ? 0.5 : 1
-              }}
-              onMouseEnter={e => {
-                if (syncPreview.recordsToRemove.length > 0) {
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(220, 38, 38, 0.3)';
-                }
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = 'none';
-              }}
-            >
-              <div style={{ fontSize: 32, fontWeight: 'bold', color: skipRemovals ? '#6b7280' : '#991b1b' }}>
-                {syncPreview.recordsToRemove.length}
-              </div>
-              <div style={{ fontSize: 14, color: skipRemovals ? '#6b7280' : '#991b1b', fontWeight: 600 }}>
-                To Remove {skipRemovals && '(Skipped)'}
-              </div>
-              {syncPreview.recordsToRemove.length > 0 && (
-                <div style={{ fontSize: 11, color: skipRemovals ? '#9ca3af' : '#dc2626', marginTop: 4 }}>
-                  Click to deselect items →
+            {syncPreview.syncMode === 'full' && (
+              <div 
+                onClick={() => setShowDetails(showDetails === 'removes' ? null : 'removes')}
+                style={{
+                  background: skipRemovals ? '#f3f4f6' : '#fee2e2',
+                  border: `1px solid ${skipRemovals ? '#9ca3af' : '#dc2626'}`,
+                  borderRadius: 8,
+                  padding: 16,
+                  textAlign: 'center',
+                  cursor: syncPreview.recordsToRemove.length > 0 ? 'pointer' : 'default',
+                  transition: 'all 0.2s',
+                  opacity: skipRemovals ? 0.5 : 1
+                }}
+                onMouseEnter={e => {
+                  if (syncPreview.recordsToRemove.length > 0) {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(220, 38, 38, 0.3)';
+                  }
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              >
+                <div style={{ fontSize: 32, fontWeight: 'bold', color: skipRemovals ? '#6b7280' : '#991b1b' }}>
+                  {syncPreview.recordsToRemove.length}
                 </div>
-              )}
-            </div>
+                <div style={{ fontSize: 14, color: skipRemovals ? '#6b7280' : '#991b1b', fontWeight: 600 }}>
+                  To Remove {skipRemovals && '(Skipped)'}
+                </div>
+                {syncPreview.recordsToRemove.length > 0 && (
+                  <div style={{ fontSize: 11, color: skipRemovals ? '#9ca3af' : '#dc2626', marginTop: 4 }}>
+                    Click to deselect items →
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           
           {showDetails === 'new' && syncPreview.newItems.length > 0 && (
@@ -1229,7 +1283,7 @@ export default function ImportDiscogsPage() {
             </div>
           )}
 
-          {showDetails === 'removes' && syncPreview.recordsToRemove.length > 0 && (
+          {showDetails === 'removes' && syncPreview.recordsToRemove.length > 0 && syncPreview.syncMode === 'full' && (
             <div style={{
               background: '#fef2f2',
               border: '1px solid #dc2626',
@@ -1240,10 +1294,10 @@ export default function ImportDiscogsPage() {
               overflowY: 'auto'
             }}>
               <h3 style={{ fontSize: 16, fontWeight: 600, color: '#991b1b', marginBottom: 8 }}>
-                Albums Not in Discogs CSV
+                Albums to Remove (Not in CSV)
               </h3>
               <p style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>
-                ⚠️ Click any album to keep it (deselect from removal)
+                ⚠️ Click any item to exclude it from removal
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {syncPreview.recordsToRemove.map((item, idx) => {
@@ -1283,8 +1337,8 @@ export default function ImportDiscogsPage() {
                         {item.artist} - {item.title}
                       </div>
                       <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
-                        Release ID: {item.discogs_release_id} • Folder: {item.folder}
-                        {isDeselected && <span style={{ color: '#10b981', marginLeft: 8, fontWeight: 600 }}>• Will be KEPT</span>}
+                        Release ID: {item.discogs_release_id} • ID: {item.id} • Folder: {item.folder}
+                        {isDeselected && <span style={{ color: '#10b981', marginLeft: 8 }}>• Will NOT be removed</span>}
                       </div>
                     </div>
                   );
