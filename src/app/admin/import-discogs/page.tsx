@@ -1,4 +1,4 @@
-// src/app/admin/import-discogs/page.tsx - WITH FULL OVERRIDE CONTROLS AND TRACK ARTIST SUPPORT
+// src/app/admin/import-discogs/page.tsx - FIXED: Proper incremental sync that catches missing albums
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -65,7 +65,7 @@ type SyncPreview = {
   syncMode: 'incremental' | 'full';
   lastImportDate: string | null;
   csvRowCount: number;
-  filteredCsvRowCount: number;
+  newItemsSinceLastImport: number;
 };
 
 interface SyncDataStorage {
@@ -275,32 +275,22 @@ export default function ImportDiscogsPage() {
           const syncMode: 'incremental' | 'full' = (lastImportDate && !forceFullSync) ? 'incremental' : 'full';
           console.log(`🔄 Sync mode: ${syncMode}`);
           
-          let filteredRows = validRows;
-          
+          // Count how many items were added since last import (for status display only)
+          let newItemsSinceLastImport = 0;
           if (syncMode === 'incremental' && lastImportDate) {
             const lastImportTimestamp = new Date(lastImportDate).getTime();
-            console.log(`📅 Last import: ${new Date(lastImportDate).toLocaleString()}`);
-            
-            filteredRows = validRows.filter(row => {
+            newItemsSinceLastImport = validRows.filter(row => {
               const dateAdded = new Date(row['Date Added']).getTime();
               return dateAdded > lastImportTimestamp;
-            });
+            }).length;
             
-            console.log(`✅ Filtered to ${filteredRows.length} items added after last import`);
-            console.log(`⏭️  Skipped ${validRows.length - filteredRows.length} older items`);
-            
-            if (filteredRows.length === 0) {
-              setStatus('No new items found since last import. Use "Force Full Sync" to re-process everything.');
-              setIsProcessing(false);
-              return;
-            }
-            
-            setStatus(`Incremental sync: Found ${filteredRows.length} new items (${validRows.length - filteredRows.length} older items skipped)`);
-          } else {
-            setStatus(`Full sync: Processing all ${validRows.length} items`);
+            console.log(`📅 ${newItemsSinceLastImport} items in CSV have Date Added after last import`);
           }
           
-          const processedRows: ProcessedRow[] = filteredRows.map(row => {
+          setStatus(`Processing all ${validRows.length} items from CSV...`);
+          
+          // FIXED: Process ALL rows regardless of date to catch any previously missed albums
+          const processedRows: ProcessedRow[] = validRows.map(row => {
             const year = row.Released || 0;
             return {
               artist: row.Artist || 'Unknown Artist',
@@ -346,6 +336,7 @@ export default function ImportDiscogsPage() {
           }
 
           console.log(`📀 Found ${allExisting.length} existing records in database`);
+          console.log(`📊 CSV has ${validRows.length} records - ${validRows.length - allExisting.length} difference`);
 
           const createKey = (releaseId: string, folder: string) => {
             const normalizedFolder = sanitizeFolder(folder);
@@ -443,7 +434,7 @@ export default function ImportDiscogsPage() {
           }
 
           const syncMessage = syncMode === 'incremental'
-            ? `Incremental sync: ${newRows.length} new, ${updateOperations.length} updates (changes since ${new Date(lastImportDate!).toLocaleDateString()})`
+            ? `Incremental sync: ${newRows.length} new, ${updateOperations.length} updates${newItemsSinceLastImport > 0 ? ` (${newItemsSinceLastImport} items added to Discogs since ${new Date(lastImportDate!).toLocaleDateString()})` : ''}`
             : `Full sync: ${newRows.length} new, ${updateOperations.length} updates, ${recordsToRemove.length} removals`;
           
           console.log(`📊 ${syncMessage}`);
@@ -459,7 +450,7 @@ export default function ImportDiscogsPage() {
             syncMode,
             lastImportDate,
             csvRowCount: validRows.length,
-            filteredCsvRowCount: filteredRows.length
+            newItemsSinceLastImport
           });
           setIsProcessing(false);
         },
@@ -1070,9 +1061,10 @@ export default function ImportDiscogsPage() {
           </h2>
           <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 16 }}>
             Mode: <strong>{syncPreview.syncMode === 'incremental' ? 'Incremental' : 'Full Sync'}</strong>
-            {syncPreview.syncMode === 'incremental' && (
-              <> • Processing {syncPreview.filteredCsvRowCount} of {syncPreview.csvRowCount} CSV rows</>
+            {syncPreview.syncMode === 'incremental' && syncPreview.newItemsSinceLastImport > 0 && (
+              <> • {syncPreview.newItemsSinceLastImport} items in CSV added after last import</>
             )}
+            {' '}• CSV has {syncPreview.csvRowCount} total records
           </p>
           
           <div style={{
