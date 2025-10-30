@@ -81,12 +81,53 @@ type TagDefinition = {
   color: string;
 };
 
+type SortOption = 
+  | 'artist-asc' | 'artist-desc' 
+  | 'title-asc' | 'title-desc' 
+  | 'year-desc' | 'year-asc' 
+  | 'added-desc' | 'added-asc' 
+  | 'format-asc' | 'format-desc' 
+  | 'tags-count-desc' | 'tags-count-asc' 
+  | 'sale-price-desc' | 'sale-price-asc' 
+  | 'condition-asc' | 'condition-desc'
+  | 'folder-asc' | 'folder-desc'
+  | 'popularity-desc' | 'popularity-asc'
+  | 'sides-desc' | 'sides-asc'
+  | 'decade-desc' | 'decade-asc';
+
 const PLATFORMS = [
   { value: 'discogs', label: 'Discogs' },
   { value: 'shopify', label: 'Shopify Store' },
   { value: 'ebay', label: 'eBay' },
   { value: 'reverb', label: 'Reverb LP' },
   { value: 'other', label: 'Other' }
+];
+
+const SORT_OPTIONS: { value: SortOption; label: string; category: string }[] = [
+  { value: 'artist-asc', label: 'Artist (A→Z)', category: 'Basic' },
+  { value: 'artist-desc', label: 'Artist (Z→A)', category: 'Basic' },
+  { value: 'title-asc', label: 'Title (A→Z)', category: 'Basic' },
+  { value: 'title-desc', label: 'Title (Z→A)', category: 'Basic' },
+  { value: 'year-desc', label: 'Year (Newest First)', category: 'Time' },
+  { value: 'year-asc', label: 'Year (Oldest First)', category: 'Time' },
+  { value: 'decade-desc', label: 'Decade (Newest)', category: 'Time' },
+  { value: 'decade-asc', label: 'Decade (Oldest)', category: 'Time' },
+  { value: 'added-desc', label: 'Date Added (Newest)', category: 'Time' },
+  { value: 'added-asc', label: 'Date Added (Oldest)', category: 'Time' },
+  { value: 'format-asc', label: 'Format (A→Z)', category: 'Physical' },
+  { value: 'format-desc', label: 'Format (Z→A)', category: 'Physical' },
+  { value: 'folder-asc', label: 'Folder (A→Z)', category: 'Physical' },
+  { value: 'folder-desc', label: 'Folder (Z→A)', category: 'Physical' },
+  { value: 'condition-asc', label: 'Condition (A→Z)', category: 'Physical' },
+  { value: 'condition-desc', label: 'Condition (Z→A)', category: 'Physical' },
+  { value: 'sides-desc', label: 'Most Sides First', category: 'Physical' },
+  { value: 'sides-asc', label: 'Fewest Sides First', category: 'Physical' },
+  { value: 'tags-count-desc', label: 'Most Tags', category: 'Metadata' },
+  { value: 'tags-count-asc', label: 'Fewest Tags', category: 'Metadata' },
+  { value: 'popularity-desc', label: 'Most Popular (Spotify)', category: 'Metadata' },
+  { value: 'popularity-asc', label: 'Least Popular (Spotify)', category: 'Metadata' },
+  { value: 'sale-price-desc', label: 'Highest Price', category: 'Sales' },
+  { value: 'sale-price-asc', label: 'Lowest Price', category: 'Sales' }
 ];
 
 function toSafeSearchString(value: unknown): string {
@@ -136,6 +177,60 @@ export default function EditCollectionPage() {
   const [albums, setAlbums] = useState<Album[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
+  const [sortBy, setSortBy] = useState<SortOption>('artist-asc');
+  const [showFilters, setShowFilters] = useState(false);
+  
+  // Search scope - ALL fields you can include in search
+  const [searchInArtist, setSearchInArtist] = useState(true);
+  const [searchInTitle, setSearchInTitle] = useState(true);
+  const [searchInTags, setSearchInTags] = useState(true);
+  const [searchInTracks, setSearchInTracks] = useState(true);
+  const [searchInFormat, setSearchInFormat] = useState(true);
+  const [searchInNotes, setSearchInNotes] = useState(true);
+  const [searchInGenres, setSearchInGenres] = useState(true);
+  const [searchInStyles, setSearchInStyles] = useState(true);
+  const [searchInYear, setSearchInYear] = useState(true);
+  const [searchInFolder, setSearchInFolder] = useState(true);
+  const [searchInCondition, setSearchInCondition] = useState(true);
+  const [searchInLabels, setSearchInLabels] = useState(true);
+  const [searchInPlatform, setSearchInPlatform] = useState(true);
+  const [searchInIds, setSearchInIds] = useState(false); // Off by default - power user feature
+  
+  // Boolean filters (checkboxes)
+  const [filterForSale, setFilterForSale] = useState(false);
+  const [filterNotForSale, setFilterNotForSale] = useState(false);
+  const [filterHasTags, setFilterHasTags] = useState(false);
+  const [filterNoTags, setFilterNoTags] = useState(false);
+  const [filter1001, setFilter1001] = useState(false);
+  const [filterTop200, setFilterTop200] = useState(false);
+  const [filterTop10, setFilterTop10] = useState(false);
+  const [filterInnerCircle, setFilterInnerCircle] = useState(false);
+  const [filterBoxSet, setFilterBoxSet] = useState(false);
+  const [filterBlocked, setFilterBlocked] = useState(false);
+  
+  // Text filters (contains/exact match)
+  const [filterFormat, setFilterFormat] = useState('');
+  const [filterArtist, setFilterArtist] = useState('');
+  const [filterTitle, setFilterTitle] = useState('');
+  const [filterFolder, setFilterFolder] = useState('');
+  const [filterCondition, setFilterCondition] = useState('');
+  const [filterPlatform, setFilterPlatform] = useState('');
+  const [filterLabel, setFilterLabel] = useState('');
+  
+  // Tag filters (include/exclude)
+  const [includeTag, setIncludeTag] = useState('');
+  const [excludeTag, setExcludeTag] = useState('');
+  
+  // Numeric range filters
+  const [yearMin, setYearMin] = useState('');
+  const [yearMax, setYearMax] = useState('');
+  const [priceMin, setPriceMin] = useState('');
+  const [priceMax, setPriceMax] = useState('');
+  const [tagCountMin, setTagCountMin] = useState('');
+  const [tagCountMax, setTagCountMax] = useState('');
+  const [sidesMin, setSidesMin] = useState('');
+  const [sidesMax, setSidesMax] = useState('');
+  
   const [tagDefinitions, setTagDefinitions] = useState<TagDefinition[]>([]);
   const [editingTagsFor, setEditingTagsFor] = useState<number | null>(null);
   const [albumTags, setAlbumTags] = useState<string[]>([]);
@@ -193,82 +288,193 @@ export default function EditCollectionPage() {
     loadAlbums();
   }, [loadAlbums]);
 
-  const filteredAlbums = albums.filter(album => {
-    if (!searchQuery) return true;
+  const matchesSearch = (album: Album, query: string): boolean => {
+    if (!query) return true;
     
-    const query = searchQuery.toLowerCase();
+    const q = query.toLowerCase();
+    const searchParts: string[] = [];
     
-    const searchParts: string[] = [
-      toSafeSearchString(album.artist),
-      toSafeSearchString(album.title),
-      toSafeSearchString(album.format),
-      toSafeSearchString(album.folder),
-      toSafeSearchString(album.year),
-      toSafeSearchString(album.media_condition),
-      toSafeSearchString(album.tracklists),
-      toSafeSearchString(album.blocked_sides),
-      toSafeSearchString(album.child_album_ids),
+    // Build search parts based on what's enabled
+    if (searchInArtist) searchParts.push(toSafeSearchString(album.artist));
+    if (searchInTitle) searchParts.push(toSafeSearchString(album.title));
+    if (searchInFormat) searchParts.push(toSafeSearchString(album.format));
+    if (searchInFolder) searchParts.push(toSafeSearchString(album.folder));
+    if (searchInYear) searchParts.push(toSafeSearchString(album.year), toSafeSearchString(album.decade));
+    if (searchInCondition) searchParts.push(toSafeSearchString(album.media_condition));
+    if (searchInTracks) searchParts.push(toSafeSearchString(album.tracklists));
+    if (searchInTags) {
+      searchParts.push(toSafeSearchString(album.custom_tags));
+      // Add badge keywords if those badges are on
+      if (album.is_1001) searchParts.push('1001 albums thousand and one 1001albums');
+      if (album.steves_top_200) searchParts.push('top 200 steves top 200 top200 steve');
+      if (album.this_weeks_top_10) searchParts.push('top 10 top10 this week weekly');
+      if (album.inner_circle_preferred) searchParts.push('inner circle preferred innercircle');
+      if (album.for_sale) searchParts.push('for sale selling available');
+      if (album.is_box_set) searchParts.push('box set boxset');
+      if (album.blocked) searchParts.push('blocked');
+    }
+    if (searchInNotes) {
+      searchParts.push(toSafeSearchString(album.discogs_notes));
+      searchParts.push(toSafeSearchString(album.sale_notes));
+      searchParts.push(toSafeSearchString(album.pricing_notes));
+      searchParts.push(toSafeSearchString(album.blocked_sides));
+    }
+    if (searchInGenres) {
+      searchParts.push(toSafeSearchString(album.discogs_genres));
+      searchParts.push(toSafeSearchString(album.spotify_genres));
+      searchParts.push(toSafeSearchString(album.apple_music_genres));
+      searchParts.push(toSafeSearchString(album.apple_music_genre));
+    }
+    if (searchInStyles) {
+      searchParts.push(toSafeSearchString(album.discogs_styles));
+    }
+    if (searchInLabels) {
+      searchParts.push(toSafeSearchString(album.spotify_label));
+      searchParts.push(toSafeSearchString(album.apple_music_label));
+    }
+    if (searchInPlatform) {
+      searchParts.push(toSafeSearchString(album.sale_platform));
+    }
+    if (searchInIds) {
+      // Power user feature - search by IDs
+      searchParts.push(
+        toSafeSearchString(album.discogs_master_id),
+        toSafeSearchString(album.discogs_release_id),
+        toSafeSearchString(album.master_release_id),
+        toSafeSearchString(album.spotify_id),
+        toSafeSearchString(album.apple_music_id),
+        toSafeSearchString(album.child_album_ids)
+      );
+    }
+    
+    // Always include these for advanced users
+    searchParts.push(
       toSafeSearchString(album.sell_price),
       toSafeSearchString(album.date_added),
-      toSafeSearchString(album.discogs_source),
-      toSafeSearchString(album.discogs_notes),
-      toSafeSearchString(album.sale_notes),
-      toSafeSearchString(album.pricing_notes),
-      toSafeSearchString(album.sale_platform),
-      toSafeSearchString(album.discogs_master_id),
-      toSafeSearchString(album.discogs_release_id),
-      toSafeSearchString(album.master_release_id),
-      toSafeSearchString(album.spotify_id),
-      toSafeSearchString(album.apple_music_id),
-      toSafeSearchString(album.image_url),
-      toSafeSearchString(album.spotify_url),
-      toSafeSearchString(album.spotify_image_url),
-      toSafeSearchString(album.apple_music_url),
-      toSafeSearchString(album.apple_music_artwork_url),
-      toSafeSearchString(album.spotify_label),
-      toSafeSearchString(album.apple_music_label),
-      toSafeSearchString(album.apple_music_genre),
-      toSafeSearchString(album.artist_norm),
-      toSafeSearchString(album.album_norm),
-      toSafeSearchString(album.artist_album_norm),
-      toSafeSearchString(album.master_release_date),
-      toSafeSearchString(album.spotify_release_date),
-      toSafeSearchString(album.apple_music_release_date),
-      toSafeSearchString(album.last_enriched_at),
-      toSafeSearchString(album.discogs_price_updated_at),
-      toSafeSearchString(album.enrichment_sources),
-      toSafeSearchString(album.decade),
-      toSafeSearchString(album.sides),
-      toSafeSearchString(album.parent_id),
-      toSafeSearchString(album.spotify_popularity),
-      toSafeSearchString(album.spotify_total_tracks),
-      toSafeSearchString(album.apple_music_track_count),
-      toSafeSearchString(album.year_int),
-      toSafeSearchString(album.sale_quantity),
-      toSafeSearchString(album.wholesale_cost),
-      toSafeSearchString(album.discogs_price_min),
-      toSafeSearchString(album.discogs_price_median),
-      toSafeSearchString(album.discogs_price_max),
-      toSafeSearchString(album.custom_tags),
-      toSafeSearchString(album.discogs_genres),
-      toSafeSearchString(album.discogs_styles),
-      toSafeSearchString(album.spotify_genres),
-      toSafeSearchString(album.apple_music_genres),
-      album.is_1001 ? '1001 albums thousand and one 1001albums' : '',
-      album.steves_top_200 ? 'top 200 steves top 200 top200 steve' : '',
-      album.this_weeks_top_10 ? 'top 10 top10 this week weekly' : '',
-      album.inner_circle_preferred ? 'inner circle preferred innercircle' : '',
-      album.for_sale ? 'for sale selling available' : '',
-      album.is_box_set ? 'box set boxset' : '',
-      album.blocked ? 'blocked' : '',
-    ];
+      toSafeSearchString(album.discogs_source)
+    );
     
     const searchableText = searchParts
       .filter(part => part.length > 0)
       .join(' ');
     
-    return searchableText.includes(query);
-  });
+    return searchableText.includes(q);
+  };
+
+  const filteredAndSortedAlbums = albums
+    .filter(album => {
+      // Search query filter
+      if (searchQuery && !matchesSearch(album, searchQuery)) {
+        return false;
+      }
+      
+      // Boolean filters
+      if (filterForSale && !album.for_sale) return false;
+      if (filterNotForSale && album.for_sale) return false;
+      if (filterHasTags && toSafeStringArray(album.custom_tags).length === 0) return false;
+      if (filterNoTags && toSafeStringArray(album.custom_tags).length > 0) return false;
+      if (filter1001 && !album.is_1001) return false;
+      if (filterTop200 && !album.steves_top_200) return false;
+      if (filterTop10 && !album.this_weeks_top_10) return false;
+      if (filterInnerCircle && !album.inner_circle_preferred) return false;
+      if (filterBoxSet && !album.is_box_set) return false;
+      if (filterBlocked && !album.blocked) return false;
+      
+      // Text filters (contains match)
+      if (filterFormat && !album.format?.toLowerCase().includes(filterFormat.toLowerCase())) return false;
+      if (filterArtist && !album.artist?.toLowerCase().includes(filterArtist.toLowerCase())) return false;
+      if (filterTitle && !album.title?.toLowerCase().includes(filterTitle.toLowerCase())) return false;
+      if (filterFolder && !album.folder?.toLowerCase().includes(filterFolder.toLowerCase())) return false;
+      if (filterCondition && !album.media_condition?.toLowerCase().includes(filterCondition.toLowerCase())) return false;
+      if (filterPlatform && !album.sale_platform?.toLowerCase().includes(filterPlatform.toLowerCase())) return false;
+      if (filterLabel) {
+        const labelMatch = 
+          album.spotify_label?.toLowerCase().includes(filterLabel.toLowerCase()) ||
+          album.apple_music_label?.toLowerCase().includes(filterLabel.toLowerCase());
+        if (!labelMatch) return false;
+      }
+      
+      // Tag filters
+      const albumTags = toSafeStringArray(album.custom_tags);
+      if (includeTag && !albumTags.some(t => t.toLowerCase().includes(includeTag.toLowerCase()))) {
+        return false;
+      }
+      if (excludeTag && albumTags.some(t => t.toLowerCase().includes(excludeTag.toLowerCase()))) {
+        return false;
+      }
+      
+      // Numeric range filters
+      if (yearMin && (!album.year_int || album.year_int < parseInt(yearMin))) return false;
+      if (yearMax && (!album.year_int || album.year_int > parseInt(yearMax))) return false;
+      if (priceMin && (!album.sale_price || album.sale_price < parseFloat(priceMin))) return false;
+      if (priceMax && (!album.sale_price || album.sale_price > parseFloat(priceMax))) return false;
+      if (tagCountMin) {
+        const count = toSafeStringArray(album.custom_tags).length;
+        if (count < parseInt(tagCountMin)) return false;
+      }
+      if (tagCountMax) {
+        const count = toSafeStringArray(album.custom_tags).length;
+        if (count > parseInt(tagCountMax)) return false;
+      }
+      if (sidesMin && (!album.sides || album.sides < parseInt(sidesMin))) return false;
+      if (sidesMax && (!album.sides || album.sides > parseInt(sidesMax))) return false;
+      
+      return true;
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case 'artist-asc':
+          return (a.artist || '').localeCompare(b.artist || '');
+        case 'artist-desc':
+          return (b.artist || '').localeCompare(a.artist || '');
+        case 'title-asc':
+          return (a.title || '').localeCompare(b.title || '');
+        case 'title-desc':
+          return (b.title || '').localeCompare(a.title || '');
+        case 'year-desc':
+          return (b.year_int || 0) - (a.year_int || 0);
+        case 'year-asc':
+          return (a.year_int || 0) - (b.year_int || 0);
+        case 'decade-desc':
+          return (b.decade || 0) - (a.decade || 0);
+        case 'decade-asc':
+          return (a.decade || 0) - (b.decade || 0);
+        case 'added-desc':
+          return (b.date_added || '').localeCompare(a.date_added || '');
+        case 'added-asc':
+          return (a.date_added || '').localeCompare(b.date_added || '');
+        case 'format-asc':
+          return (a.format || '').localeCompare(b.format || '');
+        case 'format-desc':
+          return (b.format || '').localeCompare(a.format || '');
+        case 'folder-asc':
+          return (a.folder || '').localeCompare(b.folder || '');
+        case 'folder-desc':
+          return (b.folder || '').localeCompare(a.folder || '');
+        case 'condition-asc':
+          return (a.media_condition || '').localeCompare(b.media_condition || '');
+        case 'condition-desc':
+          return (b.media_condition || '').localeCompare(a.media_condition || '');
+        case 'tags-count-desc':
+          return toSafeStringArray(b.custom_tags).length - toSafeStringArray(a.custom_tags).length;
+        case 'tags-count-asc':
+          return toSafeStringArray(a.custom_tags).length - toSafeStringArray(b.custom_tags).length;
+        case 'sale-price-desc':
+          return (b.sale_price || 0) - (a.sale_price || 0);
+        case 'sale-price-asc':
+          return (a.sale_price || 0) - (b.sale_price || 0);
+        case 'popularity-desc':
+          return (b.spotify_popularity || 0) - (a.spotify_popularity || 0);
+        case 'popularity-asc':
+          return (a.spotify_popularity || 0) - (b.spotify_popularity || 0);
+        case 'sides-desc':
+          return (b.sides || 0) - (a.sides || 0);
+        case 'sides-asc':
+          return (a.sides || 0) - (b.sides || 0);
+        default:
+          return 0;
+      }
+    });
 
   const getMatchInfo = (album: Album, query: string): string[] => {
     if (!query) return [];
@@ -456,10 +662,109 @@ export default function EditCollectionPage() {
     router.replace(`?${params.toString()}`, { scroll: false });
   };
 
+  const clearAllFilters = () => {
+    setSearchQuery('');
+    // Reset search scopes to all on
+    setSearchInArtist(true);
+    setSearchInTitle(true);
+    setSearchInTags(true);
+    setSearchInTracks(true);
+    setSearchInFormat(true);
+    setSearchInNotes(true);
+    setSearchInGenres(true);
+    setSearchInStyles(true);
+    setSearchInYear(true);
+    setSearchInFolder(true);
+    setSearchInCondition(true);
+    setSearchInLabels(true);
+    setSearchInPlatform(true);
+    setSearchInIds(false);
+    // Reset boolean filters
+    setFilterForSale(false);
+    setFilterNotForSale(false);
+    setFilterHasTags(false);
+    setFilterNoTags(false);
+    setFilter1001(false);
+    setFilterTop200(false);
+    setFilterTop10(false);
+    setFilterInnerCircle(false);
+    setFilterBoxSet(false);
+    setFilterBlocked(false);
+    // Reset text filters
+    setFilterFormat('');
+    setFilterArtist('');
+    setFilterTitle('');
+    setFilterFolder('');
+    setFilterCondition('');
+    setFilterPlatform('');
+    setFilterLabel('');
+    setIncludeTag('');
+    setExcludeTag('');
+    // Reset numeric ranges
+    setYearMin('');
+    setYearMax('');
+    setPriceMin('');
+    setPriceMax('');
+    setTagCountMin('');
+    setTagCountMax('');
+    setSidesMin('');
+    setSidesMax('');
+    // Reset sort
+    setSortBy('artist-asc');
+  };
+
+  const activeFilterCount = [
+    // Boolean filters
+    filterForSale,
+    filterNotForSale,
+    filterHasTags,
+    filterNoTags,
+    filter1001,
+    filterTop200,
+    filterTop10,
+    filterInnerCircle,
+    filterBoxSet,
+    filterBlocked,
+    // Text filters
+    filterFormat,
+    filterArtist,
+    filterTitle,
+    filterFolder,
+    filterCondition,
+    filterPlatform,
+    filterLabel,
+    includeTag,
+    excludeTag,
+    // Numeric ranges
+    yearMin,
+    yearMax,
+    priceMin,
+    priceMax,
+    tagCountMin,
+    tagCountMax,
+    sidesMin,
+    sidesMax,
+    // Search scope modifications
+    !searchInArtist,
+    !searchInTitle,
+    !searchInTags,
+    !searchInTracks,
+    !searchInFormat,
+    !searchInNotes,
+    !searchInGenres,
+    !searchInStyles,
+    !searchInYear,
+    !searchInFolder,
+    !searchInCondition,
+    !searchInLabels,
+    !searchInPlatform,
+    searchInIds // This one counts when ON (it's off by default)
+  ].filter(Boolean).length;
+
   const exportResults = () => {
     const csv = [
       ['Artist', 'Title', 'Year', 'Format', 'Folder', 'Condition', 'Tags'].join(','),
-      ...filteredAlbums.map(album => [
+      ...filteredAndSortedAlbums.map(album => [
         `"${album.artist || ''}"`,
         `"${album.title || ''}"`,
         album.year || '',
@@ -609,7 +914,6 @@ export default function EditCollectionPage() {
             display: none !important;
           }
           
-          /* Hide common admin navigation/sidebar elements */
           nav,
           aside,
           header:not(.print-only *),
@@ -644,13 +948,13 @@ export default function EditCollectionPage() {
               Collection Checklist
             </h1>
             <div style={{ fontSize: '10pt' }}>
-              {new Date().toLocaleDateString()} • {filteredAlbums.length} albums
+              {new Date().toLocaleDateString()} • {filteredAndSortedAlbums.length} albums
             </div>
           </div>
 
           {(() => {
             const byFormat: Record<string, Album[]> = {};
-            filteredAlbums.forEach(album => {
+            filteredAndSortedAlbums.forEach(album => {
               const fmt = album.format?.includes('LP') || album.format?.includes('Vinyl') || album.format?.includes('12"') || album.format?.includes('10"') || album.format?.includes('7"') 
                 ? 'Vinyl' 
                 : album.format?.includes('CD') 
@@ -774,7 +1078,7 @@ export default function EditCollectionPage() {
               fontSize: 16,
               margin: 0
             }}>
-              Your daily collection browser - {filteredAlbums.length} albums
+              Your daily collection browser - {filteredAndSortedAlbums.length} of {albums.length} albums
             </p>
           </div>
 
@@ -794,6 +1098,7 @@ export default function EditCollectionPage() {
           </Link>
         </div>
 
+        {/* Search and filters */}
         <div style={{
           background: 'white',
           border: '1px solid #e5e7eb',
@@ -802,7 +1107,8 @@ export default function EditCollectionPage() {
           marginBottom: 24,
           boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
         }}>
-          <div>
+          {/* Main search bar */}
+          <div style={{ marginBottom: 16 }}>
             <label style={{
               display: 'block',
               fontSize: 14,
@@ -816,7 +1122,7 @@ export default function EditCollectionPage() {
               type="text"
               value={searchQuery}
               onChange={e => handleSearchChange(e.target.value)}
-              placeholder="Search everything: artist, title, tracks, format, year, tags, genres, styles, labels, notes..."
+              placeholder="Search your collection..."
               style={{
                 width: '100%',
                 padding: '12px 16px',
@@ -827,51 +1133,464 @@ export default function EditCollectionPage() {
                 backgroundColor: 'white'
               }}
             />
-            {searchQuery && (
-              <div style={{
-                marginTop: 8,
-                fontSize: 13,
-                color: '#6b7280',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between'
+          </div>
+
+          {/* Search scope checkboxes - what to INCLUDE */}
+          <details open style={{ marginBottom: 16 }}>
+            <summary style={{
+              fontSize: 12,
+              fontWeight: 700,
+              color: '#374151',
+              marginBottom: 8,
+              cursor: 'pointer',
+              userSelect: 'none',
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px'
+            }}>
+              🔍 Search In (check fields to search)
+            </summary>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
+              gap: 6,
+              padding: '12px',
+              background: '#f9fafb',
+              borderRadius: 6,
+              border: '1px solid #e5e7eb'
+            }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12 }}>
+                <input type="checkbox" checked={searchInArtist} onChange={e => setSearchInArtist(e.target.checked)} style={{ width: 14, height: 14 }} />
+                Artist
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12 }}>
+                <input type="checkbox" checked={searchInTitle} onChange={e => setSearchInTitle(e.target.checked)} style={{ width: 14, height: 14 }} />
+                Title
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12 }}>
+                <input type="checkbox" checked={searchInTags} onChange={e => setSearchInTags(e.target.checked)} style={{ width: 14, height: 14 }} />
+                Tags
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12 }}>
+                <input type="checkbox" checked={searchInTracks} onChange={e => setSearchInTracks(e.target.checked)} style={{ width: 14, height: 14 }} />
+                Tracks/Lyrics
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12 }}>
+                <input type="checkbox" checked={searchInFormat} onChange={e => setSearchInFormat(e.target.checked)} style={{ width: 14, height: 14 }} />
+                Format
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12 }}>
+                <input type="checkbox" checked={searchInNotes} onChange={e => setSearchInNotes(e.target.checked)} style={{ width: 14, height: 14 }} />
+                Notes
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12 }}>
+                <input type="checkbox" checked={searchInGenres} onChange={e => setSearchInGenres(e.target.checked)} style={{ width: 14, height: 14 }} />
+                Genres
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12 }}>
+                <input type="checkbox" checked={searchInStyles} onChange={e => setSearchInStyles(e.target.checked)} style={{ width: 14, height: 14 }} />
+                Styles
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12 }}>
+                <input type="checkbox" checked={searchInLabels} onChange={e => setSearchInLabels(e.target.checked)} style={{ width: 14, height: 14 }} />
+                Labels
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12 }}>
+                <input type="checkbox" checked={searchInYear} onChange={e => setSearchInYear(e.target.checked)} style={{ width: 14, height: 14 }} />
+                Year
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12 }}>
+                <input type="checkbox" checked={searchInFolder} onChange={e => setSearchInFolder(e.target.checked)} style={{ width: 14, height: 14 }} />
+                Folder
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12 }}>
+                <input type="checkbox" checked={searchInCondition} onChange={e => setSearchInCondition(e.target.checked)} style={{ width: 14, height: 14 }} />
+                Condition
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12 }}>
+                <input type="checkbox" checked={searchInPlatform} onChange={e => setSearchInPlatform(e.target.checked)} style={{ width: 14, height: 14 }} />
+                Platform
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12, color: '#6b7280' }} title="Search Discogs, Spotify, Apple Music IDs">
+                <input type="checkbox" checked={searchInIds} onChange={e => setSearchInIds(e.target.checked)} style={{ width: 14, height: 14 }} />
+                IDs (advanced)
+              </label>
+            </div>
+          </details>
+
+          {/* Sort and filter controls */}
+          <div style={{
+            display: 'flex',
+            gap: 12,
+            flexWrap: 'wrap',
+            alignItems: 'flex-start',
+            marginBottom: 16
+          }}>
+            <div style={{ flex: '1 1 250px' }}>
+              <label style={{
+                display: 'block',
+                fontSize: 12,
+                fontWeight: 700,
+                color: '#374151',
+                marginBottom: 6,
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px'
               }}>
-                <span>Found {filteredAlbums.length} album{filteredAlbums.length !== 1 ? 's' : ''}</span>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button
-                    onClick={exportResults}
-                    style={{
-                      padding: '6px 12px',
-                      background: '#10b981',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: 4,
-                      fontSize: 12,
-                      fontWeight: 600,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    📥 Export CSV
-                  </button>
-                  <button
-                    onClick={printResults}
-                    style={{
-                      padding: '6px 12px',
-                      background: '#3b82f6',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: 4,
-                      fontSize: 12,
-                      fontWeight: 600,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    🖨️ Print Checklist
-                  </button>
-                </div>
+                📊 SORT BY:
+              </label>
+              <select
+                value={sortBy}
+                onChange={e => setSortBy(e.target.value as SortOption)}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: 6,
+                  fontSize: 13,
+                  backgroundColor: 'white',
+                  color: '#1f2937',
+                  fontWeight: 500
+                }}
+              >
+                {Object.entries(
+                  SORT_OPTIONS.reduce((acc, opt) => {
+                    if (!acc[opt.category]) acc[opt.category] = [];
+                    acc[opt.category].push(opt);
+                    return acc;
+                  }, {} as Record<string, typeof SORT_OPTIONS>)
+                ).map(([category, opts]) => (
+                  <optgroup key={category} label={category}>
+                    {opts.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ flex: '0 0 auto', paddingTop: 22 }}>
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                style={{
+                  padding: '8px 16px',
+                  background: showFilters ? '#3b82f6' : '#f3f4f6',
+                  color: showFilters ? 'white' : '#374151',
+                  border: 'none',
+                  borderRadius: 6,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6
+                }}
+              >
+                🎯 Advanced Filters {activeFilterCount > 0 && `(${activeFilterCount})`}
+              </button>
+            </div>
+
+            {(searchQuery || activeFilterCount > 0 || sortBy !== 'artist-asc') && (
+              <div style={{ flex: '0 0 auto', paddingTop: 22 }}>
+                <button
+                  onClick={clearAllFilters}
+                  style={{
+                    padding: '8px 16px',
+                    background: '#ef4444',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: 6,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  ✕ Clear All
+                </button>
               </div>
             )}
           </div>
+
+          {/* Comprehensive filters panel */}
+          {showFilters && (
+            <div style={{
+              padding: 16,
+              background: '#f9fafb',
+              borderRadius: 8,
+              border: '1px solid #e5e7eb',
+              marginBottom: 16
+            }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
+                
+                {/* Boolean Badges Section */}
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    🏆 BADGES
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
+                      <input type="checkbox" checked={filter1001} onChange={e => setFilter1001(e.target.checked)} style={{ width: 15, height: 15 }} />
+                      1001 Albums
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
+                      <input type="checkbox" checked={filterTop200} onChange={e => setFilterTop200(e.target.checked)} style={{ width: 15, height: 15 }} />
+                      Steve&apos;s Top 200
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
+                      <input type="checkbox" checked={filterTop10} onChange={e => setFilterTop10(e.target.checked)} style={{ width: 15, height: 15 }} />
+                      This Week&apos;s Top 10
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
+                      <input type="checkbox" checked={filterInnerCircle} onChange={e => setFilterInnerCircle(e.target.checked)} style={{ width: 15, height: 15 }} />
+                      Inner Circle
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
+                      <input type="checkbox" checked={filterBoxSet} onChange={e => setFilterBoxSet(e.target.checked)} style={{ width: 15, height: 15 }} />
+                      Box Set
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
+                      <input type="checkbox" checked={filterBlocked} onChange={e => setFilterBlocked(e.target.checked)} style={{ width: 15, height: 15 }} />
+                      Blocked
+                    </label>
+                  </div>
+                </div>
+
+                {/* Sale & Tags Section */}
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    💰 SALE & TAGS
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
+                      <input type="checkbox" checked={filterForSale} onChange={e => setFilterForSale(e.target.checked)} style={{ width: 15, height: 15 }} />
+                      For Sale
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
+                      <input type="checkbox" checked={filterNotForSale} onChange={e => setFilterNotForSale(e.target.checked)} style={{ width: 15, height: 15 }} />
+                      NOT For Sale
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
+                      <input type="checkbox" checked={filterHasTags} onChange={e => setFilterHasTags(e.target.checked)} style={{ width: 15, height: 15 }} />
+                      Has Tags
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
+                      <input type="checkbox" checked={filterNoTags} onChange={e => setFilterNoTags(e.target.checked)} style={{ width: 15, height: 15 }} />
+                      No Tags
+                    </label>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <input
+                      type="text"
+                      value={includeTag}
+                      onChange={e => setIncludeTag(e.target.value)}
+                      placeholder="Must have tag..."
+                      style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12 }}
+                    />
+                    <input
+                      type="text"
+                      value={excludeTag}
+                      onChange={e => setExcludeTag(e.target.value)}
+                      placeholder="Exclude tag..."
+                      style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12 }}
+                    />
+                  </div>
+                </div>
+
+                {/* Text Filters Section */}
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    📝 TEXT FILTERS (contains)
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <input
+                      type="text"
+                      value={filterArtist}
+                      onChange={e => setFilterArtist(e.target.value)}
+                      placeholder="Artist contains..."
+                      style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12 }}
+                    />
+                    <input
+                      type="text"
+                      value={filterTitle}
+                      onChange={e => setFilterTitle(e.target.value)}
+                      placeholder="Title contains..."
+                      style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12 }}
+                    />
+                    <input
+                      type="text"
+                      value={filterFormat}
+                      onChange={e => setFilterFormat(e.target.value)}
+                      placeholder="Format contains (LP, CD...)"
+                      style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12 }}
+                    />
+                    <input
+                      type="text"
+                      value={filterFolder}
+                      onChange={e => setFilterFolder(e.target.value)}
+                      placeholder="Folder contains..."
+                      style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12 }}
+                    />
+                    <input
+                      type="text"
+                      value={filterCondition}
+                      onChange={e => setFilterCondition(e.target.value)}
+                      placeholder="Condition (VG+, M, NM...)"
+                      style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12 }}
+                    />
+                    <input
+                      type="text"
+                      value={filterPlatform}
+                      onChange={e => setFilterPlatform(e.target.value)}
+                      placeholder="Platform (Discogs, eBay...)"
+                      style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12 }}
+                    />
+                    <input
+                      type="text"
+                      value={filterLabel}
+                      onChange={e => setFilterLabel(e.target.value)}
+                      placeholder="Label contains..."
+                      style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12 }}
+                    />
+                  </div>
+                </div>
+
+                {/* Numeric Ranges Section */}
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    🔢 NUMERIC RANGES
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div>
+                      <div style={{ fontSize: 10, fontWeight: 600, color: '#6b7280', marginBottom: 3 }}>Year:</div>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <input
+                          type="number"
+                          value={yearMin}
+                          onChange={e => setYearMin(e.target.value)}
+                          placeholder="Min"
+                          style={{ flex: 1, padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12 }}
+                        />
+                        <input
+                          type="number"
+                          value={yearMax}
+                          onChange={e => setYearMax(e.target.value)}
+                          placeholder="Max"
+                          style={{ flex: 1, padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12 }}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 10, fontWeight: 600, color: '#6b7280', marginBottom: 3 }}>Price ($):</div>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <input
+                          type="number"
+                          value={priceMin}
+                          onChange={e => setPriceMin(e.target.value)}
+                          placeholder="Min"
+                          step="0.01"
+                          style={{ flex: 1, padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12 }}
+                        />
+                        <input
+                          type="number"
+                          value={priceMax}
+                          onChange={e => setPriceMax(e.target.value)}
+                          placeholder="Max"
+                          step="0.01"
+                          style={{ flex: 1, padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12 }}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 10, fontWeight: 600, color: '#6b7280', marginBottom: 3 }}>Tag Count:</div>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <input
+                          type="number"
+                          value={tagCountMin}
+                          onChange={e => setTagCountMin(e.target.value)}
+                          placeholder="Min"
+                          style={{ flex: 1, padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12 }}
+                        />
+                        <input
+                          type="number"
+                          value={tagCountMax}
+                          onChange={e => setTagCountMax(e.target.value)}
+                          placeholder="Max"
+                          style={{ flex: 1, padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12 }}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 10, fontWeight: 600, color: '#6b7280', marginBottom: 3 }}>Sides:</div>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <input
+                          type="number"
+                          value={sidesMin}
+                          onChange={e => setSidesMin(e.target.value)}
+                          placeholder="Min"
+                          style={{ flex: 1, padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12 }}
+                        />
+                        <input
+                          type="number"
+                          value={sidesMax}
+                          onChange={e => setSidesMax(e.target.value)}
+                          placeholder="Max"
+                          style={{ flex: 1, padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12 }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Results summary */}
+          {(searchQuery || activeFilterCount > 0) && (
+            <div style={{
+              marginTop: 16,
+              fontSize: 13,
+              color: '#6b7280',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingTop: 16,
+              borderTop: '1px solid #e5e7eb'
+            }}>
+              <span>
+                Found <strong style={{ color: '#1f2937' }}>{filteredAndSortedAlbums.length}</strong> of {albums.length} albums
+              </span>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  onClick={exportResults}
+                  style={{
+                    padding: '6px 12px',
+                    background: '#10b981',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: 4,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  📥 Export CSV
+                </button>
+                <button
+                  onClick={printResults}
+                  style={{
+                    padding: '6px 12px',
+                    background: '#3b82f6',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: 4,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  🖨️ Print Checklist
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {loading ? (
@@ -891,7 +1610,7 @@ export default function EditCollectionPage() {
             gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
             gap: 16
           }}>
-            {filteredAlbums.map(album => {
+            {filteredAndSortedAlbums.map(album => {
               const safeTags = toSafeStringArray(album.custom_tags);
               return (
                 <div
