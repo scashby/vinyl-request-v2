@@ -1,4 +1,4 @@
-// src/app/admin/import-discogs/page.tsx - WITH FORCE FULL SYNC OPTION RESTORED
+// src/app/admin/import-discogs/page.tsx - WITH DETAILED ENRICHMENT FEEDBACK
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -73,6 +73,32 @@ interface SyncDataStorage {
   recordsToRemove?: ExistingRecord[];
 }
 
+type EnrichedItem = {
+  artist: string;
+  title: string;
+  year: number;
+  hasImage: boolean;
+  hasTracklist: boolean;
+  hasGenres: boolean;
+};
+
+type ImportResults = {
+  enrichmentStats: {
+    imagesAdded: number;
+    tracklistsAdded: number;
+    genresAdded: number;
+    itemsEnriched: EnrichedItem[];
+  };
+  updateStats: {
+    imagesAdded: number;
+    tracklistsAdded: number;
+    genresAdded: number;
+    itemsUpdated: EnrichedItem[];
+  };
+  matched1001Albums: Array<{ artist: string; title: string; year: number }>;
+  errors: string[];
+};
+
 function calculateDecade(year: number | null): number | null {
   if (!year || year <= 0) return null;
   return Math.floor(year / 10) * 10;
@@ -135,6 +161,8 @@ export default function ImportDiscogsPage() {
   const [deselectedRemovals, setDeselectedRemovals] = useState<Set<number>>(new Set());
   const [lastImportDate, setLastImportDate] = useState<string | null>(null);
   const [forceFullSync, setForceFullSync] = useState(false);
+  const [importResults, setImportResults] = useState<ImportResults | null>(null);
+  const [showResults, setShowResults] = useState<'enrichment' | 'updates' | '1001' | 'errors' | null>(null);
   
   const [skipEnrichment, setSkipEnrichment] = useState(false);
   const [skip1001Matching, setSkip1001Matching] = useState(false);
@@ -256,6 +284,7 @@ export default function ImportDiscogsPage() {
 
     setIsProcessing(true);
     setStatus('Parsing CSV...');
+    setImportResults(null);
     
     try {
       Papa.parse(file, {
@@ -275,7 +304,6 @@ export default function ImportDiscogsPage() {
           const syncMode: 'incremental' | 'full' = (lastImportDate && !forceFullSync) ? 'incremental' : 'full';
           console.log(`🔄 Sync mode: ${syncMode}`);
           
-          // Count how many items were added since last import (for info only)
           let newItemsSinceLastImport = 0;
           if (lastImportDate) {
             const lastImportTimestamp = new Date(lastImportDate).getTime();
@@ -289,7 +317,6 @@ export default function ImportDiscogsPage() {
           
           setStatus(`Processing all ${validRows.length} items from CSV...`);
           
-          // Process ALL rows to catch any previously missed albums
           const processedRows: ProcessedRow[] = validRows.map(row => {
             const year = row.Released || 0;
             return {
@@ -468,12 +495,32 @@ export default function ImportDiscogsPage() {
     }
     
     setIsProcessing(true);
+    setImportResults(null);
+    
     const BATCH_SIZE = batchSize;
     const totalItems = syncPreview.newItems.length;
     let allEnriched: ProcessedRow[] = [];
     
     const updateOperations = skipUpdates ? [] : ((window as Window & SyncDataStorage).updateOperations || []);
     const recordsToRemove = skipRemovals ? [] : ((window as Window & SyncDataStorage).recordsToRemove || []);
+    
+    // Initialize results tracking
+    const results: ImportResults = {
+      enrichmentStats: {
+        imagesAdded: 0,
+        tracklistsAdded: 0,
+        genresAdded: 0,
+        itemsEnriched: []
+      },
+      updateStats: {
+        imagesAdded: 0,
+        tracklistsAdded: 0,
+        genresAdded: 0,
+        itemsUpdated: []
+      },
+      matched1001Albums: [],
+      errors: []
+    };
     
     if (dryRun) {
       setStatus(`🔍 DRY RUN MODE - No changes will be made to the database`);
@@ -502,6 +549,7 @@ export default function ImportDiscogsPage() {
     setStatus(`Starting ${skipEnrichment ? 'import' : 'enrichment'} for ${totalItems} new items...`);
 
     try {
+      // Process new items
       for (let batchStart = 0; batchStart < totalItems; batchStart += BATCH_SIZE) {
         const batchEnd = Math.min(batchStart + BATCH_SIZE, totalItems);
         const currentBatch = syncPreview.newItems.slice(batchStart, batchEnd);
@@ -523,6 +571,22 @@ export default function ImportDiscogsPage() {
             
             try {
               const { image_url, tracklists, genres, styles } = await fetchDiscogsData(row.discogs_release_id);
+              
+              const enrichedItem: EnrichedItem = {
+                artist: row.artist,
+                title: row.title,
+                year: row.year,
+                hasImage: !!image_url,
+                hasTracklist: !!tracklists,
+                hasGenres: !!(genres && genres.length > 0)
+              };
+              
+              if (image_url) results.enrichmentStats.imagesAdded++;
+              if (tracklists) results.enrichmentStats.tracklistsAdded++;
+              if (genres && genres.length > 0) results.enrichmentStats.genresAdded++;
+              
+              results.enrichmentStats.itemsEnriched.push(enrichedItem);
+              
               batchEnriched.push({ 
                 ...row, 
                 image_url, 
@@ -532,6 +596,7 @@ export default function ImportDiscogsPage() {
               });
             } catch (error) {
               console.warn(`Failed to enrich ${row.discogs_release_id}:`, error);
+              results.errors.push(`Failed to enrich ${row.artist} - ${row.title}: ${error instanceof Error ? error.message : 'Unknown error'}`);
               batchEnriched.push({ ...row });
             }
             
@@ -547,9 +612,14 @@ export default function ImportDiscogsPage() {
                 .from('collection')
                 .insert([item]);
 
-              if (!insertError) batchInsertCount++;
+              if (!insertError) {
+                batchInsertCount++;
+              } else {
+                results.errors.push(`Failed to insert ${item.artist} - ${item.title}: ${insertError.message}`);
+              }
             } catch (error) {
               console.error(`Error inserting ${item.artist} - ${item.title}:`, error);
+              results.errors.push(`Error inserting ${item.artist} - ${item.title}: ${error instanceof Error ? error.message : 'Unknown error'}`);
             }
           }
         } else {
@@ -566,6 +636,7 @@ export default function ImportDiscogsPage() {
         }
       }
       
+      // Process updates
       if (updateOperations.length > 0) {
         setStatus(`Processing ${updateOperations.length} updates...`);
         
@@ -584,20 +655,49 @@ export default function ImportDiscogsPage() {
           const needsGenres = !genres || genres.length === 0;
           const needsStyles = !styles || styles.length === 0;
           
+          let enrichedThisUpdate = false;
+          
           if (!skipEnrichment && (needsImage || needsTracklists || needsGenres || needsStyles)) {
             try {
               const discogsData = await fetchDiscogsData(csvRow.discogs_release_id);
               
-              if (needsImage && discogsData.image_url) image_url = discogsData.image_url;
-              if (needsTracklists && discogsData.tracklists) tracklists = discogsData.tracklists;
+              const updateEnrichment: EnrichedItem = {
+                artist: csvRow.artist,
+                title: csvRow.title,
+                year: csvRow.year,
+                hasImage: false,
+                hasTracklist: false,
+                hasGenres: false
+              };
+              
+              if (needsImage && discogsData.image_url) {
+                image_url = discogsData.image_url;
+                results.updateStats.imagesAdded++;
+                updateEnrichment.hasImage = true;
+                enrichedThisUpdate = true;
+              }
+              if (needsTracklists && discogsData.tracklists) {
+                tracklists = discogsData.tracklists;
+                results.updateStats.tracklistsAdded++;
+                updateEnrichment.hasTracklist = true;
+                enrichedThisUpdate = true;
+              }
               if ((needsGenres || needsStyles) && discogsData.genres) {
                 genres = discogsData.genres;
                 styles = discogsData.styles;
+                results.updateStats.genresAdded++;
+                updateEnrichment.hasGenres = true;
+                enrichedThisUpdate = true;
+              }
+              
+              if (enrichedThisUpdate) {
+                results.updateStats.itemsUpdated.push(updateEnrichment);
               }
               
               await delay(apiDelay);
             } catch (error) {
               console.warn(`Failed to enrich ${csvRow.discogs_release_id}:`, error);
+              results.errors.push(`Failed to enrich update for ${csvRow.artist} - ${csvRow.title}: ${error instanceof Error ? error.message : 'Unknown error'}`);
             }
           }
           
@@ -619,9 +719,14 @@ export default function ImportDiscogsPage() {
                 .update(updateData)
                 .eq('id', existingRecord.id);
 
-              if (!updateError) updateCount++;
+              if (!updateError) {
+                updateCount++;
+              } else {
+                results.errors.push(`Failed to update ${csvRow.artist} - ${csvRow.title}: ${updateError.message}`);
+              }
             } catch (error) {
               console.error(`Error updating ${csvRow.discogs_release_id}:`, error);
+              results.errors.push(`Error updating ${csvRow.artist} - ${csvRow.title}: ${error instanceof Error ? error.message : 'Unknown error'}`);
             }
           } else {
             updateCount++;
@@ -634,13 +739,17 @@ export default function ImportDiscogsPage() {
         setStatus(`Skipped ${(window as Window & SyncDataStorage).updateOperations?.length} updates (override enabled)`);
       }
       
+      // Process removals
       if (syncPreview.syncMode === 'full' && recordsToRemove.length > 0) {
         const actualRemovals = recordsToRemove.filter(r => !deselectedRemovals.has(r.id));
         if (actualRemovals.length > 0) {
           setStatus(`${dryRun ? 'Would remove' : 'Removing'} ${actualRemovals.length} records...`);
           if (!dryRun) {
             const idsToDelete = actualRemovals.map(record => record.id);
-            await supabase.from('collection').delete().in('id', idsToDelete);
+            const { error: deleteError } = await supabase.from('collection').delete().in('id', idsToDelete);
+            if (deleteError) {
+              results.errors.push(`Error removing records: ${deleteError.message}`);
+            }
           } else {
             console.log('DRY RUN: Would have deleted:', actualRemovals);
           }
@@ -649,6 +758,7 @@ export default function ImportDiscogsPage() {
         setStatus(`Skipped ${(window as Window & SyncDataStorage).recordsToRemove?.length} removals (override enabled)`);
       }
       
+      // 1001 Album Matching
       if (!skip1001Matching) {
         setStatus('Running automatic 1001 album matching...');
         
@@ -678,16 +788,33 @@ export default function ImportDiscogsPage() {
             if (!sameArtistError) {
               setStatus(`Found ${sameArtistCount || 0} same-artist 1001 matches...`);
             }
+            
+            // Fetch the matched albums to display
+            const { data: matchedAlbums, error: matchedError } = await supabase
+              .from('collection')
+              .select('artist, title, year')
+              .eq('is_1001_album', true)
+              .order('artist', { ascending: true });
+            
+            if (!matchedError && matchedAlbums) {
+              results.matched1001Albums = matchedAlbums.map(album => ({
+                artist: album.artist,
+                title: album.title,
+                year: album.year || 0
+              }));
+            }
           } else {
             setStatus('DRY RUN: Skipped 1001 matching');
           }
         } catch (matchError) {
           console.warn('1001 matching failed:', matchError);
+          results.errors.push(`1001 matching error: ${matchError instanceof Error ? matchError.message : 'Unknown error'}`);
         }
       } else {
         setStatus('Skipped 1001 matching (override enabled)');
       }
 
+      // Update import history
       if (!dryRun && importRecord) {
         const removedCount = syncPreview.syncMode === 'full' 
           ? (recordsToRemove.length - deselectedRemovals.size) 
@@ -706,8 +833,11 @@ export default function ImportDiscogsPage() {
         setLastImportDate(new Date().toISOString());
       }
       
+      // Set final results
+      setImportResults(results);
+      
       const removedCount = recordsToRemove.length - deselectedRemovals.size;
-      setStatus(`${dryRun ? '🔍 DRY RUN - ' : '✅ '}Complete! ${allEnriched.length} new, ${updateOperations.length} updated, ${removedCount} removed${skip1001Matching ? '' : ', 1001 albums matched'}`);
+      setStatus(`${dryRun ? '🔍 DRY RUN - ' : '✅ '}Complete! ${allEnriched.length} new, ${updateOperations.length} updated, ${removedCount} removed${skip1001Matching ? '' : `, ${results.matched1001Albums.length} 1001 albums matched`}`);
     } catch (error) {
       if (!dryRun && importRecord) {
         await supabase
@@ -716,6 +846,8 @@ export default function ImportDiscogsPage() {
           .eq('id', importRecord.id);
       }
       setStatus(`❌ Failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      results.errors.push(`Import failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setImportResults(results);
     } finally {
       setIsProcessing(false);
     }
@@ -1035,6 +1167,320 @@ export default function ImportDiscogsPage() {
           fontWeight: 500
         }}>
           {status}
+        </div>
+      )}
+
+      {/* IMPORT RESULTS SECTION */}
+      {importResults && (
+        <div style={{
+          background: 'white',
+          border: '2px solid #10b981',
+          borderRadius: 12,
+          padding: 24,
+          marginBottom: 24,
+          boxShadow: '0 4px 6px rgba(16, 185, 129, 0.2)'
+        }}>
+          <h2 style={{
+            fontSize: 24,
+            fontWeight: 600,
+            color: '#059669',
+            marginBottom: 16
+          }}>
+            📊 Import Results Summary
+          </h2>
+
+          {/* Summary Cards */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: 16,
+            marginBottom: 24
+          }}>
+            <div 
+              onClick={() => setShowResults(showResults === 'enrichment' ? null : 'enrichment')}
+              style={{
+                background: '#f0fdf4',
+                border: '2px solid #10b981',
+                borderRadius: 8,
+                padding: 16,
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+            >
+              <div style={{ fontSize: 12, color: '#059669', fontWeight: 600, marginBottom: 8 }}>
+                NEW ITEMS ENRICHED
+              </div>
+              <div style={{ fontSize: 24, fontWeight: 'bold', color: '#047857', marginBottom: 8 }}>
+                {importResults.enrichmentStats.itemsEnriched.length}
+              </div>
+              <div style={{ fontSize: 11, color: '#059669' }}>
+                🖼️ {importResults.enrichmentStats.imagesAdded} images<br/>
+                📝 {importResults.enrichmentStats.tracklistsAdded} tracklists<br/>
+                🎵 {importResults.enrichmentStats.genresAdded} genres/styles
+              </div>
+              {importResults.enrichmentStats.itemsEnriched.length > 0 && (
+                <div style={{ fontSize: 11, color: '#10b981', marginTop: 8 }}>
+                  Click to view details →
+                </div>
+              )}
+            </div>
+
+            {importResults.updateStats.itemsUpdated.length > 0 && (
+              <div 
+                onClick={() => setShowResults(showResults === 'updates' ? null : 'updates')}
+                style={{
+                  background: '#fef3c7',
+                  border: '2px solid #f59e0b',
+                  borderRadius: 8,
+                  padding: 16,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(245, 158, 11, 0.3)';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              >
+                <div style={{ fontSize: 12, color: '#d97706', fontWeight: 600, marginBottom: 8 }}>
+                  EXISTING ITEMS ENRICHED
+                </div>
+                <div style={{ fontSize: 24, fontWeight: 'bold', color: '#b45309', marginBottom: 8 }}>
+                  {importResults.updateStats.itemsUpdated.length}
+                </div>
+                <div style={{ fontSize: 11, color: '#d97706' }}>
+                  🖼️ {importResults.updateStats.imagesAdded} images<br/>
+                  📝 {importResults.updateStats.tracklistsAdded} tracklists<br/>
+                  🎵 {importResults.updateStats.genresAdded} genres/styles
+                </div>
+                <div style={{ fontSize: 11, color: '#f59e0b', marginTop: 8 }}>
+                  Click to view details →
+                </div>
+              </div>
+            )}
+
+            {importResults.matched1001Albums.length > 0 && (
+              <div 
+                onClick={() => setShowResults(showResults === '1001' ? null : '1001')}
+                style={{
+                  background: '#ede9fe',
+                  border: '2px solid #8b5cf6',
+                  borderRadius: 8,
+                  padding: 16,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(139, 92, 246, 0.3)';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              >
+                <div style={{ fontSize: 12, color: '#7c3aed', fontWeight: 600, marginBottom: 8 }}>
+                  1001 ALBUMS MATCHED
+                </div>
+                <div style={{ fontSize: 24, fontWeight: 'bold', color: '#6d28d9', marginBottom: 8 }}>
+                  {importResults.matched1001Albums.length}
+                </div>
+                <div style={{ fontSize: 11, color: '#7c3aed' }}>
+                  Albums from the<br/>1001 Albums list
+                </div>
+                <div style={{ fontSize: 11, color: '#8b5cf6', marginTop: 8 }}>
+                  Click to view list →
+                </div>
+              </div>
+            )}
+
+            {importResults.errors.length > 0 && (
+              <div 
+                onClick={() => setShowResults(showResults === 'errors' ? null : 'errors')}
+                style={{
+                  background: '#fee2e2',
+                  border: '2px solid #dc2626',
+                  borderRadius: 8,
+                  padding: 16,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(220, 38, 38, 0.3)';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              >
+                <div style={{ fontSize: 12, color: '#dc2626', fontWeight: 600, marginBottom: 8 }}>
+                  ERRORS/WARNINGS
+                </div>
+                <div style={{ fontSize: 24, fontWeight: 'bold', color: '#991b1b', marginBottom: 8 }}>
+                  {importResults.errors.length}
+                </div>
+                <div style={{ fontSize: 11, color: '#dc2626' }}>
+                  Issues during import
+                </div>
+                <div style={{ fontSize: 11, color: '#ef4444', marginTop: 8 }}>
+                  Click to view errors →
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Detailed Results Panels */}
+          {showResults === 'enrichment' && importResults.enrichmentStats.itemsEnriched.length > 0 && (
+            <div style={{
+              background: '#f0fdf4',
+              border: '1px solid #10b981',
+              borderRadius: 8,
+              padding: 16,
+              marginBottom: 16,
+              maxHeight: 500,
+              overflowY: 'auto'
+            }}>
+              <h3 style={{ fontSize: 16, fontWeight: 600, color: '#047857', marginBottom: 12 }}>
+                New Items - Enrichment Details ({importResults.enrichmentStats.itemsEnriched.length} items)
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {importResults.enrichmentStats.itemsEnriched.map((item, idx) => (
+                  <div key={idx} style={{
+                    padding: 10,
+                    background: 'white',
+                    borderRadius: 6,
+                    fontSize: 13,
+                    border: '1px solid #bbf7d0'
+                  }}>
+                    <div style={{ fontWeight: 600, color: '#1f2937', marginBottom: 4 }}>
+                      {item.artist} - {item.title} ({item.year})
+                    </div>
+                    <div style={{ fontSize: 11, color: '#059669', display: 'flex', gap: 12 }}>
+                      {item.hasImage && <span>✅ Image</span>}
+                      {item.hasTracklist && <span>✅ Tracklist</span>}
+                      {item.hasGenres && <span>✅ Genres/Styles</span>}
+                      {!item.hasImage && !item.hasTracklist && !item.hasGenres && (
+                        <span style={{ color: '#6b7280' }}>⚠️ No enrichment data available</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {showResults === 'updates' && importResults.updateStats.itemsUpdated.length > 0 && (
+            <div style={{
+              background: '#fffbeb',
+              border: '1px solid #f59e0b',
+              borderRadius: 8,
+              padding: 16,
+              marginBottom: 16,
+              maxHeight: 500,
+              overflowY: 'auto'
+            }}>
+              <h3 style={{ fontSize: 16, fontWeight: 600, color: '#b45309', marginBottom: 12 }}>
+                Updated Items - Enrichment Details ({importResults.updateStats.itemsUpdated.length} items)
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {importResults.updateStats.itemsUpdated.map((item, idx) => (
+                  <div key={idx} style={{
+                    padding: 10,
+                    background: 'white',
+                    borderRadius: 6,
+                    fontSize: 13,
+                    border: '1px solid #fde68a'
+                  }}>
+                    <div style={{ fontWeight: 600, color: '#1f2937', marginBottom: 4 }}>
+                      {item.artist} - {item.title} ({item.year})
+                    </div>
+                    <div style={{ fontSize: 11, color: '#d97706', display: 'flex', gap: 12 }}>
+                      {item.hasImage && <span>✅ Added Image</span>}
+                      {item.hasTracklist && <span>✅ Added Tracklist</span>}
+                      {item.hasGenres && <span>✅ Added Genres/Styles</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {showResults === '1001' && importResults.matched1001Albums.length > 0 && (
+            <div style={{
+              background: '#f5f3ff',
+              border: '1px solid #8b5cf6',
+              borderRadius: 8,
+              padding: 16,
+              marginBottom: 16,
+              maxHeight: 500,
+              overflowY: 'auto'
+            }}>
+              <h3 style={{ fontSize: 16, fontWeight: 600, color: '#6d28d9', marginBottom: 12 }}>
+                Matched 1001 Albums ({importResults.matched1001Albums.length} albums)
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {importResults.matched1001Albums.map((album, idx) => (
+                  <div key={idx} style={{
+                    padding: 10,
+                    background: 'white',
+                    borderRadius: 6,
+                    fontSize: 13,
+                    border: '1px solid #ddd6fe'
+                  }}>
+                    <div style={{ fontWeight: 600, color: '#1f2937' }}>
+                      {album.artist} - {album.title}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#7c3aed', marginTop: 4 }}>
+                      Year: {album.year || 'Unknown'}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {showResults === 'errors' && importResults.errors.length > 0 && (
+            <div style={{
+              background: '#fef2f2',
+              border: '1px solid #dc2626',
+              borderRadius: 8,
+              padding: 16,
+              marginBottom: 16,
+              maxHeight: 500,
+              overflowY: 'auto'
+            }}>
+              <h3 style={{ fontSize: 16, fontWeight: 600, color: '#991b1b', marginBottom: 12 }}>
+                Errors and Warnings ({importResults.errors.length})
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {importResults.errors.map((error, idx) => (
+                  <div key={idx} style={{
+                    padding: 10,
+                    background: 'white',
+                    borderRadius: 6,
+                    fontSize: 12,
+                    border: '1px solid #fecaca',
+                    color: '#991b1b',
+                    fontFamily: 'monospace'
+                  }}>
+                    {error}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
