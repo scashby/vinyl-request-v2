@@ -1080,7 +1080,7 @@ function Thousand1AlbumsTab() {
                                 borderRadius: 6,
                                 color: "#6b7280",
                                 fontSize: 13,
-                                zIndex: 100,
+                                zIndex: 9999,
                               }}
                             >
                               Searching...
@@ -1100,7 +1100,7 @@ function Thousand1AlbumsTab() {
                                 boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)",
                                 maxHeight: 300,
                                 overflowY: "auto",
-                                zIndex: 100,
+                                zIndex: 9999,
                               }}
                             >
                               {searchResults[album.id].map((result) => (
@@ -1183,7 +1183,7 @@ function Thousand1AlbumsTab() {
                                   borderRadius: 6,
                                   color: "#991b1b",
                                   fontSize: 13,
-                                  zIndex: 100,
+                                  zIndex: 9999,
                                 }}
                               >
                                 No matches found. Try different search terms.
