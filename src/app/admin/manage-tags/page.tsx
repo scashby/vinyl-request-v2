@@ -2,6 +2,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import Image from 'next/image';
 import { supabase } from '../../../lib/supabaseClient';
 
 type TagDefinition = {
@@ -30,9 +31,11 @@ export default function ManageTags() {
   const [tagDefinitions, setTagDefinitions] = useState<TagDefinition[]>([]);
   const [tagStats, setTagStats] = useState<TagStats[]>([]);
   const [albums, setAlbums] = useState<Album[]>([]);
-  const [, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'definitions' | 'usage' | 'bulk'>('definitions');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [expandedTags, setExpandedTags] = useState<Set<string>>(new Set());
+  const [searchTerm, setSearchTerm] = useState('');
   const [newTag, setNewTag] = useState({
     tag_name: '',
     category: 'theme' as 'theme' | 'mood' | 'occasion' | 'special',
@@ -43,19 +46,19 @@ export default function ManageTags() {
   const [bulkTagAction, setBulkTagAction] = useState<'add' | 'remove'>('add');
   const [selectedBulkTag, setSelectedBulkTag] = useState<string>('');
 
-const loadData = useCallback(async () => {
-  setLoading(true);
-  await Promise.all([
-    loadTagDefinitions(),
-    loadAlbums(),
-    calculateTagStats()
-  ]);
-  setLoading(false);
-}, []);
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    await Promise.all([
+      loadTagDefinitions(),
+      loadAlbums(),
+      calculateTagStats()
+    ]);
+    setLoading(false);
+  }, []);
 
-useEffect(() => {
-  loadData();
-}, [loadData]);
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   async function loadTagDefinitions() {
     const { data, error } = await supabase
@@ -212,12 +215,43 @@ useEffect(() => {
     ? tagDefinitions 
     : tagDefinitions.filter(t => t.category === selectedCategory);
 
+  const filteredAlbums = searchTerm
+    ? albums.filter(a => 
+        a.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        a.artist.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    : albums;
+
   const categoryColors = {
     theme: '#f97316',
     mood: '#8b5cf6',
     occasion: '#14b8a6',
     special: '#eab308'
   };
+
+  if (loading) {
+    return (
+      <div style={{ 
+        padding: 24, 
+        background: '#f8fafc', 
+        minHeight: '100vh', 
+        maxWidth: 1600, 
+        margin: '0 auto',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ 
+            fontSize: 48, 
+            marginBottom: 16,
+            animation: 'spin 1s linear infinite'
+          }}>⚙️</div>
+          <div style={{ fontSize: 18, color: '#6b7280' }}>Loading tags and albums...</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ padding: 24, background: '#f8fafc', minHeight: '100vh', maxWidth: 1600, margin: '0 auto' }}>
@@ -579,6 +613,9 @@ useEffect(() => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               {tagStats.map(stat => {
                 const tagDef = tagDefinitions.find(t => t.tag_name === stat.tag_name);
+                const isExpanded = expandedTags.has(stat.tag_name);
+                const displayedAlbums = isExpanded ? stat.albums : stat.albums.slice(0, 10);
+                
                 return (
                   <div key={stat.tag_name} style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 16 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
@@ -600,44 +637,102 @@ useEffect(() => {
                           ({stat.count} album{stat.count !== 1 ? 's' : ''})
                         </span>
                       </div>
+                      {stat.albums.length > 10 && (
+                        <button
+                          onClick={() => {
+                            const newExpanded = new Set(expandedTags);
+                            if (isExpanded) {
+                              newExpanded.delete(stat.tag_name);
+                            } else {
+                              newExpanded.add(stat.tag_name);
+                            }
+                            setExpandedTags(newExpanded);
+                          }}
+                          style={{
+                            padding: '6px 12px',
+                            background: '#3b82f6',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: 4,
+                            fontSize: 12,
+                            fontWeight: 600,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {isExpanded ? 'Show Less' : `Show All ${stat.count}`}
+                        </button>
+                      )}
                     </div>
                     <div style={{
                       display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
                       gap: 8
                     }}>
-                      {stat.albums.slice(0, 10).map(album => (
+                      {displayedAlbums.map(album => (
                         <div
                           key={album.id}
                           style={{
-                            padding: 8,
                             background: '#f9fafb',
                             borderRadius: 6,
-                            fontSize: 12
+                            overflow: 'hidden',
+                            border: '1px solid #e5e7eb'
                           }}
                         >
-                          <div style={{ fontWeight: 600, color: '#1f2937', marginBottom: 2 }}>
-                            {album.title}
+                          <div style={{
+                            width: '100%',
+                            aspectRatio: '1',
+                            background: '#e5e7eb',
+                            overflow: 'hidden',
+                            position: 'relative'
+                          }}>
+                            {album.image_url ? (
+                              <Image 
+                                src={album.image_url} 
+                                alt={`${album.title} by ${album.artist}`}
+                                fill
+                                sizes="120px"
+                                style={{
+                                  objectFit: 'cover'
+                                }}
+                              />
+                            ) : (
+                              <div style={{
+                                width: '100%',
+                                height: '100%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: 32,
+                                color: '#9ca3af'
+                              }}>
+                                ♪
+                              </div>
+                            )}
                           </div>
-                          <div style={{ color: '#6b7280' }}>
-                            {album.artist}
+                          <div style={{ padding: 8 }}>
+                            <div style={{ 
+                              fontWeight: 600, 
+                              color: '#1f2937', 
+                              marginBottom: 2,
+                              fontSize: 11,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap'
+                            }}>
+                              {album.title}
+                            </div>
+                            <div style={{ 
+                              color: '#6b7280',
+                              fontSize: 10,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap'
+                            }}>
+                              {album.artist}
+                            </div>
                           </div>
                         </div>
                       ))}
-                      {stat.albums.length > 10 && (
-                        <div style={{
-                          padding: 8,
-                          background: '#f3f4f6',
-                          borderRadius: 6,
-                          fontSize: 12,
-                          color: '#6b7280',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}>
-                          +{stat.albums.length - 10} more
-                        </div>
-                      )}
                     </div>
                   </div>
                 );
@@ -744,13 +839,26 @@ useEffect(() => {
             padding: 20,
             boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
               <h2 style={{ fontSize: 18, fontWeight: 'bold', color: '#1f2937', margin: 0 }}>
-                Select Albums ({albums.length})
+                Select Albums ({filteredAlbums.length})
               </h2>
-              <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <input
+                  type="text"
+                  placeholder="Search albums..."
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                  style={{
+                    padding: '6px 12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: 4,
+                    fontSize: 12,
+                    minWidth: 200
+                  }}
+                />
                 <button
-                  onClick={() => setSelectedAlbums(albums.map(a => a.id))}
+                  onClick={() => setSelectedAlbums(filteredAlbums.map(a => a.id))}
                   style={{
                     padding: '6px 12px',
                     background: '#3b82f6',
@@ -783,10 +891,10 @@ useEffect(() => {
             </div>
             <div style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
               gap: 12
             }}>
-              {albums.map(album => {
+              {filteredAlbums.map(album => {
                 const isSelected = selectedAlbums.includes(album.id);
                 return (
                   <div
@@ -804,7 +912,8 @@ useEffect(() => {
                       padding: 8,
                       background: isSelected ? '#eff6ff' : '#f9fafb',
                       cursor: 'pointer',
-                      transition: 'all 0.2s'
+                      transition: 'all 0.2s',
+                      position: 'relative'
                     }}
                   >
                     <div style={{
@@ -813,12 +922,50 @@ useEffect(() => {
                       background: '#e5e7eb',
                       borderRadius: 4,
                       marginBottom: 8,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: 32
+                      overflow: 'hidden',
+                      position: 'relative'
                     }}>
-                      {isSelected ? '✓' : '♪'}
+                      {album.image_url ? (
+                        <Image 
+                          src={album.image_url} 
+                          alt={`${album.title} by ${album.artist}`}
+                          fill
+                          sizes="150px"
+                          style={{
+                            objectFit: 'cover'
+                          }}
+                        />
+                      ) : (
+                        <div style={{
+                          width: '100%',
+                          height: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: 32,
+                          color: '#9ca3af'
+                        }}>
+                          ♪
+                        </div>
+                      )}
+                      {isSelected && (
+                        <div style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          background: 'rgba(59, 130, 246, 0.8)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: 48,
+                          color: 'white',
+                          fontWeight: 'bold'
+                        }}>
+                          ✓
+                        </div>
+                      )}
                     </div>
                     <div style={{
                       fontSize: 12,
