@@ -1,4 +1,4 @@
-// src/app/api/enrich-multi-stats/route.ts - FIXED: Clearer metrics and accurate "needs enrichment" count
+// src/app/api/enrich-sources/stats/route.ts - WITH 1001 ALBUMS COUNT
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -57,10 +57,16 @@ export async function GET() {
       .is('spotify_id', null)
       .not('apple_music_id', 'is', null);
 
+    // Count 1001 albums
+    const { count: albums1001Count } = await supabase
+      .from('collection')
+      .select('id', { count: 'exact', head: true })
+      .eq('is_1001', true);
+
     // Check all albums with Apple Music IDs for lyrics - PAGINATED to avoid 1000 row limit
     let appleLyricsCount = 0;
     let needsAppleLyrics = 0;
-    let fullyEnrichedCount = 0; // NEW: count albums with BOTH services AND lyrics
+    let fullyEnrichedCount = 0; // count albums with BOTH services AND lyrics
     let offset = 0;
     const pageSize = 1000;
     let hasMore = true;
@@ -134,7 +140,7 @@ export async function GET() {
       offset += pageSize;
     }
 
-    // FIXED: Calculate "needs enrichment" and "fully enriched" correctly
+    // Calculate "needs enrichment" and "fully enriched" correctly
     const needsEnrichment = (total || 0) - fullyEnrichedCount;
     const fullyEnriched = fullyEnrichedCount;
 
@@ -160,7 +166,10 @@ export async function GET() {
         geniusLyrics: geniusLyricsCount,
         appleLyrics: appleLyricsCount,
         needsAppleLyrics,
-        anyLyrics: anyLyricsCount
+        anyLyrics: anyLyricsCount,
+        albums1001: albums1001Count || 0,
+        discogsTracklist: 0,
+        needsDiscogsTracklist: 0
       },
       folders
     });

@@ -1,4 +1,4 @@
-// src/app/api/enrich-sources/batch/route.ts - WITH DISCOGS TRACKLIST SUPPORT
+// src/app/api/enrich-sources/batch/route.ts - WITH DISCOGS TRACKLIST AND 1001 MATCHING
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -52,6 +52,13 @@ type AlbumResult = {
     lyricsFound?: number;
     lyricsMissing?: number;
     missingTracks?: string[];
+    error?: string;
+    skipped?: boolean;
+  };
+  match1001?: {
+    success: boolean;
+    matched?: boolean;
+    confidence?: number;
     error?: string;
     skipped?: boolean;
   };
@@ -266,14 +273,15 @@ export async function POST(req: Request) {
       spotify: true,
       appleMusic: true,
       genius: true,
-      appleLyrics: true
+      appleLyrics: true,
+      match1001: true
     };
 
     const queryLimit = limit * 3;
 
     let query = supabase
       .from('collection')
-      .select('id, artist, title, tracklists, spotify_id, apple_music_id, discogs_release_id, folder')
+      .select('id, artist, title, tracklists, spotify_id, apple_music_id, discogs_release_id, is_1001, folder')
       .gt('id', cursor)
       .order('id', { ascending: true })
       .limit(queryLimit);
@@ -304,7 +312,8 @@ export async function POST(req: Request) {
       needsDiscogsTracklist(album.tracklists, album.discogs_release_id) ||
       !album.spotify_id || 
       !album.apple_music_id || 
-      needsAppleMusicLyrics(album.tracklists, album.apple_music_id)
+      needsAppleMusicLyrics(album.tracklists, album.apple_music_id) ||
+      !album.is_1001
     ).slice(0, limit);
 
     if (albumsNeedingEnrichment.length === 0 && albums.length > 0) {
@@ -413,6 +422,24 @@ export async function POST(req: Request) {
           error: lyricsResult.error
         };
         await sleep(500);
+      }
+
+      // Match with 1001 Albums
+      if (!album.is_1001 && services.match1001) {
+        const matchResult = await callService('1001-match', album.id);
+        albumResult.match1001 = {
+          success: matchResult.success,
+          matched: matchResult.matched,
+          confidence: matchResult.data?.confidence,
+          error: matchResult.error,
+          skipped: matchResult.skipped
+        };
+        await sleep(500);
+      } else if (album.is_1001) {
+        albumResult.match1001 = {
+          success: true,
+          skipped: true
+        };
       }
 
       results.push(albumResult);
