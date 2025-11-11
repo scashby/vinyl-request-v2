@@ -1158,55 +1158,55 @@ export default function EditCollectionPage() {
               borderRadius: 6,
               border: '1px solid #e5e7eb'
             }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12, color: '#1f2937' }}>
                 <input type="checkbox" checked={searchInArtist} onChange={e => setSearchInArtist(e.target.checked)} style={{ width: 14, height: 14 }} />
                 Artist
               </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12, color: '#1f2937' }}>
                 <input type="checkbox" checked={searchInTitle} onChange={e => setSearchInTitle(e.target.checked)} style={{ width: 14, height: 14 }} />
                 Title
               </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12, color: '#1f2937' }}>
                 <input type="checkbox" checked={searchInTags} onChange={e => setSearchInTags(e.target.checked)} style={{ width: 14, height: 14 }} />
                 Tags
               </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12, color: '#1f2937' }}>
                 <input type="checkbox" checked={searchInTracks} onChange={e => setSearchInTracks(e.target.checked)} style={{ width: 14, height: 14 }} />
                 Tracks/Lyrics
               </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12, color: '#1f2937' }}>
                 <input type="checkbox" checked={searchInFormat} onChange={e => setSearchInFormat(e.target.checked)} style={{ width: 14, height: 14 }} />
                 Format
               </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12, color: '#1f2937' }}>
                 <input type="checkbox" checked={searchInNotes} onChange={e => setSearchInNotes(e.target.checked)} style={{ width: 14, height: 14 }} />
                 Notes
               </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12, color: '#1f2937' }}>
                 <input type="checkbox" checked={searchInGenres} onChange={e => setSearchInGenres(e.target.checked)} style={{ width: 14, height: 14 }} />
                 Genres
               </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12, color: '#1f2937' }}>
                 <input type="checkbox" checked={searchInStyles} onChange={e => setSearchInStyles(e.target.checked)} style={{ width: 14, height: 14 }} />
                 Styles
               </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12, color: '#1f2937' }}>
                 <input type="checkbox" checked={searchInLabels} onChange={e => setSearchInLabels(e.target.checked)} style={{ width: 14, height: 14 }} />
                 Labels
               </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12, color: '#1f2937' }}>
                 <input type="checkbox" checked={searchInYear} onChange={e => setSearchInYear(e.target.checked)} style={{ width: 14, height: 14 }} />
                 Year
               </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12, color: '#1f2937' }}>
                 <input type="checkbox" checked={searchInFolder} onChange={e => setSearchInFolder(e.target.checked)} style={{ width: 14, height: 14 }} />
                 Folder
               </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12, color: '#1f2937' }}>
                 <input type="checkbox" checked={searchInCondition} onChange={e => setSearchInCondition(e.target.checked)} style={{ width: 14, height: 14 }} />
                 Condition
               </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12, color: '#1f2937' }}>
                 <input type="checkbox" checked={searchInPlatform} onChange={e => setSearchInPlatform(e.target.checked)} style={{ width: 14, height: 14 }} />
                 Platform
               </label>
@@ -1326,27 +1326,27 @@ export default function EditCollectionPage() {
                     🏆 BADGES
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: '#1f2937' }}>
                       <input type="checkbox" checked={filter1001} onChange={e => setFilter1001(e.target.checked)} style={{ width: 15, height: 15 }} />
                       1001 Albums
                     </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: '#1f2937' }}>
                       <input type="checkbox" checked={filterTop200} onChange={e => setFilterTop200(e.target.checked)} style={{ width: 15, height: 15 }} />
                       Steve&apos;s Top 200
                     </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: '#1f2937' }}>
                       <input type="checkbox" checked={filterTop10} onChange={e => setFilterTop10(e.target.checked)} style={{ width: 15, height: 15 }} />
                       This Week&apos;s Top 10
                     </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: '#1f2937' }}>
                       <input type="checkbox" checked={filterInnerCircle} onChange={e => setFilterInnerCircle(e.target.checked)} style={{ width: 15, height: 15 }} />
                       Inner Circle
                     </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: '#1f2937' }}>
                       <input type="checkbox" checked={filterBoxSet} onChange={e => setFilterBoxSet(e.target.checked)} style={{ width: 15, height: 15 }} />
                       Box Set
                     </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: '#1f2937' }}>
                       <input type="checkbox" checked={filterBlocked} onChange={e => setFilterBlocked(e.target.checked)} style={{ width: 15, height: 15 }} />
                       Blocked
                     </label>
@@ -1359,19 +1359,19 @@ export default function EditCollectionPage() {
                     💰 SALE & TAGS
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: '#1f2937' }}>
                       <input type="checkbox" checked={filterForSale} onChange={e => setFilterForSale(e.target.checked)} style={{ width: 15, height: 15 }} />
                       For Sale
                     </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: '#1f2937' }}>
                       <input type="checkbox" checked={filterNotForSale} onChange={e => setFilterNotForSale(e.target.checked)} style={{ width: 15, height: 15 }} />
                       NOT For Sale
                     </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: '#1f2937' }}>
                       <input type="checkbox" checked={filterHasTags} onChange={e => setFilterHasTags(e.target.checked)} style={{ width: 15, height: 15 }} />
                       Has Tags
                     </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: '#1f2937' }}>
                       <input type="checkbox" checked={filterNoTags} onChange={e => setFilterNoTags(e.target.checked)} style={{ width: 15, height: 15 }} />
                       No Tags
                     </label>
@@ -1382,14 +1382,14 @@ export default function EditCollectionPage() {
                       value={includeTag}
                       onChange={e => setIncludeTag(e.target.value)}
                       placeholder="Must have tag..."
-                      style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12 }}
+                      style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12, color: '#1f2937', backgroundColor: 'white' }}
                     />
                     <input
                       type="text"
                       value={excludeTag}
                       onChange={e => setExcludeTag(e.target.value)}
                       placeholder="Exclude tag..."
-                      style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12 }}
+                      style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12, color: '#1f2937', backgroundColor: 'white' }}
                     />
                   </div>
                 </div>
@@ -1405,49 +1405,49 @@ export default function EditCollectionPage() {
                       value={filterArtist}
                       onChange={e => setFilterArtist(e.target.value)}
                       placeholder="Artist contains..."
-                      style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12 }}
+                      style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12, color: '#1f2937', backgroundColor: 'white' }}
                     />
                     <input
                       type="text"
                       value={filterTitle}
                       onChange={e => setFilterTitle(e.target.value)}
                       placeholder="Title contains..."
-                      style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12 }}
+                      style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12, color: '#1f2937', backgroundColor: 'white' }}
                     />
                     <input
                       type="text"
                       value={filterFormat}
                       onChange={e => setFilterFormat(e.target.value)}
                       placeholder="Format contains (LP, CD...)"
-                      style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12 }}
+                      style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12, color: '#1f2937', backgroundColor: 'white' }}
                     />
                     <input
                       type="text"
                       value={filterFolder}
                       onChange={e => setFilterFolder(e.target.value)}
                       placeholder="Folder contains..."
-                      style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12 }}
+                      style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12, color: '#1f2937', backgroundColor: 'white' }}
                     />
                     <input
                       type="text"
                       value={filterCondition}
                       onChange={e => setFilterCondition(e.target.value)}
                       placeholder="Condition (VG+, M, NM...)"
-                      style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12 }}
+                      style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12, color: '#1f2937', backgroundColor: 'white' }}
                     />
                     <input
                       type="text"
                       value={filterPlatform}
                       onChange={e => setFilterPlatform(e.target.value)}
                       placeholder="Platform (Discogs, eBay...)"
-                      style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12 }}
+                      style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12, color: '#1f2937', backgroundColor: 'white' }}
                     />
                     <input
                       type="text"
                       value={filterLabel}
                       onChange={e => setFilterLabel(e.target.value)}
                       placeholder="Label contains..."
-                      style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12 }}
+                      style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12, color: '#1f2937', backgroundColor: 'white' }}
                     />
                   </div>
                 </div>
@@ -1466,14 +1466,14 @@ export default function EditCollectionPage() {
                           value={yearMin}
                           onChange={e => setYearMin(e.target.value)}
                           placeholder="Min"
-                          style={{ flex: 1, padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12 }}
+                          style={{ flex: 1, padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12, color: '#1f2937', backgroundColor: 'white' }}
                         />
                         <input
                           type="number"
                           value={yearMax}
                           onChange={e => setYearMax(e.target.value)}
                           placeholder="Max"
-                          style={{ flex: 1, padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12 }}
+                          style={{ flex: 1, padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12, color: '#1f2937', backgroundColor: 'white' }}
                         />
                       </div>
                     </div>
@@ -1486,7 +1486,7 @@ export default function EditCollectionPage() {
                           onChange={e => setPriceMin(e.target.value)}
                           placeholder="Min"
                           step="0.01"
-                          style={{ flex: 1, padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12 }}
+                          style={{ flex: 1, padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12, color: '#1f2937', backgroundColor: 'white' }}
                         />
                         <input
                           type="number"
@@ -1494,7 +1494,7 @@ export default function EditCollectionPage() {
                           onChange={e => setPriceMax(e.target.value)}
                           placeholder="Max"
                           step="0.01"
-                          style={{ flex: 1, padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12 }}
+                          style={{ flex: 1, padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12, color: '#1f2937', backgroundColor: 'white' }}
                         />
                       </div>
                     </div>
@@ -1506,14 +1506,14 @@ export default function EditCollectionPage() {
                           value={tagCountMin}
                           onChange={e => setTagCountMin(e.target.value)}
                           placeholder="Min"
-                          style={{ flex: 1, padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12 }}
+                          style={{ flex: 1, padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12, color: '#1f2937', backgroundColor: 'white' }}
                         />
                         <input
                           type="number"
                           value={tagCountMax}
                           onChange={e => setTagCountMax(e.target.value)}
                           placeholder="Max"
-                          style={{ flex: 1, padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12 }}
+                          style={{ flex: 1, padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12, color: '#1f2937', backgroundColor: 'white' }}
                         />
                       </div>
                     </div>
@@ -1525,14 +1525,14 @@ export default function EditCollectionPage() {
                           value={sidesMin}
                           onChange={e => setSidesMin(e.target.value)}
                           placeholder="Min"
-                          style={{ flex: 1, padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12 }}
+                          style={{ flex: 1, padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12, color: '#1f2937', backgroundColor: 'white' }}
                         />
                         <input
                           type="number"
                           value={sidesMax}
                           onChange={e => setSidesMax(e.target.value)}
                           placeholder="Max"
-                          style={{ flex: 1, padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12 }}
+                          style={{ flex: 1, padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 12, color: '#1f2937', backgroundColor: 'white' }}
                         />
                       </div>
                     </div>
