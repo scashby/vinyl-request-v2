@@ -11,15 +11,14 @@ import "styles/events.css";
 
 /**
  * EVENTS PAGE — 9:30 Club style (STRICT 3‑SECTION STACK)
- *
- * ORDER (top to bottom):
- *  - Page Header (existing)
+ * ORDER:
+ *  - Header
  *  - Section 1: Up Next (events[0..1])
- *  - Section 2: 4‑column grid (PLACEHOLDERS ONLY until tagging exists)
- *  - Section 3: Upcoming Shows (LEFT: ALL events list • RIGHT: 350px sidebar)
- *  - Footer (global)
+ *  - Section 2: 4‑column grid (PLACEHOLDERS ONLY)
+ *  - Section 3: Upcoming Shows (LEFT: ALL events • RIGHT: 350px sidebar)
+ *  - Footer
  *
- * Lint-safe: no JSX fragments; single export; no duplicate file content.
+ * Lint-safe: no JSX fragments; single export; no duplicate content.
  */
 
 export default function Page() {
@@ -76,21 +75,17 @@ export default function Page() {
     };
   };
 
-  // Section 1: events 1 & 2 only
   const upNext = events.slice(0, 2);
 
-  // Section 2: STRICT PLACEHOLDERS (not from events yet)
+  // Section 2: placeholders only (until featured tagging exists)
   const placeholderGrid = Array.from({ length: 8 }).map((_, i) => ({
     id: `ph-${i}`,
     title: `Featured Event (TBA)`,
     date: "9999-12-31",
     time: "",
     image_url: "/images/placeholder.png",
-    ticket_url: "",
   }));
 
-  // Section 3 LEFT: ALL EVENTS
-  const allEvents = events;
   const latestSet = pastDJSets[0];
 
   const DateBox = ({ date }) => {
@@ -100,7 +95,7 @@ export default function Page() {
       <div
         style={{
           background: "#000",
-          border: "2px solid #0284c7",
+          border: "2px solid #00c4ff",
           borderRadius: 8,
           padding: "10px 8px",
           textAlign: "center",
@@ -109,7 +104,7 @@ export default function Page() {
       >
         <div
           style={{
-            color: "#0284c7",
+            color: "#00c4ff",
             fontSize: 11,
             fontWeight: 800,
             letterSpacing: ".8px",
@@ -123,7 +118,7 @@ export default function Page() {
         </div>
         <div
           style={{
-            color: "#0284c7",
+            color: "#00c4ff",
             fontSize: 11,
             fontWeight: 800,
             letterSpacing: ".8px",
@@ -136,42 +131,73 @@ export default function Page() {
     );
   };
 
+  const SectionTitle = ({ text }) => (
+    <div style={{ marginBottom: "1.5rem" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "10px",
+        }}
+      >
+        <div
+          style={{
+            width: 14,
+            height: 14,
+            borderRadius: 2,
+            background: "#00c4ff",
+            transform: "rotate(45deg)",
+          }}
+        />
+        <h2
+          style={{
+            color: "#fff",
+            fontSize: "2.6rem",
+            fontWeight: 900,
+            letterSpacing: "1px",
+            margin: 0,
+            textTransform: "uppercase",
+          }}
+        >
+          {text}
+        </h2>
+      </div>
+      <div
+        style={{
+          height: 6,
+          width: 180,
+          background: "#00c4ff",
+          borderRadius: 999,
+          marginTop: 10,
+        }}
+      />
+    </div>
+  );
+
   return (
-    <div className="page-wrapper">
+    <div className="page-wrapper" style={{ background: "#000" }}>
       {/* PAGE HEADER */}
-      <header className="event-hero">
+      <header className="event-hero" style={{ background: "#000" }}>
         <div className="overlay">
           <h1>Upcoming Vinyl Nights</h1>
         </div>
       </header>
 
-      <main className="event-body" style={{ padding: 0 }}>
+      <main className="event-body" style={{ padding: 0, background: "#000" }}>
         {loading ? (
-          <div style={{ padding: "3rem 1rem", textAlign: "center" }}>Loading…</div>
+          <div style={{ padding: "3rem 1rem", textAlign: "center", color: "#fff" }}>Loading…</div>
         ) : (
           <div data-secwrap="sections">
-            {/* SECTION 1 — UP NEXT (events[0..1]) */}
+            {/* SECTION 1 — UP NEXT */}
             <section
               style={{
-                background: "linear-gradient(180deg,#1a1a1a,#000)",
+                background: "linear-gradient(180deg,#141414,#000)",
                 padding: "2.75rem 1.25rem 3rem",
-                borderBottom: "3px solid #0284c7",
+                borderBottom: "3px solid #00c4ff",
               }}
             >
               <div style={{ maxWidth: 1400, margin: "0 auto" }}>
-                <h2
-                  style={{
-                    color: "#fff",
-                    textAlign: "center",
-                    fontSize: "2.6rem",
-                    fontWeight: 800,
-                    letterSpacing: ".5px",
-                    marginBottom: "1.75rem",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  Up Next
-                </h2>
+                <SectionTitle text="Up Next" />
 
                 <div
                   style={{
@@ -185,7 +211,6 @@ export default function Page() {
                       id: `placeholder-upnext-${i}`,
                       title: "Featured Event (TBA)",
                       date: "9999-12-31",
-                      time: "",
                       image_url: "/images/placeholder.png",
                     };
                     const img = ev.image_url || "/images/placeholder.png";
@@ -202,13 +227,13 @@ export default function Page() {
                             background: "#222",
                             borderRadius: 12,
                             overflow: "hidden",
-                            border: "3px solid #0284c7",
+                            border: "3px solid #00c4ff",
                             transition: "transform .25s ease, box-shadow .25s ease",
                           }}
                           onMouseOver={(x) => {
                             x.currentTarget.style.transform = "translateY(-6px)";
                             x.currentTarget.style.boxShadow =
-                              "0 14px 36px rgba(2,132,199,.45)";
+                              "0 14px 36px rgba(0,196,255,.35)";
                           }}
                           onMouseOut={(x) => {
                             x.currentTarget.style.transform = "translateY(0)";
@@ -228,23 +253,22 @@ export default function Page() {
                           <div style={{ padding: "1.5rem 1.25rem 1.75rem" }}>
                             <div
                               style={{
-                                background: tba ? "#6b7280" : "#0284c7",
-                                color: "#fff",
+                                background: tba ? "#6b7280" : "#00c4ff",
+                                color: tba ? "#fff" : "#000",
                                 padding: ".6rem .9rem",
                                 borderRadius: 8,
                                 display: "inline-block",
-                                fontWeight: 800,
+                                fontWeight: 900,
                                 marginBottom: ".9rem",
                               }}
                             >
                               {tba ? "TBA" : `${d.wk} ${d.mon} ${d.day}`}
-                              {e?.time ? ` • Doors: ${e.time}` : ""}
                             </div>
                             <h3
                               style={{
                                 color: "#fff",
                                 fontSize: "1.9rem",
-                                fontWeight: 800,
+                                fontWeight: 900,
                                 lineHeight: 1.2,
                                 margin: 0,
                               }}
@@ -264,10 +288,11 @@ export default function Page() {
               style={{
                 background: "#000",
                 padding: "2.75rem 1.25rem 3rem",
-                borderBottom: "2px solid #2b2b2b",
+                borderBottom: "2px solid #1f1f1f",
               }}
             >
               <div style={{ maxWidth: 1400, margin: "0 auto" }}>
+                <SectionTitle text="Featured" />
                 <div
                   style={{
                     display: "grid",
@@ -285,18 +310,18 @@ export default function Page() {
                           background: "#1b1b1b",
                           borderRadius: 8,
                           overflow: "hidden",
-                          border: "2px solid #2b2b2b",
+                          border: "2px solid #262626",
                           display: "flex",
                           flexDirection: "column",
                           transition: "transform .2s ease, border-color .2s ease",
                         }}
                         onMouseOver={(x) => {
                           x.currentTarget.style.transform = "translateY(-4px)";
-                          x.currentTarget.style.borderColor = "#0284c7";
+                          x.currentTarget.style.borderColor = "#00c4ff";
                         }}
                         onMouseOut={(x) => {
                           x.currentTarget.style.transform = "translateY(0)";
-                          x.currentTarget.style.borderColor = "#2b2b2b";
+                          x.currentTarget.style.borderColor = "#262626";
                         }}
                       >
                         <div style={{ position: "relative", width: "100%", paddingTop: "100%" }}>
@@ -331,42 +356,7 @@ export default function Page() {
                             {`${d.mon} ${d.day}`}
                           </div>
                         </div>
-                        <div style={{ display: "flex", gap: ".5rem", padding: "0 1rem 1rem" }}>
-                          <a
-                            href="#"
-                            style={{
-                              flex: 1,
-                              background: "#fff",
-                              color: "#000",
-                              textAlign: "center",
-                              textDecoration: "none",
-                              padding: ".55rem .8rem",
-                              borderRadius: 6,
-                              fontWeight: 800,
-                              pointerEvents: "none",
-                              opacity: 0.5,
-                            }}
-                          >
-                            BUY TICKETS
-                          </a>
-                          <a
-                            href="#"
-                            style={{
-                              flex: 1,
-                              background: "#00d9ff",
-                              color: "#000",
-                              textAlign: "center",
-                              textDecoration: "none",
-                              padding: ".55rem .8rem",
-                              borderRadius: 6,
-                              fontWeight: 800,
-                              pointerEvents: "none",
-                              opacity: 0.5,
-                            }}
-                          >
-                            MORE INFO
-                          </a>
-                        </div>
+                        {/* Buttons intentionally removed per request */}
                       </div>
                     );
                   })}
@@ -374,27 +364,15 @@ export default function Page() {
               </div>
             </section>
 
-            {/* SECTION 3 — UPCOMING SHOWS (Left: ALL events • Right: 350px sidebar) */}
+            {/* SECTION 3 — UPCOMING SHOWS */}
             <section
               style={{
-                background: "#111",
+                background: "#0d0d0d",
                 padding: "3rem 1.25rem 4rem",
               }}
             >
               <div style={{ maxWidth: 1400, margin: "0 auto" }}>
-                <h2
-                  style={{
-                    color: "#fff",
-                    textAlign: "center",
-                    fontSize: "2.6rem",
-                    fontWeight: 800,
-                    letterSpacing: "1px",
-                    marginBottom: "2.25rem",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  Upcoming Shows
-                </h2>
+                <SectionTitle text="Upcoming Shows" />
 
                 <div
                   style={{
@@ -405,7 +383,7 @@ export default function Page() {
                 >
                   {/* LEFT: ALL EVENTS as vertical rows */}
                   <div>
-                    {allEvents.map((e) => {
+                    {events.map((e) => {
                       const img = e.image_url || "/images/placeholder.png";
                       return (
                         <Link
@@ -419,17 +397,17 @@ export default function Page() {
                               gridTemplateColumns: "100px 150px 1fr auto",
                               gap: "1rem",
                               alignItems: "center",
-                              background: "#1a1a1a",
+                              background: "#151515",
                               padding: "1rem",
-                              borderBottom: "1px solid #2b2b2b",
+                              borderBottom: "1px solid #262626",
                               transition: "background .2s ease, border-left-color .2s ease",
                             }}
                             onMouseOver={(x) => {
-                              x.currentTarget.style.background = "#222";
-                              x.currentTarget.style.borderLeft = "4px solid #0284c7";
+                              x.currentTarget.style.background = "#1f1f1f";
+                              x.currentTarget.style.borderLeft = "4px solid #00c4ff";
                             }}
                             onMouseOut={(x) => {
-                              x.currentTarget.style.background = "#1a1a1a";
+                              x.currentTarget.style.background = "#151515";
                               x.currentTarget.style.borderLeft = "none";
                             }}
                           >
@@ -450,20 +428,15 @@ export default function Page() {
                               <h3
                                 style={{
                                   color: "#fff",
-                                  fontSize: "1.3rem",
+                                  fontSize: "1.25rem",
                                   fontWeight: 800,
                                   margin: 0,
                                   lineHeight: 1.25,
                                 }}
                                 dangerouslySetInnerHTML={{ __html: formatEventText(e.title) }}
                               />
-                              {e.time ? (
-                                <div style={{ color: "#9aa3ad", fontSize: ".9rem", marginTop: ".25rem" }}>
-                                  Doors: {e.time}
-                                </div>
-                              ) : null}
                               {e.location ? (
-                                <div style={{ color: "#6b7280", fontSize: ".86rem", marginTop: ".15rem" }}>
+                                <div style={{ color: "#9aa3ad", fontSize: ".9rem", marginTop: ".35rem" }}>
                                   📍 {e.location}
                                 </div>
                               ) : null}
@@ -471,11 +444,11 @@ export default function Page() {
 
                             <div
                               style={{
-                                background: "#0284c7",
-                                color: "#fff",
+                                background: "#00c4ff",
+                                color: "#000",
                                 padding: ".55rem 1.1rem",
                                 borderRadius: 6,
-                                fontWeight: 800,
+                                fontWeight: 900,
                                 fontSize: ".85rem",
                                 whiteSpace: "nowrap",
                                 textTransform: "uppercase",
@@ -492,8 +465,8 @@ export default function Page() {
                   {/* RIGHT: 350px sidebar */}
                   <aside
                     style={{
-                      background: "#1a1a1a",
-                      border: "2px solid #2b2b2b",
+                      background: "#121212",
+                      border: "2px solid #262626",
                       borderRadius: 12,
                       padding: "1.25rem",
                       alignSelf: "start",
@@ -502,41 +475,52 @@ export default function Page() {
                     {/* Just Announced */}
                     <div
                       style={{
-                        background: "#00d9ff",
+                        background: "linear-gradient(90deg,#00c4ff,#34dfff)",
                         color: "#000",
                         padding: ".65rem .75rem",
-                        borderRadius: 6,
+                        borderRadius: 8,
                         textAlign: "center",
                         fontWeight: 900,
                         letterSpacing: ".5px",
                         textTransform: "uppercase",
                         marginBottom: "1rem",
+                        boxShadow: "0 6px 20px rgba(0,196,255,.2)",
                       }}
                     >
                       Just Announced
                     </div>
 
                     <div style={{ display: "flex", flexDirection: "column", gap: ".85rem", marginBottom: "1.25rem" }}>
-                      {events.slice(0, 6).map((e) => {
+                      {events.slice(0, 6).map((e, idx) => {
                         const d = compactDate(e.date);
                         const tba = !e.date || e.date === "9999-12-31";
+                        const styles = [
+                          { bg: "#1e293b", border: "#334155" },
+                          { bg: "#1b1b1b", border: "#2b2b2b" },
+                          { bg: "#1f2937", border: "#334155" },
+                          { bg: "#1a1f2a", border: "#2e3a4a" },
+                          { bg: "#222222", border: "#333333" },
+                          { bg: "#202a36", border: "#314255" },
+                        ];
+                        const theme = styles[idx % styles.length];
                         return (
                           <Link key={e.id} href={`/events/event-detail/${e.id}`} style={{ textDecoration: "none" }}>
                             <div
                               style={{
-                                background: "#222",
-                                border: "1px solid #2b2b2b",
-                                borderRadius: 8,
+                                background: theme.bg,
+                                border: `1px solid ${theme.border}`,
+                                borderRadius: 10,
                                 padding: ".9rem",
-                                transition: "background .15s ease, border-color .15s ease",
+                                transition: "transform .15s ease, box-shadow .15s ease",
+                                boxShadow: "0 4px 16px rgba(0,0,0,.25)",
                               }}
                               onMouseOver={(x) => {
-                                x.currentTarget.style.background = "#2a2a2a";
-                                x.currentTarget.style.borderColor = "#0284c7";
+                                x.currentTarget.style.transform = "translateY(-2px)";
+                                x.currentTarget.style.boxShadow = "0 10px 28px rgba(0,196,255,.18)";
                               }}
                               onMouseOut={(x) => {
-                                x.currentTarget.style.background = "#222";
-                                x.currentTarget.style.borderColor = "#2b2b2b";
+                                x.currentTarget.style.transform = "translateY(0)";
+                                x.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,.25)";
                               }}
                             >
                               <h4
@@ -559,7 +543,7 @@ export default function Page() {
                     </div>
 
                     {/* Small box: Booking */}
-                    <div style={{ background: "#222", border: "1px solid #2b2b2b", borderRadius: 10, padding: "1rem", marginBottom: "1rem" }}>
+                    <div style={{ background: "#151515", border: "1px solid #2b2b2b", borderRadius: 10, padding: "1rem", marginBottom: "1rem" }}>
                       <h4 style={{ color: "#fff", margin: "0 0 .5rem", fontWeight: 800 }}>Book Dead Wax Dialogues</h4>
                       <a
                         href="https://calendly.com/deadwaxdialogues"
@@ -567,7 +551,7 @@ export default function Page() {
                         rel="noopener noreferrer"
                         style={{
                           display: "inline-block",
-                          background: "#00d9ff",
+                          background: "#00c4ff",
                           color: "#000",
                           padding: ".5rem .8rem",
                           borderRadius: 6,
@@ -581,7 +565,7 @@ export default function Page() {
 
                     {/* Small box: Latest DJ Mix */}
                     {latestSet && (
-                      <div style={{ background: "#222", border: "1px solid #2b2b2b", borderRadius: 10, padding: "1rem", marginBottom: "1rem" }}>
+                      <div style={{ background: "#0f172a", border: "1px solid #1f2a44", borderRadius: 10, padding: "1rem", marginBottom: "1rem" }}>
                         <h4 style={{ color: "#fff", margin: "0 0 .35rem", fontWeight: 800 }}>Latest DJ Mix</h4>
                         <div style={{ color: "#9ca3af", fontSize: ".9rem", marginBottom: ".6rem" }}>{latestSet.title}</div>
                         <div style={{ display: "flex", gap: ".5rem" }}>
@@ -606,14 +590,14 @@ export default function Page() {
                     )}
 
                     {/* Small box: Merch placeholder */}
-                    <div style={{ background: "#222", border: "1px solid #2b2b2b", borderRadius: 10, padding: "1rem" }}>
+                    <div style={{ background: "#1f1f1f", border: "1px solid #333", borderRadius: 10, padding: "1rem" }}>
                       <h4 style={{ color: "#fff", margin: "0 0 .5rem", fontWeight: 800 }}>Merch</h4>
                       <div style={{ color: "#9ca3af", fontSize: ".9rem", marginBottom: ".6rem" }}>
                         Shirts, stickers & more — coming soon.
                       </div>
                       <Link
                         href="/merch"
-                        style={{ display: "inline-block", background: "#0284c7", color: "#fff", padding: ".45rem .75rem", borderRadius: 6, textDecoration: "none", fontWeight: 800 }}
+                        style={{ display: "inline-block", background: "#00c4ff", color: "#000", padding: ".45rem .75rem", borderRadius: 6, textDecoration: "none", fontWeight: 800 }}
                       >
                         View Merch
                       </Link>
