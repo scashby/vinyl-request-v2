@@ -1,8 +1,5 @@
 // src/app/events/events-page/page.js
-// Events Page - 9:30 CLUB STYLE LAYOUT
-// 1. Featured events at top (1-2 events)
-// 2. 4-column grid of event cards (next 4-8 events)
-// 3. "Upcoming Shows" - VERTICAL LIST where each event is ONE FULL-WIDTH ROW
+// Events Page - Clean vertical layout matching 930.com / Roadrunner Boston
 
 "use client";
 
@@ -144,14 +141,13 @@ export default function Page() {
     );
   }
 
-  // Split events: 1-2 featured, 4-8 for grid, rest for vertical list
+  // Split events: first 2 featured, next 8 in grid, rest in vertical list
   const featuredEvents = events.slice(0, Math.min(2, events.length));
   const gridEvents = events.slice(Math.min(2, events.length), Math.min(10, events.length));
   const listEvents = events.slice(Math.min(10, events.length));
 
   return (
     <div className="page-wrapper">
-      {/* KEEP EXISTING HEADER */}
       <header className="event-hero">
         <div className="overlay">
           <h1>Upcoming Vinyl Nights</h1>
@@ -217,7 +213,7 @@ export default function Page() {
           </div>
         ) : (
           <>
-            {/* ========== NEW LAYOUT SECTION 1: FEATURED EVENTS ========== */}
+            {/* SECTION 1: Featured Events (1-2 large highlighted shows) */}
             {featuredEvents.length > 0 && (
               <section style={{
                 background: 'linear-gradient(180deg, #1a1a1a 0%, #000000 100%)',
@@ -330,9 +326,8 @@ export default function Page() {
                 </div>
               </section>
             )}
-            {/* ========== END NEW LAYOUT SECTION 1 ========== */}
 
-            {/* ========== NEW LAYOUT SECTION 2: 4-COLUMN GRID ========== */}
+            {/* SECTION 2: 4-Column Grid of Event Cards */}
             {gridEvents.length > 0 && (
               <section style={{
                 background: '#000',
@@ -422,9 +417,8 @@ export default function Page() {
                 </div>
               </section>
             )}
-            {/* ========== END NEW LAYOUT SECTION 2 ========== */}
 
-            {/* ========== NEW LAYOUT SECTION 3: VERTICAL LIST (NOT GRID - EACH EVENT IS ONE ROW) ========== */}
+            {/* SECTION 3: Upcoming Shows - VERTICAL LIST (each event is one full-width horizontal row) */}
             {listEvents.length > 0 && (
               <section style={{
                 background: '#111',
@@ -444,7 +438,7 @@ export default function Page() {
                     Upcoming Shows
                   </h2>
                   
-                  {/* THIS IS NOT A GRID - It's a vertical list where each event is a full-width horizontal row */}
+                  {/* Vertical list - each event spans full width as one row */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
                     {listEvents.map((event) => {
                       const imageSrc = event.image_url || "/images/placeholder.png";
@@ -457,7 +451,6 @@ export default function Page() {
                           href={`/events/event-detail/${event.id}`}
                           style={{ textDecoration: 'none' }}
                         >
-                          {/* Each event is ONE FULL-WIDTH ROW with date box, image, info, and button */}
                           <div style={{
                             display: 'grid',
                             gridTemplateColumns: '120px 180px 1fr auto',
@@ -584,11 +577,10 @@ export default function Page() {
                 </div>
               </section>
             )}
-            {/* ========== END NEW LAYOUT SECTION 3 ========== */}
           </>
         )}
 
-        {/* KEEP EXISTING DJ SETS SECTION */}
+        {/* DJ Sets Section */}
         {pastDJSets.length > 0 && (
           <section style={{
             background: '#f9fafb',
@@ -837,7 +829,7 @@ export default function Page() {
           </section>
         )}
 
-        {/* KEEP EXISTING BOOKING SECTION */}
+        {/* Booking Section */}
         {events.length > 0 && (
           <section style={{
             background: '#1f2937',
@@ -940,7 +932,6 @@ export default function Page() {
             </div>
           </section>
         )}
-        {/* KEEP EXISTING FOOTER */}
       </main>
     </div>
   );
