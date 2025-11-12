@@ -1,5 +1,8 @@
 // src/app/events/events-page/page.js
-// Events Page - Clean vertical layout matching 930.com / Roadrunner Boston
+// Events Page - 9:30 Club Layout
+// Section 1: "Up Next" - Featured events (1-2 large)
+// Section 2: 4-column grid of promoted/boosted shows
+// Section 3: "Upcoming Shows" - LEFT: vertical list | RIGHT: sidebar with "Just Announced"
 
 "use client";
 
@@ -141,7 +144,7 @@ export default function Page() {
     );
   }
 
-  // Split events: first 2 featured, next 8 in grid, rest in vertical list
+  // Split: 2 featured, 8 grid, rest in vertical list
   const featuredEvents = events.slice(0, Math.min(2, events.length));
   const gridEvents = events.slice(Math.min(2, events.length), Math.min(10, events.length));
   const listEvents = events.slice(Math.min(10, events.length));
@@ -213,7 +216,7 @@ export default function Page() {
           </div>
         ) : (
           <>
-            {/* SECTION 1: Featured Events (1-2 large highlighted shows) */}
+            {/* SECTION 1: "Up Next" - Featured Events */}
             {featuredEvents.length > 0 && (
               <section style={{
                 background: 'linear-gradient(180deg, #1a1a1a 0%, #000000 100%)',
@@ -327,7 +330,7 @@ export default function Page() {
               </section>
             )}
 
-            {/* SECTION 2: 4-Column Grid of Event Cards */}
+            {/* SECTION 2: 4-Column Grid of Promoted/Boosted Shows */}
             {gridEvents.length > 0 && (
               <section style={{
                 background: '#000',
@@ -418,14 +421,14 @@ export default function Page() {
               </section>
             )}
 
-            {/* SECTION 3: Upcoming Shows - VERTICAL LIST (each event is one full-width horizontal row) */}
+            {/* SECTION 3: "Upcoming Shows" - TWO COLUMN LAYOUT */}
             {listEvents.length > 0 && (
               <section style={{
                 background: '#111',
                 padding: '3rem 2rem',
                 borderTop: '3px solid #0284c7'
               }}>
-                <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+                <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
                   <h2 style={{
                     color: '#fff',
                     fontSize: '2.5rem',
@@ -438,141 +441,226 @@ export default function Page() {
                     Upcoming Shows
                   </h2>
                   
-                  {/* Vertical list - each event spans full width as one row */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
-                    {listEvents.map((event) => {
-                      const imageSrc = event.image_url || "/images/placeholder.png";
-                      const dateInfo = formatCompactDate(event.date);
-                      const isTBA = !event.date || event.date === '' || event.date === '9999-12-31';
-                      
-                      return (
-                        <Link
-                          key={event.id}
-                          href={`/events/event-detail/${event.id}`}
-                          style={{ textDecoration: 'none' }}
-                        >
-                          <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: '120px 180px 1fr auto',
-                            gap: '1.5rem',
-                            padding: '1.5rem',
-                            background: '#1a1a1a',
-                            borderBottom: '1px solid #333',
-                            transition: 'all 0.2s ease',
-                            cursor: 'pointer',
-                            alignItems: 'center'
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.background = '#222';
-                            e.currentTarget.style.borderColor = '#0284c7';
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.background = '#1a1a1a';
-                            e.currentTarget.style.borderColor = '#333';
-                          }}>
-                            {/* Date Box */}
+                  {/* TWO COLUMN LAYOUT: Left = vertical list | Right = sidebar */}
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 350px',
+                    gap: '3rem'
+                  }}>
+                    {/* LEFT COLUMN: Vertical List of Events */}
+                    <div>
+                      {listEvents.map((event) => {
+                        const imageSrc = event.image_url || "/images/placeholder.png";
+                        const dateInfo = formatCompactDate(event.date);
+                        const isTBA = !event.date || event.date === '' || event.date === '9999-12-31';
+                        
+                        return (
+                          <Link
+                            key={event.id}
+                            href={`/events/event-detail/${event.id}`}
+                            style={{ textDecoration: 'none', display: 'block' }}
+                          >
                             <div style={{
-                              background: '#000',
-                              border: '2px solid #0284c7',
-                              borderRadius: '8px',
-                              padding: '1rem',
-                              textAlign: 'center',
-                              minWidth: '120px'
+                              display: 'grid',
+                              gridTemplateColumns: '100px 150px 1fr auto',
+                              gap: '1.25rem',
+                              padding: '1.25rem',
+                              background: '#1a1a1a',
+                              borderBottom: '1px solid #333',
+                              transition: 'all 0.2s ease',
+                              cursor: 'pointer',
+                              alignItems: 'center'
+                            }}
+                            onMouseOver={(e) => {
+                              e.currentTarget.style.background = '#222';
+                              e.currentTarget.style.borderLeftColor = '#0284c7';
+                              e.currentTarget.style.borderLeftWidth = '4px';
+                              e.currentTarget.style.borderLeftStyle = 'solid';
+                            }}
+                            onMouseOut={(e) => {
+                              e.currentTarget.style.background = '#1a1a1a';
+                              e.currentTarget.style.borderLeft = 'none';
                             }}>
+                              {/* Date Box */}
                               <div style={{
-                                color: '#0284c7',
-                                fontSize: '0.85rem',
-                                fontWeight: 'bold',
-                                marginBottom: '0.25rem'
+                                background: '#000',
+                                border: '2px solid #0284c7',
+                                borderRadius: '8px',
+                                padding: '0.75rem',
+                                textAlign: 'center',
+                                minWidth: '100px'
                               }}>
-                                {isTBA ? 'TBA' : dateInfo.weekday}
+                                <div style={{
+                                  color: '#0284c7',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 'bold',
+                                  marginBottom: '0.2rem'
+                                }}>
+                                  {isTBA ? 'TBA' : dateInfo.weekday}
+                                </div>
+                                <div style={{
+                                  color: '#fff',
+                                  fontSize: '1.75rem',
+                                  fontWeight: 'bold',
+                                  lineHeight: '1'
+                                }}>
+                                  {isTBA ? '' : dateInfo.day}
+                                </div>
+                                <div style={{
+                                  color: '#0284c7',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 'bold',
+                                  marginTop: '0.2rem'
+                                }}>
+                                  {isTBA ? '' : dateInfo.month}
+                                </div>
                               </div>
+                              
+                              {/* Event Image */}
                               <div style={{
+                                position: 'relative',
+                                width: '150px',
+                                height: '150px',
+                                borderRadius: '6px',
+                                overflow: 'hidden',
+                                flexShrink: 0
+                              }}>
+                                <Image
+                                  src={imageSrc}
+                                  alt={event.title}
+                                  fill
+                                  style={{ objectFit: 'cover' }}
+                                  sizes="150px"
+                                  unoptimized
+                                />
+                              </div>
+                              
+                              {/* Event Info */}
+                              <div style={{ minWidth: 0 }}>
+                                <h3 style={{
+                                  color: '#fff',
+                                  fontSize: '1.35rem',
+                                  fontWeight: 'bold',
+                                  marginBottom: '0.4rem',
+                                  lineHeight: '1.3'
+                                }}
+                                dangerouslySetInnerHTML={{ __html: formatEventText(event.title) }}
+                                />
+                                
+                                {event.time && (
+                                  <div style={{
+                                    color: '#94a3b8',
+                                    fontSize: '0.9rem',
+                                    marginBottom: '0.2rem'
+                                  }}>
+                                    Doors: {event.time}
+                                  </div>
+                                )}
+                                
+                                {event.location && (
+                                  <div style={{
+                                    color: '#6b7280',
+                                    fontSize: '0.85rem'
+                                  }}>
+                                    📍 {event.location}
+                                  </div>
+                                )}
+                              </div>
+                              
+                              {/* More Info Button */}
+                              <div style={{
+                                background: '#0284c7',
                                 color: '#fff',
-                                fontSize: '2rem',
+                                padding: '0.65rem 1.25rem',
+                                borderRadius: '6px',
                                 fontWeight: 'bold',
-                                lineHeight: '1'
-                              }}>
-                                {isTBA ? '' : dateInfo.day}
-                              </div>
-                              <div style={{
-                                color: '#0284c7',
                                 fontSize: '0.85rem',
-                                fontWeight: 'bold',
-                                marginTop: '0.25rem'
+                                whiteSpace: 'nowrap',
+                                textTransform: 'uppercase'
                               }}>
-                                {isTBA ? '' : dateInfo.month}
+                                More Info
                               </div>
                             </div>
-                            
-                            {/* Event Image */}
-                            <div style={{
-                              position: 'relative',
-                              width: '180px',
-                              height: '180px',
-                              borderRadius: '6px',
-                              overflow: 'hidden',
-                              flexShrink: 0
-                            }}>
-                              <Image
-                                src={imageSrc}
-                                alt={event.title}
-                                fill
-                                style={{ objectFit: 'cover' }}
-                                sizes="180px"
-                                unoptimized
-                              />
-                            </div>
-                            
-                            {/* Event Info */}
-                            <div style={{ minWidth: 0 }}>
-                              <h3 style={{
-                                color: '#fff',
-                                fontSize: '1.5rem',
-                                fontWeight: 'bold',
-                                marginBottom: '0.5rem',
-                                lineHeight: '1.3'
+                          </Link>
+                        );
+                      })}
+                    </div>
+
+                    {/* RIGHT COLUMN: Sidebar for "Just Announced" or other content */}
+                    <aside style={{
+                      background: '#1a1a1a',
+                      borderRadius: '12px',
+                      padding: '2rem',
+                      border: '2px solid #333',
+                      alignSelf: 'start',
+                      position: 'sticky',
+                      top: '2rem'
+                    }}>
+                      <div style={{
+                        background: '#00d9ff',
+                        color: '#000',
+                        padding: '0.75rem',
+                        borderRadius: '6px',
+                        textAlign: 'center',
+                        fontWeight: 'bold',
+                        fontSize: '1rem',
+                        marginBottom: '1.5rem',
+                        textTransform: 'uppercase',
+                        letterSpacing: '1px'
+                      }}>
+                        Just Announced
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                        {/* Show upcoming events as simple list */}
+                        {events.slice(0, 5).map((event) => {
+                          const dateInfo = formatCompactDate(event.date);
+                          const isTBA = !event.date || event.date === '' || event.date === '9999-12-31';
+                          
+                          return (
+                            <Link
+                              key={event.id}
+                              href={`/events/event-detail/${event.id}`}
+                              style={{ textDecoration: 'none' }}
+                            >
+                              <div style={{
+                                background: '#222',
+                                padding: '1rem',
+                                borderRadius: '8px',
+                                transition: 'all 0.2s ease',
+                                cursor: 'pointer',
+                                border: '1px solid #333'
                               }}
-                              dangerouslySetInnerHTML={{ __html: formatEventText(event.title) }}
-                              />
-                              
-                              {event.time && (
+                              onMouseOver={(e) => {
+                                e.currentTarget.style.background = '#2a2a2a';
+                                e.currentTarget.style.borderColor = '#0284c7';
+                              }}
+                              onMouseOut={(e) => {
+                                e.currentTarget.style.background = '#222';
+                                e.currentTarget.style.borderColor = '#333';
+                              }}>
+                                <h4 style={{
+                                  color: '#fff',
+                                  fontSize: '1rem',
+                                  fontWeight: 'bold',
+                                  marginBottom: '0.5rem',
+                                  lineHeight: '1.3'
+                                }}
+                                dangerouslySetInnerHTML={{ __html: formatEventText(event.title) }}
+                                />
                                 <div style={{
-                                  color: '#94a3b8',
-                                  fontSize: '0.95rem',
-                                  marginBottom: '0.25rem'
+                                  color: '#0284c7',
+                                  fontSize: '0.85rem',
+                                  fontWeight: 'bold'
                                 }}>
-                                  Doors: {event.time}
+                                  {isTBA ? 'TBA' : `${dateInfo.weekday}, ${dateInfo.month} ${dateInfo.day}`}
                                 </div>
-                              )}
-                              
-                              {event.location && (
-                                <div style={{
-                                  color: '#6b7280',
-                                  fontSize: '0.9rem'
-                                }}>
-                                  📍 {event.location}
-                                </div>
-                              )}
-                            </div>
-                            
-                            {/* More Info Button */}
-                            <div style={{
-                              background: '#0284c7',
-                              color: '#fff',
-                              padding: '0.75rem 1.5rem',
-                              borderRadius: '6px',
-                              fontWeight: 'bold',
-                              fontSize: '0.9rem',
-                              whiteSpace: 'nowrap',
-                              textTransform: 'uppercase'
-                            }}>
-                              More Info
-                            </div>
-                          </div>
-                        </Link>
-                      );
-                    })}
+                              </div>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    </aside>
                   </div>
                 </div>
               </section>
@@ -580,7 +668,7 @@ export default function Page() {
           </>
         )}
 
-        {/* DJ Sets Section */}
+        {/* DJ Sets - unchanged */}
         {pastDJSets.length > 0 && (
           <section style={{
             background: '#f9fafb',
@@ -829,7 +917,7 @@ export default function Page() {
           </section>
         )}
 
-        {/* Booking Section */}
+        {/* Booking Section - unchanged */}
         {events.length > 0 && (
           <section style={{
             background: '#1f2937',
