@@ -154,7 +154,7 @@ export default function Page() {
         </div>
       </header>
       
-      <main className="event-body" style={{ padding: '0', background: '#000' }}>
+      <main className="event-body" style={{ padding: '0' }}>
         {events.length === 0 ? (
           <div style={{ 
             padding: '4rem 2rem', 
@@ -461,7 +461,8 @@ export default function Page() {
           </>
         )}
 
-        {/* DJ Sets Section */}
+
+        {/* DJ Sets Section - Full Width */}
         {pastDJSets.length > 0 && (
           <section style={{
             background: '#f9fafb',
@@ -710,7 +711,7 @@ export default function Page() {
           </section>
         )}
 
-        {/* Booking Section */}
+        {/* Booking Section - Full Width */}
         {events.length > 0 && (
           <section style={{
             background: '#1f2937',
