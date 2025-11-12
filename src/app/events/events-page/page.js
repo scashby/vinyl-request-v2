@@ -1,5 +1,8 @@
 // src/app/events/events-page/page.js
-// Events Page - Clean vertical layout matching 930.com / Roadrunner Boston
+// Events Page - 9:30 CLUB STYLE LAYOUT
+// 1. Featured events at top (1-2 events)
+// 2. 4-column grid of event cards (next 4-8 events)
+// 3. "Upcoming Shows" - VERTICAL LIST where each event is ONE FULL-WIDTH ROW
 
 "use client";
 
@@ -100,7 +103,7 @@ export default function Page() {
     return {
       month: date.toLocaleDateString('en-US', { month: 'short' }).toUpperCase(),
       day: date.getDate(),
-      weekday: date.toLocaleDateString('en-US', { weekday: 'short' })
+      weekday: date.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase()
     };
   };
 
@@ -141,12 +144,14 @@ export default function Page() {
     );
   }
 
-  // Split events into featured (first 3) and remaining
-  const featuredEvents = events.slice(0, Math.min(3, events.length));
-  const remainingEvents = events.slice(Math.min(3, events.length));
+  // Split events: 1-2 featured, 4-8 for grid, rest for vertical list
+  const featuredEvents = events.slice(0, Math.min(2, events.length));
+  const gridEvents = events.slice(Math.min(2, events.length), Math.min(10, events.length));
+  const listEvents = events.slice(Math.min(10, events.length));
 
   return (
     <div className="page-wrapper">
+      {/* KEEP EXISTING HEADER */}
       <header className="event-hero">
         <div className="overlay">
           <h1>Upcoming Vinyl Nights</h1>
@@ -212,18 +217,28 @@ export default function Page() {
           </div>
         ) : (
           <>
-            {/* SECTION 1: Featured Events - Full Width */}
+            {/* ========== NEW LAYOUT SECTION 1: FEATURED EVENTS ========== */}
             {featuredEvents.length > 0 && (
               <section style={{
-                background: 'linear-gradient(180deg, #000000 0%, #1a1a1a 100%)',
-                padding: '3rem 2rem 4rem',
-                borderBottom: '3px solid #333'
+                background: 'linear-gradient(180deg, #1a1a1a 0%, #000000 100%)',
+                padding: '3rem 2rem',
+                borderBottom: '3px solid #0284c7'
               }}>
                 <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
+                  <h2 style={{
+                    color: '#fff',
+                    fontSize: '2.5rem',
+                    fontWeight: 'bold',
+                    marginBottom: '2rem',
+                    textAlign: 'center'
+                  }}>
+                    Up Next
+                  </h2>
+                  
                   <div style={{
                     display: 'grid',
-                    gridTemplateColumns: featuredEvents.length === 1 ? '1fr' : 'repeat(auto-fit, minmax(350px, 1fr))',
-                    gap: '2.5rem'
+                    gridTemplateColumns: featuredEvents.length === 1 ? '1fr' : 'repeat(2, 1fr)',
+                    gap: '2rem'
                   }}>
                     {featuredEvents.map((event) => {
                       const imageSrc = event.image_url || "/images/placeholder.png";
@@ -242,59 +257,57 @@ export default function Page() {
                             overflow: 'hidden',
                             transition: 'all 0.3s ease',
                             cursor: 'pointer',
-                            border: '2px solid #444',
+                            border: '3px solid #0284c7',
                             height: '100%'
                           }}
                           onMouseOver={(e) => {
                             e.currentTarget.style.transform = 'translateY(-8px)';
-                            e.currentTarget.style.boxShadow = '0 12px 30px rgba(2, 132, 199, 0.4)';
-                            e.currentTarget.style.borderColor = '#0284c7';
+                            e.currentTarget.style.boxShadow = '0 15px 40px rgba(2, 132, 199, 0.5)';
                           }}
                           onMouseOut={(e) => {
                             e.currentTarget.style.transform = 'translateY(0)';
                             e.currentTarget.style.boxShadow = 'none';
-                            e.currentTarget.style.borderColor = '#444';
                           }}>
-                            <div style={{ position: 'relative', width: '100%', paddingTop: '100%' }}>
+                            <div style={{ position: 'relative', width: '100%', paddingTop: '75%' }}>
                               <Image
                                 src={imageSrc}
                                 alt={event.title}
                                 fill
                                 style={{ objectFit: 'cover' }}
-                                sizes="(max-width: 768px) 100vw, 500px"
+                                sizes="(max-width: 768px) 100vw, 700px"
                                 unoptimized
                               />
                             </div>
                             
-                            <div style={{ padding: '1.5rem' }}>
+                            <div style={{ padding: '2rem' }}>
                               <div style={{
                                 background: isTBA ? '#6b7280' : '#0284c7',
                                 color: '#fff',
-                                padding: '0.75rem',
+                                padding: '1rem',
                                 borderRadius: '8px',
-                                marginBottom: '1rem',
+                                marginBottom: '1.5rem',
                                 textAlign: 'center'
                               }}>
                                 <div style={{
-                                  fontSize: '1.5rem',
+                                  fontSize: '2rem',
                                   fontWeight: 'bold',
-                                  marginBottom: '0.25rem'
+                                  marginBottom: '0.5rem'
                                 }}>
-                                  {isTBA ? 'TBA' : `${dateInfo.month} ${dateInfo.day}`}
+                                  {isTBA ? 'TBA' : `${dateInfo.weekday} ${dateInfo.month} ${dateInfo.day}`}
                                 </div>
                                 {!isTBA && event.time && (
-                                  <div style={{ fontSize: '1rem', opacity: 0.9 }}>
-                                    {event.time}
+                                  <div style={{ fontSize: '1.2rem', opacity: 0.9 }}>
+                                    Doors: {event.time}
                                   </div>
                                 )}
                               </div>
                               
                               <h3 style={{
                                 color: '#fff',
-                                fontSize: '1.5rem',
+                                fontSize: '2rem',
                                 fontWeight: 'bold',
-                                marginBottom: '0.75rem',
-                                lineHeight: '1.3'
+                                marginBottom: '1rem',
+                                lineHeight: '1.2'
                               }}
                               dangerouslySetInnerHTML={{ __html: formatEventText(event.title) }}
                               />
@@ -302,27 +315,12 @@ export default function Page() {
                               {event.location && (
                                 <div style={{
                                   color: '#94a3b8',
-                                  fontSize: '0.95rem',
-                                  marginBottom: '0.5rem',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '0.5rem'
+                                  fontSize: '1.1rem',
+                                  marginBottom: '1rem'
                                 }}>
                                   📍 {event.location}
                                 </div>
                               )}
-                              
-                              <div style={{
-                                marginTop: '1rem',
-                                padding: '0.75rem',
-                                background: '#0284c7',
-                                color: '#fff',
-                                textAlign: 'center',
-                                borderRadius: '6px',
-                                fontWeight: '600'
-                              }}>
-                                View Details →
-                              </div>
                             </div>
                           </div>
                         </Link>
@@ -332,29 +330,123 @@ export default function Page() {
                 </div>
               </section>
             )}
+            {/* ========== END NEW LAYOUT SECTION 1 ========== */}
 
-            {/* SECTION 2: Remaining Events - Simple Vertical List */}
-            {remainingEvents.length > 0 && (
+            {/* ========== NEW LAYOUT SECTION 2: 4-COLUMN GRID ========== */}
+            {gridEvents.length > 0 && (
               <section style={{
-                background: '#fff',
-                padding: '3rem 2rem'
+                background: '#000',
+                padding: '3rem 2rem',
+                borderBottom: '2px solid #333'
+              }}>
+                <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                    gap: '2rem'
+                  }}>
+                    {gridEvents.map((event) => {
+                      const imageSrc = event.image_url || "/images/placeholder.png";
+                      const dateInfo = formatCompactDate(event.date);
+                      const isTBA = !event.date || event.date === '' || event.date === '9999-12-31';
+                      
+                      return (
+                        <Link 
+                          key={event.id} 
+                          href={`/events/event-detail/${event.id}`}
+                          style={{ textDecoration: 'none' }}
+                        >
+                          <div style={{
+                            background: '#1a1a1a',
+                            borderRadius: '8px',
+                            overflow: 'hidden',
+                            transition: 'all 0.3s ease',
+                            cursor: 'pointer',
+                            border: '2px solid #333',
+                            height: '100%'
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-4px)';
+                            e.currentTarget.style.borderColor = '#0284c7';
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.borderColor = '#333';
+                          }}>
+                            <div style={{ position: 'relative', width: '100%', paddingTop: '100%' }}>
+                              <Image
+                                src={imageSrc}
+                                alt={event.title}
+                                fill
+                                style={{ objectFit: 'cover' }}
+                                sizes="300px"
+                                unoptimized
+                              />
+                            </div>
+                            
+                            <div style={{ padding: '1.25rem' }}>
+                              <h4 style={{
+                                color: '#fff',
+                                fontSize: '1.2rem',
+                                fontWeight: 'bold',
+                                marginBottom: '0.75rem',
+                                lineHeight: '1.3',
+                                minHeight: '2.6rem'
+                              }}
+                              dangerouslySetInnerHTML={{ __html: formatEventText(event.title) }}
+                              />
+                              
+                              <div style={{
+                                color: '#0284c7',
+                                fontSize: '0.95rem',
+                                fontWeight: 'bold',
+                                marginBottom: '0.5rem'
+                              }}>
+                                {isTBA ? 'TBA' : `${dateInfo.month} ${dateInfo.day}`}
+                              </div>
+                              
+                              {event.time && (
+                                <div style={{
+                                  color: '#94a3b8',
+                                  fontSize: '0.85rem'
+                                }}>
+                                  Doors: {event.time}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              </section>
+            )}
+            {/* ========== END NEW LAYOUT SECTION 2 ========== */}
+
+            {/* ========== NEW LAYOUT SECTION 3: VERTICAL LIST (NOT GRID - EACH EVENT IS ONE ROW) ========== */}
+            {listEvents.length > 0 && (
+              <section style={{
+                background: '#111',
+                padding: '3rem 2rem',
+                borderTop: '3px solid #0284c7'
               }}>
                 <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
                   <h2 style={{
-                    fontSize: '1.75rem',
-                    marginBottom: '2rem',
-                    color: '#1f2937',
-                    fontWeight: 'bold'
+                    color: '#fff',
+                    fontSize: '2.5rem',
+                    fontWeight: 'bold',
+                    marginBottom: '2.5rem',
+                    textAlign: 'center',
+                    textTransform: 'uppercase',
+                    letterSpacing: '2px'
                   }}>
-                    All Upcoming Events
+                    Upcoming Shows
                   </h2>
                   
-                  <div style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '1rem'
-                  }}>
-                    {remainingEvents.map((event) => {
+                  {/* THIS IS NOT A GRID - It's a vertical list where each event is a full-width horizontal row */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
+                    {listEvents.map((event) => {
                       const imageSrc = event.image_url || "/images/placeholder.png";
                       const dateInfo = formatCompactDate(event.date);
                       const isTBA = !event.date || event.date === '' || event.date === '9999-12-31';
@@ -365,33 +457,67 @@ export default function Page() {
                           href={`/events/event-detail/${event.id}`}
                           style={{ textDecoration: 'none' }}
                         >
+                          {/* Each event is ONE FULL-WIDTH ROW with date box, image, info, and button */}
                           <div style={{
                             display: 'grid',
-                            gridTemplateColumns: '120px 1fr',
+                            gridTemplateColumns: '120px 180px 1fr auto',
                             gap: '1.5rem',
-                            padding: '1rem',
-                            background: '#f9fafb',
-                            border: '2px solid #e5e7eb',
-                            borderRadius: '8px',
+                            padding: '1.5rem',
+                            background: '#1a1a1a',
+                            borderBottom: '1px solid #333',
                             transition: 'all 0.2s ease',
                             cursor: 'pointer',
                             alignItems: 'center'
                           }}
                           onMouseOver={(e) => {
-                            e.currentTarget.style.background = '#f0f9ff';
+                            e.currentTarget.style.background = '#222';
                             e.currentTarget.style.borderColor = '#0284c7';
-                            e.currentTarget.style.transform = 'translateX(4px)';
                           }}
                           onMouseOut={(e) => {
-                            e.currentTarget.style.background = '#f9fafb';
-                            e.currentTarget.style.borderColor = '#e5e7eb';
-                            e.currentTarget.style.transform = 'translateX(0)';
+                            e.currentTarget.style.background = '#1a1a1a';
+                            e.currentTarget.style.borderColor = '#333';
                           }}>
+                            {/* Date Box */}
+                            <div style={{
+                              background: '#000',
+                              border: '2px solid #0284c7',
+                              borderRadius: '8px',
+                              padding: '1rem',
+                              textAlign: 'center',
+                              minWidth: '120px'
+                            }}>
+                              <div style={{
+                                color: '#0284c7',
+                                fontSize: '0.85rem',
+                                fontWeight: 'bold',
+                                marginBottom: '0.25rem'
+                              }}>
+                                {isTBA ? 'TBA' : dateInfo.weekday}
+                              </div>
+                              <div style={{
+                                color: '#fff',
+                                fontSize: '2rem',
+                                fontWeight: 'bold',
+                                lineHeight: '1'
+                              }}>
+                                {isTBA ? '' : dateInfo.day}
+                              </div>
+                              <div style={{
+                                color: '#0284c7',
+                                fontSize: '0.85rem',
+                                fontWeight: 'bold',
+                                marginTop: '0.25rem'
+                              }}>
+                                {isTBA ? '' : dateInfo.month}
+                              </div>
+                            </div>
+                            
+                            {/* Event Image */}
                             <div style={{
                               position: 'relative',
-                              width: '120px',
-                              height: '120px',
-                              borderRadius: '8px',
+                              width: '180px',
+                              height: '180px',
+                              borderRadius: '6px',
                               overflow: 'hidden',
                               flexShrink: 0
                             }}>
@@ -400,54 +526,55 @@ export default function Page() {
                                 alt={event.title}
                                 fill
                                 style={{ objectFit: 'cover' }}
-                                sizes="120px"
+                                sizes="180px"
                                 unoptimized
                               />
                             </div>
                             
+                            {/* Event Info */}
                             <div style={{ minWidth: 0 }}>
-                              <div style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '1rem',
-                                marginBottom: '0.5rem',
-                                flexWrap: 'wrap'
-                              }}>
-                                <div style={{
-                                  background: isTBA ? '#6b7280' : '#0284c7',
-                                  color: '#fff',
-                                  padding: '0.5rem 1rem',
-                                  borderRadius: '6px',
-                                  fontWeight: 'bold',
-                                  fontSize: '0.9rem',
-                                  whiteSpace: 'nowrap'
-                                }}>
-                                  {isTBA ? 'TBA' : `${dateInfo.month} ${dateInfo.day}`}
-                                  {!isTBA && event.time && ` • ${event.time}`}
-                                </div>
-                                
-                                {event.location && (
-                                  <div style={{
-                                    color: '#6b7280',
-                                    fontSize: '0.9rem',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '0.25rem'
-                                  }}>
-                                    📍 {event.location}
-                                  </div>
-                                )}
-                              </div>
-                              
                               <h3 style={{
-                                color: '#1f2937',
-                                fontSize: '1.25rem',
+                                color: '#fff',
+                                fontSize: '1.5rem',
                                 fontWeight: 'bold',
-                                marginBottom: '0.25rem',
+                                marginBottom: '0.5rem',
                                 lineHeight: '1.3'
                               }}
                               dangerouslySetInnerHTML={{ __html: formatEventText(event.title) }}
                               />
+                              
+                              {event.time && (
+                                <div style={{
+                                  color: '#94a3b8',
+                                  fontSize: '0.95rem',
+                                  marginBottom: '0.25rem'
+                                }}>
+                                  Doors: {event.time}
+                                </div>
+                              )}
+                              
+                              {event.location && (
+                                <div style={{
+                                  color: '#6b7280',
+                                  fontSize: '0.9rem'
+                                }}>
+                                  📍 {event.location}
+                                </div>
+                              )}
+                            </div>
+                            
+                            {/* More Info Button */}
+                            <div style={{
+                              background: '#0284c7',
+                              color: '#fff',
+                              padding: '0.75rem 1.5rem',
+                              borderRadius: '6px',
+                              fontWeight: 'bold',
+                              fontSize: '0.9rem',
+                              whiteSpace: 'nowrap',
+                              textTransform: 'uppercase'
+                            }}>
+                              More Info
                             </div>
                           </div>
                         </Link>
@@ -457,10 +584,11 @@ export default function Page() {
                 </div>
               </section>
             )}
+            {/* ========== END NEW LAYOUT SECTION 3 ========== */}
           </>
         )}
 
-        {/* SECTION 3: DJ Sets - Full Width */}
+        {/* KEEP EXISTING DJ SETS SECTION */}
         {pastDJSets.length > 0 && (
           <section style={{
             background: '#f9fafb',
@@ -709,7 +837,7 @@ export default function Page() {
           </section>
         )}
 
-        {/* SECTION 4: Booking - Full Width */}
+        {/* KEEP EXISTING BOOKING SECTION */}
         {events.length > 0 && (
           <section style={{
             background: '#1f2937',
@@ -812,6 +940,7 @@ export default function Page() {
             </div>
           </section>
         )}
+        {/* KEEP EXISTING FOOTER */}
       </main>
     </div>
   );
