@@ -974,7 +974,7 @@ function Thousand1AlbumsTab() {
                     ? "2px solid #fbbf24"
                     : "1px solid #e5e7eb",
                   borderRadius: 8,
-                  overflow: "hidden",
+                  overflow: "visible",
                 }}
               >
                 {/* Main Row */}
