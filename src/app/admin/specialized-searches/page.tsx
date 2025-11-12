@@ -1006,7 +1006,7 @@ function Thousand1AlbumsTab() {
                       >
                         <div style={{ fontSize: 10, fontWeight: 900, color: '#ffffff' }}>1001</div>
                       </div>
-                      <div style={{ fontWeight: 700, fontSize: 14, color: "#111827", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <div style={{ fontWeight: 700, fontSize: 14, color: "#111827", overflow: "visible", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {album.artist} — {album.album}
                       </div>
                       {isUnmatched && (
@@ -1043,7 +1043,7 @@ function Thousand1AlbumsTab() {
                         <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 6 }}>
                           Search your collection to link:
                         </label>
-                        <div style={{ position: "relative", zIndex: 1 }}>
+                        <div style={{ position: "relative", zIndex: 10000 }}>
                           <input
                             value={searchInputs[album.id] ?? ""}
                             onChange={(e) => handleSearchInput(album.id, e.target.value)}
@@ -1082,7 +1082,7 @@ function Thousand1AlbumsTab() {
                                 borderRadius: 6,
                                 color: "#6b7280",
                                 fontSize: 13,
-                                zIndex: 9999,
+                                zIndex: 99999,
                               }}
                             >
                               Searching...
@@ -1102,7 +1102,7 @@ function Thousand1AlbumsTab() {
                                 boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)",
                                 maxHeight: 300,
                                 overflowY: "auto",
-                                zIndex: 9999,
+                                zIndex: 99999,
                               }}
                             >
                               {searchResults[album.id].map((result) => (
@@ -1142,7 +1142,7 @@ function Thousand1AlbumsTab() {
                                         fontWeight: 700,
                                         fontSize: 13,
                                         color: "#111827",
-                                        overflow: "hidden",
+                                        overflow: "visible",
                                         textOverflow: "ellipsis",
                                         whiteSpace: "nowrap",
                                       }}
@@ -1153,7 +1153,7 @@ function Thousand1AlbumsTab() {
                                       style={{
                                         fontSize: 12,
                                         color: "#6b7280",
-                                        overflow: "hidden",
+                                        overflow: "visible",
                                         textOverflow: "ellipsis",
                                         whiteSpace: "nowrap",
                                       }}
@@ -1185,7 +1185,7 @@ function Thousand1AlbumsTab() {
                                   borderRadius: 6,
                                   color: "#991b1b",
                                   fontSize: 13,
-                                  zIndex: 9999,
+                                  zIndex: 99999,
                                 }}
                               >
                                 No matches found. Try different search terms.
@@ -1233,7 +1233,7 @@ function Thousand1AlbumsTab() {
                                       fontWeight: 700,
                                       fontSize: 14,
                                       color: "#111827",
-                                      overflow: "hidden",
+                                      overflow: "visible",
                                       textOverflow: "ellipsis",
                                       whiteSpace: "nowrap",
                                     }}
