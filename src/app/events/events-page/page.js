@@ -1,6 +1,5 @@
 // src/app/events/events-page/page.js
-// Events Page with featured events and compact organized list
-// Replace: src/app/events/events-page/page.js
+// Events Page - Clean vertical layout matching 930.com / Roadrunner Boston
 
 "use client";
 
@@ -154,7 +153,7 @@ export default function Page() {
         </div>
       </header>
       
-      <main className="event-body" style={{ padding: '0' }}>
+      <main className="event-body" style={{ padding: 0 }}>
         {events.length === 0 ? (
           <div style={{ 
             padding: '4rem 2rem', 
@@ -213,7 +212,7 @@ export default function Page() {
           </div>
         ) : (
           <>
-            {/* Featured Events Section */}
+            {/* SECTION 1: Featured Events - Full Width */}
             {featuredEvents.length > 0 && (
               <section style={{
                 background: 'linear-gradient(180deg, #000000 0%, #1a1a1a 100%)',
@@ -334,7 +333,7 @@ export default function Page() {
               </section>
             )}
 
-            {/* Remaining Events - Compact List */}
+            {/* SECTION 2: Remaining Events - Simple Vertical List */}
             {remainingEvents.length > 0 && (
               <section style={{
                 background: '#fff',
@@ -461,8 +460,7 @@ export default function Page() {
           </>
         )}
 
-
-        {/* DJ Sets Section - Full Width */}
+        {/* SECTION 3: DJ Sets - Full Width */}
         {pastDJSets.length > 0 && (
           <section style={{
             background: '#f9fafb',
@@ -711,7 +709,7 @@ export default function Page() {
           </section>
         )}
 
-        {/* Booking Section - Full Width */}
+        {/* SECTION 4: Booking - Full Width */}
         {events.length > 0 && (
           <section style={{
             background: '#1f2937',
