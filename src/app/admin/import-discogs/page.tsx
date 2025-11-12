@@ -764,30 +764,29 @@ export default function ImportDiscogsPage() {
         
         try {
           if (!dryRun) {
+            // Run exact matching
             const { data: exactCount, error: exactError } = await supabase.rpc('match_1001_exact');
-            if (!exactError) {
-              setStatus(`Found ${exactCount || 0} exact 1001 matches...`);
-            }
+            if (exactError) console.error('Exact matching error:', exactError);
             
             await delay(1000);
             
+            // Run fuzzy matching with more lenient parameters
             const { data: fuzzyCount, error: fuzzyError } = await supabase.rpc('match_1001_fuzzy', {
-              threshold: 0.7,
-              year_slop: 1
+              threshold: 0.5,  // More lenient - was 0.7
+              year_slop: 50    // Allow reissues - was 1
             });
-            if (!fuzzyError) {
-              setStatus(`Found ${fuzzyCount || 0} fuzzy 1001 matches...`);
-            }
+            if (fuzzyError) console.error('Fuzzy matching error:', fuzzyError);
             
             await delay(1000);
             
+            // Run same-artist matching with more lenient parameters
             const { data: sameArtistCount, error: sameArtistError } = await supabase.rpc('match_1001_same_artist', {
-              threshold: 0.6,
-              year_slop: 1
+              threshold: 0.4,  // More lenient - was 0.6
+              year_slop: 50    // Allow reissues - was 1
             });
-            if (!sameArtistError) {
-              setStatus(`Found ${sameArtistCount || 0} same-artist 1001 matches...`);
-            }
+            if (sameArtistError) console.error('Same-artist matching error:', sameArtistError);
+            
+            await delay(1000);
             
             // Fetch the matched albums to display
             const { data: matchedAlbums, error: matchedError } = await supabase
@@ -803,11 +802,14 @@ export default function ImportDiscogsPage() {
                 year: album.year || 0
               }));
             }
+            
+            const totalMatches = (exactCount || 0) + (fuzzyCount || 0) + (sameArtistCount || 0);
+            setStatus(`✅ 1001 matching: ${totalMatches} matches (Exact: ${exactCount || 0}, Fuzzy: ${fuzzyCount || 0}, Same-artist: ${sameArtistCount || 0})`);
           } else {
             setStatus('DRY RUN: Skipped 1001 matching');
           }
         } catch (matchError) {
-          console.warn('1001 matching failed:', matchError);
+          console.error('1001 matching failed:', matchError);
           results.errors.push(`1001 matching error: ${matchError instanceof Error ? matchError.message : 'Unknown error'}`);
         }
       } else {
@@ -837,7 +839,14 @@ export default function ImportDiscogsPage() {
       setImportResults(results);
       
       const removedCount = recordsToRemove.length - deselectedRemovals.size;
-      setStatus(`${dryRun ? '🔍 DRY RUN - ' : '✅ '}Complete! ${allEnriched.length} new, ${updateOperations.length} updated, ${removedCount} removed${skip1001Matching ? '' : `, ${results.matched1001Albums.length} 1001 albums matched`}`);
+      const matchedCount = results.matched1001Albums.length;
+      const matchStatus = skip1001Matching 
+        ? '' 
+        : matchedCount > 0 
+          ? `, ${matchedCount} 1001 albums in collection` 
+          : ', 0 1001 albums matched';
+      
+      setStatus(`${dryRun ? '🔍 DRY RUN - ' : '✅ '}Complete! ${allEnriched.length} new, ${updateOperations.length} updated, ${removedCount} removed${matchStatus}${results.errors.length > 0 ? ` (${results.errors.length} errors - see details)` : ''}`);
     } catch (error) {
       if (!dryRun && importRecord) {
         await supabase
