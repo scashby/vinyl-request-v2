@@ -1,5 +1,4 @@
 // src/app/admin/specialized-searches/page.tsx
-// COMPLETE VERSION: Original functionality + New features
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -47,10 +46,6 @@ export default function SpecializedSearchesPage() {
     </div>
   );
 }
-
-// ============================================================================
-// CD-ONLY TAB - ORIGINAL + NEW FEATURES
-// ============================================================================
 
 type CDOnlyAlbum = {
   id: number;
@@ -359,10 +354,6 @@ function CDOnlyTab() {
   );
 }
 
-// ============================================================================
-// 1001 ALBUMS TAB - COMPLETE WORKING VERSION
-// ============================================================================
-
 type Id = number;
 
 type A1001 = {
@@ -422,7 +413,6 @@ function Thousand1AlbumsTab() {
   const load = useCallback(async () => {
     setLoading(true);
 
-    // Fetch albums in two batches to bypass 1000-row limit
     const { data: batch1, error: e1a } = await supabase
       .from("one_thousand_one_albums")
       .select("id, artist, album, year, artist_norm, album_norm")
@@ -447,10 +437,8 @@ function Thousand1AlbumsTab() {
     }
 
     const a1001 = [...(batch1 || []), ...(batch2 || [])];
-
     setRows(a1001);
 
-    // Fetch matches
     const aIds = a1001.map((r) => r.id);
     if (aIds.length === 0) {
       setMatchesBy({});
@@ -481,7 +469,6 @@ function Thousand1AlbumsTab() {
     }
     setMatchesBy(by);
 
-    // Fetch collection rows
     let cmap: Record<Id, CollectionRow> = {};
     if (cids.size > 0) {
       const { data: crows, error: e3 } = await supabase
@@ -566,7 +553,19 @@ function Thousand1AlbumsTab() {
     await load();
   }, [pushToast, load]);
 
-  // Auto-match only once when page first opens
+  const runAggressive = useCallback(async () => {
+    setRunning(true);
+    const { data, error } = await supabase.rpc("match_1001_aggressive");
+    setRunning(false);
+    if (error) {
+      pushToast({ kind: "err", msg: `Aggressive match failed: ${error.message}` });
+      return;
+    }
+    const n = Number.isFinite(Number(data)) ? Number(data) : 0;
+    pushToast({ kind: "ok", msg: `Found ${n} aggressive match${n !== 1 ? "es" : ""}` });
+    await load();
+  }, [pushToast, load]);
+
   useEffect(() => {
     if (hasAutoMatchedSession) return;
     if (loading || running || rows.length === 0) return;
@@ -596,7 +595,6 @@ function Thousand1AlbumsTab() {
       return true;
     });
 
-    // For "All Albums" tab, sort alphabetically by artist
     if (statusFilter === "all") {
       return filtered.sort((a, b) => {
         const artistA = (a.artist || "").toLowerCase();
@@ -605,7 +603,6 @@ function Thousand1AlbumsTab() {
       });
     }
 
-    // For other tabs, sort: pending first, then unmatched, then confirmed last
     return filtered.sort((a, b) => {
       const aMatches = (matchesBy[a.id] ?? []).filter(m => m.review_status !== 'rejected');
       const bMatches = (matchesBy[b.id] ?? []).filter(m => m.review_status !== 'rejected');
@@ -617,15 +614,10 @@ function Thousand1AlbumsTab() {
       const aConfirmed = aMatches.length > 0 && aMatches.every((m) => m.review_status === "confirmed");
       const bConfirmed = bMatches.length > 0 && bMatches.every((m) => m.review_status === "confirmed");
 
-      // Pending first
       if (aHasPending && !bHasPending) return -1;
       if (!aHasPending && bHasPending) return 1;
-
-      // Then unmatched
       if (aUnmatched && !bUnmatched) return -1;
       if (!aUnmatched && bUnmatched) return 1;
-
-      // Confirmed last
       if (aConfirmed && !bConfirmed) return 1;
       if (!aConfirmed && bConfirmed) return -1;
 
@@ -703,7 +695,6 @@ function Thousand1AlbumsTab() {
   };
 
   const linkFromSearch = async (albumId: Id, collectionId: Id) => {
-    // First attempt: normal insert
     const result = await supabase.from("collection_1001_review").insert([
       {
         album_1001_id: albumId,
@@ -714,9 +705,7 @@ function Thousand1AlbumsTab() {
       },
     ]);
 
-    // If failed due to unique constraint on collection_final, check if it's a box set case
     if (result.error && result.error.message.includes("uq_c1001_review_collection_final")) {
-      // Check existing matches for this collection album
       const { data: existing } = await supabase
         .from("collection_1001_review")
         .select("id, album_1001_id, review_status")
@@ -725,7 +714,6 @@ function Thousand1AlbumsTab() {
         .limit(1);
 
       if (existing && existing.length > 0) {
-        // Ask user to confirm this is a box set
         const confirmed = window.confirm(
           "This pressing is already matched to another album from the 1001 list. Is this a set with multiple albums?\n\nClick OK to link both albums, or Cancel to keep only the existing match."
         );
@@ -734,8 +722,6 @@ function Thousand1AlbumsTab() {
           return;
         }
 
-        // User confirmed - use upsert to force the insert
-        // We'll use a RPC function to bypass the constraint
         const { error: rpcError } = await supabase.rpc("manual_link_1001", {
           p_album_1001_id: albumId,
           p_collection_id: collectionId,
@@ -793,7 +779,6 @@ function Thousand1AlbumsTab() {
 
   return (
     <div>
-      {/* Toast Notifications */}
       <div style={{ position: "fixed", top: 20, right: 20, zIndex: 50, display: "flex", flexDirection: "column", gap: 12, maxWidth: 400 }}>
         {toasts.map((t, i) => (
           <div
@@ -814,7 +799,6 @@ function Thousand1AlbumsTab() {
         ))}
       </div>
 
-      {/* Filter Tabs */}
       <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
         {[
           { value: "unmatched", label: "Need Attention", count: counts.unmatched, color: "#ef4444", bg: "#fef2f2" },
@@ -863,7 +847,6 @@ function Thousand1AlbumsTab() {
         })}
       </div>
 
-      {/* Batch Actions */}
       <div style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: 8, padding: 16, marginBottom: 16 }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: '#6b7280', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Matching Actions</div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -915,7 +898,6 @@ function Thousand1AlbumsTab() {
               cursor: running ? "not-allowed" : "pointer",
               opacity: running ? 0.6 : 1,
             }}
-            title="Exact artist match, fuzzy title match"
           >
             Same-Artist (0.60, ±1y)
           </button>
@@ -933,14 +915,29 @@ function Thousand1AlbumsTab() {
               cursor: running ? "not-allowed" : "pointer",
               opacity: running ? 0.6 : 1,
             }}
-            title="Fuzzy match on both artist and title"
           >
             Fuzzy Artist (0.70)
+          </button>
+          <button
+            onClick={() => void runAggressive()}
+            disabled={running}
+            style={{
+              padding: "8px 14px",
+              background: running ? "#9ca3af" : "#f59e0b",
+              color: "#ffffff",
+              border: "none",
+              borderRadius: 6,
+              fontWeight: 700,
+              fontSize: 13,
+              cursor: running ? "not-allowed" : "pointer",
+              opacity: running ? 0.6 : 1,
+            }}
+          >
+            🔥 Aggressive (0.50)
           </button>
         </div>
       </div>
 
-      {/* Albums List */}
       {filteredRows.length === 0 ? (
         <div style={{ background: "#ffffff", borderRadius: 8, padding: 40, textAlign: "center" }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>🎉</div>
@@ -975,9 +972,9 @@ function Thousand1AlbumsTab() {
                     : "1px solid #e5e7eb",
                   borderRadius: 8,
                   overflow: "visible",
+                  position: "relative",
                 }}
               >
-                {/* Main Row */}
                 <div
                   style={{
                     display: "flex",
@@ -1006,7 +1003,7 @@ function Thousand1AlbumsTab() {
                       >
                         <div style={{ fontSize: 10, fontWeight: 900, color: '#ffffff' }}>1001</div>
                       </div>
-                      <div style={{ fontWeight: 700, fontSize: 14, color: "#111827", overflow: "visible", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <div style={{ fontWeight: 700, fontSize: 14, color: "#111827", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {album.artist} — {album.album}
                       </div>
                       {isUnmatched && (
@@ -1034,10 +1031,8 @@ function Thousand1AlbumsTab() {
                   </div>
                 </div>
 
-                {/* Expanded Details */}
                 {isExpanded && (
                   <div style={{ padding: "16px", background: "#f9fafb", borderTop: "1px solid #e5e7eb" }}>
-                    {/* Search Box */}
                     {(isUnmatched || allConfirmed) && (
                       <div style={{ marginBottom: matches.length > 0 ? 16 : 0 }}>
                         <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 6 }}>
@@ -1142,7 +1137,7 @@ function Thousand1AlbumsTab() {
                                         fontWeight: 700,
                                         fontSize: 13,
                                         color: "#111827",
-                                        overflow: "visible",
+                                        overflow: "hidden",
                                         textOverflow: "ellipsis",
                                         whiteSpace: "nowrap",
                                       }}
@@ -1153,7 +1148,7 @@ function Thousand1AlbumsTab() {
                                       style={{
                                         fontSize: 12,
                                         color: "#6b7280",
-                                        overflow: "visible",
+                                        overflow: "hidden",
                                         textOverflow: "ellipsis",
                                         whiteSpace: "nowrap",
                                       }}
@@ -1195,7 +1190,6 @@ function Thousand1AlbumsTab() {
                       </div>
                     )}
 
-                    {/* Matched Albums */}
                     {matches.length > 0 && (
                       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                         {matches.map((match) => {
@@ -1233,7 +1227,7 @@ function Thousand1AlbumsTab() {
                                       fontWeight: 700,
                                       fontSize: 14,
                                       color: "#111827",
-                                      overflow: "visible",
+                                      overflow: "hidden",
                                       textOverflow: "ellipsis",
                                       whiteSpace: "nowrap",
                                     }}
