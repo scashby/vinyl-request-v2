@@ -1043,7 +1043,7 @@ function Thousand1AlbumsTab() {
                         <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 6 }}>
                           Search your collection to link:
                         </label>
-                        <div style={{ position: "relative" }}>
+                        <div style={{ position: "relative", zIndex: 1 }}>
                           <input
                             value={searchInputs[album.id] ?? ""}
                             onChange={(e) => handleSearchInput(album.id, e.target.value)}
@@ -1058,6 +1058,8 @@ function Thousand1AlbumsTab() {
                               transition: "border-color 0.2s",
                               color: "#111827",
                               backgroundColor: "#ffffff",
+                              position: "relative",
+                              zIndex: 1,
                             }}
                             onFocus={(e) => {
                               e.currentTarget.style.borderColor = "#3b82f6";
