@@ -356,7 +356,6 @@ export default function Page() {
                             {`${d.mon} ${d.day}`}
                           </div>
                         </div>
-                        {/* Buttons intentionally removed per request */}
                       </div>
                     );
                   })}
@@ -472,7 +471,7 @@ export default function Page() {
                       alignSelf: "start",
                     }}
                   >
-                    {/* Just Announced */}
+                    {/* Just Announced header */}
                     <div
                       style={{
                         background: "linear-gradient(90deg,#00c4ff,#34dfff)",
@@ -490,51 +489,95 @@ export default function Page() {
                       Just Announced
                     </div>
 
-                    <div style={{ display: "flex", flexDirection: "column", gap: ".85rem", marginBottom: "1.25rem" }}>
+                    {/* Just Announced list — visually distinct & varied */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: ".9rem", marginBottom: "1.25rem" }}>
                       {events.slice(0, 6).map((e, idx) => {
                         const d = compactDate(e.date);
                         const tba = !e.date || e.date === "9999-12-31";
-                        const styles = [
-                          { bg: "#1e293b", border: "#334155" },
-                          { bg: "#1b1b1b", border: "#2b2b2b" },
-                          { bg: "#1f2937", border: "#334155" },
-                          { bg: "#1a1f2a", border: "#2e3a4a" },
-                          { bg: "#222222", border: "#333333" },
-                          { bg: "#202a36", border: "#314255" },
+
+                        // Palette variations per item
+                        const palettes = [
+                          { bar:"#00c4ff", bg:"linear-gradient(135deg,#0b1220,#0f1a2e)", border:"#1c2a44", pill:"#00c4ff", pillText:"#000" },
+                          { bar:"#f59e0b", bg:"linear-gradient(135deg,#22160a,#2b1b0b)", border:"#3b2612", pill:"#f59e0b", pillText:"#000" },
+                          { bar:"#22c55e", bg:"linear-gradient(135deg,#0c1f15,#0e2a1a)", border:"#1b3b2a", pill:"#22c55e", pillText:"#000" },
+                          { bar:"#a78bfa", bg:"linear-gradient(135deg,#1a1430,#221b45)", border:"#2d2361", pill:"#a78bfa", pillText:"#000" },
+                          { bar:"#ef4444", bg:"linear-gradient(135deg,#2b1212,#3a1717)", border:"#512020", pill:"#ef4444", pillText:"#000" },
+                          { bar:"#06b6d4", bg:"linear-gradient(135deg,#062329,#082f36)", border:"#10424b", pill:"#06b6d4", pillText:"#000" },
                         ];
-                        const theme = styles[idx % styles.length];
+                        const p = palettes[idx % palettes.length];
+
                         return (
                           <Link key={e.id} href={`/events/event-detail/${e.id}`} style={{ textDecoration: "none" }}>
                             <div
                               style={{
-                                background: theme.bg,
-                                border: `1px solid ${theme.border}`,
-                                borderRadius: 10,
-                                padding: ".9rem",
+                                position: "relative",
+                                background: p.bg,
+                                border: `1px solid ${p.border}`,
+                                borderRadius: 12,
+                                padding: ".95rem .95rem .95rem 1rem",
+                                boxShadow: "0 8px 28px rgba(0,0,0,.35)",
+                                overflow: "hidden",
                                 transition: "transform .15s ease, box-shadow .15s ease",
-                                boxShadow: "0 4px 16px rgba(0,0,0,.25)",
                               }}
                               onMouseOver={(x) => {
                                 x.currentTarget.style.transform = "translateY(-2px)";
-                                x.currentTarget.style.boxShadow = "0 10px 28px rgba(0,196,255,.18)";
+                                x.currentTarget.style.boxShadow = "0 16px 36px rgba(0,196,255,.22)";
                               }}
                               onMouseOut={(x) => {
                                 x.currentTarget.style.transform = "translateY(0)";
-                                x.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,.25)";
+                                x.currentTarget.style.boxShadow = "0 8px 28px rgba(0,0,0,.35)";
                               }}
                             >
+                              {/* Accent bar */}
+                              <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 6, background: p.bar }} />
+
+                              {/* Optional NEW badge for top two */}
+                              {idx < 2 ? (
+                                <div
+                                  style={{
+                                    position: "absolute",
+                                    top: 8,
+                                    right: 8,
+                                    background: p.bar,
+                                    color: "#000",
+                                    fontWeight: 900,
+                                    fontSize: 10,
+                                    padding: "4px 6px",
+                                    borderRadius: 999,
+                                    letterSpacing: ".6px",
+                                  }}
+                                >
+                                  NEW
+                                </div>
+                              ) : null}
+
                               <h4
                                 style={{
                                   color: "#fff",
                                   fontSize: "1rem",
-                                  fontWeight: 800,
+                                  fontWeight: 900,
                                   lineHeight: 1.25,
-                                  margin: "0 0 .35rem",
+                                  margin: "0 0 .45rem",
+                                  textShadow: "0 1px 0 rgba(0,0,0,.25)",
                                 }}
                                 dangerouslySetInnerHTML={{ __html: formatEventText(e.title) }}
                               />
-                              <div style={{ color: "#00d9ff", fontSize: ".85rem", fontWeight: 800 }}>
-                                {tba ? "TBA" : `${d.wk}, ${d.mon} ${d.day}`}
+                              <div style={{ display: "flex", alignItems: "center", gap: ".5rem" }}>
+                                <div
+                                  style={{
+                                    background: p.pill,
+                                    color: p.pillText,
+                                    fontWeight: 900,
+                                    fontSize: ".75rem",
+                                    borderRadius: 999,
+                                    padding: ".25rem .55rem",
+                                  }}
+                                >
+                                  {tba ? "TBA" : `${d.wk} ${d.mon} ${d.day}`}
+                                </div>
+                                <div style={{ color: "rgba(255,255,255,.7)", fontSize: ".8rem" }}>
+                                  {e.location || "New date added"}
+                                </div>
                               </div>
                             </div>
                           </Link>
