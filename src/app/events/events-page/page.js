@@ -1,7 +1,7 @@
 // src/app/events/events-page/page.js
 // Events Page - 9:30 Club Layout
-// Section 1: "Up Next" - Featured events (1-2 large)
-// Section 2: 4-column grid of promoted/boosted shows
+// Section 1: "Up Next" - next 1–2 upcoming events (automatic)
+// Section 2: 4-column grid of promoted/boosted shows (manual featured grid)
 // Section 3: "Upcoming Shows" - LEFT: vertical list | RIGHT: sidebar with "Just Announced"
 
 "use client";
@@ -81,25 +81,19 @@ export default function Page() {
       return ad.localeCompare(bd);
     });
 
-  // Section 1: Up Next (max 2)
-  const featuredUpNext = byFeatured(
-    events.filter((e) => e.is_featured_upnext)
-  ).slice(0, 2);
-  const fallbackUpNext = events
-    .filter((e) => !e.is_featured_upnext)
-    .slice(0, Math.max(0, 2 - featuredUpNext.length));
-  const upNext = [...featuredUpNext, ...fallbackUpNext];
+  // SECTION 1 — AUTOMATIC UP NEXT (next 2 events by date, then TBA)
+  const upcomingDated = events.filter(
+    (e) => e.date && e.date !== "9999-12-31"
+  );
 
-  // Section 2: Featured Grid
+  const tbaEvents = events.filter(
+    (e) => !e.date || e.date === "9999-12-31"
+  );
+
+  const upNext = [...upcomingDated, ...tbaEvents].slice(0, 2);
+
+  // SECTION 2 — FEATURED GRID (manual selection via is_featured_grid)
   const featuredGrid = byFeatured(events.filter((e) => e.is_featured_grid));
-
-  const placeholderGrid = Array.from({ length: 8 }).map((_, i) => ({
-    id: `ph-${i}`,
-    title: "Featured Event (TBA)",
-    date: "9999-12-31",
-    time: "",
-    image_url: "/images/placeholder.png",
-  }));
 
   const latestSet = pastDJSets[0];
 
@@ -213,42 +207,37 @@ export default function Page() {
           </div>
         ) : (
           <div data-secwrap="sections">
-            {/* SECTION 1 — UP NEXT */}
-            <section
-              style={{
-                background: "linear-gradient(180deg,#141414,#000)",
-                padding: "2.75rem 1.25rem 3rem",
-                borderBottom: "3px solid #00c4ff",
-              }}
-            >
-              <div style={{ maxWidth: 1400, margin: "0 auto" }}>
-                <SectionTitle text="Up Next" />
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns:
-                      upNext.length === 1 ? "1fr" : "repeat(2,1fr)",
-                    gap: "1.75rem",
-                  }}
-                >
-                  {(upNext.length ? upNext : [0, 1].slice(0, 1)).map(
-                    (e, i) => {
-                      const ev =
-                        e || {
-                          id: `placeholder-upnext-${i}`,
-                          title: "Featured Event (TBA)",
-                          date: "9999-12-31",
-                          image_url: "/images/placeholder.png",
-                        };
+            {/* SECTION 1 — UP NEXT (only if there is something actually up next) */}
+            {upNext.length > 0 && (
+              <section
+                style={{
+                  background: "linear-gradient(180deg,#141414,#000)",
+                  padding: "2.75rem 1.25rem 3rem",
+                  borderBottom: "3px solid #00c4ff",
+                }}
+              >
+                <div style={{ maxWidth: 1400, margin: "0 auto" }}>
+                  <SectionTitle text="Up Next" />
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns:
+                        upNext.length === 1 ? "1fr" : "repeat(2,1fr)",
+                      gap: "1.75rem",
+                    }}
+                  >
+                    {upNext.map((ev) => {
                       const img = ev.image_url || "/images/placeholder.png";
                       const d = compactDate(ev.date);
                       const tba =
-                        !ev.date || ev.date === "" || ev.date === "9999-12-31";
+                        !ev.date ||
+                        ev.date === "" ||
+                        ev.date === "9999-12-31";
 
                       return (
                         <Link
                           key={ev.id}
-                          href={e ? `/events/event-detail/${ev.id}` : "#"}
+                          href={`/events/event-detail/${ev.id}`}
                           style={{ textDecoration: "none" }}
                         >
                           <div
@@ -324,31 +313,31 @@ export default function Page() {
                           </div>
                         </Link>
                       );
-                    }
-                  )}
+                    })}
+                  </div>
                 </div>
-              </div>
-            </section>
+              </section>
+            )}
 
-            {/* SECTION 2 — 4-COLUMN FEATURED GRID */}
-            <section
-              style={{
-                background: "#000",
-                padding: "2.75rem 1.25rem 3rem",
-                borderBottom: "2px solid #1f1f1f",
-              }}
-            >
-              <div style={{ maxWidth: 1400, margin: "0 auto" }}>
-                <SectionTitle text="Featured" />
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-                    gap: "1.25rem",
-                  }}
-                >
-                  {(featuredGrid.length ? featuredGrid : placeholderGrid).map(
-                    (e) => {
+            {/* SECTION 2 — 4-COLUMN FEATURED GRID (only if there are featured events) */}
+            {featuredGrid.length > 0 && (
+              <section
+                style={{
+                  background: "#000",
+                  padding: "2.75rem 1.25rem 3rem",
+                  borderBottom: "2px solid #1f1f1f",
+                }}
+              >
+                <div style={{ maxWidth: 1400, margin: "0 auto" }}>
+                  <SectionTitle text="Featured" />
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+                      gap: "1.25rem",
+                    }}
+                  >
+                    {featuredGrid.map((e) => {
                       const img = e.image_url || "/images/placeholder.png";
                       const d = compactDate(e.date);
                       return (
@@ -415,11 +404,11 @@ export default function Page() {
                           </div>
                         </div>
                       );
-                    }
-                  )}
+                    })}
+                  </div>
                 </div>
-              </div>
-            </section>
+              </section>
+            )}
 
             {/* SECTION 3 — UPCOMING SHOWS + SIDEBAR */}
             <section
