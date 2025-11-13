@@ -52,7 +52,9 @@ function BrowseQueueContent() {
         albums = res.data || [];
       }
 
-      const queueType = event?.queue_type || 'side';
+      // Handle both old queue_type (singular) and new queue_types (array)
+      const queueTypes = event?.queue_types || (event?.queue_type ? [event.queue_type] : ['side']);
+      const primaryQueueType = Array.isArray(queueTypes) ? queueTypes[0] : queueTypes;
 
       const mapped = requests.map(req => {
         const album = albums.find(a => a.id === req.album_id) || {
@@ -72,7 +74,7 @@ function BrowseQueueContent() {
           track_duration: req.track_duration || null,
           votes: req.votes ?? 1,
           created_at: req.created_at,
-          queue_type: queueType,
+          queue_type: primaryQueueType,
           collection: {
             id: album.id,
             image_url: album.image_url,
@@ -111,7 +113,9 @@ function BrowseQueueContent() {
   const formatDate = (dateString) =>
     dateString ? new Date(dateString).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : "";
 
-  const queueType = eventData?.queue_type || 'side';
+  // Get primary queue type for display
+  const queueTypes = eventData?.queue_types || (eventData?.queue_type ? [eventData.queue_type] : ['side']);
+  const queueType = Array.isArray(queueTypes) ? queueTypes[0] : queueTypes;
 
   if (loading) return (
     <div className="page-wrapper" style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: 400 }}>
@@ -196,15 +200,15 @@ function BrowseQueueContent() {
                   </button>
                 )}
 
-                
-                  <a href={`/browse/browse-albums?eventId=${eventId}`}
+                <a 
+                  href={`/browse/browse-albums?eventId=${eventId}`}
                   style={{ background: "#059669", color: "#fff", padding: "10px 16px", borderRadius: 8, textDecoration: "none", fontSize: 14, fontWeight: 600 }}
                 >
                   📚 Browse Collection
                 </a>
 
-                
-                  <a href={`/events/event-detail/${eventId}`}
+                <a 
+                  href={`/events/event-detail/${eventId}`}
                   style={{ background: "#9333ea", color: "#fff", padding: "10px 16px", borderRadius: 8, textDecoration: "none", fontSize: 14, fontWeight: 600 }}
                 >
                   📅 Event Details

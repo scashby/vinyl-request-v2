@@ -393,7 +393,9 @@ function AlbumDetailContent() {
     ? album.image_url 
     : '/images/coverplaceholder.png';
 
-  const queueType = eventData?.queue_type || 'side';
+  // Handle both old queue_type (singular) and new queue_types (array)
+  const queueTypes = eventData?.queue_types || (eventData?.queue_type ? [eventData.queue_type] : ['side']);
+  const queueTypesArray = Array.isArray(queueTypes) ? queueTypes : [queueTypes];
 
   return (
     <div className="album-detail">
@@ -533,10 +535,10 @@ function AlbumDetailContent() {
             </div>
           )}
 
-          {/* Queue Actions - Adaptive based on queue type */}
+          {/* Queue Actions - Adaptive based on queue types */}
           {eventId && eventData?.has_queue && (
             <div style={{ marginTop: '20px' }}>
-              {queueType === 'side' && (
+              {queueTypesArray.includes('side') && (
                 <>
                   <h3 style={{ color: '#fff', marginBottom: '12px', fontSize: '18px' }}>
                     Add to Event Queue (By Side):
@@ -568,10 +570,10 @@ function AlbumDetailContent() {
                 </>
               )}
 
-              {queueType === 'album' && (
+              {queueTypesArray.includes('album') && (
                 <>
                   <h3 style={{ color: '#fff', marginBottom: '12px', fontSize: '18px' }}>
-                    Add to Event Queue:
+                    Add Full Album to Queue:
                   </h3>
                   <button
                     onClick={handleAddAlbumToQueue}
@@ -586,7 +588,8 @@ function AlbumDetailContent() {
                       fontSize: 18,
                       fontWeight: 'bold',
                       opacity: submittingRequest ? 0.7 : 1,
-                      boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)'
+                      boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)',
+                      marginBottom: '16px'
                     }}
                   >
                     💿 Add Full Album to Queue
@@ -619,7 +622,7 @@ function AlbumDetailContent() {
             fontWeight: 'bold'
           }}>
             Track Listing
-            {queueType === 'track' && eventId && eventData?.has_queue && (
+            {queueTypesArray.includes('track') && eventId && eventData?.has_queue && (
               <span style={{ fontSize: '14px', marginLeft: '12px', opacity: 0.8 }}>
                 (Click any track to add to queue)
               </span>
@@ -631,7 +634,7 @@ function AlbumDetailContent() {
             <div>Title</div>
             <div>Artist</div>
             <div>Duration</div>
-            {queueType === 'track' && eventId && eventData?.has_queue && (
+            {queueTypesArray.includes('track') && eventId && eventData?.has_queue && (
               <div>Add</div>
             )}
           </div>
@@ -644,7 +647,7 @@ function AlbumDetailContent() {
                 key={index} 
                 className="track"
                 style={{
-                  cursor: queueType === 'track' && eventId && eventData?.has_queue ? 'pointer' : 'default',
+                  cursor: queueTypesArray.includes('track') && eventId && eventData?.has_queue ? 'pointer' : 'default',
                   transition: 'background-color 0.2s'
                 }}
               >
@@ -658,7 +661,7 @@ function AlbumDetailContent() {
                 <div style={{ color: '#aaa', fontSize: '14px' }}>
                   {track.duration || '--:--'}
                 </div>
-                {queueType === 'track' && eventId && eventData?.has_queue && (
+                {queueTypesArray.includes('track') && eventId && eventData?.has_queue && (
                   <div>
                     <button
                       onClick={() => handleAddTrackToQueue(track)}
