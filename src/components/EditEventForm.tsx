@@ -88,6 +88,9 @@ export default function EditEventForm() {
   const id = searchParams.get('id');
   const router = useRouter();
   const [availableTags, setAvailableTags] = useState<TagDefinition[]>([]);
+  const [editMode, setEditMode] = useState<'all' | 'future' | 'single'>('all');
+  const [isPartOfSeries, setIsPartOfSeries] = useState(false);
+  const [isParentEvent, setIsParentEvent] = useState(false);
   const [eventData, setEventData] = useState<EventData>({
     title: '',
     date: '',
@@ -158,6 +161,8 @@ export default function EditEventForm() {
           recurrence_end_date: '',
           parent_event_id: undefined,
         });
+        setIsPartOfSeries(false);
+        setIsParentEvent(false);
       } else if (id) {
         const { data, error } = await supabase
           .from('events')
@@ -193,6 +198,10 @@ export default function EditEventForm() {
             recurrence_end_date: data.recurrence_end_date || '',
             date: isTBA ? '9999-12-31' : data.date,
           });
+          
+          // Determine if this is part of a recurring series
+          setIsParentEvent(data.is_recurring === true);
+          setIsPartOfSeries(!!data.parent_event_id);
         }
       }
     };
@@ -301,158 +310,217 @@ export default function EditEventForm() {
           recurrence_interval: null,
           recurrence_end_date: null,
         }),
-        ...(eventData.parent_event_id ? { parent_event_id: eventData.parent_event_id } : {})
+        ...(eventData.parent_event_id && editMode !== 'single' ? { parent_event_id: eventData.parent_event_id } : {})
       };
 
       console.log('Submitting payload:', payload);
 
-      if (!isTBA && eventData.is_recurring) {
-        if (id) {
-          // EDITING an existing event and making it recurring
-          console.log('Updating event to be recurring...');
-          
-          const { error: updateError } = await supabase
-            .from('events')
-            .update(payload)
-            .eq('id', id);
-
-          if (updateError) {
-            console.error('Error updating parent event:', updateError);
-            throw updateError;
-          }
-
-          const recurringEvents = generateRecurringEvents({
-            ...eventData,
-            id: parseInt(id)
-          });
-
-          console.log('Generated recurring events:', recurringEvents.length);
-
-          const { data: existingChildren } = await supabase
-            .from('events')
-            .select('id, date')
-            .eq('parent_event_id', id);
-
-          const existingDates = new Set(existingChildren?.map(e => e.date) || []);
-          const newDates = recurringEvents.slice(1).map(e => e.date);
-          
-          for (const child of existingChildren || []) {
-            if (newDates.includes(child.date)) {
-              await supabase
-                .from('events')
-                .update({
-                  title: eventData.title,
-                  time: eventData.time,
-                  location: eventData.location,
-                  image_url: eventData.image_url,
-                  info: eventData.info,
-                  info_url: eventData.info_url,
-                  has_queue: eventData.has_queue,
-                  queue_types: eventData.has_queue && eventData.queue_types.length > 0 
-                    ? `{${eventData.queue_types.join(',')}}`
-                    : null,
-                  allowed_formats: `{${eventData.allowed_formats.map(f => f.trim()).join(',')}}`,
-                  allowed_tags: eventData.allowed_tags.length > 0
-                    ? `{${eventData.allowed_tags.map(t => t.trim()).join(',')}}`
-                    : null,
-                })
-                .eq('id', child.id);
-            } else {
-              await supabase
-                .from('events')
-                .update({ 
-                  title: `${eventData.title} (Cancelled)`,
-                  info: `This event was cancelled as part of a recurring series update.`
-                })
-                .eq('id', child.id);
-            }
-          }
-
-          const eventsToInsert = recurringEvents
-            .slice(1)
-            .filter(e => !existingDates.has(e.date))
-            .map(e => ({
-              ...e,
-              date: e.date,
-              allowed_formats: `{${e.allowed_formats.map(f => f.trim()).join(',')}}`,
-              queue_types: eventData.has_queue && eventData.queue_types.length > 0 
-                ? `{${eventData.queue_types.join(',')}}`
-                : null,
-              allowed_tags: e.allowed_tags.length > 0
-                ? `{${e.allowed_tags.map(t => t.trim()).join(',')}}`
-                : null,
-              parent_event_id: parseInt(id),
-              recurrence_pattern: null,
-              recurrence_interval: null,
-              recurrence_end_date: null,
-            }));
-
-          if (eventsToInsert.length > 0) {
-            const { error: insertError } = await supabase
-              .from('events')
-              .insert(eventsToInsert);
-
-            if (insertError) {
-              console.error('Error inserting new recurring events:', insertError);
-              throw insertError;
-            }
-          }
-
-          alert(`Successfully updated recurring event series! (${recurringEvents.length} total events)`);
-        } else {
-          // CREATING a new recurring event
-          console.log('Creating new recurring event...');
-          const { data: savedEvent, error: saveError } = await supabase
-            .from('events')
-            .insert([payload])
-            .select()
-            .single();
-
-          if (saveError) {
-            console.error('Error saving main event:', saveError);
-            throw saveError;
-          }
-
-          console.log('Main event saved:', savedEvent);
-
-          const recurringEvents = generateRecurringEvents({
-            ...eventData,
-            id: savedEvent.id
-          });
-
-          console.log('Generated recurring events:', recurringEvents.length);
-
-          const eventsToInsert = recurringEvents.slice(1).map(e => ({
-            ...e,
-            date: e.date,
-            allowed_formats: `{${e.allowed_formats.map(f => f.trim()).join(',')}}`,
-            queue_types: eventData.has_queue && eventData.queue_types.length > 0 
-              ? `{${eventData.queue_types.join(',')}}`
-              : null,
-            allowed_tags: e.allowed_tags.length > 0
-              ? `{${e.allowed_tags.map(t => t.trim()).join(',')}}`
-              : null,
-            parent_event_id: savedEvent.id,
+      // Handle editing a recurring series
+      if (id && (isParentEvent || isPartOfSeries)) {
+        if (editMode === 'single') {
+          // Edit this event only - detach from series
+          const singlePayload = {
+            ...payload,
+            is_recurring: false,
             recurrence_pattern: null,
             recurrence_interval: null,
             recurrence_end_date: null,
-          }));
+            parent_event_id: null
+          };
+          
+          const { error: updateError } = await supabase
+            .from('events')
+            .update(singlePayload)
+            .eq('id', id);
 
-          console.log('Events to insert:', eventsToInsert);
+          if (updateError) throw updateError;
+          alert('Event updated successfully and detached from series!');
+          
+        } else if (editMode === 'future') {
+          // Edit this and future events
+          const parentId = eventData.parent_event_id || id;
+          
+          // Update this event and all future events in the series
+          const { error: updateError } = await supabase
+            .from('events')
+            .update({
+              title: eventData.title,
+              time: eventData.time,
+              location: eventData.location,
+              image_url: eventData.image_url,
+              info: eventData.info,
+              info_url: eventData.info_url,
+              has_queue: eventData.has_queue,
+              queue_types: eventData.has_queue && eventData.queue_types.length > 0 
+                ? `{${eventData.queue_types.join(',')}}`
+                : null,
+              allowed_formats: `{${eventData.allowed_formats.map(f => f.trim()).join(',')}}`,
+              allowed_tags: eventData.allowed_tags.length > 0
+                ? `{${eventData.allowed_tags.map(t => t.trim()).join(',')}}`
+                : null,
+            })
+            .or(`id.eq.${id},parent_event_id.eq.${parentId}`)
+            .gte('date', eventData.date);
 
-          if (eventsToInsert.length > 0) {
-            const { error: insertError } = await supabase
+          if (updateError) throw updateError;
+          alert('This and future events updated successfully!');
+          
+        } else {
+          // Edit all events in series
+          const parentId = eventData.parent_event_id || id;
+          
+          if (isParentEvent && eventData.is_recurring) {
+            // Update parent and regenerate children
+            const { error: updateError } = await supabase
               .from('events')
-              .insert(eventsToInsert);
+              .update(payload)
+              .eq('id', id);
 
-            if (insertError) {
-              console.error('Error inserting recurring events:', insertError);
-              throw insertError;
+            if (updateError) throw updateError;
+
+            const recurringEvents = generateRecurringEvents({
+              ...eventData,
+              id: parseInt(id)
+            });
+
+            const { data: existingChildren } = await supabase
+              .from('events')
+              .select('id, date')
+              .eq('parent_event_id', id);
+
+            const existingDates = new Set(existingChildren?.map(e => e.date) || []);
+            const newDates = recurringEvents.slice(1).map(e => e.date);
+            
+            for (const child of existingChildren || []) {
+              if (newDates.includes(child.date)) {
+                await supabase
+                  .from('events')
+                  .update({
+                    title: eventData.title,
+                    time: eventData.time,
+                    location: eventData.location,
+                    image_url: eventData.image_url,
+                    info: eventData.info,
+                    info_url: eventData.info_url,
+                    has_queue: eventData.has_queue,
+                    queue_types: eventData.has_queue && eventData.queue_types.length > 0 
+                      ? `{${eventData.queue_types.join(',')}}`
+                      : null,
+                    allowed_formats: `{${eventData.allowed_formats.map(f => f.trim()).join(',')}}`,
+                    allowed_tags: eventData.allowed_tags.length > 0
+                      ? `{${eventData.allowed_tags.map(t => t.trim()).join(',')}}`
+                      : null,
+                  })
+                  .eq('id', child.id);
+              } else {
+                await supabase
+                  .from('events')
+                  .delete()
+                  .eq('id', child.id);
+              }
             }
-          }
 
-          alert(`Successfully created ${recurringEvents.length} recurring events!`);
+            const eventsToInsert = recurringEvents
+              .slice(1)
+              .filter(e => !existingDates.has(e.date))
+              .map(e => ({
+                ...e,
+                date: e.date,
+                allowed_formats: `{${e.allowed_formats.map(f => f.trim()).join(',')}}`,
+                queue_types: eventData.has_queue && eventData.queue_types.length > 0 
+                  ? `{${eventData.queue_types.join(',')}}`
+                  : null,
+                allowed_tags: e.allowed_tags.length > 0
+                  ? `{${e.allowed_tags.map(t => t.trim()).join(',')}}`
+                  : null,
+                parent_event_id: parseInt(id),
+                recurrence_pattern: null,
+                recurrence_interval: null,
+                recurrence_end_date: null,
+              }));
+
+            if (eventsToInsert.length > 0) {
+              const { error: insertError } = await supabase
+                .from('events')
+                .insert(eventsToInsert);
+
+              if (insertError) throw insertError;
+            }
+
+            alert(`Successfully updated recurring event series! (${recurringEvents.length} total events)`);
+          } else {
+            // Update all events in the series (parent and children)
+            const { error: updateError } = await supabase
+              .from('events')
+              .update({
+                title: eventData.title,
+                time: eventData.time,
+                location: eventData.location,
+                image_url: eventData.image_url,
+                info: eventData.info,
+                info_url: eventData.info_url,
+                has_queue: eventData.has_queue,
+                queue_types: eventData.has_queue && eventData.queue_types.length > 0 
+                  ? `{${eventData.queue_types.join(',')}}`
+                  : null,
+                allowed_formats: `{${eventData.allowed_formats.map(f => f.trim()).join(',')}}`,
+                allowed_tags: eventData.allowed_tags.length > 0
+                  ? `{${eventData.allowed_tags.map(t => t.trim()).join(',')}}`
+                  : null,
+              })
+              .or(`id.eq.${parentId},parent_event_id.eq.${parentId}`);
+
+            if (updateError) throw updateError;
+            alert('All events in series updated successfully!');
+          }
         }
+      } else if (!isTBA && eventData.is_recurring && !id) {
+        // CREATING a new recurring event
+        console.log('Creating new recurring event...');
+        const { data: savedEvent, error: saveError } = await supabase
+          .from('events')
+          .insert([payload])
+          .select()
+          .single();
+
+        if (saveError) throw saveError;
+
+        console.log('Main event saved:', savedEvent);
+
+        const recurringEvents = generateRecurringEvents({
+          ...eventData,
+          id: savedEvent.id
+        });
+
+        console.log('Generated recurring events:', recurringEvents.length);
+
+        const eventsToInsert = recurringEvents.slice(1).map(e => ({
+          ...e,
+          date: e.date,
+          allowed_formats: `{${e.allowed_formats.map(f => f.trim()).join(',')}}`,
+          queue_types: eventData.has_queue && eventData.queue_types.length > 0 
+            ? `{${eventData.queue_types.join(',')}}`
+            : null,
+          allowed_tags: e.allowed_tags.length > 0
+            ? `{${e.allowed_tags.map(t => t.trim()).join(',')}}`
+            : null,
+          parent_event_id: savedEvent.id,
+          recurrence_pattern: null,
+          recurrence_interval: null,
+          recurrence_end_date: null,
+        }));
+
+        console.log('Events to insert:', eventsToInsert);
+
+        if (eventsToInsert.length > 0) {
+          const { error: insertError } = await supabase
+            .from('events')
+            .insert(eventsToInsert);
+
+          if (insertError) throw insertError;
+        }
+
+        alert(`Successfully created ${recurringEvents.length} recurring events!`);
       } else {
         // Single event (including TBA) or non-recurring update
         console.log('Saving single event...');
@@ -463,10 +531,7 @@ export default function EditEventForm() {
           result = await supabase.from('events').insert([payload]);
         }
 
-        if (result.error) {
-          console.error('Error saving single event:', result.error);
-          throw result.error;
-        }
+        if (result.error) throw result.error;
         alert('Event saved successfully!');
       }
 
@@ -512,6 +577,97 @@ export default function EditEventForm() {
       <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1.5rem' }}>
         {id ? 'Edit Event' : 'New Event'}
       </h2>
+      
+      {(isParentEvent || isPartOfSeries) && (
+        <div style={{
+          backgroundColor: '#fef3c7',
+          border: '2px solid #f59e0b',
+          borderRadius: '8px',
+          padding: '1rem',
+          marginBottom: '1.5rem'
+        }}>
+          <h3 style={{ marginTop: 0, marginBottom: '1rem', fontSize: '1rem', fontWeight: 'bold' }}>
+            📅 Editing Recurring Event
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <label style={{ 
+              display: 'flex', 
+              alignItems: 'center',
+              padding: '0.75rem',
+              background: editMode === 'single' ? '#fff' : '#fef3c7',
+              border: `2px solid ${editMode === 'single' ? '#f59e0b' : '#fde68a'}`,
+              borderRadius: '6px',
+              cursor: 'pointer'
+            }}>
+              <input
+                type="radio"
+                name="editMode"
+                value="single"
+                checked={editMode === 'single'}
+                onChange={(e) => setEditMode(e.target.value as 'all' | 'future' | 'single')}
+                style={{ marginRight: '0.75rem', transform: 'scale(1.2)', cursor: 'pointer' }}
+              />
+              <div>
+                <div style={{ fontWeight: '600' }}>Edit this event only</div>
+                <div style={{ fontSize: '0.85rem', color: '#666' }}>
+                  Changes won&apos;t affect other events. This event will be detached from the series.
+                </div>
+              </div>
+            </label>
+
+            <label style={{ 
+              display: 'flex', 
+              alignItems: 'center',
+              padding: '0.75rem',
+              background: editMode === 'future' ? '#fff' : '#fef3c7',
+              border: `2px solid ${editMode === 'future' ? '#f59e0b' : '#fde68a'}`,
+              borderRadius: '6px',
+              cursor: 'pointer'
+            }}>
+              <input
+                type="radio"
+                name="editMode"
+                value="future"
+                checked={editMode === 'future'}
+                onChange={(e) => setEditMode(e.target.value as 'all' | 'future' | 'single')}
+                style={{ marginRight: '0.75rem', transform: 'scale(1.2)', cursor: 'pointer' }}
+              />
+              <div>
+                <div style={{ fontWeight: '600' }}>Edit this and future events</div>
+                <div style={{ fontSize: '0.85rem', color: '#666' }}>
+                  Changes will apply to this event and all events after this date.
+                </div>
+              </div>
+            </label>
+
+            <label style={{ 
+              display: 'flex', 
+              alignItems: 'center',
+              padding: '0.75rem',
+              background: editMode === 'all' ? '#fff' : '#fef3c7',
+              border: `2px solid ${editMode === 'all' ? '#f59e0b' : '#fde68a'}`,
+              borderRadius: '6px',
+              cursor: 'pointer'
+            }}>
+              <input
+                type="radio"
+                name="editMode"
+                value="all"
+                checked={editMode === 'all'}
+                onChange={(e) => setEditMode(e.target.value as 'all' | 'future' | 'single')}
+                style={{ marginRight: '0.75rem', transform: 'scale(1.2)', cursor: 'pointer' }}
+              />
+              <div>
+                <div style={{ fontWeight: '600' }}>Edit all events in series</div>
+                <div style={{ fontSize: '0.85rem', color: '#666' }}>
+                  Changes will apply to all events in this recurring series.
+                </div>
+              </div>
+            </label>
+          </div>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit}>
         <input
           name="title"
@@ -577,6 +733,87 @@ export default function EditEventForm() {
           placeholder="Event Info URL (optional)"
           style={{ display: 'block', width: '100%', marginBottom: '1rem', padding: '0.5rem' }}
         />
+
+        {/* RECURRING EVENT SECTION - MOVED UP */}
+        {eventData.date && eventData.date !== '9999-12-31' && !isPartOfSeries && (
+          <div style={{
+            border: '2px solid #8b5cf6',
+            borderRadius: '8px',
+            padding: '1rem',
+            marginBottom: '1rem',
+            backgroundColor: '#faf5ff'
+          }}>
+            <label style={{ display: 'block', marginBottom: '1rem' }}>
+              <input
+                type="checkbox"
+                name="is_recurring"
+                checked={eventData.is_recurring}
+                onChange={handleCheckboxChange}
+              />
+              {' '}<strong>Recurring Event</strong>
+            </label>
+
+            {eventData.is_recurring && (
+              <div style={{ marginLeft: '1.5rem' }}>
+                <label style={{ display: 'block', marginBottom: '1rem' }}>
+                  Pattern:
+                  <select
+                    name="recurrence_pattern"
+                    value={eventData.recurrence_pattern}
+                    onChange={handleChange}
+                    style={{ display: 'block', width: '100%', padding: '0.5rem', marginTop: '0.25rem' }}
+                  >
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                  </select>
+                </label>
+
+                <label style={{ display: 'block', marginBottom: '1rem' }}>
+                  Every:
+                  <input
+                    type="number"
+                    name="recurrence_interval"
+                    min="1"
+                    value={eventData.recurrence_interval}
+                    onChange={handleChange}
+                    style={{ display: 'block', width: '100%', padding: '0.5rem', marginTop: '0.25rem' }}
+                  />
+                  <small style={{ color: '#666' }}>
+                    {eventData.recurrence_pattern === 'daily' && 'day(s)'}
+                    {eventData.recurrence_pattern === 'weekly' && 'week(s)'}
+                    {eventData.recurrence_pattern === 'monthly' && 'month(s)'}
+                  </small>
+                </label>
+
+                <label style={{ display: 'block', marginBottom: '1rem' }}>
+                  End Date:
+                  <input
+                    type="date"
+                    name="recurrence_end_date"
+                    value={eventData.recurrence_end_date}
+                    onChange={handleChange}
+                    required
+                    style={{ display: 'block', width: '100%', padding: '0.5rem', marginTop: '0.25rem' }}
+                  />
+                </label>
+              </div>
+            )}
+          </div>
+        )}
+
+        {(!eventData.date || eventData.date === '9999-12-31') && (
+          <div style={{
+            backgroundColor: '#fff3cd',
+            border: '1px solid #ffeaa7',
+            borderRadius: '4px',
+            padding: '1rem',
+            marginBottom: '1rem',
+            color: '#856404'
+          }}>
+            <strong>Note:</strong> TBA events cannot be set as recurring. Please set a specific date to enable recurring options.
+          </div>
+        )}
         
         {/* Queue Settings Section */}
         <div style={{
@@ -685,86 +922,6 @@ export default function EditEventForm() {
             </div>
           )}
         </div>
-
-        {eventData.date && eventData.date !== '9999-12-31' && (
-          <label style={{ display: 'block', marginBottom: '1rem' }}>
-            <input
-              type="checkbox"
-              name="is_recurring"
-              checked={eventData.is_recurring}
-              onChange={handleCheckboxChange}
-            />
-            {' '}Recurring Event
-          </label>
-        )}
-
-        {(!eventData.date || eventData.date === '9999-12-31') && (
-          <div style={{
-            backgroundColor: '#fff3cd',
-            border: '1px solid #ffeaa7',
-            borderRadius: '4px',
-            padding: '1rem',
-            marginBottom: '1rem',
-            color: '#856404'
-          }}>
-            <strong>Note:</strong> TBA events cannot be set as recurring. Please set a specific date to enable recurring options.
-          </div>
-        )}
-
-        {eventData.date && eventData.date !== '9999-12-31' && eventData.is_recurring && (
-          <div style={{ 
-            border: '1px solid #ddd', 
-            padding: '1rem', 
-            borderRadius: '4px', 
-            marginBottom: '1rem',
-            backgroundColor: '#f9f9f9'
-          }}>
-            <h4 style={{ marginTop: 0, marginBottom: '1rem' }}>Recurrence Settings</h4>
-            
-            <label style={{ display: 'block', marginBottom: '1rem' }}>
-              Pattern:
-              <select
-                name="recurrence_pattern"
-                value={eventData.recurrence_pattern}
-                onChange={handleChange}
-                style={{ display: 'block', width: '100%', padding: '0.5rem', marginTop: '0.25rem' }}
-              >
-                <option value="daily">Daily</option>
-                <option value="weekly">Weekly</option>
-                <option value="monthly">Monthly</option>
-              </select>
-            </label>
-
-            <label style={{ display: 'block', marginBottom: '1rem' }}>
-              Every:
-              <input
-                type="number"
-                name="recurrence_interval"
-                min="1"
-                value={eventData.recurrence_interval}
-                onChange={handleChange}
-                style={{ display: 'block', width: '100%', padding: '0.5rem', marginTop: '0.25rem' }}
-              />
-              <small style={{ color: '#666' }}>
-                {eventData.recurrence_pattern === 'daily' && 'day(s)'}
-                {eventData.recurrence_pattern === 'weekly' && 'week(s)'}
-                {eventData.recurrence_pattern === 'monthly' && 'month(s)'}
-              </small>
-            </label>
-
-            <label style={{ display: 'block', marginBottom: '1rem' }}>
-              End Date:
-              <input
-                type="date"
-                name="recurrence_end_date"
-                value={eventData.recurrence_end_date}
-                onChange={handleChange}
-                required
-                style={{ display: 'block', width: '100%', padding: '0.5rem', marginTop: '0.25rem' }}
-              />
-            </label>
-          </div>
-        )}
 
         <fieldset style={{ marginBottom: '1rem', padding: '1rem', border: '1px solid #ddd', borderRadius: '4px' }}>
           <legend style={{ fontWeight: 'bold', padding: '0 0.5rem' }}>Allowed Formats</legend>
