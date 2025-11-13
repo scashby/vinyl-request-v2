@@ -26,7 +26,7 @@ interface EventData {
   recurrence_interval: number;
   recurrence_end_date: string;
   parent_event_id?: number;
-  // ➕ FEATURED FIELDS (added)
+  // ➕ FEATURED FIELDS (kept for DB wiring, but now edited on separate admin page)
   is_featured_grid?: boolean;
   is_featured_upnext?: boolean;
   featured_priority?: number | null;
@@ -111,7 +111,7 @@ export default function EditEventForm() {
     recurrence_pattern: 'weekly',
     recurrence_interval: 1,
     recurrence_end_date: '',
-    // ➕ FEATURED DEFAULTS (added)
+    // FEATURED defaults (still mapped to DB, but UI now lives on /admin/featured-events)
     is_featured_grid: false,
     is_featured_upnext: false,
     featured_priority: null,
@@ -168,7 +168,7 @@ export default function EditEventForm() {
           is_recurring: false,
           recurrence_end_date: '',
           parent_event_id: undefined,
-          // ➕ FEATURED copy behavior: keep grid/priority; clear upnext to avoid accidental promotion
+          // FEATURED copy behavior: keep grid/priority; clear upnext to avoid accidental promotion
           is_featured_grid: !!copiedEvent.is_featured_grid,
           is_featured_upnext: false,
           featured_priority: copiedEvent.featured_priority ?? null,
@@ -209,7 +209,7 @@ export default function EditEventForm() {
             recurrence_interval: data.recurrence_interval || 1,
             recurrence_end_date: data.recurrence_end_date || '',
             date: isTBA ? '9999-12-31' : data.date,
-            // ➕ FEATURED flags in DB (added)
+            // FEATURED flags in DB (still loaded so they survive edits)
             is_featured_grid: !!data.is_featured_grid,
             is_featured_upnext: !!data.is_featured_upnext,
             featured_priority: data.featured_priority ?? null,
@@ -332,7 +332,7 @@ export default function EditEventForm() {
           recurrence_end_date: null,
         }),
         ...(eventData.parent_event_id && editMode !== 'single' ? { parent_event_id: eventData.parent_event_id } : {}),
-        // ➕ FEATURED (persist)
+        // FEATURED (still persisted, but now normally edited via /admin/featured-events)
         is_featured_grid: !!eventData.is_featured_grid,
         is_featured_upnext: !!eventData.is_featured_upnext,
         featured_priority: eventData.featured_priority ?? null,
@@ -383,7 +383,7 @@ export default function EditEventForm() {
               allowed_tags: eventData.allowed_tags.length > 0
                 ? `{${eventData.allowed_tags.map(t => t.trim()).join(',')}}`
                 : null,
-              // ➕ FEATURED fields applied to future items too
+              // FEATURED fields applied to future items too (unchanged logic)
               is_featured_grid: !!eventData.is_featured_grid,
               is_featured_upnext: !!eventData.is_featured_upnext,
               featured_priority: eventData.featured_priority ?? null,
@@ -512,49 +512,6 @@ export default function EditEventForm() {
         {id ? 'Edit Event' : 'New Event'}
       </h2>
 
-      {/* ➕ FEATURED PANEL (added) */}
-      <div
-        style={{
-          border: '2px solid #0ea5e9',
-          background: '#e0f2fe',
-          borderRadius: 8,
-          padding: '1rem',
-          marginBottom: '1rem'
-        }}
-      >
-        <div style={{ fontWeight: 800, marginBottom: '.5rem' }}>Featured</div>
-        <label style={{ display: 'block', marginBottom: '.5rem' }}>
-          <input
-            type="checkbox"
-            name="is_featured_upnext"
-            checked={!!eventData.is_featured_upnext}
-            onChange={handleCheckboxChange}
-          />{' '}
-          Show in <strong>Up Next</strong> (max 2)
-        </label>
-        <label style={{ display: 'block' }}>
-          <input
-            type="checkbox"
-            name="is_featured_grid"
-            checked={!!eventData.is_featured_grid}
-            onChange={handleCheckboxChange}
-          />{' '}
-          Show in <strong>Featured Grid</strong> (Section 2)
-        </label>
-        <div style={{ marginTop: '.75rem' }}>
-          <label>
-            Priority (lower shows first):
-            <input
-              type="number"
-              name="featured_priority"
-              value={eventData.featured_priority ?? ''}
-              onChange={handleChange}
-              style={{ marginLeft: '.5rem', width: '6rem' }}
-            />
-          </label>
-        </div>
-      </div>
-      
       {(isParentEvent || isPartOfSeries) && (
         <div style={{
           backgroundColor: '#fef3c7',
@@ -711,7 +668,7 @@ export default function EditEventForm() {
           style={{ display: 'block', width: '100%', marginBottom: '1rem', padding: '0.5rem' }}
         />
 
-        {/* RECURRING EVENT SECTION - MOVED UP */}
+        {/* RECURRING EVENT SECTION */}
         {eventData.date && eventData.date !== '9999-12-31' && !isPartOfSeries && (
           <div style={{
             border: '2px solid #8b5cf6',
