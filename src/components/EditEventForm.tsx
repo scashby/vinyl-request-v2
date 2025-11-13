@@ -26,6 +26,10 @@ interface EventData {
   recurrence_interval: number;
   recurrence_end_date: string;
   parent_event_id?: number;
+  // ➕ FEATURED FIELDS (added)
+  is_featured_grid?: boolean;
+  is_featured_upnext?: boolean;
+  featured_priority?: number | null;
 }
 
 interface TagDefinition {
@@ -107,6 +111,10 @@ export default function EditEventForm() {
     recurrence_pattern: 'weekly',
     recurrence_interval: 1,
     recurrence_end_date: '',
+    // ➕ FEATURED DEFAULTS (added)
+    is_featured_grid: false,
+    is_featured_upnext: false,
+    featured_priority: null,
   });
 
   useEffect(() => {
@@ -160,6 +168,10 @@ export default function EditEventForm() {
           is_recurring: false,
           recurrence_end_date: '',
           parent_event_id: undefined,
+          // ➕ FEATURED copy behavior: keep grid/priority; clear upnext to avoid accidental promotion
+          is_featured_grid: !!copiedEvent.is_featured_grid,
+          is_featured_upnext: false,
+          featured_priority: copiedEvent.featured_priority ?? null,
         });
         setIsPartOfSeries(false);
         setIsParentEvent(false);
@@ -197,6 +209,10 @@ export default function EditEventForm() {
             recurrence_interval: data.recurrence_interval || 1,
             recurrence_end_date: data.recurrence_end_date || '',
             date: isTBA ? '9999-12-31' : data.date,
+            // ➕ FEATURED flags in DB (added)
+            is_featured_grid: !!data.is_featured_grid,
+            is_featured_upnext: !!data.is_featured_upnext,
+            featured_priority: data.featured_priority ?? null,
           });
           
           // Determine if this is part of a recurring series
@@ -215,7 +231,12 @@ export default function EditEventForm() {
     const { name, value } = e.target;
     setEventData((prev) => ({
       ...prev,
-      [name]: name === 'recurrence_interval' ? parseInt(value) || 1 : value,
+      [name]:
+        name === 'recurrence_interval'
+          ? parseInt(value) || 1
+          : name === 'featured_priority'
+            ? (value === '' ? null : parseInt(value))
+            : value,
       // If date is being cleared, disable recurring
       ...(name === 'date' && !value ? { is_recurring: false, recurrence_end_date: '' } : {})
     }));
@@ -310,7 +331,11 @@ export default function EditEventForm() {
           recurrence_interval: null,
           recurrence_end_date: null,
         }),
-        ...(eventData.parent_event_id && editMode !== 'single' ? { parent_event_id: eventData.parent_event_id } : {})
+        ...(eventData.parent_event_id && editMode !== 'single' ? { parent_event_id: eventData.parent_event_id } : {}),
+        // ➕ FEATURED (persist)
+        is_featured_grid: !!eventData.is_featured_grid,
+        is_featured_upnext: !!eventData.is_featured_upnext,
+        featured_priority: eventData.featured_priority ?? null,
       };
 
       console.log('Submitting payload:', payload);
@@ -358,6 +383,10 @@ export default function EditEventForm() {
               allowed_tags: eventData.allowed_tags.length > 0
                 ? `{${eventData.allowed_tags.map(t => t.trim()).join(',')}}`
                 : null,
+              // ➕ FEATURED fields applied to future items too
+              is_featured_grid: !!eventData.is_featured_grid,
+              is_featured_upnext: !!eventData.is_featured_upnext,
+              featured_priority: eventData.featured_priority ?? null,
             })
             .or(`id.eq.${id},parent_event_id.eq.${parentId}`)
             .gte('date', eventData.date);
@@ -369,110 +398,15 @@ export default function EditEventForm() {
           // Edit all events in series
           const parentId = eventData.parent_event_id || id;
           
-          if (isParentEvent && eventData.is_recurring) {
-            // Update parent and regenerate children
-            const { error: updateError } = await supabase
-              .from('events')
-              .update(payload)
-              .eq('id', id);
+          const { error: updateError } = await supabase
+            .from('events')
+            .update({
+              ...payload
+            })
+            .or(`id.eq.${parentId},parent_event_id.eq.${parentId}`);
 
-            if (updateError) throw updateError;
-
-            const recurringEvents = generateRecurringEvents({
-              ...eventData,
-              id: parseInt(id)
-            });
-
-            const { data: existingChildren } = await supabase
-              .from('events')
-              .select('id, date')
-              .eq('parent_event_id', id);
-
-            const existingDates = new Set(existingChildren?.map(e => e.date) || []);
-            const newDates = recurringEvents.slice(1).map(e => e.date);
-            
-            for (const child of existingChildren || []) {
-              if (newDates.includes(child.date)) {
-                await supabase
-                  .from('events')
-                  .update({
-                    title: eventData.title,
-                    time: eventData.time,
-                    location: eventData.location,
-                    image_url: eventData.image_url,
-                    info: eventData.info,
-                    info_url: eventData.info_url,
-                    has_queue: eventData.has_queue,
-                    queue_types: eventData.has_queue && eventData.queue_types.length > 0 
-                      ? `{${eventData.queue_types.join(',')}}`
-                      : null,
-                    allowed_formats: `{${eventData.allowed_formats.map(f => f.trim()).join(',')}}`,
-                    allowed_tags: eventData.allowed_tags.length > 0
-                      ? `{${eventData.allowed_tags.map(t => t.trim()).join(',')}}`
-                      : null,
-                  })
-                  .eq('id', child.id);
-              } else {
-                await supabase
-                  .from('events')
-                  .delete()
-                  .eq('id', child.id);
-              }
-            }
-
-            const eventsToInsert = recurringEvents
-              .slice(1)
-              .filter(e => !existingDates.has(e.date))
-              .map(e => ({
-                ...e,
-                date: e.date,
-                allowed_formats: `{${e.allowed_formats.map(f => f.trim()).join(',')}}`,
-                queue_types: eventData.has_queue && eventData.queue_types.length > 0 
-                  ? `{${eventData.queue_types.join(',')}}`
-                  : null,
-                allowed_tags: e.allowed_tags.length > 0
-                  ? `{${e.allowed_tags.map(t => t.trim()).join(',')}}`
-                  : null,
-                parent_event_id: parseInt(id),
-                recurrence_pattern: null,
-                recurrence_interval: null,
-                recurrence_end_date: null,
-              }));
-
-            if (eventsToInsert.length > 0) {
-              const { error: insertError } = await supabase
-                .from('events')
-                .insert(eventsToInsert);
-
-              if (insertError) throw insertError;
-            }
-
-            alert(`Successfully updated recurring event series! (${recurringEvents.length} total events)`);
-          } else {
-            // Update all events in the series (parent and children)
-            const { error: updateError } = await supabase
-              .from('events')
-              .update({
-                title: eventData.title,
-                time: eventData.time,
-                location: eventData.location,
-                image_url: eventData.image_url,
-                info: eventData.info,
-                info_url: eventData.info_url,
-                has_queue: eventData.has_queue,
-                queue_types: eventData.has_queue && eventData.queue_types.length > 0 
-                  ? `{${eventData.queue_types.join(',')}}`
-                  : null,
-                allowed_formats: `{${eventData.allowed_formats.map(f => f.trim()).join(',')}}`,
-                allowed_tags: eventData.allowed_tags.length > 0
-                  ? `{${eventData.allowed_tags.map(t => t.trim()).join(',')}}`
-                  : null,
-              })
-              .or(`id.eq.${parentId},parent_event_id.eq.${parentId}`);
-
-            if (updateError) throw updateError;
-            alert('All events in series updated successfully!');
-          }
+          if (updateError) throw updateError;
+          alert('All events in series updated successfully!');
         }
       } else if (!isTBA && eventData.is_recurring && !id) {
         // CREATING a new recurring event
@@ -542,12 +476,12 @@ export default function EditEventForm() {
       let errorMessage = 'An unknown error occurred';
       
       if (error && typeof error === 'object') {
-        if ('message' in error && typeof error.message === 'string') {
-          errorMessage = error.message;
-        } else if ('details' in error && typeof error.details === 'string') {
-          errorMessage = error.details;
-        } else if ('hint' in error && typeof error.hint === 'string') {
-          errorMessage = error.hint;
+        if ('message' in error && typeof (error as { message?: unknown }).message === 'string') {
+          errorMessage = (error as { message: string }).message;
+        } else if ('details' in error && typeof (error as { details?: unknown }).details === 'string') {
+          errorMessage = (error as { details: string }).details;
+        } else if ('hint' in error && typeof (error as { hint?: unknown }).hint === 'string') {
+          errorMessage = (error as { hint: string }).hint;
         }
       }
       
@@ -577,6 +511,49 @@ export default function EditEventForm() {
       <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1.5rem' }}>
         {id ? 'Edit Event' : 'New Event'}
       </h2>
+
+      {/* ➕ FEATURED PANEL (added) */}
+      <div
+        style={{
+          border: '2px solid #0ea5e9',
+          background: '#e0f2fe',
+          borderRadius: 8,
+          padding: '1rem',
+          marginBottom: '1rem'
+        }}
+      >
+        <div style={{ fontWeight: 800, marginBottom: '.5rem' }}>Featured</div>
+        <label style={{ display: 'block', marginBottom: '.5rem' }}>
+          <input
+            type="checkbox"
+            name="is_featured_upnext"
+            checked={!!eventData.is_featured_upnext}
+            onChange={handleCheckboxChange}
+          />{' '}
+          Show in <strong>Up Next</strong> (max 2)
+        </label>
+        <label style={{ display: 'block' }}>
+          <input
+            type="checkbox"
+            name="is_featured_grid"
+            checked={!!eventData.is_featured_grid}
+            onChange={handleCheckboxChange}
+          />{' '}
+          Show in <strong>Featured Grid</strong> (Section 2)
+        </label>
+        <div style={{ marginTop: '.75rem' }}>
+          <label>
+            Priority (lower shows first):
+            <input
+              type="number"
+              name="featured_priority"
+              value={eventData.featured_priority ?? ''}
+              onChange={handleChange}
+              style={{ marginLeft: '.5rem', width: '6rem' }}
+            />
+          </label>
+        </div>
+      </div>
       
       {(isParentEvent || isPartOfSeries) && (
         <div style={{
