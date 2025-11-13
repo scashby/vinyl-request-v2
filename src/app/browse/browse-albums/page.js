@@ -24,6 +24,7 @@ function BrowseAlbumsContent() {
   const [searchTerm, setSearchTerm] = useState('');
   const [allowedFormats, setAllowedFormats] = useState(null);
   const [eventTitle, setEventTitle] = useState('');
+  const [eventDate, setEventDate] = useState('');
   const [mediaFilter, setMediaFilter] = useState('');
   const [sortField, setSortField] = useState('date_added');
   const [sortAsc, setSortAsc] = useState(false);
@@ -43,28 +44,44 @@ function BrowseAlbumsContent() {
     return addedDate >= twoWeeksAgo;
   };
 
+  // Helper function to format date
+  const formatDate = (dateString) => {
+    if (!dateString || dateString === '9999-12-31') return '';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+      weekday: 'long',
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+  };
+
   useEffect(() => {
     let isMounted = true;
     async function fetchEventDataIfNeeded() {
       if (eventId) {
         const { data, error } = await supabase
           .from('events')
-          .select('id, title, allowed_formats')
+          .select('id, title, date, allowed_formats')
           .eq('id', eventId)
           .single();
         if (!error && data && isMounted) {
           setAllowedFormats(data.allowed_formats || []);
           setEventTitle(data.title || '');
+          setEventDate(data.date || '');
         } else if (isMounted) {
           setAllowedFormats(null);
           setEventTitle('');
+          setEventDate('');
         }
       } else if (allowedFormatsParam && eventTitleParam) {
         setAllowedFormats(allowedFormatsParam.split(',').map(f => f.trim()));
         setEventTitle(eventTitleParam);
+        setEventDate('');
       } else {
         setAllowedFormats(null);
         setEventTitle('');
+        setEventDate('');
       }
     }
     fetchEventDataIfNeeded();
@@ -251,7 +268,16 @@ function BrowseAlbumsContent() {
       <header className="event-hero">
         <div className="overlay">
           <h1>
-            Browse the Collection{eventTitle ? <span> for <span dangerouslySetInnerHTML={{ __html: formatEventText(eventTitle) }} /></span> : ''}
+            Browse the Collection{eventTitle ? (
+              <span>
+                {' '}for <span dangerouslySetInnerHTML={{ __html: formatEventText(eventTitle) }} />
+                {eventDate && eventDate !== '9999-12-31' && (
+                  <span style={{ display: 'block', fontSize: '0.6em', fontWeight: '400', marginTop: '0.5rem', opacity: 0.9 }}>
+                    {formatDate(eventDate)}
+                  </span>
+                )}
+              </span>
+            ) : ''}
           </h1>
         </div>
       </header>
