@@ -657,24 +657,6 @@ export default function Page() {
                                   background: p.bar,
                                 }}
                               />
-                              {idx < 2 ? (
-                                <div
-                                  style={{
-                                    position: "absolute",
-                                    top: 8,
-                                    right: 8,
-                                    background: p.bar,
-                                    color: "#000",
-                                    fontWeight: 900,
-                                    fontSize: 10,
-                                    padding: "4px 6px",
-                                    borderRadius: 999,
-                                    letterSpacing: ".6px",
-                                  }}
-                                >
-                                  NEW
-                                </div>
-                              ) : null}
                               <h4
                                 style={{
                                   color: "#fff",
@@ -704,6 +686,11 @@ export default function Page() {
                                     fontSize: ".75rem",
                                     borderRadius: 999,
                                     padding: ".25rem .55rem",
+                                    minWidth: 72,
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    textAlign: "center",
                                   }}
                                 >
                                   {tba
