@@ -11,12 +11,6 @@ import "styles/events.css";
 
 /**
  * EVENTS PAGE — 9:30 Club style (STRICT 3‑SECTION STACK)
- * ORDER:
- *  - Header
- *  - Section 1: Up Next (events[0..1])
- *  - Section 2: 4‑column grid (PLACEHOLDERS ONLY)
- *  - Section 3: Upcoming Shows (LEFT: ALL events • RIGHT: 350px sidebar)
- *  - Footer
  */
 
 export default function Page() {
@@ -26,12 +20,10 @@ export default function Page() {
 
   useEffect(() => {
     const load = async () => {
-      // EVENTS
-      const { data: ev, error: evErr } = await supabase
+      const { data: ev } = await supabase
         .from("events")
         .select("*")
         .order("date", { ascending: true });
-      if (evErr) console.error("Events error:", evErr);
 
       const today = new Date().toISOString().slice(0, 10);
       const filtered = (ev || []).filter(
@@ -47,15 +39,12 @@ export default function Page() {
       });
       setEvents(sorted);
 
-      // DJ sets for sidebar card
-      const { data: sets, error: setErr } = await supabase
+      const { data: sets } = await supabase
         .from("dj_sets")
         .select(`*, events ( id, title, date, location )`)
         .order("recorded_at", { ascending: false })
         .limit(6);
-      if (setErr) console.error("DJ sets error:", setErr);
       setPastDJSets(sets || []);
-
       setLoading(false);
     };
     load();
@@ -74,8 +63,6 @@ export default function Page() {
   };
 
   const upNext = events.slice(0, 2);
-
-  // Section 2: placeholders only (until featured tagging exists)
   const placeholderGrid = Array.from({ length: 8 }).map((_, i) => ({
     id: `ph-${i}`,
     title: `Featured Event (TBA)`,
@@ -83,7 +70,6 @@ export default function Page() {
     time: "",
     image_url: "/images/placeholder.png",
   }));
-
   const latestSet = pastDJSets[0];
 
   const DateBox = ({ date }) => {
@@ -100,29 +86,13 @@ export default function Page() {
           minWidth: 84,
         }}
       >
-        <div
-          style={{
-            color: "#00c4ff",
-            fontSize: 11,
-            fontWeight: 800,
-            letterSpacing: ".8px",
-            marginBottom: 2,
-          }}
-        >
+        <div style={{ color: "#00c4ff", fontSize: 11, fontWeight: 800, letterSpacing: ".8px", marginBottom: 2 }}>
           {tba ? "TBA" : d.wk}
         </div>
         <div style={{ color: "#fff", fontSize: 26, fontWeight: 800, lineHeight: 1 }}>
           {tba ? "" : d.day}
         </div>
-        <div
-          style={{
-            color: "#00c4ff",
-            fontSize: 11,
-            fontWeight: 800,
-            letterSpacing: ".8px",
-            marginTop: 2,
-          }}
-        >
+        <div style={{ color: "#00c4ff", fontSize: 11, fontWeight: 800, letterSpacing: ".8px", marginTop: 2 }}>
           {tba ? "" : d.mon}
         </div>
       </div>
@@ -131,50 +101,16 @@ export default function Page() {
 
   const SectionTitle = ({ text }) => (
     <div style={{ marginBottom: "1.5rem" }}>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "10px",
-        }}
-      >
-        <div
-          style={{
-            width: 14,
-            height: 14,
-            borderRadius: 2,
-            background: "#00c4ff",
-            transform: "rotate(45deg)",
-          }}
-        />
-        <h2
-          style={{
-            color: "#fff",
-            fontSize: "2.6rem",
-            fontWeight: 900,
-            letterSpacing: "1px",
-            margin: 0,
-            textTransform: "uppercase",
-          }}
-        >
-          {text}
-        </h2>
+      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+        <div style={{ width: 14, height: 14, borderRadius: 2, background: "#00c4ff", transform: "rotate(45deg)" }} />
+        <h2 style={{ color: "#fff", fontSize: "2.6rem", fontWeight: 900, letterSpacing: "1px", margin: 0, textTransform: "uppercase" }}>{text}</h2>
       </div>
-      <div
-        style={{
-          height: 6,
-          width: 180,
-          background: "#00c4ff",
-          borderRadius: 999,
-          marginTop: 10,
-        }}
-      />
+      <div style={{ height: 6, width: 180, background: "#00c4ff", borderRadius: 999, marginTop: 10 }} />
     </div>
   );
 
   return (
     <div className="page-wrapper" style={{ background: "#000" }}>
-      {/* PAGE HEADER */}
       <header className="event-hero" style={{ background: "#000" }}>
         <div className="overlay">
           <h1>Upcoming Vinyl Nights</h1>
@@ -187,39 +123,17 @@ export default function Page() {
         ) : (
           <div data-secwrap="sections">
             {/* SECTION 1 — UP NEXT */}
-            <section
-              style={{
-                background: "linear-gradient(180deg,#141414,#000)",
-                padding: "2.75rem 1.25rem 3rem",
-                borderBottom: "3px solid #00c4ff",
-              }}
-            >
+            <section style={{ background: "linear-gradient(180deg,#141414,#000)", padding: "2.75rem 1.25rem 3rem", borderBottom: "3px solid #00c4ff" }}>
               <div style={{ maxWidth: 1400, margin: "0 auto" }}>
                 <SectionTitle text="Up Next" />
-
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: upNext.length === 1 ? "1fr" : "repeat(2,1fr)",
-                    gap: "1.75rem",
-                  }}
-                >
+                <div style={{ display: "grid", gridTemplateColumns: upNext.length === 1 ? "1fr" : "repeat(2,1fr)", gap: "1.75rem" }}>
                   {(upNext.length ? upNext : [0, 1].slice(0, 1)).map((e, i) => {
-                    const ev = e || {
-                      id: `placeholder-upnext-${i}`,
-                      title: "Featured Event (TBA)",
-                      date: "9999-12-31",
-                      image_url: "/images/placeholder.png",
-                    };
+                    const ev = e || { id: `placeholder-upnext-${i}`, title: "Featured Event (TBA)", date: "9999-12-31", image_url: "/images/placeholder.png" };
                     const img = ev.image_url || "/images/placeholder.png";
                     const d = compactDate(ev.date);
                     const tba = !ev.date || ev.date === "9999-12-31";
                     return (
-                      <Link
-                        key={ev.id}
-                        href={e ? `/events/event-detail/${ev.id}` : "#"}
-                        style={{ textDecoration: "none" }}
-                      >
+                      <Link key={ev.id} href={e ? `/events/event-detail/${ev.id}` : "#"} style={{ textDecoration: "none" }}>
                         <div
                           style={{
                             background: "#222",
@@ -230,8 +144,7 @@ export default function Page() {
                           }}
                           onMouseOver={(x) => {
                             x.currentTarget.style.transform = "translateY(-6px)";
-                            x.currentTarget.style.boxShadow =
-                              "0 14px 36px rgba(0,196,255,.35)";
+                            x.currentTarget.style.boxShadow = "0 14px 36px rgba(0,196,255,.35)";
                           }}
                           onMouseOut={(x) => {
                             x.currentTarget.style.transform = "translateY(0)";
@@ -239,39 +152,13 @@ export default function Page() {
                           }}
                         >
                           <div style={{ position: "relative", width: "100%", paddingTop: "56.25%" }}>
-                            <Image
-                              src={img}
-                              alt={ev.title}
-                              fill
-                              sizes="(max-width:900px) 100vw, 700px"
-                              style={{ objectFit: "cover" }}
-                              unoptimized
-                            />
+                            <Image src={img} alt={ev.title} fill sizes="(max-width:900px) 100vw, 700px" style={{ objectFit: "cover" }} unoptimized />
                           </div>
                           <div style={{ padding: "1.5rem 1.25rem 1.75rem" }}>
-                            <div
-                              style={{
-                                background: tba ? "#6b7280" : "#00c4ff",
-                                color: tba ? "#fff" : "#000",
-                                padding: ".6rem .9rem",
-                                borderRadius: 8,
-                                display: "inline-block",
-                                fontWeight: 900,
-                                marginBottom: ".9rem",
-                              }}
-                            >
+                            <div style={{ background: tba ? "#6b7280" : "#00c4ff", color: tba ? "#fff" : "#000", padding: ".6rem .9rem", borderRadius: 8, display: "inline-block", fontWeight: 900, marginBottom: ".9rem" }}>
                               {tba ? "TBA" : `${d.wk} ${d.mon} ${d.day}`}
                             </div>
-                            <h3
-                              style={{
-                                color: "#fff",
-                                fontSize: "1.9rem",
-                                fontWeight: 900,
-                                lineHeight: 1.2,
-                                margin: 0,
-                              }}
-                              dangerouslySetInnerHTML={{ __html: formatEventText(ev.title) }}
-                            />
+                            <h3 style={{ color: "#fff", fontSize: "1.9rem", fontWeight: 900, lineHeight: 1.2, margin: 0 }} dangerouslySetInnerHTML={{ __html: formatEventText(ev.title) }} />
                           </div>
                         </div>
                       </Link>
@@ -282,22 +169,10 @@ export default function Page() {
             </section>
 
             {/* SECTION 2 — 4‑COLUMN GRID (PLACEHOLDERS ONLY) */}
-            <section
-              style={{
-                background: "#000",
-                padding: "2.75rem 1.25rem 3rem",
-                borderBottom: "2px solid #1f1f1f",
-              }}
-            >
+            <section style={{ background: "#000", padding: "2.75rem 1.25rem 3rem", borderBottom: "2px solid #1f1f1f" }}>
               <div style={{ maxWidth: 1400, margin: "0 auto" }}>
                 <SectionTitle text="Featured" />
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-                    gap: "1.25rem",
-                  }}
-                >
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "1.25rem" }}>
                   {placeholderGrid.map((e) => {
                     const img = e.image_url;
                     const d = compactDate(e.date);
@@ -323,36 +198,11 @@ export default function Page() {
                         }}
                       >
                         <div style={{ position: "relative", width: "100%", paddingTop: "100%" }}>
-                          <Image
-                            src={img}
-                            alt={e.title}
-                            fill
-                            sizes="280px"
-                            style={{ objectFit: "cover" }}
-                            unoptimized
-                          />
+                          <Image src={img} alt={e.title} fill sizes="280px" style={{ objectFit: "cover" }} unoptimized />
                         </div>
                         <div style={{ padding: "1rem 1rem 1.25rem" }}>
-                          <h4
-                            style={{
-                              color: "#fff",
-                              fontSize: "1.1rem",
-                              fontWeight: 800,
-                              lineHeight: 1.3,
-                              minHeight: "2.5rem",
-                              margin: "0 0 .5rem",
-                            }}
-                            dangerouslySetInnerHTML={{ __html: formatEventText(e.title) }}
-                          />
-                          <div
-                            style={{
-                              color: "#00d9ff",
-                              fontWeight: 800,
-                              fontSize: ".92rem",
-                            }}
-                          >
-                            {`${d.mon} ${d.day}`}
-                          </div>
+                          <h4 style={{ color: "#fff", fontSize: "1.1rem", fontWeight: 800, lineHeight: 1.3, minHeight: "2.5rem", margin: "0 0 .5rem" }} dangerouslySetInnerHTML={{ __html: formatEventText(e.title) }} />
+                          <div style={{ color: "#00d9ff", fontWeight: 800, fontSize: ".92rem" }}>{`${d.mon} ${d.day}`}</div>
                         </div>
                       </div>
                     );
@@ -362,32 +212,16 @@ export default function Page() {
             </section>
 
             {/* SECTION 3 — UPCOMING SHOWS */}
-            <section
-              style={{
-                background: "#0d0d0d",
-                padding: "3rem 1.25rem 4rem",
-              }}
-            >
+            <section style={{ background: "#0d0d0d", padding: "3rem 1.25rem 4rem" }}>
               <div style={{ maxWidth: 1400, margin: "0 auto" }}>
                 <SectionTitle text="Upcoming Shows" />
-
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 350px",
-                    gap: "2rem",
-                  }}
-                >
-                  {/* LEFT: ALL EVENTS as vertical rows */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 350px", gap: "2rem" }}>
+                  {/* LEFT LIST */}
                   <div>
                     {events.map((e) => {
                       const img = e.image_url || "/images/placeholder.png";
                       return (
-                        <Link
-                          key={e.id}
-                          href={`/events/event-detail/${e.id}`}
-                          style={{ textDecoration: "none", display: "block" }}
-                        >
+                        <Link key={e.id} href={`/events/event-detail/${e.id}`} style={{ textDecoration: "none", display: "block" }}>
                           <div
                             style={{
                               display: "grid",
@@ -409,48 +243,14 @@ export default function Page() {
                             }}
                           >
                             <DateBox date={e.date} />
-
                             <div style={{ position: "relative", width: 150, height: 150, borderRadius: 6, overflow: "hidden" }}>
-                              <Image
-                                src={img}
-                                alt={e.title}
-                                fill
-                                sizes="150px"
-                                style={{ objectFit: "cover" }}
-                                unoptimized
-                              />
+                              <Image src={img} alt={e.title} fill sizes="150px" style={{ objectFit: "cover" }} unoptimized />
                             </div>
-
                             <div style={{ minWidth: 0 }}>
-                              <h3
-                                style={{
-                                  color: "#fff",
-                                  fontSize: "1.25rem",
-                                  fontWeight: 800,
-                                  margin: 0,
-                                  lineHeight: 1.25,
-                                }}
-                                dangerouslySetInnerHTML={{ __html: formatEventText(e.title) }}
-                              />
-                              {e.location ? (
-                                <div style={{ color: "#9aa3ad", fontSize: ".9rem", marginTop: ".35rem" }}>
-                                  📍 {e.location}
-                                </div>
-                              ) : null}
+                              <h3 style={{ color: "#fff", fontSize: "1.25rem", fontWeight: 800, margin: 0, lineHeight: 1.25 }} dangerouslySetInnerHTML={{ __html: formatEventText(e.title) }} />
+                              {e.location ? <div style={{ color: "#9aa3ad", fontSize: ".9rem", marginTop: ".35rem" }}>📍 {e.location}</div> : null}
                             </div>
-
-                            <div
-                              style={{
-                                background: "#00c4ff",
-                                color: "#000",
-                                padding: ".55rem 1.1rem",
-                                borderRadius: 6,
-                                fontWeight: 900,
-                                fontSize: ".85rem",
-                                whiteSpace: "nowrap",
-                                textTransform: "uppercase",
-                              }}
-                            >
+                            <div style={{ background: "#00c4ff", color: "#000", padding: ".55rem 1.1rem", borderRadius: 6, fontWeight: 900, fontSize: ".85rem", whiteSpace: "nowrap", textTransform: "uppercase" }}>
                               More Info
                             </div>
                           </div>
@@ -459,31 +259,10 @@ export default function Page() {
                     })}
                   </div>
 
-                  {/* RIGHT: 350px sidebar with AD-style boxes */}
-                  <aside
-                    style={{
-                      background: "#121212",
-                      border: "2px solid #262626",
-                      borderRadius: 12,
-                      padding: "1.25rem",
-                      alignSelf: "start",
-                    }}
-                  >
+                  {/* RIGHT SIDEBAR */}
+                  <aside style={{ background: "#121212", border: "2px solid #262626", borderRadius: 12, padding: "1.25rem", alignSelf: "start" }}>
                     {/* Just Announced header */}
-                    <div
-                      style={{
-                        background: "linear-gradient(90deg,#00c4ff,#34dfff)",
-                        color: "#000",
-                        padding: ".65rem .75rem",
-                        borderRadius: 8,
-                        textAlign: "center",
-                        fontWeight: 900,
-                        letterSpacing: ".5px",
-                        textTransform: "uppercase",
-                        marginBottom: "1rem",
-                        boxShadow: "0 6px 20px rgba(0,196,255,.2)",
-                      }}
-                    >
+                    <div style={{ background: "linear-gradient(90deg,#00c4ff,#34dfff)", color: "#000", padding: ".65rem .75rem", borderRadius: 8, textAlign: "center", fontWeight: 900, letterSpacing: ".5px", textTransform: "uppercase", marginBottom: "1rem", boxShadow: "0 6px 20px rgba(0,196,255,.2)" }}>
                       Just Announced
                     </div>
 
@@ -501,7 +280,6 @@ export default function Page() {
                           { bar:"#06b6d4", bg:"linear-gradient(135deg,#062329,#082f36)", border:"#10424b", pill:"#06b6d4", pillText:"#000" },
                         ];
                         const p = palettes[idx % palettes.length];
-
                         return (
                           <Link key={e.id} href={`/events/event-detail/${e.id}`} style={{ textDecoration: "none" }}>
                             <div
@@ -515,62 +293,15 @@ export default function Page() {
                                 overflow: "hidden",
                                 transition: "transform .15s ease, box-shadow .15s ease",
                               }}
-                              onMouseOver={(x) => {
-                                x.currentTarget.style.transform = "translateY(-2px)";
-                                x.currentTarget.style.boxShadow = "0 16px 36px rgba(0,196,255,.22)";
-                              }}
-                              onMouseOut={(x) => {
-                                x.currentTarget.style.transform = "translateY(0)";
-                                x.currentTarget.style.boxShadow = "0 8px 28px rgba(0,0,0,.35)";
-                              }}
+                              onMouseOver={(x) => { x.currentTarget.style.transform = "translateY(-2px)"; x.currentTarget.style.boxShadow = "0 16px 36px rgba(0,196,255,.22)"; }}
+                              onMouseOut={(x) => { x.currentTarget.style.transform = "translateY(0)"; x.currentTarget.style.boxShadow = "0 8px 28px rgba(0,0,0,.35)"; }}
                             >
                               <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 6, background: p.bar }} />
-                              {idx < 2 ? (
-                                <div
-                                  style={{
-                                    position: "absolute",
-                                    top: 8,
-                                    right: 8,
-                                    background: p.bar,
-                                    color: "#000",
-                                    fontWeight: 900,
-                                    fontSize: 10,
-                                    padding: "4px 6px",
-                                    borderRadius: 999,
-                                    letterSpacing: ".6px",
-                                  }}
-                                >
-                                  NEW
-                                </div>
-                              ) : null}
-
-                              <h4
-                                style={{
-                                  color: "#fff",
-                                  fontSize: "1rem",
-                                  fontWeight: 900,
-                                  lineHeight: 1.25,
-                                  margin: "0 0 .45rem",
-                                  textShadow: "0 1px 0 rgba(0,0,0,.25)",
-                                }}
-                                dangerouslySetInnerHTML={{ __html: formatEventText(e.title) }}
-                              />
+                              {idx < 2 ? (<div style={{ position: "absolute", top: 8, right: 8, background: p.bar, color: "#000", fontWeight: 900, fontSize: 10, padding: "4px 6px", borderRadius: 999, letterSpacing: ".6px" }}>NEW</div>) : null}
+                              <h4 style={{ color: "#fff", fontSize: "1rem", fontWeight: 900, lineHeight: 1.25, margin: "0 0 .45rem", textShadow: "0 1px 0 rgba(0,0,0,.25)" }} dangerouslySetInnerHTML={{ __html: formatEventText(e.title) }} />
                               <div style={{ display: "flex", alignItems: "center", gap: ".5rem" }}>
-                                <div
-                                  style={{
-                                    background: p.pill,
-                                    color: p.pillText,
-                                    fontWeight: 900,
-                                    fontSize: ".75rem",
-                                    borderRadius: 999,
-                                    padding: ".25rem .55rem",
-                                  }}
-                                >
-                                  {tba ? "TBA" : `${d.wk} ${d.mon} ${d.day}`}
-                                </div>
-                                <div style={{ color: "rgba(255,255,255,.7)", fontSize: ".8rem" }}>
-                                  {e.location || "New date added"}
-                                </div>
+                                <div style={{ background: p.pill, color: p.pillText, fontWeight: 900, fontSize: ".75rem", borderRadius: 999, padding: ".25rem .55rem" }}>{tba ? "TBA" : `${d.wk} ${d.mon} ${d.day}`}</div>
+                                <div style={{ color: "rgba(255,255,255,.7)", fontSize: ".8rem" }}>{e.location || "New date added"}</div>
                               </div>
                             </div>
                           </Link>
@@ -578,112 +309,43 @@ export default function Page() {
                       })}
                     </div>
 
-                    {/* AD SLOT: Book DJ Gigs */}
-                    <div
-                      style={{
-                        background:
-                          "repeating-linear-gradient(135deg, #0a0a0a, #0a0a0a 12px, #0f0f0f 12px, #0f0f0f 24px)",
-                        border: "2px solid #2b2b2b",
-                        borderRadius: 14,
-                        padding: "1.1rem",
-                        marginBottom: "1rem",
-                        boxShadow: "inset 0 0 0 2px rgba(0,196,255,.08)",
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: ".6rem", marginBottom: ".5rem" }}>
-                        <div style={{ width: 26, height: 26, borderRadius: 6, background: "#00c4ff", color: "#000", fontWeight: 900, display: "grid", placeItems: "center" }}>📅</div>
-                        <div style={{ color: "#fff", fontSize: "1.15rem", fontWeight: 900, letterSpacing: ".3px", textTransform: "uppercase" }}>
-                          Book DJ Gigs
-                        </div>
+                    {/* AD: Book DJ Gigs — Retro Poster */}
+                    <div style={{ position: "relative", background: "radial-gradient(circle at 30% 20%, #ffe8a3 0%, #ffd15e 40%, #ff9a3c 60%, #ff6b3d 100%)", borderRadius: 16, padding: "1.1rem", marginBottom: "1rem", boxShadow: "0 12px 28px rgba(0,0,0,.35)", overflow: "hidden" }}>
+                      <div style={{ position: "absolute", inset: 0, background: "radial-gradient(circle at 70% 30%, rgba(255,255,255,.4), rgba(255,255,255,0) 35%)" }} />
+                      <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(#000 1px, transparent 1px)", backgroundSize: "6px 6px", opacity: .06 }} />
+                      <div style={{ position: "absolute", top: -18, right: -32, transform: "rotate(15deg)", background: "#000", color: "#fff", padding: ".35rem .9rem", fontWeight: 900, letterSpacing: "1px", textTransform: "uppercase", boxShadow: "0 8px 20px rgba(0,0,0,.4)" }}>
+                        Limited Dates
                       </div>
-                      <div style={{ color: "#9ca3af", fontSize: ".92rem", marginBottom: ".8rem" }}>
-                        Bring Dead Wax Dialogues to your venue or event.
+                      <div style={{ position: "relative" }}>
+                        <div style={{ fontSize: "1.4rem", fontWeight: 1000, textTransform: "uppercase", color: "#111", letterSpacing: "1.5px", textShadow: "0 1px 0 rgba(255,255,255,.6)" }}>Book DJ Gigs</div>
+                        <div style={{ color: "#111", opacity: .85, margin: ".4rem 0 .9rem", fontWeight: 700 }}>Parties • Breweries • Pop‑ups</div>
+                        <a href="https://calendly.com/deadwaxdialogues" target="_blank" rel="noopener noreferrer" style={{ display: "inline-block", background: "#111", color: "#ffd15e", padding: ".75rem 1rem", borderRadius: 6, fontWeight: 1000, textDecoration: "none", transform: "skewX(-12deg)", boxShadow: "0 8px 20px rgba(0,0,0,.35)" }}>
+                          <span style={{ display: "inline-block", transform: "skewX(12deg)" }}>Book Online</span>
+                        </a>
                       </div>
-                      <a
-                        href="https://calendly.com/deadwaxdialogues"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{
-                          display: "inline-block",
-                          background: "#00c4ff",
-                          color: "#000",
-                          padding: ".6rem .9rem",
-                          borderRadius: 10,
-                          fontWeight: 900,
-                          textDecoration: "none",
-                          boxShadow: "0 6px 22px rgba(0,196,255,.25)",
-                        }}
-                      >
-                        Book Online
-                      </a>
                     </div>
 
-                    {/* AD SLOT: Latest DJ Sets */}
+                    {/* AD: Latest DJ Sets — Neon Synthwave */}
                     {latestSet && (
-                      <div
-                        style={{
-                          background:
-                            "linear-gradient(160deg,#0b1022,#0f1f3d)",
-                          border: "2px solid #1f2a44",
-                          borderRadius: 14,
-                          padding: "1.1rem",
-                          marginBottom: "1rem",
-                          boxShadow: "inset 0 0 0 2px rgba(255,255,255,.04)",
-                        }}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", gap: ".6rem", marginBottom: ".5rem" }}>
-                          <div style={{ width: 26, height: 26, borderRadius: 6, background: "#7dd3fc", color: "#000", fontWeight: 900, display: "grid", placeItems: "center" }}>🎧</div>
-                          <div style={{ color: "#fff", fontSize: "1.15rem", fontWeight: 900, letterSpacing: ".3px", textTransform: "uppercase" }}>
-                            Latest DJ Sets
+                      <div style={{ position: "relative", background: "radial-gradient(circle at 50% 0%, rgba(255,0,204,.35), rgba(0,0,0,0) 60%), radial-gradient(circle at 50% 120%, rgba(0,255,255,.25), rgba(0,0,0,0) 55%), #050510", borderRadius: 16, padding: "1.1rem", marginBottom: "1rem", boxShadow: "0 14px 34px rgba(0,0,0,.45)", overflow: "hidden" }}>
+                        <div style={{ position: "absolute", left: -20, right: -20, bottom: 0, height: 110, backgroundImage: "linear-gradient(rgba(255,255,255,.12) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.12) 1px, transparent 1px)", backgroundSize: "22px 22px", transform: "perspective(300px) rotateX(60deg)", transformOrigin: "bottom" }} />
+                        <div style={{ position: "absolute", top: 10, right: 12, fontSize: 26, filter: "drop-shadow(0 0 6px rgba(0,255,255,.6))" }}>📼</div>
+                        <div style={{ position: "relative" }}>
+                          <div style={{ color: "#00ffff", fontWeight: 900, textTransform: "uppercase", letterSpacing: "1.2px", textShadow: "0 0 8px rgba(0,255,255,.8)" }}>Latest DJ Sets</div>
+                          <div style={{ color: "#e5e7eb", margin: ".35rem 0 .8rem" }}>{latestSet.title}</div>
+                          <div style={{ display: "flex", gap: ".65rem" }}>
+                            <a href={latestSet.file_url} target="_blank" rel="noopener noreferrer" style={{ background: "linear-gradient(90deg,#00ffff,#ff00ff)", color: "#000", padding: ".55rem .9rem", borderRadius: 999, fontWeight: 1000, textDecoration: "none", boxShadow: "0 0 20px rgba(0,255,255,.35)" }}>▶ Play</a>
+                            <a href={latestSet.download_url || latestSet.file_url} target="_blank" rel="noopener noreferrer" style={{ background: "#111", color: "#fff", padding: ".55rem .9rem", borderRadius: 999, fontWeight: 900, textDecoration: "none", border: "1px solid rgba(255,255,255,.25)" }}>⬇ Download</a>
                           </div>
-                        </div>
-                        <div style={{ color: "#cbd5e1", fontSize: ".92rem", marginBottom: ".8rem" }}>
-                          {latestSet.title}
-                        </div>
-                        <div style={{ display: "flex", gap: ".6rem" }}>
-                          <a
-                            href={latestSet.file_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{ background: "#fff", color: "#000", padding: ".5rem .85rem", borderRadius: 10, textDecoration: "none", fontWeight: 900 }}
-                          >
-                            ▶ Play
-                          </a>
-                          <a
-                            href={latestSet.download_url || latestSet.file_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{ background: "#22c55e", color: "#000", padding: ".5rem .85rem", borderRadius: 10, textDecoration: "none", fontWeight: 900 }}
-                          >
-                            ⬇ Download
-                          </a>
                         </div>
                       </div>
                     )}
 
-                    {/* AD SLOT: Merch */}
-                    <div
-                      style={{
-                        background:
-                          "repeating-linear-gradient(-45deg,#022c35,#022c35 10px,#053a44 10px,#053a44 20px)",
-                        border: "2px solid #0a4a57",
-                        borderRadius: 14,
-                        padding: "1.1rem",
-                        boxShadow: "0 8px 26px rgba(0,196,255,.12)",
-                      }}
-                    >
-                      <div style={{ color: "#00e6ff", fontSize: "1.35rem", fontWeight: 900, letterSpacing: "1px", textTransform: "uppercase", marginBottom: ".35rem", textShadow: "0 1px 0 rgba(0,0,0,.35)" }}>
-                        Merch
-                      </div>
-                      <div style={{ color: "#b9e6ee", fontSize: ".95rem", marginBottom: ".8rem" }}>
-                        New designs / styles — new deals. Check it out!
-                      </div>
-                      <Link
-                        href="/merch"
-                        style={{ display: "inline-block", background: "#00e6ff", color: "#000", padding: ".6rem .9rem", borderRadius: 10, textDecoration: "none", fontWeight: 900 }}
-                      >
-                        View Merch
-                      </Link>
+                    {/* AD: Merch */}
+                    <div style={{ background: "repeating-linear-gradient(-45deg,#022c35,#022c35 10px,#053a44 10px,#053a44 20px)", border: "2px solid #0a4a57", borderRadius: 14, padding: "1.1rem", boxShadow: "0 8px 26px rgba(0,196,255,.12)" }}>
+                      <div style={{ color: "#00e6ff", fontSize: "1.35rem", fontWeight: 900, letterSpacing: "1px", textTransform: "uppercase", marginBottom: ".35rem", textShadow: "0 1px 0 rgba(0,0,0,.35)" }}>Merch</div>
+                      <div style={{ color: "#b9e6ee", fontSize: ".95rem", marginBottom: ".8rem" }}>New designs / styles — new deals. Check it out!</div>
+                      <Link href="/merch" style={{ display: "inline-block", background: "#00e6ff", color: "#000", padding: ".6rem .9rem", borderRadius: 10, textDecoration: "none", fontWeight: 900 }}>View Merch</Link>
                     </div>
                   </aside>
                 </div>
