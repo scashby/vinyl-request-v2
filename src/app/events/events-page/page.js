@@ -17,8 +17,6 @@ import "styles/events.css";
  *  - Section 2: 4‑column grid (PLACEHOLDERS ONLY)
  *  - Section 3: Upcoming Shows (LEFT: ALL events • RIGHT: 350px sidebar)
  *  - Footer
- *
- * Lint-safe: no JSX fragments; single export; no duplicate content.
  */
 
 export default function Page() {
@@ -461,7 +459,7 @@ export default function Page() {
                     })}
                   </div>
 
-                  {/* RIGHT: 350px sidebar */}
+                  {/* RIGHT: 350px sidebar with AD-style boxes */}
                   <aside
                     style={{
                       background: "#121212",
@@ -489,13 +487,11 @@ export default function Page() {
                       Just Announced
                     </div>
 
-                    {/* Just Announced list — visually distinct & varied */}
+                    {/* Just Announced list */}
                     <div style={{ display: "flex", flexDirection: "column", gap: ".9rem", marginBottom: "1.25rem" }}>
                       {events.slice(0, 6).map((e, idx) => {
                         const d = compactDate(e.date);
                         const tba = !e.date || e.date === "9999-12-31";
-
-                        // Palette variations per item
                         const palettes = [
                           { bar:"#00c4ff", bg:"linear-gradient(135deg,#0b1220,#0f1a2e)", border:"#1c2a44", pill:"#00c4ff", pillText:"#000" },
                           { bar:"#f59e0b", bg:"linear-gradient(135deg,#22160a,#2b1b0b)", border:"#3b2612", pill:"#f59e0b", pillText:"#000" },
@@ -528,10 +524,7 @@ export default function Page() {
                                 x.currentTarget.style.boxShadow = "0 8px 28px rgba(0,0,0,.35)";
                               }}
                             >
-                              {/* Accent bar */}
                               <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 6, background: p.bar }} />
-
-                              {/* Optional NEW badge for top two */}
                               {idx < 2 ? (
                                 <div
                                   style={{
@@ -585,9 +578,27 @@ export default function Page() {
                       })}
                     </div>
 
-                    {/* Small box: Booking */}
-                    <div style={{ background: "#151515", border: "1px solid #2b2b2b", borderRadius: 10, padding: "1rem", marginBottom: "1rem" }}>
-                      <h4 style={{ color: "#fff", margin: "0 0 .5rem", fontWeight: 800 }}>Book Dead Wax Dialogues</h4>
+                    {/* AD SLOT: Book DJ Gigs */}
+                    <div
+                      style={{
+                        background:
+                          "repeating-linear-gradient(135deg, #0a0a0a, #0a0a0a 12px, #0f0f0f 12px, #0f0f0f 24px)",
+                        border: "2px solid #2b2b2b",
+                        borderRadius: 14,
+                        padding: "1.1rem",
+                        marginBottom: "1rem",
+                        boxShadow: "inset 0 0 0 2px rgba(0,196,255,.08)",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: ".6rem", marginBottom: ".5rem" }}>
+                        <div style={{ width: 26, height: 26, borderRadius: 6, background: "#00c4ff", color: "#000", fontWeight: 900, display: "grid", placeItems: "center" }}>📅</div>
+                        <div style={{ color: "#fff", fontSize: "1.15rem", fontWeight: 900, letterSpacing: ".3px", textTransform: "uppercase" }}>
+                          Book DJ Gigs
+                        </div>
+                      </div>
+                      <div style={{ color: "#9ca3af", fontSize: ".92rem", marginBottom: ".8rem" }}>
+                        Bring Dead Wax Dialogues to your venue or event.
+                      </div>
                       <a
                         href="https://calendly.com/deadwaxdialogues"
                         target="_blank"
@@ -596,27 +607,45 @@ export default function Page() {
                           display: "inline-block",
                           background: "#00c4ff",
                           color: "#000",
-                          padding: ".5rem .8rem",
-                          borderRadius: 6,
+                          padding: ".6rem .9rem",
+                          borderRadius: 10,
                           fontWeight: 900,
                           textDecoration: "none",
+                          boxShadow: "0 6px 22px rgba(0,196,255,.25)",
                         }}
                       >
-                        📅 Book Online
+                        Book Online
                       </a>
                     </div>
 
-                    {/* Small box: Latest DJ Mix */}
+                    {/* AD SLOT: Latest DJ Sets */}
                     {latestSet && (
-                      <div style={{ background: "#0f172a", border: "1px solid #1f2a44", borderRadius: 10, padding: "1rem", marginBottom: "1rem" }}>
-                        <h4 style={{ color: "#fff", margin: "0 0 .35rem", fontWeight: 800 }}>Latest DJ Mix</h4>
-                        <div style={{ color: "#9ca3af", fontSize: ".9rem", marginBottom: ".6rem" }}>{latestSet.title}</div>
-                        <div style={{ display: "flex", gap: ".5rem" }}>
+                      <div
+                        style={{
+                          background:
+                            "linear-gradient(160deg,#0b1022,#0f1f3d)",
+                          border: "2px solid #1f2a44",
+                          borderRadius: 14,
+                          padding: "1.1rem",
+                          marginBottom: "1rem",
+                          boxShadow: "inset 0 0 0 2px rgba(255,255,255,.04)",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: ".6rem", marginBottom: ".5rem" }}>
+                          <div style={{ width: 26, height: 26, borderRadius: 6, background: "#7dd3fc", color: "#000", fontWeight: 900, display: "grid", placeItems: "center" }}>🎧</div>
+                          <div style={{ color: "#fff", fontSize: "1.15rem", fontWeight: 900, letterSpacing: ".3px", textTransform: "uppercase" }}>
+                            Latest DJ Sets
+                          </div>
+                        </div>
+                        <div style={{ color: "#cbd5e1", fontSize: ".92rem", marginBottom: ".8rem" }}>
+                          {latestSet.title}
+                        </div>
+                        <div style={{ display: "flex", gap: ".6rem" }}>
                           <a
                             href={latestSet.file_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            style={{ background: "#fff", color: "#000", padding: ".45rem .75rem", borderRadius: 6, textDecoration: "none", fontWeight: 800 }}
+                            style={{ background: "#fff", color: "#000", padding: ".5rem .85rem", borderRadius: 10, textDecoration: "none", fontWeight: 900 }}
                           >
                             ▶ Play
                           </a>
@@ -624,7 +653,7 @@ export default function Page() {
                             href={latestSet.download_url || latestSet.file_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            style={{ background: "#059669", color: "#fff", padding: ".45rem .75rem", borderRadius: 6, textDecoration: "none", fontWeight: 800 }}
+                            style={{ background: "#22c55e", color: "#000", padding: ".5rem .85rem", borderRadius: 10, textDecoration: "none", fontWeight: 900 }}
                           >
                             ⬇ Download
                           </a>
@@ -632,15 +661,26 @@ export default function Page() {
                       </div>
                     )}
 
-                    {/* Small box: Merch placeholder */}
-                    <div style={{ background: "#1f1f1f", border: "1px solid #333", borderRadius: 10, padding: "1rem" }}>
-                      <h4 style={{ color: "#fff", margin: "0 0 .5rem", fontWeight: 800 }}>Merch</h4>
-                      <div style={{ color: "#9ca3af", fontSize: ".9rem", marginBottom: ".6rem" }}>
-                        Shirts, stickers & more — coming soon.
+                    {/* AD SLOT: Merch */}
+                    <div
+                      style={{
+                        background:
+                          "repeating-linear-gradient(-45deg,#022c35,#022c35 10px,#053a44 10px,#053a44 20px)",
+                        border: "2px solid #0a4a57",
+                        borderRadius: 14,
+                        padding: "1.1rem",
+                        boxShadow: "0 8px 26px rgba(0,196,255,.12)",
+                      }}
+                    >
+                      <div style={{ color: "#00e6ff", fontSize: "1.35rem", fontWeight: 900, letterSpacing: "1px", textTransform: "uppercase", marginBottom: ".35rem", textShadow: "0 1px 0 rgba(0,0,0,.35)" }}>
+                        Merch
+                      </div>
+                      <div style={{ color: "#b9e6ee", fontSize: ".95rem", marginBottom: ".8rem" }}>
+                        New designs / styles — new deals. Check it out!
                       </div>
                       <Link
                         href="/merch"
-                        style={{ display: "inline-block", background: "#00c4ff", color: "#000", padding: ".45rem .75rem", borderRadius: 6, textDecoration: "none", fontWeight: 800 }}
+                        style={{ display: "inline-block", background: "#00e6ff", color: "#000", padding: ".6rem .9rem", borderRadius: 10, textDecoration: "none", fontWeight: 900 }}
                       >
                         View Merch
                       </Link>
