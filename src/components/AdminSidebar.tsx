@@ -1,4 +1,4 @@
-// src/components/AdminSidebar.tsx - COMPLETE NEW FILE
+// src/components/AdminSidebar.tsx - COMPLETE FILE WITH FEATURED EVENTS LINK
 
 "use client";
 
@@ -228,6 +228,19 @@ export default function AdminSidebar() {
           >
             📅 Manage Events
           </Link>
+
+          {/* ⭐ Featured Events link */}
+          <Link 
+            href="/admin/featured-events"
+            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+              pathname === "/admin/featured-events" 
+                ? "bg-orange-700 text-white" 
+                : "bg-orange-600 text-white hover:bg-orange-700"
+            }`}
+          >
+            ⭐ Featured Events
+          </Link>
+
           <Link 
             href="/admin/manage-dj-sets"
             className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
