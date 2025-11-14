@@ -1,4 +1,4 @@
-// src/app/api/enrich-sources/batch/route.ts - WITH DISCOGS TRACKLIST AND 1001 MATCHING
+// src/app/api/enrich-sources/batch/route.ts - OPTIMIZED FOR PERFORMANCE
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { enrichDiscogsTracklist, enrichGenius } from 'lib/enrichment-utils';
@@ -200,7 +200,7 @@ async function callService(endpoint: string, albumId: number) {
       const errorText = await res.text();
       return {
         success: false,
-        error: `HTTP ${res.status}: ${errorText}`
+        error: `HTTP ${res.status}: ${errorText.substring(0, 100)}`
       };
     }
 
@@ -250,7 +250,7 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const cursor = body.cursor || 0;
-    const limit = body.limit || 20;
+    const limit = Math.min(body.limit || 20, 10); // MAX 10 albums per batch to avoid timeout
     const folder = body.folder;
     const services = body.services || {
       discogsTracklist: true,
@@ -328,24 +328,21 @@ export async function POST(req: Request) {
         title: album.title
       };
 
-      // Enrich Discogs Tracklist FIRST (for per-track artists)
-        if (needsDiscogsTracklist(album.tracklists, album.discogs_release_id) && services.discogsTracklist) {
-          const discogsResult = await enrichDiscogsTracklist(album.id);
-          albumResult.discogsTracklist = {
-            success: discogsResult.success,
-            data: discogsResult.data as { totalTracks?: number; tracksWithArtists?: number },
-            error: discogsResult.error,
-            skipped: discogsResult.skipped
-          };
-          await sleep(1000);
-        } else if (album.tracklists) {
-          albumResult.discogsTracklist = {
-            success: true,
-            skipped: true
-          };
-        }
+      // Discogs Tracklist - Direct call (no HTTP)
+      if (needsDiscogsTracklist(album.tracklists, album.discogs_release_id) && services.discogsTracklist) {
+        const discogsResult = await enrichDiscogsTracklist(album.id);
+        albumResult.discogsTracklist = {
+          success: discogsResult.success,
+          data: discogsResult.data as { totalTracks?: number; tracksWithArtists?: number },
+          error: discogsResult.error,
+          skipped: discogsResult.skipped
+        };
+        await sleep(500); // Reduced delay
+      } else if (album.tracklists) {
+        albumResult.discogsTracklist = { success: true, skipped: true };
+      }
 
-      // Enrich Spotify
+      // Spotify - HTTP call
       if (!album.spotify_id && services.spotify) {
         const spotifyResult = await callService('spotify', album.id);
         albumResult.spotify = {
@@ -354,15 +351,12 @@ export async function POST(req: Request) {
           error: spotifyResult.error,
           skipped: spotifyResult.skipped
         };
-        await sleep(500);
+        await sleep(300);
       } else if (album.spotify_id) {
-        albumResult.spotify = {
-          success: true,
-          skipped: true
-        };
+        albumResult.spotify = { success: true, skipped: true };
       }
 
-      // Enrich Apple Music
+      // Apple Music - HTTP call
       if (!album.apple_music_id && services.appleMusic) {
         const appleResult = await callService('apple-music', album.id);
         albumResult.appleMusic = {
@@ -371,15 +365,12 @@ export async function POST(req: Request) {
           error: appleResult.error,
           skipped: appleResult.skipped
         };
-        await sleep(500);
+        await sleep(300);
       } else if (album.apple_music_id) {
-        albumResult.appleMusic = {
-          success: true,
-          skipped: true
-        };
+        albumResult.appleMusic = { success: true, skipped: true };
       }
 
-      // Enrich Genius lyrics
+      // Genius - Direct call (no HTTP)
       if (album.tracklists && services.genius) {
         const geniusResult = await enrichGenius(album.id);
         albumResult.genius = {
@@ -393,7 +384,7 @@ export async function POST(req: Request) {
         };
       }
 
-      // Enrich Apple Music lyrics
+      // Apple Lyrics - Direct call (inline)
       const newlyAddedAppleMusicId = albumResult.appleMusic?.data?.apple_music_id;
       const finalAppleMusicId = (typeof newlyAddedAppleMusicId === 'string' ? newlyAddedAppleMusicId : null) || album.apple_music_id;
       
@@ -405,10 +396,10 @@ export async function POST(req: Request) {
           lyricsMissing: lyricsResult.stats?.lyricsNotFound,
           error: lyricsResult.error
         };
-        await sleep(500);
+        await sleep(300);
       }
 
-      // Match with 1001 Albums
+      // 1001 Albums - HTTP call
       if (!album.is_1001 && services.match1001) {
         const matchResult = await callService('1001-match', album.id);
         albumResult.match1001 = {
@@ -418,12 +409,9 @@ export async function POST(req: Request) {
           error: matchResult.error,
           skipped: matchResult.skipped
         };
-        await sleep(500);
+        await sleep(300);
       } else if (album.is_1001) {
-        albumResult.match1001 = {
-          success: true,
-          skipped: true
-        };
+        albumResult.match1001 = { success: true, skipped: true };
       }
 
       results.push(albumResult);
