@@ -1,6 +1,7 @@
 // src/app/api/enrich-sources/batch/route.ts - WITH DISCOGS TRACKLIST AND 1001 MATCHING
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { enrichDiscogsTracklist, enrichGenius } from 'lib/enrichment-utils';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -199,15 +200,7 @@ async function callService(endpoint: string, albumId: number) {
       const errorText = await res.text();
       return {
         success: false,
-        error: `HTTP ${res.status}: ${errorText}`,
-        details: {
-          status: res.status,
-          statusText: res.statusText,
-          url,
-          endpoint,
-          albumId,
-          responseBody: errorText
-        }
+        error: `HTTP ${res.status}: ${errorText}`
       };
     }
 
@@ -216,16 +209,7 @@ async function callService(endpoint: string, albumId: number) {
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Service call failed',
-      details: {
-        errorType: error instanceof Error ? error.constructor.name : typeof error,
-        errorMessage: error instanceof Error ? error.message : String(error),
-        errorStack: error instanceof Error ? error.stack : undefined,
-        endpoint,
-        albumId,
-        baseUrl: process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL || 'localhost',
-        nodeEnv: process.env.NODE_ENV
-      }
+      error: error instanceof Error ? error.message : 'Service call failed'
     };
   }
 }
@@ -345,21 +329,21 @@ export async function POST(req: Request) {
       };
 
       // Enrich Discogs Tracklist FIRST (for per-track artists)
-      if (needsDiscogsTracklist(album.tracklists, album.discogs_release_id) && services.discogsTracklist) {
-        const discogsResult = await callService('discogs-tracklist', album.id);
-        albumResult.discogsTracklist = {
-          success: discogsResult.success,
-          data: discogsResult.data as { totalTracks?: number; tracksWithArtists?: number },
-          error: discogsResult.error,
-          skipped: discogsResult.skipped
-        };
-        await sleep(1000);
-      } else if (album.tracklists) {
-        albumResult.discogsTracklist = {
-          success: true,
-          skipped: true
-        };
-      }
+        if (needsDiscogsTracklist(album.tracklists, album.discogs_release_id) && services.discogsTracklist) {
+          const discogsResult = await enrichDiscogsTracklist(album.id);
+          albumResult.discogsTracklist = {
+            success: discogsResult.success,
+            data: discogsResult.data as { totalTracks?: number; tracksWithArtists?: number },
+            error: discogsResult.error,
+            skipped: discogsResult.skipped
+          };
+          await sleep(1000);
+        } else if (album.tracklists) {
+          albumResult.discogsTracklist = {
+            success: true,
+            skipped: true
+          };
+        }
 
       // Enrich Spotify
       if (!album.spotify_id && services.spotify) {
@@ -397,7 +381,7 @@ export async function POST(req: Request) {
 
       // Enrich Genius lyrics
       if (album.tracklists && services.genius) {
-        const geniusResult = await callService('genius', album.id);
+        const geniusResult = await enrichGenius(album.id);
         albumResult.genius = {
           success: geniusResult.success,
           enrichedCount: geniusResult.data?.enrichedCount,
