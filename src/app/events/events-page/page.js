@@ -399,76 +399,81 @@ export default function Page() {
                         e.date === "9999-12-31";
 
                       return (
-                        <div
+                        <Link
                           key={e.id}
-                          style={{
-                            background: "#1b1b1b",
-                            borderRadius: 8,
-                            overflow: "hidden",
-                            border: "2px solid #262626",
-                            display: "flex",
-                            flexDirection: "column",
-                            transition:
-                              "transform .2s ease, border-color .2s ease",
-                          }}
-                          onMouseOver={(evt) => {
-                            const card = evt.currentTarget;
-                            card.style.transform =
-                              "translateY(-4px)";
-                            card.style.borderColor = "#00c4ff";
-                          }}
-                          onMouseOut={(evt) => {
-                            const card = evt.currentTarget;
-                            card.style.transform =
-                              "translateY(0)";
-                            card.style.borderColor = "#262626";
-                          }}
+                          href={`/events/event-detail/${e.id}`}
+                          style={{ textDecoration: "none" }}
                         >
                           <div
                             style={{
-                              position: "relative",
-                              width: "100%",
-                              paddingTop: "100%",
+                              background: "#1b1b1b",
+                              borderRadius: 8,
+                              overflow: "hidden",
+                              border: "2px solid #262626",
+                              display: "flex",
+                              flexDirection: "column",
+                              transition:
+                                "transform .2s ease, border-color .2s ease",
+                            }}
+                            onMouseOver={(evt) => {
+                              const card = evt.currentTarget;
+                              card.style.transform =
+                                "translateY(-4px)";
+                              card.style.borderColor = "#00c4ff";
+                            }}
+                            onMouseOut={(evt) => {
+                              const card = evt.currentTarget;
+                              card.style.transform =
+                                "translateY(0)";
+                              card.style.borderColor = "#262626";
                             }}
                           >
-                            <Image
-                              src={img}
-                              alt={e.title}
-                              fill
-                              sizes="280px"
-                              style={{ objectFit: "cover" }}
-                              unoptimized
-                            />
-                          </div>
-                          <div
-                            style={{
-                              padding: "1rem 1rem 1.25rem",
-                            }}
-                          >
-                            <h4
-                              style={{
-                                color: "#fff",
-                                fontSize: "1.1rem",
-                                fontWeight: 800,
-                                lineHeight: 1.3,
-                                minHeight: "2.5rem",
-                                margin: "0 0 .5rem",
-                              }}
-                              dangerouslySetInnerHTML={{
-                                __html: formatEventText(e.title),
-                              }}
-                            />
                             <div
                               style={{
-                                color: "#00d9ff",
-                                fontWeight: 800,
-                                fontSize: ".92rem",
+                                position: "relative",
+                                width: "100%",
+                                paddingTop: "100%",
                               }}
                             >
-                              {tba ? "TBA" : `${d.mon} ${d.day}`}
+                              <Image
+                                src={img}
+                                alt={e.title}
+                                fill
+                                sizes="280px"
+                                style={{ objectFit: "cover" }}
+                                unoptimized
+                              />
+                            </div>
+                            <div
+                              style={{
+                                padding: "1rem 1rem 1.25rem",
+                              }}
+                            >
+                              <h4
+                                style={{
+                                  color: "#fff",
+                                  fontSize: "1.1rem",
+                                  fontWeight: 800,
+                                  lineHeight: 1.3,
+                                  minHeight: "2.5rem",
+                                  margin: "0 0 .5rem",
+                                }}
+                                dangerouslySetInnerHTML={{
+                                  __html: formatEventText(e.title),
+                                }}
+                              />
+                              <div
+                                style={{
+                                  color: "#00d9ff",
+                                  fontWeight: 800,
+                                  fontSize: ".92rem",
+                                }}
+                              >
+                                {tba ? "TBA" : `${d.mon} ${d.day}`}
+                              </div>
                             </div>
                           </div>
-                        </div>
+                        </Link>
                       );
                     })}
                   </div>
