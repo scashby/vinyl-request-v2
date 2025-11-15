@@ -200,18 +200,16 @@ function CDOnlyTab() {
   setView('scanner');
   
   try {
-    // Query 1: Get albums where format contains CD
+    // Query 1: Get albums where format contains CD (NO .not() filter)
     const { data: cdsByFormat, error: error1 } = await supabase
       .from('collection')
       .select('id, artist, title, year, discogs_release_id, image_url, discogs_genres, folder, notes')
-      .not('discogs_release_id', 'is', null)
       .ilike('format', '%CD%');
     
-    // Query 2: Get albums where folder is CDs
+    // Query 2: Get albums where folder is CDs (NO .not() filter)
     const { data: cdsByFolder, error: error2 } = await supabase
       .from('collection')
       .select('id, artist, title, year, discogs_release_id, image_url, discogs_genres, folder, notes')
-      .not('discogs_release_id', 'is', null)
       .eq('folder', 'CDs');
     
     if (error1 || error2) {
@@ -224,20 +222,23 @@ function CDOnlyTab() {
       new Map(allCDs.map(cd => [cd.id, cd])).values()
     );
     
-    if (uniqueCDs.length === 0) {
-      setStatus('No CDs found');
+    // Filter out nulls in JavaScript - THIS REPLACES THE .not() FILTER
+    const cdsWithReleaseId = uniqueCDs.filter(cd => cd.discogs_release_id != null && cd.discogs_release_id !== '');
+    
+    if (cdsWithReleaseId.length === 0) {
+      setStatus('No CDs found with Discogs release IDs');
       setScanning(false);
       return;
     }
     
-    setStatus(`Checking ${uniqueCDs.length} CDs...`);
+    setStatus(`Checking ${cdsWithReleaseId.length} CDs...`);
     const results: CDOnlyAlbum[] = [];
     const errorList: Array<{album: string, error: string}> = [];
     
-    for (let i = 0; i < uniqueCDs.length; i++) {
-      const album = uniqueCDs[i];
-      setStatus(`Checking ${i + 1}/${uniqueCDs.length}: ${album.artist} - ${album.title}`);
-      setProgress(((i + 1) / uniqueCDs.length) * 100);
+    for (let i = 0; i < cdsWithReleaseId.length; i++) {
+      const album = cdsWithReleaseId[i];
+      setStatus(`Checking ${i + 1}/${cdsWithReleaseId.length}: ${album.artist} - ${album.title}`);
+      setProgress(((i + 1) / cdsWithReleaseId.length) * 100);
       
       const result = await checkAlbumFormats({
         id: album.id,
@@ -258,12 +259,12 @@ function CDOnlyTab() {
         results.push(result);
       }
       
-      if (i < uniqueCDs.length - 1) await delay(1000);
+      if (i < cdsWithReleaseId.length - 1) await delay(1000);
     }
     
     const cdOnly = results.filter(r => !r.has_vinyl);
     setResults(cdOnly);
-    setStats({ total: uniqueCDs.length, scanned: uniqueCDs.length, cdOnly: cdOnly.length, errors: errorList.length });
+    setStats({ total: cdsWithReleaseId.length, scanned: cdsWithReleaseId.length, cdOnly: cdOnly.length, errors: errorList.length });
     setStatus(`✅ Complete! Found ${cdOnly.length} CD-only albums`);
     setProgress(100);
     setView('results');
