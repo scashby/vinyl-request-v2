@@ -1,10 +1,9 @@
-// src/app/events/events-page/page.js
+"use client";
+
 // Events Page - 9:30 Club Layout
 // Section 1: "Up Next" - next 1–2 upcoming events (automatic)
 // Section 2: 4-column grid of promoted/boosted shows (manual featured grid)
 // Section 3: "Upcoming Shows" - LEFT: vertical list | RIGHT: sidebar with "Just Announced"
-
-"use client";
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
@@ -21,33 +20,51 @@ export default function Page() {
 
   useEffect(() => {
     const load = async () => {
-      const { data: ev } = await supabase
+      // Load events
+      const { data: ev, error: evError } = await supabase
         .from("events")
         .select("*")
         .order("date", { ascending: true });
 
+      if (evError) {
+        console.error("Error loading events", evError);
+      }
+
       const today = new Date().toISOString().slice(0, 10);
+      const all = ev || [];
 
-      const filtered = (ev || []).filter(
-        (e) => !e.date || e.date === "9999-12-31" || e.date >= today
-      );
+      // Keep upcoming + TBA
+      const filtered = all.filter((e) => {
+        const d = e.date;
+        if (!d || d === "" || d === "9999-12-31") return true; // TBA
+        return d >= today;
+      });
 
-      const sorted = filtered.sort((a, b) => {
-        const aTBA = !a.date || a.date === "" || a.date === "9999-12-31";
-        const bTBA = !b.date || b.date === "" || b.date === "9999-12-31";
+      // Sort: dated first, by date; then TBA
+      const sorted = [...filtered].sort((a, b) => {
+        const aTBA =
+          !a.date || a.date === "" || a.date === "9999-12-31";
+        const bTBA =
+          !b.date || b.date === "" || b.date === "9999-12-31";
         if (aTBA && !bTBA) return 1;
         if (!aTBA && bTBA) return -1;
         if (aTBA && bTBA) return 0;
-        return a.date.localeCompare(b.date);
+
+        return (a.date || "").localeCompare(b.date || "");
       });
 
       setEvents(sorted);
 
-      const { data: sets } = await supabase
+      // Load DJ sets
+      const { data: sets, error: setsError } = await supabase
         .from("dj_sets")
         .select(`*, events ( id, title, date, location )`)
         .order("recorded_at", { ascending: false })
         .limit(6);
+
+      if (setsError) {
+        console.error("Error loading dj_sets", setsError);
+      }
 
       setPastDJSets(sets || []);
       setLoading(false);
@@ -56,50 +73,65 @@ export default function Page() {
     load();
   }, []);
 
+  // Compact date helper used across sections
   const compactDate = (dateString) => {
     if (!dateString || dateString === "9999-12-31") {
       return { mon: "TBA", day: "", wk: "" };
     }
     const d = new Date(dateString + "T00:00:00");
+    if (Number.isNaN(d.getTime())) {
+      return { mon: "TBA", day: "", wk: "" };
+    }
     return {
-      mon: d.toLocaleDateString("en-US", { month: "short" }).toUpperCase(),
+      mon: d.toLocaleDateString("en-US", {
+        month: "short",
+      }).toUpperCase(),
       day: d.getDate(),
-      wk: d.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase(),
+      wk: d.toLocaleDateString("en-US", {
+        weekday: "short",
+      }).toUpperCase(),
     };
   };
 
-  // Helper to sort by featured priority then date
+  // Sort helper: featured priority then date
   const byFeatured = (arr) =>
     [...arr].sort((a, b) => {
       const ap =
-        typeof a.featured_priority === "number" ? a.featured_priority : 9999;
+        typeof a.featured_priority === "number"
+          ? a.featured_priority
+          : parseInt(a.featured_priority, 10) || 9999;
       const bp =
-        typeof b.featured_priority === "number" ? b.featured_priority : 9999;
+        typeof b.featured_priority === "number"
+          ? b.featured_priority
+          : parseInt(b.featured_priority, 10) || 9999;
+
       if (ap !== bp) return ap - bp;
+
       const ad = a.date || "9999-12-31";
       const bd = b.date || "9999-12-31";
       return ad.localeCompare(bd);
     });
 
-  // SECTION 1 — AUTOMATIC UP NEXT (next 2 events by date, then TBA)
+  // For Up Next: dated first, then TBA
   const upcomingDated = events.filter(
     (e) => e.date && e.date !== "9999-12-31"
   );
-
   const tbaEvents = events.filter(
-    (e) => !e.date || e.date === "9999-12-31"
+    (e) => !e.date || e.date === "" || e.date === "9999-12-31"
   );
-
   const upNext = [...upcomingDated, ...tbaEvents].slice(0, 2);
 
-  // SECTION 2 — FEATURED GRID (manual selection via is_featured_grid)
-  const featuredGrid = byFeatured(events.filter((e) => e.is_featured_grid));
+  // Featured grid (manual selection via is_featured_grid), max 8 items (2 rows of 4)
+  const featuredGrid = byFeatured(
+    events.filter((e) => e.is_featured_grid)
+  ).slice(0, 8);
 
   const latestSet = pastDJSets[0];
 
   const DateBox = ({ date }) => {
     const d = compactDate(date);
-    const tba = !date || date === "9999-12-31";
+    const tba =
+      !date || date === "" || date === "9999-12-31";
 
     return (
       <div
@@ -150,7 +182,7 @@ export default function Page() {
 
   const SectionTitle = ({ text }) => (
     <div style={{ marginBottom: "1.5rem" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <div
           style={{
             width: 14,
@@ -187,14 +219,17 @@ export default function Page() {
 
   return (
     <div className="page-wrapper">
-      {/* IMPORTANT: keep CSS-driven hero image */}
+      {/* Hero image is driven by CSS (event-hero class) */}
       <header className="event-hero">
         <div className="overlay">
           <h1>Upcoming Vinyl Nights</h1>
         </div>
       </header>
 
-      <main className="event-body" style={{ padding: 0, background: "#000" }}>
+      <main
+        className="event-body"
+        style={{ padding: 0, background: "#000" }}
+      >
         {loading ? (
           <div
             style={{
@@ -207,7 +242,7 @@ export default function Page() {
           </div>
         ) : (
           <div data-secwrap="sections">
-            {/* SECTION 1 — UP NEXT (only if there is something actually up next) */}
+            {/* SECTION 1 — UP NEXT */}
             {upNext.length > 0 && (
               <section
                 style={{
@@ -216,18 +251,25 @@ export default function Page() {
                   borderBottom: "3px solid #00c4ff",
                 }}
               >
-                <div style={{ maxWidth: 1400, margin: "0 auto" }}>
+                <div
+                  style={{
+                    maxWidth: 1400,
+                    margin: "0 auto",
+                  }}
+                >
                   <SectionTitle text="Up Next" />
+
                   <div
                     style={{
                       display: "grid",
                       gridTemplateColumns:
-                        upNext.length === 1 ? "1fr" : "repeat(2,1fr)",
+                        upNext.length === 1 ? "1fr" : "repeat(2, 1fr)",
                       gap: "1.75rem",
                     }}
                   >
                     {upNext.map((ev) => {
-                      const img = ev.image_url || "/images/placeholder.png";
+                      const img =
+                        ev.image_url || "/images/placeholder.png";
                       const d = compactDate(ev.date);
                       const tba =
                         !ev.date ||
@@ -249,16 +291,18 @@ export default function Page() {
                               transition:
                                 "transform .25s ease, box-shadow .25s ease",
                             }}
-                            onMouseOver={(x) => {
-                              x.currentTarget.style.transform =
+                            onMouseOver={(e) => {
+                              const card = e.currentTarget;
+                              card.style.transform =
                                 "translateY(-6px)";
-                              x.currentTarget.style.boxShadow =
+                              card.style.boxShadow =
                                 "0 14px 36px rgba(0,196,255,.35)";
                             }}
-                            onMouseOut={(x) => {
-                              x.currentTarget.style.transform =
+                            onMouseOut={(e) => {
+                              const card = e.currentTarget;
+                              card.style.transform =
                                 "translateY(0)";
-                              x.currentTarget.style.boxShadow = "none";
+                              card.style.boxShadow = "none";
                             }}
                           >
                             <div
@@ -284,7 +328,9 @@ export default function Page() {
                             >
                               <div
                                 style={{
-                                  background: tba ? "#6b7280" : "#00c4ff",
+                                  background: tba
+                                    ? "#6b7280"
+                                    : "#00c4ff",
                                   color: tba ? "#fff" : "#000",
                                   padding: ".6rem .9rem",
                                   borderRadius: 8,
@@ -319,7 +365,7 @@ export default function Page() {
               </section>
             )}
 
-            {/* SECTION 2 — 4-COLUMN FEATURED GRID (only if there are featured events) */}
+            {/* SECTION 2 — FEATURED GRID */}
             {featuredGrid.length > 0 && (
               <section
                 style={{
@@ -328,18 +374,30 @@ export default function Page() {
                   borderBottom: "2px solid #1f1f1f",
                 }}
               >
-                <div style={{ maxWidth: 1400, margin: "0 auto" }}>
+                <div
+                  style={{
+                    maxWidth: 1400,
+                    margin: "0 auto",
+                  }}
+                >
                   <SectionTitle text="Featured" />
                   <div
                     style={{
                       display: "grid",
-                      gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+                      gridTemplateColumns:
+                        "repeat(4, minmax(0, 1fr))",
                       gap: "1.25rem",
                     }}
                   >
                     {featuredGrid.map((e) => {
-                      const img = e.image_url || "/images/placeholder.png";
+                      const img =
+                        e.image_url || "/images/placeholder.png";
                       const d = compactDate(e.date);
+                      const tba =
+                        !e.date ||
+                        e.date === "" ||
+                        e.date === "9999-12-31";
+
                       return (
                         <div
                           key={e.id}
@@ -353,15 +411,17 @@ export default function Page() {
                             transition:
                               "transform .2s ease, border-color .2s ease",
                           }}
-                          onMouseOver={(x) => {
-                            x.currentTarget.style.transform =
+                          onMouseOver={(evt) => {
+                            const card = evt.currentTarget;
+                            card.style.transform =
                               "translateY(-4px)";
-                            x.currentTarget.style.borderColor = "#00c4ff";
+                            card.style.borderColor = "#00c4ff";
                           }}
-                          onMouseOut={(x) => {
-                            x.currentTarget.style.transform =
+                          onMouseOut={(evt) => {
+                            const card = evt.currentTarget;
+                            card.style.transform =
                               "translateY(0)";
-                            x.currentTarget.style.borderColor = "#262626";
+                            card.style.borderColor = "#262626";
                           }}
                         >
                           <div
@@ -380,7 +440,11 @@ export default function Page() {
                               unoptimized
                             />
                           </div>
-                          <div style={{ padding: "1rem 1rem 1.25rem" }}>
+                          <div
+                            style={{
+                              padding: "1rem 1rem 1.25rem",
+                            }}
+                          >
                             <h4
                               style={{
                                 color: "#fff",
@@ -400,7 +464,9 @@ export default function Page() {
                                 fontWeight: 800,
                                 fontSize: ".92rem",
                               }}
-                            >{`${d.mon} ${d.day}`}</div>
+                            >
+                              {tba ? "TBA" : `${d.mon} ${d.day}`}
+                            </div>
                           </div>
                         </div>
                       );
@@ -417,8 +483,14 @@ export default function Page() {
                 padding: "3rem 1.25rem 4rem",
               }}
             >
-              <div style={{ maxWidth: 1400, margin: "0 auto" }}>
+              <div
+                style={{
+                  maxWidth: 1400,
+                  margin: "0 auto",
+                }}
+              >
                 <SectionTitle text="Upcoming Shows" />
+
                 <div
                   style={{
                     display: "grid",
@@ -426,15 +498,20 @@ export default function Page() {
                     gap: "2rem",
                   }}
                 >
-                  {/* LEFT COLUMN: full-width rows */}
+                  {/* LEFT COLUMN: list of upcoming events */}
                   <div>
                     {events.map((e) => {
-                      const img = e.image_url || "/images/placeholder.png";
+                      const img =
+                        e.image_url || "/images/placeholder.png";
+
                       return (
                         <Link
                           key={e.id}
                           href={`/events/event-detail/${e.id}`}
-                          style={{ textDecoration: "none", display: "block" }}
+                          style={{
+                            textDecoration: "none",
+                            display: "block",
+                          }}
                         >
                           <div
                             style={{
@@ -445,18 +522,21 @@ export default function Page() {
                               alignItems: "center",
                               background: "#151515",
                               padding: "1rem",
-                              borderBottom: "1px solid #262626",
+                              borderBottom:
+                                "1px solid #262626",
                               transition:
                                 "background .2s ease, border-left-color .2s ease",
                             }}
-                            onMouseOver={(x) => {
-                              x.currentTarget.style.background = "#1f1f1f";
-                              x.currentTarget.style.borderLeft =
+                            onMouseOver={(evt) => {
+                              const row = evt.currentTarget;
+                              row.style.background = "#1f1f1f";
+                              row.style.borderLeft =
                                 "4px solid #00c4ff";
                             }}
-                            onMouseOut={(x) => {
-                              x.currentTarget.style.background = "#151515";
-                              x.currentTarget.style.borderLeft = "none";
+                            onMouseOut={(evt) => {
+                              const row = evt.currentTarget;
+                              row.style.background = "#151515";
+                              row.style.borderLeft = "none";
                             }}
                           >
                             <DateBox date={e.date} />
@@ -478,6 +558,7 @@ export default function Page() {
                                 unoptimized
                               />
                             </div>
+
                             <div style={{ minWidth: 0 }}>
                               <h3
                                 style={{
@@ -503,6 +584,7 @@ export default function Page() {
                                 </div>
                               ) : null}
                             </div>
+
                             <div
                               style={{
                                 background: "#00c4ff",
@@ -523,7 +605,7 @@ export default function Page() {
                     })}
                   </div>
 
-                  {/* RIGHT COLUMN: Just Announced + 3 ad blocks */}
+                  {/* RIGHT COLUMN: Just Announced + ads */}
                   <aside
                     style={{
                       background: "#121212",
@@ -546,13 +628,14 @@ export default function Page() {
                         letterSpacing: ".5px",
                         textTransform: "uppercase",
                         marginBottom: "1rem",
-                        boxShadow: "0 6px 20px rgba(0,196,255,.2)",
+                        boxShadow:
+                          "0 6px 20px rgba(0,196,255,.2)",
                       }}
                     >
                       Just Announced
                     </div>
 
-                    {/* Just Announced list */}
+                    {/* Just Announced list (up to 6) */}
                     <div
                       style={{
                         display: "flex",
@@ -612,6 +695,7 @@ export default function Page() {
                             pillText: "#000",
                           },
                         ];
+
                         const p = palettes[idx % palettes.length];
 
                         return (
@@ -634,16 +718,18 @@ export default function Page() {
                                 transition:
                                   "transform .15s ease, box-shadow .15s ease",
                               }}
-                              onMouseOver={(x) => {
-                                x.currentTarget.style.transform =
+                              onMouseOver={(evt) => {
+                                const card = evt.currentTarget;
+                                card.style.transform =
                                   "translateY(-2px)";
-                                x.currentTarget.style.boxShadow =
+                                card.style.boxShadow =
                                   "0 16px 36px rgba(0,196,255,.22)";
                               }}
-                              onMouseOut={(x) => {
-                                x.currentTarget.style.transform =
+                              onMouseOut={(evt) => {
+                                const card = evt.currentTarget;
+                                card.style.transform =
                                   "translateY(0)";
-                                x.currentTarget.style.boxShadow =
+                                card.style.boxShadow =
                                   "0 8px 28px rgba(0,0,0,.35)";
                               }}
                             >
@@ -685,7 +771,8 @@ export default function Page() {
                                     fontWeight: 900,
                                     fontSize: ".75rem",
                                     borderRadius: 999,
-                                    padding: ".25rem .55rem",
+                                    padding:
+                                      ".25rem .55rem",
                                     minWidth: 72,
                                     display: "inline-flex",
                                     alignItems: "center",
@@ -699,11 +786,13 @@ export default function Page() {
                                 </div>
                                 <div
                                   style={{
-                                    color: "rgba(255,255,255,.7)",
+                                    color:
+                                      "rgba(255,255,255,.7)",
                                     fontSize: ".8rem",
                                   }}
                                 >
-                                  {e.location || "New date added"}
+                                  {e.location ||
+                                    "New date added"}
                                 </div>
                               </div>
                             </div>
@@ -712,7 +801,7 @@ export default function Page() {
                       })}
                     </div>
 
-                    {/* AD: Book DJ Gigs — Retro Poster */}
+                    {/* AD: Book DJ Gigs */}
                     <div
                       style={{
                         position: "relative",
@@ -721,7 +810,8 @@ export default function Page() {
                         borderRadius: 16,
                         padding: "1.1rem",
                         marginBottom: "1rem",
-                        boxShadow: "0 12px 28px rgba(0,0,0,.35)",
+                        boxShadow:
+                          "0 12px 28px rgba(0,0,0,.35)",
                         overflow: "hidden",
                       }}
                     >
@@ -814,7 +904,7 @@ export default function Page() {
                       </div>
                     </div>
 
-                    {/* AD: Latest DJ Sets — Neon Synthwave */}
+                    {/* AD: Latest DJ Sets */}
                     {latestSet && (
                       <div
                         style={{
@@ -891,7 +981,8 @@ export default function Page() {
                                 background:
                                   "linear-gradient(90deg,#00ffff,#ff00ff)",
                                 color: "#000",
-                                padding: ".55rem .9rem",
+                                padding:
+                                  ".55rem .9rem",
                                 borderRadius: 999,
                                 fontWeight: 1000,
                                 textDecoration: "none",
@@ -911,7 +1002,8 @@ export default function Page() {
                               style={{
                                 background: "#111",
                                 color: "#fff",
-                                padding: ".55rem .9rem",
+                                padding:
+                                  ".55rem .9rem",
                                 borderRadius: 999,
                                 fontWeight: 900,
                                 textDecoration: "none",
