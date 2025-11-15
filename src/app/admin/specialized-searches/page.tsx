@@ -897,78 +897,58 @@ function Thousand1AlbumsTab() {
   };
 
   const printResults = () => {
-    const printWindow = window.open('', '', 'width=800,height=600');
-    if (!printWindow) return;
-    
-    const formatLabel = formatFilter === "all" ? "All Formats" : formatFilter === "vinyl" ? "Vinyl Only" : formatFilter === "cd" ? "CD Only" : "Cassette Only";
-    
-    const content = `
-      <html>
-        <head>
-          <title>1001 Albums - ${statusFilter} - ${formatLabel}</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 20px; }
-            h1 { color: #1f2937; }
-            h2 { color: #6b7280; font-size: 16px; margin-top: 0; }
-            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-            th, td { border: 1px solid #e5e7eb; padding: 8px; text-align: left; }
-            th { background-color: #f9fafb; font-weight: 600; }
-            tr:nth-child(even) { background-color: #f9fafb; }
-            .status-unmatched { color: #991b1b; }
-            .status-pending { color: #92400e; }
-            .status-confirmed { color: #065f46; }
-          </style>
-        </head>
-        <body>
-          <h1>1001 Albums You Must Hear Before You Die</h1>
-          <h2>${statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)} Albums • ${formatLabel} (${filteredRows.length})</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>Artist</th>
-                <th>Album</th>
-                <th>Year</th>
-                <th>Status</th>
-                <th>Matches</th>
-                <th>Format</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${filteredRows.map((album) => {
-                const matches = (matchesBy[album.id] ?? []).filter(m => m.review_status !== 'rejected');
-                const isUnmatched = matches.length === 0;
-                const hasPending = matches.some((m) => m.review_status === "pending" || m.review_status === "linked");
-                const allConfirmed = matches.length > 0 && matches.every((m) => m.review_status === "confirmed");
-                const status = isUnmatched ? 'Unmatched' : hasPending ? 'Pending' : allConfirmed ? 'Confirmed' : '';
-                const statusClass = isUnmatched ? 'status-unmatched' : hasPending ? 'status-pending' : 'status-confirmed';
-                
-                const formats = matches.map(m => collectionsBy[m.collection_id]?.format || '—').join(', ');
-                
-                return `
-                  <tr>
-                    <td>${album.artist}</td>
-                    <td>${album.album}</td>
-                    <td>${album.year || '—'}</td>
-                    <td class="${statusClass}">${status}</td>
-                    <td>${matches.length > 0 ? `${matches.length} pressing${matches.length > 1 ? 's' : ''}` : '—'}</td>
-                    <td>${formats || '—'}</td>
-                  </tr>
-                `;
-              }).join('')}
-            </tbody>
-          </table>
-        </body>
-      </html>
-    `;
-    
-    printWindow.document.write(content);
-    printWindow.document.close();
-    printWindow.focus();
-    setTimeout(() => {
-      printWindow.print();
-      printWindow.close();
-    }, 250);
-  };
+  const printWindow = window.open('', '', 'width=800,height=600');
+  if (!printWindow) return;
+  
+  const formatLabel = formatFilter === "all" ? "All Formats" : formatFilter === "vinyl" ? "Vinyl Only" : formatFilter === "cd" ? "CD Only" : "Cassette Only";
+  
+  const content = `
+    <html>
+      <head>
+        <title>1001 Albums - ${statusFilter} - ${formatLabel}</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; }
+          h1 { color: #1f2937; }
+          h2 { color: #6b7280; font-size: 16px; margin-top: 0; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th, td { border: 1px solid #e5e7eb; padding: 8px; text-align: left; }
+          th { background-color: #f9fafb; font-weight: 600; }
+          tr:nth-child(even) { background-color: #f9fafb; }
+        </style>
+      </head>
+      <body>
+        <h1>1001 Albums You Must Hear Before You Die</h1>
+        <h2>${statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)} Albums • ${formatLabel} (${filteredRows.length})</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Artist</th>
+              <th>Album</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${filteredRows.map((album) => {
+              return `
+                <tr>
+                  <td>${album.artist}</td>
+                  <td>${album.album}</td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      </body>
+    </html>
+  `;
+  
+  printWindow.document.write(content);
+  printWindow.document.close();
+  printWindow.focus();
+  setTimeout(() => {
+    printWindow.print();
+    printWindow.close();
+  }, 250);
+};
 
   if (loading) {
     return (
