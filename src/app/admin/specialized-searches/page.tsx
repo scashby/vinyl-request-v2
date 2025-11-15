@@ -12,27 +12,59 @@ export default function SpecializedSearchesPage() {
   const [activeTab, setActiveTab] = useState<TabType>('cd-only');
 
   return (
-    <div style={{ padding: 24, background: '#f8fafc', minHeight: '100vh', maxWidth: 1400, margin: '0 auto' }}>
-      <div style={{ marginBottom: 32 }}>
-        <h1 style={{ fontSize: 32, fontWeight: 'bold', color: '#1f2937', margin: '0 0 8px 0' }}>
+    <div style={{ padding: '16px 12px', background: '#f8fafc', minHeight: '100vh', maxWidth: 1400, margin: '0 auto' }}>
+      <div style={{ marginBottom: 24 }}>
+        <h1 style={{ fontSize: 'clamp(24px, 5vw, 32px)', fontWeight: 'bold', color: '#1f2937', margin: '0 0 8px 0' }}>
           🔎 Specialized Searches
         </h1>
-        <p style={{ color: '#6b7280', fontSize: 16, margin: 0 }}>
+        <p style={{ color: '#6b7280', fontSize: 'clamp(14px, 3vw, 16px)', margin: 0 }}>
           Advanced tools for managing your collection
         </p>
       </div>
 
       <div style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: 12, boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)', overflow: 'hidden', marginBottom: 24 }}>
-        <div style={{ display: 'flex', borderBottom: '1px solid #e5e7eb' }}>
-          <button onClick={() => setActiveTab('cd-only')} style={{ flex: 1, padding: '16px 24px', background: activeTab === 'cd-only' ? '#8b5cf6' : 'white', color: activeTab === 'cd-only' ? 'white' : '#6b7280', border: 'none', fontSize: 16, fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s', borderBottom: activeTab === 'cd-only' ? '3px solid #7c3aed' : 'none' }}>
-            💿 CD-Only Releases
+        <div style={{ display: 'flex', flexDirection: 'row', borderBottom: '1px solid #e5e7eb', overflowX: 'auto' }}>
+          <button 
+            onClick={() => setActiveTab('cd-only')} 
+            style={{ 
+              flex: '1 0 auto',
+              minWidth: '140px',
+              padding: '12px 16px', 
+              background: activeTab === 'cd-only' ? '#8b5cf6' : 'white', 
+              color: activeTab === 'cd-only' ? 'white' : '#6b7280', 
+              border: 'none', 
+              fontSize: 'clamp(14px, 3vw, 16px)', 
+              fontWeight: 600, 
+              cursor: 'pointer', 
+              transition: 'all 0.2s', 
+              borderBottom: activeTab === 'cd-only' ? '3px solid #7c3aed' : 'none',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            💿 CD-Only
           </button>
-          <button onClick={() => setActiveTab('1001-albums')} style={{ flex: 1, padding: '16px 24px', background: activeTab === '1001-albums' ? '#8b5cf6' : 'white', color: activeTab === '1001-albums' ? 'white' : '#6b7280', border: 'none', fontSize: 16, fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s', borderBottom: activeTab === '1001-albums' ? '3px solid #7c3aed' : 'none' }}>
+          <button 
+            onClick={() => setActiveTab('1001-albums')} 
+            style={{ 
+              flex: '1 0 auto',
+              minWidth: '140px',
+              padding: '12px 16px', 
+              background: activeTab === '1001-albums' ? '#8b5cf6' : 'white', 
+              color: activeTab === '1001-albums' ? 'white' : '#6b7280', 
+              border: 'none', 
+              fontSize: 'clamp(14px, 3vw, 16px)', 
+              fontWeight: 600, 
+              cursor: 'pointer', 
+              transition: 'all 0.2s', 
+              borderBottom: activeTab === '1001-albums' ? '3px solid #7c3aed' : 'none',
+              whiteSpace: 'nowrap'
+            }}
+          >
             📖 1001 Albums
           </button>
         </div>
 
-        <div style={{ padding: 32 }}>
+        <div style={{ padding: 'clamp(16px, 4vw, 32px)' }}>
           {activeTab === 'cd-only' && <CDOnlyTab />}
           {activeTab === '1001-albums' && <Thousand1AlbumsTab />}
         </div>
@@ -117,10 +149,8 @@ function CDOnlyTab() {
     }
 
     try {
-      const DISCOGS_TOKEN = process.env.NEXT_PUBLIC_DISCOGS_TOKEN;
-      const response = await fetch(`https://api.discogs.com/releases/${album.discogs_release_id}`, {
-        headers: { 'Authorization': `Discogs token=${DISCOGS_TOKEN}`, 'User-Agent': 'DeadwaxDialogues/1.0' }
-      });
+      // Get release data via proxy
+      const response = await fetch(`/api/discogsProxy?releaseId=${album.discogs_release_id}`);
       
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       
@@ -136,9 +166,9 @@ function CDOnlyTab() {
         return { ...album, available_formats: formatArray, has_vinyl: !hasCD || hasVinyl, format_check_method: 'Single release' };
       }
 
+      // Use proxy for search as well
       const searchQuery = encodeURIComponent(`${album.artist} ${album.title}`);
-      const searchUrl = `https://api.discogs.com/database/search?q=${searchQuery}&type=release&per_page=100&token=${DISCOGS_TOKEN}`;
-      const searchResponse = await fetch(searchUrl, { headers: { 'User-Agent': 'DeadwaxDialogues/1.0' }});
+      const searchResponse = await fetch(`/api/discogsProxy?search=${searchQuery}&type=release`);
       
       if (!searchResponse.ok) throw new Error(`Search failed: ${searchResponse.status}`);
       
@@ -270,8 +300,8 @@ function CDOnlyTab() {
         <>
           <div style={{ textAlign: 'center', marginBottom: 32 }}>
             <div style={{ fontSize: 64, marginBottom: 16 }}>💿</div>
-            <h2 style={{ fontSize: 24, fontWeight: 600, color: '#1f2937', marginBottom: 12 }}>CD-Only Release Finder</h2>
-            <p style={{ color: '#6b7280', fontSize: 16, maxWidth: 600, margin: '0 auto 24px' }}>
+            <h2 style={{ fontSize: 'clamp(20px, 4vw, 24px)', fontWeight: 600, color: '#1f2937', marginBottom: 12 }}>CD-Only Release Finder</h2>
+            <p style={{ color: '#6b7280', fontSize: 'clamp(14px, 3vw, 16px)', maxWidth: 600, margin: '0 auto 24px' }}>
               Comprehensively checks Discogs to find albums never released on vinyl
             </p>
           </div>
@@ -287,7 +317,7 @@ function CDOnlyTab() {
           {scanning && (
             <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: 8, padding: 20, marginBottom: 24 }}>
               <div style={{ fontSize: 48, marginBottom: 12, textAlign: 'center' }}>🔍</div>
-              <div style={{ fontSize: 16, fontWeight: 600, color: '#92400e', marginBottom: 8, textAlign: 'center' }}>{status}</div>
+              <div style={{ fontSize: 16, fontWeight: 600, color: '#92400e', marginBottom: 8, textAlign: 'center', wordWrap: 'break-word' }}>{status}</div>
               <div style={{ width: '100%', height: 8, background: '#e9ecef', borderRadius: 4, overflow: 'hidden', marginBottom: 8 }}>
                 <div style={{ width: `${progress}%`, height: '100%', background: '#8b5cf6', transition: 'width 0.3s' }} />
               </div>
@@ -307,10 +337,10 @@ function CDOnlyTab() {
             </p>
           </div>
 
-          <div style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: 8, padding: 20, marginBottom: 24 }}>
+          <div style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: 8, padding: 16, marginBottom: 24 }}>
             <div style={{ marginBottom: 20 }}>
               <h3 style={{ fontSize: 14, fontWeight: 600, color: '#1f2937', marginBottom: 12 }}>🔍 Filters</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
                 <input type="text" placeholder="Filter by artist..." value={artistFilter} onChange={(e) => setArtistFilter(e.target.value)} style={{ padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 14 }} />
                 <input type="text" placeholder="Filter by year..." value={yearFilter} onChange={(e) => setYearFilter(e.target.value)} style={{ padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 14 }} />
                 <select value={genreFilter} onChange={(e) => setGenreFilter(e.target.value)} style={{ padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 14 }}>
@@ -324,20 +354,20 @@ function CDOnlyTab() {
             <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 16 }}>
               <h3 style={{ fontSize: 14, fontWeight: 600, color: '#1f2937', marginBottom: 12 }}>⚡ Quick Actions</h3>
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                <button onClick={() => setSelectedIds(new Set(filteredResults.map(a => a.id)))} style={{ padding: '8px 16px', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 14, cursor: 'pointer' }}>Select All</button>
+                <button onClick={() => setSelectedIds(new Set(filteredResults.map(a => a.id)))} style={{ padding: '8px 16px', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 14, cursor: 'pointer', whiteSpace: 'nowrap' }}>Select All</button>
                 <button onClick={() => setSelectedIds(new Set())} style={{ padding: '8px 16px', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 14, cursor: 'pointer' }}>Clear</button>
-                <button onClick={tagSelected} disabled={selectedIds.size === 0} style={{ padding: '8px 16px', background: selectedIds.size === 0 ? '#f3f4f6' : '#8b5cf6', color: selectedIds.size === 0 ? '#9ca3af' : 'white', border: 'none', borderRadius: 6, fontSize: 14, cursor: selectedIds.size === 0 ? 'not-allowed' : 'pointer' }}>🏷️ Tag ({selectedIds.size})</button>
-                <button onClick={exportToCSV} style={{ padding: '8px 16px', background: '#10b981', color: 'white', border: 'none', borderRadius: 6, fontSize: 14, cursor: 'pointer' }}>📥 Export CSV</button>
-                <button onClick={() => { setView('scanner'); setResults([]); setSelectedIds(new Set()); }} style={{ padding: '8px 16px', background: '#6b7280', color: 'white', border: 'none', borderRadius: 6, fontSize: 14, cursor: 'pointer' }}>🔄 New Scan</button>
+                <button onClick={tagSelected} disabled={selectedIds.size === 0} style={{ padding: '8px 16px', background: selectedIds.size === 0 ? '#f3f4f6' : '#8b5cf6', color: selectedIds.size === 0 ? '#9ca3af' : 'white', border: 'none', borderRadius: 6, fontSize: 14, cursor: selectedIds.size === 0 ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}>🏷️ Tag ({selectedIds.size})</button>
+                <button onClick={exportToCSV} style={{ padding: '8px 16px', background: '#10b981', color: 'white', border: 'none', borderRadius: 6, fontSize: 14, cursor: 'pointer', whiteSpace: 'nowrap' }}>📥 Export CSV</button>
+                <button onClick={() => { setView('scanner'); setResults([]); setSelectedIds(new Set()); }} style={{ padding: '8px 16px', background: '#6b7280', color: 'white', border: 'none', borderRadius: 6, fontSize: 14, cursor: 'pointer', whiteSpace: 'nowrap' }}>🔄 New Scan</button>
               </div>
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 16 }}>
             {filteredResults.map((album) => (
               <div key={album.id} onClick={() => setSelectedIds(s => { const n = new Set(s); if (n.has(album.id)) { n.delete(album.id); } else { n.add(album.id); } return n; })} style={{ background: 'white', border: selectedIds.has(album.id) ? '2px solid #8b5cf6' : '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden', cursor: 'pointer', position: 'relative' }}>
                 {album.cd_only_tagged && <div style={{ position: 'absolute', top: 8, left: 8, background: '#10b981', color: 'white', borderRadius: 4, padding: '2px 6px', fontSize: 10, fontWeight: 'bold', zIndex: 10 }}>🏷️</div>}
-                {album.image_url && <Image src={album.image_url} alt={`${album.artist} - ${album.title}`} width={180} height={180} style={{ objectFit: 'cover', width: '100%', height: 180 }} unoptimized />}
+                {album.image_url && <Image src={album.image_url} alt={`${album.artist} - ${album.title}`} width={180} height={180} style={{ objectFit: 'cover', width: '100%', height: 'auto', aspectRatio: '1' }} unoptimized />}
                 <div style={{ padding: 12 }}>
                   <div style={{ fontSize: 12, fontWeight: 600, color: '#1f2937', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{album.artist}</div>
                   <div style={{ fontSize: 12, color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 4 }}>{album.title}</div>
@@ -768,6 +798,122 @@ function Thousand1AlbumsTab() {
     setExpandedAlbums((prev) => ({ ...prev, [albumId]: !prev[albumId] }));
   };
 
+  const exportToCSV = () => {
+    const headers = ['Artist', 'Album', 'Year', 'Status', 'Matches', 'Collection Artist', 'Collection Title', 'Collection Year', 'Confidence'];
+    
+    const dataRows: string[][] = [];
+    
+    filteredRows.forEach((album) => {
+      const matches = (matchesBy[album.id] ?? []).filter(m => m.review_status !== 'rejected');
+      const isUnmatched = matches.length === 0;
+      const hasPending = matches.some((m) => m.review_status === "pending" || m.review_status === "linked");
+      const allConfirmed = matches.length > 0 && matches.every((m) => m.review_status === "confirmed");
+      
+      const status = isUnmatched ? 'Unmatched' : hasPending ? 'Pending' : allConfirmed ? 'Confirmed' : '';
+      
+      if (matches.length === 0) {
+        dataRows.push([album.artist, album.album, album.year?.toString() || '', status, '0', '', '', '', '']);
+      } else {
+        matches.forEach((match) => {
+          const collection = collectionsBy[match.collection_id];
+          dataRows.push([
+            album.artist,
+            album.album,
+            album.year?.toString() || '',
+            match.review_status || '',
+            matches.length.toString(),
+            collection?.artist || '',
+            collection?.title || '',
+            collection?.year?.toString() || '',
+            match.confidence ? `${match.confidence}%` : ''
+          ]);
+        });
+      }
+    });
+
+    const csvContent = [
+      headers.join(','),
+      ...dataRows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `1001-albums-${statusFilter}-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const printResults = () => {
+    const printWindow = window.open('', '', 'width=800,height=600');
+    if (!printWindow) return;
+    
+    const content = `
+      <html>
+        <head>
+          <title>1001 Albums - ${statusFilter}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            h1 { color: #1f2937; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #e5e7eb; padding: 8px; text-align: left; }
+            th { background-color: #f9fafb; font-weight: 600; }
+            tr:nth-child(even) { background-color: #f9fafb; }
+            .status-unmatched { color: #991b1b; }
+            .status-pending { color: #92400e; }
+            .status-confirmed { color: #065f46; }
+          </style>
+        </head>
+        <body>
+          <h1>1001 Albums You Must Hear Before You Die</h1>
+          <h2>${statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)} Albums (${filteredRows.length})</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Artist</th>
+                <th>Album</th>
+                <th>Year</th>
+                <th>Status</th>
+                <th>Matches</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${filteredRows.map((album) => {
+                const matches = (matchesBy[album.id] ?? []).filter(m => m.review_status !== 'rejected');
+                const isUnmatched = matches.length === 0;
+                const hasPending = matches.some((m) => m.review_status === "pending" || m.review_status === "linked");
+                const allConfirmed = matches.length > 0 && matches.every((m) => m.review_status === "confirmed");
+                const status = isUnmatched ? 'Unmatched' : hasPending ? 'Pending' : allConfirmed ? 'Confirmed' : '';
+                const statusClass = isUnmatched ? 'status-unmatched' : hasPending ? 'status-pending' : 'status-confirmed';
+                
+                return `
+                  <tr>
+                    <td>${album.artist}</td>
+                    <td>${album.album}</td>
+                    <td>${album.year || '—'}</td>
+                    <td class="${statusClass}">${status}</td>
+                    <td>${matches.length > 0 ? `${matches.length} pressing${matches.length > 1 ? 's' : ''}` : '—'}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `;
+    
+    printWindow.document.write(content);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 250);
+  };
+
   if (loading) {
     return (
       <div style={{ textAlign: 'center', padding: 60, background: '#f9fafb', borderRadius: 8 }}>
@@ -802,9 +948,9 @@ function Thousand1AlbumsTab() {
       <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
         {[
           { value: "unmatched", label: "Need Attention", count: counts.unmatched, color: "#ef4444", bg: "#fef2f2" },
-          { value: "pending", label: "Pending Review", count: counts.pending, color: "#f59e0b", bg: "#fffbeb" },
+          { value: "pending", label: "Pending", count: counts.pending, color: "#f59e0b", bg: "#fffbeb" },
           { value: "confirmed", label: "Confirmed", count: counts.confirmed, color: "#10b981", bg: "#f0fdf4" },
-          { value: "all", label: "All Albums", count: rows.length, color: "#6b7280", bg: "#f9fafb" },
+          { value: "all", label: "All", count: rows.length, color: "#6b7280", bg: "#f9fafb" },
         ].map((tab) => {
           const isActive = statusFilter === tab.value;
           return (
@@ -813,14 +959,14 @@ function Thousand1AlbumsTab() {
               onClick={() => setStatusFilter(tab.value as StatusFilter)}
               style={{
                 flex: "1 1 auto",
-                minWidth: 120,
-                padding: "10px 16px",
+                minWidth: '90px',
+                padding: "8px 12px",
                 border: isActive ? `2px solid ${tab.color}` : "2px solid #e5e7eb",
                 borderRadius: 8,
                 background: isActive ? tab.bg : "#ffffff",
                 color: isActive ? tab.color : "#6b7280",
                 fontWeight: 700,
-                fontSize: 13,
+                fontSize: 'clamp(11px, 2.5vw, 13px)',
                 cursor: "pointer",
                 transition: "all 0.2s",
                 display: "flex",
@@ -829,15 +975,16 @@ function Thousand1AlbumsTab() {
                 gap: 6,
               }}
             >
-              <span>{tab.label}</span>
+              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tab.label}</span>
               <span
                 style={{
                   background: isActive ? tab.color : "#d1d5db",
                   color: "#ffffff",
                   borderRadius: 999,
-                  padding: "2px 8px",
-                  fontSize: 11,
+                  padding: "2px 6px",
+                  fontSize: 10,
                   fontWeight: 800,
+                  flexShrink: 0,
                 }}
               >
                 {tab.count}
@@ -849,92 +996,135 @@ function Thousand1AlbumsTab() {
 
       <div style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: 8, padding: 16, marginBottom: 16 }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: '#6b7280', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Matching Actions</div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
           <button
             onClick={() => void runExact()}
             disabled={running}
             style={{
-              padding: "8px 14px",
+              padding: "8px 12px",
               background: running ? "#9ca3af" : "#3b82f6",
               color: "#ffffff",
               border: "none",
               borderRadius: 6,
               fontWeight: 700,
-              fontSize: 13,
+              fontSize: 'clamp(11px, 2.5vw, 13px)',
               cursor: running ? "not-allowed" : "pointer",
               opacity: running ? 0.6 : 1,
+              whiteSpace: 'nowrap',
             }}
           >
-            {running ? "Running..." : "Run Exact Match"}
+            {running ? "Running..." : "Exact"}
           </button>
           <button
             onClick={() => void runFuzzy(0.7, 1)}
             disabled={running}
             style={{
-              padding: "8px 14px",
+              padding: "8px 12px",
               background: running ? "#9ca3af" : "#8b5cf6",
               color: "#ffffff",
               border: "none",
               borderRadius: 6,
               fontWeight: 700,
-              fontSize: 13,
+              fontSize: 'clamp(11px, 2.5vw, 13px)',
               cursor: running ? "not-allowed" : "pointer",
               opacity: running ? 0.6 : 1,
+              whiteSpace: 'nowrap',
             }}
           >
-            Run Fuzzy (0.70, ±1y)
+            Fuzzy (0.70)
           </button>
           <button
             onClick={() => void runSameArtist(0.6, 1)}
             disabled={running}
             style={{
-              padding: "8px 14px",
+              padding: "8px 12px",
               background: running ? "#9ca3af" : "#06b6d4",
               color: "#ffffff",
               border: "none",
               borderRadius: 6,
               fontWeight: 700,
-              fontSize: 13,
+              fontSize: 'clamp(11px, 2.5vw, 13px)',
               cursor: running ? "not-allowed" : "pointer",
               opacity: running ? 0.6 : 1,
+              whiteSpace: 'nowrap',
             }}
           >
-            Same-Artist (0.60, ±1y)
+            Same-Artist
           </button>
           <button
             onClick={() => void runFuzzyArtist(0.7)}
             disabled={running}
             style={{
-              padding: "8px 14px",
+              padding: "8px 12px",
               background: running ? "#9ca3af" : "#ec4899",
               color: "#ffffff",
               border: "none",
               borderRadius: 6,
               fontWeight: 700,
-              fontSize: 13,
+              fontSize: 'clamp(11px, 2.5vw, 13px)',
               cursor: running ? "not-allowed" : "pointer",
               opacity: running ? 0.6 : 1,
+              whiteSpace: 'nowrap',
             }}
           >
-            Fuzzy Artist (0.70)
+            Fuzzy Artist
           </button>
           <button
             onClick={() => void runAggressive()}
             disabled={running}
             style={{
-              padding: "8px 14px",
+              padding: "8px 12px",
               background: running ? "#9ca3af" : "#f59e0b",
               color: "#ffffff",
               border: "none",
               borderRadius: 6,
               fontWeight: 700,
-              fontSize: 13,
+              fontSize: 'clamp(11px, 2.5vw, 13px)',
               cursor: running ? "not-allowed" : "pointer",
               opacity: running ? 0.6 : 1,
+              whiteSpace: 'nowrap',
             }}
           >
-            🔥 Aggressive (0.50)
+            🔥 Aggressive
           </button>
+        </div>
+        
+        <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 12 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#6b7280', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Export Options</div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button
+              onClick={exportToCSV}
+              style={{
+                padding: "8px 12px",
+                background: "#10b981",
+                color: "#ffffff",
+                border: "none",
+                borderRadius: 6,
+                fontWeight: 700,
+                fontSize: 'clamp(11px, 2.5vw, 13px)',
+                cursor: "pointer",
+                whiteSpace: 'nowrap',
+              }}
+            >
+              📥 Export CSV
+            </button>
+            <button
+              onClick={printResults}
+              style={{
+                padding: "8px 12px",
+                background: "#6366f1",
+                color: "#ffffff",
+                border: "none",
+                borderRadius: 6,
+                fontWeight: 700,
+                fontSize: 'clamp(11px, 2.5vw, 13px)',
+                cursor: "pointer",
+                whiteSpace: 'nowrap',
+              }}
+            >
+              🖨️ Print
+            </button>
+          </div>
         </div>
       </div>
 
@@ -988,11 +1178,11 @@ function Thousand1AlbumsTab() {
                   }}
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
                       <div
                         style={{
-                          width: 32,
-                          height: 32,
+                          width: 28,
+                          height: 28,
                           background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
                           borderRadius: 6,
                           display: "flex",
@@ -1001,33 +1191,33 @@ function Thousand1AlbumsTab() {
                           flexShrink: 0,
                         }}
                       >
-                        <div style={{ fontSize: 10, fontWeight: 900, color: '#ffffff' }}>1001</div>
+                        <div style={{ fontSize: 9, fontWeight: 900, color: '#ffffff' }}>1001</div>
                       </div>
-                      <div style={{ fontWeight: 700, fontSize: 14, color: "#111827", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <div style={{ fontWeight: 700, fontSize: 'clamp(12px, 3vw, 14px)', color: "#111827", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>
                         {album.artist} — {album.album}
                       </div>
                       {isUnmatched && (
-                        <span style={{ background: "#fee2e2", color: "#991b1b", padding: "3px 8px", borderRadius: 4, fontSize: 11, fontWeight: 700, textTransform: "uppercase", flexShrink: 0 }}>
+                        <span style={{ background: "#fee2e2", color: "#991b1b", padding: "2px 6px", borderRadius: 4, fontSize: 10, fontWeight: 700, textTransform: "uppercase", flexShrink: 0, whiteSpace: 'nowrap' }}>
                           Unmatched
                         </span>
                       )}
                       {hasPending && (
-                        <span style={{ background: "#fef3c7", color: "#92400e", padding: "3px 8px", borderRadius: 4, fontSize: 11, fontWeight: 700, textTransform: "uppercase", flexShrink: 0 }}>
+                        <span style={{ background: "#fef3c7", color: "#92400e", padding: "2px 6px", borderRadius: 4, fontSize: 10, fontWeight: 700, textTransform: "uppercase", flexShrink: 0, whiteSpace: 'nowrap' }}>
                           Pending
                         </span>
                       )}
                       {allConfirmed && (
-                        <span style={{ background: "#d1fae5", color: "#065f46", padding: "3px 8px", borderRadius: 4, fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
+                        <span style={{ background: "#d1fae5", color: "#065f46", padding: "2px 6px", borderRadius: 4, fontSize: 10, fontWeight: 700, flexShrink: 0, whiteSpace: 'nowrap' }}>
                           Confirmed
                         </span>
                       )}
                     </div>
-                    <div style={{ fontSize: 12, color: "#6b7280", paddingLeft: 44 }}>
-                      {album.year ?? "—"} • {matches.length > 0 ? `${matches.length} pressing${matches.length > 1 ? "s" : ""}` : "No matches"}
+                    <div style={{ fontSize: 11, color: "#6b7280", paddingLeft: '36px' }}>
+                      {album.year ?? "—"} • {matches.length > 0 ? `${matches.length} pressing${matches.length > 1 ? 's' : ''}` : "No matches"}
                     </div>
                   </div>
-                  <div style={{ fontSize: 12, color: "#3b82f6", fontWeight: 600, flexShrink: 0, marginLeft: 16 }}>
-                    {(matches.length > 0 || isUnmatched) && (isExpanded ? "▼ Collapse" : "▶ Expand")}
+                  <div style={{ fontSize: 11, color: "#3b82f6", fontWeight: 600, flexShrink: 0, marginLeft: 12, whiteSpace: 'nowrap' }}>
+                    {(matches.length > 0 || isUnmatched) && (isExpanded ? "▼" : "▶")}
                   </div>
                 </div>
 
@@ -1035,20 +1225,20 @@ function Thousand1AlbumsTab() {
                   <div style={{ padding: "16px", background: "#f9fafb", borderTop: "1px solid #e5e7eb" }}>
                     {(isUnmatched || allConfirmed) && (
                       <div style={{ marginBottom: matches.length > 0 ? 16 : 0 }}>
-                        <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 6 }}>
-                          Search your collection to link:
+                        <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#374151", marginBottom: 6 }}>
+                          Search to link:
                         </label>
                         <div style={{ position: "relative", zIndex: 10000 }}>
                           <input
                             value={searchInputs[album.id] ?? ""}
                             onChange={(e) => handleSearchInput(album.id, e.target.value)}
-                            placeholder={`Try "${album.artist}" or "${album.album}"`}
+                            placeholder={`Try "${album.artist}"`}
                             style={{
                               width: "100%",
-                              padding: "10px 12px",
+                              padding: "8px 10px",
                               border: "2px solid #d1d5db",
                               borderRadius: 6,
-                              fontSize: 14,
+                              fontSize: 13,
                               outline: "none",
                               transition: "border-color 0.2s",
                               color: "#111827",
@@ -1076,7 +1266,7 @@ function Thousand1AlbumsTab() {
                                 border: "2px solid #e5e7eb",
                                 borderRadius: 6,
                                 color: "#6b7280",
-                                fontSize: 13,
+                                fontSize: 12,
                                 zIndex: 99999,
                               }}
                             >
@@ -1106,8 +1296,8 @@ function Thousand1AlbumsTab() {
                                   onClick={() => void linkFromSearch(album.id, result.id)}
                                   style={{
                                     display: "flex",
-                                    gap: 10,
-                                    padding: 10,
+                                    gap: 8,
+                                    padding: 8,
                                     cursor: "pointer",
                                     borderBottom: "1px solid #f3f4f6",
                                     transition: "background 0.2s",
@@ -1126,8 +1316,8 @@ function Thousand1AlbumsTab() {
                                         : "/images/coverplaceholder.png"
                                     }
                                     alt={result.title || "cover"}
-                                    width={40}
-                                    height={40}
+                                    width={36}
+                                    height={36}
                                     unoptimized
                                     style={{ borderRadius: 4, objectFit: "cover", flexShrink: 0 }}
                                   />
@@ -1135,7 +1325,7 @@ function Thousand1AlbumsTab() {
                                     <div
                                       style={{
                                         fontWeight: 700,
-                                        fontSize: 13,
+                                        fontSize: 12,
                                         color: "#111827",
                                         overflow: "hidden",
                                         textOverflow: "ellipsis",
@@ -1146,7 +1336,7 @@ function Thousand1AlbumsTab() {
                                     </div>
                                     <div
                                       style={{
-                                        fontSize: 12,
+                                        fontSize: 11,
                                         color: "#6b7280",
                                         overflow: "hidden",
                                         textOverflow: "ellipsis",
@@ -1155,7 +1345,7 @@ function Thousand1AlbumsTab() {
                                     >
                                       {result.title || "Unknown Title"}
                                     </div>
-                                    <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>
+                                    <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 2 }}>
                                       {result.year || "—"} • {result.format || "—"}
                                     </div>
                                   </div>
@@ -1179,11 +1369,11 @@ function Thousand1AlbumsTab() {
                                   border: "2px solid #fecaca",
                                   borderRadius: 6,
                                   color: "#991b1b",
-                                  fontSize: 13,
+                                  fontSize: 12,
                                   zIndex: 99999,
                                 }}
                               >
-                                No matches found. Try different search terms.
+                                No matches found
                               </div>
                             )}
                         </div>
@@ -1191,7 +1381,7 @@ function Thousand1AlbumsTab() {
                     )}
 
                     {matches.length > 0 && (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                         {matches.map((match) => {
                           const collection = collectionsBy[match.collection_id];
                           const isConfirmed = match.review_status === "confirmed";
@@ -1200,12 +1390,13 @@ function Thousand1AlbumsTab() {
                               key={match.id}
                               style={{
                                 display: "flex",
-                                gap: 12,
-                                padding: 12,
+                                gap: 10,
+                                padding: 10,
                                 background: isConfirmed ? "#f0fdf4" : "#fffbeb",
                                 border: `2px solid ${isConfirmed ? "#86efac" : "#fde68a"}`,
                                 borderRadius: 6,
                                 alignItems: "center",
+                                flexWrap: 'wrap',
                               }}
                             >
                               <Image
@@ -1215,21 +1406,21 @@ function Thousand1AlbumsTab() {
                                     : "/images/coverplaceholder.png"
                                 }
                                 alt={collection?.title || "cover"}
-                                width={50}
-                                height={50}
+                                width={44}
+                                height={44}
                                 unoptimized
                                 style={{ borderRadius: 6, objectFit: "cover", flexShrink: 0 }}
                               />
                               <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3, flexWrap: 'wrap' }}>
                                   <div
                                     style={{
                                       fontWeight: 700,
-                                      fontSize: 14,
+                                      fontSize: 12,
                                       color: "#111827",
                                       overflow: "hidden",
                                       textOverflow: "ellipsis",
-                                      whiteSpace: "nowrap",
+                                      minWidth: 0,
                                     }}
                                   >
                                     {collection?.artist || "Unknown"} — {collection?.title || "Unknown"}
@@ -1238,85 +1429,83 @@ function Thousand1AlbumsTab() {
                                     style={{
                                       background: isConfirmed ? "#10b981" : "#f59e0b",
                                       color: "#ffffff",
-                                      padding: "2px 6px",
+                                      padding: "2px 5px",
                                       borderRadius: 4,
-                                      fontSize: 10,
+                                      fontSize: 9,
                                       fontWeight: 700,
                                       textTransform: "uppercase",
+                                      flexShrink: 0,
+                                      whiteSpace: 'nowrap',
                                     }}
                                   >
-                                    {isConfirmed ? "Confirmed" : "Pending"}
+                                    {isConfirmed ? "✓" : "?"}
                                   </span>
                                   {typeof match.confidence === "number" && (
                                     <span
                                       style={{
                                         background: "#eef2ff",
                                         color: "#4f46e5",
-                                        padding: "2px 6px",
+                                        padding: "2px 5px",
                                         borderRadius: 4,
-                                        fontSize: 10,
+                                        fontSize: 9,
                                         fontWeight: 700,
+                                        flexShrink: 0,
                                       }}
                                     >
                                       {(match.confidence * 100).toFixed(0)}%
                                     </span>
                                   )}
                                 </div>
-                                <div style={{ fontSize: 12, color: "#6b7280" }}>
+                                <div style={{ fontSize: 11, color: "#6b7280" }}>
                                   {collection?.year || "—"} • {collection?.format || "—"}
                                 </div>
-                                {match.notes && (
-                                  <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2, fontStyle: "italic" }}>
-                                    {match.notes}
-                                  </div>
-                                )}
                               </div>
-                              {!isConfirmed && (
-                                <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                              {!isConfirmed ? (
+                                <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
                                   <button
                                     onClick={() => void updateStatus(match.id, album.id, "confirmed")}
                                     style={{
-                                      padding: "6px 12px",
+                                      padding: "5px 10px",
                                       background: "#10b981",
                                       color: "#ffffff",
                                       border: "none",
                                       borderRadius: 6,
-                                      fontSize: 12,
+                                      fontSize: 11,
                                       fontWeight: 700,
                                       cursor: "pointer",
                                     }}
                                   >
-                                    ✓ Confirm
+                                    ✓
                                   </button>
                                   <button
                                     onClick={() => void rejectMatch(match.id, album.id)}
                                     style={{
-                                      padding: "6px 12px",
+                                      padding: "5px 10px",
                                       background: "#ef4444",
                                       color: "#ffffff",
                                       border: "none",
                                       borderRadius: 6,
-                                      fontSize: 12,
+                                      fontSize: 11,
                                       fontWeight: 700,
                                       cursor: "pointer",
                                     }}
                                   >
-                                    ✕ Remove
+                                    ✕
                                   </button>
                                 </div>
-                              )}
-                              {isConfirmed && (
+                              ) : (
                                 <button
                                   onClick={() => void rejectMatch(match.id, album.id)}
                                   style={{
-                                    padding: "6px 12px",
+                                    padding: "5px 10px",
                                     background: "#ffffff",
                                     color: "#6b7280",
                                     border: "2px solid #d1d5db",
                                     borderRadius: 6,
-                                    fontSize: 12,
+                                    fontSize: 11,
                                     fontWeight: 700,
                                     cursor: "pointer",
+                                    flexShrink: 0,
                                   }}
                                 >
                                   Unlink
