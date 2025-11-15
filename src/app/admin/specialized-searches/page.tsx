@@ -204,7 +204,7 @@ function CDOnlyTab() {
       const { data: cdAlbums, error } = await supabase
         .from('collection')
         .select('id, artist, title, year, discogs_release_id, image_url, discogs_genres, folder, notes')
-        .or('format.ilike.*CD*,folder.eq.CDs')
+        .or('format.ilike.%CD%,folder.eq.CDs')
         .not('discogs_release_id', 'is', null);
       
       if (error) throw new Error(error.message);
