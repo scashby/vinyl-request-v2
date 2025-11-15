@@ -21,10 +21,10 @@ export default function AdminSidebar() {
   ];
 
   return (
-    <div className="w-48 bg-gray-100 h-screen p-4 border-r fixed overflow-y-auto">
-      <h2 className="text-lg font-bold mb-6 text-gray-800">Admin Panel</h2>
+    <div className="w-64 bg-gray-100 h-screen p-4 border-r fixed overflow-y-auto">
+      <h2 className="text-xl font-bold mb-6 text-gray-800">Admin Panel</h2>
       
-      {/* Core Navigation */}
+      {/* Primary Actions */}
       <div className="mb-6">
         <ul className="space-y-2">
           {navItems.map((item) => {
@@ -33,13 +33,11 @@ export default function AdminSidebar() {
               <li key={item.path}>
                 <Link
                   href={item.path}
-                  className={`
-                    block p-2 rounded-md text-sm transition-colors
-                    ${isActive 
-                      ? "bg-blue-100 text-blue-700 font-semibold border-l-4 border-blue-500" 
-                      : "text-gray-700 hover:bg-gray-200 hover:text-blue-600"
-                    }
-                  `}
+                  className={`block w-full text-center py-2 rounded font-semibold transition-colors ${
+                    isActive
+                      ? "bg-emerald-700 text-white"
+                      : "bg-emerald-600 text-white hover:bg-emerald-700"
+                  }`}
                 >
                   {item.label}
                 </Link>
@@ -47,6 +45,52 @@ export default function AdminSidebar() {
             );
           })}
         </ul>
+      </div>
+
+      {/* System Overview */}
+      <div className="mb-4 p-3 bg-white border border-gray-200 rounded-lg">
+        <h3 className="text-sm font-semibold text-gray-800 mb-2">System Overview</h3>
+        <p className="text-xs text-gray-600">
+          Key admin tools for managing events, collection data, customer engagement, and external systems.
+        </p>
+      </div>
+
+      {/* Event Management */}
+      <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+        <h4 className="text-sm font-semibold text-blue-800 mb-2">🎫 Events & DJ Schedule</h4>
+        <div className="space-y-2">
+          <Link 
+            href="/admin/manage-events"
+            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+              pathname === "/admin/manage-events" 
+                ? "bg-blue-700 text-white" 
+                : "bg-blue-600 text-white hover:bg-blue-700"
+            }`}
+          >
+            📅 Manage Events
+          </Link>
+          <Link 
+            href="/admin/featured-events"
+            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+              pathname === "/admin/featured-events" 
+                ? "bg-orange-700 text-white" 
+                : "bg-orange-600 text-white hover:bg-orange-700"
+            }`}
+          >
+            ⭐ Featured Events
+          </Link>
+
+          <Link 
+            href="/admin/manage-dj-sets"
+            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+              pathname === "/admin/manage-dj-sets" 
+                ? "bg-red-700 text-white" 
+                : "bg-red-600 text-white hover:bg-red-700"
+            }`}
+          >
+            🎧 DJ Sets
+          </Link>
+        </div>
       </div>
 
       {/* Collection Management */}
@@ -71,88 +115,27 @@ export default function AdminSidebar() {
                 : "bg-purple-600 text-white hover:bg-purple-700"
             }`}
           >
-            📥 Import from Discogs
+            ⬆️ Import Discogs
           </Link>
           <Link 
-            href="/admin/manage-tags"
+            href="/admin/1001-review"
             className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
-              pathname === "/admin/manage-tags" 
+              pathname === "/admin/1001-review" 
                 ? "bg-purple-700 text-white" 
                 : "bg-purple-600 text-white hover:bg-purple-700"
             }`}
           >
-            🏷️ Manage Tags
+            📖 1001 Albums Review
           </Link>
-        </div>
-      </div>
-
-      {/* Merchandise */}
-      <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
-        <h4 className="text-sm font-semibold text-emerald-800 mb-2">💰 Merchandise</h4>
-        <div className="space-y-2">
           <Link 
-            href="/admin/sale-items"
+            href="/admin/cd-only-checker"
             className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
-              pathname === "/admin/sale-items" 
-                ? "bg-emerald-700 text-white" 
-                : "bg-emerald-600 text-white hover:bg-emerald-700"
+              pathname === "/admin/cd-only-checker" 
+                ? "bg-purple-700 text-white" 
+                : "bg-purple-600 text-white hover:bg-purple-700"
             }`}
           >
-            💿 Sale Items
-          </Link>
-          <div className="pt-2 border-t border-emerald-300">
-            <div className="text-xs text-emerald-700 font-semibold mb-1 px-1">External:</div>
-            <div className="grid grid-cols-2 gap-1 text-xs">
-              <a 
-                href="https://admin.shopify.com/store/kstusk-d1?ui_locales=en"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-center bg-emerald-700 text-white py-1 px-1 rounded font-medium hover:bg-emerald-800 transition-colors"
-              >
-                🛍️ Shopify
-              </a>
-              <a 
-                href="https://www.discogs.com/seller/socialblunders/profile"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-center bg-emerald-700 text-white py-1 px-1 rounded font-medium hover:bg-emerald-800 transition-colors"
-              >
-                💿 Discogs
-              </a>
-              <a 
-                href="https://www.moo.com/us/account/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-center bg-emerald-700 text-white py-1 px-1 rounded font-medium hover:bg-emerald-800 transition-colors"
-              >
-                🐄 Moo
-              </a>
-              <a 
-                href="https://www.vistaprint.com/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-center bg-emerald-700 text-white py-1 px-1 rounded font-medium hover:bg-emerald-800 transition-colors"
-              >
-                🖨️ Vista
-              </a>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Data Quality */}
-      <div className="mb-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
-        <h4 className="text-sm font-semibold text-indigo-800 mb-2">🔧 Data Quality</h4>
-        <div className="space-y-2">
-          <Link 
-            href="/admin/diagnostics"
-            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
-              pathname === "/admin/diagnostics" 
-                ? "bg-indigo-700 text-white" 
-                : "bg-indigo-600 text-white hover:bg-indigo-700"
-            }`}
-          >
-            🔍 Diagnostics
+            💿 CD-Only Checker
           </Link>
           <Link 
             href="/admin/enrich-sources"
@@ -184,6 +167,17 @@ export default function AdminSidebar() {
           >
             📊 Enrich Collection
           </Link>
+          {/* 🏆 NEW: Best-Of Lists */}
+          <Link 
+            href="/admin/best-of"
+            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+              pathname === "/admin/best-of" 
+                ? "bg-indigo-700 text-white" 
+                : "bg-indigo-600 text-white hover:bg-indigo-700"
+            }`}
+          >
+            🏆 Best-Of Lists
+          </Link>
         </div>
       </div>
 
@@ -211,107 +205,152 @@ export default function AdminSidebar() {
           >
             🔎 Specialized Searches
           </Link>
-        </div>
-      </div>
-
-      {/* Event Management */}
-      <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
-        <h4 className="text-sm font-semibold text-orange-800 mb-2">📅 Events</h4>
-        <div className="space-y-2">
           <Link 
-            href="/admin/manage-events"
+            href="/admin/diagnostics"
             className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
-              pathname === "/admin/manage-events" 
-                ? "bg-orange-700 text-white" 
-                : "bg-orange-600 text-white hover:bg-orange-700"
+              pathname === "/admin/diagnostics" 
+                ? "bg-amber-700 text-white" 
+                : "bg-amber-600 text-white hover:bg-amber-700"
             }`}
           >
-            📅 Manage Events
-          </Link>
-
-          {/* ⭐ Featured Events link */}
-          <Link 
-            href="/admin/featured-events"
-            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
-              pathname === "/admin/featured-events" 
-                ? "bg-orange-700 text-white" 
-                : "bg-orange-600 text-white hover:bg-orange-700"
-            }`}
-          >
-            ⭐ Featured Events
-          </Link>
-
-          <Link 
-            href="/admin/manage-dj-sets"
-            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
-              pathname === "/admin/manage-dj-sets" 
-                ? "bg-red-700 text-white" 
-                : "bg-red-600 text-white hover:bg-red-700"
-            }`}
-          >
-            🎧 DJ Sets
-          </Link>
-          <Link 
-            href="/admin/edit-queue"
-            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
-              pathname === "/admin/edit-queue" 
-                ? "bg-orange-700 text-white" 
-                : "bg-orange-600 text-white hover:bg-orange-700"
-            }`}
-          >
-            🎵 Queues
+            🧪 Diagnostics
           </Link>
         </div>
       </div>
 
-      {/* Content */}
+      {/* Engagement & Voting */}
       <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-        <h4 className="text-sm font-semibold text-green-800 mb-2">📝 Content</h4>
+        <h4 className="text-sm font-semibold text-green-800 mb-2">🗳️ Engagement</h4>
         <div className="space-y-2">
           <Link 
-            href="/admin/edit-about"
+            href="/admin/inner-circle-results"
             className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
-              pathname === "/admin/edit-about" 
+              pathname === "/admin/inner-circle-results" 
                 ? "bg-green-700 text-white" 
                 : "bg-green-600 text-white hover:bg-green-700"
             }`}
           >
-            📄 About Page
+            🎟️ Inner Circle Voting
+          </Link>
+          <Link 
+            href="/admin/album-suggestions"
+            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+              pathname === "/admin/album-suggestions" 
+                ? "bg-green-700 text-white" 
+                : "bg-green-600 text-white hover:bg-green-700"
+            }`}
+          >
+            💡 Album Suggestions
+          </Link>
+        </div>
+      </div>
+
+      {/* Playlists & Curation */}
+      <div className="mb-4 p-3 bg-pink-50 border border-pink-200 rounded-lg">
+        <h4 className="text-sm font-semibold text-pink-800 mb-2">🎧 Curation</h4>
+        <div className="space-y-2">
+          <Link 
+            href="/admin/playlists"
+            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+              pathname === "/admin/playlists" 
+                ? "bg-pink-700 text-white" 
+                : "bg-pink-600 text-white hover:bg-pink-700"
+            }`}
+          >
+            🎶 Playlists
           </Link>
           <Link 
             href="/admin/most-wanted"
             className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
               pathname === "/admin/most-wanted" 
-                ? "bg-blue-700 text-white" 
-                : "bg-blue-600 text-white hover:bg-blue-700"
+                ? "bg-pink-700 text-white" 
+                : "bg-pink-600 text-white hover:bg-pink-700"
             }`}
           >
-            ⭐ Most Wanted
+            🔥 Most Wanted
           </Link>
           <Link 
-            href="/admin/playlists"
+            href="/admin/staff-picks"
             className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
-              pathname === "/admin/playlists" 
-                ? "bg-green-700 text-white" 
-                : "bg-green-600 text-white hover:bg-green-700"
+              pathname === "/admin/staff-picks" 
+                ? "bg-pink-700 text-white" 
+                : "bg-pink-600 text-white hover:bg-pink-700"
             }`}
           >
-            🎶 Playlists
+            ⭐ Staff Picks
           </Link>
         </div>
       </div>
 
-      {/* External Tools */}
-      <div className="mb-4 p-3 bg-slate-50 border border-slate-200 rounded-lg">
-        <h4 className="text-sm font-semibold text-slate-800 mb-2">🔗 External Tools</h4>
+      {/* Social & Communication */}
+      <div className="mb-4 p-3 bg-sky-50 border border-sky-200 rounded-lg">
+        <h4 className="text-sm font-semibold text-sky-800 mb-2">📣 Social & Comms</h4>
+        <div className="space-y-2">
+          <Link 
+            href="/admin/socials"
+            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+              pathname === "/admin/socials" 
+                ? "bg-sky-700 text-white" 
+                : "bg-sky-600 text-white hover:bg-sky-700"
+            }`}
+          >
+            📱 Social Scheduler
+          </Link>
+        </div>
+      </div>
+
+      {/* Sale Items */}
+      <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+        <h4 className="text-sm font-semibold text-yellow-800 mb-2">💸 Sale Items</h4>
+        <div className="space-y-2">
+          <Link 
+            href="/admin/sale-items"
+            className={`block w-full text-center py-1.5 px-2 rounded text-xs font-semibold transition-colors ${
+              pathname === "/admin/sale-items" 
+                ? "bg-yellow-500 text-gray-900" 
+                : "bg-yellow-400 text-gray-900 hover:bg-yellow-500"
+            }`}
+          >
+            🏷️ Manage Sale Items
+          </Link>
+        </div>
+      </div>
+
+      {/* External Systems */}
+      <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+        <h4 className="text-sm font-semibold text-gray-800 mb-2">🌐 External Systems</h4>
         <div className="grid grid-cols-2 gap-1 text-xs">
           <a 
-            href="https://blog.deadwaxdialogues.com/wp-admin/"
+            href="https://admin.shopify.com/store/kstusk-d1?ui_locales=en"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-center bg-slate-600 text-white py-1 px-1 rounded font-medium hover:bg-slate-700 transition-colors"
+            className="text-center bg-green-600 text-white py-1 px-1 rounded font-medium hover:bg-green-700 transition-colors"
           >
-            📝 WP
+            🛒 Shopify
+          </a>
+          <a 
+            href="https://venmo.com/u/deadwaxdialogues"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-center bg-blue-500 text-white py-1 px-1 rounded font-medium hover:bg-blue-600 transition-colors"
+          >
+            💰 Venmo
+          </a>
+          <a 
+            href="https://calendar.google.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-center bg-red-500 text-white py-1 px-1 rounded font-medium hover:bg-red-600 transition-colors"
+          >
+            📆 Calendar
+          </a>
+          <a 
+            href="https://docs.google.com/forms"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-center bg-indigo-500 text-white py-1 px-1 rounded font-medium hover:bg-indigo-600 transition-colors"
+          >
+            📋 Forms
           </a>
           <a 
             href="https://console.hetzner.com/projects"
@@ -333,49 +372,33 @@ export default function AdminSidebar() {
             href="https://supabase.com/dashboard"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-center bg-emerald-600 text-white py-1 px-1 rounded font-medium hover:bg-emerald-700 transition-colors"
+            className="text-center bg-emerald-700 text-white py-1 px-1 rounded font-medium hover:bg-emerald-800 transition-colors"
           >
-            🟩 Supabase
+            🗄️ Supabase
           </a>
           <a 
-            href="https://business.facebook.com/"
+            href="https://www.moo.com/us/account/"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-center bg-blue-600 text-white py-1 px-1 rounded font-medium hover:bg-blue-700 transition-colors"
+            className="text-center bg-emerald-700 text-white py-1 px-1 rounded font-medium hover:bg-emerald-800 transition-colors"
           >
-            📘 FB
+            🐄 Moo
           </a>
           <a 
-            href="https://login.buffer.com/login"
+            href="https://www.vistaprint.com/"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-center bg-sky-600 text-white py-1 px-1 rounded font-medium hover:bg-sky-700 transition-colors"
+            className="text-center bg-emerald-700 text-white py-1 px-1 rounded font-medium hover:bg-emerald-800 transition-colors"
           >
-            📱 Buffer
+            🖨️ Vistaprint
           </a>
           <a 
-            href="https://admin.google.com/"
+            href="https://app.canva.com"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-center bg-red-500 text-white py-1 px-1 rounded font-medium hover:bg-red-600 transition-colors"
+            className="text-center bg-emerald-700 text-white py-1 px-1 rounded font-medium hover:bg-emerald-800 transition-colors"
           >
-            🔍 Google
-          </a>
-          <a 
-            href="https://login.squarespace.com/api/1/login/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-center bg-gray-800 text-white py-1 px-1 rounded font-medium hover:bg-gray-900 transition-colors"
-          >
-            ⬛ Square
-          </a>
-          <a 
-            href="https://app.dub.co/login"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-center bg-violet-600 text-white py-1 px-1 rounded font-medium hover:bg-violet-700 transition-colors"
-          >
-            🔗 Dub
+            🎨 Canva
           </a>
         </div>
       </div>
@@ -383,7 +406,7 @@ export default function AdminSidebar() {
       {/* Quick Stats */}
       <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
         <h4 className="text-sm font-semibold text-gray-800 mb-2">📊 Status</h4>
-        <div className="space-y-1 text-xs text-gray-600">
+        <div className="space-	y-1 text-xs text-gray-600">
           <div>🗳️ Voting: Active</div>
           <div>💡 Suggestions: Active</div>
           <div>💸 Venmo: @deadwaxdialogues</div>
