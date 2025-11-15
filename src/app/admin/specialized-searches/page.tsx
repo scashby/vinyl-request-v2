@@ -204,15 +204,15 @@ function CDOnlyTab() {
     const { data: cdsByFormat, error: error1 } = await supabase
       .from('collection')
       .select('id, artist, title, year, discogs_release_id, image_url, discogs_genres, folder, notes')
-      .ilike('format', '%CD%')
-      .not('discogs_release_id', 'is', null);
+      .not('discogs_release_id', 'is', null)
+      .ilike('format', '%CD%');
     
     // Query 2: Get albums where folder is CDs
     const { data: cdsByFolder, error: error2 } = await supabase
       .from('collection')
       .select('id, artist, title, year, discogs_release_id, image_url, discogs_genres, folder, notes')
-      .eq('folder', 'CDs')
-      .not('discogs_release_id', 'is', null);
+      .not('discogs_release_id', 'is', null)
+      .eq('folder', 'CDs');
     
     if (error1 || error2) {
       throw new Error(error1?.message || error2?.message);
