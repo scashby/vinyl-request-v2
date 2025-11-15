@@ -194,73 +194,89 @@ function CDOnlyTab() {
   };
 
   const runCDOnlyCheck = async () => {
-    setScanning(true);
-    setStatus('Fetching CD collection...');
-    setProgress(0);
-    setView('scanner');
+  setScanning(true);
+  setStatus('Fetching CD collection...');
+  setProgress(0);
+  setView('scanner');
+  
+  try {
+    // Query 1: Get albums where format contains CD
+    const { data: cdsByFormat, error: error1 } = await supabase
+      .from('collection')
+      .select('id, artist, title, year, discogs_release_id, image_url, discogs_genres, folder, notes')
+      .ilike('format', '%CD%')
+      .not('discogs_release_id', 'is', null);
     
-    try {
-      // Fixed query - use * wildcards and proper or() syntax
-      const { data: cdAlbums, error } = await supabase
-        .from('collection')
-        .select('id, artist, title, year, discogs_release_id, image_url, discogs_genres, folder, notes')
-        .or('format.ilike.%CD%,folder.eq.CDs')
-        .not('discogs_release_id', 'is', null);
-      
-      if (error) throw new Error(error.message);
-      if (!cdAlbums || cdAlbums.length === 0) {
-        setStatus('No CDs found');
-        setScanning(false);
-        return;
-      }
-      
-      setStatus(`Checking ${cdAlbums.length} CDs...`);
-      const results: CDOnlyAlbum[] = [];
-      const errorList: Array<{album: string, error: string}> = [];
-      
-      for (let i = 0; i < cdAlbums.length; i++) {
-        const album = cdAlbums[i];
-        setStatus(`Checking ${i + 1}/${cdAlbums.length}: ${album.artist} - ${album.title}`);
-        setProgress(((i + 1) / cdAlbums.length) * 100);
-        
-        const result = await checkAlbumFormats({
-          id: album.id,
-          artist: album.artist,
-          title: album.title,
-          year: album.year,
-          discogs_release_id: album.discogs_release_id,
-          image_url: album.image_url,
-          discogs_genres: album.discogs_genres,
-          folder: album.folder,
-          has_vinyl: null,
-          cd_only_tagged: album.notes?.includes('[CD-ONLY]') || false
-        });
-        
-        if (result.available_formats?.includes('Error')) {
-          errorList.push({ album: `${result.artist} - ${result.title}`, error: 'Discogs API error' });
-        } else {
-          results.push(result);
-        }
-        
-        if (i < cdAlbums.length - 1) await delay(1000);
-      }
-      
-      const cdOnly = results.filter(r => !r.has_vinyl);
-      setResults(cdOnly);
-      setStats({ total: cdAlbums.length, scanned: cdAlbums.length, cdOnly: cdOnly.length, errors: errorList.length });
-      setStatus(`✅ Complete! Found ${cdOnly.length} CD-only albums`);
-      setProgress(100);
-      setView('results');
-      
-      const genres = new Set<string>();
-      cdOnly.forEach(album => { album.discogs_genres?.forEach(g => genres.add(g)); });
-      setAvailableGenres(Array.from(genres).sort());
-    } catch (err) {
-      setStatus(`❌ Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
-    } finally {
-      setScanning(false);
+    // Query 2: Get albums where folder is CDs
+    const { data: cdsByFolder, error: error2 } = await supabase
+      .from('collection')
+      .select('id, artist, title, year, discogs_release_id, image_url, discogs_genres, folder, notes')
+      .eq('folder', 'CDs')
+      .not('discogs_release_id', 'is', null);
+    
+    if (error1 || error2) {
+      throw new Error(error1?.message || error2?.message);
     }
-  };
+    
+    // Combine and deduplicate by id
+    const allCDs = [...(cdsByFormat || []), ...(cdsByFolder || [])];
+    const uniqueCDs = Array.from(
+      new Map(allCDs.map(cd => [cd.id, cd])).values()
+    );
+    
+    if (uniqueCDs.length === 0) {
+      setStatus('No CDs found');
+      setScanning(false);
+      return;
+    }
+    
+    setStatus(`Checking ${uniqueCDs.length} CDs...`);
+    const results: CDOnlyAlbum[] = [];
+    const errorList: Array<{album: string, error: string}> = [];
+    
+    for (let i = 0; i < uniqueCDs.length; i++) {
+      const album = uniqueCDs[i];
+      setStatus(`Checking ${i + 1}/${uniqueCDs.length}: ${album.artist} - ${album.title}`);
+      setProgress(((i + 1) / uniqueCDs.length) * 100);
+      
+      const result = await checkAlbumFormats({
+        id: album.id,
+        artist: album.artist,
+        title: album.title,
+        year: album.year,
+        discogs_release_id: album.discogs_release_id,
+        image_url: album.image_url,
+        discogs_genres: album.discogs_genres,
+        folder: album.folder,
+        has_vinyl: null,
+        cd_only_tagged: album.notes?.includes('[CD-ONLY]') || false
+      });
+      
+      if (result.available_formats?.includes('Error')) {
+        errorList.push({ album: `${result.artist} - ${result.title}`, error: 'Discogs API error' });
+      } else {
+        results.push(result);
+      }
+      
+      if (i < uniqueCDs.length - 1) await delay(1000);
+    }
+    
+    const cdOnly = results.filter(r => !r.has_vinyl);
+    setResults(cdOnly);
+    setStats({ total: uniqueCDs.length, scanned: uniqueCDs.length, cdOnly: cdOnly.length, errors: errorList.length });
+    setStatus(`✅ Complete! Found ${cdOnly.length} CD-only albums`);
+    setProgress(100);
+    setView('results');
+    
+    const genres = new Set<string>();
+    cdOnly.forEach(album => { album.discogs_genres?.forEach(g => genres.add(g)); });
+    setAvailableGenres(Array.from(genres).sort());
+  } catch (err) {
+    setStatus(`❌ Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+  } finally {
+    setScanning(false);
+  }
+};
 
   const exportToCSV = () => {
     const headers = ['Artist', 'Title', 'Year', 'Formats', 'Check Method'];
@@ -417,6 +433,7 @@ type CollectionRow = {
 };
 
 type StatusFilter = "unmatched" | "pending" | "confirmed" | "all";
+type FormatFilter = "all" | "vinyl" | "cd" | "cassette";
 
 type Toast = { kind: "info" | "ok" | "err"; msg: string };
 
@@ -426,6 +443,7 @@ function Thousand1AlbumsTab() {
   const [collectionsBy, setCollectionsBy] = useState<Record<Id, CollectionRow>>({});
   const [loading, setLoading] = useState<boolean>(true);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("unmatched");
+  const [formatFilter, setFormatFilter] = useState<FormatFilter>("all");
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [running, setRunning] = useState<boolean>(false);
   const [searchInputs, setSearchInputs] = useState<Record<Id, string>>({});
@@ -615,8 +633,33 @@ function Thousand1AlbumsTab() {
     }
   }, [rows, matchesBy, loading, running, pushToast, runExact, hasAutoMatchedSession]);
 
+  const matchesFormat = useCallback((album: A1001, filter: FormatFilter): boolean => {
+    if (filter === "all") return true;
+    
+    const matches = (matchesBy[album.id] ?? []).filter(m => m.review_status !== 'rejected');
+    if (matches.length === 0) return false;
+    
+    return matches.some(match => {
+      const collection = collectionsBy[match.collection_id];
+      if (!collection?.format) return false;
+      
+      const format = collection.format.toLowerCase();
+      
+      switch (filter) {
+        case "vinyl":
+          return format.includes('vinyl') || format.includes('lp') || format.includes('12"') || format.includes('7"');
+        case "cd":
+          return format.includes('cd');
+        case "cassette":
+          return format.includes('cassette');
+        default:
+          return true;
+      }
+    });
+  }, [matchesBy, collectionsBy]);
+
   const filteredRows = useMemo(() => {
-    const filtered = rows.filter((r) => {
+    let filtered = rows.filter((r) => {
       const ms = (matchesBy[r.id] ?? []).filter(m => m.review_status !== 'rejected');
       if (statusFilter === "all") return true;
       if (statusFilter === "unmatched") return ms.length === 0;
@@ -625,6 +668,9 @@ function Thousand1AlbumsTab() {
       if (statusFilter === "confirmed") return ms.some((m) => m.review_status === "confirmed");
       return true;
     });
+
+    // Apply format filter
+    filtered = filtered.filter(album => matchesFormat(album, formatFilter));
 
     if (statusFilter === "all") {
       return filtered.sort((a, b) => {
@@ -654,7 +700,7 @@ function Thousand1AlbumsTab() {
 
       return 0;
     });
-  }, [rows, matchesBy, statusFilter]);
+  }, [rows, matchesBy, statusFilter, formatFilter, matchesFormat]);
 
   const updateStatus = async (matchId: Id, albumId: Id, review_status: MatchStatus) => {
     const { error } = await supabase
@@ -699,7 +745,7 @@ function Thousand1AlbumsTab() {
     const { data, error } = await supabase
       .from("collection")
       .select("id, artist, title, year, format, image_url")
-      .or(`artist.ilike.*${query}*,title.ilike.*${query}*`)
+      .or(`artist.ilike.%${query}%,title.ilike.%${query}%`)
       .order("artist", { ascending: true })
       .limit(20);
 
@@ -800,7 +846,8 @@ function Thousand1AlbumsTab() {
   };
 
   const exportToCSV = () => {
-    const headers = ['Artist', 'Album', 'Year', 'Status', 'Matches', 'Collection Artist', 'Collection Title', 'Collection Year', 'Confidence'];
+    const formatLabel = formatFilter === "all" ? "all" : formatFilter;
+    const headers = ['Artist', 'Album', 'Year', 'Status', 'Matches', 'Collection Artist', 'Collection Title', 'Collection Year', 'Format', 'Confidence'];
     
     const dataRows: string[][] = [];
     
@@ -813,7 +860,7 @@ function Thousand1AlbumsTab() {
       const status = isUnmatched ? 'Unmatched' : hasPending ? 'Pending' : allConfirmed ? 'Confirmed' : '';
       
       if (matches.length === 0) {
-        dataRows.push([album.artist, album.album, album.year?.toString() || '', status, '0', '', '', '', '']);
+        dataRows.push([album.artist, album.album, album.year?.toString() || '', status, '0', '', '', '', '', '']);
       } else {
         matches.forEach((match) => {
           const collection = collectionsBy[match.collection_id];
@@ -826,6 +873,7 @@ function Thousand1AlbumsTab() {
             collection?.artist || '',
             collection?.title || '',
             collection?.year?.toString() || '',
+            collection?.format || '',
             match.confidence ? `${match.confidence}%` : ''
           ]);
         });
@@ -841,7 +889,7 @@ function Thousand1AlbumsTab() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `1001-albums-${statusFilter}-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `1001-albums-${statusFilter}-${formatLabel}-${new Date().toISOString().split('T')[0]}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -852,13 +900,16 @@ function Thousand1AlbumsTab() {
     const printWindow = window.open('', '', 'width=800,height=600');
     if (!printWindow) return;
     
+    const formatLabel = formatFilter === "all" ? "All Formats" : formatFilter === "vinyl" ? "Vinyl Only" : formatFilter === "cd" ? "CD Only" : "Cassette Only";
+    
     const content = `
       <html>
         <head>
-          <title>1001 Albums - ${statusFilter}</title>
+          <title>1001 Albums - ${statusFilter} - ${formatLabel}</title>
           <style>
             body { font-family: Arial, sans-serif; padding: 20px; }
             h1 { color: #1f2937; }
+            h2 { color: #6b7280; font-size: 16px; margin-top: 0; }
             table { width: 100%; border-collapse: collapse; margin-top: 20px; }
             th, td { border: 1px solid #e5e7eb; padding: 8px; text-align: left; }
             th { background-color: #f9fafb; font-weight: 600; }
@@ -870,7 +921,7 @@ function Thousand1AlbumsTab() {
         </head>
         <body>
           <h1>1001 Albums You Must Hear Before You Die</h1>
-          <h2>${statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)} Albums (${filteredRows.length})</h2>
+          <h2>${statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)} Albums • ${formatLabel} (${filteredRows.length})</h2>
           <table>
             <thead>
               <tr>
@@ -879,6 +930,7 @@ function Thousand1AlbumsTab() {
                 <th>Year</th>
                 <th>Status</th>
                 <th>Matches</th>
+                <th>Format</th>
               </tr>
             </thead>
             <tbody>
@@ -890,6 +942,8 @@ function Thousand1AlbumsTab() {
                 const status = isUnmatched ? 'Unmatched' : hasPending ? 'Pending' : allConfirmed ? 'Confirmed' : '';
                 const statusClass = isUnmatched ? 'status-unmatched' : hasPending ? 'status-pending' : 'status-confirmed';
                 
+                const formats = matches.map(m => collectionsBy[m.collection_id]?.format || '—').join(', ');
+                
                 return `
                   <tr>
                     <td>${album.artist}</td>
@@ -897,6 +951,7 @@ function Thousand1AlbumsTab() {
                     <td>${album.year || '—'}</td>
                     <td class="${statusClass}">${status}</td>
                     <td>${matches.length > 0 ? `${matches.length} pressing${matches.length > 1 ? 's' : ''}` : '—'}</td>
+                    <td>${formats || '—'}</td>
                   </tr>
                 `;
               }).join('')}
@@ -1090,6 +1145,39 @@ function Thousand1AlbumsTab() {
           </button>
         </div>
         
+        <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 12, marginBottom: 12 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#6b7280', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Format Filter</div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {[
+              { value: "all", label: "All Formats", icon: "🎵" },
+              { value: "vinyl", label: "Vinyl Only", icon: "💿" },
+              { value: "cd", label: "CD Only", icon: "💽" },
+              { value: "cassette", label: "Cassette Only", icon: "📼" },
+            ].map((format) => {
+              const isActive = formatFilter === format.value;
+              return (
+                <button
+                  key={format.value}
+                  onClick={() => setFormatFilter(format.value as FormatFilter)}
+                  style={{
+                    padding: "8px 12px",
+                    background: isActive ? "#8b5cf6" : "#ffffff",
+                    color: isActive ? "#ffffff" : "#6b7280",
+                    border: isActive ? "none" : "1px solid #d1d5db",
+                    borderRadius: 6,
+                    fontWeight: 700,
+                    fontSize: 'clamp(11px, 2.5vw, 13px)',
+                    cursor: "pointer",
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {format.icon} {format.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        
         <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 12 }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: '#6b7280', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Export Options</div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -1132,10 +1220,14 @@ function Thousand1AlbumsTab() {
       {filteredRows.length === 0 ? (
         <div style={{ background: "#ffffff", borderRadius: 8, padding: 40, textAlign: "center" }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>🎉</div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: "#111827", marginBottom: 6 }}>All done!</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: "#111827", marginBottom: 6 }}>
+            {formatFilter === "all" ? "All done!" : `No ${formatFilter} matches found`}
+          </div>
           <div style={{ color: "#6b7280", fontSize: 14 }}>
             {statusFilter === "unmatched"
               ? "No unmatched albums. Switch to another tab to see matched albums."
+              : formatFilter !== "all" 
+              ? `Try selecting "All Formats" to see all results.`
               : "No albums in this category."}
           </div>
         </div>
