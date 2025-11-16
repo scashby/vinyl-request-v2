@@ -200,11 +200,12 @@ function CDOnlyTab() {
     setView('scanner');
     
     try {
-      // Just get ALL albums with discogs_release_id, then filter in JavaScript
+      // Get all albums with discogs_release_id using range like import-discogs does
       const { data: allAlbums, error } = await supabase
         .from('collection')
         .select('id, artist, title, year, discogs_release_id, image_url, discogs_genres, folder, format, notes')
-        .not('discogs_release_id', 'is', null);
+        .not('discogs_release_id', 'is', null)
+        .range(0, 9999);
       
       if (error) throw new Error(error.message);
       if (!allAlbums) throw new Error('No data returned');
