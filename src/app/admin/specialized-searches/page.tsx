@@ -194,90 +194,83 @@ function CDOnlyTab() {
   };
 
   const runCDOnlyCheck = async () => {
-  setScanning(true);
-  setStatus('Fetching CD collection...');
-  setProgress(0);
-  setView('scanner');
-  
-  try {
-    // Query 1: Get albums where format contains CD (NO .not() filter)
-    const { data: cdsByFormat, error: error1 } = await supabase
-      .from('collection')
-      .select('id, artist, title, year, discogs_release_id, image_url, discogs_genres, folder, notes')
-      .ilike('format', '%CD%');
+    setScanning(true);
+    setStatus('Fetching CD collection...');
+    setProgress(0);
+    setView('scanner');
     
-    // Query 2: Get albums where folder is CDs (NO .not() filter)
-    const { data: cdsByFolder, error: error2 } = await supabase
-      .from('collection')
-      .select('id, artist, title, year, discogs_release_id, image_url, discogs_genres, folder, notes')
-      .eq('folder', 'CDs');
-    
-    if (error1 || error2) {
-      throw new Error(error1?.message || error2?.message);
-    }
-    
-    // Combine and deduplicate by id
-    const allCDs = [...(cdsByFormat || []), ...(cdsByFolder || [])];
-    const uniqueCDs = Array.from(
-      new Map(allCDs.map(cd => [cd.id, cd])).values()
-    );
-    
-    // Filter out nulls in JavaScript - THIS REPLACES THE .not() FILTER
-    const cdsWithReleaseId = uniqueCDs.filter(cd => cd.discogs_release_id != null && cd.discogs_release_id !== '');
-    
-    if (cdsWithReleaseId.length === 0) {
-      setStatus('No CDs found with Discogs release IDs');
-      setScanning(false);
-      return;
-    }
-    
-    setStatus(`Checking ${cdsWithReleaseId.length} CDs...`);
-    const results: CDOnlyAlbum[] = [];
-    const errorList: Array<{album: string, error: string}> = [];
-    
-    for (let i = 0; i < cdsWithReleaseId.length; i++) {
-      const album = cdsWithReleaseId[i];
-      setStatus(`Checking ${i + 1}/${cdsWithReleaseId.length}: ${album.artist} - ${album.title}`);
-      setProgress(((i + 1) / cdsWithReleaseId.length) * 100);
+    try {
+      // Just get ALL albums with discogs_release_id, then filter in JavaScript
+      const { data: allAlbums, error } = await supabase
+        .from('collection')
+        .select('id, artist, title, year, discogs_release_id, image_url, discogs_genres, folder, format, notes')
+        .not('discogs_release_id', 'is', null);
       
-      const result = await checkAlbumFormats({
-        id: album.id,
-        artist: album.artist,
-        title: album.title,
-        year: album.year,
-        discogs_release_id: album.discogs_release_id,
-        image_url: album.image_url,
-        discogs_genres: album.discogs_genres,
-        folder: album.folder,
-        has_vinyl: null,
-        cd_only_tagged: album.notes?.includes('[CD-ONLY]') || false
+      if (error) throw new Error(error.message);
+      if (!allAlbums) throw new Error('No data returned');
+      
+      // Filter for CDs in JavaScript
+      const cdsWithReleaseId = allAlbums.filter(album => {
+        const format = (album.format || '').toLowerCase();
+        const folder = (album.folder || '').toLowerCase();
+        const isCD = format.includes('cd') || folder === 'cds';
+        const hasReleaseId = album.discogs_release_id && album.discogs_release_id !== '';
+        return isCD && hasReleaseId;
       });
       
-      if (result.available_formats?.includes('Error')) {
-        errorList.push({ album: `${result.artist} - ${result.title}`, error: 'Discogs API error' });
-      } else {
-        results.push(result);
+      if (cdsWithReleaseId.length === 0) {
+        setStatus('No CDs found with Discogs release IDs');
+        setScanning(false);
+        return;
       }
       
-      if (i < cdsWithReleaseId.length - 1) await delay(1000);
+      setStatus(`Checking ${cdsWithReleaseId.length} CDs...`);
+      const results: CDOnlyAlbum[] = [];
+      const errorList: Array<{album: string, error: string}> = [];
+      
+      for (let i = 0; i < cdsWithReleaseId.length; i++) {
+        const album = cdsWithReleaseId[i];
+        setStatus(`Checking ${i + 1}/${cdsWithReleaseId.length}: ${album.artist} - ${album.title}`);
+        setProgress(((i + 1) / cdsWithReleaseId.length) * 100);
+        
+        const result = await checkAlbumFormats({
+          id: album.id,
+          artist: album.artist,
+          title: album.title,
+          year: album.year,
+          discogs_release_id: album.discogs_release_id,
+          image_url: album.image_url,
+          discogs_genres: album.discogs_genres,
+          folder: album.folder,
+          has_vinyl: null,
+          cd_only_tagged: album.notes?.includes('[CD-ONLY]') || false
+        });
+        
+        if (result.available_formats?.includes('Error')) {
+          errorList.push({ album: `${result.artist} - ${result.title}`, error: 'Discogs API error' });
+        } else {
+          results.push(result);
+        }
+        
+        if (i < cdsWithReleaseId.length - 1) await delay(1000);
+      }
+      
+      const cdOnly = results.filter(r => !r.has_vinyl);
+      setResults(cdOnly);
+      setStats({ total: cdsWithReleaseId.length, scanned: cdsWithReleaseId.length, cdOnly: cdOnly.length, errors: errorList.length });
+      setStatus(`✅ Complete! Found ${cdOnly.length} CD-only albums`);
+      setProgress(100);
+      setView('results');
+      
+      const genres = new Set<string>();
+      cdOnly.forEach(album => { album.discogs_genres?.forEach(g => genres.add(g)); });
+      setAvailableGenres(Array.from(genres).sort());
+    } catch (err) {
+      setStatus(`❌ Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setScanning(false);
     }
-    
-    const cdOnly = results.filter(r => !r.has_vinyl);
-    setResults(cdOnly);
-    setStats({ total: cdsWithReleaseId.length, scanned: cdsWithReleaseId.length, cdOnly: cdOnly.length, errors: errorList.length });
-    setStatus(`✅ Complete! Found ${cdOnly.length} CD-only albums`);
-    setProgress(100);
-    setView('results');
-    
-    const genres = new Set<string>();
-    cdOnly.forEach(album => { album.discogs_genres?.forEach(g => genres.add(g)); });
-    setAvailableGenres(Array.from(genres).sort());
-  } catch (err) {
-    setStatus(`❌ Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
-  } finally {
-    setScanning(false);
-  }
-};
+  };
 
   const exportToCSV = () => {
     const headers = ['Artist', 'Title', 'Year', 'Formats', 'Check Method'];
