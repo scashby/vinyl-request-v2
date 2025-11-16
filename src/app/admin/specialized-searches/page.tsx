@@ -194,104 +194,104 @@ function CDOnlyTab() {
   };
 
   const runCDOnlyCheck = async () => {
-  setScanning(true);
-  setStatus('Fetching CD collection...');
-  setProgress(0);
-  setView('scanner');
-  
-  try {
-    // Use native fetch instead of Supabase client
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/collection?select=id,artist,title,year,discogs_release_id,image_url,discogs_genres,folder,format,notes`,
-      {
-        headers: {
-          'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
-          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+    setScanning(true);
+    setStatus('Fetching CD collection...');
+    setProgress(0);
+    setView('scanner');
+    
+    try {
+      // Use native fetch - notes column doesn't exist in collection table
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/collection?select=id,artist,title,year,discogs_release_id,image_url,discogs_genres,folder,format`,
+        {
+          headers: {
+            'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+            'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+          }
         }
+      );
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${await response.text()}`);
       }
-    );
-    
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${await response.text()}`);
-    }
-    
-    const allAlbums = await response.json();
-    
-    // Filter for CDs with release IDs in JavaScript
-    const cdsWithReleaseId = (allAlbums as Array<{
-      id: number;
-      artist: string;
-      title: string;
-      year: string | null;
-      discogs_release_id: string | null;
-      image_url: string | null;
-      discogs_genres: string[] | null;
-      folder: string | null;
-      format: string | null;
-      notes: string | null;
-    }>).filter((album) => {
-      const hasReleaseId = album.discogs_release_id && album.discogs_release_id !== '';
-      if (!hasReleaseId) return false;
       
-      const format = (album.format || '').toLowerCase();
-      const folder = (album.folder || '').toLowerCase();
-      const isCD = format.includes('cd') || folder === 'cds';
-      return isCD;
-    });
-    
-    if (cdsWithReleaseId.length === 0) {
-      setStatus('No CDs found with Discogs release IDs');
-      setScanning(false);
-      return;
-    }
-    
-    setStatus(`Checking ${cdsWithReleaseId.length} CDs...`);
-    const results: CDOnlyAlbum[] = [];
-    const errorList: Array<{album: string, error: string}> = [];
-    
-    for (let i = 0; i < cdsWithReleaseId.length; i++) {
-      const album = cdsWithReleaseId[i];
-      setStatus(`Checking ${i + 1}/${cdsWithReleaseId.length}: ${album.artist} - ${album.title}`);
-      setProgress(((i + 1) / cdsWithReleaseId.length) * 100);
+      const allAlbums = await response.json();
       
-      const result = await checkAlbumFormats({
-        id: album.id,
-        artist: album.artist,
-        title: album.title,
-        year: album.year,
-        discogs_release_id: album.discogs_release_id,
-        image_url: album.image_url,
-        discogs_genres: album.discogs_genres,
-        folder: album.folder,
-        has_vinyl: null,
-        cd_only_tagged: album.notes?.includes('[CD-ONLY]') || false
+      // Filter for CDs with release IDs in JavaScript
+      const cdsWithReleaseId = (allAlbums as Array<{
+        id: number;
+        artist: string;
+        title: string;
+        year: string | null;
+        discogs_release_id: string | null;
+        image_url: string | null;
+        discogs_genres: string[] | null;
+        folder: string | null;
+        format: string | null;
+      }>).filter((album) => {
+        const hasReleaseId = album.discogs_release_id && album.discogs_release_id !== '';
+        if (!hasReleaseId) return false;
+        
+        const format = (album.format || '').toLowerCase();
+        const folder = (album.folder || '').toLowerCase();
+        const isCD = format.includes('cd') || folder === 'cds';
+        return isCD;
       });
       
-      if (result.available_formats?.includes('Error')) {
-        errorList.push({ album: `${result.artist} - ${result.title}`, error: 'Discogs API error' });
-      } else {
-        results.push(result);
+      if (cdsWithReleaseId.length === 0) {
+        setStatus('No CDs found with Discogs release IDs');
+        setScanning(false);
+        return;
       }
       
-      if (i < cdsWithReleaseId.length - 1) await delay(1000);
+      setStatus(`Checking ${cdsWithReleaseId.length} CDs...`);
+      const results: CDOnlyAlbum[] = [];
+      const errorList: Array<{album: string, error: string}> = [];
+      
+      for (let i = 0; i < cdsWithReleaseId.length; i++) {
+        const album = cdsWithReleaseId[i];
+        setStatus(`Checking ${i + 1}/${cdsWithReleaseId.length}: ${album.artist} - ${album.title}`);
+        setProgress(((i + 1) / cdsWithReleaseId.length) * 100);
+        
+        const result = await checkAlbumFormats({
+          id: album.id,
+          artist: album.artist,
+          title: album.title,
+          year: album.year,
+          discogs_release_id: album.discogs_release_id,
+          image_url: album.image_url,
+          discogs_genres: album.discogs_genres,
+          folder: album.folder,
+          has_vinyl: null,
+          cd_only_tagged: false
+        });
+        
+        if (result.available_formats?.includes('Error')) {
+          errorList.push({ album: `${result.artist} - ${result.title}`, error: 'Discogs API error' });
+        } else {
+          results.push(result);
+        }
+        
+        if (i < cdsWithReleaseId.length - 1) await delay(1000);
+      }
+      
+      const cdOnly = results.filter(r => !r.has_vinyl);
+      setResults(cdOnly);
+      setStats({ total: cdsWithReleaseId.length, scanned: cdsWithReleaseId.length, cdOnly: cdOnly.length, errors: errorList.length });
+      setStatus(`✅ Complete! Found ${cdOnly.length} CD-only albums`);
+      setProgress(100);
+      setView('results');
+      
+      const genres = new Set<string>();
+      cdOnly.forEach(album => { album.discogs_genres?.forEach(g => genres.add(g)); });
+      setAvailableGenres(Array.from(genres).sort());
+    } catch (err) {
+      setStatus(`❌ Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setScanning(false);
     }
-    
-    const cdOnly = results.filter(r => !r.has_vinyl);
-    setResults(cdOnly);
-    setStats({ total: cdsWithReleaseId.length, scanned: cdsWithReleaseId.length, cdOnly: cdOnly.length, errors: errorList.length });
-    setStatus(`✅ Complete! Found ${cdOnly.length} CD-only albums`);
-    setProgress(100);
-    setView('results');
-    
-    const genres = new Set<string>();
-    cdOnly.forEach(album => { album.discogs_genres?.forEach(g => genres.add(g)); });
-    setAvailableGenres(Array.from(genres).sort());
-  } catch (err) {
-    setStatus(`❌ Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
-  } finally {
-    setScanning(false);
-  }
-};
+  };
+
   const exportToCSV = () => {
     const headers = ['Artist', 'Title', 'Year', 'Formats', 'Check Method'];
     const rows = filteredResults.map(a => [a.artist, a.title, a.year || '', (a.available_formats || []).join('; '), a.format_check_method || '']);
@@ -309,20 +309,7 @@ function CDOnlyTab() {
 
   const tagSelected = async () => {
     if (selectedIds.size === 0) return;
-    try {
-      for (const id of Array.from(selectedIds)) {
-        const { data: album } = await supabase.from('collection').select('notes').eq('id', id).single();
-        if (!album) continue;
-        const currentNotes = album.notes || '';
-        if (currentNotes.includes('[CD-ONLY]')) continue;
-        const newNotes = currentNotes ? `[CD-ONLY] ${currentNotes}` : '[CD-ONLY]';
-        await supabase.from('collection').update({ notes: newNotes }).eq('id', id);
-      }
-      setResults(results.map(a => selectedIds.has(a.id) ? { ...a, cd_only_tagged: true } : a));
-      setSelectedIds(new Set());
-    } catch (err) {
-      console.error('Error tagging:', err);
-    }
+    alert('Tagging requires a "notes" column in the collection table. This feature is currently disabled.');
   };
 
   return (
@@ -397,7 +384,6 @@ function CDOnlyTab() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 16 }}>
             {filteredResults.map((album) => (
               <div key={album.id} onClick={() => setSelectedIds(s => { const n = new Set(s); if (n.has(album.id)) { n.delete(album.id); } else { n.add(album.id); } return n; })} style={{ background: 'white', border: selectedIds.has(album.id) ? '2px solid #8b5cf6' : '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden', cursor: 'pointer', position: 'relative' }}>
-                {album.cd_only_tagged && <div style={{ position: 'absolute', top: 8, left: 8, background: '#10b981', color: 'white', borderRadius: 4, padding: '2px 6px', fontSize: 10, fontWeight: 'bold', zIndex: 10 }}>🏷️</div>}
                 {album.image_url && <Image src={album.image_url} alt={`${album.artist} - ${album.title}`} width={180} height={180} style={{ objectFit: 'cover', width: '100%', height: 'auto', aspectRatio: '1' }} unoptimized />}
                 <div style={{ padding: 12 }}>
                   <div style={{ fontSize: 12, fontWeight: 600, color: '#1f2937', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{album.artist}</div>
