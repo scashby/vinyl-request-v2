@@ -194,84 +194,84 @@ function CDOnlyTab() {
   };
 
   const runCDOnlyCheck = async () => {
-    setScanning(true);
-    setStatus('Fetching CD collection...');
-    setProgress(0);
-    setView('scanner');
+  setScanning(true);
+  setStatus('Fetching CD collection...');
+  setProgress(0);
+  setView('scanner');
+  
+  try {
+    // Get ALL albums without any filters, then filter in JavaScript
+    const { data: allAlbums, error } = await supabase
+      .from('collection')
+      .select('id, artist, title, year, discogs_release_id, image_url, discogs_genres, folder, format, notes');
     
-    try {
-      // Get all albums with discogs_release_id using range like import-discogs does
-      const { data: allAlbums, error } = await supabase
-        .from('collection')
-        .select('id, artist, title, year, discogs_release_id, image_url, discogs_genres, folder, format, notes')
-        .not('discogs_release_id', 'is', null)
-        .range(0, 9999);
+    if (error) throw new Error(error.message);
+    if (!allAlbums) throw new Error('No data returned');
+    
+    // Filter for CDs with release IDs in JavaScript
+    const cdsWithReleaseId = allAlbums.filter(album => {
+      const hasReleaseId = album.discogs_release_id && album.discogs_release_id !== '';
+      if (!hasReleaseId) return false;
       
-      if (error) throw new Error(error.message);
-      if (!allAlbums) throw new Error('No data returned');
+      const format = (album.format || '').toLowerCase();
+      const folder = (album.folder || '').toLowerCase();
+      const isCD = format.includes('cd') || folder === 'cds';
+      return isCD;
+    });
+    
+    if (cdsWithReleaseId.length === 0) {
+      setStatus('No CDs found with Discogs release IDs');
+      setScanning(false);
+      return;
+    }
+    
+    setStatus(`Checking ${cdsWithReleaseId.length} CDs...`);
+    const results: CDOnlyAlbum[] = [];
+    const errorList: Array<{album: string, error: string}> = [];
+    
+    for (let i = 0; i < cdsWithReleaseId.length; i++) {
+      const album = cdsWithReleaseId[i];
+      setStatus(`Checking ${i + 1}/${cdsWithReleaseId.length}: ${album.artist} - ${album.title}`);
+      setProgress(((i + 1) / cdsWithReleaseId.length) * 100);
       
-      // Filter for CDs in JavaScript
-      const cdsWithReleaseId = allAlbums.filter(album => {
-        const format = (album.format || '').toLowerCase();
-        const folder = (album.folder || '').toLowerCase();
-        const isCD = format.includes('cd') || folder === 'cds';
-        const hasReleaseId = album.discogs_release_id && album.discogs_release_id !== '';
-        return isCD && hasReleaseId;
+      const result = await checkAlbumFormats({
+        id: album.id,
+        artist: album.artist,
+        title: album.title,
+        year: album.year,
+        discogs_release_id: album.discogs_release_id,
+        image_url: album.image_url,
+        discogs_genres: album.discogs_genres,
+        folder: album.folder,
+        has_vinyl: null,
+        cd_only_tagged: album.notes?.includes('[CD-ONLY]') || false
       });
       
-      if (cdsWithReleaseId.length === 0) {
-        setStatus('No CDs found with Discogs release IDs');
-        setScanning(false);
-        return;
+      if (result.available_formats?.includes('Error')) {
+        errorList.push({ album: `${result.artist} - ${result.title}`, error: 'Discogs API error' });
+      } else {
+        results.push(result);
       }
       
-      setStatus(`Checking ${cdsWithReleaseId.length} CDs...`);
-      const results: CDOnlyAlbum[] = [];
-      const errorList: Array<{album: string, error: string}> = [];
-      
-      for (let i = 0; i < cdsWithReleaseId.length; i++) {
-        const album = cdsWithReleaseId[i];
-        setStatus(`Checking ${i + 1}/${cdsWithReleaseId.length}: ${album.artist} - ${album.title}`);
-        setProgress(((i + 1) / cdsWithReleaseId.length) * 100);
-        
-        const result = await checkAlbumFormats({
-          id: album.id,
-          artist: album.artist,
-          title: album.title,
-          year: album.year,
-          discogs_release_id: album.discogs_release_id,
-          image_url: album.image_url,
-          discogs_genres: album.discogs_genres,
-          folder: album.folder,
-          has_vinyl: null,
-          cd_only_tagged: album.notes?.includes('[CD-ONLY]') || false
-        });
-        
-        if (result.available_formats?.includes('Error')) {
-          errorList.push({ album: `${result.artist} - ${result.title}`, error: 'Discogs API error' });
-        } else {
-          results.push(result);
-        }
-        
-        if (i < cdsWithReleaseId.length - 1) await delay(1000);
-      }
-      
-      const cdOnly = results.filter(r => !r.has_vinyl);
-      setResults(cdOnly);
-      setStats({ total: cdsWithReleaseId.length, scanned: cdsWithReleaseId.length, cdOnly: cdOnly.length, errors: errorList.length });
-      setStatus(`✅ Complete! Found ${cdOnly.length} CD-only albums`);
-      setProgress(100);
-      setView('results');
-      
-      const genres = new Set<string>();
-      cdOnly.forEach(album => { album.discogs_genres?.forEach(g => genres.add(g)); });
-      setAvailableGenres(Array.from(genres).sort());
-    } catch (err) {
-      setStatus(`❌ Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
-    } finally {
-      setScanning(false);
+      if (i < cdsWithReleaseId.length - 1) await delay(1000);
     }
-  };
+    
+    const cdOnly = results.filter(r => !r.has_vinyl);
+    setResults(cdOnly);
+    setStats({ total: cdsWithReleaseId.length, scanned: cdsWithReleaseId.length, cdOnly: cdOnly.length, errors: errorList.length });
+    setStatus(`✅ Complete! Found ${cdOnly.length} CD-only albums`);
+    setProgress(100);
+    setView('results');
+    
+    const genres = new Set<string>();
+    cdOnly.forEach(album => { album.discogs_genres?.forEach(g => genres.add(g)); });
+    setAvailableGenres(Array.from(genres).sort());
+  } catch (err) {
+    setStatus(`❌ Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+  } finally {
+    setScanning(false);
+  }
+};
 
   const exportToCSV = () => {
     const headers = ['Artist', 'Title', 'Year', 'Formats', 'Check Method'];
