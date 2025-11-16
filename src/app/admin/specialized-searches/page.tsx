@@ -105,15 +105,6 @@ type DiscogsRelease = {
   master_id?: number;
 };
 
-type DiscogsSearchResult = {
-  master_id?: number;
-  format?: string[];
-};
-
-type DiscogsSearchResponse = {
-  results?: DiscogsSearchResult[];
-};
-
 function CDOnlyTab() {
   const [view, setView] = useState<'scanner' | 'results'>('scanner');
   const [scanning, setScanning] = useState(false);
@@ -144,52 +135,44 @@ function CDOnlyTab() {
   const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
   const checkAlbumFormats = async (album: CDOnlyAlbum): Promise<CDOnlyAlbum> => {
-    if (!album.discogs_release_id) {
+    const releaseId = album.discogs_release_id?.trim();
+    
+    if (!releaseId || releaseId === '' || releaseId === 'null' || releaseId === 'undefined') {
       return { ...album, available_formats: ['Unknown'], has_vinyl: false, format_check_method: 'No release ID' };
     }
 
     try {
-      // Get release data via proxy
-      const response = await fetch(`/api/discogsProxy?releaseId=${album.discogs_release_id}`);
+      const response = await fetch(`/api/discogsProxy?releaseId=${encodeURIComponent(releaseId)}`);
       
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
       
       const releaseData: DiscogsRelease = await response.json();
-      const masterId = releaseData.master_id;
-
-      if (!masterId) {
-        const availableFormats = new Set<string>();
-        releaseData.formats?.forEach((f: DiscogsFormat) => { if (f.name) availableFormats.add(f.name.toLowerCase()); });
-        const formatArray = Array.from(availableFormats);
-        const hasCD = formatArray.some(f => f.includes('cd'));
-        const hasVinyl = formatArray.some(f => f.includes('vinyl') || f.includes('lp') || f.includes('12"'));
-        return { ...album, available_formats: formatArray, has_vinyl: !hasCD || hasVinyl, format_check_method: 'Single release' };
-      }
-
-      // Use proxy for search as well
-      const searchQuery = encodeURIComponent(`${album.artist} ${album.title}`);
-      const searchResponse = await fetch(`/api/discogsProxy?search=${searchQuery}&type=release`);
       
-      if (!searchResponse.ok) throw new Error(`Search failed: ${searchResponse.status}`);
-      
-      const searchData: DiscogsSearchResponse = await searchResponse.json();
       const availableFormats = new Set<string>();
-      let releaseCount = 0;
-      
-      searchData.results?.forEach((result: DiscogsSearchResult) => {
-        if (result.master_id === masterId) {
-          releaseCount++;
-          result.format?.forEach((format: string) => availableFormats.add(format.toLowerCase()));
-        }
+      releaseData.formats?.forEach((f: DiscogsFormat) => { 
+        if (f.name) availableFormats.add(f.name.toLowerCase()); 
       });
       
       const formatArray = Array.from(availableFormats);
-      const hasCD = formatArray.some(f => f.includes('cd'));
-      const hasVinyl = formatArray.some(f => f.includes('vinyl') || f.includes('lp') || f.includes('12"'));
+      const hasVinyl = formatArray.some(f => 
+        f.includes('vinyl') || 
+        f.includes('lp') || 
+        f.includes('12"') || 
+        f.includes('7"')
+      );
       
-      return { ...album, available_formats: formatArray, has_vinyl: !hasCD || hasVinyl, format_check_method: `Master (${releaseCount} releases)` };
-    } catch {
-      return { ...album, available_formats: ['Error'], has_vinyl: false, format_check_method: 'Error' };
+      return { 
+        ...album, 
+        available_formats: formatArray, 
+        has_vinyl: hasVinyl,
+        format_check_method: 'Single release check'
+      };
+    } catch (error) {
+      console.error(`Error checking ${album.artist} - ${album.title}:`, error);
+      return { ...album, available_formats: ['Error'], has_vinyl: false, format_check_method: 'API Error' };
     }
   };
 
@@ -200,7 +183,6 @@ function CDOnlyTab() {
     setView('scanner');
     
     try {
-      // Use native fetch - notes column doesn't exist in collection table
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/collection?select=id,artist,title,year,discogs_release_id,image_url,discogs_genres,folder,format`,
         {
@@ -217,7 +199,6 @@ function CDOnlyTab() {
       
       const allAlbums = await response.json();
       
-      // Filter for CDs with release IDs in JavaScript
       const cdsWithReleaseId = (allAlbums as Array<{
         id: number;
         artist: string;
@@ -229,17 +210,20 @@ function CDOnlyTab() {
         folder: string | null;
         format: string | null;
       }>).filter((album) => {
-        const hasReleaseId = album.discogs_release_id && album.discogs_release_id !== '';
-        if (!hasReleaseId) return false;
+        const releaseId = album.discogs_release_id?.trim();
+        const hasValidReleaseId = releaseId && releaseId !== '' && releaseId !== 'null' && releaseId !== 'undefined';
+        
+        if (!hasValidReleaseId) return false;
         
         const format = (album.format || '').toLowerCase();
         const folder = (album.folder || '').toLowerCase();
         const isCD = format.includes('cd') || folder === 'cds';
+        
         return isCD;
       });
       
       if (cdsWithReleaseId.length === 0) {
-        setStatus('No CDs found with Discogs release IDs');
+        setStatus('No CDs found with valid Discogs release IDs');
         setScanning(false);
         return;
       }
@@ -669,7 +653,6 @@ function Thousand1AlbumsTab() {
       return true;
     });
 
-    // Apply format filter
     filtered = filtered.filter(album => matchesFormat(album, formatFilter));
 
     if (statusFilter === "all") {
