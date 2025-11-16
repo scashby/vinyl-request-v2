@@ -200,16 +200,36 @@ function CDOnlyTab() {
   setView('scanner');
   
   try {
-    // Get ALL albums without any filters, then filter in JavaScript
-    const { data: allAlbums, error } = await supabase
-      .from('collection')
-      .select('id, artist, title, year, discogs_release_id, image_url, discogs_genres, folder, format, notes');
+    // Use native fetch instead of Supabase client
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/collection?select=id,artist,title,year,discogs_release_id,image_url,discogs_genres,folder,format,notes`,
+      {
+        headers: {
+          'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+        }
+      }
+    );
     
-    if (error) throw new Error(error.message);
-    if (!allAlbums) throw new Error('No data returned');
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+    }
+    
+    const allAlbums = await response.json();
     
     // Filter for CDs with release IDs in JavaScript
-    const cdsWithReleaseId = allAlbums.filter(album => {
+    const cdsWithReleaseId = (allAlbums as Array<{
+      id: number;
+      artist: string;
+      title: string;
+      year: string | null;
+      discogs_release_id: string | null;
+      image_url: string | null;
+      discogs_genres: string[] | null;
+      folder: string | null;
+      format: string | null;
+      notes: string | null;
+    }>).filter((album) => {
       const hasReleaseId = album.discogs_release_id && album.discogs_release_id !== '';
       if (!hasReleaseId) return false;
       
@@ -272,7 +292,6 @@ function CDOnlyTab() {
     setScanning(false);
   }
 };
-
   const exportToCSV = () => {
     const headers = ['Artist', 'Title', 'Year', 'Formats', 'Check Method'];
     const rows = filteredResults.map(a => [a.artist, a.title, a.year || '', (a.available_formats || []).join('; '), a.format_check_method || '']);
