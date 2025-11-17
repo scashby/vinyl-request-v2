@@ -319,28 +319,37 @@ export default function BestOfImportPage() {
   const previewRows = parsedRows.slice(0, 10);
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold mb-2">Best-Of Lists Import</h1>
-      <p className="text-sm text-slate-600">
+    <div className="space-y-6 text-slate-100">
+      <h1 className="text-2xl font-bold mb-2 text-slate-50">Best-Of Lists Import</h1>
+      <p className="text-sm text-slate-200">
         Import ranked or unranked “best albums” lists into
-        <code className="mx-1 px-1 py-0.5 bg-slate-100 rounded text-xs">music_bestof_sources</code>
+        <code className="mx-1 px-1 py-0.5 bg-slate-900/70 border border-slate-600 rounded text-xs">
+          music_bestof_sources
+        </code>
         and
-        <code className="mx-1 px-1 py-0.5 bg-slate-100 rounded text-xs">music_bestof_items</code>.
-        Use a CSV with columns like
-        <code className="mx-1 px-1 py-0.5 bg-slate-100 rounded text-xs">rank, artist, album, year, notes</code>.
+        <code className="mx-1 px-1 py-0.5 bg-slate-900/70 border border-slate-600 rounded text-xs">
+          music_bestof_items
+        </code>
+        . Use a CSV with columns like
+        <code className="mx-1 px-1 py-0.5 bg-slate-900/70 border border-slate-600 rounded text-xs">
+          rank, artist, album, year, notes
+        </code>
+        .
       </p>
 
       {/* Source selection / creation */}
-      <div className="border rounded-lg p-4 bg-white shadow-sm space-y-4">
-        <h2 className="font-semibold text-lg">1. Choose or Create Source</h2>
+      <div className="border border-slate-700 rounded-lg p-4 bg-slate-900/80 shadow-sm space-y-4">
+        <h2 className="font-semibold text-lg text-slate-50">
+          1. Choose or Create Source
+        </h2>
 
         <div className="grid md:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <label className="block text-sm font-medium">
+            <label className="block text-sm font-medium text-slate-100">
               Existing Sources
             </label>
             <select
-              className="w-full border rounded px-2 py-1 text-sm"
+              className="w-full border border-slate-600 rounded px-2 py-1 text-sm bg-slate-950 text-slate-100"
               value={selectedSourceId === 'new' ? 'new' : (selectedSourceId ?? '')}
               onChange={e => {
                 const v = e.target.value;
@@ -362,12 +371,12 @@ export default function BestOfImportPage() {
               ))}
             </select>
             {loadingSources && (
-              <p className="text-xs text-slate-500">Loading sources…</p>
+              <p className="text-xs text-slate-300">Loading sources…</p>
             )}
           </div>
 
           <div className="space-y-2">
-            <label className="block text-sm font-medium">
+            <label className="block text-sm font-medium text-slate-100">
               Source Type
             </label>
             <div className="flex gap-2 text-sm">
@@ -376,10 +385,10 @@ export default function BestOfImportPage() {
                   key={t}
                   type="button"
                   onClick={() => setNewSourceType(t)}
-                  className={`px-2 py-1 rounded border ${
+                  className={`px-2 py-1 rounded border text-xs font-semibold uppercase tracking-wide ${
                     newSourceType === t
-                      ? 'bg-emerald-600 text-white border-emerald-700'
-                      : 'bg-white text-slate-700 border-slate-300'
+                      ? 'bg-emerald-600 text-white border-emerald-500'
+                      : 'bg-slate-950 text-slate-200 border-slate-600 hover:bg-slate-800'
                   }`}
                 >
                   {t}
@@ -387,11 +396,11 @@ export default function BestOfImportPage() {
               ))}
             </div>
             {newSourceType === 'ranked' && (
-              <div className="flex items-center gap-2 text-sm mt-1">
+              <div className="flex items-center gap-2 text-sm mt-1 text-slate-100">
                 <span>Max rank:</span>
                 <input
                   type="number"
-                  className="w-24 border rounded px-2 py-1 text-sm"
+                  className="w-24 border border-slate-600 rounded px-2 py-1 text-sm bg-slate-950 text-slate-100"
                   value={newSourceMaxRank}
                   onChange={e => setNewSourceMaxRank(e.target.value === '' ? '' : Number(e.target.value))}
                 />
@@ -403,44 +412,44 @@ export default function BestOfImportPage() {
         {/* New source fields */}
         <div className="grid md:grid-cols-2 gap-4 mt-3">
           <div className="space-y-2">
-            <label className="block text-sm font-medium">
+            <label className="block text-sm font-medium text-slate-100">
               Source Name (for new sources)
             </label>
             <input
               type="text"
-              className="w-full border rounded px-2 py-1 text-sm"
+              className="w-full border border-slate-600 rounded px-2 py-1 text-sm bg-slate-950 text-slate-100 placeholder-slate-500"
               value={newSourceName}
               onChange={e => setNewSourceName(e.target.value)}
               placeholder='e.g. "Dimery 1001 Albums", "Paste Top 300 Albums"'
             />
-            <label className="block text-xs font-medium mt-1">
+            <label className="block text-xs font-medium mt-1 text-slate-200">
               Weight
             </label>
             <input
               type="number"
               step="0.1"
-              className="w-24 border rounded px-2 py-1 text-sm"
+              className="w-24 border border-slate-600 rounded px-2 py-1 text-sm bg-slate-950 text-slate-100"
               value={newSourceWeight}
               onChange={e => setNewSourceWeight(e.target.value === '' ? '' : Number(e.target.value))}
             />
           </div>
 
           <div className="space-y-2">
-            <label className="block text-sm font-medium">
+            <label className="block text-sm font-medium text-slate-100">
               Source URL (optional)
             </label>
             <input
               type="text"
-              className="w-full border rounded px-2 py-1 text-sm"
+              className="w-full border border-slate-600 rounded px-2 py-1 text-sm bg-slate-950 text-slate-100 placeholder-slate-500"
               value={newSourceUrl}
               onChange={e => setNewSourceUrl(e.target.value)}
               placeholder="https://…"
             />
-            <label className="block text-sm font-medium mt-1">
+            <label className="block text-sm font-medium mt-1 text-slate-100">
               Description (optional)
             </label>
             <textarea
-              className="w-full border rounded px-2 py-1 text-sm h-16"
+              className="w-full border border-slate-600 rounded px-2 py-1 text-sm h-16 bg-slate-950 text-slate-100"
               value={newSourceDescription}
               onChange={e => setNewSourceDescription(e.target.value)}
             />
@@ -449,12 +458,15 @@ export default function BestOfImportPage() {
       </div>
 
       {/* CSV upload & preview */}
-      <div className="border rounded-lg p-4 bg-white shadow-sm space-y-4">
-        <h2 className="font-semibold text-lg">2. Upload & Parse CSV</h2>
+      <div className="border border-slate-700 rounded-lg p-4 bg-slate-900/80 shadow-sm space-y-4">
+        <h2 className="font-semibold text-lg text-slate-50">
+          2. Upload & Parse CSV
+        </h2>
         <div className="flex flex-col md:flex-row gap-3 items-start md:items-center">
           <input
             type="file"
             accept=".csv,text/csv"
+            className="text-sm text-slate-100"
             onChange={e => {
               const file = e.target.files?.[0] ?? null;
               setCsvFile(file);
@@ -466,43 +478,50 @@ export default function BestOfImportPage() {
             }}
           />
           {csvFile && (
-            <span className="text-xs text-slate-600">
+            <span className="text-xs text-slate-200">
               Selected: {csvFile.name}
             </span>
           )}
           {isParsing && (
-            <span className="text-xs text-emerald-700">Parsing CSV…</span>
+            <span className="text-xs text-emerald-400">Parsing CSV…</span>
           )}
         </div>
         {parseError && (
-          <div className="text-sm text-red-600">
+          <div className="text-sm text-red-400">
             {parseError}
           </div>
         )}
         {parsedRows.length > 0 && (
           <div className="space-y-2">
-            <p className="text-sm text-slate-700">
+            <p className="text-sm text-slate-200">
               Parsed {parsedRows.length} rows. Preview of first 10:
             </p>
-            <div className="overflow-x-auto border rounded">
+            <div className="overflow-x-auto border border-slate-700 rounded">
               <table className="min-w-full text-xs">
-                <thead className="bg-slate-100">
+                <thead className="bg-slate-800">
                   <tr>
-                    <th className="px-2 py-1 text-left">Rank</th>
-                    <th className="px-2 py-1 text-left">Artist</th>
-                    <th className="px-2 py-1 text-left">Album</th>
-                    <th className="px-2 py-1 text-left">Year</th>
-                    <th className="px-2 py-1 text-left">Notes</th>
+                    <th className="px-2 py-1 text-left text-slate-100">Rank</th>
+                    <th className="px-2 py-1 text-left text-slate-100">Artist</th>
+                    <th className="px-2 py-1 text-left text-slate-100">Album</th>
+                    <th className="px-2 py-1 text-left text-slate-100">Year</th>
+                    <th className="px-2 py-1 text-left text-slate-100">Notes</th>
                   </tr>
                 </thead>
                 <tbody>
                   {previewRows.map((row, idx) => (
-                    <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
-                      <td className="px-2 py-1">{row.rank ?? ''}</td>
-                      <td className="px-2 py-1">{row.artist}</td>
-                      <td className="px-2 py-1">{row.album}</td>
-                      <td className="px-2 py-1">{row.year ?? ''}</td>
-                      <td className="px-2 py-1">{row.notes ?? ''}</td>
+                    <tr
+                      key={idx}
+                      className={
+                        idx % 2 === 0
+                          ? 'bg-slate-950'
+                          : 'bg-slate-900'
+                      }
+                    >
+                      <td className="px-2 py-1 text-slate-100">{row.rank ?? ''}</td>
+                      <td className="px-2 py-1 text-slate-100">{row.artist}</td>
+                      <td className="px-2 py-1 text-slate-100">{row.album}</td>
+                      <td className="px-2 py-1 text-slate-100">{row.year ?? ''}</td>
+                      <td className="px-2 py-1 text-slate-100">{row.notes ?? ''}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -513,8 +532,10 @@ export default function BestOfImportPage() {
       </div>
 
       {/* Import + scores */}
-      <div className="border rounded-lg p-4 bg-white shadow-sm space-y-3">
-        <h2 className="font-semibold text-lg">3. Import & Compute Scores</h2>
+      <div className="border border-slate-700 rounded-lg p-4 bg-slate-900/80 shadow-sm space-y-3">
+        <h2 className="font-semibold text-lg text-slate-50">
+          3. Import & Compute Scores
+        </h2>
         <div className="flex flex-wrap gap-3 items-center">
           <button
             type="button"
@@ -522,7 +543,7 @@ export default function BestOfImportPage() {
             disabled={importing || parsedRows.length === 0}
             className={`px-3 py-1.5 rounded text-sm font-semibold ${
               importing || parsedRows.length === 0
-                ? 'bg-slate-300 text-slate-600 cursor-not-allowed'
+                ? 'bg-slate-700 text-slate-400 cursor-not-allowed'
                 : 'bg-emerald-600 text-white hover:bg-emerald-700'
             }`}
           >
@@ -530,33 +551,33 @@ export default function BestOfImportPage() {
           </button>
 
           {importProgress && (
-            <span className="text-xs text-slate-700">
+            <span className="text-xs text-slate-200">
               Imported {importProgress.done} / {importProgress.total} rows
             </span>
           )}
 
           {importStatus && (
-            <span className="text-xs text-slate-700">
+            <span className="text-xs text-slate-200">
               {importStatus}
             </span>
           )}
         </div>
 
-        <div className="flex flex-wrap gap-3 items-center border-t pt-3 mt-2">
+        <div className="flex flex-wrap gap-3 items-center border-t border-slate-700 pt-3 mt-2">
           <button
             type="button"
             onClick={handleRunScores}
             disabled={runningScores}
             className={`px-3 py-1.5 rounded text-sm font-semibold ${
               runningScores
-                ? 'bg-slate-300 text-slate-600 cursor-not-allowed'
+                ? 'bg-slate-700 text-slate-400 cursor-not-allowed'
                 : 'bg-blue-600 text-white hover:bg-blue-700'
             }`}
           >
             {runningScores ? 'Recomputing…' : 'Recompute aggregate scores'}
           </button>
           {scoresStatus && (
-            <span className="text-xs text-slate-700">
+            <span className="text-xs text-slate-200">
               {scoresStatus}
             </span>
           )}
