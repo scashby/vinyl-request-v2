@@ -287,14 +287,15 @@ function CDOnlyTab() {
         console.log(`🇺🇸 Has US/Worldwide vinyl: ${hasUSVinyl}`);
       }
       
-      let category: 'no-vinyl' | 'no-us-vinyl' | 'limited-vinyl' = 'no-vinyl';
-      if (vinylCount === 0) {
-        category = 'no-vinyl';
-      } else if (!hasUSVinyl) {
-        category = 'no-us-vinyl';
-      } else if (vinylCount === 1) {
-        category = 'limited-vinyl';
-      }
+      let category: 'no-vinyl' | 'no-us-vinyl' | 'limited-vinyl' | null = null;
+        if (vinylCount === 0) {
+          category = 'no-vinyl';
+        } else if (!hasUSVinyl) {
+          category = 'no-us-vinyl';
+        } else if (vinylCount === 1) {
+          category = 'limited-vinyl';
+        }
+        // If category is still null, this album has multiple US vinyl releases and should be skipped
       
       return { 
         ...album, 
