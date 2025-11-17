@@ -1,4 +1,4 @@
-// src/app/api/enrich-sources/batch/route.ts - OPTIMIZED FOR PERFORMANCE
+// src/app/api/enrich-sources/batch/route.ts - COMPLETE WITH DISCOGS METADATA
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { enrichDiscogsTracklist, enrichGenius } from 'lib/enrichment-utils';
@@ -21,6 +21,12 @@ type AlbumResult = {
   albumId: number;
   artist: string;
   title: string;
+  discogsMetadata?: {
+    success: boolean;
+    data?: { foundReleaseId?: string; addedImage?: boolean; addedGenres?: boolean; addedTracklist?: boolean };
+    error?: string;
+    skipped?: boolean;
+  };
   discogsTracklist?: {
     success: boolean;
     data?: { totalTracks?: number; tracksWithArtists?: number };
@@ -246,13 +252,22 @@ function needsDiscogsTracklist(tracklists: string | null, discogsReleaseId: stri
   }
 }
 
+function needsDiscogsMetadata(
+  discogsReleaseId: string | null, 
+  imageUrl: string | null, 
+  discogsGenres: string[] | null
+): boolean {
+  return !discogsReleaseId || !imageUrl || !discogsGenres || discogsGenres.length === 0;
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
     const cursor = body.cursor || 0;
-    const limit = Math.min(body.limit || 20, 10); // MAX 10 albums per batch to avoid timeout
+    const limit = Math.min(body.limit || 20, 10);
     const folder = body.folder;
     const services = body.services || {
+      discogsMetadata: true,
       discogsTracklist: true,
       spotify: true,
       appleMusic: true,
@@ -265,7 +280,7 @@ export async function POST(req: Request) {
 
     let query = supabase
       .from('collection')
-      .select('id, artist, title, tracklists, spotify_id, apple_music_id, discogs_release_id, is_1001, folder')
+      .select('id, artist, title, tracklists, spotify_id, apple_music_id, discogs_release_id, image_url, discogs_genres, is_1001, folder')
       .gt('id', cursor)
       .order('id', { ascending: true })
       .limit(queryLimit);
@@ -293,6 +308,7 @@ export async function POST(req: Request) {
     }
 
     const albumsNeedingEnrichment = albums.filter(album => 
+      needsDiscogsMetadata(album.discogs_release_id, album.image_url, album.discogs_genres) ||
       needsDiscogsTracklist(album.tracklists, album.discogs_release_id) ||
       !album.spotify_id || 
       !album.apple_music_id || 
@@ -328,6 +344,20 @@ export async function POST(req: Request) {
         title: album.title
       };
 
+      // Discogs Metadata - Search for release ID, fetch image/genres
+      if (needsDiscogsMetadata(album.discogs_release_id, album.image_url, album.discogs_genres) && services.discogsMetadata) {
+        const discogsMetaResult = await callService('discogs-metadata', album.id);
+        albumResult.discogsMetadata = {
+          success: discogsMetaResult.success,
+          data: discogsMetaResult.data,
+          error: discogsMetaResult.error,
+          skipped: discogsMetaResult.skipped
+        };
+        await sleep(1000);
+      } else if (album.discogs_release_id && album.image_url && album.discogs_genres) {
+        albumResult.discogsMetadata = { success: true, skipped: true };
+      }
+
       // Discogs Tracklist - Direct call (no HTTP)
       if (needsDiscogsTracklist(album.tracklists, album.discogs_release_id) && services.discogsTracklist) {
         const discogsResult = await enrichDiscogsTracklist(album.id);
@@ -337,7 +367,7 @@ export async function POST(req: Request) {
           error: discogsResult.error,
           skipped: discogsResult.skipped
         };
-        await sleep(500); // Reduced delay
+        await sleep(500);
       } else if (album.tracklists) {
         albumResult.discogsTracklist = { success: true, skipped: true };
       }

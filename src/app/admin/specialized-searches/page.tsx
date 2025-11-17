@@ -142,37 +142,128 @@ function CDOnlyTab() {
     }
 
     try {
-      const response = await fetch(`/api/discogsProxy?releaseId=${encodeURIComponent(releaseId)}`);
+      console.log(`\n🔍 Checking ${album.artist} - ${album.title} (Release ID: ${releaseId})`);
       
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      // Step 1: Get the specific release to extract master_id
+      const releaseResponse = await fetch(`/api/discogsProxy?releaseId=${encodeURIComponent(releaseId)}`);
+      
+      if (!releaseResponse.ok) {
+        console.error(`❌ Release fetch failed: HTTP ${releaseResponse.status}`);
+        return { ...album, available_formats: ['Error'], has_vinyl: false, format_check_method: 'API Error' };
       }
       
-      const releaseData: DiscogsRelease = await response.json();
-      
-      const availableFormats = new Set<string>();
-      releaseData.formats?.forEach((f: DiscogsFormat) => { 
-        if (f.name) availableFormats.add(f.name.toLowerCase()); 
+      const releaseData: DiscogsRelease & { master_id?: number } = await releaseResponse.json();
+      console.log(`📀 Release data:`, {
+        has_master: !!releaseData.master_id,
+        master_id: releaseData.master_id,
+        formats: releaseData.formats
       });
       
-      const formatArray = Array.from(availableFormats);
-      const hasVinyl = formatArray.some(f => 
-        f.includes('vinyl') || 
-        f.includes('lp') || 
-        f.includes('12"') || 
-        f.includes('7"')
+      // If there's no master_id, this might be a standalone release
+      // Do a search to see if vinyl versions exist for this artist/title
+      if (!releaseData.master_id) {
+        console.log(`⚠️ No master_id found, searching for vinyl versions...`);
+        
+        const searchParams = new URLSearchParams({
+          artist: album.artist,
+          release_title: album.title,
+          format: 'vinyl',
+          type: 'release'
+        });
+        
+        const searchResponse = await fetch(
+          `https://api.discogs.com/database/search?${searchParams.toString()}`,
+          {
+            headers: {
+              'User-Agent': 'DeadwaxDialogues/1.0',
+              'Authorization': `Discogs token=${process.env.NEXT_PUBLIC_DISCOGS_TOKEN}`
+            }
+          }
+        );
+        
+        if (searchResponse.ok) {
+          const searchData = await searchResponse.json();
+          const hasVinylResults = searchData.results && searchData.results.length > 0;
+          console.log(`🔍 Search results: ${searchData.results?.length || 0} vinyl versions found`);
+          
+          return {
+            ...album,
+            available_formats: hasVinylResults ? ['vinyl', 'cd'] : ['cd'],
+            has_vinyl: hasVinylResults,
+            format_check_method: 'Direct search (no master)'
+          };
+        }
+        
+        // If search fails, assume CD-only
+        const availableFormats = new Set<string>();
+        releaseData.formats?.forEach((f: DiscogsFormat) => { 
+          if (f.name) availableFormats.add(f.name.toLowerCase()); 
+        });
+        
+        return {
+          ...album,
+          available_formats: Array.from(availableFormats),
+          has_vinyl: false,
+          format_check_method: 'No master, search failed'
+        };
+      }
+      
+      // Step 2: Get ALL versions under the master release
+      console.log(`📚 Fetching versions for master ID: ${releaseData.master_id}`);
+      const versionsResponse = await fetch(
+        `/api/discogsProxy?masterId=${releaseData.master_id}&checkVersions=true`
       );
+      
+      if (!versionsResponse.ok) {
+        console.error(`❌ Versions fetch failed: HTTP ${versionsResponse.status}`);
+        return { ...album, available_formats: ['Error'], has_vinyl: false, format_check_method: 'API Error' };
+      }
+      
+      const versionsData: { versions?: Array<{ format?: string; major_formats?: string[] }> } = await versionsResponse.json();
+      console.log(`📊 Found ${versionsData.versions?.length || 0} versions`);
+      
+      // Step 3: Check if ANY version is vinyl
+      const allFormats = new Set<string>();
+      let hasVinyl = false;
+      let vinylCount = 0;
+      
+      if (versionsData.versions) {
+        versionsData.versions.forEach((version) => {
+          // Check major_formats first (more reliable)
+          if (version.major_formats) {
+            version.major_formats.forEach(fmt => {
+              const lowerFmt = fmt.toLowerCase();
+              allFormats.add(lowerFmt);
+              if (lowerFmt.includes('vinyl') || lowerFmt === 'lp' || lowerFmt.includes('12"') || lowerFmt.includes('7"')) {
+                hasVinyl = true;
+                vinylCount++;
+              }
+            });
+          }
+          // Fallback to format string
+          if (version.format) {
+            const lowerFmt = version.format.toLowerCase();
+            allFormats.add(lowerFmt);
+            if (lowerFmt.includes('vinyl') || lowerFmt.includes('lp') || lowerFmt.includes('12"') || lowerFmt.includes('7"')) {
+              hasVinyl = true;
+              vinylCount++;
+            }
+          }
+        });
+      }
+      
+      console.log(`${hasVinyl ? '✅' : '❌'} ${hasVinyl ? 'HAS VINYL' : 'CD ONLY'} - ${vinylCount} vinyl versions found`);
+      console.log(`📋 All formats:`, Array.from(allFormats).join(', '));
       
       return { 
         ...album, 
-        available_formats: formatArray, 
+        available_formats: Array.from(allFormats), 
         has_vinyl: hasVinyl,
-        format_check_method: 'Single release check'
+        format_check_method: `Master check (${versionsData.versions?.length || 0} versions, ${vinylCount} vinyl)`
       };
     } catch (error) {
-      console.error(`Error checking ${album.artist} - ${album.title}:`, error);
-      return { ...album, available_formats: ['Error'], has_vinyl: false, format_check_method: 'API Error' };
+      console.error(`❌ ERROR checking ${album.artist} - ${album.title}:`, error);
+      return { ...album, available_formats: ['Error'], has_vinyl: false, format_check_method: 'Exception' };
     }
   };
 

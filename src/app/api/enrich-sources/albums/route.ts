@@ -1,4 +1,4 @@
-// src/app/api/enrich-multi-albums/route.ts - COMPLETE FILE with all clickable categories
+// src/app/api/enrich-sources/albums/route.ts - COMPLETE WITH ALL CATEGORIES
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -10,6 +10,7 @@ type Track = {
   lyrics_url?: string;
   lyrics?: string;
   lyrics_source?: 'apple_music' | 'genius';
+  artist?: string;
 };
 
 function hasAppleMusicLyrics(tracklists: unknown): boolean {
@@ -40,6 +41,20 @@ function hasGeniusLinks(tracklists: unknown): boolean {
   }
 }
 
+function hasTrackArtists(tracklists: unknown): boolean {
+  try {
+    const tracks = typeof tracklists === 'string' 
+      ? JSON.parse(tracklists)
+      : tracklists;
+    
+    if (!Array.isArray(tracks)) return false;
+    
+    return tracks.some((t: Track) => t.artist);
+  } catch {
+    return false;
+  }
+}
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -52,7 +67,7 @@ export async function GET(req: Request) {
 
     let query = supabase
       .from('collection')
-      .select('id, artist, title, image_url, spotify_id, apple_music_id, tracklists')
+      .select('id, artist, title, image_url, spotify_id, apple_music_id, tracklists, discogs_release_id, discogs_genres, is_1001')
       .order('artist', { ascending: true })
       .limit(limit);
 
@@ -115,6 +130,36 @@ export async function GET(req: Request) {
           .not('apple_music_id', 'is', null);
         break;
 
+      case 'has-discogs-tracklist':
+        // Will filter after fetch
+        query = query.not('tracklists', 'is', null);
+        break;
+
+      case 'needs-discogs-tracklist':
+        // Will filter after fetch
+        query = query
+          .not('discogs_release_id', 'is', null)
+          .not('tracklists', 'is', null);
+        break;
+
+      case 'missing-discogs-id':
+        query = query.is('discogs_release_id', null);
+        break;
+
+      case 'missing-image':
+        query = query
+          .not('discogs_release_id', 'is', null)
+          .is('image_url', null);
+        break;
+
+      case 'missing-genres':
+        query = query.or('discogs_genres.is.null,discogs_genres.eq.{}');
+        break;
+
+      case '1001-albums':
+        query = query.eq('is_1001', true);
+        break;
+
       default:
         return NextResponse.json({ error: 'Invalid category' }, { status: 400 });
     }
@@ -169,6 +214,18 @@ export async function GET(req: Request) {
           return album.spotify_id && 
                  album.apple_music_id && 
                  hasAppleMusicLyrics(album.tracklists);
+        });
+        break;
+
+      case 'has-discogs-tracklist':
+        filteredAlbums = filteredAlbums.filter(album => {
+          return hasTrackArtists(album.tracklists);
+        });
+        break;
+
+      case 'needs-discogs-tracklist':
+        filteredAlbums = filteredAlbums.filter(album => {
+          return !hasTrackArtists(album.tracklists);
         });
         break;
     }

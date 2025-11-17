@@ -1,4 +1,4 @@
-// src/app/admin/enrich-sources/page.tsx - COMPLETE WITH 1001 MATCHING
+// src/app/admin/enrich-sources/page.tsx - COMPLETE WITH DISCOGS METADATA ENRICHMENT
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
@@ -18,26 +18,29 @@ type AlbumResult = {
   albumId: number;
   artist: string;
   title: string;
+  discogsMetadata?: {
+    success: boolean;
+    data?: { foundReleaseId?: string; addedImage?: boolean; addedGenres?: boolean; addedTracklist?: boolean };
+    error?: string;
+    skipped?: boolean;
+  };
   discogsTracklist?: {
     success: boolean;
     data?: { totalTracks?: number; tracksWithArtists?: number };
     error?: string;
     skipped?: boolean;
-    details?: unknown;
   };
   spotify?: {
     success: boolean;
     data?: { spotify_id?: string; genres?: string[] };
     error?: string;
     skipped?: boolean;
-    details?: unknown;
   };
   appleMusic?: {
     success: boolean;
     data?: { apple_music_id?: string; genres?: string[] };
     error?: string;
     skipped?: boolean;
-    details?: unknown;
   };
   genius?: {
     success: boolean;
@@ -47,7 +50,6 @@ type AlbumResult = {
     failedTracks?: Array<{ position: string; title: string; error: string }>;
     error?: string;
     skipped?: boolean;
-    details?: unknown;
   };
   appleLyrics?: {
     success: boolean;
@@ -56,7 +58,6 @@ type AlbumResult = {
     missingTracks?: string[];
     error?: string;
     skipped?: boolean;
-    details?: unknown;
   };
   match1001?: {
     success: boolean;
@@ -64,7 +65,6 @@ type AlbumResult = {
     confidence?: number;
     error?: string;
     skipped?: boolean;
-    details?: unknown;
   };
 };
 
@@ -83,7 +83,10 @@ export default function MultiSourceEnrichment() {
     anyLyrics: 0,
     discogsTracklist: 0,
     needsDiscogsTracklist: 0,
-    albums1001: 0
+    albums1001: 0,
+    missingDiscogsId: 0,
+    missingImage: 0,
+    missingGenres: 0
   });
   const [enriching, setEnriching] = useState(false);
   const [status, setStatus] = useState('');
@@ -91,6 +94,7 @@ export default function MultiSourceEnrichment() {
   const [folderFilter, setFolderFilter] = useState('');
   const [folders, setFolders] = useState([]);
   const [selectedServices, setSelectedServices] = useState({
+    discogsMetadata: true,
     discogsTracklist: true,
     spotify: true,
     appleMusic: true,
@@ -109,6 +113,7 @@ export default function MultiSourceEnrichment() {
   
   const albumsToEnrich = useMemo(() => {
     const servicesSelected = {
+      discogsMetadata: selectedServices.discogsMetadata,
       discogsTracklist: selectedServices.discogsTracklist,
       spotify: selectedServices.spotify,
       appleMusic: selectedServices.appleMusic,
@@ -120,11 +125,11 @@ export default function MultiSourceEnrichment() {
     const count = Object.values(servicesSelected).filter(Boolean).length;
     if (count === 0) return 0;
     
-    if (servicesSelected.appleLyrics && !servicesSelected.spotify && !servicesSelected.appleMusic && !servicesSelected.genius && !servicesSelected.discogsTracklist && !servicesSelected.match1001) {
+    if (servicesSelected.appleLyrics && !servicesSelected.spotify && !servicesSelected.appleMusic && !servicesSelected.genius && !servicesSelected.discogsTracklist && !servicesSelected.match1001 && !servicesSelected.discogsMetadata) {
       return stats.needsAppleLyrics;
     }
     
-    if ((servicesSelected.spotify || servicesSelected.appleMusic) && !servicesSelected.genius && !servicesSelected.appleLyrics && !servicesSelected.discogsTracklist && !servicesSelected.match1001) {
+    if ((servicesSelected.spotify || servicesSelected.appleMusic) && !servicesSelected.genius && !servicesSelected.appleLyrics && !servicesSelected.discogsTracklist && !servicesSelected.match1001 && !servicesSelected.discogsMetadata) {
       return stats.unenriched + stats.spotifyOnly + stats.appleOnly;
     }
     
@@ -177,6 +182,7 @@ export default function MultiSourceEnrichment() {
     }
 
     const serviceNames = [];
+    if (selectedServices.discogsMetadata) serviceNames.push('Discogs Metadata');
     if (selectedServices.discogsTracklist) serviceNames.push('Discogs Tracklist');
     if (selectedServices.spotify) serviceNames.push('Spotify');
     if (selectedServices.appleMusic) serviceNames.push('Apple Music');
@@ -235,44 +241,26 @@ export default function MultiSourceEnrichment() {
         if (result.results && result.results.length > 0) {
           result.results.forEach((albumResult: AlbumResult) => {
             console.group(`Album #${albumResult.albumId}: ${albumResult.artist} - ${albumResult.title}`);
+            if (albumResult.discogsMetadata) {
+              console.log('Discogs Metadata:', albumResult.discogsMetadata);
+            }
             if (albumResult.discogsTracklist) {
               console.log('Discogs Tracklist:', albumResult.discogsTracklist);
-              if (albumResult.discogsTracklist.details) {
-                console.log('Discogs details:', albumResult.discogsTracklist.details);
-              }
             }
             if (albumResult.spotify) {
               console.log('Spotify:', albumResult.spotify);
-              if (albumResult.spotify.details) {
-                console.log('Spotify details:', albumResult.spotify.details);
-              }
             }
             if (albumResult.appleMusic) {
               console.log('Apple Music:', albumResult.appleMusic);
-              if (albumResult.appleMusic.details) {
-                console.log('Apple Music details:', albumResult.appleMusic.details);
-              }
             }
             if (albumResult.genius) {
               console.log('Genius:', albumResult.genius);
-              if (albumResult.genius.details) {
-                console.log('Genius details:', albumResult.genius.details);
-              }
             }
             if (albumResult.appleLyrics) {
               console.log('Apple Lyrics:', albumResult.appleLyrics);
-              if (!albumResult.appleLyrics.success) {
-                console.error('Apple Lyrics failed:', albumResult.appleLyrics.error);
-                if (albumResult.appleLyrics.details) {
-                  console.error('Full error details:', albumResult.appleLyrics.details);
-                }
-              }
             }
             if (albumResult.match1001) {
               console.log('1001 Match:', albumResult.match1001);
-              if (albumResult.match1001.details) {
-                console.log('1001 details:', albumResult.match1001.details);
-              }
             }
             console.groupEnd();
           });
@@ -376,6 +364,40 @@ export default function MultiSourceEnrichment() {
         </div>
       </div>
 
+      {/* Discogs Data Quality */}
+      <div style={{ marginBottom: 32 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 16, color: '#1f2937' }}>
+          💿 Discogs Data Quality
+        </h2>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: 16
+        }}>
+          <ClickableStatCard 
+            label="⚠️ Missing Release ID" 
+            value={stats.missingDiscogsId} 
+            color="#dc2626"
+            description="Need Discogs search & link"
+            onClick={() => showAlbumsForCategory('missing-discogs-id', '⚠️ Albums Missing Discogs Release ID')}
+          />
+          <ClickableStatCard 
+            label="🖼️ Missing Images" 
+            value={stats.missingImage} 
+            color="#f59e0b"
+            description="Have release ID, no image"
+            onClick={() => showAlbumsForCategory('missing-image', '🖼️ Albums Missing Cover Art')}
+          />
+          <ClickableStatCard 
+            label="🎵 Missing Genres" 
+            value={stats.missingGenres} 
+            color="#f59e0b"
+            description="No genre/style data"
+            onClick={() => showAlbumsForCategory('missing-genres', '🎵 Albums Missing Genre Data')}
+          />
+        </div>
+      </div>
+
       {/* Streaming Services */}
       <div style={{ marginBottom: 32 }}>
         <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 16, color: '#1f2937' }}>
@@ -383,7 +405,7 @@ export default function MultiSourceEnrichment() {
         </h2>
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minMax(200px, 1fr))',
           gap: 16
         }}>
           <ClickableStatCard 
@@ -502,6 +524,16 @@ export default function MultiSourceEnrichment() {
             Select Services to Enrich:
           </div>
           <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, cursor: 'pointer', padding: '8px 12px', background: '#f3f4f6', borderRadius: 6 }}>
+              <input 
+                type="checkbox" 
+                checked={selectedServices.discogsMetadata}
+                onChange={e => setSelectedServices(prev => ({ ...prev, discogsMetadata: e.target.checked }))}
+                disabled={enriching}
+                style={{ width: 16, height: 16 }}
+              />
+              <span style={{ fontWeight: 600, color: '#1f2937' }}>💿 Discogs Metadata</span>
+            </label>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, cursor: 'pointer', padding: '8px 12px', background: '#f3f4f6', borderRadius: 6 }}>
               <input 
                 type="checkbox" 
@@ -709,11 +741,12 @@ export default function MultiSourceEnrichment() {
                       #{result.albumId}: {result.artist} - {result.title}
                     </div>
                     <div style={{ fontSize: 13, color: '#6b7280', display: 'flex', gap: 12 }}>
-                      <span>{getResultIcon(result.discogsTracklist)} Discogs</span>
+                      <span>{getResultIcon(result.discogsMetadata)} Metadata</span>
+                      <span>{getResultIcon(result.discogsTracklist)} Tracklist</span>
                       <span>{getResultIcon(result.spotify)} Spotify</span>
-                      <span>{getResultIcon(result.appleMusic)} Apple Music</span>
+                      <span>{getResultIcon(result.appleMusic)} Apple</span>
                       <span>{getResultIcon(result.genius)} Genius</span>
-                      <span>{getResultIcon(result.appleLyrics)} Apple Lyrics</span>
+                      <span>{getResultIcon(result.appleLyrics)} Lyrics</span>
                       <span>{getResultIcon(result.match1001)} 1001</span>
                     </div>
                   </div>
@@ -724,6 +757,26 @@ export default function MultiSourceEnrichment() {
 
                 {expandedAlbum === result.albumId && (
                   <div style={{ padding: 16, background: 'white', fontSize: 13 }}>
+                    {result.discogsMetadata && (
+                      <div style={{ marginBottom: 12, padding: 12, background: '#fef3c7', borderRadius: 6 }}>
+                        <div style={{ fontWeight: 600, color: '#d97706', marginBottom: 6 }}>
+                          {getResultIcon(result.discogsMetadata)} Discogs Metadata
+                        </div>
+                        {result.discogsMetadata.skipped ? (
+                          <div style={{ color: '#6b7280', fontSize: 12 }}>Already has metadata</div>
+                        ) : result.discogsMetadata.success ? (
+                          <div style={{ color: '#92400e', fontSize: 12 }}>
+                            {result.discogsMetadata.data?.foundReleaseId && <div>✓ Found & linked release ID</div>}
+                            {result.discogsMetadata.data?.addedImage && <div>✓ Added cover image</div>}
+                            {result.discogsMetadata.data?.addedGenres && <div>✓ Added genres/styles</div>}
+                            {result.discogsMetadata.data?.addedTracklist && <div>✓ Added tracklist</div>}
+                          </div>
+                        ) : (
+                          <div style={{ color: '#dc2626', fontSize: 12 }}>{result.discogsMetadata.error}</div>
+                        )}
+                      </div>
+                    )}
+
                     {result.discogsTracklist && (
                       <div style={{ marginBottom: 12, padding: 12, background: '#fef3c7', borderRadius: 6 }}>
                         <div style={{ fontWeight: 600, color: '#d97706', marginBottom: 6 }}>

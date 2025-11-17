@@ -1,4 +1,4 @@
-// src/app/api/enrich-sources/stats/route.ts - WITH 1001 ALBUMS COUNT
+// src/app/api/enrich-sources/stats/route.ts - COMPREHENSIVE DISCOGS TRACKING
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -10,6 +10,7 @@ type Track = {
   lyrics?: string;
   lyrics_source?: 'apple_music' | 'genius';
   lyrics_url?: string;
+  artist?: string;
 };
 
 function hasAppleMusicLyrics(tracklists: unknown): boolean {
@@ -26,13 +27,27 @@ function hasAppleMusicLyrics(tracklists: unknown): boolean {
   }
 }
 
+function hasTrackArtists(tracklists: unknown): boolean {
+  try {
+    const tracks = typeof tracklists === 'string' 
+      ? JSON.parse(tracklists)
+      : tracklists;
+    
+    if (!Array.isArray(tracks)) return false;
+    
+    return tracks.some((t: Track) => t.artist);
+  } catch {
+    return false;
+  }
+}
+
 export async function GET() {
   try {
     const { count: total } = await supabase
       .from('collection')
       .select('id', { count: 'exact', head: true });
 
-    // Albums with BOTH Spotify and Apple Music IDs
+    // Streaming Services
     const { count: bothServices } = await supabase
       .from('collection')
       .select('id', { count: 'exact', head: true })
@@ -57,50 +72,79 @@ export async function GET() {
       .is('spotify_id', null)
       .not('apple_music_id', 'is', null);
 
-    // Count 1001 albums
+    // DISCOGS DATA - Critical missing data
+    const { count: missingDiscogsId } = await supabase
+      .from('collection')
+      .select('id', { count: 'exact', head: true })
+      .is('discogs_release_id', null);
+
+    const { count: missingImage } = await supabase
+      .from('collection')
+      .select('id', { count: 'exact', head: true })
+      .not('discogs_release_id', 'is', null)
+      .is('image_url', null);
+
+    const { count: missingGenres } = await supabase
+      .from('collection')
+      .select('id', { count: 'exact', head: true })
+      .or('discogs_genres.is.null,discogs_genres.eq.{}');
+
+    // 1001 Albums
     const { count: albums1001Count } = await supabase
       .from('collection')
       .select('id', { count: 'exact', head: true })
       .eq('is_1001', true);
 
-    // Check all albums with Apple Music IDs for lyrics - PAGINATED to avoid 1000 row limit
+    // Paginated counts for complex checks
     let appleLyricsCount = 0;
     let needsAppleLyrics = 0;
-    let fullyEnrichedCount = 0; // count albums with BOTH services AND lyrics
+    let fullyEnrichedCount = 0;
+    let discogsTracklistCount = 0;
+    let needsDiscogsTracklist = 0;
     let offset = 0;
     const pageSize = 1000;
     let hasMore = true;
 
     while (hasMore) {
-      const { data: albumsWithAppleMusic } = await supabase
+      const { data: albums } = await supabase
         .from('collection')
-        .select('id, tracklists, apple_music_id, spotify_id')
-        .not('apple_music_id', 'is', null)
+        .select('id, tracklists, apple_music_id, spotify_id, discogs_release_id')
         .range(offset, offset + pageSize - 1);
 
-      if (!albumsWithAppleMusic || albumsWithAppleMusic.length === 0) {
+      if (!albums || albums.length === 0) {
         hasMore = false;
         break;
       }
 
-      for (const album of albumsWithAppleMusic) {
-        const hasLyrics = hasAppleMusicLyrics(album.tracklists);
-        if (hasLyrics) {
-          appleLyricsCount++;
-          // If has Apple lyrics AND Spotify ID, it's fully enriched
-          if (album.spotify_id) {
-            fullyEnrichedCount++;
+      for (const album of albums) {
+        // Apple Music Lyrics
+        if (album.apple_music_id) {
+          const hasLyrics = hasAppleMusicLyrics(album.tracklists);
+          if (hasLyrics) {
+            appleLyricsCount++;
+            if (album.spotify_id) {
+              fullyEnrichedCount++;
+            }
+          } else {
+            needsAppleLyrics++;
           }
-        } else {
-          needsAppleLyrics++;
+        }
+        
+        // Discogs Track Artists
+        if (album.discogs_release_id) {
+          if (album.tracklists && hasTrackArtists(album.tracklists)) {
+            discogsTracklistCount++;
+          } else if (album.tracklists) {
+            needsDiscogsTracklist++;
+          }
         }
       }
 
-      hasMore = albumsWithAppleMusic.length === pageSize;
+      hasMore = albums.length === pageSize;
       offset += pageSize;
     }
 
-    // Count Genius lyrics - PAGINATED to avoid 1000 row limit
+    // Genius lyrics
     let geniusLyricsCount = 0;
     let anyLyricsCount = 0;
     offset = 0;
@@ -140,7 +184,6 @@ export async function GET() {
       offset += pageSize;
     }
 
-    // Calculate "needs enrichment" and "fully enriched" correctly
     const needsEnrichment = (total || 0) - fullyEnrichedCount;
     const fullyEnriched = fullyEnrichedCount;
 
@@ -168,8 +211,11 @@ export async function GET() {
         needsAppleLyrics,
         anyLyrics: anyLyricsCount,
         albums1001: albums1001Count || 0,
-        discogsTracklist: 0,
-        needsDiscogsTracklist: 0
+        discogsTracklist: discogsTracklistCount,
+        needsDiscogsTracklist,
+        missingDiscogsId: missingDiscogsId || 0,
+        missingImage: missingImage || 0,
+        missingGenres: missingGenres || 0
       },
       folders
     });
