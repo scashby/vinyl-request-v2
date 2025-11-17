@@ -95,7 +95,7 @@ type CDOnlyAlbum = {
   available_formats?: string[];
   format_check_method?: string;
   cd_only_tagged?: boolean;
-  category?: 'no-vinyl' | 'no-us-vinyl' | 'limited-vinyl';
+  category?: 'no-vinyl' | 'no-us-vinyl' | 'limited-vinyl' | null;
 };
 
 type DiscogsFormat = {
