@@ -199,7 +199,8 @@ function CDOnlyTab() {
       
       const allAlbums = await response.json();
       
-      const cdsWithReleaseId = (allAlbums as Array<{
+      // Filter for CDs
+      const allCDs = (allAlbums as Array<{
         id: number;
         artist: string;
         title: string;
@@ -210,25 +211,33 @@ function CDOnlyTab() {
         folder: string | null;
         format: string | null;
       }>).filter((album) => {
-        const releaseId = album.discogs_release_id?.trim();
-        const hasValidReleaseId = releaseId && releaseId !== '' && releaseId !== 'null' && releaseId !== 'undefined';
-        
-        if (!hasValidReleaseId) return false;
-        
         const format = (album.format || '').toLowerCase();
         const folder = (album.folder || '').toLowerCase();
-        const isCD = format.includes('cd') || folder === 'cds';
-        
-        return isCD;
+        return format.includes('cd') || folder === 'cds';
       });
       
+      // Filter for CDs with valid release IDs
+      const cdsWithReleaseId = allCDs.filter((album) => {
+        const releaseId = album.discogs_release_id?.trim();
+        return releaseId && releaseId !== '' && releaseId !== 'null' && releaseId !== 'undefined';
+      });
+      
+      const skippedCount = allCDs.length - cdsWithReleaseId.length;
+      
       if (cdsWithReleaseId.length === 0) {
-        setStatus('No CDs found with valid Discogs release IDs');
+        setStatus(`Found ${allCDs.length} CDs, but none have valid Discogs release IDs`);
         setScanning(false);
         return;
       }
       
-      setStatus(`Checking ${cdsWithReleaseId.length} CDs...`);
+      if (skippedCount > 0) {
+        setStatus(`Found ${allCDs.length} CDs total. Checking ${cdsWithReleaseId.length} with release IDs (${skippedCount} skipped)`);
+      } else {
+        setStatus(`Checking ${cdsWithReleaseId.length} CDs...`);
+      }
+      
+      await delay(2000); // Give user time to read the status
+      
       const results: CDOnlyAlbum[] = [];
       const errorList: Array<{album: string, error: string}> = [];
       
@@ -261,8 +270,19 @@ function CDOnlyTab() {
       
       const cdOnly = results.filter(r => !r.has_vinyl);
       setResults(cdOnly);
-      setStats({ total: cdsWithReleaseId.length, scanned: cdsWithReleaseId.length, cdOnly: cdOnly.length, errors: errorList.length });
-      setStatus(`✅ Complete! Found ${cdOnly.length} CD-only albums`);
+      setStats({ 
+        total: allCDs.length, 
+        scanned: cdsWithReleaseId.length, 
+        cdOnly: cdOnly.length, 
+        errors: errorList.length 
+      });
+      
+      let statusMessage = `✅ Complete! Found ${cdOnly.length} CD-only albums`;
+      if (skippedCount > 0) {
+        statusMessage += ` (${skippedCount} CDs skipped - no release ID)`;
+      }
+      setStatus(statusMessage);
+      
       setProgress(100);
       setView('results');
       
