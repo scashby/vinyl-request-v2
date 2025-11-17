@@ -224,7 +224,7 @@ function CDOnlyTab() {
       
       console.log(`📚 Fetching versions for master ID: ${releaseData.master_id}`);
       const versionsResponse = await fetch(
-        `/api/discogsProxy?masterId=${releaseData.master_id}&checkVersions=true`
+        `/api/enrich-sources/discogs-versions?masterId=${releaseData.master_id}`
       );
       
       if (!versionsResponse.ok) {
