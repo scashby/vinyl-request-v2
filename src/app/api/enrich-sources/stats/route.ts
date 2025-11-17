@@ -1,4 +1,4 @@
-// src/app/api/enrich-sources/stats/route.ts - COMPREHENSIVE DISCOGS TRACKING
+// src/app/api/enrich-sources/stats/route.ts - FIXED WITH PROGRAMMATIC VALIDATION
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -11,6 +11,16 @@ type Track = {
   lyrics_source?: 'apple_music' | 'genius';
   lyrics_url?: string;
   artist?: string;
+};
+
+type Album = {
+  id: number;
+  discogs_release_id: string | null;
+  image_url: string | null;
+  discogs_genres: string[] | null;
+  tracklists: unknown;
+  apple_music_id: string | null;
+  spotify_id: string | null;
 };
 
 function hasAppleMusicLyrics(tracklists: unknown): boolean {
@@ -39,6 +49,12 @@ function hasTrackArtists(tracklists: unknown): boolean {
   } catch {
     return false;
   }
+}
+
+// Match the exact validation logic from CD-Only scanner
+function hasValidDiscogsId(releaseId: string | null): boolean {
+  const trimmed = releaseId?.trim();
+  return !!(trimmed && trimmed !== '' && trimmed !== 'null' && trimmed !== 'undefined' && trimmed !== '0');
 }
 
 export async function GET() {
@@ -72,35 +88,22 @@ export async function GET() {
       .is('spotify_id', null)
       .not('apple_music_id', 'is', null);
 
-    // DISCOGS DATA - Critical missing data
-    const { count: missingDiscogsId } = await supabase
-      .from('collection')
-      .select('id', { count: 'exact', head: true })
-      .or('discogs_release_id.is.null,discogs_release_id.eq.,discogs_release_id.eq.null,discogs_release_id.eq.undefined');
-
-    const { count: missingImage } = await supabase
-      .from('collection')
-      .select('id', { count: 'exact', head: true })
-      .not('discogs_release_id', 'is', null)
-      .is('image_url', null);
-
-    const { count: missingGenres } = await supabase
-      .from('collection')
-      .select('id', { count: 'exact', head: true })
-      .or('discogs_genres.is.null,discogs_genres.eq.{}');
-
     // 1001 Albums
     const { count: albums1001Count } = await supabase
       .from('collection')
       .select('id', { count: 'exact', head: true })
       .eq('is_1001', true);
 
-    // Paginated counts for complex checks
+    // For Discogs data quality, we need to fetch and validate programmatically
+    let missingDiscogsId = 0;
+    let missingImage = 0;
+    let missingGenres = 0;
     let appleLyricsCount = 0;
     let needsAppleLyrics = 0;
     let fullyEnrichedCount = 0;
     let discogsTracklistCount = 0;
     let needsDiscogsTracklist = 0;
+    
     let offset = 0;
     const pageSize = 1000;
     let hasMore = true;
@@ -108,7 +111,7 @@ export async function GET() {
     while (hasMore) {
       const { data: albums } = await supabase
         .from('collection')
-        .select('id, tracklists, apple_music_id, spotify_id, discogs_release_id')
+        .select('id, discogs_release_id, image_url, discogs_genres, tracklists, apple_music_id, spotify_id')
         .range(offset, offset + pageSize - 1);
 
       if (!albums || albums.length === 0) {
@@ -116,7 +119,23 @@ export async function GET() {
         break;
       }
 
-      for (const album of albums) {
+      for (const album of albums as Album[]) {
+        // Check Discogs ID validity using same logic as CD scanner
+        const hasValidId = hasValidDiscogsId(album.discogs_release_id);
+        if (!hasValidId) {
+          missingDiscogsId++;
+        }
+        
+        // Check image (only count if they have a valid release ID)
+        if (hasValidId && !album.image_url) {
+          missingImage++;
+        }
+        
+        // Check genres
+        if (!album.discogs_genres || album.discogs_genres.length === 0) {
+          missingGenres++;
+        }
+        
         // Apple Music Lyrics
         if (album.apple_music_id) {
           const hasLyrics = hasAppleMusicLyrics(album.tracklists);
@@ -130,8 +149,8 @@ export async function GET() {
           }
         }
         
-        // Discogs Track Artists
-        if (album.discogs_release_id) {
+        // Discogs Track Artists (only check if they have a valid release ID)
+        if (hasValidId) {
           if (album.tracklists && hasTrackArtists(album.tracklists)) {
             discogsTracklistCount++;
           } else if (album.tracklists) {
@@ -213,9 +232,9 @@ export async function GET() {
         albums1001: albums1001Count || 0,
         discogsTracklist: discogsTracklistCount,
         needsDiscogsTracklist,
-        missingDiscogsId: missingDiscogsId || 0,
-        missingImage: missingImage || 0,
-        missingGenres: missingGenres || 0
+        missingDiscogsId,
+        missingImage,
+        missingGenres
       },
       folders
     });
