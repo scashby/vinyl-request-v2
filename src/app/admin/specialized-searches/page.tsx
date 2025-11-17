@@ -1,4 +1,19 @@
-// Replace the CDOnlyTab function in src/app/admin/specialized-searches/page.tsx
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+import Image from 'next/image';
+
+// Type definitions
+type DiscogsFormat = {
+  name?: string;
+  descriptions?: string[];
+};
+
+type DiscogsRelease = {
+  id: number;
+  formats?: DiscogsFormat[];
+  master_id?: number;
+};
 
 type CDOnlyAlbum = {
   id: number;
@@ -212,8 +227,6 @@ function CDOnlyTab() {
       } else if (vinylCount === 1) {
         category = 'limited-vinyl';
       }
-      
-      const shouldFlag = vinylCount === 0 || !hasUSVinyl || vinylCount === 1;
       
       return { 
         ...album, 
@@ -583,3 +596,5 @@ function CDOnlyTab() {
     </div>
   );
 }
+
+export default CDOnlyTab;
