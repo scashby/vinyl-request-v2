@@ -76,7 +76,7 @@ export async function GET() {
     const { count: missingDiscogsId } = await supabase
       .from('collection')
       .select('id', { count: 'exact', head: true })
-      .is('discogs_release_id', null);
+      .or('discogs_release_id.is.null,discogs_release_id.eq.,discogs_release_id.eq.null,discogs_release_id.eq.undefined');
 
     const { count: missingImage } = await supabase
       .from('collection')
