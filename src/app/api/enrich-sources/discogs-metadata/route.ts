@@ -116,9 +116,13 @@ export async function POST(req: Request) {
     let releaseId = album.discogs_release_id;
     let foundReleaseId = false;
 
-    // If no release ID, search for it
-    if (!releaseId) {
-      console.log('🔍 No Discogs release ID, searching...');
+    // Check if release ID is valid (not null, empty, "null", "undefined", or "0")
+    const trimmed = releaseId?.trim();
+    const hasValidId = !!(trimmed && trimmed !== '' && trimmed !== 'null' && trimmed !== 'undefined' && trimmed !== '0');
+
+    // If no valid release ID, search for it
+    if (!hasValidId) {
+      console.log('🔍 No valid Discogs release ID, searching...');
       releaseId = await searchDiscogsForRelease(album.artist, album.title, album.year);
       
       if (!releaseId) {

@@ -257,7 +257,11 @@ function needsDiscogsMetadata(
   imageUrl: string | null, 
   discogsGenres: string[] | null
 ): boolean {
-  return !discogsReleaseId || !imageUrl || !discogsGenres || discogsGenres.length === 0;
+  // Use same validation as stats page
+  const trimmed = discogsReleaseId?.trim();
+  const hasValidId = !!(trimmed && trimmed !== '' && trimmed !== 'null' && trimmed !== 'undefined' && trimmed !== '0');
+  
+  return !hasValidId || !imageUrl || !discogsGenres || discogsGenres.length === 0;
 }
 
 export async function POST(req: Request) {
