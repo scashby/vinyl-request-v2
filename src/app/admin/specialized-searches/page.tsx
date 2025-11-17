@@ -89,9 +89,13 @@ type CDOnlyAlbum = {
   discogs_genres: string[] | null;
   folder: string | null;
   has_vinyl: boolean | null;
+  vinyl_count?: number;
+  has_us_vinyl?: boolean;
+  vinyl_countries?: string[];
   available_formats?: string[];
   format_check_method?: string;
   cd_only_tagged?: boolean;
+  category?: 'no-vinyl' | 'no-us-vinyl' | 'limited-vinyl';
 };
 
 type DiscogsFormat = {
@@ -110,13 +114,22 @@ function CDOnlyTab() {
   const [scanning, setScanning] = useState(false);
   const [results, setResults] = useState<CDOnlyAlbum[]>([]);
   const [filteredResults, setFilteredResults] = useState<CDOnlyAlbum[]>([]);
-  const [stats, setStats] = useState({ total: 0, scanned: 0, cdOnly: 0, errors: 0 });
+  const [stats, setStats] = useState({ 
+    total: 0, 
+    scanned: 0, 
+    cdOnly: 0, 
+    noVinyl: 0,
+    noUSVinyl: 0,
+    limitedVinyl: 0,
+    errors: 0 
+  });
   const [status, setStatus] = useState('');
   const [progress, setProgress] = useState(0);
   
   const [artistFilter, setArtistFilter] = useState('');
   const [yearFilter, setYearFilter] = useState('');
   const [genreFilter, setGenreFilter] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<'all' | 'no-vinyl' | 'no-us-vinyl' | 'limited-vinyl'>('all');
   const [availableGenres, setAvailableGenres] = useState<string[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
@@ -125,8 +138,9 @@ function CDOnlyTab() {
     if (artistFilter) filtered = filtered.filter(a => a.artist.toLowerCase().includes(artistFilter.toLowerCase()));
     if (yearFilter) filtered = filtered.filter(a => a.year && a.year.includes(yearFilter));
     if (genreFilter) filtered = filtered.filter(a => a.discogs_genres && a.discogs_genres.some(g => g.toLowerCase().includes(genreFilter.toLowerCase())));
+    if (categoryFilter !== 'all') filtered = filtered.filter(a => a.category === categoryFilter);
     setFilteredResults(filtered);
-  }, [results, artistFilter, yearFilter, genreFilter]);
+  }, [results, artistFilter, yearFilter, genreFilter, categoryFilter]);
 
   useEffect(() => {
     applyFilters();
@@ -144,7 +158,6 @@ function CDOnlyTab() {
     try {
       console.log(`\n🔍 Checking ${album.artist} - ${album.title} (Release ID: ${releaseId})`);
       
-      // Step 1: Get the specific release to extract master_id
       const releaseResponse = await fetch(`/api/discogsProxy?releaseId=${encodeURIComponent(releaseId)}`);
       
       if (!releaseResponse.ok) {
@@ -159,8 +172,6 @@ function CDOnlyTab() {
         formats: releaseData.formats
       });
       
-      // If there's no master_id, this might be a standalone release
-      // Do a search to see if vinyl versions exist for this artist/title
       if (!releaseData.master_id) {
         console.log(`⚠️ No master_id found, searching for vinyl versions...`);
         
@@ -190,11 +201,12 @@ function CDOnlyTab() {
             ...album,
             available_formats: hasVinylResults ? ['vinyl', 'cd'] : ['cd'],
             has_vinyl: hasVinylResults,
+            vinyl_count: searchData.results?.length || 0,
+            category: 'no-vinyl',
             format_check_method: 'Direct search (no master)'
           };
         }
         
-        // If search fails, assume CD-only
         const availableFormats = new Set<string>();
         releaseData.formats?.forEach((f: DiscogsFormat) => { 
           if (f.name) availableFormats.add(f.name.toLowerCase()); 
@@ -204,11 +216,12 @@ function CDOnlyTab() {
           ...album,
           available_formats: Array.from(availableFormats),
           has_vinyl: false,
+          vinyl_count: 0,
+          category: 'no-vinyl',
           format_check_method: 'No master, search failed'
         };
       }
       
-      // Step 2: Get ALL versions under the master release
       console.log(`📚 Fetching versions for master ID: ${releaseData.master_id}`);
       const versionsResponse = await fetch(
         `/api/discogsProxy?masterId=${releaseData.master_id}&checkVersions=true`
@@ -219,46 +232,78 @@ function CDOnlyTab() {
         return { ...album, available_formats: ['Error'], has_vinyl: false, format_check_method: 'API Error' };
       }
       
-      const versionsData: { versions?: Array<{ format?: string; major_formats?: string[] }> } = await versionsResponse.json();
+      const versionsData: { versions?: Array<{ format?: string; major_formats?: string[]; country?: string }> } = await versionsResponse.json();
       console.log(`📊 Found ${versionsData.versions?.length || 0} versions`);
       
-      // Step 3: Check if ANY version is vinyl
       const allFormats = new Set<string>();
-      let hasVinyl = false;
       let vinylCount = 0;
+      let hasUSVinyl = false;
+      const vinylCountries: string[] = [];
       
       if (versionsData.versions) {
         versionsData.versions.forEach((version) => {
-          // Check major_formats first (more reliable)
+          let isVinyl = false;
+          
           if (version.major_formats) {
             version.major_formats.forEach(fmt => {
               const lowerFmt = fmt.toLowerCase();
               allFormats.add(lowerFmt);
               if (lowerFmt.includes('vinyl') || lowerFmt === 'lp' || lowerFmt.includes('12"') || lowerFmt.includes('7"')) {
-                hasVinyl = true;
-                vinylCount++;
+                isVinyl = true;
               }
             });
           }
-          // Fallback to format string
+          
           if (version.format) {
             const lowerFmt = version.format.toLowerCase();
             allFormats.add(lowerFmt);
             if (lowerFmt.includes('vinyl') || lowerFmt.includes('lp') || lowerFmt.includes('12"') || lowerFmt.includes('7"')) {
-              hasVinyl = true;
-              vinylCount++;
+              isVinyl = true;
+            }
+          }
+          
+          if (isVinyl) {
+            vinylCount++;
+            if (version.country) {
+              vinylCountries.push(version.country);
+              
+              const country = version.country.toLowerCase();
+              if (country === 'us' || 
+                  country === 'usa' || 
+                  country === 'united states' ||
+                  country === 'worldwide' ||
+                  country === 'international' ||
+                  country === 'north america') {
+                hasUSVinyl = true;
+              }
             }
           }
         });
       }
       
-      console.log(`${hasVinyl ? '✅' : '❌'} ${hasVinyl ? 'HAS VINYL' : 'CD ONLY'} - ${vinylCount} vinyl versions found`);
-      console.log(`📋 All formats:`, Array.from(allFormats).join(', '));
+      console.log(`${vinylCount > 0 ? '✅' : '❌'} Found ${vinylCount} vinyl versions`);
+      if (vinylCount > 0) {
+        console.log(`📍 Countries: ${vinylCountries.join(', ')}`);
+        console.log(`🇺🇸 Has US/Worldwide vinyl: ${hasUSVinyl}`);
+      }
+      
+      let category: 'no-vinyl' | 'no-us-vinyl' | 'limited-vinyl' = 'no-vinyl';
+      if (vinylCount === 0) {
+        category = 'no-vinyl';
+      } else if (!hasUSVinyl) {
+        category = 'no-us-vinyl';
+      } else if (vinylCount === 1) {
+        category = 'limited-vinyl';
+      }
       
       return { 
         ...album, 
         available_formats: Array.from(allFormats), 
-        has_vinyl: hasVinyl,
+        has_vinyl: vinylCount > 0,
+        vinyl_count: vinylCount,
+        has_us_vinyl: hasUSVinyl,
+        vinyl_countries: vinylCountries,
+        category,
         format_check_method: `Master check (${versionsData.versions?.length || 0} versions, ${vinylCount} vinyl)`
       };
     } catch (error) {
@@ -290,7 +335,6 @@ function CDOnlyTab() {
       
       const allAlbums = await response.json();
       
-      // Filter for CDs
       const allCDs = (allAlbums as Array<{
         id: number;
         artist: string;
@@ -307,7 +351,6 @@ function CDOnlyTab() {
         return format.includes('cd') || folder === 'cds';
       });
       
-      // Filter for CDs with valid release IDs
       const cdsWithReleaseId = allCDs.filter((album) => {
         const releaseId = album.discogs_release_id?.trim();
         return releaseId && releaseId !== '' && releaseId !== 'null' && releaseId !== 'undefined';
@@ -327,7 +370,7 @@ function CDOnlyTab() {
         setStatus(`Checking ${cdsWithReleaseId.length} CDs...`);
       }
       
-      await delay(2000); // Give user time to read the status
+      await delay(2000);
       
       const results: CDOnlyAlbum[] = [];
       const errorList: Array<{album: string, error: string}> = [];
@@ -359,16 +402,28 @@ function CDOnlyTab() {
         if (i < cdsWithReleaseId.length - 1) await delay(1000);
       }
       
-      const cdOnly = results.filter(r => !r.has_vinyl);
+      const cdOnly = results.filter(r => 
+        r.category === 'no-vinyl' || 
+        r.category === 'no-us-vinyl' || 
+        r.category === 'limited-vinyl'
+      );
+      
+      const noVinyl = results.filter(r => r.category === 'no-vinyl').length;
+      const noUSVinyl = results.filter(r => r.category === 'no-us-vinyl').length;
+      const limitedVinyl = results.filter(r => r.category === 'limited-vinyl').length;
+      
       setResults(cdOnly);
       setStats({ 
         total: allCDs.length, 
         scanned: cdsWithReleaseId.length, 
-        cdOnly: cdOnly.length, 
+        cdOnly: cdOnly.length,
+        noVinyl,
+        noUSVinyl,
+        limitedVinyl,
         errors: errorList.length 
       });
       
-      let statusMessage = `✅ Complete! Found ${cdOnly.length} CD-only albums`;
+      let statusMessage = `✅ Complete! Found ${cdOnly.length} CD-only albums (${noVinyl} no vinyl, ${noUSVinyl} no US vinyl, ${limitedVinyl} limited vinyl)`;
       if (skippedCount > 0) {
         statusMessage += ` (${skippedCount} CDs skipped - no release ID)`;
       }
@@ -388,8 +443,17 @@ function CDOnlyTab() {
   };
 
   const exportToCSV = () => {
-    const headers = ['Artist', 'Title', 'Year', 'Formats', 'Check Method'];
-    const rows = filteredResults.map(a => [a.artist, a.title, a.year || '', (a.available_formats || []).join('; '), a.format_check_method || '']);
+    const headers = ['Artist', 'Title', 'Year', 'Category', 'Vinyl Count', 'Has US Vinyl', 'Countries', 'Check Method'];
+    const rows = filteredResults.map(a => [
+      a.artist, 
+      a.title, 
+      a.year || '', 
+      a.category || '',
+      a.vinyl_count?.toString() || '0',
+      a.has_us_vinyl ? 'Yes' : 'No',
+      a.vinyl_countries?.join('; ') || '',
+      a.format_check_method || ''
+    ]);
     const csvContent = [headers.join(','), ...rows.map(row => row.map(cell => `"${cell}"`).join(','))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -407,6 +471,22 @@ function CDOnlyTab() {
     alert('Tagging requires a "notes" column in the collection table. This feature is currently disabled.');
   };
 
+  const getCategoryLabel = (category: 'no-vinyl' | 'no-us-vinyl' | 'limited-vinyl') => {
+    switch (category) {
+      case 'no-vinyl': return '🚫 No Vinyl';
+      case 'no-us-vinyl': return '🇺🇸 No US Vinyl';
+      case 'limited-vinyl': return '⭐ Limited Vinyl (1 pressing)';
+    }
+  };
+
+  const getCategoryColor = (category: 'no-vinyl' | 'no-us-vinyl' | 'limited-vinyl') => {
+    switch (category) {
+      case 'no-vinyl': return '#dc2626';
+      case 'no-us-vinyl': return '#f59e0b';
+      case 'limited-vinyl': return '#8b5cf6';
+    }
+  };
+
   return (
     <div>
       {view === 'scanner' && (
@@ -415,7 +495,7 @@ function CDOnlyTab() {
             <div style={{ fontSize: 64, marginBottom: 16 }}>💿</div>
             <h2 style={{ fontSize: 'clamp(20px, 4vw, 24px)', fontWeight: 600, color: '#1f2937', marginBottom: 12 }}>CD-Only Release Finder</h2>
             <p style={{ color: '#6b7280', fontSize: 'clamp(14px, 3vw, 16px)', maxWidth: 600, margin: '0 auto 24px' }}>
-              Comprehensively checks Discogs to find albums never released on vinyl
+              Finds albums with no vinyl, no US vinyl releases, or only 1 limited vinyl pressing
             </p>
           </div>
 
@@ -445,7 +525,11 @@ function CDOnlyTab() {
           <div style={{ background: '#f0fdf4', border: '1px solid #10b981', borderRadius: 8, padding: 20, marginBottom: 24 }}>
             <h3 style={{ fontSize: 16, fontWeight: 600, color: '#065f46', marginBottom: 8 }}>✅ Scan Complete</h3>
             <p style={{ color: '#065f46', fontSize: 14, margin: 0 }}>
-              Found <strong>{stats.cdOnly}</strong> CD-only releases • {stats.errors} errors
+              Found <strong>{stats.cdOnly}</strong> CD-only albums • 
+              {stats.noVinyl} no vinyl • 
+              {stats.noUSVinyl} no US vinyl • 
+              {stats.limitedVinyl} limited vinyl • 
+              {stats.errors} errors
               {filteredResults.length < results.length ? <> • Showing <strong>{filteredResults.length}</strong> filtered</> : null}
             </p>
           </div>
@@ -453,15 +537,77 @@ function CDOnlyTab() {
           <div style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: 8, padding: 16, marginBottom: 24 }}>
             <div style={{ marginBottom: 20 }}>
               <h3 style={{ fontSize: 14, fontWeight: 600, color: '#1f2937', marginBottom: 12 }}>🔍 Filters</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 12 }}>
                 <input type="text" placeholder="Filter by artist..." value={artistFilter} onChange={(e) => setArtistFilter(e.target.value)} style={{ padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 14 }} />
                 <input type="text" placeholder="Filter by year..." value={yearFilter} onChange={(e) => setYearFilter(e.target.value)} style={{ padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 14 }} />
                 <select value={genreFilter} onChange={(e) => setGenreFilter(e.target.value)} style={{ padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 14 }}>
                   <option value="">All Genres</option>
                   {availableGenres.map(g => <option key={g} value={g}>{g}</option>)}
                 </select>
-                <button onClick={() => { setArtistFilter(''); setYearFilter(''); setGenreFilter(''); }} style={{ padding: '8px 12px', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 14, cursor: 'pointer' }}>Clear</button>
               </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button 
+                  onClick={() => setCategoryFilter('all')} 
+                  style={{ 
+                    padding: '8px 16px', 
+                    background: categoryFilter === 'all' ? '#8b5cf6' : '#f3f4f6', 
+                    color: categoryFilter === 'all' ? 'white' : '#6b7280',
+                    border: 'none', 
+                    borderRadius: 6, 
+                    fontSize: 13, 
+                    fontWeight: 600,
+                    cursor: 'pointer' 
+                  }}
+                >
+                  All ({results.length})
+                </button>
+                <button 
+                  onClick={() => setCategoryFilter('no-vinyl')} 
+                  style={{ 
+                    padding: '8px 16px', 
+                    background: categoryFilter === 'no-vinyl' ? '#dc2626' : '#f3f4f6', 
+                    color: categoryFilter === 'no-vinyl' ? 'white' : '#6b7280',
+                    border: 'none', 
+                    borderRadius: 6, 
+                    fontSize: 13, 
+                    fontWeight: 600,
+                    cursor: 'pointer' 
+                  }}
+                >
+                  🚫 No Vinyl ({stats.noVinyl})
+                </button>
+                <button 
+                  onClick={() => setCategoryFilter('no-us-vinyl')} 
+                  style={{ 
+                    padding: '8px 16px', 
+                    background: categoryFilter === 'no-us-vinyl' ? '#f59e0b' : '#f3f4f6', 
+                    color: categoryFilter === 'no-us-vinyl' ? 'white' : '#6b7280',
+                    border: 'none', 
+                    borderRadius: 6, 
+                    fontSize: 13, 
+                    fontWeight: 600,
+                    cursor: 'pointer' 
+                  }}
+                >
+                  🇺🇸 No US Vinyl ({stats.noUSVinyl})
+                </button>
+                <button 
+                  onClick={() => setCategoryFilter('limited-vinyl')} 
+                  style={{ 
+                    padding: '8px 16px', 
+                    background: categoryFilter === 'limited-vinyl' ? '#8b5cf6' : '#f3f4f6', 
+                    color: categoryFilter === 'limited-vinyl' ? 'white' : '#6b7280',
+                    border: 'none', 
+                    borderRadius: 6, 
+                    fontSize: 13, 
+                    fontWeight: 600,
+                    cursor: 'pointer' 
+                  }}
+                >
+                  ⭐ Limited ({stats.limitedVinyl})
+                </button>
+              </div>
+              <button onClick={() => { setArtistFilter(''); setYearFilter(''); setGenreFilter(''); setCategoryFilter('all'); }} style={{ marginTop: 12, padding: '8px 12px', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 14, cursor: 'pointer' }}>Clear All Filters</button>
             </div>
 
             <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 16 }}>
@@ -484,8 +630,30 @@ function CDOnlyTab() {
                   <div style={{ fontSize: 12, fontWeight: 600, color: '#1f2937', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{album.artist}</div>
                   <div style={{ fontSize: 12, color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 4 }}>{album.title}</div>
                   {album.year && <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>{album.year}</div>}
-                  <div style={{ marginTop: 8, padding: '4px 8px', background: '#fef3c7', color: '#92400e', fontSize: 11, fontWeight: 600, borderRadius: 4, textAlign: 'center' }}>💿 CD Only</div>
-                  {album.format_check_method && <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 4 }}>{album.format_check_method}</div>}
+                  {album.category && (
+                    <div style={{ 
+                      marginTop: 8, 
+                      padding: '4px 8px', 
+                      background: `${getCategoryColor(album.category)}20`, 
+                      color: getCategoryColor(album.category), 
+                      fontSize: 10, 
+                      fontWeight: 700, 
+                      borderRadius: 4, 
+                      textAlign: 'center',
+                      border: `1px solid ${getCategoryColor(album.category)}`
+                    }}>
+                      {getCategoryLabel(album.category)}
+                    </div>
+                  )}
+                  {album.vinyl_count !== undefined && album.vinyl_count > 0 && (
+                    <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 4 }}>
+                      {album.vinyl_count} vinyl {album.vinyl_count === 1 ? 'version' : 'versions'}
+                      {album.vinyl_countries && album.vinyl_countries.length > 0 && (
+                        <div style={{ fontSize: 9 }}>{album.vinyl_countries.slice(0, 3).join(', ')}</div>
+                      )}
+                    </div>
+                  )}
+                  {album.format_check_method && <div style={{ fontSize: 9, color: '#9ca3af', marginTop: 4 }}>{album.format_check_method}</div>}
                 </div>
               </div>
             ))}
