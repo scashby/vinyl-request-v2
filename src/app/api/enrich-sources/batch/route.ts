@@ -1,7 +1,7 @@
-// src/app/api/enrich-sources/batch/route.ts - FIXED: Now checks master_id
+// src/app/api/enrich-sources/batch/route.ts - FIXED: Direct call to enrichDiscogsMetadata
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { enrichDiscogsTracklist, enrichGenius } from 'lib/enrichment-utils';
+import { enrichDiscogsMetadata, enrichDiscogsTracklist, enrichGenius } from 'lib/enrichment-utils';
 import { hasValidDiscogsId } from 'lib/discogs-validation';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -349,9 +349,9 @@ export async function POST(req: Request) {
         title: album.title
       };
 
-      // Discogs Metadata - Search for release ID, fetch image/genres/master_id
+      // Discogs Metadata - Direct call (no HTTP)
       if (needsDiscogsMetadata(album.discogs_release_id, album.discogs_master_id, album.image_url, album.discogs_genres) && services.discogsMetadata) {
-        const discogsMetaResult = await callService('discogs-metadata', album.id);
+        const discogsMetaResult = await enrichDiscogsMetadata(album.id);
         albumResult.discogsMetadata = {
           success: discogsMetaResult.success,
           data: discogsMetaResult.data,
