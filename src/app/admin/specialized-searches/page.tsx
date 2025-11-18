@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { supabase } from 'src/lib/supabaseClient';
+import { hasValidDiscogsId } from 'lib/discogs-validation';
 
 type TabType = 'cd-only' | '1001-albums';
 
@@ -353,8 +354,7 @@ function CDOnlyTab() {
       });
       
       const cdsWithReleaseId = allCDs.filter((album) => {
-        const releaseId = album.discogs_release_id?.trim();
-        return releaseId && releaseId !== '' && releaseId !== 'null' && releaseId !== 'undefined';
+        return hasValidDiscogsId(album.discogs_release_id);
       });
       
       const skippedCount = allCDs.length - cdsWithReleaseId.length;

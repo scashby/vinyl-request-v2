@@ -1,6 +1,7 @@
-// src/app/api/enrich-sources/albums/route.ts - COMPLETE WITH ALL CATEGORIES
+// src/app/api/enrich-sources/albums/route.ts - FIXED WITH PROPER DISCOGS ID VALIDATION
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { INVALID_DISCOGS_ID_FILTER } from "lib/discogs-validation";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -143,7 +144,8 @@ export async function GET(req: Request) {
         break;
 
       case 'missing-discogs-id':
-        query = query.is('discogs_release_id', null);
+        // FIXED: Now catches null, '', 'null', 'undefined', '0'
+        query = query.or(INVALID_DISCOGS_ID_FILTER);
         break;
 
       case 'missing-image':

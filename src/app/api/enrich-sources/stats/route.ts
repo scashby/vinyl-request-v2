@@ -1,6 +1,7 @@
-// src/app/api/enrich-sources/stats/route.ts - FIXED WITH PROGRAMMATIC VALIDATION
+// src/app/api/enrich-sources/stats/route.ts - FIXED WITH SHARED VALIDATION
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { hasValidDiscogsId } from "lib/discogs-validation";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -49,12 +50,6 @@ function hasTrackArtists(tracklists: unknown): boolean {
   } catch {
     return false;
   }
-}
-
-// Match the exact validation logic from CD-Only scanner
-function hasValidDiscogsId(releaseId: string | null): boolean {
-  const trimmed = releaseId?.trim();
-  return !!(trimmed && trimmed !== '' && trimmed !== 'null' && trimmed !== 'undefined' && trimmed !== '0');
 }
 
 export async function GET() {
@@ -120,7 +115,7 @@ export async function GET() {
       }
 
       for (const album of albums as Album[]) {
-        // Check Discogs ID validity using same logic as CD scanner
+        // Check Discogs ID validity using shared validation
         const hasValidId = hasValidDiscogsId(album.discogs_release_id);
         if (!hasValidId) {
           missingDiscogsId++;

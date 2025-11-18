@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { enrichDiscogsTracklist, enrichGenius } from 'lib/enrichment-utils';
+import { hasValidDiscogsId } from 'lib/discogs-validation';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -253,16 +254,15 @@ function needsDiscogsTracklist(tracklists: string | null, discogsReleaseId: stri
 }
 
 function needsDiscogsMetadata(
-  discogsReleaseId: string | null, 
-  imageUrl: string | null, 
-  discogsGenres: string[] | null
-): boolean {
-  // Use same validation as stats page
-  const trimmed = discogsReleaseId?.trim();
-  const hasValidId = !!(trimmed && trimmed !== '' && trimmed !== 'null' && trimmed !== 'undefined' && trimmed !== '0');
-  
-  return !hasValidId || !imageUrl || !discogsGenres || discogsGenres.length === 0;
-}
+    discogsReleaseId: string | null, 
+    imageUrl: string | null, 
+    discogsGenres: string[] | null
+  ): boolean {
+    // Use shared validation function
+    const hasValidId = hasValidDiscogsId(discogsReleaseId);
+    
+    return !hasValidId || !imageUrl || !discogsGenres || discogsGenres.length === 0;
+  }
 
 export async function POST(req: Request) {
   try {

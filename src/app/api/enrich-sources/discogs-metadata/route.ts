@@ -1,6 +1,7 @@
 // src/app/api/enrich-sources/discogs-metadata/route.ts
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { hasValidDiscogsId } from 'lib/discogs-validation';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -116,9 +117,8 @@ export async function POST(req: Request) {
     let releaseId = album.discogs_release_id;
     let foundReleaseId = false;
 
-    // Check if release ID is valid (not null, empty, "null", "undefined", or "0")
-    const trimmed = releaseId?.trim();
-    const hasValidId = !!(trimmed && trimmed !== '' && trimmed !== 'null' && trimmed !== 'undefined' && trimmed !== '0');
+    // Check if release ID is valid using shared validation
+    const hasValidId = hasValidDiscogsId(releaseId);
 
     // If no valid release ID, search for it
     if (!hasValidId) {
