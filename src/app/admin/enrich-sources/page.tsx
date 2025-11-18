@@ -1,4 +1,4 @@
-// src/app/admin/enrich-sources/page.tsx - COMPLETE WITH DISCOGS METADATA ENRICHMENT
+// src/app/admin/enrich-sources/page.tsx - WITH COMPREHENSIVE DISCOGS DATA QUALITY TRACKING
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
@@ -84,9 +84,15 @@ export default function MultiSourceEnrichment() {
     discogsTracklist: 0,
     needsDiscogsTracklist: 0,
     albums1001: 0,
+    // Comprehensive Discogs data quality
     missingDiscogsId: 0,
+    missingMasterId: 0,
     missingImage: 0,
-    missingGenres: 0
+    missingGenres: 0,
+    missingStyles: 0,
+    missingTracklists: 0,
+    missingSource: 0,
+    missingYear: 0
   });
   const [enriching, setEnriching] = useState(false);
   const [status, setStatus] = useState('');
@@ -364,7 +370,7 @@ export default function MultiSourceEnrichment() {
         </div>
       </div>
 
-      {/* Discogs Data Quality */}
+      {/* Discogs Data Quality - COMPREHENSIVE */}
       <div style={{ marginBottom: 32 }}>
         <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 16, color: '#1f2937' }}>
           💿 Discogs Data Quality
@@ -382,18 +388,53 @@ export default function MultiSourceEnrichment() {
             onClick={() => showAlbumsForCategory('missing-discogs-id', '⚠️ Albums Missing Discogs Release ID')}
           />
           <ClickableStatCard 
+            label="🆔 Missing Master ID" 
+            value={stats.missingMasterId} 
+            color="#ef4444"
+            description="No master release linked"
+            onClick={() => showAlbumsForCategory('missing-master-id', '🆔 Albums Missing Master ID')}
+          />
+          <ClickableStatCard 
             label="🖼️ Missing Images" 
             value={stats.missingImage} 
             color="#f59e0b"
-            description="Have release ID, no image"
+            description="No cover art"
             onClick={() => showAlbumsForCategory('missing-image', '🖼️ Albums Missing Cover Art')}
           />
           <ClickableStatCard 
             label="🎵 Missing Genres" 
             value={stats.missingGenres} 
             color="#f59e0b"
-            description="No genre/style data"
+            description="No genre data"
             onClick={() => showAlbumsForCategory('missing-genres', '🎵 Albums Missing Genre Data')}
+          />
+          <ClickableStatCard 
+            label="🎨 Missing Styles" 
+            value={stats.missingStyles} 
+            color="#f59e0b"
+            description="No style data"
+            onClick={() => showAlbumsForCategory('missing-styles', '🎨 Albums Missing Style Data')}
+          />
+          <ClickableStatCard 
+            label="📋 Missing Tracklists" 
+            value={stats.missingTracklists} 
+            color="#f97316"
+            description="No track data"
+            onClick={() => showAlbumsForCategory('missing-tracklists', '📋 Albums Missing Tracklists')}
+          />
+          <ClickableStatCard 
+            label="📍 Missing Source" 
+            value={stats.missingSource} 
+            color="#f97316"
+            description="No import source"
+            onClick={() => showAlbumsForCategory('missing-source', '📍 Albums Missing Source')}
+          />
+          <ClickableStatCard 
+            label="📅 Missing Year" 
+            value={stats.missingYear} 
+            color="#fb923c"
+            description="No release year"
+            onClick={() => showAlbumsForCategory('missing-year', '📅 Albums Missing Year')}
           />
         </div>
       </div>
@@ -405,7 +446,7 @@ export default function MultiSourceEnrichment() {
         </h2>
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minMax(200px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
           gap: 16
         }}>
           <ClickableStatCard 
@@ -635,9 +676,9 @@ export default function MultiSourceEnrichment() {
                 minWidth: 150
               }}
             >
-              <option value="" style={{ color: '#1f2937', backgroundColor: '#ffffff' }}>All Folders</option>
+              <option value="">All Folders</option>
               {folders.map(folder => (
-                <option key={folder} value={folder} style={{ color: '#1f2937', backgroundColor: '#ffffff' }}>{folder}</option>
+                <option key={folder} value={folder}>{folder}</option>
               ))}
             </select>
           </div>

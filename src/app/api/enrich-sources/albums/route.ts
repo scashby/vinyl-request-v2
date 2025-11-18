@@ -162,6 +162,26 @@ export async function GET(req: Request) {
         query = query.eq('is_1001', true);
         break;
 
+      case 'missing-master-id':
+        query = query.or('discogs_master_id.is.null,discogs_master_id.eq.,discogs_master_id.eq.null,discogs_master_id.eq.undefined,discogs_master_id.eq.0');
+        break;
+
+      case 'missing-styles':
+        query = query.or('discogs_styles.is.null,discogs_styles.eq.{}');
+        break;
+
+      case 'missing-tracklists':
+        query = query.is('tracklists', null);
+        break;
+
+      case 'missing-source':
+        query = query.is('discogs_source', null);
+        break;
+
+      case 'missing-year':
+        query = query.or('year.is.null,year.eq.,year.eq.0');
+        break;
+
       default:
         return NextResponse.json({ error: 'Invalid category' }, { status: 400 });
     }

@@ -1,4 +1,4 @@
-// src/app/api/enrich-sources/stats/route.ts - FIXED WITH SHARED VALIDATION
+// src/app/api/enrich-sources/stats/route.ts - FIXED WITH COMPREHENSIVE DISCOGS TRACKING
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { hasValidDiscogsId } from "lib/discogs-validation";
@@ -17,8 +17,12 @@ type Track = {
 type Album = {
   id: number;
   discogs_release_id: string | null;
+  discogs_master_id: string | null;
   image_url: string | null;
   discogs_genres: string[] | null;
+  discogs_styles: string[] | null;
+  discogs_source: string | null;
+  year: string | null;
   tracklists: unknown;
   apple_music_id: string | null;
   spotify_id: string | null;
@@ -89,10 +93,15 @@ export async function GET() {
       .select('id', { count: 'exact', head: true })
       .eq('is_1001', true);
 
-    // For Discogs data quality, we need to fetch and validate programmatically
+    // For comprehensive Discogs tracking, fetch all albums and count programmatically
     let missingDiscogsId = 0;
+    let missingMasterId = 0;
     let missingImage = 0;
     let missingGenres = 0;
+    let missingStyles = 0;
+    let missingTracklists = 0;
+    let missingSource = 0;
+    let missingYear = 0;
     let appleLyricsCount = 0;
     let needsAppleLyrics = 0;
     let fullyEnrichedCount = 0;
@@ -103,10 +112,12 @@ export async function GET() {
     const pageSize = 1000;
     let hasMore = true;
 
+    console.log('📊 Starting comprehensive stats calculation...');
+
     while (hasMore) {
       const { data: albums } = await supabase
         .from('collection')
-        .select('id, discogs_release_id, image_url, discogs_genres, tracklists, apple_music_id, spotify_id')
+        .select('id, discogs_release_id, discogs_master_id, image_url, discogs_genres, discogs_styles, discogs_source, year, tracklists, apple_music_id, spotify_id')
         .range(offset, offset + pageSize - 1);
 
       if (!albums || albums.length === 0) {
@@ -115,20 +126,46 @@ export async function GET() {
       }
 
       for (const album of albums as Album[]) {
-        // Check Discogs ID validity using shared validation
-        const hasValidId = hasValidDiscogsId(album.discogs_release_id);
-        if (!hasValidId) {
+        // FIXED: Check Discogs Release ID validity (null, '', 'null', 'undefined', '0')
+        const hasValidReleaseId = hasValidDiscogsId(album.discogs_release_id);
+        if (!hasValidReleaseId) {
           missingDiscogsId++;
         }
         
-        // Check image (only count if they have a valid release ID)
-        if (hasValidId && !album.image_url) {
+        // Check Master ID
+        const hasValidMasterId = hasValidDiscogsId(album.discogs_master_id);
+        if (!hasValidMasterId) {
+          missingMasterId++;
+        }
+        
+        // FIXED: Count missing images for ALL albums, not just those with valid release IDs
+        if (!album.image_url) {
           missingImage++;
         }
         
-        // Check genres
+        // FIXED: Count missing genres for ALL albums
         if (!album.discogs_genres || album.discogs_genres.length === 0) {
           missingGenres++;
+        }
+        
+        // NEW: Count missing styles
+        if (!album.discogs_styles || album.discogs_styles.length === 0) {
+          missingStyles++;
+        }
+        
+        // NEW: Count missing tracklists
+        if (!album.tracklists) {
+          missingTracklists++;
+        }
+        
+        // NEW: Count missing source
+        if (!album.discogs_source) {
+          missingSource++;
+        }
+        
+        // NEW: Count missing year
+        if (!album.year || album.year === '' || album.year === '0') {
+          missingYear++;
         }
         
         // Apple Music Lyrics
@@ -145,7 +182,7 @@ export async function GET() {
         }
         
         // Discogs Track Artists (only check if they have a valid release ID)
-        if (hasValidId) {
+        if (hasValidReleaseId) {
           if (album.tracklists && hasTrackArtists(album.tracklists)) {
             discogsTracklistCount++;
           } else if (album.tracklists) {
@@ -156,7 +193,19 @@ export async function GET() {
 
       hasMore = albums.length === pageSize;
       offset += pageSize;
+      
+      console.log(`📊 Processed ${offset} albums...`);
     }
+
+    console.log('📊 Discogs data quality results:');
+    console.log(`   Missing Release IDs: ${missingDiscogsId}`);
+    console.log(`   Missing Master IDs: ${missingMasterId}`);
+    console.log(`   Missing Images: ${missingImage}`);
+    console.log(`   Missing Genres: ${missingGenres}`);
+    console.log(`   Missing Styles: ${missingStyles}`);
+    console.log(`   Missing Tracklists: ${missingTracklists}`);
+    console.log(`   Missing Source: ${missingSource}`);
+    console.log(`   Missing Year: ${missingYear}`);
 
     // Genius lyrics
     let geniusLyricsCount = 0;
@@ -227,9 +276,15 @@ export async function GET() {
         albums1001: albums1001Count || 0,
         discogsTracklist: discogsTracklistCount,
         needsDiscogsTracklist,
+        // Comprehensive Discogs data quality stats
         missingDiscogsId,
+        missingMasterId,
         missingImage,
-        missingGenres
+        missingGenres,
+        missingStyles,
+        missingTracklists,
+        missingSource,
+        missingYear
       },
       folders
     });
