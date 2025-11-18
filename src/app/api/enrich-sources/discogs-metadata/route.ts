@@ -1,4 +1,4 @@
-// src/app/api/enrich-sources/discogs-metadata/route.ts - FIXED TO FETCH MASTER IDS
+// src/app/api/enrich-sources/discogs-metadata/route.ts - COMPLETE FILE
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { hasValidDiscogsId } from 'lib/discogs-validation';
@@ -40,6 +40,41 @@ async function fetchDiscogsRelease(releaseId: string): Promise<DiscogsResponse> 
   return await res.json();
 }
 
+async function searchDiscogsForRelease(artist: string, title: string, year?: string): Promise<string | null> {
+  const params = new URLSearchParams({
+    artist,
+    release_title: title,
+    type: 'release',
+    per_page: '1'
+  });
+  
+  if (year) {
+    params.set('year', year);
+  }
+  
+  const url = `https://api.discogs.com/database/search?${params.toString()}`;
+  
+  const res = await fetch(url, {
+    headers: {
+      'User-Agent': 'DeadwaxDialogues/1.0',
+      'Authorization': `Discogs token=${DISCOGS_TOKEN}`
+    }
+  });
+  
+  if (!res.ok) {
+    throw new Error(`Discogs search returned ${res.status}`);
+  }
+  
+  const data = await res.json();
+  const firstResult = data.results?.[0];
+  
+  if (firstResult?.id) {
+    return String(firstResult.id);
+  }
+  
+  return null;
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -63,7 +98,7 @@ export async function POST(req: Request) {
 
     const { data: album, error: dbError } = await supabase
       .from('collection')
-      .select('id, artist, title, discogs_release_id, discogs_master_id, image_url, discogs_genres, discogs_styles, tracklists')
+      .select('id, artist, title, year, discogs_release_id, discogs_master_id, image_url, discogs_genres, discogs_styles, tracklists')
       .eq('id', albumId)
       .single();
 
@@ -76,13 +111,26 @@ export async function POST(req: Request) {
 
     console.log(`✓ Album found: "${album.artist}" - "${album.title}"`);
 
-    const hasValidReleaseId = hasValidDiscogsId(album.discogs_release_id);
+    let releaseId = album.discogs_release_id;
+    let foundReleaseId = false;
     
+    const hasValidReleaseId = hasValidDiscogsId(releaseId);
+
+    // If no valid release ID, search for it
     if (!hasValidReleaseId) {
-      return NextResponse.json({
-        success: false,
-        error: 'Album has no valid Discogs release ID'
-      }, { status: 400 });
+      console.log('🔍 No valid Discogs release ID, searching...');
+      releaseId = await searchDiscogsForRelease(album.artist, album.title, album.year);
+      
+      if (!releaseId) {
+        console.log('❌ No match found on Discogs');
+        return NextResponse.json({
+          success: false,
+          error: 'No match found on Discogs'
+        }, { status: 404 });
+      }
+      
+      console.log(`✓ Found release ID: ${releaseId}`);
+      foundReleaseId = true;
     }
 
     // Check what needs enrichment
@@ -91,7 +139,7 @@ export async function POST(req: Request) {
     const needsGenres = !album.discogs_genres || album.discogs_genres.length === 0;
     const needsTracklist = !album.tracklists;
 
-    if (!needsMasterId && !needsImage && !needsGenres && !needsTracklist) {
+    if (!foundReleaseId && !needsMasterId && !needsImage && !needsGenres && !needsTracklist) {
       console.log('⏭️ Album already has all Discogs metadata');
       return NextResponse.json({
         success: true,
@@ -100,11 +148,15 @@ export async function POST(req: Request) {
       });
     }
 
-    // Fetch from Discogs using existing release ID
-    console.log(`📀 Fetching metadata from Discogs release ${album.discogs_release_id}...`);
-    const discogsData = await fetchDiscogsRelease(album.discogs_release_id);
+    // Fetch from Discogs
+    console.log(`📀 Fetching metadata from Discogs release ${releaseId}...`);
+    const discogsData = await fetchDiscogsRelease(releaseId);
 
     const updateData: Record<string, unknown> = {};
+
+    if (foundReleaseId) {
+      updateData.discogs_release_id = releaseId;
+    }
 
     if (needsMasterId && discogsData.master_id) {
       updateData.discogs_master_id = String(discogsData.master_id);
@@ -173,6 +225,7 @@ export async function POST(req: Request) {
         albumId: album.id,
         artist: album.artist,
         title: album.title,
+        foundReleaseId: foundReleaseId ? releaseId : undefined,
         addedMasterId: !!updateData.discogs_master_id,
         addedImage: !!updateData.image_url,
         addedGenres: !!updateData.discogs_genres,
