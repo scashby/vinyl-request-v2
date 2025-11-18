@@ -118,6 +118,12 @@ export default function MultiSourceEnrichment() {
   const [loadingModal, setLoadingModal] = useState(false);
   
   const albumsToEnrich = useMemo(() => {
+    // When a folder is selected, we don't have accurate stats for just that folder
+    // So don't try to calculate a count
+    if (folderFilter) {
+      return null; // Signal to show folder name instead of count
+    }
+    
     const servicesSelected = {
       discogsMetadata: selectedServices.discogsMetadata,
       discogsTracklist: selectedServices.discogsTracklist,
@@ -140,7 +146,7 @@ export default function MultiSourceEnrichment() {
     }
     
     return stats.needsEnrichment;
-  }, [selectedServices, stats.needsAppleLyrics, stats.needsEnrichment, stats.unenriched, stats.spotifyOnly, stats.appleOnly]);
+  }, [selectedServices, stats, folderFilter]);
 
   useEffect(() => {
     loadStatsAndFolders();
@@ -196,7 +202,7 @@ export default function MultiSourceEnrichment() {
     if (selectedServices.appleLyrics) serviceNames.push('Apple Lyrics');
     if (selectedServices.match1001) serviceNames.push('1001 Albums');
 
-    if (!confirm(`This will enrich up to ${albumsToEnrich} albums with: ${serviceNames.join(', ')}${folderFilter ? `\nFolder: "${folderFilter}"` : ' (all folders)'}\n\nThis may take a while and consume API quota. Continue?`)) {
+    if (!confirm(`This will enrich ${albumsToEnrich === null ? `all albums in "${folderFilter}" folder` : `${albumsToEnrich} albums`} with: ${serviceNames.join(', ')}\n\nThis may take a while and consume API quota. Continue?`)) {
       return;
     }
 
@@ -654,7 +660,7 @@ export default function MultiSourceEnrichment() {
               boxShadow: enriching ? 'none' : '0 4px 12px rgba(124, 58, 237, 0.3)'
             }}
           >
-            {enriching ? 'Enriching...' : `Enrich ${folderFilter ? 'Folder' : `${albumsToEnrich} Albums`}`}
+            {enriching ? 'Enriching...' : albumsToEnrich === null ? `Enrich "${folderFilter}" Folder` : `Enrich ${albumsToEnrich} Albums`}
           </button>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

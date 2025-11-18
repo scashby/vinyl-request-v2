@@ -280,7 +280,7 @@ export async function POST(req: Request) {
       match1001: true
     };
 
-    const queryLimit = limit * 3;
+    const queryLimit = Math.min(limit, 10); // Process max 10 albums per request
 
     let query = supabase
       .from('collection')
@@ -318,7 +318,7 @@ export async function POST(req: Request) {
       !album.apple_music_id || 
       needsAppleMusicLyrics(album.tracklists, album.apple_music_id) ||
       !album.is_1001
-    ).slice(0, limit);
+    ).slice(0, Math.min(limit, 10)); // Process max 10 per batch
 
     if (albumsNeedingEnrichment.length === 0 && albums.length > 0) {
       return NextResponse.json({
