@@ -5,7 +5,6 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { supabase } from 'src/lib/supabaseClient';
-import { hasValidDiscogsId } from 'lib/discogs-validation';
 
 type TabType = 'cd-only' | '1001-albums';
 
@@ -87,6 +86,7 @@ type CDOnlyAlbum = {
   year: string | null;
   image_url: string | null;
   discogs_release_id: string | null;
+  discogs_master_id: string | null;
   discogs_genres: string[] | null;
   folder: string | null;
   has_vinyl: boolean | null;
@@ -97,17 +97,6 @@ type CDOnlyAlbum = {
   format_check_method?: string;
   cd_only_tagged?: boolean;
   category?: 'no-vinyl' | 'no-us-vinyl' | 'limited-vinyl' | null;
-};
-
-type DiscogsFormat = {
-  name: string;
-  qty?: string;
-  descriptions?: string[];
-};
-
-type DiscogsRelease = {
-  formats?: DiscogsFormat[];
-  master_id?: number;
 };
 
 function CDOnlyTab() {
@@ -150,82 +139,17 @@ function CDOnlyTab() {
   const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
   const checkAlbumFormats = async (album: CDOnlyAlbum): Promise<CDOnlyAlbum> => {
-    const releaseId = album.discogs_release_id?.trim();
+    const masterId = album.discogs_master_id?.trim();
     
-    if (!releaseId || releaseId === '' || releaseId === 'null' || releaseId === 'undefined') {
-      return { ...album, available_formats: ['Unknown'], has_vinyl: false, format_check_method: 'No release ID' };
+    if (!masterId || masterId === '' || masterId === 'null' || masterId === 'undefined' || masterId === '0') {
+      return { ...album, available_formats: ['Unknown'], has_vinyl: false, format_check_method: 'No master ID', category: null };
     }
 
     try {
-      console.log(`\n🔍 Checking ${album.artist} - ${album.title} (Release ID: ${releaseId})`);
+      console.log(`\n🔍 Checking ${album.artist} - ${album.title} (Master ID: ${masterId})`);
       
-      const releaseResponse = await fetch(`/api/discogsProxy?releaseId=${encodeURIComponent(releaseId)}`);
-      
-      if (!releaseResponse.ok) {
-        console.error(`❌ Release fetch failed: HTTP ${releaseResponse.status}`);
-        return { ...album, available_formats: ['Error'], has_vinyl: false, format_check_method: 'API Error' };
-      }
-      
-      const releaseData: DiscogsRelease & { master_id?: number } = await releaseResponse.json();
-      console.log(`📀 Release data:`, {
-        has_master: !!releaseData.master_id,
-        master_id: releaseData.master_id,
-        formats: releaseData.formats
-      });
-      
-      if (!releaseData.master_id) {
-        console.log(`⚠️ No master_id found, searching for vinyl versions...`);
-        
-        const searchParams = new URLSearchParams({
-          artist: album.artist,
-          release_title: album.title,
-          format: 'vinyl',
-          type: 'release'
-        });
-        
-        const searchResponse = await fetch(
-          `https://api.discogs.com/database/search?${searchParams.toString()}`,
-          {
-            headers: {
-              'User-Agent': 'DeadwaxDialogues/1.0',
-              'Authorization': `Discogs token=${process.env.NEXT_PUBLIC_DISCOGS_TOKEN}`
-            }
-          }
-        );
-        
-        if (searchResponse.ok) {
-          const searchData = await searchResponse.json();
-          const hasVinylResults = searchData.results && searchData.results.length > 0;
-          console.log(`🔍 Search results: ${searchData.results?.length || 0} vinyl versions found`);
-          
-          return {
-            ...album,
-            available_formats: hasVinylResults ? ['vinyl', 'cd'] : ['cd'],
-            has_vinyl: hasVinylResults,
-            vinyl_count: searchData.results?.length || 0,
-            category: 'no-vinyl',
-            format_check_method: 'Direct search (no master)'
-          };
-        }
-        
-        const availableFormats = new Set<string>();
-        releaseData.formats?.forEach((f: DiscogsFormat) => { 
-          if (f.name) availableFormats.add(f.name.toLowerCase()); 
-        });
-        
-        return {
-          ...album,
-          available_formats: Array.from(availableFormats),
-          has_vinyl: false,
-          vinyl_count: 0,
-          category: 'no-vinyl',
-          format_check_method: 'No master, search failed'
-        };
-      }
-      
-      console.log(`📚 Fetching versions for master ID: ${releaseData.master_id}`);
       const versionsResponse = await fetch(
-        `/api/enrich-sources/discogs-versions?masterId=${releaseData.master_id}`
+        `/api/enrich-sources/discogs-versions?masterId=${masterId}`
       );
       
       if (!versionsResponse.ok) {
@@ -289,14 +213,13 @@ function CDOnlyTab() {
       }
       
       let category: 'no-vinyl' | 'no-us-vinyl' | 'limited-vinyl' | null = null;
-        if (vinylCount === 0) {
-          category = 'no-vinyl';
-        } else if (!hasUSVinyl) {
-          category = 'no-us-vinyl';
-        } else if (vinylCount === 1) {
-          category = 'limited-vinyl';
-        }
-        // If category is still null, this album has multiple US vinyl releases and should be skipped
+      if (vinylCount === 0) {
+        category = 'no-vinyl';
+      } else if (!hasUSVinyl) {
+        category = 'no-us-vinyl';
+      } else if (vinylCount === 1) {
+        category = 'limited-vinyl';
+      }
       
       return { 
         ...album, 
@@ -316,70 +239,37 @@ function CDOnlyTab() {
 
   const runCDOnlyCheck = async () => {
     setScanning(true);
-    setStatus('Fetching CD collection...');
+    setStatus('Fetching CDs from database...');
     setProgress(0);
     setView('scanner');
     
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/collection?select=id,artist,title,year,discogs_release_id,image_url,discogs_genres,folder,format`,
-        {
-          headers: {
-            'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
-            'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
-          }
-        }
-      );
+      const { data: allCDs, error } = await supabase
+        .from('collection')
+        .select('id, artist, title, year, discogs_release_id, discogs_master_id, image_url, discogs_genres, folder, format')
+        .eq('folder', 'CDs')
+        .order('id', { ascending: true });
       
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+      if (error) {
+        throw new Error(`Database error: ${error.message}`);
       }
       
-      const allAlbums = await response.json();
-      
-      const allCDs = (allAlbums as Array<{
-        id: number;
-        artist: string;
-        title: string;
-        year: string | null;
-        discogs_release_id: string | null;
-        image_url: string | null;
-        discogs_genres: string[] | null;
-        folder: string | null;
-        format: string | null;
-      }>).filter((album) => {
-        const format = (album.format || '').toLowerCase();
-        const folder = (album.folder || '').toLowerCase();
-        return format.includes('cd') || folder === 'cds';
-      });
-      
-      const cdsWithReleaseId = allCDs.filter((album) => {
-        return hasValidDiscogsId(album.discogs_release_id);
-      });
-      
-      const skippedCount = allCDs.length - cdsWithReleaseId.length;
-      
-      if (cdsWithReleaseId.length === 0) {
-        setStatus(`Found ${allCDs.length} CDs, but none have valid Discogs release IDs`);
+      if (!allCDs || allCDs.length === 0) {
+        setStatus('No CDs found in the CDs folder');
         setScanning(false);
         return;
       }
       
-      if (skippedCount > 0) {
-        setStatus(`Found ${allCDs.length} CDs total. Checking ${cdsWithReleaseId.length} with release IDs (${skippedCount} skipped)`);
-      } else {
-        setStatus(`Checking ${cdsWithReleaseId.length} CDs...`);
-      }
-      
-      await delay(2000);
+      setStatus(`Found ${allCDs.length} CDs. Starting check...`);
+      await delay(1000);
       
       const results: CDOnlyAlbum[] = [];
       const errorList: Array<{album: string, error: string}> = [];
       
-      for (let i = 0; i < cdsWithReleaseId.length; i++) {
-        const album = cdsWithReleaseId[i];
-        setStatus(`Checking ${i + 1}/${cdsWithReleaseId.length}: ${album.artist} - ${album.title}`);
-        setProgress(((i + 1) / cdsWithReleaseId.length) * 100);
+      for (let i = 0; i < allCDs.length; i++) {
+        const album = allCDs[i];
+        setStatus(`Checking ${i + 1}/${allCDs.length}: ${album.artist} - ${album.title}`);
+        setProgress(((i + 1) / allCDs.length) * 100);
         
         const result = await checkAlbumFormats({
           id: album.id,
@@ -387,6 +277,7 @@ function CDOnlyTab() {
           title: album.title,
           year: album.year,
           discogs_release_id: album.discogs_release_id,
+          discogs_master_id: album.discogs_master_id,
           image_url: album.image_url,
           discogs_genres: album.discogs_genres,
           folder: album.folder,
@@ -400,7 +291,7 @@ function CDOnlyTab() {
           results.push(result);
         }
         
-        if (i < cdsWithReleaseId.length - 1) await delay(1000);
+        if (i < allCDs.length - 1) await delay(1000);
       }
       
       const cdOnly = results.filter(r => 
@@ -416,7 +307,7 @@ function CDOnlyTab() {
       setResults(cdOnly);
       setStats({ 
         total: allCDs.length, 
-        scanned: cdsWithReleaseId.length, 
+        scanned: allCDs.length, 
         cdOnly: cdOnly.length,
         noVinyl,
         noUSVinyl,
@@ -424,11 +315,7 @@ function CDOnlyTab() {
         errors: errorList.length 
       });
       
-      let statusMessage = `✅ Complete! Found ${cdOnly.length} CD-only albums (${noVinyl} no vinyl, ${noUSVinyl} no US vinyl, ${limitedVinyl} limited vinyl)`;
-      if (skippedCount > 0) {
-        statusMessage += ` (${skippedCount} CDs skipped - no release ID)`;
-      }
-      setStatus(statusMessage);
+      setStatus(`✅ Complete! Checked ${allCDs.length} CDs, found ${cdOnly.length} CD-only albums (${noVinyl} no vinyl, ${noUSVinyl} no US vinyl, ${limitedVinyl} limited vinyl)`);
       
       setProgress(100);
       setView('results');
