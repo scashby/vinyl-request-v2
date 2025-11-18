@@ -654,7 +654,7 @@ export default function MultiSourceEnrichment() {
               boxShadow: enriching ? 'none' : '0 4px 12px rgba(124, 58, 237, 0.3)'
             }}
           >
-            {enriching ? 'Enriching...' : `Enrich ${albumsToEnrich} Albums`}
+            {enriching ? 'Enriching...' : `Enrich ${folderFilter ? 'Folder' : `${albumsToEnrich} Albums`}`}
           </button>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
