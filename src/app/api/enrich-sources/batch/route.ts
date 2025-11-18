@@ -1,4 +1,4 @@
-// src/app/api/enrich-sources/batch/route.ts - COMPLETE WITH DISCOGS METADATA
+// src/app/api/enrich-sources/batch/route.ts - FIXED: Now checks master_id
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { enrichDiscogsTracklist, enrichGenius } from 'lib/enrichment-utils';
@@ -24,7 +24,7 @@ type AlbumResult = {
   title: string;
   discogsMetadata?: {
     success: boolean;
-    data?: { foundReleaseId?: string; addedImage?: boolean; addedGenres?: boolean; addedTracklist?: boolean };
+    data?: { foundReleaseId?: string; addedImage?: boolean; addedGenres?: boolean; addedTracklist?: boolean; addedMasterId?: boolean };
     error?: string;
     skipped?: boolean;
   };
@@ -254,15 +254,16 @@ function needsDiscogsTracklist(tracklists: string | null, discogsReleaseId: stri
 }
 
 function needsDiscogsMetadata(
-    discogsReleaseId: string | null, 
-    imageUrl: string | null, 
-    discogsGenres: string[] | null
-  ): boolean {
-    // Use shared validation function
-    const hasValidId = hasValidDiscogsId(discogsReleaseId);
-    
-    return !hasValidId || !imageUrl || !discogsGenres || discogsGenres.length === 0;
-  }
+  discogsReleaseId: string | null,
+  discogsMasterId: string | null,
+  imageUrl: string | null, 
+  discogsGenres: string[] | null
+): boolean {
+  const hasValidReleaseId = hasValidDiscogsId(discogsReleaseId);
+  const hasValidMasterId = hasValidDiscogsId(discogsMasterId);
+  
+  return !hasValidReleaseId || !hasValidMasterId || !imageUrl || !discogsGenres || discogsGenres.length === 0;
+}
 
 export async function POST(req: Request) {
   try {
@@ -280,11 +281,11 @@ export async function POST(req: Request) {
       match1001: true
     };
 
-    const queryLimit = Math.min(limit, 10); // Process max 10 albums per request
+    const queryLimit = Math.min(limit, 10);
 
     let query = supabase
       .from('collection')
-      .select('id, artist, title, tracklists, spotify_id, apple_music_id, discogs_release_id, image_url, discogs_genres, is_1001, folder')
+      .select('id, artist, title, tracklists, spotify_id, apple_music_id, discogs_release_id, discogs_master_id, image_url, discogs_genres, is_1001, folder')
       .gt('id', cursor)
       .order('id', { ascending: true })
       .limit(queryLimit);
@@ -312,13 +313,13 @@ export async function POST(req: Request) {
     }
 
     const albumsNeedingEnrichment = albums.filter(album => 
-      needsDiscogsMetadata(album.discogs_release_id, album.image_url, album.discogs_genres) ||
+      needsDiscogsMetadata(album.discogs_release_id, album.discogs_master_id, album.image_url, album.discogs_genres) ||
       needsDiscogsTracklist(album.tracklists, album.discogs_release_id) ||
       !album.spotify_id || 
       !album.apple_music_id || 
       needsAppleMusicLyrics(album.tracklists, album.apple_music_id) ||
       !album.is_1001
-    ).slice(0, Math.min(limit, 10)); // Process max 10 per batch
+    ).slice(0, Math.min(limit, 10));
 
     if (albumsNeedingEnrichment.length === 0 && albums.length > 0) {
       return NextResponse.json({
@@ -348,8 +349,8 @@ export async function POST(req: Request) {
         title: album.title
       };
 
-      // Discogs Metadata - Search for release ID, fetch image/genres
-      if (needsDiscogsMetadata(album.discogs_release_id, album.image_url, album.discogs_genres) && services.discogsMetadata) {
+      // Discogs Metadata - Search for release ID, fetch image/genres/master_id
+      if (needsDiscogsMetadata(album.discogs_release_id, album.discogs_master_id, album.image_url, album.discogs_genres) && services.discogsMetadata) {
         const discogsMetaResult = await callService('discogs-metadata', album.id);
         albumResult.discogsMetadata = {
           success: discogsMetaResult.success,
@@ -358,7 +359,7 @@ export async function POST(req: Request) {
           skipped: discogsMetaResult.skipped
         };
         await sleep(1000);
-      } else if (album.discogs_release_id && album.image_url && album.discogs_genres) {
+      } else if (album.discogs_release_id && album.discogs_master_id && album.image_url && album.discogs_genres) {
         albumResult.discogsMetadata = { success: true, skipped: true };
       }
 
