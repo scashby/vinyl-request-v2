@@ -101,14 +101,14 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
                 📥 Import from Discogs
               </Link>
               <Link 
-                href="/admin/manage-tags"
+                href="/admin/manage-metadata"
                 className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
-                  pathname === "/admin/manage-tags" 
+                  pathname === "/admin/manage-metadata" 
                     ? "bg-purple-700 text-white" 
                     : "bg-purple-600 text-white hover:bg-purple-700"
                 }`}
               >
-                🏷️ Manage Tags
+                🏷️ Manage Metadata
               </Link>
               <Link 
                 href="/admin/best-of"

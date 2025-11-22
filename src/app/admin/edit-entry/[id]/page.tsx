@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from 'lib/supabaseClient'
 import Image from 'next/image';
+import GenreStyleSelector from 'components/GenreStyleSelector';
 
 type Track = { 
   position: string; 
@@ -31,6 +32,7 @@ type CollectionEntry = {
   inner_circle_preferred: boolean | null;
   blocked: boolean | null;
   blocked_sides: string[] | null;
+  blocked_tracks: Array<{ position: string; reason: string }> | null;  // ADD THIS LINE
   tracklists: string | null;
   discogs_release_id: string | null;
   discogs_genres: string[] | null;
@@ -805,25 +807,23 @@ export default function EditEntryPage() {
                 <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>
                   Genres {!entry.discogs_genres || entry.discogs_genres.length === 0 ? '⚠️' : '✅'}
                 </label>
-                <input 
-                  style={inputStyle} 
-                  value={entry.discogs_genres?.join(', ') || ''} 
-                  onChange={e => handleChange('discogs_genres', e.target.value.split(',').map(s => s.trim()).filter(Boolean))} 
-                  placeholder="Rock, Jazz, Blues" 
+                <GenreStyleSelector
+                  value={entry.discogs_genres || []}
+                  onChange={(genres) => handleChange('discogs_genres', genres)}
+                  type="genre"
+                  placeholder="Select or add genres..."
                 />
-                <div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>Comma-separated</div>
               </div>
               <div>
                 <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>
                   Styles {!entry.discogs_styles || entry.discogs_styles.length === 0 ? '⚠️' : '✅'}
                 </label>
-                <input 
-                  style={inputStyle} 
-                  value={entry.discogs_styles?.join(', ') || ''} 
-                  onChange={e => handleChange('discogs_styles', e.target.value.split(',').map(s => s.trim()).filter(Boolean))} 
-                  placeholder="Progressive Rock, Psychedelic" 
+                <GenreStyleSelector
+                  value={entry.discogs_styles || []}
+                  onChange={(styles) => handleChange('discogs_styles', styles)}
+                  type="style"
+                  placeholder="Select or add styles..."
                 />
-                <div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>Comma-separated</div>
               </div>
               <div>
                 <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>
@@ -919,6 +919,87 @@ export default function EditEntryPage() {
                     </div>
                   </div>
                 )}
+                
+                {/* NEW: Track-level blocking */}
+                  {tracks.length > 0 && (
+                    <div style={{ marginTop: 16, paddingTop: 16, borderTop: '2px solid #fbbf24' }}>
+                      <div style={{ fontWeight: '600', marginBottom: 10, fontSize: '13px' }}>
+                        Block Individual Tracks:
+                      </div>
+                      <div style={{ maxHeight: 300, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {tracks.map((track, idx) => {
+                          const blockedTracks = entry.blocked_tracks || [];
+                          const blockedTrackData = blockedTracks.find(
+                            (bt) => bt.position === track.position
+                          );
+                          const isBlocked = !!blockedTrackData;
+                          
+                          return (
+                            <div
+                              key={idx}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 8,
+                                padding: '8px 12px',
+                                background: isBlocked ? '#fee2e2' : '#fff',
+                                border: '1px solid #d1d5db',
+                                borderRadius: 6
+                              }}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isBlocked}
+                                onChange={e => {
+                                  const blockedTracks = entry.blocked_tracks || [];
+                                  let newBlockedTracks: Array<{ position: string; reason: string }>;
+                                  
+                                  if (e.target.checked) {
+                                    newBlockedTracks = [...blockedTracks, { position: track.position, reason: '' }];
+                                  } else {
+                                    newBlockedTracks = blockedTracks.filter(
+                                      bt => bt.position !== track.position
+                                    );
+                                  }
+                                  handleChange('blocked_tracks', newBlockedTracks);
+                                }}
+                                style={{ width: 16, height: 16 }}
+                              />
+                              <span style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', minWidth: 40 }}>
+                                {track.position}
+                              </span>
+                              <span style={{ flex: 1, fontSize: 13, color: '#1f2937' }}>
+                                {track.title}
+                              </span>
+                              {isBlocked && (
+                                <input
+                                  type="text"
+                                  value={blockedTrackData?.reason || ''}
+                                  onChange={e => {
+                                    const blockedTracks = entry.blocked_tracks || [];
+                                    const newBlockedTracks = blockedTracks.map(bt =>
+                                      bt.position === track.position
+                                        ? { ...bt, reason: e.target.value }
+                                        : bt
+                                    );
+                                    handleChange('blocked_tracks', newBlockedTracks);
+                                  }}
+                                  placeholder="Reason (e.g., scratch at 2:30)"
+                                  style={{
+                                    flex: 1,
+                                    padding: '4px 8px',
+                                    border: '1px solid #d1d5db',
+                                    borderRadius: 4,
+                                    fontSize: 12
+                                  }}
+                                />
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
               </div>
             </div>
           </div>

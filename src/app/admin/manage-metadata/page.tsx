@@ -1,9 +1,9 @@
-// src/app/admin/manage-tags/page.tsx
+// src/app/admin/manage-metadata/page.tsx
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
 import Image from 'next/image';
-import { supabase } from '../../../lib/supabaseClient';
+import { supabase } from 'lib/supabaseClient';
 
 type TagDefinition = {
   id: number;
@@ -18,40 +18,44 @@ type Album = {
   artist: string;
   title: string;
   custom_tags: string[];
+  discogs_genres: string[];
+  discogs_styles: string[];
   image_url: string | null;
 };
 
-type TagStats = {
-  tag_name: string;
+type MetadataStats = {
+  name: string;
   count: number;
   albums: Album[];
 };
 
-export default function ManageTags() {
+type TabType = 'tags' | 'genres' | 'styles';
+
+export default function ManageMetadata() {
   const [tagDefinitions, setTagDefinitions] = useState<TagDefinition[]>([]);
-  const [tagStats, setTagStats] = useState<TagStats[]>([]);
-  const [albums, setAlbums] = useState<Album[]>([]);
+  const [genreStats, setGenreStats] = useState<MetadataStats[]>([]);
+  const [styleStats, setStyleStats] = useState<MetadataStats[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'definitions' | 'usage' | 'bulk'>('definitions');
+  const [activeTab, setActiveTab] = useState<TabType>('tags');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [expandedTags, setExpandedTags] = useState<Set<string>>(new Set());
-  const [searchTerm, setSearchTerm] = useState('');
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [newTag, setNewTag] = useState({
     tag_name: '',
     category: 'theme' as 'theme' | 'mood' | 'occasion' | 'special',
     color: '#3b82f6',
     description: ''
   });
-  const [selectedAlbums, setSelectedAlbums] = useState<number[]>([]);
-  const [bulkTagAction, setBulkTagAction] = useState<'add' | 'remove'>('add');
-  const [selectedBulkTag, setSelectedBulkTag] = useState<string>('');
+
+  // Metadata renaming
+  const [renamingItem, setRenamingItem] = useState<{ type: 'genre' | 'style'; oldName: string; newName: string } | null>(null);
+  const [renaming, setRenaming] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     await Promise.all([
       loadTagDefinitions(),
-      loadAlbums(),
-      calculateTagStats()
+      calculateGenreStats(),
+      calculateStyleStats()
     ]);
     setLoading(false);
   }, []);
@@ -74,49 +78,84 @@ export default function ManageTags() {
     }
   }
 
-  async function loadAlbums() {
+  async function calculateGenreStats() {
     const { data, error } = await supabase
       .from('collection')
-      .select('id, artist, title, custom_tags, image_url')
-      .order('artist', { ascending: true });
+      .select('id, artist, title, discogs_genres, image_url');
     
     if (error) {
-      console.error('Error loading albums:', error);
-    } else {
-      setAlbums(data || []);
-    }
-  }
-
-  async function calculateTagStats() {
-    const { data, error } = await supabase
-      .from('collection')
-      .select('id, artist, title, custom_tags, image_url');
-    
-    if (error) {
-      console.error('Error calculating tag stats:', error);
+      console.error('Error calculating genre stats:', error);
       return;
     }
 
-    const tagMap = new Map<string, Album[]>();
+    const genreMap = new Map<string, Album[]>();
     
     data?.forEach(album => {
-      if (album.custom_tags && Array.isArray(album.custom_tags)) {
-        album.custom_tags.forEach((tag: string) => {
-          if (!tagMap.has(tag)) {
-            tagMap.set(tag, []);
+      if (album.discogs_genres && Array.isArray(album.discogs_genres)) {
+        album.discogs_genres.forEach((genre: string) => {
+          if (!genreMap.has(genre)) {
+            genreMap.set(genre, []);
           }
-          tagMap.get(tag)?.push(album);
+          genreMap.get(genre)?.push({
+            id: album.id,
+            artist: album.artist,
+            title: album.title,
+            custom_tags: [],
+            discogs_genres: album.discogs_genres,
+            discogs_styles: [],
+            image_url: album.image_url
+          });
         });
       }
     });
 
-    const stats: TagStats[] = Array.from(tagMap.entries()).map(([tag_name, albums]) => ({
-      tag_name,
+    const stats: MetadataStats[] = Array.from(genreMap.entries()).map(([name, albums]) => ({
+      name,
       count: albums.length,
       albums
     })).sort((a, b) => b.count - a.count);
 
-    setTagStats(stats);
+    setGenreStats(stats);
+  }
+
+  async function calculateStyleStats() {
+    const { data, error } = await supabase
+      .from('collection')
+      .select('id, artist, title, discogs_styles, image_url');
+    
+    if (error) {
+      console.error('Error calculating style stats:', error);
+      return;
+    }
+
+    const styleMap = new Map<string, Album[]>();
+    
+    data?.forEach(album => {
+      if (album.discogs_styles && Array.isArray(album.discogs_styles)) {
+        album.discogs_styles.forEach((style: string) => {
+          if (!styleMap.has(style)) {
+            styleMap.set(style, []);
+          }
+          styleMap.get(style)?.push({
+            id: album.id,
+            artist: album.artist,
+            title: album.title,
+            custom_tags: [],
+            discogs_genres: [],
+            discogs_styles: album.discogs_styles,
+            image_url: album.image_url
+          });
+        });
+      }
+    });
+
+    const stats: MetadataStats[] = Array.from(styleMap.entries()).map(([name, albums]) => ({
+      name,
+      count: albums.length,
+      albums
+    })).sort((a, b) => b.count - a.count);
+
+    setStyleStats(stats);
   }
 
   async function createTag() {
@@ -148,7 +187,6 @@ export default function ManageTags() {
       return;
     }
 
-    // Delete from tag_definitions
     const { error: defError } = await supabase
       .from('tag_definitions')
       .delete()
@@ -160,67 +198,106 @@ export default function ManageTags() {
       return;
     }
 
-    // Remove tag from all albums
-    const albumsWithTag = albums.filter(a => a.custom_tags?.includes(tagName));
+    // Remove tag from all albums - fetch ALL albums and filter client-side
+    const { data: allAlbums, error: fetchError } = await supabase
+      .from('collection')
+      .select('id, custom_tags');
     
-    for (const album of albumsWithTag) {
-      const updatedTags = album.custom_tags.filter(t => t !== tagName);
-      await supabase
-        .from('collection')
-        .update({ custom_tags: updatedTags })
-        .eq('id', album.id);
+    if (fetchError) {
+      console.error('Error fetching albums:', fetchError);
+      return;
+    }
+
+    if (allAlbums) {
+      const albumsWithTag = allAlbums.filter(album => 
+        album.custom_tags && Array.isArray(album.custom_tags) && album.custom_tags.includes(tagName)
+      );
+
+      for (const album of albumsWithTag) {
+        const updatedTags = (album.custom_tags || []).filter(t => t !== tagName);
+        const { error: updateError } = await supabase
+          .from('collection')
+          .update({ custom_tags: updatedTags })
+          .eq('id', album.id);
+        
+        if (updateError) {
+          console.error(`Error updating album ${album.id}:`, updateError);
+        }
+      }
     }
 
     loadData();
   }
 
-  async function applyBulkTags() {
-    if (selectedAlbums.length === 0) {
-      alert('Please select albums first');
+  async function renameMetadata() {
+    if (!renamingItem || !renamingItem.newName.trim()) {
+      alert('New name is required');
       return;
     }
 
-    if (!selectedBulkTag) {
-      alert('Please select a tag');
+    if (renamingItem.oldName === renamingItem.newName) {
+      setRenamingItem(null);
       return;
     }
 
-    for (const albumId of selectedAlbums) {
-      const album = albums.find(a => a.id === albumId);
-      if (!album) continue;
+    setRenaming(true);
 
-      let updatedTags = [...(album.custom_tags || [])];
+    try {
+      const field = renamingItem.type === 'genre' ? 'discogs_genres' : 'discogs_styles';
+      
+      type AlbumWithMetadata = {
+        id: number;
+        discogs_genres?: string[];
+        discogs_styles?: string[];
+      };
 
-      if (bulkTagAction === 'add') {
-        if (!updatedTags.includes(selectedBulkTag)) {
-          updatedTags.push(selectedBulkTag);
-        }
-      } else {
-        updatedTags = updatedTags.filter(t => t !== selectedBulkTag);
+      const { data: albumsWithItem, error: fetchError } = await supabase
+        .from('collection')
+        .select(`id, ${field}`)
+        .returns<AlbumWithMetadata[]>();
+
+      if (fetchError) {
+        throw fetchError;
       }
 
-      await supabase
-        .from('collection')
-        .update({ custom_tags: updatedTags })
-        .eq('id', albumId);
-    }
+      if (albumsWithItem) {
+        // Filter albums that contain the old name
+        const filteredAlbums = albumsWithItem.filter(album => {
+          const items = album[field as keyof AlbumWithMetadata];
+          return Array.isArray(items) && items.includes(renamingItem.oldName);
+        });
 
-    setSelectedAlbums([]);
-    setSelectedBulkTag('');
-    loadData();
-    alert(`${bulkTagAction === 'add' ? 'Added' : 'Removed'} tag for ${selectedAlbums.length} albums`);
+        for (const album of filteredAlbums) {
+          const items = album[field as keyof AlbumWithMetadata] as string[] || [];
+          const updated = items.map((item: string) => 
+            item === renamingItem.oldName ? renamingItem.newName : item
+          );
+          
+          const { error: updateError } = await supabase
+            .from('collection')
+            .update({ [field]: updated })
+            .eq('id', album.id);
+          
+          if (updateError) {
+            console.error(`Error updating album ${album.id}:`, updateError);
+          }
+        }
+      }
+
+      setRenamingItem(null);
+      loadData();
+      alert(`Successfully renamed "${renamingItem.oldName}" to "${renamingItem.newName}"`);
+    } catch (error) {
+      console.error('Error renaming:', error);
+      alert('Error renaming item');
+    } finally {
+      setRenaming(false);
+    }
   }
 
   const filteredDefinitions = selectedCategory === 'all' 
     ? tagDefinitions 
     : tagDefinitions.filter(t => t.category === selectedCategory);
-
-  const filteredAlbums = searchTerm
-    ? albums.filter(a => 
-        a.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        a.artist.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    : albums;
 
   const categoryColors = {
     theme: '#f97316',
@@ -228,6 +305,18 @@ export default function ManageTags() {
     occasion: '#14b8a6',
     special: '#eab308'
   };
+
+  const tabStyle = (tab: TabType) => ({
+    padding: '12px 24px',
+    background: activeTab === tab ? '#3b82f6' : 'transparent',
+    color: activeTab === tab ? 'white' : '#6b7280',
+    border: 'none',
+    borderRadius: '8px 8px 0 0',
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: 'pointer',
+    transition: 'all 0.2s'
+  });
 
   if (loading) {
     return (
@@ -242,12 +331,8 @@ export default function ManageTags() {
         justifyContent: 'center'
       }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ 
-            fontSize: 48, 
-            marginBottom: 16,
-            animation: 'spin 1s linear infinite'
-          }}>⚙️</div>
-          <div style={{ fontSize: 18, color: '#6b7280' }}>Loading tags and albums...</div>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>⚙️</div>
+          <div style={{ fontSize: 18, color: '#6b7280' }}>Loading metadata...</div>
         </div>
       </div>
     );
@@ -258,64 +343,28 @@ export default function ManageTags() {
       {/* Header */}
       <div style={{ marginBottom: 32 }}>
         <h1 style={{ fontSize: 32, fontWeight: 'bold', color: '#1f2937', margin: '0 0 8px 0' }}>
-          Tag Management
+          🏷️ Manage Tags
         </h1>
         <p style={{ color: '#6b7280', fontSize: 16, margin: 0 }}>
-          Create, organize, and apply tags to your collection
+          Manage custom tags, genres, and styles across your collection
         </p>
       </div>
 
       {/* Tabs */}
       <div style={{ marginBottom: 24, display: 'flex', gap: 8, borderBottom: '2px solid #e5e7eb' }}>
-        <button
-          onClick={() => setActiveTab('definitions')}
-          style={{
-            padding: '12px 24px',
-            background: activeTab === 'definitions' ? '#3b82f6' : 'transparent',
-            color: activeTab === 'definitions' ? 'white' : '#6b7280',
-            border: 'none',
-            borderRadius: '8px 8px 0 0',
-            fontSize: 14,
-            fontWeight: 600,
-            cursor: 'pointer'
-          }}
-        >
-          Tag Definitions
+        <button onClick={() => setActiveTab('tags')} style={tabStyle('tags')}>
+          🏷️ Custom Tags
         </button>
-        <button
-          onClick={() => setActiveTab('usage')}
-          style={{
-            padding: '12px 24px',
-            background: activeTab === 'usage' ? '#3b82f6' : 'transparent',
-            color: activeTab === 'usage' ? 'white' : '#6b7280',
-            border: 'none',
-            borderRadius: '8px 8px 0 0',
-            fontSize: 14,
-            fontWeight: 600,
-            cursor: 'pointer'
-          }}
-        >
-          Tag Usage
+        <button onClick={() => setActiveTab('genres')} style={tabStyle('genres')}>
+          🎵 Genres ({genreStats.length})
         </button>
-        <button
-          onClick={() => setActiveTab('bulk')}
-          style={{
-            padding: '12px 24px',
-            background: activeTab === 'bulk' ? '#3b82f6' : 'transparent',
-            color: activeTab === 'bulk' ? 'white' : '#6b7280',
-            border: 'none',
-            borderRadius: '8px 8px 0 0',
-            fontSize: 14,
-            fontWeight: 600,
-            cursor: 'pointer'
-          }}
-        >
-          Bulk Tagging
+        <button onClick={() => setActiveTab('styles')} style={tabStyle('styles')}>
+          🎨 Styles ({styleStats.length})
         </button>
       </div>
 
-      {/* Tag Definitions Tab */}
-      {activeTab === 'definitions' && (
+      {/* TAGS TAB */}
+      {activeTab === 'tags' && (
         <div>
           {/* Create New Tag */}
           <div style={{
@@ -593,8 +642,8 @@ export default function ManageTags() {
         </div>
       )}
 
-      {/* Tag Usage Tab */}
-      {activeTab === 'usage' && (
+      {/* GENRES TAB */}
+      {activeTab === 'genres' && (
         <div style={{
           background: 'white',
           border: '1px solid #e5e7eb',
@@ -602,55 +651,62 @@ export default function ManageTags() {
           padding: 20,
           boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
         }}>
-          <h2 style={{ fontSize: 18, fontWeight: 'bold', color: '#1f2937', marginBottom: 16 }}>
-            Tag Usage Statistics
-          </h2>
-          {tagStats.length === 0 ? (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <h2 style={{ fontSize: 18, fontWeight: 'bold', color: '#1f2937', margin: 0 }}>
+              Genre Usage Statistics
+            </h2>
+          </div>
+
+          {genreStats.length === 0 ? (
             <div style={{ color: '#6b7280', textAlign: 'center', padding: 40 }}>
-              No tags have been applied to albums yet.
+              No genres have been applied to albums yet.
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {tagStats.map(stat => {
-                const tagDef = tagDefinitions.find(t => t.tag_name === stat.tag_name);
-                const isExpanded = expandedTags.has(stat.tag_name);
+              {genreStats.map(stat => {
+                const isExpanded = expandedItems.has(`genre-${stat.name}`);
                 const displayedAlbums = isExpanded ? stat.albums : stat.albums.slice(0, 10);
                 
                 return (
-                  <div key={stat.tag_name} style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 16 }}>
+                  <div key={stat.name} style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 16 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                      {tagDef && (
-                        <div
-                          style={{
-                            width: 20,
-                            height: 20,
-                            borderRadius: 4,
-                            background: tagDef.color
-                          }}
-                        />
-                      )}
                       <div style={{ flex: 1 }}>
                         <span style={{ fontSize: 16, fontWeight: 600, color: '#1f2937' }}>
-                          {stat.tag_name}
+                          {stat.name}
                         </span>
                         <span style={{ marginLeft: 8, fontSize: 14, color: '#6b7280' }}>
                           ({stat.count} album{stat.count !== 1 ? 's' : ''})
                         </span>
                       </div>
+                      <button
+                        onClick={() => setRenamingItem({ type: 'genre', oldName: stat.name, newName: stat.name })}
+                        style={{
+                          padding: '6px 12px',
+                          background: '#3b82f6',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: 4,
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        ✏️ Rename
+                      </button>
                       {stat.albums.length > 10 && (
                         <button
                           onClick={() => {
-                            const newExpanded = new Set(expandedTags);
+                            const newExpanded = new Set(expandedItems);
                             if (isExpanded) {
-                              newExpanded.delete(stat.tag_name);
+                              newExpanded.delete(`genre-${stat.name}`);
                             } else {
-                              newExpanded.add(stat.tag_name);
+                              newExpanded.add(`genre-${stat.name}`);
                             }
-                            setExpandedTags(newExpanded);
+                            setExpandedItems(newExpanded);
                           }}
                           style={{
                             padding: '6px 12px',
-                            background: '#3b82f6',
+                            background: '#10b981',
                             color: 'white',
                             border: 'none',
                             borderRadius: 4,
@@ -742,282 +798,288 @@ export default function ManageTags() {
         </div>
       )}
 
-      {/* Bulk Tagging Tab */}
-      {activeTab === 'bulk' && (
-        <div>
-          {/* Bulk Actions Panel */}
+      {/* STYLES TAB */}
+      {activeTab === 'styles' && (
+        <div style={{
+          background: 'white',
+          border: '1px solid #e5e7eb',
+          borderRadius: 12,
+          padding: 20,
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <h2 style={{ fontSize: 18, fontWeight: 'bold', color: '#1f2937', margin: 0 }}>
+              Style Usage Statistics
+            </h2>
+          </div>
+
+          {styleStats.length === 0 ? (
+            <div style={{ color: '#6b7280', textAlign: 'center', padding: 40 }}>
+              No styles have been applied to albums yet.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {styleStats.map(stat => {
+                const isExpanded = expandedItems.has(`style-${stat.name}`);
+                const displayedAlbums = isExpanded ? stat.albums : stat.albums.slice(0, 10);
+                
+                return (
+                  <div key={stat.name} style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 16 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                      <div style={{ flex: 1 }}>
+                        <span style={{ fontSize: 16, fontWeight: 600, color: '#1f2937' }}>
+                          {stat.name}
+                        </span>
+                        <span style={{ marginLeft: 8, fontSize: 14, color: '#6b7280' }}>
+                          ({stat.count} album{stat.count !== 1 ? 's' : ''})
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => setRenamingItem({ type: 'style', oldName: stat.name, newName: stat.name })}
+                        style={{
+                          padding: '6px 12px',
+                          background: '#ec4899',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: 4,
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        ✏️ Rename
+                      </button>
+                      {stat.albums.length > 10 && (
+                        <button
+                          onClick={() => {
+                            const newExpanded = new Set(expandedItems);
+                            if (isExpanded) {
+                              newExpanded.delete(`style-${stat.name}`);
+                            } else {
+                              newExpanded.add(`style-${stat.name}`);
+                            }
+                            setExpandedItems(newExpanded);
+                          }}
+                          style={{
+                            padding: '6px 12px',
+                            background: '#10b981',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: 4,
+                            fontSize: 12,
+                            fontWeight: 600,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {isExpanded ? 'Show Less' : `Show All ${stat.count}`}
+                        </button>
+                      )}
+                    </div>
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+                      gap: 8
+                    }}>
+                      {displayedAlbums.map(album => (
+                        <div
+                          key={album.id}
+                          style={{
+                            background: '#f9fafb',
+                            borderRadius: 6,
+                            overflow: 'hidden',
+                            border: '1px solid #e5e7eb'
+                          }}
+                        >
+                          <div style={{
+                            width: '100%',
+                            aspectRatio: '1',
+                            background: '#e5e7eb',
+                            overflow: 'hidden',
+                            position: 'relative'
+                          }}>
+                            {album.image_url ? (
+                              <Image 
+                                src={album.image_url} 
+                                alt={`${album.title} by ${album.artist}`}
+                                fill
+                                sizes="120px"
+                                style={{
+                                  objectFit: 'cover'
+                                }}
+                              />
+                            ) : (
+                              <div style={{
+                                width: '100%',
+                                height: '100%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: 32,
+                                color: '#9ca3af'
+                              }}>
+                                ♪
+                              </div>
+                            )}
+                          </div>
+                          <div style={{ padding: 8 }}>
+                            <div style={{ 
+                              fontWeight: 600, 
+                              color: '#1f2937', 
+                              marginBottom: 2,
+                              fontSize: 11,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap'
+                            }}>
+                              {album.title}
+                            </div>
+                            <div style={{ 
+                              color: '#6b7280',
+                              fontSize: 10,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap'
+                            }}>
+                              {album.artist}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Rename Modal */}
+      {renamingItem && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: 20
+        }}>
           <div style={{
             background: 'white',
-            border: '1px solid #e5e7eb',
             borderRadius: 12,
-            padding: 24,
-            marginBottom: 24,
-            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+            maxWidth: 500,
+            width: '100%',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
           }}>
-            <h2 style={{ fontSize: 18, fontWeight: 'bold', color: '#1f2937', marginBottom: 16 }}>
-              Bulk Tag Actions
-            </h2>
-            <div style={{ display: 'flex', gap: 12, alignItems: 'end', flexWrap: 'wrap' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 4 }}>
-                  Action
-                </label>
-                <select
-                  value={bulkTagAction}
-                  onChange={e => setBulkTagAction(e.target.value as 'add' | 'remove')}
-                  style={{
-                    padding: '8px 12px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: 6,
-                    fontSize: 14
-                  }}
-                >
-                  <option value="add">Add Tag</option>
-                  <option value="remove">Remove Tag</option>
-                </select>
+            <div style={{ padding: 24, borderBottom: '1px solid #e5e7eb' }}>
+              <div style={{ fontSize: 20, fontWeight: 'bold', color: '#1f2937', marginBottom: 4 }}>
+                ✏️ Rename {renamingItem.type === 'genre' ? 'Genre' : 'Style'}
               </div>
-              <div style={{ flex: 1, minWidth: 200 }}>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 4 }}>
-                  Select Tag
+              <div style={{ fontSize: 14, color: '#6b7280' }}>
+                This will update all albums using this {renamingItem.type}
+              </div>
+            </div>
+
+            <div style={{ padding: 24 }}>
+              <div style={{ marginBottom: 16 }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: '#374151',
+                  marginBottom: 6
+                }}>
+                  Current Name
                 </label>
-                <select
-                  value={selectedBulkTag}
-                  onChange={e => setSelectedBulkTag(e.target.value)}
+                <input
+                  type="text"
+                  value={renamingItem.oldName}
+                  disabled
                   style={{
                     width: '100%',
-                    padding: '8px 12px',
+                    padding: '10px 12px',
                     border: '1px solid #d1d5db',
                     borderRadius: 6,
-                    fontSize: 14
+                    fontSize: 14,
+                    color: '#9ca3af',
+                    backgroundColor: '#f3f4f6'
                   }}
-                >
-                  <option value="">Choose a tag...</option>
-                  {tagDefinitions.map(tag => (
-                    <option key={tag.id} value={tag.tag_name}>
-                      {tag.tag_name} ({tag.category})
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
+
+              <div style={{ marginBottom: 0 }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: '#374151',
+                  marginBottom: 6
+                }}>
+                  New Name
+                </label>
+                <input
+                  type="text"
+                  value={renamingItem.newName}
+                  onChange={e => setRenamingItem({ ...renamingItem, newName: e.target.value })}
+                  placeholder="Enter new name..."
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: 6,
+                    fontSize: 14,
+                    color: '#1f2937',
+                    backgroundColor: 'white'
+                  }}
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            <div style={{
+              padding: 24,
+              borderTop: '1px solid #e5e7eb',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: 12
+            }}>
               <button
-                onClick={applyBulkTags}
-                disabled={selectedAlbums.length === 0 || !selectedBulkTag}
+                onClick={() => setRenamingItem(null)}
+                disabled={renaming}
                 style={{
-                  padding: '8px 24px',
-                  background: selectedAlbums.length === 0 || !selectedBulkTag ? '#9ca3af' : '#10b981',
+                  padding: '10px 20px',
+                  background: '#6b7280',
                   color: 'white',
                   border: 'none',
                   borderRadius: 6,
                   fontSize: 14,
                   fontWeight: 600,
-                  cursor: selectedAlbums.length === 0 || !selectedBulkTag ? 'not-allowed' : 'pointer'
+                  cursor: renaming ? 'not-allowed' : 'pointer'
                 }}
               >
-                Apply to {selectedAlbums.length} Album{selectedAlbums.length !== 1 ? 's' : ''}
+                Cancel
               </button>
-            </div>
-            {selectedAlbums.length > 0 && (
-              <div style={{
-                marginTop: 12,
-                padding: 12,
-                background: '#f0f9ff',
-                border: '1px solid #bae6fd',
-                borderRadius: 6,
-                fontSize: 14,
-                color: '#0c4a6e'
-              }}>
-                ✓ {selectedAlbums.length} album{selectedAlbums.length !== 1 ? 's' : ''} selected
-              </div>
-            )}
-          </div>
-
-          {/* Album Selection */}
-          <div style={{
-            background: 'white',
-            border: '1px solid #e5e7eb',
-            borderRadius: 12,
-            padding: 20,
-            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
-              <h2 style={{ fontSize: 18, fontWeight: 'bold', color: '#1f2937', margin: 0 }}>
-                Select Albums ({filteredAlbums.length})
-              </h2>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <input
-                  type="text"
-                  placeholder="Search albums..."
-                  value={searchTerm}
-                  onChange={e => setSearchTerm(e.target.value)}
-                  style={{
-                    padding: '6px 12px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: 4,
-                    fontSize: 12,
-                    minWidth: 200
-                  }}
-                />
-                <button
-                  onClick={() => setSelectedAlbums(filteredAlbums.map(a => a.id))}
-                  style={{
-                    padding: '6px 12px',
-                    background: '#3b82f6',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: 4,
-                    fontSize: 12,
-                    fontWeight: 600,
-                    cursor: 'pointer'
-                  }}
-                >
-                  Select All
-                </button>
-                <button
-                  onClick={() => setSelectedAlbums([])}
-                  style={{
-                    padding: '6px 12px',
-                    background: '#6b7280',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: 4,
-                    fontSize: 12,
-                    fontWeight: 600,
-                    cursor: 'pointer'
-                  }}
-                >
-                  Clear
-                </button>
-              </div>
-            </div>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
-              gap: 12
-            }}>
-              {filteredAlbums.map(album => {
-                const isSelected = selectedAlbums.includes(album.id);
-                return (
-                  <div
-                    key={album.id}
-                    onClick={() => {
-                      setSelectedAlbums(prev =>
-                        isSelected
-                          ? prev.filter(id => id !== album.id)
-                          : [...prev, album.id]
-                      );
-                    }}
-                    style={{
-                      border: isSelected ? '3px solid #3b82f6' : '1px solid #e5e7eb',
-                      borderRadius: 8,
-                      padding: 8,
-                      background: isSelected ? '#eff6ff' : '#f9fafb',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      position: 'relative'
-                    }}
-                  >
-                    <div style={{
-                      width: '100%',
-                      aspectRatio: '1',
-                      background: '#e5e7eb',
-                      borderRadius: 4,
-                      marginBottom: 8,
-                      overflow: 'hidden',
-                      position: 'relative'
-                    }}>
-                      {album.image_url ? (
-                        <Image 
-                          src={album.image_url} 
-                          alt={`${album.title} by ${album.artist}`}
-                          fill
-                          sizes="150px"
-                          style={{
-                            objectFit: 'cover'
-                          }}
-                        />
-                      ) : (
-                        <div style={{
-                          width: '100%',
-                          height: '100%',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: 32,
-                          color: '#9ca3af'
-                        }}>
-                          ♪
-                        </div>
-                      )}
-                      {isSelected && (
-                        <div style={{
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          bottom: 0,
-                          background: 'rgba(59, 130, 246, 0.8)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: 48,
-                          color: 'white',
-                          fontWeight: 'bold'
-                        }}>
-                          ✓
-                        </div>
-                      )}
-                    </div>
-                    <div style={{
-                      fontSize: 12,
-                      fontWeight: 600,
-                      color: '#1f2937',
-                      marginBottom: 2,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap'
-                    }}>
-                      {album.title}
-                    </div>
-                    <div style={{
-                      fontSize: 11,
-                      color: '#6b7280',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap'
-                    }}>
-                      {album.artist}
-                    </div>
-                    {album.custom_tags && album.custom_tags.length > 0 && (
-                      <div style={{
-                        fontSize: 10,
-                        color: '#9ca3af',
-                        marginTop: 4,
-                        display: 'flex',
-                        gap: 4,
-                        flexWrap: 'wrap'
-                      }}>
-                        {album.custom_tags.slice(0, 2).map(tag => (
-                          <span
-                            key={tag}
-                            style={{
-                              padding: '2px 6px',
-                              background: '#e5e7eb',
-                              borderRadius: 3
-                            }}
-                          >
-                            {tag}
-                          </span>
-                        ))}
-                        {album.custom_tags.length > 2 && (
-                          <span style={{ padding: '2px 6px' }}>
-                            +{album.custom_tags.length - 2}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+              <button
+                onClick={renameMetadata}
+                disabled={renaming || !renamingItem.newName.trim()}
+                style={{
+                  padding: '10px 20px',
+                  background: renaming || !renamingItem.newName.trim() ? '#9ca3af' : '#10b981',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 6,
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: renaming || !renamingItem.newName.trim() ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {renaming ? 'Renaming...' : 'Rename'}
+              </button>
             </div>
           </div>
         </div>

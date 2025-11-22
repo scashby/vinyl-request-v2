@@ -641,49 +641,90 @@ function AlbumDetailContent() {
           
           {(() => {
             const tracks = getTracksList();
+            const blockedTracks = album.blocked_tracks || [];
             
-            return tracks.map((track, index) => (
-              <div 
-                key={index} 
-                className="track"
-                style={{
-                  cursor: queueTypesArray.includes('track') && eventId && eventData?.has_queue ? 'pointer' : 'default',
-                  transition: 'background-color 0.2s'
-                }}
-              >
-                <div>{track.position || index + 1}</div>
-                <div style={{ color: '#fff', fontWeight: '500' }}>
-                  {track.title || track.name || 'Unknown Track'}
-                </div>
-                <div style={{ color: '#ccc' }}>
-                  {track.artist || album.artist}
-                </div>
-                <div style={{ color: '#aaa', fontSize: '14px' }}>
-                  {track.duration || '--:--'}
-                </div>
-                {queueTypesArray.includes('track') && eventId && eventData?.has_queue && (
-                  <div>
-                    <button
-                      onClick={() => handleAddTrackToQueue(track)}
-                      disabled={submittingRequest}
-                      style={{
-                        background: '#3b82f6',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '6px',
-                        padding: '6px 12px',
-                        fontSize: '14px',
-                        fontWeight: '600',
-                        cursor: submittingRequest ? 'not-allowed' : 'pointer',
-                        opacity: submittingRequest ? 0.7 : 1
-                      }}
-                    >
-                      + Add
-                    </button>
+            return tracks.map((track, index) => {
+              const blockedInfo = blockedTracks.find(bt => bt.position === track.position);
+              const isBlocked = !!blockedInfo;
+              
+              return (
+                <div 
+                  key={index} 
+                  className="track"
+                  style={{
+                    cursor: queueTypesArray.includes('track') && eventId && eventData?.has_queue ? 'pointer' : 'default',
+                    transition: 'background-color 0.2s',
+                    opacity: isBlocked ? 0.6 : 1,
+                    position: 'relative'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {track.position || index + 1}
+                    {isBlocked && (
+                      <span 
+                        title={blockedInfo.reason || 'Track blocked'}
+                        style={{
+                          display: 'inline-block',
+                          width: '16px',
+                          height: '16px',
+                          borderRadius: '50%',
+                          background: '#ef4444',
+                          color: 'white',
+                          fontSize: '10px',
+                          fontWeight: 'bold',
+                          textAlign: 'center',
+                          lineHeight: '16px',
+                          cursor: 'help'
+                        }}
+                      >
+                        !
+                      </span>
+                    )}
                   </div>
-                )}
-              </div>
-            ));
+                  <div style={{ color: '#fff', fontWeight: '500' }}>
+                    {track.title || track.name || 'Unknown Track'}
+                    {isBlocked && (
+                      <span style={{
+                        marginLeft: '8px',
+                        fontSize: '11px',
+                        color: '#fca5a5',
+                        fontStyle: 'italic'
+                      }}>
+                        ({blockedInfo.reason || 'Blocked'})
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ color: '#ccc' }}>
+                    {track.artist || album.artist}
+                  </div>
+                  <div style={{ color: '#aaa', fontSize: '14px' }}>
+                    {track.duration || '--:--'}
+                  </div>
+                  {queueTypesArray.includes('track') && eventId && eventData?.has_queue && (
+                    <div>
+                      <button
+                        onClick={() => handleAddTrackToQueue(track)}
+                        disabled={submittingRequest || isBlocked}
+                        style={{
+                          background: isBlocked ? '#9ca3af' : '#3b82f6',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '6px',
+                          padding: '6px 12px',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          cursor: submittingRequest || isBlocked ? 'not-allowed' : 'pointer',
+                          opacity: submittingRequest || isBlocked ? 0.7 : 1
+                        }}
+                        title={isBlocked ? blockedInfo.reason || 'Track blocked' : 'Add to queue'}
+                      >
+                        {isBlocked ? '🚫' : '+ Add'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            });
           })()}
         </div>
       )}
@@ -699,54 +740,102 @@ function AlbumDetailContent() {
             Album Sides
           </h3>
           
-          {Object.entries(album.sides).map(([sideName, tracks]) => (
-            <div key={sideName} style={{ marginBottom: '24px' }}>
-              <h4 style={{ 
-                color: '#fff', 
-                fontSize: '16px', 
-                marginBottom: '12px',
-                textTransform: 'uppercase',
-                letterSpacing: '1px'
-              }}>
-                Side {sideName}
-              </h4>
-              
-              <div className="tracklist-header">
-                <div>#</div>
-                <div>Title</div>
-                <div>Artist</div>
-                <div>Duration</div>
+          {Object.entries(album.sides).map(([sideName, tracks]) => {
+            const blockedTracks = album.blocked_tracks || [];
+            
+            return (
+              <div key={sideName} style={{ marginBottom: '24px' }}>
+                <h4 style={{ 
+                  color: '#fff', 
+                  fontSize: '16px', 
+                  marginBottom: '12px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '1px'
+                }}>
+                  Side {sideName}
+                </h4>
+                
+                <div className="tracklist-header">
+                  <div>#</div>
+                  <div>Title</div>
+                  <div>Artist</div>
+                  <div>Duration</div>
+                </div>
+                
+                {Array.isArray(tracks) ? tracks.map((track, index) => {
+                  const trackPosition = `${sideName}${index + 1}`;
+                  const blockedInfo = blockedTracks.find(bt => bt.position === trackPosition);
+                  const isBlocked = !!blockedInfo;
+                  
+                  return (
+                    <div 
+                      key={index} 
+                      className="track"
+                      style={{
+                        opacity: isBlocked ? 0.6 : 1
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {index + 1}
+                        {isBlocked && (
+                          <span 
+                            title={blockedInfo.reason || 'Track blocked'}
+                            style={{
+                              display: 'inline-block',
+                              width: '16px',
+                              height: '16px',
+                              borderRadius: '50%',
+                              background: '#ef4444',
+                              color: 'white',
+                              fontSize: '10px',
+                              fontWeight: 'bold',
+                              textAlign: 'center',
+                              lineHeight: '16px',
+                              cursor: 'help'
+                            }}
+                          >
+                            !
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ color: '#fff', fontWeight: '500' }}>
+                        {typeof track === 'string' ? track : track.title || track.name || 'Unknown Track'}
+                        {isBlocked && (
+                          <span style={{
+                            marginLeft: '8px',
+                            fontSize: '11px',
+                            color: '#fca5a5',
+                            fontStyle: 'italic'
+                          }}>
+                            ({blockedInfo.reason || 'Blocked'})
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ color: '#ccc' }}>
+                        {typeof track === 'object' && track.artist ? track.artist : album.artist}
+                      </div>
+                      <div style={{ color: '#aaa', fontSize: '14px' }}>
+                        {typeof track === 'object' && track.duration ? track.duration : '--:--'}
+                      </div>
+                    </div>
+                  );
+                }) : (
+                  <div className="track">
+                    <div>1</div>
+                    <div style={{ color: '#fff', fontWeight: '500' }}>
+                      {typeof tracks === 'string' ? tracks : 'No track information'}
+                    </div>
+                    <div style={{ color: '#ccc' }}>
+                      {album.artist}
+                    </div>
+                    <div style={{ color: '#aaa', fontSize: '14px' }}>
+                      --:--
+                    </div>
+                  </div>
+                )}
               </div>
-              
-              {Array.isArray(tracks) ? tracks.map((track, index) => (
-                <div key={index} className="track">
-                  <div>{index + 1}</div>
-                  <div style={{ color: '#fff', fontWeight: '500' }}>
-                    {typeof track === 'string' ? track : track.title || track.name || 'Unknown Track'}
-                  </div>
-                  <div style={{ color: '#ccc' }}>
-                    {typeof track === 'object' && track.artist ? track.artist : album.artist}
-                  </div>
-                  <div style={{ color: '#aaa', fontSize: '14px' }}>
-                    {typeof track === 'object' && track.duration ? track.duration : '--:--'}
-                  </div>
-                </div>
-              )) : (
-                <div className="track">
-                  <div>1</div>
-                  <div style={{ color: '#fff', fontWeight: '500' }}>
-                    {typeof tracks === 'string' ? tracks : 'No track information'}
-                  </div>
-                  <div style={{ color: '#ccc' }}>
-                    {album.artist}
-                  </div>
-                  <div style={{ color: '#aaa', fontSize: '14px' }}>
-                    --:--
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
