@@ -440,21 +440,18 @@ export default function EditEntryPage() {
   function moveTrackToSide(trackIndex: number, newSide: string) {
     const newTracks = [...tracks];
     const track = newTracks[trackIndex];
+    const oldSide = track.position?.[0];
     
-    // Get the highest track number on the target side
-    const targetSideTracks = tracks.filter(t => t.position?.startsWith(newSide));
-    const maxNumber = targetSideTracks.length > 0
-      ? Math.max(...targetSideTracks.map(t => {
-          const match = t.position.match(/\d+$/);
-          return match ? parseInt(match[0]) : 0;
-        }))
-      : 0;
+    if (oldSide === newSide) return;
     
-    // Assign new position
+    // Change the side
     newTracks[trackIndex] = {
       ...track,
-      position: `${newSide}${maxNumber + 1}`
+      position: `${newSide}${track.position?.substring(1) || '1'}`
     };
+    
+    // Renumber the target side
+    renumberSideInArray(newTracks, newSide);
     
     setTracks(newTracks);
     setStatus(`✅ Moved track to Side ${newSide}`);
@@ -465,17 +462,44 @@ export default function EditEntryPage() {
     
     const newTracks = tracks.map(track => {
       if (track.position?.startsWith(fromSide)) {
-        const trackNumber = track.position.substring(1);
         return {
           ...track,
-          position: `${toSide}${trackNumber}`
+          position: `${toSide}${track.position.substring(1)}`
         };
       }
       return track;
     });
     
+    // Renumber the merged side so tracks are sequential
+    renumberSideInArray(newTracks, toSide);
+    
     setTracks(newTracks);
-    setStatus(`✅ Merged Side ${fromSide} into Side ${toSide}`);
+    setStatus(`✅ Merged Side ${fromSide} into Side ${toSide} and renumbered`);
+  }
+
+  function renumberSideInArray(trackArray: Track[], side: string) {
+    // Get all tracks for this side
+    const sideTrackIndices: number[] = [];
+    trackArray.forEach((track, idx) => {
+      if (track.position?.startsWith(side)) {
+        sideTrackIndices.push(idx);
+      }
+    });
+    
+    // Renumber them sequentially
+    sideTrackIndices.forEach((trackIdx, sequenceNum) => {
+      trackArray[trackIdx] = {
+        ...trackArray[trackIdx],
+        position: `${side}${sequenceNum + 1}`
+      };
+    });
+  }
+
+  function renumberSide(side: string) {
+    const newTracks = [...tracks];
+    renumberSideInArray(newTracks, side);
+    setTracks(newTracks);
+    setStatus(`✅ Renumbered Side ${side}`);
   }
 
   function deleteSide(sideToDelete: string) {
@@ -1109,8 +1133,31 @@ export default function EditEntryPage() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <h3 style={{ fontSize: '18px', fontWeight: '700', margin: 0, color: '#111' }}>
                 {tracks.length === 0 ? '⚠️' : '✅'} {tracks.length} tracks
+                {sides.length > 1 && <span style={{ fontSize: '14px', color: '#6b7280', fontWeight: '500', marginLeft: 12 }}>
+                  ({sides.length} sides)
+                </span>}
               </h3>
               <div style={{ display: 'flex', gap: 8 }}>
+                {tracks.length > 0 && sides.length > 1 && (
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      const newTracks = [...tracks];
+                      sides.forEach(side => renumberSideInArray(newTracks, side));
+                      setTracks(newTracks);
+                      setStatus('✅ Renumbered all sides');
+                    }}
+                    style={{ 
+                      ...buttonStyle, 
+                      background: '#3b82f6', 
+                      color: 'white',
+                      fontSize: '14px',
+                      padding: '10px 18px'
+                    }}
+                  >
+                    🔢 Renumber All Sides
+                  </button>
+                )}
                 {tracks.length > 0 && (
                   <button 
                     type="button" 
@@ -1186,10 +1233,27 @@ export default function EditEntryPage() {
                           {sideTracks.length} {sideTracks.length === 1 ? 'track' : 'tracks'}
                         </span>
                         
-                        {/* Side controls - only show if multiple sides exist */}
-                        {hasMultipleSides && (
-                          <>
-                            <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+                        {/* Side controls */}
+                        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+                          {/* Always show renumber button */}
+                          <button
+                            onClick={() => renumberSide(side)}
+                            style={{
+                              ...buttonStyle,
+                              background: '#dbeafe',
+                              color: '#1e40af',
+                              border: '1px solid #3b82f6',
+                              padding: '6px 12px',
+                              fontSize: '13px'
+                            }}
+                            title="Renumber tracks in this side sequentially"
+                          >
+                            🔢 Renumber
+                          </button>
+                          
+                          {/* Only show merge/delete if multiple sides */}
+                          {hasMultipleSides && (
+                            <>
                               <label style={{ fontSize: '13px', color: '#6b7280', fontWeight: '500' }}>
                                 Merge into:
                               </label>
@@ -1230,9 +1294,9 @@ export default function EditEntryPage() {
                               >
                                 🗑️ Delete Side
                               </button>
-                            </div>
-                          </>
-                        )}
+                            </>
+                          )}
+                        </div>
                       </div>
                       
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
