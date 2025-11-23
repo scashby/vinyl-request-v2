@@ -148,10 +148,7 @@ export default function EditEntryPage() {
   const [saleQuantity, setSaleQuantity] = useState('1');
   const [saleNotes, setSaleNotes] = useState('');
 
-  // Tracklist management tools state
-  const [showTracklistTools, setShowTracklistTools] = useState(false);
-  const [bulkRenameFrom, setBulkRenameFrom] = useState('');
-  const [bulkRenameTo, setBulkRenameTo] = useState('');
+  // Tracklist management - no separate panel needed
 
   useEffect(() => {
     fetchEntry(id).then((data) => {
@@ -440,37 +437,32 @@ export default function EditEntryPage() {
     setTracks(newTracks);
   }
 
-  function applyBulkRename() {
-    if (!bulkRenameFrom || !bulkRenameTo) {
-      setStatus('❌ Please enter both "from" and "to" values');
-      return;
-    }
-
-    // Parse the "from" value - can be comma-separated sides
-    const fromSides = bulkRenameFrom.split(',').map(s => s.trim()).filter(Boolean);
-    const toSide = bulkRenameTo.trim();
-
-    let updated = 0;
-    const newTracks = tracks.map(track => {
-      const currentSide = track.position?.[0];
-      if (currentSide && fromSides.includes(currentSide)) {
-        const trackNumber = track.position.substring(1); // Get everything after the side letter
-        updated++;
-        return {
-          ...track,
-          position: `${toSide}${trackNumber}`
-        };
-      }
-      return track;
-    });
-
+  function moveTrackToSide(trackIndex: number, newSide: string) {
+    const newTracks = [...tracks];
+    const track = newTracks[trackIndex];
+    
+    // Get the highest track number on the target side
+    const targetSideTracks = tracks.filter(t => t.position?.startsWith(newSide));
+    const maxNumber = targetSideTracks.length > 0
+      ? Math.max(...targetSideTracks.map(t => {
+          const match = t.position.match(/\d+$/);
+          return match ? parseInt(match[0]) : 0;
+        }))
+      : 0;
+    
+    // Assign new position
+    newTracks[trackIndex] = {
+      ...track,
+      position: `${newSide}${maxNumber + 1}`
+    };
+    
     setTracks(newTracks);
-    setStatus(`✅ Renamed ${updated} tracks from Side ${fromSides.join(',')} to Side ${toSide}`);
-    setBulkRenameFrom('');
-    setBulkRenameTo('');
+    setStatus(`✅ Moved track to Side ${newSide}`);
   }
 
-  function mergeSides(fromSide: string, toSide: string) {
+  function mergeSide(fromSide: string, toSide: string) {
+    if (fromSide === toSide) return;
+    
     const newTracks = tracks.map(track => {
       if (track.position?.startsWith(fromSide)) {
         const trackNumber = track.position.substring(1);
@@ -481,51 +473,48 @@ export default function EditEntryPage() {
       }
       return track;
     });
+    
     setTracks(newTracks);
     setStatus(`✅ Merged Side ${fromSide} into Side ${toSide}`);
   }
 
-  function deleteEmptySides() {
-    const sidesWithTracks = new Set(tracks.map(t => t.position?.[0]).filter(Boolean));
-    const allSides = Array.from(new Set(tracks.map(t => t.position?.[0]).filter(Boolean)));
+  function deleteSide(sideToDelete: string) {
+    if (!confirm(`Delete all tracks from Side ${sideToDelete}?`)) return;
     
-    if (sidesWithTracks.size === allSides.length) {
-      setStatus('ℹ️ No empty sides to delete');
-      return;
+    const newTracks = tracks.filter(track => !track.position?.startsWith(sideToDelete));
+    setTracks(newTracks);
+    setStatus(`✅ Deleted Side ${sideToDelete}`);
+  }
+
+  function addNewSide() {
+    // Find the next available side letter/number
+    const existingSides = Array.from(new Set(tracks.map(t => t.position?.[0]).filter(Boolean)));
+    const numericSides = existingSides.filter(s => /^\d+$/.test(s)).map(s => parseInt(s));
+    const letterSides = existingSides.filter(s => /^[A-Z]$/i.test(s));
+    
+    let newSide: string;
+    if (numericSides.length > 0) {
+      // If we have numeric sides, add the next number
+      newSide = String(Math.max(...numericSides) + 1);
+    } else if (letterSides.length > 0) {
+      // If we have letter sides, add the next letter
+      const lastLetter = letterSides.sort().pop() || 'A';
+      newSide = String.fromCharCode(lastLetter.charCodeAt(0) + 1);
+    } else {
+      // First side
+      newSide = '1';
     }
-
-    setStatus(`✅ All sides have tracks`);
-  }
-
-  function renumberTracks() {
-    const tracksBySide = tracks.reduce((acc, track) => {
-      const side = track.position?.[0] || 'A';
-      if (!acc[side]) acc[side] = [];
-      acc[side].push(track);
-      return acc;
-    }, {} as Record<string, Track[]>);
-
-    const newTracks: Track[] = [];
-    Object.keys(tracksBySide).sort().forEach(side => {
-      tracksBySide[side].forEach((track, idx) => {
-        newTracks.push({
-          ...track,
-          position: `${side}${idx + 1}`
-        });
-      });
-    });
-
-    setTracks(newTracks);
-    setStatus('✅ Renumbered all tracks');
-  }
-
-  function mergeAllSidesIntoOne() {
-    const newTracks = tracks.map((track, idx) => ({
-      ...track,
-      position: `1-${idx + 1}`
-    }));
-    setTracks(newTracks);
-    setStatus('✅ Merged all sides into Disc 1');
+    
+    // Add a placeholder track to the new side
+    const newTrack: Track = {
+      position: `${newSide}1`,
+      title: '',
+      duration: '',
+      artist: undefined
+    };
+    
+    setTracks([...tracks, newTrack]);
+    setStatus(`✅ Added Side ${newSide}`);
   }
 
   if (!entry) {
@@ -1122,19 +1111,21 @@ export default function EditEntryPage() {
                 {tracks.length === 0 ? '⚠️' : '✅'} {tracks.length} tracks
               </h3>
               <div style={{ display: 'flex', gap: 8 }}>
-                <button 
-                  type="button" 
-                  onClick={() => setShowTracklistTools(!showTracklistTools)} 
-                  style={{ 
-                    ...buttonStyle, 
-                    background: showTracklistTools ? '#7c3aed' : '#e9d5ff', 
-                    color: showTracklistTools ? 'white' : '#7c3aed',
-                    fontSize: '14px',
-                    padding: '10px 18px'
-                  }}
-                >
-                  🛠️ Tracklist Tools
-                </button>
+                {tracks.length > 0 && (
+                  <button 
+                    type="button" 
+                    onClick={addNewSide} 
+                    style={{ 
+                      ...buttonStyle, 
+                      background: '#7c3aed', 
+                      color: 'white',
+                      fontSize: '14px',
+                      padding: '10px 18px'
+                    }}
+                  >
+                    + Add New Side
+                  </button>
+                )}
                 <button 
                   type="button" 
                   onClick={addTrack} 
@@ -1151,158 +1142,6 @@ export default function EditEntryPage() {
               </div>
             </div>
 
-            {/* TRACKLIST TOOLS PANEL */}
-            {showTracklistTools && tracks.length > 0 && (
-              <div style={{
-                marginBottom: 20,
-                padding: 20,
-                background: 'linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%)',
-                border: '2px solid #7c3aed',
-                borderRadius: 10
-              }}>
-                <h4 style={{ fontSize: '16px', fontWeight: '700', margin: '0 0 16px 0', color: '#6b21a8' }}>
-                  🛠️ Tracklist Management Tools
-                </h4>
-
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
-                  {/* Bulk Rename */}
-                  <div style={{ 
-                    padding: 16, 
-                    background: 'white', 
-                    borderRadius: 8, 
-                    border: '1px solid #d1d5db' 
-                  }}>
-                    <div style={{ fontSize: '14px', fontWeight: '700', marginBottom: 10, color: '#374151' }}>
-                      📝 Bulk Rename Sides
-                    </div>
-                    <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: 12 }}>
-                      Example: Change &quot;2,3,4,5,6,7&quot; → &quot;1&quot; to merge all into Disc 1
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      <input
-                        type="text"
-                        value={bulkRenameFrom}
-                        onChange={e => setBulkRenameFrom(e.target.value)}
-                        placeholder="From sides (e.g., 2,3,4,5)"
-                        style={{ ...inputStyle, fontSize: '13px' }}
-                      />
-                      <input
-                        type="text"
-                        value={bulkRenameTo}
-                        onChange={e => setBulkRenameTo(e.target.value)}
-                        placeholder="To side (e.g., 1)"
-                        style={{ ...inputStyle, fontSize: '13px' }}
-                      />
-                      <button
-                        onClick={applyBulkRename}
-                        style={{
-                          ...buttonStyle,
-                          background: '#7c3aed',
-                          color: 'white',
-                          fontSize: '13px'
-                        }}
-                      >
-                        Apply Rename
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Quick Actions */}
-                  <div style={{ 
-                    padding: 16, 
-                    background: 'white', 
-                    borderRadius: 8, 
-                    border: '1px solid #d1d5db' 
-                  }}>
-                    <div style={{ fontSize: '14px', fontWeight: '700', marginBottom: 10, color: '#374151' }}>
-                      ⚡ Quick Actions
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      <button
-                        onClick={mergeAllSidesIntoOne}
-                        style={{
-                          ...buttonStyle,
-                          background: '#10b981',
-                          color: 'white',
-                          fontSize: '13px',
-                          textAlign: 'left',
-                          padding: '10px 14px'
-                        }}
-                      >
-                        🔗 Merge All → Disc 1
-                      </button>
-                      <button
-                        onClick={renumberTracks}
-                        style={{
-                          ...buttonStyle,
-                          background: '#3b82f6',
-                          color: 'white',
-                          fontSize: '13px',
-                          textAlign: 'left',
-                          padding: '10px 14px'
-                        }}
-                      >
-                        🔢 Renumber All Tracks
-                      </button>
-                      <button
-                        onClick={deleteEmptySides}
-                        style={{
-                          ...buttonStyle,
-                          background: '#ef4444',
-                          color: 'white',
-                          fontSize: '13px',
-                          textAlign: 'left',
-                          padding: '10px 14px'
-                        }}
-                      >
-                        🗑️ Delete Empty Sides
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Side Manager */}
-                  {sides.length > 1 && (
-                    <div style={{ 
-                      padding: 16, 
-                      background: 'white', 
-                      borderRadius: 8, 
-                      border: '1px solid #d1d5db' 
-                    }}>
-                      <div style={{ fontSize: '14px', fontWeight: '700', marginBottom: 10, color: '#374151' }}>
-                        📀 Merge Sides
-                      </div>
-                      <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: 12 }}>
-                        Current sides: {sides.join(', ')}
-                      </div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                        {sides.map(side => (
-                          <div key={side} style={{ display: 'flex', gap: 4 }}>
-                            {sides.filter(s => s !== side).map(targetSide => (
-                              <button
-                                key={`${side}-${targetSide}`}
-                                onClick={() => mergeSides(side, targetSide)}
-                                style={{
-                                  ...buttonStyle,
-                                  background: '#f3f4f6',
-                                  color: '#374151',
-                                  fontSize: '11px',
-                                  padding: '6px 10px',
-                                  border: '1px solid #d1d5db'
-                                }}
-                                title={`Merge Side ${side} into Side ${targetSide}`}
-                              >
-                                {side} → {targetSide}
-                              </button>
-                            ))}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
             {tracks.length === 0 ? (
               <div style={{ 
                 padding: 60, 
@@ -1318,194 +1157,279 @@ export default function EditEntryPage() {
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-                {Object.entries(tracksBySide).map(([side, sideTracks]) => (
-                  <div key={side}>
-                    <div style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: 10, 
-                      marginBottom: 12,
-                      paddingBottom: 8,
-                      borderBottom: '2px solid #e5e7eb'
-                    }}>
-                      <h4 style={{ 
-                        fontSize: '16px', 
-                        fontWeight: '700', 
-                        margin: 0, 
-                        color: '#374151',
-                        background: '#f3f4f6',
-                        padding: '6px 14px',
-                        borderRadius: '6px'
+                {Object.entries(tracksBySide).map(([side, sideTracks]) => {
+                  const hasMultipleSides = Object.keys(tracksBySide).length > 1;
+                  const otherSides = Object.keys(tracksBySide).filter(s => s !== side);
+                  
+                  return (
+                    <div key={side}>
+                      <div style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: 10, 
+                        marginBottom: 12,
+                        paddingBottom: 8,
+                        borderBottom: '2px solid #e5e7eb'
                       }}>
-                        Side {side}
-                      </h4>
-                      <span style={{ fontSize: '13px', color: '#6b7280', fontWeight: '500' }}>
-                        {sideTracks.length} {sideTracks.length === 1 ? 'track' : 'tracks'}
-                      </span>
-                    </div>
-                    
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                      {sideTracks.map((track) => {
-                        const globalIdx = tracks.indexOf(track);
-                        return (
-                          <div 
-                            key={globalIdx}
-                            style={{ 
-                              padding: 14, 
-                              background: '#f9fafb', 
-                              borderRadius: 8, 
-                              border: '1px solid #e5e7eb',
-                              display: 'grid',
-                              gridTemplateColumns: '50px 80px 140px 1fr 100px 80px 40px',
-                              gap: 12,
-                              alignItems: 'center'
-                            }}
-                          >
-                            {/* Move buttons */}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                              <button
-                                onClick={() => moveTrackUp(globalIdx)}
-                                disabled={globalIdx === 0}
-                                style={{
-                                  background: globalIdx === 0 ? '#f3f4f6' : '#e5e7eb',
-                                  border: 'none',
-                                  borderRadius: 3,
-                                  cursor: globalIdx === 0 ? 'not-allowed' : 'pointer',
-                                  fontSize: 14,
-                                  padding: '2px 4px',
-                                  color: globalIdx === 0 ? '#d1d5db' : '#374151'
-                                }}
-                                title="Move up"
-                              >
-                                ▲
-                              </button>
-                              <button
-                                onClick={() => moveTrackDown(globalIdx)}
-                                disabled={globalIdx === tracks.length - 1}
-                                style={{
-                                  background: globalIdx === tracks.length - 1 ? '#f3f4f6' : '#e5e7eb',
-                                  border: 'none',
-                                  borderRadius: 3,
-                                  cursor: globalIdx === tracks.length - 1 ? 'not-allowed' : 'pointer',
-                                  fontSize: 14,
-                                  padding: '2px 4px',
-                                  color: globalIdx === tracks.length - 1 ? '#d1d5db' : '#374151'
-                                }}
-                                title="Move down"
-                              >
-                                ▼
-                              </button>
-                            </div>
-
-                            <div>
-                              <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#6b7280', marginBottom: 4 }}>
-                                Position
+                        <h4 style={{ 
+                          fontSize: '16px', 
+                          fontWeight: '700', 
+                          margin: 0, 
+                          color: '#374151',
+                          background: '#f3f4f6',
+                          padding: '6px 14px',
+                          borderRadius: '6px'
+                        }}>
+                          Side {side}
+                        </h4>
+                        <span style={{ fontSize: '13px', color: '#6b7280', fontWeight: '500' }}>
+                          {sideTracks.length} {sideTracks.length === 1 ? 'track' : 'tracks'}
+                        </span>
+                        
+                        {/* Side controls - only show if multiple sides exist */}
+                        {hasMultipleSides && (
+                          <>
+                            <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+                              <label style={{ fontSize: '13px', color: '#6b7280', fontWeight: '500' }}>
+                                Merge into:
                               </label>
-                              <input 
-                                value={track.position} 
-                                onChange={e => handleTrackChange(globalIdx, 'position', e.target.value)} 
-                                style={{ 
-                                  ...inputStyle, 
-                                  textAlign: 'center',
-                                  fontWeight: '600',
+                              <select
+                                onChange={(e) => {
+                                  if (e.target.value) {
+                                    mergeSide(side, e.target.value);
+                                    e.target.value = ''; // Reset
+                                  }
+                                }}
+                                style={{
+                                  padding: '6px 10px',
+                                  border: '1px solid #d1d5db',
+                                  borderRadius: 4,
                                   fontSize: '13px',
-                                  padding: '8px'
-                                }} 
-                                placeholder="A1" 
-                              />
+                                  background: 'white',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                <option value="">Select side...</option>
+                                {otherSides.map(targetSide => (
+                                  <option key={targetSide} value={targetSide}>
+                                    Side {targetSide}
+                                  </option>
+                                ))}
+                              </select>
+                              
+                              <button
+                                onClick={() => deleteSide(side)}
+                                style={{
+                                  ...buttonStyle,
+                                  background: '#fee2e2',
+                                  color: '#dc2626',
+                                  border: '1px solid #dc2626',
+                                  padding: '6px 12px',
+                                  fontSize: '13px'
+                                }}
+                              >
+                                🗑️ Delete Side
+                              </button>
                             </div>
+                          </>
+                        )}
+                      </div>
+                      
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        {sideTracks.map((track) => {
+                          const globalIdx = tracks.indexOf(track);
+                          const hasMultipleSides = Object.keys(tracksBySide).length > 1;
+                          const availableSides = Object.keys(tracksBySide);
+                          
+                          return (
+                            <div 
+                              key={globalIdx}
+                              style={{ 
+                                padding: 14, 
+                                background: '#f9fafb', 
+                                borderRadius: 8, 
+                                border: '1px solid #e5e7eb',
+                                display: 'grid',
+                                gridTemplateColumns: hasMultipleSides 
+                                  ? '50px 80px 120px 140px 1fr 100px 80px 40px'
+                                  : '50px 80px 140px 1fr 100px 80px 40px',
+                                gap: 12,
+                                alignItems: 'center'
+                              }}
+                            >
+                              {/* Move buttons */}
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                <button
+                                  onClick={() => moveTrackUp(globalIdx)}
+                                  disabled={globalIdx === 0}
+                                  style={{
+                                    background: globalIdx === 0 ? '#f3f4f6' : '#e5e7eb',
+                                    border: 'none',
+                                    borderRadius: 3,
+                                    cursor: globalIdx === 0 ? 'not-allowed' : 'pointer',
+                                    fontSize: 14,
+                                    padding: '2px 4px',
+                                    color: globalIdx === 0 ? '#d1d5db' : '#374151'
+                                  }}
+                                  title="Move up"
+                                >
+                                  ▲
+                                </button>
+                                <button
+                                  onClick={() => moveTrackDown(globalIdx)}
+                                  disabled={globalIdx === tracks.length - 1}
+                                  style={{
+                                    background: globalIdx === tracks.length - 1 ? '#f3f4f6' : '#e5e7eb',
+                                    border: 'none',
+                                    borderRadius: 3,
+                                    cursor: globalIdx === tracks.length - 1 ? 'not-allowed' : 'pointer',
+                                    fontSize: 14,
+                                    padding: '2px 4px',
+                                    color: globalIdx === tracks.length - 1 ? '#d1d5db' : '#374151'
+                                  }}
+                                  title="Move down"
+                                >
+                                  ▼
+                                </button>
+                              </div>
 
-                            <div>
-                              <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#6b7280', marginBottom: 4 }}>
-                                Track Artist
-                              </label>
-                              <input 
-                                value={track.artist || ''} 
-                                onChange={e => handleTrackChange(globalIdx, 'artist', e.target.value)} 
-                                style={{...inputStyle, padding: '8px', fontSize: '13px'}} 
-                                placeholder="Optional" 
-                              />
-                            </div>
+                              <div>
+                                <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#6b7280', marginBottom: 4 }}>
+                                  Position
+                                </label>
+                                <input 
+                                  value={track.position} 
+                                  onChange={e => handleTrackChange(globalIdx, 'position', e.target.value)} 
+                                  style={{ 
+                                    ...inputStyle, 
+                                    textAlign: 'center',
+                                    fontWeight: '600',
+                                    fontSize: '13px',
+                                    padding: '8px'
+                                  }} 
+                                  placeholder="A1" 
+                                />
+                              </div>
 
-                            <div>
-                              <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#6b7280', marginBottom: 4 }}>
-                                Track Title
-                              </label>
-                              <input 
-                                value={track.title} 
-                                onChange={e => handleTrackChange(globalIdx, 'title', e.target.value)} 
-                                style={{...inputStyle, padding: '8px', fontSize: '13px'}} 
-                                placeholder="Enter track title" 
-                              />
-                            </div>
-
-                            <div>
-                              <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#6b7280', marginBottom: 4 }}>
-                                Duration
-                              </label>
-                              <input 
-                                value={track.duration} 
-                                onChange={e => handleTrackChange(globalIdx, 'duration', e.target.value)} 
-                                style={{ ...inputStyle, textAlign: 'center', padding: '8px', fontSize: '13px' }} 
-                                placeholder="3:45" 
-                              />
-                            </div>
-
-                            <div style={{ textAlign: 'center' }}>
-                              <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#6b7280', marginBottom: 4 }}>
-                                Lyrics
-                              </label>
-                              <div style={{ display: 'flex', justifyContent: 'center', gap: 6, alignItems: 'center', minHeight: 32 }}>
-                                {track.lyrics && track.lyrics_source === 'apple_music' && (
-                                  <span style={{ fontSize: 20 }} title="Has Apple Music lyrics">🍎</span>
-                                )}
-                                {track.lyrics_url && (
-                                  <a 
-                                    href={track.lyrics_url} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer" 
-                                    style={{ fontSize: 20, textDecoration: 'none' }} 
-                                    title="View on Genius"
+                              {/* Move to Side dropdown - only show if multiple sides */}
+                              {hasMultipleSides && (
+                                <div>
+                                  <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#6b7280', marginBottom: 4 }}>
+                                    Move to
+                                  </label>
+                                  <select
+                                    value={track.position?.[0] || ''}
+                                    onChange={(e) => {
+                                      if (e.target.value && e.target.value !== track.position?.[0]) {
+                                        moveTrackToSide(globalIdx, e.target.value);
+                                      }
+                                    }}
+                                    style={{
+                                      ...inputStyle,
+                                      padding: '8px',
+                                      fontSize: '13px',
+                                      background: 'white'
+                                    }}
                                   >
-                                    📝
-                                  </a>
-                                )}
-                                {!track.lyrics && !track.lyrics_url && (
-                                  <span style={{ fontSize: 16, color: '#d1d5db' }}>—</span>
-                                )}
+                                    {availableSides.map(s => (
+                                      <option key={s} value={s}>Side {s}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                              )}
+
+                              <div>
+                                <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#6b7280', marginBottom: 4 }}>
+                                  Track Artist
+                                </label>
+                                <input 
+                                  value={track.artist || ''} 
+                                  onChange={e => handleTrackChange(globalIdx, 'artist', e.target.value)} 
+                                  style={{...inputStyle, padding: '8px', fontSize: '13px'}} 
+                                  placeholder="Optional" 
+                                />
+                              </div>
+
+                              <div>
+                                <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#6b7280', marginBottom: 4 }}>
+                                  Track Title
+                                </label>
+                                <input 
+                                  value={track.title} 
+                                  onChange={e => handleTrackChange(globalIdx, 'title', e.target.value)} 
+                                  style={{...inputStyle, padding: '8px', fontSize: '13px'}} 
+                                  placeholder="Enter track title" 
+                                />
+                              </div>
+
+                              <div>
+                                <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#6b7280', marginBottom: 4 }}>
+                                  Duration
+                                </label>
+                                <input 
+                                  value={track.duration} 
+                                  onChange={e => handleTrackChange(globalIdx, 'duration', e.target.value)} 
+                                  style={{ ...inputStyle, textAlign: 'center', padding: '8px', fontSize: '13px' }} 
+                                  placeholder="3:45" 
+                                />
+                              </div>
+
+                              <div style={{ textAlign: 'center' }}>
+                                <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#6b7280', marginBottom: 4 }}>
+                                  Lyrics
+                                </label>
+                                <div style={{ display: 'flex', justifyContent: 'center', gap: 6, alignItems: 'center', minHeight: 32 }}>
+                                  {track.lyrics && track.lyrics_source === 'apple_music' && (
+                                    <span style={{ fontSize: 20 }} title="Has Apple Music lyrics">🍎</span>
+                                  )}
+                                  {track.lyrics_url && (
+                                    <a 
+                                      href={track.lyrics_url} 
+                                      target="_blank" 
+                                      rel="noopener noreferrer" 
+                                      style={{ fontSize: 20, textDecoration: 'none' }} 
+                                      title="View on Genius"
+                                    >
+                                      📝
+                                    </a>
+                                  )}
+                                  {!track.lyrics && !track.lyrics_url && (
+                                    <span style={{ fontSize: 16, color: '#d1d5db' }}>—</span>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-end', height: '100%' }}>
+                                <button 
+                                  type="button" 
+                                  onClick={() => removeTrack(globalIdx)} 
+                                  style={{ 
+                                    color: "#dc2626", 
+                                    background: '#fee2e2', 
+                                    border: '1px solid #dc2626', 
+                                    fontSize: 18, 
+                                    cursor: 'pointer', 
+                                    padding: '8px', 
+                                    borderRadius: '6px',
+                                    width: 36,
+                                    height: 36,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontWeight: 'bold'
+                                  }} 
+                                  title="Remove track"
+                                >
+                                  ×
+                                </button>
                               </div>
                             </div>
-
-                            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-end', height: '100%' }}>
-                              <button 
-                                type="button" 
-                                onClick={() => removeTrack(globalIdx)} 
-                                style={{ 
-                                  color: "#dc2626", 
-                                  background: '#fee2e2', 
-                                  border: '1px solid #dc2626', 
-                                  fontSize: 18, 
-                                  cursor: 'pointer', 
-                                  padding: '8px', 
-                                  borderRadius: '6px',
-                                  width: 36,
-                                  height: 36,
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  fontWeight: 'bold'
-                                }} 
-                                title="Remove track"
-                              >
-                                ×
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
