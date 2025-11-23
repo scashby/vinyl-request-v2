@@ -125,6 +125,18 @@ function cleanTrack(track: Partial<Track>): Track {
   };
 }
 
+function getSideFromPosition(position: string): string {
+  if (!position) return 'Unknown';
+  
+  // Check if format is "1-1", "2-3" etc (disc-track format)
+  if (position.includes('-')) {
+    return position.split('-')[0];
+  }
+  
+  // Otherwise assume first character is the side (A1, B2, etc)
+  return position[0];
+}
+
 export default function EditEntryPage() {
   const params = useParams();
   const id = params.id as string;
@@ -221,13 +233,24 @@ export default function EditEntryPage() {
 
       if (!tracks || tracks.length === 0) {
         if (data.tracklist && data.tracklist.length > 0) {
-          const newTracks = data.tracklist.map(track => {
+          // Detect if this is a CD (numeric positions) vs Vinyl (letter positions)
+          const firstPosition = data.tracklist[0]?.position || '';
+          const isCD = /^\d+$/.test(firstPosition); // Pure number = CD
+          
+          const newTracks = data.tracklist.map((track, idx) => {
             let trackArtist = undefined;
             if (track.artists && track.artists.length > 0) {
               trackArtist = track.artists.map(a => a.name).join(', ');
             }
+            
+            // Normalize CD positions to "1-1", "1-2" format
+            let position = track.position || String(idx + 1);
+            if (isCD && /^\d+$/.test(position)) {
+              position = `1-${position}`;
+            }
+            
             return cleanTrack({
-              position: track.position,
+              position: position,
               title: track.title,
               duration: track.duration,
               artist: trackArtist
@@ -440,14 +463,23 @@ export default function EditEntryPage() {
   function moveTrackToSide(trackIndex: number, newSide: string) {
     const newTracks = [...tracks];
     const track = newTracks[trackIndex];
-    const oldSide = track.position?.[0];
+    const oldSide = getSideFromPosition(track.position);
     
     if (oldSide === newSide) return;
     
-    // Change the side
+    // Get the track number portion
+    const trackNum = track.position?.includes('-') 
+      ? track.position.split('-')[1] 
+      : track.position?.substring(1) || '1';
+    
+    // Create new position in the target side's format
+    // If target side uses hyphen format, use it; otherwise use letter format
+    const targetSideTracks = tracks.filter(t => getSideFromPosition(t.position) === newSide);
+    const usesHyphenFormat = targetSideTracks.length > 0 && targetSideTracks[0].position.includes('-');
+    
     newTracks[trackIndex] = {
       ...track,
-      position: `${newSide}${track.position?.substring(1) || '1'}`
+      position: usesHyphenFormat ? `${newSide}-${trackNum}` : `${newSide}${trackNum}`
     };
     
     // Renumber the target side
@@ -460,11 +492,21 @@ export default function EditEntryPage() {
   function mergeSide(fromSide: string, toSide: string) {
     if (fromSide === toSide) return;
     
+    // Check format of target side
+    const targetSideTracks = tracks.filter(t => getSideFromPosition(t.position) === toSide);
+    const usesHyphenFormat = targetSideTracks.length > 0 && targetSideTracks[0].position.includes('-');
+    
     const newTracks = tracks.map(track => {
-      if (track.position?.startsWith(fromSide)) {
+      const trackSide = getSideFromPosition(track.position);
+      if (trackSide === fromSide) {
+        // Get the track number
+        const trackNum = track.position.includes('-')
+          ? track.position.split('-')[1]
+          : track.position.substring(1);
+        
         return {
           ...track,
-          position: `${toSide}${track.position.substring(1)}`
+          position: usesHyphenFormat ? `${toSide}-${trackNum}` : `${toSide}${trackNum}`
         };
       }
       return track;
@@ -481,16 +523,22 @@ export default function EditEntryPage() {
     // Get all tracks for this side
     const sideTrackIndices: number[] = [];
     trackArray.forEach((track, idx) => {
-      if (track.position?.startsWith(side)) {
+      if (getSideFromPosition(track.position) === side) {
         sideTrackIndices.push(idx);
       }
     });
+    
+    // Determine format (hyphen vs letter)
+    const usesHyphenFormat = sideTrackIndices.length > 0 && 
+                             trackArray[sideTrackIndices[0]].position.includes('-');
     
     // Renumber them sequentially
     sideTrackIndices.forEach((trackIdx, sequenceNum) => {
       trackArray[trackIdx] = {
         ...trackArray[trackIdx],
-        position: `${side}${sequenceNum + 1}`
+        position: usesHyphenFormat 
+          ? `${side}-${sequenceNum + 1}` 
+          : `${side}${sequenceNum + 1}`
       };
     });
   }
@@ -505,33 +553,36 @@ export default function EditEntryPage() {
   function deleteSide(sideToDelete: string) {
     if (!confirm(`Delete all tracks from Side ${sideToDelete}?`)) return;
     
-    const newTracks = tracks.filter(track => !track.position?.startsWith(sideToDelete));
+    const newTracks = tracks.filter(track => getSideFromPosition(track.position) !== sideToDelete);
     setTracks(newTracks);
     setStatus(`✅ Deleted Side ${sideToDelete}`);
   }
 
   function addNewSide() {
-    // Find the next available side letter/number
-    const existingSides = Array.from(new Set(tracks.map(t => t.position?.[0]).filter(Boolean)));
-    const numericSides = existingSides.filter(s => /^\d+$/.test(s)).map(s => parseInt(s));
-    const letterSides = existingSides.filter(s => /^[A-Z]$/i.test(s));
+    // Determine the format being used
+    const existingSides = Array.from(new Set(tracks.map(t => getSideFromPosition(t.position)).filter(s => s !== 'Unknown')));
+    const usesHyphenFormat = tracks.length > 0 && tracks[0].position.includes('-');
     
     let newSide: string;
-    if (numericSides.length > 0) {
-      // If we have numeric sides, add the next number
-      newSide = String(Math.max(...numericSides) + 1);
-    } else if (letterSides.length > 0) {
-      // If we have letter sides, add the next letter
-      const lastLetter = letterSides.sort().pop() || 'A';
-      newSide = String.fromCharCode(lastLetter.charCodeAt(0) + 1);
+    
+    if (usesHyphenFormat) {
+      // CD format - use numbers
+      const numericSides = existingSides.filter(s => /^\d+$/.test(s)).map(s => parseInt(s));
+      newSide = String(numericSides.length > 0 ? Math.max(...numericSides) + 1 : 1);
     } else {
-      // First side
-      newSide = '1';
+      // Vinyl format - use letters
+      const letterSides = existingSides.filter(s => /^[A-Z]$/i.test(s));
+      if (letterSides.length > 0) {
+        const lastLetter = letterSides.sort().pop() || 'A';
+        newSide = String.fromCharCode(lastLetter.charCodeAt(0) + 1);
+      } else {
+        newSide = 'A';
+      }
     }
     
     // Add a placeholder track to the new side
     const newTrack: Track = {
-      position: `${newSide}1`,
+      position: usesHyphenFormat ? `${newSide}-1` : `${newSide}1`,
       title: '',
       duration: '',
       artist: undefined
@@ -627,11 +678,11 @@ export default function EditEntryPage() {
     }
   }
 
-  const sides = Array.from(new Set(tracks.map(t => t.position?.[0]).filter(Boolean)));
+  const sides = Array.from(new Set(tracks.map(t => getSideFromPosition(t.position)).filter(s => s !== 'Unknown')));
   
   // Group tracks by side
   const tracksBySide = tracks.reduce((acc, track) => {
-    const side = track.position?.[0] || 'Unknown';
+    const side = getSideFromPosition(track.position);
     if (!acc[side]) acc[side] = [];
     acc[side].push(track);
     return acc;
@@ -1382,9 +1433,9 @@ export default function EditEntryPage() {
                                     Move to
                                   </label>
                                   <select
-                                    value={track.position?.[0] || ''}
+                                    value={getSideFromPosition(track.position)}
                                     onChange={(e) => {
-                                      if (e.target.value && e.target.value !== track.position?.[0]) {
+                                      if (e.target.value && e.target.value !== getSideFromPosition(track.position)) {
                                         moveTrackToSide(globalIdx, e.target.value);
                                       }
                                     }}
