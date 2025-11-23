@@ -211,16 +211,6 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
               >
                 🎯 Media Grading
               </Link>
-              <Link 
-                href="/admin/enrich-collection"
-                className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
-                  pathname === "/admin/enrich-collection" 
-                    ? "bg-indigo-700 text-white" 
-                    : "bg-indigo-600 text-white hover:bg-indigo-700"
-                }`}
-              >
-                📊 Enrich Collection
-              </Link>
             </div>
           </div>
 

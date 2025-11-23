@@ -1,7 +1,7 @@
-// src/app/api/enrich-sources/stats/route.ts - FIXED WITH COMPREHENSIVE DISCOGS TRACKING
+// src/app/api/enrich-sources/stats/route.ts
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { hasValidDiscogsId } from "lib/discogs-validation";
+import { hasValidDiscogsId, hasValidDiscogsMasterId } from "lib/discogs-validation";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -107,6 +107,7 @@ export async function GET() {
     let fullyEnrichedCount = 0;
     let discogsTracklistCount = 0;
     let needsDiscogsTracklist = 0;
+    let copiedData = 0;
     
     let offset = 0;
     const pageSize = 1000;
@@ -126,44 +127,66 @@ export async function GET() {
       }
 
       for (const album of albums as Album[]) {
-        // FIXED: Check Discogs Release ID validity (null, '', 'null', 'undefined', '0')
+        // Check if we need to copy genres/styles between columns
+        const hasGenres = album.discogs_genres && album.discogs_genres.length > 0;
+        const hasStyles = album.discogs_styles && album.discogs_styles.length > 0;
+        
+        if (hasGenres && !hasStyles) {
+          // Copy genres to styles
+          await supabase
+            .from('collection')
+            .update({ discogs_styles: album.discogs_genres })
+            .eq('id', album.id);
+          copiedData++;
+        } else if (hasStyles && !hasGenres) {
+          // Copy styles to genres
+          await supabase
+            .from('collection')
+            .update({ discogs_genres: album.discogs_styles })
+            .eq('id', album.id);
+          copiedData++;
+        }
+        
+        // Check Discogs Release ID validity
         const hasValidReleaseId = hasValidDiscogsId(album.discogs_release_id);
         if (!hasValidReleaseId) {
           missingDiscogsId++;
         }
         
-        // Check Master ID
-        const hasValidMasterId = hasValidDiscogsId(album.discogs_master_id);
+        // Check Master ID validity using shared function
+        const hasValidMasterId = hasValidDiscogsMasterId(album.discogs_master_id);
         if (!hasValidMasterId) {
           missingMasterId++;
         }
         
-        // FIXED: Count missing images for ALL albums, not just those with valid release IDs
+        // Count missing images for ALL albums
         if (!album.image_url) {
           missingImage++;
         }
         
-        // FIXED: Count missing genres for ALL albums
-        if (!album.discogs_genres || album.discogs_genres.length === 0) {
+        // Count missing genres/styles (after potential copying)
+        const finalGenres = hasGenres ? album.discogs_genres : (hasStyles ? album.discogs_styles : null);
+        const finalStyles = hasStyles ? album.discogs_styles : (hasGenres ? album.discogs_genres : null);
+        
+        if (!finalGenres || finalGenres.length === 0) {
           missingGenres++;
         }
         
-        // NEW: Count missing styles
-        if (!album.discogs_styles || album.discogs_styles.length === 0) {
+        if (!finalStyles || finalStyles.length === 0) {
           missingStyles++;
         }
         
-        // NEW: Count missing tracklists
+        // Count missing tracklists
         if (!album.tracklists) {
           missingTracklists++;
         }
         
-        // NEW: Count missing source
+        // Count missing source
         if (!album.discogs_source) {
           missingSource++;
         }
         
-        // NEW: Count missing year
+        // Count missing year
         if (!album.year || album.year === '' || album.year === '0') {
           missingYear++;
         }
@@ -181,7 +204,7 @@ export async function GET() {
           }
         }
         
-        // Discogs Track Artists (only check if they have a valid release ID)
+        // Discogs Track Artists
         if (hasValidReleaseId) {
           if (album.tracklists && hasTrackArtists(album.tracklists)) {
             discogsTracklistCount++;
@@ -206,6 +229,7 @@ export async function GET() {
     console.log(`   Missing Tracklists: ${missingTracklists}`);
     console.log(`   Missing Source: ${missingSource}`);
     console.log(`   Missing Year: ${missingYear}`);
+    console.log(`   Copied data between columns: ${copiedData}`);
 
     // Genius lyrics
     let geniusLyricsCount = 0;

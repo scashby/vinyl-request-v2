@@ -27,6 +27,13 @@ export function hasValidDiscogsId(releaseId: string | null | undefined): boolean
 }
 
 /**
+ * Checks if a Discogs master ID is valid (same rules as release ID)
+ */
+export function hasValidDiscogsMasterId(masterId: string | null | undefined): boolean {
+  return hasValidDiscogsId(masterId);
+}
+
+/**
  * Supabase query filter for finding albums with invalid Discogs release IDs
  * Use with: query.or(INVALID_DISCOGS_ID_FILTER)
  */
@@ -36,3 +43,14 @@ export const INVALID_DISCOGS_ID_FILTER =
   'discogs_release_id.eq.null,' +
   'discogs_release_id.eq.undefined,' +
   'discogs_release_id.eq.0';
+
+/**
+ * Supabase query filter for finding albums with invalid Discogs master IDs
+ * Use with: query.or(INVALID_MASTER_ID_FILTER)
+ */
+export const INVALID_MASTER_ID_FILTER = 
+  'discogs_master_id.is.null,' +
+  'discogs_master_id.eq.,' +
+  'discogs_master_id.eq.null,' +
+  'discogs_master_id.eq.undefined,' +
+  'discogs_master_id.eq.0';
