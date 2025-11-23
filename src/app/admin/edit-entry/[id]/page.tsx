@@ -128,12 +128,12 @@ function cleanTrack(track: Partial<Track>): Track {
 function getSideFromPosition(position: string): string {
   if (!position) return 'Unknown';
   
-  // Check if format is "1-1", "2-3" etc (disc-track format)
+  // Check if format is "1-1", "2-3" etc (disc-track format with hyphen)
   if (position.includes('-')) {
     return position.split('-')[0];
   }
   
-  // Otherwise assume first character is the side (A1, B2, etc)
+  // Standard format: first character is the side (A1, B2, etc)
   return position[0];
 }
 
@@ -233,9 +233,9 @@ export default function EditEntryPage() {
 
       if (!tracks || tracks.length === 0) {
         if (data.tracklist && data.tracklist.length > 0) {
-          // Detect if this is a CD (numeric positions) vs Vinyl (letter positions)
+          // For CDs with numeric positions, convert to letter format (A1, A2, etc) for consistency
           const firstPosition = data.tracklist[0]?.position || '';
-          const isCD = /^\d+$/.test(firstPosition); // Pure number = CD
+          const isNumericCD = /^\d+$/.test(firstPosition);
           
           const newTracks = data.tracklist.map((track, idx) => {
             let trackArtist = undefined;
@@ -243,10 +243,11 @@ export default function EditEntryPage() {
               trackArtist = track.artists.map(a => a.name).join(', ');
             }
             
-            // Normalize CD positions to "1-1", "1-2" format
+            // Normalize positions to letter format (A1, A2, B1, B2, etc)
             let position = track.position || String(idx + 1);
-            if (isCD && /^\d+$/.test(position)) {
-              position = `1-${position}`;
+            if (isNumericCD && /^\d+$/.test(position)) {
+              // Convert numeric CD positions to A1, A2 format
+              position = `A${position}`;
             }
             
             return cleanTrack({
@@ -467,13 +468,12 @@ export default function EditEntryPage() {
     
     if (oldSide === newSide) return;
     
-    // Get the track number portion
+    // Get the track number portion (works for both "A1" and "1-1" formats)
     const trackNum = track.position?.includes('-') 
       ? track.position.split('-')[1] 
       : track.position?.substring(1) || '1';
     
-    // Create new position in the target side's format
-    // If target side uses hyphen format, use it; otherwise use letter format
+    // Determine format from existing tracks in target side
     const targetSideTracks = tracks.filter(t => getSideFromPosition(t.position) === newSide);
     const usesHyphenFormat = targetSideTracks.length > 0 && targetSideTracks[0].position.includes('-');
     
@@ -492,14 +492,14 @@ export default function EditEntryPage() {
   function mergeSide(fromSide: string, toSide: string) {
     if (fromSide === toSide) return;
     
-    // Check format of target side
+    // Determine format from target side
     const targetSideTracks = tracks.filter(t => getSideFromPosition(t.position) === toSide);
     const usesHyphenFormat = targetSideTracks.length > 0 && targetSideTracks[0].position.includes('-');
     
     const newTracks = tracks.map(track => {
       const trackSide = getSideFromPosition(track.position);
       if (trackSide === fromSide) {
-        // Get the track number
+        // Get the track number (works for both formats)
         const trackNum = track.position.includes('-')
           ? track.position.split('-')[1]
           : track.position.substring(1);
@@ -528,11 +528,11 @@ export default function EditEntryPage() {
       }
     });
     
-    // Determine format (hyphen vs letter)
+    // Determine format (detect hyphen vs standard letter format)
     const usesHyphenFormat = sideTrackIndices.length > 0 && 
                              trackArray[sideTrackIndices[0]].position.includes('-');
     
-    // Renumber them sequentially
+    // Renumber them sequentially in the same format
     sideTrackIndices.forEach((trackIdx, sequenceNum) => {
       trackArray[trackIdx] = {
         ...trackArray[trackIdx],
@@ -561,23 +561,25 @@ export default function EditEntryPage() {
   function addNewSide() {
     // Determine the format being used
     const existingSides = Array.from(new Set(tracks.map(t => getSideFromPosition(t.position)).filter(s => s !== 'Unknown')));
-    const usesHyphenFormat = tracks.length > 0 && tracks[0].position.includes('-');
+    
+    // Always prefer letter format (A, B, C) for consistency with vinyl
+    const letterSides = existingSides.filter(s => /^[A-Z]$/i.test(s));
+    const numericSides = existingSides.filter(s => /^\d+$/.test(s)).map(s => parseInt(s));
     
     let newSide: string;
+    let usesHyphenFormat = false;
     
-    if (usesHyphenFormat) {
-      // CD format - use numbers
-      const numericSides = existingSides.filter(s => /^\d+$/.test(s)).map(s => parseInt(s));
-      newSide = String(numericSides.length > 0 ? Math.max(...numericSides) + 1 : 1);
+    if (letterSides.length > 0) {
+      // Continue with letter format
+      const lastLetter = letterSides.sort().pop() || 'A';
+      newSide = String.fromCharCode(lastLetter.charCodeAt(0) + 1);
+    } else if (numericSides.length > 0) {
+      // Existing numeric sides - check if they use hyphen format
+      usesHyphenFormat = tracks.length > 0 && tracks[0].position.includes('-');
+      newSide = String(Math.max(...numericSides) + 1);
     } else {
-      // Vinyl format - use letters
-      const letterSides = existingSides.filter(s => /^[A-Z]$/i.test(s));
-      if (letterSides.length > 0) {
-        const lastLetter = letterSides.sort().pop() || 'A';
-        newSide = String.fromCharCode(lastLetter.charCodeAt(0) + 1);
-      } else {
-        newSide = 'A';
-      }
+      // First side - use letter format
+      newSide = 'A';
     }
     
     // Add a placeholder track to the new side
