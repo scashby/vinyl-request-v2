@@ -1,4 +1,4 @@
-// src/app/admin/edit-entry/[id]/page.tsx - TAB-BASED REDESIGN
+// src/app/admin/edit-entry/[id]/page.tsx - WITH TRACKLIST MANAGEMENT TOOLS
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -32,7 +32,7 @@ type CollectionEntry = {
   inner_circle_preferred: boolean | null;
   blocked: boolean | null;
   blocked_sides: string[] | null;
-  blocked_tracks: Array<{ position: string; reason: string }> | null;  // ADD THIS LINE
+  blocked_tracks: Array<{ position: string; reason: string }> | null;
   tracklists: string | null;
   discogs_release_id: string | null;
   discogs_genres: string[] | null;
@@ -147,6 +147,11 @@ export default function EditEntryPage() {
   const [salePlatform, setSalePlatform] = useState('');
   const [saleQuantity, setSaleQuantity] = useState('1');
   const [saleNotes, setSaleNotes] = useState('');
+
+  // Tracklist management tools state
+  const [showTracklistTools, setShowTracklistTools] = useState(false);
+  const [bulkRenameFrom, setBulkRenameFrom] = useState('');
+  const [bulkRenameTo, setBulkRenameTo] = useState('');
 
   useEffect(() => {
     fetchEntry(id).then((data) => {
@@ -420,6 +425,109 @@ export default function EditEntryPage() {
     }
   }
 
+  // TRACKLIST MANAGEMENT FUNCTIONS
+  function moveTrackUp(index: number) {
+    if (index === 0) return;
+    const newTracks = [...tracks];
+    [newTracks[index - 1], newTracks[index]] = [newTracks[index], newTracks[index - 1]];
+    setTracks(newTracks);
+  }
+
+  function moveTrackDown(index: number) {
+    if (index === tracks.length - 1) return;
+    const newTracks = [...tracks];
+    [newTracks[index], newTracks[index + 1]] = [newTracks[index + 1], newTracks[index]];
+    setTracks(newTracks);
+  }
+
+  function applyBulkRename() {
+    if (!bulkRenameFrom || !bulkRenameTo) {
+      setStatus('❌ Please enter both "from" and "to" values');
+      return;
+    }
+
+    // Parse the "from" value - can be comma-separated sides
+    const fromSides = bulkRenameFrom.split(',').map(s => s.trim()).filter(Boolean);
+    const toSide = bulkRenameTo.trim();
+
+    let updated = 0;
+    const newTracks = tracks.map(track => {
+      const currentSide = track.position?.[0];
+      if (currentSide && fromSides.includes(currentSide)) {
+        const trackNumber = track.position.substring(1); // Get everything after the side letter
+        updated++;
+        return {
+          ...track,
+          position: `${toSide}${trackNumber}`
+        };
+      }
+      return track;
+    });
+
+    setTracks(newTracks);
+    setStatus(`✅ Renamed ${updated} tracks from Side ${fromSides.join(',')} to Side ${toSide}`);
+    setBulkRenameFrom('');
+    setBulkRenameTo('');
+  }
+
+  function mergeSides(fromSide: string, toSide: string) {
+    const newTracks = tracks.map(track => {
+      if (track.position?.startsWith(fromSide)) {
+        const trackNumber = track.position.substring(1);
+        return {
+          ...track,
+          position: `${toSide}${trackNumber}`
+        };
+      }
+      return track;
+    });
+    setTracks(newTracks);
+    setStatus(`✅ Merged Side ${fromSide} into Side ${toSide}`);
+  }
+
+  function deleteEmptySides() {
+    const sidesWithTracks = new Set(tracks.map(t => t.position?.[0]).filter(Boolean));
+    const allSides = Array.from(new Set(tracks.map(t => t.position?.[0]).filter(Boolean)));
+    
+    if (sidesWithTracks.size === allSides.length) {
+      setStatus('ℹ️ No empty sides to delete');
+      return;
+    }
+
+    setStatus(`✅ All sides have tracks`);
+  }
+
+  function renumberTracks() {
+    const tracksBySide = tracks.reduce((acc, track) => {
+      const side = track.position?.[0] || 'A';
+      if (!acc[side]) acc[side] = [];
+      acc[side].push(track);
+      return acc;
+    }, {} as Record<string, Track[]>);
+
+    const newTracks: Track[] = [];
+    Object.keys(tracksBySide).sort().forEach(side => {
+      tracksBySide[side].forEach((track, idx) => {
+        newTracks.push({
+          ...track,
+          position: `${side}${idx + 1}`
+        });
+      });
+    });
+
+    setTracks(newTracks);
+    setStatus('✅ Renumbered all tracks');
+  }
+
+  function mergeAllSidesIntoOne() {
+    const newTracks = tracks.map((track, idx) => ({
+      ...track,
+      position: `1-${idx + 1}`
+    }));
+    setTracks(newTracks);
+    setStatus('✅ Merged all sides into Disc 1');
+  }
+
   if (!entry) {
     return <div style={{ maxWidth: 1200, margin: '32px auto', padding: 24, background: '#fff', borderRadius: 8, color: "#222", textAlign: 'center' }}>Loading...</div>;
   }
@@ -463,6 +571,7 @@ export default function EditEntryPage() {
       inner_circle_preferred: !!entry.inner_circle_preferred,
       blocked_sides: blockedSides || [],
       blocked: !!entry.blocked,
+      blocked_tracks: entry.blocked_tracks || [],
       tracklists: JSON.stringify(tracks),
       discogs_release_id: entry.discogs_release_id || '',
       discogs_genres: entry.discogs_genres || null,
@@ -920,86 +1029,86 @@ export default function EditEntryPage() {
                   </div>
                 )}
                 
-                {/* NEW: Track-level blocking */}
-                  {tracks.length > 0 && (
-                    <div style={{ marginTop: 16, paddingTop: 16, borderTop: '2px solid #fbbf24' }}>
-                      <div style={{ fontWeight: '600', marginBottom: 10, fontSize: '13px' }}>
-                        Block Individual Tracks:
-                      </div>
-                      <div style={{ maxHeight: 300, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        {tracks.map((track, idx) => {
-                          const blockedTracks = entry.blocked_tracks || [];
-                          const blockedTrackData = blockedTracks.find(
-                            (bt) => bt.position === track.position
-                          );
-                          const isBlocked = !!blockedTrackData;
-                          
-                          return (
-                            <div
-                              key={idx}
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 8,
-                                padding: '8px 12px',
-                                background: isBlocked ? '#fee2e2' : '#fff',
-                                border: '1px solid #d1d5db',
-                                borderRadius: 6
+                {/* Track-level blocking */}
+                {tracks.length > 0 && (
+                  <div style={{ marginTop: 16, paddingTop: 16, borderTop: '2px solid #fbbf24' }}>
+                    <div style={{ fontWeight: '600', marginBottom: 10, fontSize: '13px' }}>
+                      Block Individual Tracks:
+                    </div>
+                    <div style={{ maxHeight: 300, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {tracks.map((track, idx) => {
+                        const blockedTracks = entry.blocked_tracks || [];
+                        const blockedTrackData = blockedTracks.find(
+                          (bt) => bt.position === track.position
+                        );
+                        const isBlocked = !!blockedTrackData;
+                        
+                        return (
+                          <div
+                            key={idx}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 8,
+                              padding: '8px 12px',
+                              background: isBlocked ? '#fee2e2' : '#fff',
+                              border: '1px solid #d1d5db',
+                              borderRadius: 6
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isBlocked}
+                              onChange={e => {
+                                const blockedTracks = entry.blocked_tracks || [];
+                                let newBlockedTracks: Array<{ position: string; reason: string }>;
+                                
+                                if (e.target.checked) {
+                                  newBlockedTracks = [...blockedTracks, { position: track.position, reason: '' }];
+                                } else {
+                                  newBlockedTracks = blockedTracks.filter(
+                                    bt => bt.position !== track.position
+                                  );
+                                }
+                                handleChange('blocked_tracks', newBlockedTracks);
                               }}
-                            >
+                              style={{ width: 16, height: 16 }}
+                            />
+                            <span style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', minWidth: 40 }}>
+                              {track.position}
+                            </span>
+                            <span style={{ flex: 1, fontSize: 13, color: '#1f2937' }}>
+                              {track.title}
+                            </span>
+                            {isBlocked && (
                               <input
-                                type="checkbox"
-                                checked={isBlocked}
+                                type="text"
+                                value={blockedTrackData?.reason || ''}
                                 onChange={e => {
                                   const blockedTracks = entry.blocked_tracks || [];
-                                  let newBlockedTracks: Array<{ position: string; reason: string }>;
-                                  
-                                  if (e.target.checked) {
-                                    newBlockedTracks = [...blockedTracks, { position: track.position, reason: '' }];
-                                  } else {
-                                    newBlockedTracks = blockedTracks.filter(
-                                      bt => bt.position !== track.position
-                                    );
-                                  }
+                                  const newBlockedTracks = blockedTracks.map(bt =>
+                                    bt.position === track.position
+                                      ? { ...bt, reason: e.target.value }
+                                      : bt
+                                  );
                                   handleChange('blocked_tracks', newBlockedTracks);
                                 }}
-                                style={{ width: 16, height: 16 }}
+                                placeholder="Reason (e.g., scratch at 2:30)"
+                                style={{
+                                  flex: 1,
+                                  padding: '4px 8px',
+                                  border: '1px solid #d1d5db',
+                                  borderRadius: 4,
+                                  fontSize: 12
+                                }}
                               />
-                              <span style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', minWidth: 40 }}>
-                                {track.position}
-                              </span>
-                              <span style={{ flex: 1, fontSize: 13, color: '#1f2937' }}>
-                                {track.title}
-                              </span>
-                              {isBlocked && (
-                                <input
-                                  type="text"
-                                  value={blockedTrackData?.reason || ''}
-                                  onChange={e => {
-                                    const blockedTracks = entry.blocked_tracks || [];
-                                    const newBlockedTracks = blockedTracks.map(bt =>
-                                      bt.position === track.position
-                                        ? { ...bt, reason: e.target.value }
-                                        : bt
-                                    );
-                                    handleChange('blocked_tracks', newBlockedTracks);
-                                  }}
-                                  placeholder="Reason (e.g., scratch at 2:30)"
-                                  style={{
-                                    flex: 1,
-                                    padding: '4px 8px',
-                                    border: '1px solid #d1d5db',
-                                    borderRadius: 4,
-                                    fontSize: 12
-                                  }}
-                                />
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
-                  )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1012,20 +1121,187 @@ export default function EditEntryPage() {
               <h3 style={{ fontSize: '18px', fontWeight: '700', margin: 0, color: '#111' }}>
                 {tracks.length === 0 ? '⚠️' : '✅'} {tracks.length} tracks
               </h3>
-              <button 
-                type="button" 
-                onClick={addTrack} 
-                style={{ 
-                  ...buttonStyle, 
-                  background: '#2563eb', 
-                  color: 'white',
-                  fontSize: '14px',
-                  padding: '10px 18px'
-                }}
-              >
-                + Add Track
-              </button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button 
+                  type="button" 
+                  onClick={() => setShowTracklistTools(!showTracklistTools)} 
+                  style={{ 
+                    ...buttonStyle, 
+                    background: showTracklistTools ? '#7c3aed' : '#e9d5ff', 
+                    color: showTracklistTools ? 'white' : '#7c3aed',
+                    fontSize: '14px',
+                    padding: '10px 18px'
+                  }}
+                >
+                  🛠️ Tracklist Tools
+                </button>
+                <button 
+                  type="button" 
+                  onClick={addTrack} 
+                  style={{ 
+                    ...buttonStyle, 
+                    background: '#2563eb', 
+                    color: 'white',
+                    fontSize: '14px',
+                    padding: '10px 18px'
+                  }}
+                >
+                  + Add Track
+                </button>
+              </div>
             </div>
+
+            {/* TRACKLIST TOOLS PANEL */}
+            {showTracklistTools && tracks.length > 0 && (
+              <div style={{
+                marginBottom: 20,
+                padding: 20,
+                background: 'linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%)',
+                border: '2px solid #7c3aed',
+                borderRadius: 10
+              }}>
+                <h4 style={{ fontSize: '16px', fontWeight: '700', margin: '0 0 16px 0', color: '#6b21a8' }}>
+                  🛠️ Tracklist Management Tools
+                </h4>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
+                  {/* Bulk Rename */}
+                  <div style={{ 
+                    padding: 16, 
+                    background: 'white', 
+                    borderRadius: 8, 
+                    border: '1px solid #d1d5db' 
+                  }}>
+                    <div style={{ fontSize: '14px', fontWeight: '700', marginBottom: 10, color: '#374151' }}>
+                      📝 Bulk Rename Sides
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: 12 }}>
+                      Example: Change &quot;2,3,4,5,6,7&quot; → &quot;1&quot; to merge all into Disc 1
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <input
+                        type="text"
+                        value={bulkRenameFrom}
+                        onChange={e => setBulkRenameFrom(e.target.value)}
+                        placeholder="From sides (e.g., 2,3,4,5)"
+                        style={{ ...inputStyle, fontSize: '13px' }}
+                      />
+                      <input
+                        type="text"
+                        value={bulkRenameTo}
+                        onChange={e => setBulkRenameTo(e.target.value)}
+                        placeholder="To side (e.g., 1)"
+                        style={{ ...inputStyle, fontSize: '13px' }}
+                      />
+                      <button
+                        onClick={applyBulkRename}
+                        style={{
+                          ...buttonStyle,
+                          background: '#7c3aed',
+                          color: 'white',
+                          fontSize: '13px'
+                        }}
+                      >
+                        Apply Rename
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Quick Actions */}
+                  <div style={{ 
+                    padding: 16, 
+                    background: 'white', 
+                    borderRadius: 8, 
+                    border: '1px solid #d1d5db' 
+                  }}>
+                    <div style={{ fontSize: '14px', fontWeight: '700', marginBottom: 10, color: '#374151' }}>
+                      ⚡ Quick Actions
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <button
+                        onClick={mergeAllSidesIntoOne}
+                        style={{
+                          ...buttonStyle,
+                          background: '#10b981',
+                          color: 'white',
+                          fontSize: '13px',
+                          textAlign: 'left',
+                          padding: '10px 14px'
+                        }}
+                      >
+                        🔗 Merge All → Disc 1
+                      </button>
+                      <button
+                        onClick={renumberTracks}
+                        style={{
+                          ...buttonStyle,
+                          background: '#3b82f6',
+                          color: 'white',
+                          fontSize: '13px',
+                          textAlign: 'left',
+                          padding: '10px 14px'
+                        }}
+                      >
+                        🔢 Renumber All Tracks
+                      </button>
+                      <button
+                        onClick={deleteEmptySides}
+                        style={{
+                          ...buttonStyle,
+                          background: '#ef4444',
+                          color: 'white',
+                          fontSize: '13px',
+                          textAlign: 'left',
+                          padding: '10px 14px'
+                        }}
+                      >
+                        🗑️ Delete Empty Sides
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Side Manager */}
+                  {sides.length > 1 && (
+                    <div style={{ 
+                      padding: 16, 
+                      background: 'white', 
+                      borderRadius: 8, 
+                      border: '1px solid #d1d5db' 
+                    }}>
+                      <div style={{ fontSize: '14px', fontWeight: '700', marginBottom: 10, color: '#374151' }}>
+                        📀 Merge Sides
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: 12 }}>
+                        Current sides: {sides.join(', ')}
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {sides.map(side => (
+                          <div key={side} style={{ display: 'flex', gap: 4 }}>
+                            {sides.filter(s => s !== side).map(targetSide => (
+                              <button
+                                key={`${side}-${targetSide}`}
+                                onClick={() => mergeSides(side, targetSide)}
+                                style={{
+                                  ...buttonStyle,
+                                  background: '#f3f4f6',
+                                  color: '#374151',
+                                  fontSize: '11px',
+                                  padding: '6px 10px',
+                                  border: '1px solid #d1d5db'
+                                }}
+                                title={`Merge Side ${side} into Side ${targetSide}`}
+                              >
+                                {side} → {targetSide}
+                              </button>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {tracks.length === 0 ? (
               <div style={{ 
@@ -1080,11 +1356,47 @@ export default function EditEntryPage() {
                               borderRadius: 8, 
                               border: '1px solid #e5e7eb',
                               display: 'grid',
-                              gridTemplateColumns: '80px 140px 1fr 100px 80px 40px',
+                              gridTemplateColumns: '50px 80px 140px 1fr 100px 80px 40px',
                               gap: 12,
                               alignItems: 'center'
                             }}
                           >
+                            {/* Move buttons */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                              <button
+                                onClick={() => moveTrackUp(globalIdx)}
+                                disabled={globalIdx === 0}
+                                style={{
+                                  background: globalIdx === 0 ? '#f3f4f6' : '#e5e7eb',
+                                  border: 'none',
+                                  borderRadius: 3,
+                                  cursor: globalIdx === 0 ? 'not-allowed' : 'pointer',
+                                  fontSize: 14,
+                                  padding: '2px 4px',
+                                  color: globalIdx === 0 ? '#d1d5db' : '#374151'
+                                }}
+                                title="Move up"
+                              >
+                                ▲
+                              </button>
+                              <button
+                                onClick={() => moveTrackDown(globalIdx)}
+                                disabled={globalIdx === tracks.length - 1}
+                                style={{
+                                  background: globalIdx === tracks.length - 1 ? '#f3f4f6' : '#e5e7eb',
+                                  border: 'none',
+                                  borderRadius: 3,
+                                  cursor: globalIdx === tracks.length - 1 ? 'not-allowed' : 'pointer',
+                                  fontSize: 14,
+                                  padding: '2px 4px',
+                                  color: globalIdx === tracks.length - 1 ? '#d1d5db' : '#374151'
+                                }}
+                                title="Move down"
+                              >
+                                ▼
+                              </button>
+                            </div>
+
                             <div>
                               <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#6b7280', marginBottom: 4 }}>
                                 Position
