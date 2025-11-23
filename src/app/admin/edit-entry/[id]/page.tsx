@@ -146,7 +146,7 @@ export default function EditEntryPage() {
   const [blockedSides, setBlockedSides] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [tracks, setTracks] = useState<Track[]>([]);
-  const [activeTab, setActiveTab] = useState<'basic' | 'streaming' | 'metadata' | 'tracklist' | 'sale'>('basic');
+  const [activeTab, setActiveTab] = useState<'basic' | 'streaming' | 'metadata' | 'tracklist' | 'sale' | 'database'>('basic');
   
   const [fetchingDiscogs, setFetchingDiscogs] = useState(false);
   const [enrichingSpotify, setEnrichingSpotify] = useState(false);
@@ -665,7 +665,19 @@ export default function EditEntryPage() {
       sale_price: forSale && salePrice ? parseFloat(salePrice) : null,
       sale_platform: forSale && salePlatform ? salePlatform : null,
       sale_quantity: forSale && saleQuantity ? parseInt(saleQuantity) : null,
-      sale_notes: forSale && saleNotes ? saleNotes : null
+      sale_notes: forSale && saleNotes ? saleNotes : null,
+      // Database fields
+      discogs_master_id: entry.discogs_master_id || null,
+      discogs_notes: entry.discogs_notes || null,
+      pricing_notes: entry.pricing_notes || null,
+      wholesale_cost: entry.wholesale_cost || null,
+      discogs_price_min: entry.discogs_price_min || null,
+      discogs_price_median: entry.discogs_price_median || null,
+      discogs_price_max: entry.discogs_price_max || null,
+      sides: entry.sides || null,
+      is_box_set: !!entry.is_box_set,
+      parent_id: entry.parent_id || null,
+      child_album_ids: entry.child_album_ids || null
     };
     
     const { error } = await supabase.from('collection').update(update).eq('id', entry.id);
@@ -804,6 +816,9 @@ export default function EditEntryPage() {
         </button>
         <button onClick={() => setActiveTab('sale')} style={tabStyle(activeTab === 'sale')}>
           💰 Sale Info
+        </button>
+        <button onClick={() => setActiveTab('database')} style={tabStyle(activeTab === 'database')}>
+          🗄️ Database
         </button>
       </div>
 
@@ -1728,6 +1743,363 @@ export default function EditEntryPage() {
                 </p>
               </div>
             )}
+          </div>
+        )}
+
+        {/* DATABASE TAB */}
+        {activeTab === 'database' && (
+          <div>
+            <div style={{
+              marginBottom: 20,
+              padding: 16,
+              background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+              borderRadius: 10
+            }}>
+              <h3 style={{ fontSize: '18px', fontWeight: '700', color: 'white', margin: '0 0 4px 0' }}>
+                🗄️ Database Fields
+              </h3>
+              <p style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.9)', margin: 0 }}>
+                Direct access to all database fields and system metadata
+              </p>
+            </div>
+
+            {/* Discogs IDs Section */}
+            <div style={{ marginBottom: 24 }}>
+              <h4 style={{ fontSize: '16px', fontWeight: '700', color: '#374151', marginBottom: 12, borderBottom: '2px solid #e5e7eb', paddingBottom: 8 }}>
+                🔗 Discogs Identifiers
+              </h4>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>
+                    Discogs Release ID
+                  </label>
+                  <input 
+                    style={inputStyle} 
+                    value={entry.discogs_release_id || ''} 
+                    onChange={e => handleChange('discogs_release_id', e.target.value)} 
+                    placeholder="e.g., 673589" 
+                  />
+                  <div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>Specific pressing/release</div>
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>
+                    Discogs Master ID
+                  </label>
+                  <input 
+                    style={inputStyle} 
+                    value={(entry.discogs_master_id as string) || ''} 
+                    onChange={e => handleChange('discogs_master_id', e.target.value)} 
+                    placeholder="e.g., 12345" 
+                  />
+                  <div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>Master release ID</div>
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>
+                    Master Release ID (System)
+                  </label>
+                  <input 
+                    style={inputStyle} 
+                    value={entry.master_release_id || ''} 
+                    onChange={e => handleChange('master_release_id', e.target.value)} 
+                    placeholder="System field" 
+                  />
+                  <div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>Internal tracking</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Pricing Data Section */}
+            <div style={{ marginBottom: 24 }}>
+              <h4 style={{ fontSize: '16px', fontWeight: '700', color: '#374151', marginBottom: 12, borderBottom: '2px solid #e5e7eb', paddingBottom: 8 }}>
+                💵 Pricing & Cost Data
+              </h4>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>
+                    Wholesale Cost
+                  </label>
+                  <input 
+                    type="number"
+                    step="0.01"
+                    style={inputStyle} 
+                    value={(entry.wholesale_cost as number) || ''} 
+                    onChange={e => handleChange('wholesale_cost', e.target.value ? parseFloat(e.target.value) : null)} 
+                    placeholder="0.00" 
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>
+                    Discogs Price Min
+                  </label>
+                  <input 
+                    type="number"
+                    step="0.01"
+                    style={inputStyle} 
+                    value={(entry.discogs_price_min as number) || ''} 
+                    onChange={e => handleChange('discogs_price_min', e.target.value ? parseFloat(e.target.value) : null)} 
+                    placeholder="0.00" 
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>
+                    Discogs Price Median
+                  </label>
+                  <input 
+                    type="number"
+                    step="0.01"
+                    style={inputStyle} 
+                    value={(entry.discogs_price_median as number) || ''} 
+                    onChange={e => handleChange('discogs_price_median', e.target.value ? parseFloat(e.target.value) : null)} 
+                    placeholder="0.00" 
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>
+                    Discogs Price Max
+                  </label>
+                  <input 
+                    type="number"
+                    step="0.01"
+                    style={inputStyle} 
+                    value={(entry.discogs_price_max as number) || ''} 
+                    onChange={e => handleChange('discogs_price_max', e.target.value ? parseFloat(e.target.value) : null)} 
+                    placeholder="0.00" 
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>
+                    Price Updated At
+                  </label>
+                  <input 
+                    type="text"
+                    style={{...inputStyle, background: '#f9fafb'}} 
+                    value={(entry.discogs_price_updated_at as string) || ''} 
+                    readOnly
+                    placeholder="Not updated" 
+                  />
+                  <div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>Read-only timestamp</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Notes Section */}
+            <div style={{ marginBottom: 24 }}>
+              <h4 style={{ fontSize: '16px', fontWeight: '700', color: '#374151', marginBottom: 12, borderBottom: '2px solid #e5e7eb', paddingBottom: 8 }}>
+                📝 Notes & Documentation
+              </h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>
+                    Discogs Notes
+                  </label>
+                  <textarea
+                    style={{...inputStyle, resize: 'vertical', fontFamily: 'inherit'}}
+                    value={(entry.discogs_notes as string) || ''}
+                    onChange={e => handleChange('discogs_notes', e.target.value)}
+                    rows={3}
+                    placeholder="Notes from Discogs or manual entry..."
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>
+                    Pricing Notes
+                  </label>
+                  <textarea
+                    style={{...inputStyle, resize: 'vertical', fontFamily: 'inherit'}}
+                    value={(entry.pricing_notes as string) || ''}
+                    onChange={e => handleChange('pricing_notes', e.target.value)}
+                    rows={3}
+                    placeholder="Internal pricing notes..."
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* System Metadata Section */}
+            <div style={{ marginBottom: 24 }}>
+              <h4 style={{ fontSize: '16px', fontWeight: '700', color: '#374151', marginBottom: 12, borderBottom: '2px solid #e5e7eb', paddingBottom: 8 }}>
+                ⚙️ System Metadata
+              </h4>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>
+                    Discogs Source
+                  </label>
+                  <input 
+                    style={{...inputStyle, background: '#f9fafb'}} 
+                    value={(entry.discogs_source as string) || ''} 
+                    readOnly
+                    placeholder="Not set" 
+                  />
+                  <div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>Read-only system field</div>
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>
+                    Enrichment Sources
+                  </label>
+                  <input 
+                    style={{...inputStyle, background: '#f9fafb'}} 
+                    value={(entry.enrichment_sources as string) || ''} 
+                    readOnly
+                    placeholder="No enrichment data" 
+                  />
+                  <div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>Which APIs provided data</div>
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>
+                    Last Enriched At
+                  </label>
+                  <input 
+                    type="text"
+                    style={{...inputStyle, background: '#f9fafb'}} 
+                    value={(entry.last_enriched_at as string) || ''} 
+                    readOnly
+                    placeholder="Never enriched" 
+                  />
+                  <div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>Last metadata update</div>
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>
+                    Date Added
+                  </label>
+                  <input 
+                    type="text"
+                    style={{...inputStyle, background: '#f9fafb'}} 
+                    value={(entry.date_added as string) || ''} 
+                    readOnly
+                    placeholder="Unknown" 
+                  />
+                  <div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>When added to collection</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Normalized Fields Section */}
+            <div style={{ marginBottom: 24 }}>
+              <h4 style={{ fontSize: '16px', fontWeight: '700', color: '#374151', marginBottom: 12, borderBottom: '2px solid #e5e7eb', paddingBottom: 8 }}>
+                🔤 Normalized Search Fields
+              </h4>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>
+                    Artist (Normalized)
+                  </label>
+                  <input 
+                    style={{...inputStyle, background: '#f9fafb'}} 
+                    value={(entry.artist_norm as string) || ''} 
+                    readOnly
+                    placeholder="Auto-generated" 
+                  />
+                  <div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>For search indexing</div>
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>
+                    Album (Normalized)
+                  </label>
+                  <input 
+                    style={{...inputStyle, background: '#f9fafb'}} 
+                    value={(entry.album_norm as string) || ''} 
+                    readOnly
+                    placeholder="Auto-generated" 
+                  />
+                  <div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>For search indexing</div>
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>
+                    Artist + Album (Normalized)
+                  </label>
+                  <input 
+                    style={{...inputStyle, background: '#f9fafb'}} 
+                    value={(entry.artist_album_norm as string) || ''} 
+                    readOnly
+                    placeholder="Auto-generated" 
+                  />
+                  <div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>Combined search key</div>
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>
+                    Year (Integer)
+                  </label>
+                  <input 
+                    type="number"
+                    style={{...inputStyle, background: '#f9fafb'}} 
+                    value={(entry.year_int as number) || ''} 
+                    readOnly
+                    placeholder="Auto-generated" 
+                  />
+                  <div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>Numeric version of year</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Box Set & Relationships */}
+            <div style={{ marginBottom: 24 }}>
+              <h4 style={{ fontSize: '16px', fontWeight: '700', color: '#374151', marginBottom: 12, borderBottom: '2px solid #e5e7eb', paddingBottom: 8 }}>
+                📦 Box Sets & Relationships
+              </h4>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>
+                    Number of Sides/Discs
+                  </label>
+                  <input 
+                    type="number"
+                    style={inputStyle} 
+                    value={(entry.sides as number) || ''} 
+                    onChange={e => handleChange('sides', e.target.value ? parseInt(e.target.value) : null)} 
+                    placeholder="e.g., 2" 
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: '14px', marginTop: 28 }}>
+                    <input 
+                      type="checkbox" 
+                      checked={!!entry.is_box_set} 
+                      onChange={e => handleChange('is_box_set', e.target.checked)} 
+                      style={{ marginRight: 10, width: 18, height: 18, cursor: 'pointer' }} 
+                    />
+                    <span style={{ fontWeight: '600', color: '#374151' }}>Is Box Set</span>
+                  </label>
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>
+                    Parent ID
+                  </label>
+                  <input 
+                    type="number"
+                    style={inputStyle} 
+                    value={(entry.parent_id as number) || ''} 
+                    onChange={e => handleChange('parent_id', e.target.value ? parseInt(e.target.value) : null)} 
+                    placeholder="Parent album ID" 
+                  />
+                  <div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>If part of a box set</div>
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: 6, fontWeight: '600', color: "#374151", fontSize: '13px' }}>
+                    Child Album IDs
+                  </label>
+                  <input 
+                    style={inputStyle} 
+                    value={(entry.child_album_ids as string) || ''} 
+                    onChange={e => handleChange('child_album_ids', e.target.value)} 
+                    placeholder="Comma-separated IDs" 
+                  />
+                  <div style={{ fontSize: '11px', color: '#6b7280', marginTop: 4 }}>If this is a box set parent</div>
+                </div>
+              </div>
+            </div>
+
+            <div style={{
+              marginTop: 20,
+              padding: 16,
+              background: '#fef3c7',
+              border: '1px solid #f59e0b',
+              borderRadius: 8,
+              fontSize: 13,
+              color: '#92400e'
+            }}>
+              ⚠️ <strong>Warning:</strong> Some fields are auto-populated by the system. Manual changes may be overwritten during enrichment.
+            </div>
           </div>
         )}
       </div>
