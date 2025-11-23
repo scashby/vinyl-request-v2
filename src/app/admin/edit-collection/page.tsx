@@ -288,78 +288,101 @@ export default function EditCollectionPage() {
     loadAlbums();
   }, [loadAlbums]);
 
-  const matchesSearch = (album: Album, query: string): boolean => {
-    if (!query) return true;
-    
-    const q = query.toLowerCase();
-    const searchParts: string[] = [];
-    
-    // Build search parts based on what's enabled
-    if (searchInArtist) searchParts.push(toSafeSearchString(album.artist));
-    if (searchInTitle) searchParts.push(toSafeSearchString(album.title));
-    if (searchInFormat) searchParts.push(toSafeSearchString(album.format));
-    if (searchInFolder) searchParts.push(toSafeSearchString(album.folder));
-    if (searchInYear) searchParts.push(toSafeSearchString(album.year), toSafeSearchString(album.decade));
-    if (searchInCondition) searchParts.push(toSafeSearchString(album.media_condition));
-    if (searchInTracks) searchParts.push(toSafeSearchString(album.tracklists));
-    if (searchInTags) {
-      searchParts.push(toSafeSearchString(album.custom_tags));
-      // Add badge keywords if those badges are on
-      if (album.is_1001) searchParts.push('1001 albums thousand and one 1001albums');
-      if (album.steves_top_200) searchParts.push('top 200 steves top 200 top200 steve');
-      if (album.this_weeks_top_10) searchParts.push('top 10 top10 this week weekly');
-      if (album.inner_circle_preferred) searchParts.push('inner circle preferred innercircle');
-      if (album.for_sale) searchParts.push('for sale selling available');
-      if (album.is_box_set) searchParts.push('box set boxset');
-      if (album.blocked) searchParts.push('blocked');
-    }
-    if (searchInNotes) {
-      searchParts.push(toSafeSearchString(album.discogs_notes));
-      searchParts.push(toSafeSearchString(album.sale_notes));
-      searchParts.push(toSafeSearchString(album.pricing_notes));
-      searchParts.push(toSafeSearchString(album.blocked_sides));
-    }
-    if (searchInGenres) {
-      searchParts.push(toSafeSearchString(album.discogs_genres));
-      searchParts.push(toSafeSearchString(album.spotify_genres));
-      searchParts.push(toSafeSearchString(album.apple_music_genres));
-      searchParts.push(toSafeSearchString(album.apple_music_genre));
-    }
-    if (searchInStyles) {
-      searchParts.push(toSafeSearchString(album.discogs_styles));
-    }
-    if (searchInLabels) {
-      searchParts.push(toSafeSearchString(album.spotify_label));
-      searchParts.push(toSafeSearchString(album.apple_music_label));
-    }
-    if (searchInPlatform) {
-      searchParts.push(toSafeSearchString(album.sale_platform));
-    }
-    if (searchInIds) {
-      // Power user feature - search by IDs
+  // SEARCH FIX for src/app/admin/edit-collection/page.tsx
+  // Replace the matchesSearch function (around line 262) with this version:
+
+    const matchesSearch = (album: Album, query: string): boolean => {
+      if (!query) return true;
+      
+      const q = query.toLowerCase();
+      const searchParts: string[] = [];
+      
+      // Build search parts based on what's enabled
+      if (searchInArtist) searchParts.push(toSafeSearchString(album.artist));
+      if (searchInTitle) searchParts.push(toSafeSearchString(album.title));
+      if (searchInFormat) searchParts.push(toSafeSearchString(album.format));
+      if (searchInFolder) searchParts.push(toSafeSearchString(album.folder));
+      if (searchInYear) searchParts.push(toSafeSearchString(album.year), toSafeSearchString(album.decade));
+      if (searchInCondition) searchParts.push(toSafeSearchString(album.media_condition));
+      if (searchInTracks) {
+        // Parse tracklists to only search track titles and lyrics, NOT URLs
+        try {
+          const tracks = typeof album.tracklists === 'string' 
+            ? JSON.parse(album.tracklists)
+            : album.tracklists;
+          if (Array.isArray(tracks)) {
+            tracks.forEach((track: { title?: string; lyrics?: string; position?: string }) => {
+              if (track.title) searchParts.push(toSafeSearchString(track.title));
+              if (track.lyrics) searchParts.push(toSafeSearchString(track.lyrics));
+              if (track.position) searchParts.push(toSafeSearchString(track.position));
+            });
+          }
+        } catch {
+          // If parsing fails, fall back to string search but exclude URLs
+          const tracklistStr = toSafeSearchString(album.tracklists);
+          // Remove all URLs from the search string
+          const withoutUrls = tracklistStr.replace(/https?:\/\/[^\s]+/g, '');
+          searchParts.push(withoutUrls);
+        }
+      }
+      if (searchInTags) {
+        searchParts.push(toSafeSearchString(album.custom_tags));
+        // Add badge keywords if those badges are on
+        if (album.is_1001) searchParts.push('1001 albums thousand and one 1001albums');
+        if (album.steves_top_200) searchParts.push('top 200 steves top 200 top200 steve');
+        if (album.this_weeks_top_10) searchParts.push('top 10 top10 this week weekly');
+        if (album.inner_circle_preferred) searchParts.push('inner circle preferred innercircle');
+        if (album.for_sale) searchParts.push('for sale selling available');
+        if (album.is_box_set) searchParts.push('box set boxset');
+        if (album.blocked) searchParts.push('blocked');
+      }
+      if (searchInNotes) {
+        searchParts.push(toSafeSearchString(album.discogs_notes));
+        searchParts.push(toSafeSearchString(album.sale_notes));
+        searchParts.push(toSafeSearchString(album.pricing_notes));
+        searchParts.push(toSafeSearchString(album.blocked_sides));
+      }
+      if (searchInGenres) {
+        searchParts.push(toSafeSearchString(album.discogs_genres));
+        searchParts.push(toSafeSearchString(album.spotify_genres));
+        searchParts.push(toSafeSearchString(album.apple_music_genres));
+        searchParts.push(toSafeSearchString(album.apple_music_genre));
+      }
+      if (searchInStyles) {
+        searchParts.push(toSafeSearchString(album.discogs_styles));
+      }
+      if (searchInLabels) {
+        searchParts.push(toSafeSearchString(album.spotify_label));
+        searchParts.push(toSafeSearchString(album.apple_music_label));
+      }
+      if (searchInPlatform) {
+        searchParts.push(toSafeSearchString(album.sale_platform));
+      }
+      if (searchInIds) {
+        // Power user feature - search by IDs
+        searchParts.push(
+          toSafeSearchString(album.discogs_master_id),
+          toSafeSearchString(album.discogs_release_id),
+          toSafeSearchString(album.master_release_id),
+          toSafeSearchString(album.spotify_id),
+          toSafeSearchString(album.apple_music_id),
+          toSafeSearchString(album.child_album_ids)
+        );
+      }
+      
+      // Always include these for advanced users
       searchParts.push(
-        toSafeSearchString(album.discogs_master_id),
-        toSafeSearchString(album.discogs_release_id),
-        toSafeSearchString(album.master_release_id),
-        toSafeSearchString(album.spotify_id),
-        toSafeSearchString(album.apple_music_id),
-        toSafeSearchString(album.child_album_ids)
+        toSafeSearchString(album.sell_price),
+        toSafeSearchString(album.date_added),
+        toSafeSearchString(album.discogs_source)
       );
-    }
-    
-    // Always include these for advanced users
-    searchParts.push(
-      toSafeSearchString(album.sell_price),
-      toSafeSearchString(album.date_added),
-      toSafeSearchString(album.discogs_source)
-    );
-    
-    const searchableText = searchParts
-      .filter(part => part.length > 0)
-      .join(' ');
-    
-    return searchableText.includes(q);
-  };
+      
+      const searchableText = searchParts
+        .filter(part => part.length > 0)
+        .join(' ');
+      
+      return searchableText.includes(q);
+    };
 
   const filteredAndSortedAlbums = albums
     .filter(album => {

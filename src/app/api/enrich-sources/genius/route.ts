@@ -1,4 +1,4 @@
-// src/app/api/enrich-sources/genius/route.ts - WITH COMPREHENSIVE LOGGING
+// src/app/api/enrich-sources/genius/route.ts - FIXED with proper matching validation
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -18,13 +18,53 @@ type Track = {
   lyrics_source?: 'apple_music' | 'genius';
 };
 
-async function searchLyrics(artist: string, trackTitle: string): Promise<string | null> {
+function normalizeForMatch(str: string): string {
+  return str
+    .toLowerCase()
+    .replace(/[^\w\s]/g, '') // Remove punctuation
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function isGoodMatch(searchArtist: string, searchTrack: string, resultArtist: string, resultTrack: string): boolean {
+  const normSearchArtist = normalizeForMatch(searchArtist);
+  const normSearchTrack = normalizeForMatch(searchTrack);
+  const normResultArtist = normalizeForMatch(resultArtist);
+  const normResultTrack = normalizeForMatch(resultTrack);
+
+  // Artist must match (exact or one contains the other)
+  const artistMatch = 
+    normSearchArtist === normResultArtist ||
+    normSearchArtist.includes(normResultArtist) ||
+    normResultArtist.includes(normSearchArtist);
+
+  if (!artistMatch) {
+    console.log(`    ❌ Artist mismatch: "${searchArtist}" vs "${resultArtist}"`);
+    return false;
+  }
+
+  // Track title must match (exact or one contains the other)
+  const trackMatch = 
+    normSearchTrack === normResultTrack ||
+    normSearchTrack.includes(normResultTrack) ||
+    normResultTrack.includes(normSearchTrack);
+
+  if (!trackMatch) {
+    console.log(`    ❌ Track mismatch: "${searchTrack}" vs "${resultTrack}"`);
+    return false;
+  }
+
+  console.log(`    ✅ Good match: "${resultArtist}" - "${resultTrack}"`);
+  return true;
+}
+
+async function searchLyrics(albumArtist: string, trackTitle: string): Promise<string | null> {
   if (!GENIUS_TOKEN) {
     throw new Error('Genius token not configured');
   }
 
-  const query = encodeURIComponent(`${artist} ${trackTitle}`);
-  console.log(`    → Searching Genius: "${artist}" - "${trackTitle}"`);
+  const query = encodeURIComponent(`${albumArtist} ${trackTitle}`);
+  console.log(`    → Searching Genius: "${albumArtist}" - "${trackTitle}"`);
   
   const searchRes = await fetch(`https://api.genius.com/search?q=${query}`, {
     headers: { 'Authorization': `Bearer ${GENIUS_TOKEN}` }
@@ -36,16 +76,34 @@ async function searchLyrics(artist: string, trackTitle: string): Promise<string 
   }
 
   const searchData = await searchRes.json();
-  const hit = searchData?.response?.hits?.[0];
+  const hits = searchData?.response?.hits || [];
 
-  if (!hit) {
-    console.log(`    → No Genius match found`);
+  if (hits.length === 0) {
+    console.log(`    → No Genius results found`);
     return null;
   }
 
-  const url = hit.result?.url;
-  console.log(`    → Found Genius URL: ${url}`);
-  return url;
+  console.log(`    → Got ${hits.length} search results, validating...`);
+
+  // Check each result until we find a good match
+  for (const hit of hits) {
+    const result = hit.result;
+    if (!result) continue;
+
+    const resultArtist = result.primary_artist?.name || result.artist_names || '';
+    const resultTrack = result.title || '';
+    const url = result.url;
+
+    console.log(`    🔍 Checking: "${resultArtist}" - "${resultTrack}"`);
+
+    if (isGoodMatch(albumArtist, trackTitle, resultArtist, resultTrack)) {
+      console.log(`    ✅ Found validated match: ${url}`);
+      return url;
+    }
+  }
+
+  console.log(`    ❌ No validated matches found among ${hits.length} results`);
+  return null;
 }
 
 export async function POST(req: Request) {
@@ -63,7 +121,6 @@ export async function POST(req: Request) {
       }, { status: 400 });
     }
 
-    // Get album info
     const { data: album, error: dbError } = await supabase
       .from('collection')
       .select('id, artist, title, tracklists')
@@ -80,7 +137,6 @@ export async function POST(req: Request) {
 
     console.log(`✓ Album found: "${album.artist}" - "${album.title}"`);
 
-    // Parse tracklist
     let tracks: Track[] = [];
     if (album.tracklists) {
       try {
@@ -115,7 +171,6 @@ export async function POST(req: Request) {
       });
     }
 
-    // Enrich each track
     console.log(`\n🔍 Processing ${tracks.length} tracks...`);
     const enrichedTracks: Track[] = [];
     let enrichedCount = 0;
@@ -128,7 +183,6 @@ export async function POST(req: Request) {
       const track = tracks[i];
       console.log(`\n  Track ${i + 1}/${tracks.length}: "${track.title || 'untitled'}"`);
 
-      // Skip if no title or already has lyrics URL
       if (!track.title) {
         console.log(`    ⏭️ Skipping: No title`);
         enrichedTracks.push(track);
@@ -143,12 +197,11 @@ export async function POST(req: Request) {
         continue;
       }
 
-      // Search Genius
       try {
         const lyricsUrl = await searchLyrics(album.artist, track.title);
 
         if (lyricsUrl) {
-          console.log(`    ✅ Found lyrics URL`);
+          console.log(`    ✅ Found validated lyrics URL`);
           enrichedTracks.push({
             ...track,
             lyrics_url: lyricsUrl
@@ -160,17 +213,16 @@ export async function POST(req: Request) {
             lyrics_url: lyricsUrl
           });
         } else {
-          console.log(`    ❌ No lyrics found`);
+          console.log(`    ❌ No validated match found`);
           enrichedTracks.push(track);
           failedCount++;
           failedTracksList.push({
             position: track.position || '',
             title: track.title,
-            error: 'No match found on Genius'
+            error: 'No validated match found on Genius'
           });
         }
 
-        // Rate limit: wait 1s between requests
         await new Promise(resolve => setTimeout(resolve, 1000));
 
       } catch (error) {
@@ -188,7 +240,6 @@ export async function POST(req: Request) {
 
     console.log(`\n📊 SUMMARY: ${enrichedCount} enriched, ${skippedCount} skipped, ${failedCount} failed`);
 
-    // Update database if any tracks were enriched
     if (enrichedCount > 0) {
       console.log(`💾 Updating database...`);
       const { error: updateError } = await supabase
