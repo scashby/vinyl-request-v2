@@ -1,4 +1,4 @@
-// src/app/admin/enrich-sources/page.tsx - WITH COMPREHENSIVE DISCOGS DATA QUALITY TRACKING
+// src/app/admin/enrich-sources/page.tsx - WITH TARGETED MODAL ENRICHMENT
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
@@ -20,7 +20,7 @@ type AlbumResult = {
   title: string;
   discogsMetadata?: {
     success: boolean;
-    data?: { foundReleaseId?: string; addedImage?: boolean; addedGenres?: boolean; addedTracklist?: boolean };
+    data?: { foundReleaseId?: string; addedImage?: boolean; addedGenres?: boolean; addedTracklist?: boolean; addedMasterId?: boolean };
     error?: string;
     skipped?: boolean;
   };
@@ -84,7 +84,6 @@ export default function MultiSourceEnrichment() {
     discogsTracklist: 0,
     needsDiscogsTracklist: 0,
     albums1001: 0,
-    // Comprehensive Discogs data quality
     missingDiscogsId: 0,
     missingMasterId: 0,
     missingImage: 0,
@@ -114,14 +113,18 @@ export default function MultiSourceEnrichment() {
   // Modal state
   const [showModal, setShowModal] = useState(false);
   const [modalTitle, setModalTitle] = useState('');
+  const [modalCategory, setModalCategory] = useState('');
   const [modalAlbums, setModalAlbums] = useState<Album[]>([]);
   const [loadingModal, setLoadingModal] = useState(false);
   
+  // Modal enrichment state
+  const [modalEnriching, setModalEnriching] = useState(false);
+  const [modalEnrichStatus, setModalEnrichStatus] = useState('');
+  const [modalEnrichResults, setModalEnrichResults] = useState<AlbumResult[]>([]);
+  
   const albumsToEnrich = useMemo(() => {
-    // When a folder is selected, we don't have accurate stats for just that folder
-    // So don't try to calculate a count
     if (folderFilter) {
-      return null; // Signal to show folder name instead of count
+      return null;
     }
     
     const servicesSelected = {
@@ -170,7 +173,10 @@ export default function MultiSourceEnrichment() {
   async function showAlbumsForCategory(category: string, title: string) {
     setShowModal(true);
     setModalTitle(title);
+    setModalCategory(category);
     setModalAlbums([]);
+    setModalEnrichResults([]);
+    setModalEnrichStatus('');
     setLoadingModal(true);
 
     try {
@@ -183,6 +189,135 @@ export default function MultiSourceEnrichment() {
       console.error('Failed to load albums:', error);
     } finally {
       setLoadingModal(false);
+    }
+  }
+
+  // Determine which services are needed for a given category
+  function getServicesForCategory(category: string) {
+    const services = {
+      discogsMetadata: false,
+      discogsTracklist: false,
+      spotify: false,
+      appleMusic: false,
+      genius: false,
+      appleLyrics: false,
+      match1001: false
+    };
+
+    switch (category) {
+      case 'missing-discogs-id':
+      case 'missing-master-id':
+      case 'missing-image':
+      case 'missing-genres':
+      case 'missing-styles':
+        services.discogsMetadata = true;
+        break;
+      case 'missing-tracklists':
+        services.discogsMetadata = true; // Get tracklist from Discogs
+        break;
+      case 'needs-discogs-tracklist':
+        services.discogsTracklist = true;
+        break;
+      case 'no-data':
+        services.spotify = true;
+        services.appleMusic = true;
+        break;
+      case 'missing-spotify':
+        services.spotify = true;
+        break;
+      case 'missing-apple':
+        services.appleMusic = true;
+        break;
+      case 'needs-apple-lyrics':
+        services.appleLyrics = true;
+        break;
+      case 'needs-enrichment':
+        // Enable all services
+        services.discogsMetadata = true;
+        services.discogsTracklist = true;
+        services.spotify = true;
+        services.appleMusic = true;
+        services.genius = true;
+        services.appleLyrics = true;
+        services.match1001 = true;
+        break;
+      default:
+        break;
+    }
+
+    return services;
+  }
+
+  async function enrichModalAlbums() {
+    if (modalAlbums.length === 0) {
+      alert('No albums to enrich');
+      return;
+    }
+
+    const services = getServicesForCategory(modalCategory);
+    const serviceNames = [];
+    if (services.discogsMetadata) serviceNames.push('Discogs Metadata');
+    if (services.discogsTracklist) serviceNames.push('Discogs Tracklist');
+    if (services.spotify) serviceNames.push('Spotify');
+    if (services.appleMusic) serviceNames.push('Apple Music');
+    if (services.genius) serviceNames.push('Genius');
+    if (services.appleLyrics) serviceNames.push('Apple Lyrics');
+    if (services.match1001) serviceNames.push('1001 Albums');
+
+    if (serviceNames.length === 0) {
+      alert('No services selected for this category');
+      return;
+    }
+
+    if (!confirm(`Enrich ${modalAlbums.length} albums with:\n${serviceNames.join(', ')}\n\nThis may take a while. Continue?`)) {
+      return;
+    }
+
+    setModalEnriching(true);
+    setModalEnrichStatus('Starting enrichment...');
+    setModalEnrichResults([]);
+
+    try {
+      const albumIds = modalAlbums.map(a => a.id);
+      
+      console.log('🎯 Starting targeted enrichment');
+      console.log('Album IDs:', albumIds);
+      console.log('Services:', services);
+
+      setModalEnrichStatus(`Enriching ${albumIds.length} albums...`);
+
+      const res = await fetch('/api/enrich-sources/targeted', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ albumIds, services })
+      });
+
+      const result = await res.json();
+
+      if (!result.success) {
+        setModalEnrichStatus(`Error: ${result.error}`);
+        return;
+      }
+
+      setModalEnrichResults(result.results || []);
+      setModalEnrichStatus(`✅ Complete! Enriched ${result.processed} albums.`);
+      
+      // Refresh stats
+      await loadStatsAndFolders();
+      
+      // Refresh modal albums
+      const refreshRes = await fetch(`/api/enrich-sources/albums?category=${modalCategory}`);
+      const refreshData = await refreshRes.json();
+      if (refreshData.success) {
+        setModalAlbums(refreshData.albums || []);
+      }
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      setModalEnrichStatus(`Error: ${errorMessage}`);
+      console.error('Modal enrichment error:', error);
+    } finally {
+      setModalEnriching(false);
     }
   }
 
@@ -376,7 +511,7 @@ export default function MultiSourceEnrichment() {
         </div>
       </div>
 
-      {/* Discogs Data Quality - COMPREHENSIVE */}
+      {/* Discogs Data Quality */}
       <div style={{ marginBottom: 32 }}>
         <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 16, color: '#1f2937' }}>
           💿 Discogs Data Quality
@@ -1041,6 +1176,98 @@ export default function MultiSourceEnrichment() {
                 Close
               </button>
             </div>
+
+            {/* Targeted Enrichment Controls */}
+            {modalAlbums.length > 0 && !loadingModal && (
+              <div style={{
+                marginBottom: 24,
+                padding: 16,
+                background: '#f9fafb',
+                border: '1px solid #e5e7eb',
+                borderRadius: 8
+              }}>
+                <div style={{ marginBottom: 12, fontWeight: 600, color: '#1f2937' }}>
+                  🎯 Targeted Enrichment
+                </div>
+                <div style={{ marginBottom: 12, fontSize: 14, color: '#6b7280' }}>
+                  Enrich all {modalAlbums.length} albums in this category with the appropriate services
+                </div>
+                <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                  <button
+                    onClick={enrichModalAlbums}
+                    disabled={modalEnriching || modalAlbums.length === 0}
+                    style={{
+                      padding: '10px 20px',
+                      background: modalEnriching ? '#9ca3af' : 'linear-gradient(135deg, #7c3aed, #a855f7)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: 6,
+                      fontSize: 14,
+                      fontWeight: 600,
+                      cursor: modalEnriching ? 'not-allowed' : 'pointer',
+                      boxShadow: modalEnriching ? 'none' : '0 4px 12px rgba(124, 58, 237, 0.3)'
+                    }}
+                  >
+                    {modalEnriching ? '⚡ Enriching...' : `⚡ Enrich ${modalAlbums.length} Albums`}
+                  </button>
+                  {modalEnrichStatus && (
+                    <div style={{
+                      flex: 1,
+                      padding: 8,
+                      background: modalEnrichStatus.includes('Error') ? '#fee2e2' : 
+                                 modalEnrichStatus.includes('Complete') ? '#dcfce7' : '#dbeafe',
+                      border: `1px solid ${modalEnrichStatus.includes('Error') ? '#dc2626' : 
+                                           modalEnrichStatus.includes('Complete') ? '#16a34a' : '#3b82f6'}`,
+                      borderRadius: 6,
+                      fontSize: 13,
+                      color: modalEnrichStatus.includes('Error') ? '#991b1b' : 
+                             modalEnrichStatus.includes('Complete') ? '#15803d' : '#1e40af'
+                    }}>
+                      {modalEnrichStatus}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Enrichment Results in Modal */}
+            {modalEnrichResults.length > 0 && (
+              <div style={{ marginBottom: 24 }}>
+                <div style={{ fontWeight: 600, color: '#1f2937', marginBottom: 12 }}>
+                  Enrichment Results ({modalEnrichResults.length} albums)
+                </div>
+                <div style={{ 
+                  maxHeight: 200, 
+                  overflow: 'auto',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: 6,
+                  padding: 12,
+                  background: '#f9fafb',
+                  fontSize: 13
+                }}>
+                  {modalEnrichResults.map((result, idx) => (
+                    <div key={idx} style={{ 
+                      marginBottom: 8, 
+                      paddingBottom: 8, 
+                      borderBottom: idx < modalEnrichResults.length - 1 ? '1px solid #e5e7eb' : 'none'
+                    }}>
+                      <div style={{ fontWeight: 600, color: '#1f2937', marginBottom: 4 }}>
+                        {result.artist} - {result.title}
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, fontSize: 12, color: '#6b7280' }}>
+                        {result.discogsMetadata && <span>{getResultIcon(result.discogsMetadata)} Metadata</span>}
+                        {result.discogsTracklist && <span>{getResultIcon(result.discogsTracklist)} Tracklist</span>}
+                        {result.spotify && <span>{getResultIcon(result.spotify)} Spotify</span>}
+                        {result.appleMusic && <span>{getResultIcon(result.appleMusic)} Apple</span>}
+                        {result.genius && <span>{getResultIcon(result.genius)} Genius</span>}
+                        {result.appleLyrics && <span>{getResultIcon(result.appleLyrics)} Lyrics</span>}
+                        {result.match1001 && <span>{getResultIcon(result.match1001)} 1001</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {loadingModal ? (
               <div style={{ textAlign: 'center', padding: 40, color: '#6b7280' }}>
