@@ -75,6 +75,7 @@ export default function MigratePage() {
 
   const migrateSingleAlbum = async (albumId: number) => {
     setMigratingAlbumId(albumId);
+    setStatus('');
     try {
       const res = await fetch('/api/dj-tools/sync-single', {
         method: 'POST',
@@ -85,11 +86,11 @@ export default function MigratePage() {
       const data = await res.json();
 
       if (data.success) {
+        setStatus(`✅ Album ${albumId} migrated successfully`);
         await loadStats();
         await loadAlbumsList();
-        setStatus(`✅ Album ${albumId} migrated successfully`);
       } else {
-        setStatus(`❌ Failed to migrate album ${albumId}: ${data.error}`);
+        setStatus(`❌ Failed to migrate album ${albumId}: ${data.result?.error || data.error}`);
       }
     } catch (err) {
       setStatus(`❌ Error migrating album ${albumId}: ${err instanceof Error ? err.message : 'Unknown'}`);
@@ -146,7 +147,6 @@ export default function MigratePage() {
 
         setStatus(`Batch ${batchCount}: Migrated ${data.processed} albums (${totalProcessed} total, ${percent}%)`);
 
-        // Collect errors
         if (data.results) {
           const batchErrors = data.results
             .filter((r: { success: boolean }) => !r.success)
@@ -292,7 +292,8 @@ export default function MigratePage() {
                     View
                   </Link>
                   <button
-                    onClick={() => migrateSingleAlbum(album.id)}
+                    type="button"
+                    onClick={(e) => { e.preventDefault(); migrateSingleAlbum(album.id); }}
                     disabled={migratingAlbumId === album.id}
                     style={{
                       padding: '6px 12px',
@@ -325,7 +326,11 @@ export default function MigratePage() {
           </p>
 
           {!migrating && (
-            <button onClick={startMigration} style={{ padding: '14px 28px', background: 'linear-gradient(135deg, #10b981, #047857)', color: 'white', border: 'none', borderRadius: 8, fontSize: 16, fontWeight: 700, cursor: 'pointer' }}>
+            <button 
+              type="button" 
+              onClick={(e) => { e.preventDefault(); startMigration(); }} 
+              style={{ padding: '14px 28px', background: 'linear-gradient(135deg, #10b981, #047857)', color: 'white', border: 'none', borderRadius: 8, fontSize: 16, fontWeight: 700, cursor: 'pointer' }}
+            >
               🚀 Start Batch Migration
             </button>
           )}
@@ -399,7 +404,8 @@ export default function MigratePage() {
       {/* Actions */}
       <div style={{ display: 'flex', gap: 12 }}>
         <button 
-          onClick={() => { loadStats(); loadAlbumsList(); }} 
+          type="button"
+          onClick={(e) => { e.preventDefault(); loadStats(); loadAlbumsList(); }} 
           disabled={migrating} 
           style={{ padding: '10px 20px', background: migrating ? '#9ca3af' : '#3b82f6', color: 'white', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: migrating ? 'not-allowed' : 'pointer' }}
         >
@@ -407,7 +413,12 @@ export default function MigratePage() {
         </button>
 
         {!needsMigration && (
-          <button onClick={startMigration} disabled={migrating} style={{ padding: '10px 20px', background: migrating ? '#9ca3af' : '#f59e0b', color: 'white', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: migrating ? 'not-allowed' : 'pointer' }}>
+          <button 
+            type="button" 
+            onClick={(e) => { e.preventDefault(); startMigration(); }} 
+            disabled={migrating} 
+            style={{ padding: '10px 20px', background: migrating ? '#9ca3af' : '#f59e0b', color: 'white', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: migrating ? 'not-allowed' : 'pointer' }}
+          >
             🔄 Re-migrate All
           </button>
         )}
