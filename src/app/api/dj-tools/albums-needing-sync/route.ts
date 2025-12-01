@@ -8,32 +8,60 @@ const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSessi
 
 export async function GET() {
   try {
-    // Get all album IDs that have tracks
-    const { data: trackedAlbums } = await supabase
-      .from('tracks')
-      .select('album_id');
+    // Get ALL album IDs that have tracks (paginated to handle large datasets)
+    const trackedIds = new Set<number>();
+    let offset = 0;
+    const pageSize = 1000;
+    let hasMore = true;
 
-    const trackedIds = new Set((trackedAlbums || []).map(t => t.album_id));
+    while (hasMore) {
+      const { data: trackedAlbums } = await supabase
+        .from('tracks')
+        .select('album_id')
+        .range(offset, offset + pageSize - 1);
 
-    // Get Vinyl/45s albums with tracklists
-    const { data: albums, error } = await supabase
-      .from('collection')
-      .select('id, artist, title, tracklists')
-      .in('folder', ['Vinyl', '45s'])
-      .or('for_sale.is.null,for_sale.eq.false')
-      .not('tracklists', 'is', null)
-      .order('id')
-      .limit(100); // First 100 to check
+      if (trackedAlbums && trackedAlbums.length > 0) {
+        trackedAlbums.forEach(t => trackedIds.add(t.album_id));
+        offset += pageSize;
+        hasMore = trackedAlbums.length === pageSize;
+      } else {
+        hasMore = false;
+      }
+    }
 
-    if (error) {
-      return NextResponse.json({
-        success: false,
-        error: error.message
-      }, { status: 500 });
+    // Get ALL Vinyl/45s albums with tracklists (paginated)
+    const allAlbums = [];
+    offset = 0;
+    hasMore = true;
+
+    while (hasMore) {
+      const { data: albums, error } = await supabase
+        .from('collection')
+        .select('id, artist, title, tracklists')
+        .in('folder', ['Vinyl', '45s'])
+        .or('for_sale.is.null,for_sale.eq.false')
+        .not('tracklists', 'is', null)
+        .order('id')
+        .range(offset, offset + pageSize - 1);
+
+      if (error) {
+        return NextResponse.json({
+          success: false,
+          error: error.message
+        }, { status: 500 });
+      }
+
+      if (albums && albums.length > 0) {
+        allAlbums.push(...albums);
+        offset += pageSize;
+        hasMore = albums.length === pageSize;
+      } else {
+        hasMore = false;
+      }
     }
 
     // Filter to only albums that don't have tracks
-    const needingSync = (albums || [])
+    const needingMigration = allAlbums
       .filter(a => !trackedIds.has(a.id))
       .map(a => {
         // Count tracks in JSON
@@ -57,7 +85,7 @@ export async function GET() {
 
     return NextResponse.json({
       success: true,
-      albums: needingSync
+      albums: needingMigration
     });
 
   } catch (error) {

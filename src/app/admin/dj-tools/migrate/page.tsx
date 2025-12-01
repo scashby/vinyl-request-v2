@@ -1,3 +1,4 @@
+// src/app/admin/dj-tools/migrate/page.tsx
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -17,7 +18,7 @@ type IntegrityStats = {
   tracksWithoutTitle: number;
 };
 
-type AlbumNeedingSync = {
+type AlbumNeedingMigration = {
   id: number;
   artist: string;
   title: string;
@@ -27,13 +28,13 @@ type AlbumNeedingSync = {
 export default function MigratePage() {
   const [stats, setStats] = useState<MigrationStats | null>(null);
   const [integrity, setIntegrity] = useState<IntegrityStats | null>(null);
-  const [albumsList, setAlbumsList] = useState<AlbumNeedingSync[]>([]);
+  const [albumsList, setAlbumsList] = useState<AlbumNeedingMigration[]>([]);
   const [loading, setLoading] = useState(true);
   const [migrating, setMigrating] = useState(false);
   const [progress, setProgress] = useState({ processed: 0, initial: 0 });
   const [status, setStatus] = useState('');
   const [errors, setErrors] = useState<string[]>([]);
-  const [syncingAlbumId, setSyncingAlbumId] = useState<number | null>(null);
+  const [migratingAlbumId, setMigratingAlbumId] = useState<number | null>(null);
 
   useEffect(() => {
     loadStats();
@@ -72,8 +73,8 @@ export default function MigratePage() {
     }
   };
 
-  const syncSingleAlbum = async (albumId: number) => {
-    setSyncingAlbumId(albumId);
+  const migrateSingleAlbum = async (albumId: number) => {
+    setMigratingAlbumId(albumId);
     try {
       const res = await fetch('/api/dj-tools/sync-single', {
         method: 'POST',
@@ -86,23 +87,23 @@ export default function MigratePage() {
       if (data.success) {
         await loadStats();
         await loadAlbumsList();
-        setStatus(`✅ Album ${albumId} synced successfully`);
+        setStatus(`✅ Album ${albumId} migrated successfully`);
       } else {
-        setStatus(`❌ Failed to sync album ${albumId}: ${data.error}`);
+        setStatus(`❌ Failed to migrate album ${albumId}: ${data.error}`);
       }
     } catch (err) {
-      setStatus(`❌ Error syncing album ${albumId}: ${err instanceof Error ? err.message : 'Unknown'}`);
+      setStatus(`❌ Error migrating album ${albumId}: ${err instanceof Error ? err.message : 'Unknown'}`);
     } finally {
-      setSyncingAlbumId(null);
+      setMigratingAlbumId(null);
     }
   };
 
   const startMigration = async () => {
-    if (!stats) return;
+    if (!albumsList.length) return;
     
     setMigrating(true);
     setErrors([]);
-    setProgress({ processed: 0, initial: stats.albumsNeedingSync });
+    setProgress({ processed: 0, initial: albumsList.length });
     setStatus('Starting migration...');
 
     const maxToProcess = 100;
@@ -129,7 +130,7 @@ export default function MigratePage() {
         }
 
         if (data.processed === 0) {
-          setStatus(`✅ Complete! Processed ${totalProcessed} albums total`);
+          setStatus(`✅ Complete! Migrated ${totalProcessed} albums total`);
           setMigrating(false);
           await loadStats();
           await loadAlbumsList();
@@ -143,7 +144,7 @@ export default function MigratePage() {
           ? Math.min(100, Math.round((totalProcessed / progress.initial) * 100))
           : 100;
 
-        setStatus(`Batch ${batchCount}: Processed ${data.processed} albums (${totalProcessed} total, ${percent}%)`);
+        setStatus(`Batch ${batchCount}: Migrated ${data.processed} albums (${totalProcessed} total, ${percent}%)`);
 
         // Collect errors
         if (data.results) {
@@ -160,7 +161,7 @@ export default function MigratePage() {
         }
 
         if (data.complete) {
-          setStatus(`✅ Complete! Processed ${totalProcessed} albums`);
+          setStatus(`✅ Complete! Migrated ${totalProcessed} albums`);
           setMigrating(false);
           await loadStats();
           await loadAlbumsList();
@@ -187,7 +188,7 @@ export default function MigratePage() {
     );
   }
 
-  const needsMigration = stats && stats.albumsNeedingSync > 0;
+  const needsMigration = albumsList.length > 0;
   const hasIntegrityIssues = integrity && (
     integrity.orphanedTracks > 0 ||
     integrity.tracksWithoutPosition > 0 ||
@@ -208,7 +209,7 @@ export default function MigratePage() {
               🔄 Track Migration
             </h1>
             <p style={{ fontSize: 14, color: '#6b7280', margin: 0 }}>
-              Sync tracks from JSON to database for DJ Tools (Vinyl & 45s only)
+              One-way migration: JSON → Database (Vinyl & 45s only)
             </p>
           </div>
           <Link href="/admin/dj-tools" style={{ padding: '10px 20px', background: '#f3f4f6', color: '#374151', borderRadius: 8, textDecoration: 'none', fontSize: 14, fontWeight: 600 }}>
@@ -242,19 +243,19 @@ export default function MigratePage() {
 
         <div style={{ padding: 20, background: needsMigration ? 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)' : 'linear-gradient(135deg, #30cfd0 0%, #330867 100%)', color: 'white', borderRadius: 10 }}>
           <div style={{ fontSize: 32, fontWeight: 'bold', marginBottom: 4 }}>
-            {stats?.albumsNeedingSync.toLocaleString()}
+            {albumsList.length}
           </div>
           <div style={{ opacity: 0.9, fontSize: 13 }}>
-            {needsMigration ? 'Need Migration' : 'Fully Synced'}
+            {needsMigration ? 'Need Migration' : 'Fully Migrated'}
           </div>
         </div>
       </div>
 
-      {/* Albums Needing Sync */}
+      {/* Albums Needing Migration */}
       {albumsList.length > 0 && (
         <div style={{ background: '#fef3c7', border: '2px solid #f59e0b', borderRadius: 12, padding: 24, marginBottom: 24 }}>
           <h2 style={{ fontSize: 18, fontWeight: 700, color: '#92400e', margin: '0 0 16px 0' }}>
-            📋 Albums Needing Sync ({albumsList.length})
+            📋 Albums Needing Migration ({albumsList.length})
           </h2>
           <div style={{ maxHeight: 400, overflowY: 'auto', background: 'white', borderRadius: 8, padding: 12 }}>
             {albumsList.map(album => (
@@ -291,20 +292,20 @@ export default function MigratePage() {
                     View
                   </Link>
                   <button
-                    onClick={() => syncSingleAlbum(album.id)}
-                    disabled={syncingAlbumId === album.id}
+                    onClick={() => migrateSingleAlbum(album.id)}
+                    disabled={migratingAlbumId === album.id}
                     style={{
                       padding: '6px 12px',
-                      background: syncingAlbumId === album.id ? '#9ca3af' : '#10b981',
+                      background: migratingAlbumId === album.id ? '#9ca3af' : '#10b981',
                       color: 'white',
                       border: 'none',
                       borderRadius: 6,
                       fontSize: 12,
                       fontWeight: 600,
-                      cursor: syncingAlbumId === album.id ? 'not-allowed' : 'pointer'
+                      cursor: migratingAlbumId === album.id ? 'not-allowed' : 'pointer'
                     }}
                   >
-                    {syncingAlbumId === album.id ? 'Syncing...' : 'Sync'}
+                    {migratingAlbumId === album.id ? 'Migrating...' : 'Migrate'}
                   </button>
                 </div>
               </div>
@@ -320,7 +321,7 @@ export default function MigratePage() {
             ⚠️ Migration Required
           </h2>
           <p style={{ fontSize: 14, color: '#78350f', margin: '0 0 20px 0' }}>
-            {stats?.albumsNeedingSync} albums need syncing for DJ Tools features.
+            {albumsList.length} albums need migrating for DJ Tools features.
           </p>
 
           {!migrating && (
@@ -357,7 +358,7 @@ export default function MigratePage() {
         <div style={{ background: '#dcfce7', border: '2px solid #16a34a', borderRadius: 12, padding: 24, marginBottom: 24, textAlign: 'center' }}>
           <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
           <h2 style={{ fontSize: 22, fontWeight: 700, color: '#15803d', margin: '0 0 8px 0' }}>
-            All Tracks Synced
+            All Tracks Migrated
           </h2>
           <p style={{ fontSize: 14, color: '#16a34a', margin: 0 }}>
             {stats.totalTracksInTable.toLocaleString()} tracks from {stats.albumsWithTracks.toLocaleString()} albums ready for DJ Tools.
@@ -407,20 +408,21 @@ export default function MigratePage() {
 
         {!needsMigration && (
           <button onClick={startMigration} disabled={migrating} style={{ padding: '10px 20px', background: migrating ? '#9ca3af' : '#f59e0b', color: 'white', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: migrating ? 'not-allowed' : 'pointer' }}>
-            🔄 Re-sync All
+            🔄 Re-migrate All
           </button>
         )}
       </div>
 
       {/* Info */}
       <div style={{ marginTop: 24, padding: 16, background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 13, color: '#6b7280' }}>
-        <strong>ℹ️ About Track Sync:</strong>
+        <strong>ℹ️ About Track Migration:</strong>
         <ul style={{ margin: '8px 0 0 0', paddingLeft: 20 }}>
-          <li>Only syncs Vinyl and 45s albums (excludes CDs, sale items)</li>
-          <li>JSON remains source of truth - table is index for relationships</li>
-          <li>Auto-syncs during imports/enrichments for Vinyl/45s</li>
+          <li>Only migrates Vinyl and 45s albums (excludes CDs, sale items)</li>
+          <li>JSON remains source of truth - database table is index for relationships</li>
+          <li>Migration is one-way: JSON → Database (not bidirectional sync)</li>
+          <li>Auto-migrates during imports/enrichments for Vinyl/45s</li>
           <li>Use &ldquo;View&rdquo; to inspect an album&apos;s tracklist JSON</li>
-          <li>Use &ldquo;Sync&rdquo; to manually sync individual albums</li>
+          <li>Use &ldquo;Migrate&rdquo; to manually migrate individual albums</li>
         </ul>
       </div>
     </div>
