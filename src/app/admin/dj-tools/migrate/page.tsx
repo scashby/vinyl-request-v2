@@ -52,82 +52,80 @@ export default function MigratePage() {
   };
 
   const startMigration = async () => {
-    if (!stats) return;
-    
-    setMigrating(true);
-    setComplete(false);
-    setErrors([]);
-    setProgress({ current: 0, total: stats.albumsNeedingSync, percent: 0 });
-    setStatus('Starting migration...');
+  if (!stats) return;
+  
+  setMigrating(true);
+  setComplete(false);
+  setErrors([]);
+  setProgress({ current: 0, total: stats.albumsNeedingSync, percent: 0 });
+  setStatus('Starting migration...');
 
-    let cursor = 0;
-    const batchSize = 20; // Smaller batches for better progress updates
-    let totalProcessed = 0;
-    const migrationErrors: string[] = [];
+  const batchSize = 20;
+  let totalProcessed = 0;
+  const migrationErrors: string[] = [];
 
-    while (true) {
-      try {
-        const res = await fetch('/api/dj-tools/migrate-batch', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ cursor, batchSize })
-        });
+  while (true) {
+    try {
+      const res = await fetch('/api/dj-tools/migrate-batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ batchSize })
+      });
 
-        const data = await res.json();
+      const data = await res.json();
 
-        if (!data.success) {
-          setStatus(`❌ Migration failed: ${data.error}`);
-          setMigrating(false);
-          return;
-        }
-
-        totalProcessed += data.processed;
-        cursor = data.nextCursor;
-
-        const percent = stats.albumsNeedingSync > 0 
-          ? Math.round((totalProcessed / stats.albumsNeedingSync) * 100)
-          : 100;
-
-        setProgress({
-          current: totalProcessed,
-          total: stats.albumsNeedingSync,
-          percent
-        });
-
-        setStatus(`Migrating... ${totalProcessed} / ${stats.albumsNeedingSync} albums (${percent}%)`);
-
-        // Collect errors
-        if (data.results) {
-          const batchErrors = data.results
-            .filter((r: { success: boolean; error?: string }) => !r.success)
-            .map((r: { albumId: number; error?: string }) => `Album ${r.albumId}: ${r.error}`);
-          
-          if (batchErrors.length > 0) {
-            migrationErrors.push(...batchErrors);
-            setErrors(migrationErrors);
-          }
-        }
-
-        if (data.complete) {
-          setStatus(`✅ Migration complete! Processed ${totalProcessed} albums`);
-          setComplete(true);
-          setMigrating(false);
-          
-          // Reload stats
-          await loadStats();
-          return;
-        }
-
-        // Small delay between batches to avoid overwhelming the server
-        await new Promise(resolve => setTimeout(resolve, 200));
-
-      } catch (error) {
-        setStatus(`❌ Migration error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      if (!data.success) {
+        setStatus(`❌ Migration failed: ${data.error}`);
         setMigrating(false);
         return;
       }
+
+      totalProcessed += data.processed;
+
+      const percent = stats.albumsNeedingSync > 0 
+        ? Math.min(100, Math.round((totalProcessed / stats.albumsNeedingSync) * 100))
+        : 100;
+
+      setProgress({
+        current: totalProcessed,
+        total: stats.albumsNeedingSync,
+        percent
+      });
+
+      setStatus(`Migrating... ${totalProcessed} / ${stats.albumsNeedingSync} albums (${percent}%)`);
+
+      // Collect errors
+      if (data.results) {
+        const batchErrors = data.results
+          .filter((r: { success: boolean; error?: string }) => !r.success)
+          .map((r: { albumId: number; error?: string }) => `Album ${r.albumId}: ${r.error}`);
+        
+        if (batchErrors.length > 0) {
+          migrationErrors.push(...batchErrors);
+          setErrors(migrationErrors);
+        }
+      }
+
+      if (data.complete || data.processed === 0) {
+        setStatus(`✅ Migration complete! Processed ${totalProcessed} albums`);
+        setComplete(true);
+        setMigrating(false);
+        
+        // Reload stats
+        await loadStats();
+        return;
+      }
+
+      // Small delay between batches
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+    } catch (error) {
+      setStatus(`❌ Migration error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setMigrating(false);
+      return;
     }
-  };
+  }
+};
 
   if (loading) {
     return (

@@ -7,30 +7,28 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
 
-// Reduce batch size to avoid timeouts
-const DEFAULT_BATCH_SIZE = 20; // Much smaller to stay under timeout limits
+const DEFAULT_BATCH_SIZE = 20;
 
 export async function POST(req: Request) {
   const startTime = Date.now();
   
   try {
     const body = await req.json();
-    const { cursor = 0, batchSize = DEFAULT_BATCH_SIZE } = body;
+    const { batchSize = DEFAULT_BATCH_SIZE } = body;
     
-    // Cap batch size to prevent timeouts
     const safeBatchSize = Math.min(batchSize, DEFAULT_BATCH_SIZE);
 
-    console.log(`📦 Starting batch migration: cursor=${cursor}, batchSize=${safeBatchSize}`);
+    console.log(`📦 Starting batch migration: batchSize=${safeBatchSize}`);
 
-    // Fetch ONLY Vinyl and 45s albums (not for sale) with tracklists that need syncing
-    const { data: albums, error: fetchError } = await supabase
+    // Step 1: Get all Vinyl/45s albums with tracklists
+    const { data: albumsWithTracklists, error: fetchError } = await supabase
       .from('collection')
       .select('id')
       .in('folder', ['Vinyl', '45s'])
       .or('for_sale.is.null,for_sale.eq.false')
       .not('tracklists', 'is', null)
       .order('id', { ascending: true })
-      .range(cursor, cursor + safeBatchSize - 1);
+      .limit(1000); // Get a reasonable chunk to check
 
     if (fetchError) {
       console.error('Fetch error:', fetchError);
@@ -40,37 +38,65 @@ export async function POST(req: Request) {
       }, { status: 500 });
     }
 
-    if (!albums || albums.length === 0) {
-      console.log('  ✅ No more albums to process');
+    if (!albumsWithTracklists || albumsWithTracklists.length === 0) {
+      console.log('  ✅ No albums with tracklists found');
       return NextResponse.json({
         success: true,
         processed: 0,
-        nextCursor: null,
         complete: true,
         results: []
       });
     }
 
-    console.log(`  → Processing ${albums.length} albums...`);
+    // Step 2: Get all album IDs that already have tracks
+    const { data: albumsWithTracks, error: tracksError } = await supabase
+      .from('tracks')
+      .select('album_id')
+      .in('album_id', albumsWithTracklists.map(a => a.id));
 
-    // Sync each album
+    if (tracksError) {
+      console.error('Tracks fetch error:', tracksError);
+      return NextResponse.json({
+        success: false,
+        error: `Failed to fetch existing tracks: ${tracksError.message}`
+      }, { status: 500 });
+    }
+
+    const albumIdsWithTracks = new Set(albumsWithTracks?.map(t => t.album_id) || []);
+
+    // Step 3: Filter to only albums that need syncing
+    const albumsNeedingSync = albumsWithTracklists
+      .filter(a => !albumIdsWithTracks.has(a.id))
+      .slice(0, safeBatchSize);
+
+    if (albumsNeedingSync.length === 0) {
+      console.log('  ✅ No more albums need syncing');
+      return NextResponse.json({
+        success: true,
+        processed: 0,
+        complete: true,
+        results: []
+      });
+    }
+
+    console.log(`  → Processing ${albumsNeedingSync.length} albums that need syncing...`);
+
+    // Step 4: Sync each album
     const results = [];
     let successCount = 0;
     let errorCount = 0;
 
-    for (let i = 0; i < albums.length; i++) {
-      const album = albums[i];
+    for (let i = 0; i < albumsNeedingSync.length; i++) {
+      const album = albumsNeedingSync[i];
       
-      // Check if we're approaching timeout (leave 2 seconds buffer)
+      // Check if we're approaching timeout
       const elapsed = Date.now() - startTime;
-      if (elapsed > 8000) { // 8 seconds on a 10 second timeout
-        console.log(`  ⏱️ Approaching timeout, stopping at ${i + 1}/${albums.length}`);
+      if (elapsed > 8000) {
+        console.log(`  ⏱️ Approaching timeout, stopping at ${i + 1}/${albumsNeedingSync.length}`);
         
-        // Return partial results
         return NextResponse.json({
           success: true,
           processed: i,
-          nextCursor: cursor + i,
           complete: false,
           successCount,
           errorCount,
@@ -91,16 +117,14 @@ export async function POST(req: Request) {
       }
     }
 
-    const nextCursor = cursor + albums.length;
-    const complete = albums.length < safeBatchSize;
-
+    const complete = albumsNeedingSync.length < safeBatchSize;
     const elapsed = Date.now() - startTime;
+    
     console.log(`  ✅ Batch complete: ${successCount} success, ${errorCount} errors (${elapsed}ms)`);
 
     return NextResponse.json({
       success: true,
-      processed: albums.length,
-      nextCursor: complete ? null : nextCursor,
+      processed: albumsNeedingSync.length,
       complete,
       successCount,
       errorCount,
