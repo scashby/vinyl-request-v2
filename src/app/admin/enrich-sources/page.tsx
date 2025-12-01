@@ -210,6 +210,8 @@ export default function MultiSourceEnrichment() {
       case 'missing-image':
       case 'missing-genres':
       case 'missing-styles':
+      case 'missing-year':        // Added
+      case 'missing-source':      // Added
         services.discogsMetadata = true;
         break;
       case 'missing-tracklists':
@@ -230,6 +232,16 @@ export default function MultiSourceEnrichment() {
         break;
       case 'needs-apple-lyrics':
         services.appleLyrics = true;
+        break;
+      case 'has-genius-links':
+      case 'has-apple-lyrics':
+      case 'with-lyrics':
+      case 'has-discogs-tracklist':
+      case 'both-services':
+      case 'fully-enriched':
+      case '1001-albums':
+        // These are "has" categories - no enrichment needed
+        // Just show the albums, don't enable any services
         break;
       case 'needs-enrichment':
         // Enable all services
