@@ -27,7 +27,6 @@ type SyncResult = {
 
 /**
  * Sync tracks for a single album from JSON to tracks table
- * This is the core function called by all sync operations
  */
 export async function syncTracksFromAlbum(albumId: number): Promise<SyncResult> {
   const result: SyncResult = {
@@ -85,7 +84,7 @@ export async function syncTracksFromAlbum(albumId: number): Promise<SyncResult> 
     const existingPositions = new Set(existingTracks?.map(t => t.position) || []);
     const newPositions = new Set(tracks.map(t => t.position || '').filter(Boolean));
 
-    // Determine what to delete (tracks in DB but not in JSON)
+    // Delete tracks in DB but not in JSON
     const positionsToDelete = Array.from(existingPositions).filter(pos => !newPositions.has(pos));
     
     if (positionsToDelete.length > 0) {
@@ -107,7 +106,6 @@ export async function syncTracksFromAlbum(albumId: number): Promise<SyncResult> 
     // Insert or update tracks
     for (const track of tracks) {
       if (!track.position || !track.title) {
-        // Skip tracks without position or title
         continue;
       }
 
@@ -124,7 +122,6 @@ export async function syncTracksFromAlbum(albumId: number): Promise<SyncResult> 
       };
 
       if (existingPositions.has(track.position)) {
-        // Update existing track
         const { error: updateError } = await supabase
           .from('tracks')
           .update(trackData)
@@ -137,7 +134,6 @@ export async function syncTracksFromAlbum(albumId: number): Promise<SyncResult> 
           result.tracksUpdated++;
         }
       } else {
-        // Insert new track
         const { error: insertError } = await supabase
           .from('tracks')
           .insert([trackData]);
@@ -162,22 +158,6 @@ export async function syncTracksFromAlbum(albumId: number): Promise<SyncResult> 
 }
 
 /**
- * Sync tracks for multiple albums in batch
- */
-export async function syncTracksBatch(
-  albumIds: number[]
-): Promise<SyncResult[]> {
-  const results: SyncResult[] = [];
-
-  for (const albumId of albumIds) {
-    const result = await syncTracksFromAlbum(albumId);
-    results.push(result);
-  }
-
-  return results;
-}
-
-/**
  * Get sync statistics - ONLY for Vinyl and 45s (not for sale)
  */
 export async function getSyncStats(): Promise<{
@@ -186,7 +166,7 @@ export async function getSyncStats(): Promise<{
   totalTracksInTable: number;
   albumsNeedingSync: number;
 }> {
-  // Only count Vinyl and 45s that are not for sale
+  // Count Vinyl and 45s that are not for sale
   const { count: totalAlbums } = await supabase
     .from('collection')
     .select('id', { count: 'exact', head: true })
@@ -204,7 +184,7 @@ export async function getSyncStats(): Promise<{
     .from('tracks')
     .select('id', { count: 'exact', head: true });
 
-  // Get all Vinyl/45s albums with tracklists (paginated to handle >1000)
+  // Get albums needing sync (paginated to handle >1000)
   let allAlbumIds: number[] = [];
   let offset = 0;
   const pageSize = 1000;
@@ -228,7 +208,7 @@ export async function getSyncStats(): Promise<{
     }
   }
 
-  // Get all albums that have tracks in the table (paginated)
+  // Get albums with tracks in table (paginated)
   const albumsWithTracksInTable = new Set<number>();
   offset = 0;
   hasMore = true;
@@ -248,7 +228,6 @@ export async function getSyncStats(): Promise<{
     }
   }
 
-  // Count albums that have tracklists but no tracks
   const albumsNeedingSync = allAlbumIds.filter(id => !albumsWithTracksInTable.has(id)).length;
 
   return {
@@ -273,7 +252,6 @@ async function logSyncOperation(result: SyncResult): Promise<void> {
       error_message: result.error || null
     }]);
   } catch (error) {
-    // Don't throw - logging failure shouldn't break sync
     console.error('Failed to log sync operation:', error);
   }
 }
@@ -287,7 +265,6 @@ export async function validateTrackIntegrity(): Promise<{
   tracksWithoutPosition: number;
   tracksWithoutTitle: number;
 }> {
-  // Orphaned tracks (track references non-existent album)
   const { count: orphanedTracks } = await supabase
     .from('tracks')
     .select('id', { count: 'exact', head: true })
@@ -295,24 +272,19 @@ export async function validateTrackIntegrity(): Promise<{
       supabase.from('collection').select('id')
     );
 
-  // Tracks without position
   const { count: tracksWithoutPosition } = await supabase
     .from('tracks')
     .select('id', { count: 'exact', head: true })
     .or('position.is.null,position.eq.');
 
-  // Tracks without title
   const { count: tracksWithoutTitle } = await supabase
     .from('tracks')
     .select('id', { count: 'exact', head: true })
     .or('title.is.null,title.eq.');
 
-  // Note: duplicatePositions would require more complex query
-  // For now, we rely on the unique constraint to prevent them
-
   return {
     orphanedTracks: orphanedTracks || 0,
-    duplicatePositions: 0, // TODO: Implement if needed
+    duplicatePositions: 0,
     tracksWithoutPosition: tracksWithoutPosition || 0,
     tracksWithoutTitle: tracksWithoutTitle || 0
   };
