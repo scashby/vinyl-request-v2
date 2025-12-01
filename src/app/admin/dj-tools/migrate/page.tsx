@@ -17,17 +17,27 @@ type IntegrityStats = {
   tracksWithoutTitle: number;
 };
 
+type AlbumNeedingSync = {
+  id: number;
+  artist: string;
+  title: string;
+  trackCount: number;
+};
+
 export default function MigratePage() {
   const [stats, setStats] = useState<MigrationStats | null>(null);
   const [integrity, setIntegrity] = useState<IntegrityStats | null>(null);
+  const [albumsList, setAlbumsList] = useState<AlbumNeedingSync[]>([]);
   const [loading, setLoading] = useState(true);
   const [migrating, setMigrating] = useState(false);
   const [progress, setProgress] = useState({ processed: 0, initial: 0 });
   const [status, setStatus] = useState('');
   const [errors, setErrors] = useState<string[]>([]);
+  const [syncingAlbumId, setSyncingAlbumId] = useState<number | null>(null);
 
   useEffect(() => {
     loadStats();
+    loadAlbumsList();
   }, []);
 
   const loadStats = async () => {
@@ -42,10 +52,48 @@ export default function MigratePage() {
       } else {
         setStatus(`Error: ${data.error}`);
       }
-    } catch (error) {
-      setStatus(`Error: ${error instanceof Error ? error.message : 'Unknown'}`);
+    } catch (err) {
+      setStatus(`Error: ${err instanceof Error ? err.message : 'Unknown'}`);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadAlbumsList = async () => {
+    try {
+      const res = await fetch('/api/dj-tools/albums-needing-sync');
+      const data = await res.json();
+      
+      if (data.success) {
+        setAlbumsList(data.albums || []);
+      }
+    } catch (err) {
+      console.error('Failed to load albums list:', err);
+    }
+  };
+
+  const syncSingleAlbum = async (albumId: number) => {
+    setSyncingAlbumId(albumId);
+    try {
+      const res = await fetch('/api/dj-tools/sync-single', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ albumId })
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        await loadStats();
+        await loadAlbumsList();
+        setStatus(`✅ Album ${albumId} synced successfully`);
+      } else {
+        setStatus(`❌ Failed to sync album ${albumId}: ${data.error}`);
+      }
+    } catch (err) {
+      setStatus(`❌ Error syncing album ${albumId}: ${err instanceof Error ? err.message : 'Unknown'}`);
+    } finally {
+      setSyncingAlbumId(null);
     }
   };
 
@@ -57,7 +105,7 @@ export default function MigratePage() {
     setProgress({ processed: 0, initial: stats.albumsNeedingSync });
     setStatus('Starting migration...');
 
-    const batchSize = 20;
+    const maxToProcess = 100;
     let totalProcessed = 0;
     const migrationErrors: string[] = [];
     let batchCount = 0;
@@ -69,7 +117,7 @@ export default function MigratePage() {
         const res = await fetch('/api/dj-tools/migrate-batch', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ batchSize })
+          body: JSON.stringify({ maxToProcess })
         });
 
         const data = await res.json();
@@ -84,6 +132,7 @@ export default function MigratePage() {
           setStatus(`✅ Complete! Processed ${totalProcessed} albums total`);
           setMigrating(false);
           await loadStats();
+          await loadAlbumsList();
           return;
         }
 
@@ -114,14 +163,14 @@ export default function MigratePage() {
           setStatus(`✅ Complete! Processed ${totalProcessed} albums`);
           setMigrating(false);
           await loadStats();
+          await loadAlbumsList();
           return;
         }
 
-        // Delay between batches
         await new Promise(resolve => setTimeout(resolve, 200));
 
-      } catch (error) {
-        setStatus(`❌ Error: ${error instanceof Error ? error.message : 'Unknown'}`);
+      } catch (err) {
+        setStatus(`❌ Error: ${err instanceof Error ? err.message : 'Unknown'}`);
         setMigrating(false);
         return;
       }
@@ -201,6 +250,69 @@ export default function MigratePage() {
         </div>
       </div>
 
+      {/* Albums Needing Sync */}
+      {albumsList.length > 0 && (
+        <div style={{ background: '#fef3c7', border: '2px solid #f59e0b', borderRadius: 12, padding: 24, marginBottom: 24 }}>
+          <h2 style={{ fontSize: 18, fontWeight: 700, color: '#92400e', margin: '0 0 16px 0' }}>
+            📋 Albums Needing Sync ({albumsList.length})
+          </h2>
+          <div style={{ maxHeight: 400, overflowY: 'auto', background: 'white', borderRadius: 8, padding: 12 }}>
+            {albumsList.map(album => (
+              <div key={album.id} style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center',
+                padding: 12,
+                borderBottom: '1px solid #e5e7eb',
+                fontSize: 14
+              }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600, color: '#111' }}>
+                    {album.artist} - {album.title}
+                  </div>
+                  <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+                    ID: {album.id} • {album.trackCount === -1 ? 'Invalid JSON' : `${album.trackCount} tracks`}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <Link
+                    href={`/admin/edit-entry/${album.id}`}
+                    target="_blank"
+                    style={{
+                      padding: '6px 12px',
+                      background: '#3b82f6',
+                      color: 'white',
+                      borderRadius: 6,
+                      textDecoration: 'none',
+                      fontSize: 12,
+                      fontWeight: 600
+                    }}
+                  >
+                    View
+                  </Link>
+                  <button
+                    onClick={() => syncSingleAlbum(album.id)}
+                    disabled={syncingAlbumId === album.id}
+                    style={{
+                      padding: '6px 12px',
+                      background: syncingAlbumId === album.id ? '#9ca3af' : '#10b981',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: 6,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: syncingAlbumId === album.id ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    {syncingAlbumId === album.id ? 'Syncing...' : 'Sync'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Migration Control */}
       {needsMigration && (
         <div style={{ background: '#fef3c7', border: '2px solid #f59e0b', borderRadius: 12, padding: 24, marginBottom: 24 }}>
@@ -213,7 +325,7 @@ export default function MigratePage() {
 
           {!migrating && (
             <button onClick={startMigration} style={{ padding: '14px 28px', background: 'linear-gradient(135deg, #10b981, #047857)', color: 'white', border: 'none', borderRadius: 8, fontSize: 16, fontWeight: 700, cursor: 'pointer' }}>
-              🚀 Start Migration
+              🚀 Start Batch Migration
             </button>
           )}
 
@@ -285,7 +397,11 @@ export default function MigratePage() {
 
       {/* Actions */}
       <div style={{ display: 'flex', gap: 12 }}>
-        <button onClick={loadStats} disabled={migrating} style={{ padding: '10px 20px', background: migrating ? '#9ca3af' : '#3b82f6', color: 'white', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: migrating ? 'not-allowed' : 'pointer' }}>
+        <button 
+          onClick={() => { loadStats(); loadAlbumsList(); }} 
+          disabled={migrating} 
+          style={{ padding: '10px 20px', background: migrating ? '#9ca3af' : '#3b82f6', color: 'white', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: migrating ? 'not-allowed' : 'pointer' }}
+        >
           🔄 Refresh Stats
         </button>
 
@@ -303,7 +419,8 @@ export default function MigratePage() {
           <li>Only syncs Vinyl and 45s albums (excludes CDs, sale items)</li>
           <li>JSON remains source of truth - table is index for relationships</li>
           <li>Auto-syncs during imports/enrichments for Vinyl/45s</li>
-          <li>Can manually re-sync anytime if data gets out of sync</li>
+          <li>Use &ldquo;View&rdquo; to inspect an album&apos;s tracklist JSON</li>
+          <li>Use &ldquo;Sync&rdquo; to manually sync individual albums</li>
         </ul>
       </div>
     </div>
