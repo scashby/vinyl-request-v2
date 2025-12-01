@@ -178,7 +178,7 @@ export async function syncTracksBatch(
 }
 
 /**
- * Get sync statistics
+ * Get sync statistics - ONLY for Vinyl and 45s (not for sale)
  */
 export async function getSyncStats(): Promise<{
   totalAlbums: number;
@@ -186,42 +186,70 @@ export async function getSyncStats(): Promise<{
   totalTracksInTable: number;
   albumsNeedingSync: number;
 }> {
+  // Only count Vinyl and 45s that are not for sale
   const { count: totalAlbums } = await supabase
     .from('collection')
-    .select('id', { count: 'exact', head: true });
+    .select('id', { count: 'exact', head: true })
+    .in('folder', ['Vinyl', '45s'])
+    .or('for_sale.is.null,for_sale.eq.false');
 
   const { count: albumsWithTracks } = await supabase
     .from('collection')
     .select('id', { count: 'exact', head: true })
+    .in('folder', ['Vinyl', '45s'])
+    .or('for_sale.is.null,for_sale.eq.false')
     .not('tracklists', 'is', null);
 
   const { count: totalTracksInTable } = await supabase
     .from('tracks')
     .select('id', { count: 'exact', head: true });
 
-  // Albums with tracklists but no tracks in table
-  const { data: albumsWithTracklistsData } = await supabase
-    .from('collection')
-    .select('id')
-    .not('tracklists', 'is', null);
+  // Get all Vinyl/45s albums with tracklists (paginated to handle >1000)
+  let allAlbumIds: number[] = [];
+  let offset = 0;
+  const pageSize = 1000;
+  let hasMore = true;
 
-  const albumIdsWithTracklists = (albumsWithTracklistsData || []).map(a => a.id);
+  while (hasMore) {
+    const { data: pageData } = await supabase
+      .from('collection')
+      .select('id')
+      .in('folder', ['Vinyl', '45s'])
+      .or('for_sale.is.null,for_sale.eq.false')
+      .not('tracklists', 'is', null)
+      .range(offset, offset + pageSize - 1);
 
-  let albumsNeedingSync = 0;
-  if (albumIdsWithTracklists.length > 0) {
-    const { data: albumsWithTracksInTable } = await supabase
+    if (pageData && pageData.length > 0) {
+      allAlbumIds = allAlbumIds.concat(pageData.map(a => a.id));
+      offset += pageSize;
+      hasMore = pageData.length === pageSize;
+    } else {
+      hasMore = false;
+    }
+  }
+
+  // Get all albums that have tracks in the table (paginated)
+  const albumsWithTracksInTable = new Set<number>();
+  offset = 0;
+  hasMore = true;
+
+  while (hasMore) {
+    const { data: pageData } = await supabase
       .from('tracks')
       .select('album_id')
-      .in('album_id', albumIdsWithTracklists);
+      .range(offset, offset + pageSize - 1);
 
-    const albumIdsWithTracksInTable = new Set(
-      (albumsWithTracksInTable || []).map(t => t.album_id)
-    );
-
-    albumsNeedingSync = albumIdsWithTracklists.filter(
-      id => !albumIdsWithTracksInTable.has(id)
-    ).length;
+    if (pageData && pageData.length > 0) {
+      pageData.forEach(t => albumsWithTracksInTable.add(t.album_id));
+      offset += pageSize;
+      hasMore = pageData.length === pageSize;
+    } else {
+      hasMore = false;
+    }
   }
+
+  // Count albums that have tracklists but no tracks
+  const albumsNeedingSync = allAlbumIds.filter(id => !albumsWithTracksInTable.has(id)).length;
 
   return {
     totalAlbums: totalAlbums || 0,

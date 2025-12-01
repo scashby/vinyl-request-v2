@@ -171,7 +171,7 @@ export default function MigratePage() {
               🔄 Track Migration
             </h1>
             <p style={{ fontSize: 14, color: '#6b7280', margin: 0 }}>
-              Sync tracks from JSON to database for DJ Tools features
+              Sync tracks from JSON to database for DJ Tools features (Vinyl & 45s only)
             </p>
           </div>
           <Link
@@ -209,7 +209,7 @@ export default function MigratePage() {
           <div style={{ fontSize: 32, fontWeight: 'bold', marginBottom: 4 }}>
             {stats?.totalAlbums.toLocaleString()}
           </div>
-          <div style={{ opacity: 0.9, fontSize: 13 }}>Total Albums</div>
+          <div style={{ opacity: 0.9, fontSize: 13 }}>Vinyl & 45s Albums</div>
         </div>
 
         <div style={{
@@ -274,7 +274,7 @@ export default function MigratePage() {
             ⚠️ Migration Required
           </h2>
           <p style={{ fontSize: 14, color: '#78350f', margin: '0 0 20px 0' }}>
-            {stats?.albumsNeedingSync} albums have tracklists in JSON but haven&apos;t been synced to the tracks table yet.
+            {stats?.albumsNeedingSync} Vinyl/45s albums have tracklists in JSON but haven&apos;t been synced to the tracks table yet.
             This is required for DJ Tools features like crates, annotations, and track linking.
           </p>
 
@@ -390,7 +390,7 @@ export default function MigratePage() {
             All Tracks Synced
           </h2>
           <p style={{ fontSize: 14, color: '#16a34a', margin: 0 }}>
-            Your collection is fully synced. {stats.totalTracksInTable.toLocaleString()} tracks from {stats.albumsWithTracks.toLocaleString()} albums are ready for DJ Tools.
+            Your Vinyl & 45s collection is fully synced. {stats.totalTracksInTable.toLocaleString()} tracks from {stats.albumsWithTracks.toLocaleString()} albums are ready for DJ Tools.
           </p>
         </div>
       )}
@@ -519,9 +519,10 @@ export default function MigratePage() {
       }}>
         <strong style={{ color: '#374151' }}>ℹ️ About Track Sync:</strong>
         <ul style={{ margin: '8px 0 0 0', paddingLeft: 20 }}>
+          <li>Only syncs <strong>Vinyl</strong> and <strong>45s</strong> albums (excludes CDs, cassettes, 8-tracks, sale items)</li>
           <li>Tracks are extracted from the <code style={{ background: '#e5e7eb', padding: '2px 4px', borderRadius: 3 }}>collection.tracklists</code> JSON column</li>
           <li>The JSON remains the source of truth - the tracks table is an index for relationships</li>
-          <li>Sync happens automatically during imports and enrichments</li>
+          <li>Sync happens automatically during imports and enrichments for Vinyl/45s</li>
           <li>You can manually re-sync anytime if data gets out of sync</li>
         </ul>
       </div>
