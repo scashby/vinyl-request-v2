@@ -61,7 +61,7 @@ export default function MigratePage() {
     setStatus('Starting migration...');
 
     let cursor = 0;
-    const batchSize = 50; // Smaller batches for better progress updates
+    const batchSize = 20; // Smaller batches for better progress updates
     let totalProcessed = 0;
     const migrationErrors: string[] = [];
 
@@ -119,7 +119,7 @@ export default function MigratePage() {
         }
 
         // Small delay between batches to avoid overwhelming the server
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, 200));
 
       } catch (error) {
         setStatus(`❌ Migration error: ${error instanceof Error ? error.message : 'Unknown error'}`);
