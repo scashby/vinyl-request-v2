@@ -241,6 +241,33 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
             </div>
           </div>
 
+          {/* DJ Tools */}
+            <div className="mb-4 p-3 bg-pink-50 border border-pink-200 rounded-lg">
+              <h4 className="text-sm font-semibold text-pink-800 mb-2">🎧 DJ Tools</h4>
+              <div className="space-y-2">
+                <Link 
+                  href="/admin/dj-tools"
+                  className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+                    pathname === "/admin/dj-tools" 
+                      ? "bg-pink-700 text-white" 
+                      : "bg-pink-600 text-white hover:bg-pink-700"
+                  }`}
+                >
+                  🎧 Dashboard
+                </Link>
+                <Link 
+                  href="/admin/dj-tools/migrate"
+                  className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+                    pathname === "/admin/dj-tools/migrate" 
+                      ? "bg-pink-700 text-white" 
+                      : "bg-pink-600 text-white hover:bg-pink-700"
+                  }`}
+                >
+                  🔄 Migration
+                </Link>
+              </div>
+            </div>
+
           {/* Event Management */}
           <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
             <h4 className="text-sm font-semibold text-orange-800 mb-2">📅 Events</h4>
