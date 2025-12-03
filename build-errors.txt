@@ -1,0 +1,55 @@
+
+> deadwaxdialogues@0.1.0 prebuild
+> ls -l src/lib && cat jsconfig.json
+
+total 152
+-rw-r--r--  1 stephenashby  staff   1629 Sep  6 14:13 addOrVoteRequest.js
+-rw-r--r--  1 stephenashby  staff   9451 Dec  3 16:28 collection-columns.ts
+-rw-r--r--@ 1 stephenashby  staff    689 Jul 13 19:36 csvUtils.js
+-rw-r--r--  1 stephenashby  staff   1544 Nov 23 09:45 discogs-validation.ts
+-rw-r--r--@ 1 stephenashby  staff    246 Jul 21 18:52 enrichWithLastFM.ts
+-rw-r--r--@ 1 stephenashby  staff    281 Jul 21 18:52 enrichWithSpotify.ts
+-rw-r--r--  1 stephenashby  staff  11427 Nov 17 23:25 enrichment-utils.ts
+-rw-r--r--@ 1 stephenashby  staff    993 Aug 11 20:33 lastfm.ts
+-rw-r--r--@ 1 stephenashby  staff   1772 Aug 11 20:33 spotify.ts
+-rw-r--r--@ 1 stephenashby  staff    395 Aug 15 21:51 supabaseAdmin.ts
+-rw-r--r--@ 1 stephenashby  staff    490 Jul 21 18:44 supabaseClient.ts
+-rw-r--r--@ 1 stephenashby  staff    398 Aug 15 21:33 supabaseServer.ts
+-rw-r--r--  1 stephenashby  staff   8301 Dec  1 16:14 track-sync.ts
+{
+  "compilerOptions": {
+    "baseUrl": "src"
+  }
+}
+
+> deadwaxdialogues@0.1.0 build
+> next build
+
+   ▲ Next.js 16.0.7 (Turbopack)
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 6.2s
+   Running TypeScript ...
+
+   We detected TypeScript in your project and reconfigured your tsconfig.json file for you. Strict-mode is set to false by default.
+   The following suggested values were added to your tsconfig.json. These values can be changed to fit your project's needs:
+
+   	- include was updated to add '.next/dev/types/**/*.ts'
+
+   The following mandatory changes were made to your tsconfig.json:
+
+   	- jsx was set to react-jsx (next.js uses the React automatic runtime)
+
+Failed to compile.
+
+./src/app/admin/1001-review/page.tsx:125:17
+Type error: Property 'album_1001_id' does not exist on type 'never'.
+
+[0m [90m 123 |[39m     [36mconst[39m cids [33m=[39m [36mnew[39m [33mSet[39m[33m<[39m[33mId[39m[33m>[39m()[33m;[39m
+ [90m 124 |[39m     [36mfor[39m ([36mconst[39m m [36mof[39m mrows) {
+[31m[1m>[22m[39m[90m 125 |[39m       [36mif[39m ([33m![39mby[m[33m.[39malbum_1001_id]) by[m[33m.[39malbum_1001_id] [33m=[39m [][33m;[39m
+ [90m     |[39m                 [31m[1m^[22m[39m
+ [90m 126 |[39m       by[m[33m.[39malbum_1001_id][33m.[39mpush(m)[33m;[39m
+ [90m 127 |[39m       cids[33m.[39madd(m[33m.[39mcollection_id)[33m;[39m
+ [90m 128 |[39m     }[0m
+Next.js build worker exited with code: 1 and signal: null
