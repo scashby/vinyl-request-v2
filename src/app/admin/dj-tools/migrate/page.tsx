@@ -74,28 +74,41 @@ export default function MigratePage() {
   };
 
   const migrateSingleAlbum = async (albumId: number) => {
+    console.log('🚀 Starting migration for album:', albumId);
     setMigratingAlbumId(albumId);
-    setStatus('');
+    setStatus(`Migrating album ${albumId}...`);
+    
     try {
+      console.log('  → Fetching /api/dj-tools/sync-single...');
       const res = await fetch('/api/dj-tools/sync-single', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ albumId })
       });
 
+      console.log('  → Response status:', res.status);
       const data = await res.json();
+      console.log('  → Response data:', data);
 
       if (data.success) {
-        setStatus(`✅ Album ${albumId} migrated successfully`);
+        const tracksAdded = data.result?.tracksAdded || 0;
+        const tracksUpdated = data.result?.tracksUpdated || 0;
+        setStatus(`✅ Album ${albumId} migrated! Added: ${tracksAdded}, Updated: ${tracksUpdated}`);
+        console.log('  ✅ Migration successful');
         await loadStats();
         await loadAlbumsList();
       } else {
-        setStatus(`❌ Failed to migrate album ${albumId}: ${data.result?.error || data.error}`);
+        const errorMsg = data.result?.error || data.error || 'Unknown error';
+        setStatus(`❌ Failed to migrate album ${albumId}: ${errorMsg}`);
+        console.error('  ❌ Migration failed:', errorMsg);
       }
     } catch (err) {
-      setStatus(`❌ Error migrating album ${albumId}: ${err instanceof Error ? err.message : 'Unknown'}`);
+      const errorMsg = err instanceof Error ? err.message : 'Unknown';
+      setStatus(`❌ Error migrating album ${albumId}: ${errorMsg}`);
+      console.error('  ❌ Exception during migration:', err);
     } finally {
       setMigratingAlbumId(null);
+      console.log('  → Migration attempt complete');
     }
   };
 
