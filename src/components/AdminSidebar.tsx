@@ -81,7 +81,7 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
             <h4 className="text-sm font-semibold text-purple-800 mb-2">🎵 Collection</h4>
             <div className="space-y-2">
               <Link 
-                href="/admin/edit-collection"
+                href="/edit-collection"
                 target="_blank"
                 className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
                   pathname === "/admin/edit-collection" 

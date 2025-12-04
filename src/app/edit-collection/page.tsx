@@ -5,11 +5,11 @@ import { useCallback, useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { supabase } from '../../../lib/supabaseClient';
-import CollectionTable from '../../../components/CollectionTable';
-import AlbumDetailPanel from '../../../components/AlbumDetailPanel';
-import ColumnSelector from '../../../components/ColumnSelector';
-import { ColumnId, DEFAULT_VISIBLE_COLUMNS } from '../../../lib/collection-columns';
+import { supabase } from '../../lib/supabaseClient';
+import CollectionTable from '../../components/CollectionTable';
+import AlbumDetailPanel from '../../components/AlbumDetailPanel';
+import ColumnSelector from '../../components/ColumnSelector';
+import { ColumnId, DEFAULT_VISIBLE_COLUMNS } from '../../lib/collection-columns';
 
 type Album = {
   id: number;
