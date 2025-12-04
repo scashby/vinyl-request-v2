@@ -93,6 +93,17 @@ function generateRecurringEvents(baseEvent: EventData & { id?: number }): Omit<E
   return events;
 }
 
+// Helper function to normalize string arrays from database
+function normalizeStringArray(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    return value.replace(/[{}]/g, '').split(',').map((item: string) => item.trim()).filter(Boolean);
+  }
+  return [];
+}
+
 export default function EditEventForm() {
   const searchParams = useSearchParams();
   const id = searchParams.get('id');
@@ -151,24 +162,22 @@ export default function EditEventForm() {
       }
       if (copiedEvent) {
         const isTBA = !copiedEvent.date || copiedEvent.date === '' || copiedEvent.date === '9999-12-31';
+        
+        // Extract and normalize fields with proper type checking
+        const normalizedFormats = normalizeStringArray(copiedEvent.allowed_formats);
+        const normalizedTags = normalizeStringArray(copiedEvent.allowed_tags);
+        const normalizedQueueTypes = Array.isArray(copiedEvent.queue_types)
+          ? copiedEvent.queue_types
+          : copiedEvent.queue_type
+            ? [copiedEvent.queue_type]
+            : [];
+        
         setEventData({
           ...eventData,
           ...copiedEvent,
-          allowed_formats: Array.isArray(copiedEvent.allowed_formats)
-            ? copiedEvent.allowed_formats
-            : typeof copiedEvent.allowed_formats === 'string'
-              ? copiedEvent.allowed_formats.replace(/[{}]/g, '').split(',').map((f: string) => f.trim()).filter(Boolean)
-              : [],
-          queue_types: Array.isArray(copiedEvent.queue_types)
-            ? copiedEvent.queue_types
-            : copiedEvent.queue_type
-              ? [copiedEvent.queue_type]
-              : [],
-          allowed_tags: Array.isArray(copiedEvent.allowed_tags)
-            ? copiedEvent.allowed_tags
-            : typeof copiedEvent.allowed_tags === 'string'
-              ? copiedEvent.allowed_tags.replace(/[{}]/g, '').split(',').map((t: string) => t.trim()).filter(Boolean)
-              : [],
+          allowed_formats: normalizedFormats,
+          queue_types: normalizedQueueTypes,
+          allowed_tags: normalizedTags,
           title: copiedEvent.title ? `${copiedEvent.title} (Copy)` : '',
           date: isTBA ? '9999-12-31' : (copiedEvent.date || ''),
           is_recurring: false,
@@ -193,24 +202,22 @@ export default function EditEventForm() {
         } else if (data) {
           const dbEvent = data as DbEvent;
           const isTBA = !dbEvent.date || dbEvent.date === '' || dbEvent.date === '9999-12-31';
+          
+          // Extract and normalize fields with proper type checking
+          const normalizedFormats = normalizeStringArray(dbEvent.allowed_formats);
+          const normalizedTags = normalizeStringArray(dbEvent.allowed_tags);
+          const normalizedQueueTypes = Array.isArray(dbEvent.queue_types)
+            ? dbEvent.queue_types
+            : dbEvent.queue_type
+              ? [dbEvent.queue_type]
+              : [];
+          
           setEventData({
             ...eventData,
             ...dbEvent,
-            allowed_formats: Array.isArray(dbEvent.allowed_formats)
-              ? dbEvent.allowed_formats
-              : typeof dbEvent.allowed_formats === 'string'
-                ? dbEvent.allowed_formats.replace(/[{}]/g, '').split(',').map((f: string) => f.trim()).filter(Boolean)
-                : [],
-            queue_types: Array.isArray(dbEvent.queue_types)
-              ? dbEvent.queue_types
-              : dbEvent.queue_type
-                ? [dbEvent.queue_type]
-                : [],
-            allowed_tags: Array.isArray(dbEvent.allowed_tags)
-              ? dbEvent.allowed_tags
-              : typeof dbEvent.allowed_tags === 'string'
-                ? dbEvent.allowed_tags.replace(/[{}]/g, '').split(',').map((t: string) => t.trim()).filter(Boolean)
-                : [],
+            allowed_formats: normalizedFormats,
+            queue_types: normalizedQueueTypes,
+            allowed_tags: normalizedTags,
             is_recurring: dbEvent.is_recurring || false,
             recurrence_pattern: dbEvent.recurrence_pattern || 'weekly',
             recurrence_interval: dbEvent.recurrence_interval || 1,
