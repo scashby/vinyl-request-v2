@@ -148,11 +148,10 @@ export default function Page(): ReactElement {
 
   const runFuzzy = useCallback(async (threshold = 0.7, yearSlop = 1) => {
     setRunning(true);
-    // @ts-expect-error - Supabase RPC type inference issue
     const { data, error } = await supabase.rpc("match_1001_fuzzy", {
       threshold: parseFloat(threshold.toString()),
       year_slop: parseInt(yearSlop.toString(), 10),
-    });
+    } as any);
     setRunning(false);
     if (error) {
       pushToast({ kind: "err", msg: `Fuzzy match failed: ${error.message}` });
@@ -165,11 +164,10 @@ export default function Page(): ReactElement {
 
   const runSameArtist = useCallback(async (threshold = 0.6, yearSlop = 1) => {
     setRunning(true);
-    // @ts-expect-error - Supabase RPC type inference issue
     const { data, error } = await supabase.rpc("match_1001_same_artist", {
       threshold: parseFloat(threshold.toString()),
       year_slop: parseInt(yearSlop.toString(), 10),
-    });
+    } as any);
     setRunning(false);
     if (error) {
       pushToast({ kind: "err", msg: `Same-artist match failed: ${error.message}` });
@@ -182,10 +180,9 @@ export default function Page(): ReactElement {
 
   const runFuzzyArtist = useCallback(async (threshold = 0.7) => {
     setRunning(true);
-    // @ts-expect-error - Supabase RPC type inference issue
     const { data, error } = await supabase.rpc("match_1001_fuzzy_artist", {
       threshold: parseFloat(threshold.toString()),
-    });
+    } as any);
     setRunning(false);
     if (error) {
       pushToast({ kind: "err", msg: `Fuzzy artist match failed: ${error.message}` });
@@ -266,7 +263,7 @@ export default function Page(): ReactElement {
   const updateStatus = async (matchId: Id, albumId: Id, review_status: MatchStatus) => {
     const { error } = await supabase
       .from("collection_1001_review")
-      .update({ review_status }) // @ts-expect-error - Supabase update type inference issue
+      .update({ review_status } as any)
       .eq("id", matchId);
     if (error) {
       pushToast({ kind: "err", msg: `Update failed: ${error.message}` });
@@ -282,7 +279,7 @@ export default function Page(): ReactElement {
   const rejectMatch = async (matchId: Id, albumId: Id) => {
     const { error } = await supabase
       .from("collection_1001_review")
-      .update({ review_status: 'rejected' }) // @ts-expect-error - Supabase update type inference issue
+      .update({ review_status: 'rejected' } as any)
       .eq("id", matchId);
     if (error) {
       pushToast({ kind: "err", msg: `Rejection failed: ${error.message}` });
@@ -334,7 +331,6 @@ export default function Page(): ReactElement {
 
   const linkFromSearch = async (albumId: Id, collectionId: Id) => {
     // First attempt: normal insert
-    // @ts-expect-error - Supabase insert type inference issue
     const result = await supabase.from("collection_1001_review").insert([
       {
         album_1001_id: albumId,
@@ -342,7 +338,7 @@ export default function Page(): ReactElement {
         review_status: "confirmed",
         confidence: 1.0,
         notes: "manual link via search",
-      },
+      } as any,
     ]);
 
     // If failed due to unique constraint on collection_final, check if it's a box set case
@@ -366,11 +362,10 @@ export default function Page(): ReactElement {
         }
 
         // User confirmed - use RPC function to bypass the constraint
-        // @ts-expect-error - Supabase RPC type inference issue
         const { error: rpcError } = await supabase.rpc("manual_link_1001", {
           p_album_1001_id: albumId,
           p_collection_id: collectionId,
-        });
+        } as any);
 
         if (rpcError) {
           pushToast({ kind: "err", msg: `Link failed: ${rpcError.message}` });

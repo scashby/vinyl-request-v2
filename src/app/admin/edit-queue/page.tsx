@@ -1,3 +1,4 @@
+// src/app/admin/edit-queue/page.tsx
 // Admin Edit Queue page ("/admin/edit-queue")
 // Updated with queue type support (track/side/album)
 
@@ -8,6 +9,7 @@ import { useSearchParams } from 'next/navigation';
 import { supabase } from 'lib/supabaseClient'
 import 'styles/admin-edit-queue.css';
 import { formatEventText } from 'src/utils/textFormatter';
+import type { DbEvent, DbRequest, Collection } from 'types/supabase';
 
 type Event = {
   id: string;
@@ -52,12 +54,14 @@ function EditQueueContent() {
         .eq('has_queue', true)
         .order('date', { ascending: false });
       
-      console.log('🔍 Admin Debug: Events query result:', { data, error, count: data?.length });
+      const typedData = (data || []) as DbEvent[];
+      
+      console.log('🔍 Admin Debug: Events query result:', { data: typedData, error, count: typedData?.length });
       
       if (error) {
         console.error('Error fetching events:', error);
       } else {
-        setEvents((data || []) as Event[]);
+        setEvents(typedData as unknown as Event[]);
       }
     } catch (error) {
       console.error('Error fetching events:', error);
@@ -70,13 +74,15 @@ function EditQueueContent() {
     try {
       console.log('🔍 Admin Debug: Fetching requests for event_id:', eventId);
       
-      const { data: requests, error: requestsError } = await supabase
+      const { data, error: requestsError } = await supabase
         .from('requests')
         .select('*')
         .eq('event_id', eventId)
         .order('id', { ascending: true });
 
-      console.log('🔍 Admin Debug: Requests query result:', { requests, requestsError, count: requests?.length });
+      const typedRequests = (data || []) as DbRequest[];
+
+      console.log('🔍 Admin Debug: Requests query result:', { requests: typedRequests, requestsError, count: typedRequests?.length });
 
       if (requestsError) {
         console.error('Error loading requests:', requestsError);
@@ -84,19 +90,19 @@ function EditQueueContent() {
         return;
       }
 
-      if (!requests || requests.length === 0) {
+      if (!typedRequests || typedRequests.length === 0) {
         console.log('🔍 Admin Debug: No requests found, setting empty queue');
         setRequests([]);
         return;
       }
 
-      const albumIds = requests.map(r => r.album_id).filter(Boolean);
+      const albumIds = typedRequests.map(r => r.album_id).filter(Boolean);
       console.log('🔍 Admin Debug: Album IDs found:', albumIds);
       
       if (albumIds.length === 0) {
         console.log('🔍 Admin Debug: No album IDs, using direct request data');
-        const mapped = requests.map(req => ({
-          id: req.id,
+        const mapped = typedRequests.map(req => ({
+          id: req.id.toString(),
           artist: req.artist || '',
           title: req.title || '',
           side: req.side || null,
@@ -106,7 +112,7 @@ function EditQueueContent() {
           votes: req.votes || 1,
           album_id: req.album_id,
           created_at: req.created_at,
-          event_id: req.event_id
+          event_id: req.event_id.toString()
         }));
         console.log('🔍 Admin Debug: Mapped requests without albums:', mapped);
         
@@ -122,10 +128,12 @@ function EditQueueContent() {
       }
 
       console.log('🔍 Admin Debug: Fetching albums for IDs:', albumIds);
-      const { data: albums, error: albumsError } = await supabase
+      const { data: albumData, error: albumsError } = await supabase
         .from('collection')
         .select('id, artist, title, image_url, year, format')
         .in('id', albumIds);
+
+      const albums = (albumData || []) as Collection[];
 
       console.log('🔍 Admin Debug: Albums query result:', { albums, albumsError });
 
@@ -135,10 +143,10 @@ function EditQueueContent() {
         return;
       }
 
-      const mapped = requests.map(req => {
+      const mapped = typedRequests.map(req => {
         const album = albums?.find(a => a.id === req.album_id);
         return {
-          id: req.id,
+          id: req.id.toString(),
           artist: req.artist || album?.artist || '',
           title: req.title || album?.title || '',
           side: req.side || null,
@@ -148,7 +156,7 @@ function EditQueueContent() {
           votes: req.votes || 1,
           album_id: req.album_id,
           created_at: req.created_at,
-          event_id: req.event_id
+          event_id: req.event_id.toString()
         };
       });
 

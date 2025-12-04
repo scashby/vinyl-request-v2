@@ -4,6 +4,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import Image from 'next/image';
 import { supabase } from 'lib/supabaseClient';
+import type { Collection, DbTagDefinition } from 'types/supabase';
 
 type TagDefinition = {
   id: number;
@@ -71,10 +72,12 @@ export default function ManageMetadata() {
       .order('category', { ascending: true })
       .order('tag_name', { ascending: true });
     
+    const typedData = (data || []) as DbTagDefinition[];
+    
     if (error) {
       console.error('Error loading tag definitions:', error);
     } else {
-      setTagDefinitions(data || []);
+      setTagDefinitions(typedData as unknown as TagDefinition[]);
     }
   }
 
@@ -83,6 +86,8 @@ export default function ManageMetadata() {
       .from('collection')
       .select('id, artist, title, discogs_genres, image_url');
     
+    const typedData = (data || []) as Collection[];
+    
     if (error) {
       console.error('Error calculating genre stats:', error);
       return;
@@ -90,9 +95,15 @@ export default function ManageMetadata() {
 
     const genreMap = new Map<string, Album[]>();
     
-    data?.forEach(album => {
-      if (album.discogs_genres && Array.isArray(album.discogs_genres)) {
-        album.discogs_genres.forEach((genre: string) => {
+    typedData?.forEach(album => {
+      const genres = album.discogs_genres;
+      // Parse if it's a string, otherwise assume it's already an array
+      const genreArray = typeof genres === 'string' 
+        ? (genres ? JSON.parse(genres) : [])
+        : (Array.isArray(genres) ? genres : []);
+        
+      if (genreArray && Array.isArray(genreArray)) {
+        genreArray.forEach((genre: string) => {
           if (!genreMap.has(genre)) {
             genreMap.set(genre, []);
           }
@@ -101,7 +112,7 @@ export default function ManageMetadata() {
             artist: album.artist,
             title: album.title,
             custom_tags: [],
-            discogs_genres: album.discogs_genres,
+            discogs_genres: genreArray,
             discogs_styles: [],
             image_url: album.image_url
           });
@@ -123,6 +134,8 @@ export default function ManageMetadata() {
       .from('collection')
       .select('id, artist, title, discogs_styles, image_url');
     
+    const typedData = (data || []) as Collection[];
+    
     if (error) {
       console.error('Error calculating style stats:', error);
       return;
@@ -130,9 +143,15 @@ export default function ManageMetadata() {
 
     const styleMap = new Map<string, Album[]>();
     
-    data?.forEach(album => {
-      if (album.discogs_styles && Array.isArray(album.discogs_styles)) {
-        album.discogs_styles.forEach((style: string) => {
+    typedData?.forEach(album => {
+      const styles = album.discogs_styles;
+      // Parse if it's a string, otherwise assume it's already an array
+      const styleArray = typeof styles === 'string'
+        ? (styles ? JSON.parse(styles) : [])
+        : (Array.isArray(styles) ? styles : []);
+        
+      if (styleArray && Array.isArray(styleArray)) {
+        styleArray.forEach((style: string) => {
           if (!styleMap.has(style)) {
             styleMap.set(style, []);
           }
@@ -142,7 +161,7 @@ export default function ManageMetadata() {
             title: album.title,
             custom_tags: [],
             discogs_genres: [],
-            discogs_styles: album.discogs_styles,
+            discogs_styles: styleArray,
             image_url: album.image_url
           });
         });
@@ -166,7 +185,7 @@ export default function ManageMetadata() {
 
     const { error } = await supabase
       .from('tag_definitions')
-      .insert([newTag]);
+      .insert([newTag] as any);
 
     if (error) {
       console.error('Error creating tag:', error);
@@ -199,9 +218,11 @@ export default function ManageMetadata() {
     }
 
     // Remove tag from all albums - fetch ALL albums and filter client-side
-    const { data: allAlbums, error: fetchError } = await supabase
+    const { data, error: fetchError } = await supabase
       .from('collection')
       .select('id, custom_tags');
+    
+    const allAlbums = (data || []) as Collection[];
     
     if (fetchError) {
       console.error('Error fetching albums:', fetchError);
@@ -209,15 +230,24 @@ export default function ManageMetadata() {
     }
 
     if (allAlbums) {
-      const albumsWithTag = allAlbums.filter(album => 
-        album.custom_tags && Array.isArray(album.custom_tags) && album.custom_tags.includes(tagName)
-      );
+      const albumsWithTag = allAlbums.filter(album => {
+        const tags = album.custom_tags;
+        const tagArray = typeof tags === 'string' 
+          ? (tags ? JSON.parse(tags) : [])
+          : (Array.isArray(tags) ? tags : []);
+        return tagArray && Array.isArray(tagArray) && tagArray.includes(tagName);
+      });
 
       for (const album of albumsWithTag) {
-        const updatedTags = (album.custom_tags || []).filter(t => t !== tagName);
+        const tags = album.custom_tags;
+        const tagArray = typeof tags === 'string'
+          ? (tags ? JSON.parse(tags) : [])
+          : (Array.isArray(tags) ? tags : []);
+        const updatedTags = (tagArray || []).filter(t => t !== tagName);
+        
         const { error: updateError } = await supabase
           .from('collection')
-          .update({ custom_tags: updatedTags })
+          .update({ custom_tags: updatedTags } as any)
           .eq('id', album.id);
         
         if (updateError) {
@@ -245,16 +275,11 @@ export default function ManageMetadata() {
     try {
       const field = renamingItem.type === 'genre' ? 'discogs_genres' : 'discogs_styles';
       
-      type AlbumWithMetadata = {
-        id: number;
-        discogs_genres?: string[];
-        discogs_styles?: string[];
-      };
-
-      const { data: albumsWithItem, error: fetchError } = await supabase
+      const { data, error: fetchError } = await supabase
         .from('collection')
-        .select(`id, ${field}`)
-        .returns<AlbumWithMetadata[]>();
+        .select(`id, ${field}`);
+
+      const albumsWithItem = (data || []) as Collection[];
 
       if (fetchError) {
         throw fetchError;
@@ -263,19 +288,25 @@ export default function ManageMetadata() {
       if (albumsWithItem) {
         // Filter albums that contain the old name
         const filteredAlbums = albumsWithItem.filter(album => {
-          const items = album[field as keyof AlbumWithMetadata];
-          return Array.isArray(items) && items.includes(renamingItem.oldName);
+          const items = album[field as keyof Collection];
+          const itemArray = typeof items === 'string'
+            ? (items ? JSON.parse(items) : [])
+            : (Array.isArray(items) ? items : []);
+          return Array.isArray(itemArray) && itemArray.includes(renamingItem.oldName);
         });
 
         for (const album of filteredAlbums) {
-          const items = album[field as keyof AlbumWithMetadata] as string[] || [];
-          const updated = items.map((item: string) => 
+          const items = album[field as keyof Collection];
+          const itemArray = typeof items === 'string'
+            ? (items ? JSON.parse(items) : [])
+            : (Array.isArray(items) ? items : []);
+          const updated = itemArray.map((item: string) => 
             item === renamingItem.oldName ? renamingItem.newName : item
           );
           
           const { error: updateError } = await supabase
             .from('collection')
-            .update({ [field]: updated })
+            .update({ [field]: updated } as any)
             .eq('id', album.id);
           
           if (updateError) {
