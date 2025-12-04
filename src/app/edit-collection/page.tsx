@@ -1,7 +1,7 @@
-// src/app/admin/edit-collection/page.tsx
+// src/app/edit-collection/page.tsx
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, Suspense } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -178,7 +178,7 @@ function toSafeStringArray(value: unknown): string[] {
   return value.filter(item => typeof item === 'string' && item.length > 0);
 }
 
-export default function CollectionBrowserPage() {
+function CollectionBrowserPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
@@ -803,7 +803,7 @@ export default function CollectionBrowserPage() {
         />
       )}
 
-      {/* Tag Editor Modal - same as before */}
+      {/* Tag Editor Modal */}
       {editingTagsFor && editingAlbum && (
         <div style={{
           position: 'fixed',
@@ -1013,7 +1013,7 @@ export default function CollectionBrowserPage() {
         </div>
       )}
 
-      {/* Sale Modal - same as before */}
+      {/* Sale Modal */}
       {saleModalAlbum && (
         <div style={{
           position: 'fixed',
@@ -1200,5 +1200,25 @@ export default function CollectionBrowserPage() {
         </div>
       )}
     </div>
+  );
+}
+
+// Suspense wrapper for useSearchParams
+export default function Page() {
+  return (
+    <Suspense fallback={
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh',
+        fontSize: '18px',
+        color: '#6B7280'
+      }}>
+        Loading collection browser...
+      </div>
+    }>
+      <CollectionBrowserPage />
+    </Suspense>
   );
 }
