@@ -82,6 +82,7 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
             <div className="space-y-2">
               <Link 
                 href="/admin/edit-collection"
+                target="_blank"
                 className={`block w-full text-center py-1.5 px-2 rounded text-xs font-medium transition-colors ${
                   pathname === "/admin/edit-collection" 
                     ? "bg-purple-700 text-white" 
