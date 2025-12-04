@@ -108,12 +108,10 @@ type SortOption =
   | 'sides-desc' | 'sides-asc'
   | 'decade-desc' | 'decade-asc';
 
-// View modes that reorganize the entire left sidebar
-type ViewMode = 'format' | 'artist' | 'artist-release-year' | 'genre-artist' | 'label' | 
-                'original-release-date' | 'original-release-month' | 'original-release-year' |
-                'recording-date' | 'recording-month' | 'recording-year';
+// TODO: Expand view modes - see PROJECT_STATUS.md Phase 2
+type ViewMode = 'format' | 'artist' | 'artist-release-year' | 'genre-artist' | 'label';
 
-// Collection filter options
+// TODO: Add database fields for these statuses - see PROJECT_STATUS.md Phase 5
 type CollectionFilter = 'all' | 'in-collection' | 'for-sale' | 'on-wish-list' | 'on-order' | 'sold' | 'not-in-collection';
 
 const PLATFORMS = [
@@ -183,20 +181,20 @@ function CollectionBrowserPage() {
   const [showCollectionDropdown, setShowCollectionDropdown] = useState(false);
   const [showViewDropdown, setShowViewDropdown] = useState(false);
   
-  // Selection state
+  // Selection state - NEW for multi-select functionality
   const [selectedAlbumIds, setSelectedAlbumIds] = useState<Set<number>>(new Set());
   const [selectedAlbumId, setSelectedAlbumId] = useState<number | null>(null); // For detail panel
   
-  // Column management
+  // Column management (existing)
   const [visibleColumns, setVisibleColumns] = useState<ColumnId[]>(DEFAULT_VISIBLE_COLUMNS);
   const [showColumnSelector, setShowColumnSelector] = useState(false);
   
-  // Format/View filter (dynamic based on view mode)
+  // Format/View filter (existing, but now dynamic based on view mode)
   const [selectedViewItem, setSelectedViewItem] = useState<string | null>(null);
   const [viewItemSearch, setViewItemSearch] = useState('');
   
-  // Modals
-  const [showAddAlbumsModal, setShowAddAlbumsModal] = useState(false);
+  // Modals (existing)
+  const [showAddAlbumsModal, setShowAddAlbumsModal] = useState(false); // NEW modal
   const [editingTagsFor, setEditingTagsFor] = useState<number | null>(null);
   const [albumTags, setAlbumTags] = useState<string[]>([]);
   const [savingTags, setSavingTags] = useState(false);
@@ -208,10 +206,10 @@ function CollectionBrowserPage() {
   const [saleNotes, setSaleNotes] = useState('');
   const [savingSale, setSavingSale] = useState(false);
   
-  // Active collection tab (for multiple collections feature)
+  // Active collection tab (NEW for multiple collections feature)
   const [activeCollection, setActiveCollection] = useState('music');
 
-  // Load column preferences from localStorage
+  // Load column preferences from localStorage (existing)
   useEffect(() => {
     const stored = localStorage.getItem('collection-visible-columns');
     if (stored) {
@@ -272,15 +270,16 @@ function CollectionBrowserPage() {
     loadAlbums();
   }, [loadAlbums]);
 
-  // Filter and sort albums
+  // Filter and sort albums (existing, with expanded collection filter)
   const filteredAndSortedAlbums = albums
     .filter(album => {
       // Collection filter
       // TODO: Expand with actual for_sale, wish_list, on_order, sold filtering
+      // See PROJECT_STATUS.md Phase 5 for database fields needed
       if (collectionFilter === 'for-sale' && !album.for_sale) return false;
       if (collectionFilter === 'not-in-collection') return false; // TODO: Add logic
       
-      // Letter filter
+      // Letter filter (existing)
       if (selectedLetter !== 'all') {
         const firstChar = (album.artist || '').charAt(0).toUpperCase();
         if (selectedLetter === '0-9') {
@@ -290,12 +289,13 @@ function CollectionBrowserPage() {
         }
       }
 
-      // View item filter (format/artist/etc depending on view mode)
-      // TODO: Expand for other view modes
+      // View item filter (existing for format, needs expansion for other view modes)
+      // TODO: Expand for other view modes - see PROJECT_STATUS.md Phase 2
       if (viewMode === 'format' && selectedViewItem && album.format !== selectedViewItem) return false;
       if (viewMode === 'artist' && selectedViewItem && album.artist !== selectedViewItem) return false;
+      // TODO: Add genre-artist, artist-release-year, label, etc.
 
-      // Search filter
+      // Search filter (existing)
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
         const searchable = [
@@ -312,6 +312,7 @@ function CollectionBrowserPage() {
       return true;
     })
     .sort((a, b) => {
+      // Existing sort logic - all 24 options preserved
       switch (sortBy) {
         case 'artist-asc': return (a.artist || '').localeCompare(b.artist || '');
         case 'artist-desc': return (b.artist || '').localeCompare(a.artist || '');
@@ -347,7 +348,8 @@ function CollectionBrowserPage() {
       }
     });
 
-  // Selection handlers
+  // Selection handlers - NEW for multi-select
+  // TODO: See PROJECT_STATUS.md Phase 1 for batch operations to implement
   const toggleAlbumSelection = (albumId: number) => {
     setSelectedAlbumIds(prev => {
       const newSet = new Set(prev);
@@ -368,7 +370,7 @@ function CollectionBrowserPage() {
     setSelectedAlbumIds(new Set());
   };
 
-  // Tag management
+  // Tag management (existing)
   const openTagEditor = (album: Album) => {
     setEditingTagsFor(album.id);
     setAlbumTags(toSafeStringArray(album.custom_tags));
@@ -411,7 +413,7 @@ function CollectionBrowserPage() {
     setSavingTags(false);
   };
 
-  // Sale management
+  // Sale management (existing)
   const openSaleModal = (album: Album) => {
     setSaleModalAlbum(album);
     setSalePrice(album.sale_price?.toString() || '');
@@ -460,8 +462,8 @@ function CollectionBrowserPage() {
   const editingAlbum = albums.find(a => a.id === editingTagsFor);
   const selectedAlbum = albums.find(a => a.id === selectedAlbumId);
 
-  // View item counts (formats/artists/etc depending on view mode)
-  // TODO: Expand for other view modes beyond format
+  // View item counts (existing for format, needs expansion for other view modes)
+  // TODO: Expand for other view modes - see PROJECT_STATUS.md Phase 2
   const viewItemCounts = albums.reduce((acc, album) => {
     let itemKey = 'Unknown';
     if (viewMode === 'format') {
@@ -469,7 +471,7 @@ function CollectionBrowserPage() {
     } else if (viewMode === 'artist') {
       itemKey = album.artist || 'Unknown';
     }
-    // TODO: Add other view modes
+    // TODO: Add genre-artist, artist-release-year, label, etc.
     
     acc[itemKey] = (acc[itemKey] || 0) + 1;
     return acc;
@@ -488,49 +490,72 @@ function CollectionBrowserPage() {
       display: 'flex',
       height: '100vh',
       overflow: 'hidden',
-      background: '#F9FAFB'
+      background: '#f5f5f5'
     }}>
-      {/* LEFT HAMBURGER SIDEBAR - TODO: Build out full menu structure */}
+      {/* LEFT HAMBURGER SIDEBAR - TODO: Build out full menu structure
+          See PROJECT_STATUS.md Phase 3 for complete menu items */}
       {sidebarOpen && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          bottom: 0,
-          width: '280px',
-          background: '#2C2C2C',
-          color: 'white',
-          zIndex: 2000,
-          overflowY: 'auto',
-          padding: '20px'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-            <div style={{ fontSize: '18px', fontWeight: 600 }}>CLZ MUSIC WEB</div>
-            <button
-              onClick={() => setSidebarOpen(false)}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: 'white',
-                fontSize: '24px',
-                cursor: 'pointer'
-              }}
-            >
-              ×
-            </button>
-          </div>
+        <>
+          <div
+            onClick={() => setSidebarOpen(false)}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0,0,0,0.5)',
+              zIndex: 1999
+            }}
+          />
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            bottom: 0,
+            width: '280px',
+            background: '#333',
+            color: 'white',
+            zIndex: 2000,
+            overflowY: 'auto',
+            padding: '20px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <div style={{ fontSize: '18px', fontWeight: 600 }}>MENU</div>
+              <button
+                onClick={() => setSidebarOpen(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'white',
+                  fontSize: '24px',
+                  cursor: 'pointer'
+                }}
+              >
+                ×
+              </button>
+            </div>
 
-          {/* TODO: Build out full sidebar menu with sections:
-              - Collection (Add Albums, Manage Pick Lists, Manage Collections)
-              - Tools (Print to PDF, Statistics, Find Duplicates, Loan Manager)
-              - Customization (CLZ Cloud Sharing, Pre-fill Settings, Settings)
-              - Maintenance (Re-Assign Index Values, Backup/Restore, Clear Database, Transfer Field Data)
-              - Import/Export (Export to CSV/TXT, Export to XML)
-          */}
-          <div style={{ fontSize: '14px', color: '#888', marginTop: '20px' }}>
-            [Full sidebar menu structure to be built - see PROJECT_STATUS.md]
+            {/* TODO: Build out full sidebar menu with sections:
+                - Collection (Add Albums, Manage Pick Lists, Manage Collections)
+                - Tools (Print to PDF, Statistics, Find Duplicates, Loan Manager)
+                - Customization (CLZ Cloud Sharing, Pre-fill Settings, Settings)
+                - Maintenance (Re-Assign Index Values, Backup/Restore, Clear Database, Transfer Field Data)
+                - Import/Export (Export to CSV/TXT, Export to XML)
+                See PROJECT_STATUS.md Phase 3
+            */}
+            <div style={{ fontSize: '14px', color: '#888', marginTop: '20px' }}>
+              [Full sidebar menu structure to be built]
+              <ul style={{ marginTop: '10px', paddingLeft: '20px' }}>
+                <li>Collection</li>
+                <li>Tools</li>
+                <li>Customization</li>
+                <li>Maintenance</li>
+                <li>Import / Export</li>
+              </ul>
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       {/* MAIN CONTENT AREA */}
@@ -542,13 +567,12 @@ function CollectionBrowserPage() {
       }}>
         {/* TOP BAR */}
         <div style={{
-          background: 'linear-gradient(135deg, #667EEA 0%, #764BA2 100%)',
+          background: '#667eea',
           color: 'white',
           padding: '12px 24px',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+          justifyContent: 'space-between'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             {/* Hamburger Menu Button */}
@@ -610,20 +634,20 @@ function CollectionBrowserPage() {
           </div>
         </div>
 
-        {/* CONTROLS BAR */}
+        {/* CONTROLS BAR - NEW section with all the dropdowns and buttons */}
         <div style={{
-          background: '#FFFFFF',
-          borderBottom: '1px solid #E5E7EB',
+          background: '#fff',
+          borderBottom: '1px solid #ddd',
           padding: '12px 16px',
           display: 'flex',
           alignItems: 'center',
           gap: '12px'
         }}>
-          {/* Add Albums Button */}
+          {/* Add Albums Button - NEW */}
           <button
             onClick={() => setShowAddAlbumsModal(true)}
             style={{
-              background: '#667EEA',
+              background: '#4CAF50',
               color: 'white',
               border: 'none',
               padding: '8px 16px',
@@ -636,13 +660,13 @@ function CollectionBrowserPage() {
             + Add Albums
           </button>
 
-          {/* Collection Filter Dropdown */}
+          {/* Collection Filter Dropdown - NEW */}
           <div style={{ position: 'relative' }}>
             <button
               onClick={() => setShowCollectionDropdown(!showCollectionDropdown)}
               style={{
-                background: '#F3F4F6',
-                border: '1px solid #D1D5DB',
+                background: '#f0f0f0',
+                border: '1px solid #ddd',
                 padding: '8px 16px',
                 borderRadius: '6px',
                 cursor: 'pointer',
@@ -663,13 +687,13 @@ function CollectionBrowserPage() {
                 left: 0,
                 marginTop: '4px',
                 background: 'white',
-                border: '1px solid #D1D5DB',
+                border: '1px solid #ddd',
                 borderRadius: '6px',
                 boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
                 zIndex: 100,
                 minWidth: '200px'
               }}>
-                {/* TODO: Add icons for each filter option */}
+                {/* TODO: Add proper icons for each filter option - see CLZ screenshots */}
                 {['all', 'in-collection', 'for-sale', 'on-wish-list', 'on-order', 'sold', 'not-in-collection'].map(filter => (
                   <button
                     key={filter}
@@ -680,12 +704,12 @@ function CollectionBrowserPage() {
                     style={{
                       width: '100%',
                       padding: '10px 16px',
-                      background: collectionFilter === filter ? '#EEF2FF' : 'transparent',
+                      background: collectionFilter === filter ? '#e3f2fd' : 'transparent',
                       border: 'none',
                       textAlign: 'left',
                       cursor: 'pointer',
                       fontSize: '14px',
-                      color: collectionFilter === filter ? '#667EEA' : '#374151'
+                      color: collectionFilter === filter ? '#1976d2' : '#333'
                     }}
                   >
                     {filter === 'all' ? 'All' : filter.replace('-', ' ')}
@@ -695,13 +719,13 @@ function CollectionBrowserPage() {
             )}
           </div>
 
-          {/* View Mode Selector (labeled as Format in CLZ) */}
+          {/* View Mode Selector - NEW (labeled as Format in CLZ) */}
           <div style={{ position: 'relative' }}>
             <button
               onClick={() => setShowViewDropdown(!showViewDropdown)}
               style={{
-                background: '#F3F4F6',
-                border: '1px solid #D1D5DB',
+                background: '#f0f0f0',
+                border: '1px solid #ddd',
                 padding: '8px 16px',
                 borderRadius: '6px',
                 cursor: 'pointer',
@@ -722,32 +746,33 @@ function CollectionBrowserPage() {
                 left: 0,
                 marginTop: '4px',
                 background: 'white',
-                border: '1px solid #D1D5DB',
+                border: '1px solid #ddd',
                 borderRadius: '6px',
                 boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
                 zIndex: 100,
                 minWidth: '250px'
               }}>
-                {/* TODO: Organize into expandable sections: Main, Details, Classical, People */}
+                {/* TODO: Organize into expandable sections: Main, Details, Classical, People
+                    See PROJECT_STATUS.md Phase 2 */}
                 <div style={{ padding: '8px 0' }}>
-                  <div style={{ padding: '8px 16px', fontSize: '12px', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase' }}>Main</div>
+                  <div style={{ padding: '8px 16px', fontSize: '12px', fontWeight: 600, color: '#666', textTransform: 'uppercase' }}>Main</div>
                   {['format', 'artist', 'artist-release-year', 'genre-artist'].map(mode => (
                     <button
                       key={mode}
                       onClick={() => {
                         setViewMode(mode as ViewMode);
                         setShowViewDropdown(false);
-                        setSelectedViewItem(null); // Reset filter when changing view
+                        setSelectedViewItem(null);
                       }}
                       style={{
                         width: '100%',
                         padding: '10px 24px',
-                        background: viewMode === mode ? '#EEF2FF' : 'transparent',
+                        background: viewMode === mode ? '#e3f2fd' : 'transparent',
                         border: 'none',
                         textAlign: 'left',
                         cursor: 'pointer',
                         fontSize: '14px',
-                        color: viewMode === mode ? '#667EEA' : '#374151'
+                        color: viewMode === mode ? '#1976d2' : '#333'
                       }}
                     >
                       {mode === 'artist-release-year' ? 'Artist / Release Year' :
@@ -756,21 +781,21 @@ function CollectionBrowserPage() {
                     </button>
                   ))}
                   {/* TODO: Add Details, Classical, People sections with more view modes */}
-                  <div style={{ padding: '8px 16px', fontSize: '12px', color: '#9CA3AF' }}>
-                    [More view modes to be added - see PROJECT_STATUS.md]
+                  <div style={{ padding: '8px 16px', fontSize: '12px', color: '#999' }}>
+                    [More view modes to be added]
                   </div>
                 </div>
               </div>
             )}
           </div>
 
-          {/* View Management Icons */}
+          {/* View Management Icons - NEW */}
           <div style={{ display: 'flex', gap: '4px' }}>
-            {/* List/Grid Toggle - TODO: Implement grid view */}
+            {/* List/Grid Toggle - TODO: Implement grid view - see PROJECT_STATUS.md Phase 6 */}
             <button
               style={{
-                background: '#F3F4F6',
-                border: '1px solid #D1D5DB',
+                background: '#f0f0f0',
+                border: '1px solid #ddd',
                 padding: '8px 12px',
                 borderRadius: '6px',
                 cursor: 'pointer',
@@ -784,8 +809,8 @@ function CollectionBrowserPage() {
             {/* Manage Current View - TODO: Open manage modal for current view mode */}
             <button
               style={{
-                background: '#F3F4F6',
-                border: '1px solid #D1D5DB',
+                background: '#f0f0f0',
+                border: '1px solid #ddd',
                 padding: '8px 12px',
                 borderRadius: '6px',
                 cursor: 'pointer',
@@ -799,8 +824,8 @@ function CollectionBrowserPage() {
             {/* Sort/Filter Toggle */}
             <button
               style={{
-                background: '#F3F4F6',
-                border: '1px solid #D1D5DB',
+                background: '#f0f0f0',
+                border: '1px solid #ddd',
                 padding: '8px 12px',
                 borderRadius: '6px',
                 cursor: 'pointer',
@@ -815,7 +840,7 @@ function CollectionBrowserPage() {
           {/* Spacer */}
           <div style={{ flex: 1 }} />
 
-          {/* Search and settings */}
+          {/* Search */}
           <input
             type="text"
             placeholder="Search albums..."
@@ -824,16 +849,17 @@ function CollectionBrowserPage() {
             style={{
               width: '300px',
               padding: '8px 12px',
-              border: '1px solid #D1D5DB',
+              border: '1px solid #ddd',
               borderRadius: '6px',
               fontSize: '14px'
             }}
           />
           
+          {/* Settings */}
           <button
             style={{
-              background: '#F3F4F6',
-              border: '1px solid #D1D5DB',
+              background: '#f0f0f0',
+              border: '1px solid #ddd',
               padding: '8px 12px',
               borderRadius: '6px',
               cursor: 'pointer',
@@ -847,16 +873,16 @@ function CollectionBrowserPage() {
 
         {/* ALPHABET NAVIGATION */}
         <div style={{
-          background: '#FFFFFF',
-          borderBottom: '1px solid #E5E7EB',
+          background: '#fff',
+          borderBottom: '1px solid #ddd',
           padding: '12px 16px'
         }}>
           <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
             <button
               onClick={() => setSelectedLetter('all')}
               style={{
-                background: selectedLetter === 'all' ? '#667EEA' : '#F3F4F6',
-                color: selectedLetter === 'all' ? 'white' : '#374151',
+                background: selectedLetter === 'all' ? '#667eea' : '#f0f0f0',
+                color: selectedLetter === 'all' ? 'white' : '#333',
                 border: 'none',
                 padding: '6px 12px',
                 borderRadius: '4px',
@@ -870,8 +896,8 @@ function CollectionBrowserPage() {
             <button
               onClick={() => setSelectedLetter('0-9')}
               style={{
-                background: selectedLetter === '0-9' ? '#667EEA' : '#F3F4F6',
-                color: selectedLetter === '0-9' ? 'white' : '#374151',
+                background: selectedLetter === '0-9' ? '#667eea' : '#f0f0f0',
+                color: selectedLetter === '0-9' ? 'white' : '#333',
                 border: 'none',
                 padding: '6px 12px',
                 borderRadius: '4px',
@@ -887,8 +913,8 @@ function CollectionBrowserPage() {
                 key={letter}
                 onClick={() => setSelectedLetter(letter)}
                 style={{
-                  background: selectedLetter === letter ? '#667EEA' : '#F3F4F6',
-                  color: selectedLetter === letter ? 'white' : '#374151',
+                  background: selectedLetter === letter ? '#667eea' : '#f0f0f0',
+                  color: selectedLetter === letter ? 'white' : '#333',
                   border: 'none',
                   padding: '6px 10px',
                   borderRadius: '4px',
@@ -904,16 +930,16 @@ function CollectionBrowserPage() {
           </div>
         </div>
 
-        {/* SELECTION TOOLBAR - Shows when albums are selected */}
+        {/* SELECTION TOOLBAR - NEW - Shows when albums are selected */}
         {selectedAlbumIds.size > 0 && (
           <div style={{
-            background: '#3B82F6',
+            background: '#2196F3',
             color: 'white',
             padding: '12px 16px',
             display: 'flex',
             alignItems: 'center',
             gap: '12px',
-            borderBottom: '1px solid #2563EB'
+            borderBottom: '1px solid #1976D2'
           }}>
             <button
               onClick={clearSelection}
@@ -943,7 +969,8 @@ function CollectionBrowserPage() {
             >
               ☑ All
             </button>
-            {/* TODO: Add more batch action buttons: Edit, Remove, Print to PDF, etc. */}
+            {/* TODO: Add more batch action buttons: Edit, Remove, Print to PDF, etc.
+                See PROJECT_STATUS.md Phase 1.2 for implementation */}
             <button
               style={{
                 background: 'rgba(255,255,255,0.2)',
@@ -999,14 +1026,14 @@ function CollectionBrowserPage() {
           {/* LEFT SIDEBAR - View Items (Format/Artist/etc) */}
           <div style={{
             width: '280px',
-            background: '#FFFFFF',
-            borderRight: '1px solid #E5E7EB',
+            background: '#fff',
+            borderRight: '1px solid #ddd',
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden'
           }}>
             {/* Search for view items */}
-            <div style={{ padding: '16px', borderBottom: '1px solid #E5E7EB' }}>
+            <div style={{ padding: '16px', borderBottom: '1px solid #ddd' }}>
               <input
                 type="text"
                 placeholder={`Search ${viewMode}...`}
@@ -1015,7 +1042,7 @@ function CollectionBrowserPage() {
                 style={{
                   width: '100%',
                   padding: '8px 12px',
-                  border: '1px solid #D1D5DB',
+                  border: '1px solid #ddd',
                   borderRadius: '6px',
                   fontSize: '13px'
                 }}
@@ -1033,19 +1060,19 @@ function CollectionBrowserPage() {
                   justifyContent: 'space-between',
                   alignItems: 'center',
                   padding: '10px 12px',
-                  background: !selectedViewItem ? '#EEF2FF' : 'transparent',
+                  background: !selectedViewItem ? '#e3f2fd' : 'transparent',
                   border: 'none',
                   borderRadius: '6px',
                   cursor: 'pointer',
                   marginBottom: '4px',
                   fontSize: '14px',
-                  color: !selectedViewItem ? '#667EEA' : '#374151'
+                  color: !selectedViewItem ? '#1976d2' : '#333'
                 }}
               >
                 <span>[All {viewMode === 'format' ? 'Albums' : viewMode === 'artist' ? 'Artists' : 'Items'}]</span>
                 <span style={{
-                  background: !selectedViewItem ? '#667EEA' : '#E5E7EB',
-                  color: !selectedViewItem ? 'white' : '#6B7280',
+                  background: !selectedViewItem ? '#1976d2' : '#e0e0e0',
+                  color: !selectedViewItem ? 'white' : '#666',
                   padding: '2px 8px',
                   borderRadius: '12px',
                   fontSize: '12px',
@@ -1066,20 +1093,20 @@ function CollectionBrowserPage() {
                     justifyContent: 'space-between',
                     alignItems: 'center',
                     padding: '10px 12px',
-                    background: selectedViewItem === item ? '#EEF2FF' : 'transparent',
+                    background: selectedViewItem === item ? '#e3f2fd' : 'transparent',
                     border: 'none',
                     borderRadius: '6px',
                     cursor: 'pointer',
                     marginBottom: '4px',
                     fontSize: '14px',
-                    color: selectedViewItem === item ? '#667EEA' : '#374151',
+                    color: selectedViewItem === item ? '#1976d2' : '#333',
                     textAlign: 'left'
                   }}
                 >
                   <span>{item}</span>
                   <span style={{
-                    background: selectedViewItem === item ? '#667EEA' : '#E5E7EB',
-                    color: selectedViewItem === item ? 'white' : '#6B7280',
+                    background: selectedViewItem === item ? '#1976d2' : '#e0e0e0',
+                    color: selectedViewItem === item ? 'white' : '#666',
                     padding: '2px 8px',
                     borderRadius: '12px',
                     fontSize: '12px',
@@ -1098,23 +1125,23 @@ function CollectionBrowserPage() {
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
-            background: '#FFFFFF'
+            background: '#fff'
           }}>
             {/* Sort Controls */}
             <div style={{
               padding: '12px 16px',
-              borderBottom: '1px solid #E5E7EB',
+              borderBottom: '1px solid #ddd',
               display: 'flex',
               alignItems: 'center',
               gap: '12px'
             }}>
-              <label style={{ fontSize: '14px', color: '#6B7280' }}>Sort by:</label>
+              <label style={{ fontSize: '14px', color: '#666' }}>Sort by:</label>
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as SortOption)}
                 style={{
                   padding: '6px 12px',
-                  border: '1px solid #D1D5DB',
+                  border: '1px solid #ddd',
                   borderRadius: '6px',
                   fontSize: '14px'
                 }}
@@ -1137,16 +1164,16 @@ function CollectionBrowserPage() {
               </select>
             </div>
 
-            {/* Table with checkboxes - TODO: Update CollectionTable to include selection checkboxes */}
+            {/* Table with checkboxes */}
+            {/* TODO: Update CollectionTable to include selection checkboxes
+                See PROJECT_STATUS.md Phase 1.1 */}
             <div style={{ flex: 1, overflow: 'auto' }}>
               {loading ? (
-                <div style={{ padding: '40px', textAlign: 'center', color: '#6B7280' }}>
+                <div style={{ padding: '40px', textAlign: 'center', color: '#666' }}>
                   Loading albums...
                 </div>
               ) : (
                 <div>
-                  {/* TODO: Create new CollectionTableWithSelection component or modify existing CollectionTable
-                      to include checkboxes in first column, handle selection state */}
                   <CollectionTable
                     albums={filteredAndSortedAlbums}
                     visibleColumns={visibleColumns}
@@ -1154,8 +1181,8 @@ function CollectionBrowserPage() {
                     onSellClick={openSaleModal}
                     selectedAlbumId={selectedAlbumId}
                   />
-                  <div style={{ padding: '20px', textAlign: 'center', color: '#9CA3AF', fontSize: '13px' }}>
-                    [Selection checkboxes to be added to table - see PROJECT_STATUS.md]
+                  <div style={{ padding: '20px', textAlign: 'center', color: '#999', fontSize: '13px' }}>
+                    [Selection checkboxes to be added to table - see PROJECT_STATUS.md Phase 1.1]
                   </div>
                 </div>
               )}
@@ -1166,8 +1193,8 @@ function CollectionBrowserPage() {
           {selectedAlbum && (
             <div style={{
               width: '400px',
-              background: '#FFFFFF',
-              borderLeft: '1px solid #E5E7EB',
+              background: '#fff',
+              borderLeft: '1px solid #ddd',
               overflow: 'auto'
             }}>
               <AlbumDetailPanel
@@ -1180,16 +1207,17 @@ function CollectionBrowserPage() {
           )}
         </div>
 
-        {/* BOTTOM COLLECTION TABS */}
+        {/* BOTTOM COLLECTION TABS - NEW */}
         <div style={{
-          background: '#2C2C2C',
-          borderTop: '1px solid #1F1F1F',
+          background: '#333',
+          borderTop: '1px solid #222',
           padding: '0',
           display: 'flex',
           alignItems: 'center',
           gap: '0'
         }}>
-          {/* TODO: Load collections from database/settings */}
+          {/* TODO: Load collections from database/settings
+              See PROJECT_STATUS.md Phase 3.1 for Manage Collections implementation */}
           {['music', 'Vinyl', 'Singles (45s and 12")', 'Sale'].map(collection => (
             <button
               key={collection}
@@ -1213,7 +1241,7 @@ function CollectionBrowserPage() {
           <button
             style={{
               background: 'transparent',
-              color: '#9CA3AF',
+              color: '#999',
               border: 'none',
               padding: '12px 24px',
               cursor: 'pointer',
@@ -1226,7 +1254,8 @@ function CollectionBrowserPage() {
         </div>
       </div>
 
-      {/* ADD ALBUMS MODAL - TODO: Build out full add albums interface */}
+      {/* ADD ALBUMS MODAL - NEW - TODO: Build out full add albums interface
+          See PROJECT_STATUS.md Phase 4 */}
       {showAddAlbumsModal && (
         <div style={{
           position: 'fixed',
@@ -1249,7 +1278,7 @@ function CollectionBrowserPage() {
           }}>
             <div style={{
               padding: 20,
-              borderBottom: '1px solid #e5e7eb',
+              borderBottom: '1px solid #e0e0e0',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center'
@@ -1264,20 +1293,21 @@ function CollectionBrowserPage() {
                   border: 'none',
                   fontSize: '24px',
                   cursor: 'pointer',
-                  color: '#6B7280'
+                  color: '#666'
                 }}
               >
                 ×
               </button>
             </div>
             <div style={{ padding: 20 }}>
-              {/* TODO: Add tab buttons for Artist & Title, Barcode, Catalog Nr, Add Manually */}
-              <div style={{ fontSize: '14px', color: '#6B7280' }}>
-                [Add Albums interface to be built - see PROJECT_STATUS.md]
+              {/* TODO: Add tab buttons for Artist & Title, Barcode, Catalog Nr, Add Manually
+                  See PROJECT_STATUS.md Phase 4.1 */}
+              <div style={{ fontSize: '14px', color: '#666' }}>
+                [Add Albums interface to be built]
               </div>
               <div style={{ marginTop: '20px' }}>
                 <p>Options to implement:</p>
-                <ul style={{ fontSize: '14px', color: '#6B7280' }}>
+                <ul style={{ fontSize: '14px', color: '#666' }}>
                   <li>Artist & Title search</li>
                   <li>Barcode scan/entry</li>
                   <li>Catalog Number entry</li>
@@ -1289,7 +1319,9 @@ function CollectionBrowserPage() {
         </div>
       )}
 
-      {/* EXISTING MODALS - Keep these */}
+      {/* EXISTING MODALS - ALL PRESERVED BELOW */}
+      
+      {/* Column Selector Modal - EXISTING */}
       {showColumnSelector && (
         <ColumnSelector
           visibleColumns={visibleColumns}
@@ -1298,7 +1330,7 @@ function CollectionBrowserPage() {
         />
       )}
 
-      {/* Tag Editor Modal */}
+      {/* Tag Editor Modal - EXISTING */}
       {editingTagsFor && editingAlbum && (
         <div style={{
           position: 'fixed',
@@ -1325,12 +1357,12 @@ function CollectionBrowserPage() {
           }}>
             <div style={{
               padding: 20,
-              borderBottom: '1px solid #e5e7eb'
+              borderBottom: '1px solid #e0e0e0'
             }}>
               <h2 style={{ fontSize: 20, fontWeight: 'bold', margin: 0, marginBottom: 8 }}>
                 Edit Tags
               </h2>
-              <p style={{ fontSize: 14, color: '#6b7280', margin: 0 }}>
+              <p style={{ fontSize: 14, color: '#666', margin: 0 }}>
                 {editingAlbum.artist} - {editingAlbum.title}
               </p>
             </div>
@@ -1341,7 +1373,7 @@ function CollectionBrowserPage() {
                   <h3 style={{
                     fontSize: 14,
                     fontWeight: 600,
-                    color: '#374151',
+                    color: '#333',
                     marginBottom: 12,
                     textTransform: 'uppercase',
                     letterSpacing: '0.5px'
@@ -1362,8 +1394,8 @@ function CollectionBrowserPage() {
                           style={{
                             padding: '8px 12px',
                             background: isSelected ? tag.color : 'white',
-                            color: isSelected ? 'white' : '#374151',
-                            border: `2px solid ${isSelected ? tag.color : '#e5e7eb'}`,
+                            color: isSelected ? 'white' : '#333',
+                            border: `2px solid ${isSelected ? tag.color : '#e0e0e0'}`,
                             borderRadius: 6,
                             fontSize: 13,
                             fontWeight: isSelected ? 600 : 400,
@@ -1380,11 +1412,11 @@ function CollectionBrowserPage() {
                 </div>
               ))}
 
-              <div style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid #e5e7eb' }}>
+              <div style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid #e0e0e0' }}>
                 <h3 style={{
                   fontSize: 14,
                   fontWeight: 600,
-                  color: '#374151',
+                  color: '#333',
                   marginBottom: 12,
                   textTransform: 'uppercase',
                   letterSpacing: '0.5px'
@@ -1406,7 +1438,7 @@ function CollectionBrowserPage() {
                     style={{
                       flex: 1,
                       padding: '8px 12px',
-                      border: '1px solid #d1d5db',
+                      border: '1px solid #ddd',
                       borderRadius: 6,
                       fontSize: 14
                     }}
@@ -1415,7 +1447,7 @@ function CollectionBrowserPage() {
                     onClick={addCustomTag}
                     style={{
                       padding: '8px 16px',
-                      background: '#3b82f6',
+                      background: '#2196F3',
                       color: 'white',
                       border: 'none',
                       borderRadius: 6,
@@ -1436,8 +1468,8 @@ function CollectionBrowserPage() {
                         alignItems: 'center',
                         gap: 6,
                         padding: '6px 10px',
-                        background: '#f3f4f6',
-                        border: '1px solid #e5e7eb',
+                        background: '#f0f0f0',
+                        border: '1px solid #e0e0e0',
                         borderRadius: 6,
                         fontSize: 13
                       }}>
@@ -1447,7 +1479,7 @@ function CollectionBrowserPage() {
                           style={{
                             background: 'none',
                             border: 'none',
-                            color: '#ef4444',
+                            color: '#f44336',
                             cursor: 'pointer',
                             padding: 0,
                             fontSize: 16,
@@ -1464,7 +1496,7 @@ function CollectionBrowserPage() {
 
             <div style={{
               padding: 20,
-              borderTop: '1px solid #e5e7eb',
+              borderTop: '1px solid #e0e0e0',
               display: 'flex',
               gap: 12,
               justifyContent: 'flex-end'
@@ -1475,8 +1507,8 @@ function CollectionBrowserPage() {
                 style={{
                   padding: '10px 20px',
                   background: 'white',
-                  color: '#374151',
-                  border: '1px solid #d1d5db',
+                  color: '#333',
+                  border: '1px solid #ddd',
                   borderRadius: 8,
                   fontSize: 14,
                   fontWeight: 600,
@@ -1491,7 +1523,7 @@ function CollectionBrowserPage() {
                 disabled={savingTags}
                 style={{
                   padding: '10px 20px',
-                  background: '#3b82f6',
+                  background: '#2196F3',
                   color: 'white',
                   border: 'none',
                   borderRadius: 8,
@@ -1508,7 +1540,7 @@ function CollectionBrowserPage() {
         </div>
       )}
 
-      {/* Sale Modal */}
+      {/* Sale Modal - EXISTING */}
       {saleModalAlbum && (
         <div style={{
           position: 'fixed',
@@ -1532,12 +1564,12 @@ function CollectionBrowserPage() {
           }}>
             <div style={{
               padding: 20,
-              borderBottom: '1px solid #e5e7eb'
+              borderBottom: '1px solid #e0e0e0'
             }}>
               <h2 style={{ fontSize: 20, fontWeight: 'bold', margin: 0, marginBottom: 8 }}>
                 Mark for Sale
               </h2>
-              <p style={{ fontSize: 14, color: '#6b7280', margin: 0 }}>
+              <p style={{ fontSize: 14, color: '#666', margin: 0 }}>
                 {saleModalAlbum.artist} - {saleModalAlbum.title}
               </p>
             </div>
@@ -1548,7 +1580,7 @@ function CollectionBrowserPage() {
                   display: 'block',
                   fontSize: 13,
                   fontWeight: 600,
-                  color: '#374151',
+                  color: '#333',
                   marginBottom: 6
                 }}>
                   Sale Price ($)
@@ -1561,7 +1593,7 @@ function CollectionBrowserPage() {
                   style={{
                     width: '100%',
                     padding: '10px 12px',
-                    border: '1px solid #d1d5db',
+                    border: '1px solid #ddd',
                     borderRadius: 6,
                     fontSize: 14
                   }}
@@ -1573,7 +1605,7 @@ function CollectionBrowserPage() {
                   display: 'block',
                   fontSize: 13,
                   fontWeight: 600,
-                  color: '#374151',
+                  color: '#333',
                   marginBottom: 6
                 }}>
                   Platform
@@ -1584,7 +1616,7 @@ function CollectionBrowserPage() {
                   style={{
                     width: '100%',
                     padding: '10px 12px',
-                    border: '1px solid #d1d5db',
+                    border: '1px solid #ddd',
                     borderRadius: 6,
                     fontSize: 14,
                     background: 'white'
@@ -1602,7 +1634,7 @@ function CollectionBrowserPage() {
                   display: 'block',
                   fontSize: 13,
                   fontWeight: 600,
-                  color: '#374151',
+                  color: '#333',
                   marginBottom: 6
                 }}>
                   Quantity
@@ -1615,7 +1647,7 @@ function CollectionBrowserPage() {
                   style={{
                     width: '100%',
                     padding: '10px 12px',
-                    border: '1px solid #d1d5db',
+                    border: '1px solid #ddd',
                     borderRadius: 6,
                     fontSize: 14
                   }}
@@ -1627,7 +1659,7 @@ function CollectionBrowserPage() {
                   display: 'block',
                   fontSize: 13,
                   fontWeight: 600,
-                  color: '#374151',
+                  color: '#333',
                   marginBottom: 6
                 }}>
                   Sale Notes (optional)
@@ -1639,7 +1671,7 @@ function CollectionBrowserPage() {
                   style={{
                     width: '100%',
                     padding: '10px 12px',
-                    border: '1px solid #d1d5db',
+                    border: '1px solid #ddd',
                     borderRadius: 6,
                     fontSize: 14,
                     resize: 'vertical',
@@ -1651,7 +1683,7 @@ function CollectionBrowserPage() {
 
             <div style={{
               padding: 20,
-              borderTop: '1px solid #e5e7eb',
+              borderTop: '1px solid #e0e0e0',
               display: 'flex',
               gap: 12,
               justifyContent: 'flex-end'
@@ -1662,8 +1694,8 @@ function CollectionBrowserPage() {
                 style={{
                   padding: '10px 20px',
                   background: 'white',
-                  color: '#374151',
-                  border: '1px solid #d1d5db',
+                  color: '#333',
+                  border: '1px solid #ddd',
                   borderRadius: 8,
                   fontSize: 14,
                   fontWeight: 600,
@@ -1678,7 +1710,7 @@ function CollectionBrowserPage() {
                 disabled={savingSale}
                 style={{
                   padding: '10px 20px',
-                  background: '#10b981',
+                  background: '#4CAF50',
                   color: 'white',
                   border: 'none',
                   borderRadius: 8,
@@ -1698,7 +1730,7 @@ function CollectionBrowserPage() {
   );
 }
 
-// Suspense wrapper for useSearchParams
+// Suspense wrapper for useSearchParams - EXISTING
 export default function Page() {
   return (
     <Suspense fallback={
@@ -1708,7 +1740,7 @@ export default function Page() {
         justifyContent: 'center',
         height: '100vh',
         fontSize: '18px',
-        color: '#6B7280'
+        color: '#666'
       }}>
         Loading collection browser...
       </div>
