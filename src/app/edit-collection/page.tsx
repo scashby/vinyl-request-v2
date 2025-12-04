@@ -109,8 +109,6 @@ type SortOption =
   | 'sides-desc' | 'sides-asc'
   | 'decade-desc' | 'decade-asc';
 
-type FolderMode = 'format' | 'artist' | 'artist-release-year' | 'genre-artist' | 'label';
-
 const PLATFORMS = [
   { value: 'discogs', label: 'Discogs' },
   { value: 'shopify', label: 'Shopify Store' },
@@ -146,84 +144,6 @@ const SORT_OPTIONS: { value: SortOption; label: string; category: string }[] = [
   { value: 'sale-price-asc', label: 'Lowest Price', category: 'Sales' }
 ];
 
-// Folder options matching CLZ structure
-const FOLDER_OPTIONS = {
-  favorites: [
-    { id: '1', filter: 'artist', name: 'Artist' },
-    { id: '2', filter: 'format', name: 'Format' },
-    { id: '3', filter: 'artist', name: 'Artist / Release Year' },
-    { id: '4', filter: 'genre', name: 'Genre / Artist' }
-  ],
-  main: [
-    { filter: 'artist', name: 'Artist' },
-    { filter: 'format', name: 'Format' },
-    { filter: 'genre', name: 'Genre' },
-    { filter: 'label', name: 'Label' },
-    { filter: 'originalreleasedate', name: 'Original Release Date' },
-    { filter: 'originalreleasemonth', name: 'Original Release Month' },
-    { filter: 'originalreleaseyear', name: 'Original Release Year' },
-    { filter: 'recordingdate', name: 'Recording Date' },
-    { filter: 'recordingmonth', name: 'Recording Month' },
-    { filter: 'recordingyear', name: 'Recording Year' },
-    { filter: 'releasedate', name: 'Release Date' },
-    { filter: 'releasemonth', name: 'Release Month' },
-    { filter: 'releaseyear', name: 'Release Year' }
-  ],
-  details: [
-    { filter: 'boxset', name: 'Box Set' },
-    { filter: 'country', name: 'Country' },
-    { filter: 'extra', name: 'Extra' },
-    { filter: 'instrument', name: 'Instrument' },
-    { filter: 'islive', name: 'Is Live' },
-    { filter: 'mediacondition', name: 'Media Condition' },
-    { filter: 'condition', name: 'Package/Sleeve Condition' },
-    { filter: 'packaging', name: 'Packaging' },
-    { filter: 'rpm', name: 'RPM' },
-    { filter: 'sparscode', name: 'SPARS' },
-    { filter: 'soundtype', name: 'Sound' },
-    { filter: 'storagedevice', name: 'Storage Device' },
-    { filter: 'studio', name: 'Studio' },
-    { filter: 'vinylcolor', name: 'Vinyl Color' }
-  ],
-  classical: [
-    { filter: 'chorus', name: 'Chorus' },
-    { filter: 'composer', name: 'Composer' },
-    { filter: 'composition', name: 'Composition' },
-    { filter: 'conductor', name: 'Conductor' },
-    { filter: 'orchestra', name: 'Orchestra' }
-  ],
-  people: [
-    { filter: 'engineer', name: 'Engineer' },
-    { filter: 'musician', name: 'Musician' },
-    { filter: 'producer', name: 'Producer' },
-    { filter: 'songwriter', name: 'Songwriter' }
-  ],
-  personal: [
-    { filter: 'added', name: 'Added Date' },
-    { filter: 'addedmonth', name: 'Added Month' },
-    { filter: 'addedyear', name: 'Added Year' },
-    { filter: 'status', name: 'Collection Status' },
-    { filter: 'issigned', name: 'Is Signed' },
-    { filter: 'lastcleaneddate', name: 'Last Cleaned Date' },
-    { filter: 'lastcleanedmonth', name: 'Last Cleaned Month' },
-    { filter: 'lastcleanedyear', name: 'Last Cleaned Year' },
-    { filter: 'location', name: 'Location' },
-    { filter: 'modified', name: 'Modified Date' },
-    { filter: 'modifiedmonth', name: 'Modified Month' },
-    { filter: 'rating', name: 'My Rating' },
-    { filter: 'owner', name: 'Owner' },
-    { filter: 'consumptions', name: 'Played Date' },
-    { filter: 'lastconsumedmonth', name: 'Played Month' },
-    { filter: 'lastconsumedyear', name: 'Played Year' },
-    { filter: 'purchased', name: 'Purchase Date' },
-    { filter: 'purchasemonth', name: 'Purchase Month' },
-    { filter: 'purchasestore', name: 'Purchase Store' },
-    { filter: 'purchaseyear', name: 'Purchase Year' },
-    { filter: 'signees', name: 'Signed by' },
-    { filter: 'tags', name: 'Tags' }
-  ]
-};
-
 function toSafeSearchString(value: unknown): string {
   if (value === null || value === undefined) return '';
   if (typeof value === 'string') return value.toLowerCase();
@@ -249,6 +169,8 @@ function CollectionBrowserPage() {
   // UI State
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
+  const [searchType, setSearchType] = useState<'both' | 'albums' | 'tracks'>('albums');
+  const [showSearchTypeDropdown, setShowSearchTypeDropdown] = useState(false);
   const [sortBy, setSortBy] = useState<SortOption>('artist-asc');
   const [selectedLetter, setSelectedLetter] = useState<string>('all');
   const [folderMode, setFolderMode] = useState<string>('format');
@@ -256,7 +178,7 @@ function CollectionBrowserPage() {
   const [collectionFilter, setCollectionFilter] = useState<string>('all');
   const [showCollectionDropdown, setShowCollectionDropdown] = useState(false);
   const [showFolderDropdown, setShowFolderDropdown] = useState(false);
-  const [expandedFolderGroups, setExpandedFolderGroups] = useState<Set<string>>(new Set());
+  const [folderSortByCount, setFolderSortByCount] = useState(false);
   
   // Selection state
   const [selectedAlbumIds, setSelectedAlbumIds] = useState<Set<number>>(new Set());
@@ -550,24 +472,18 @@ function CollectionBrowserPage() {
   }, {} as Record<string, number>);
 
   const sortedFolderItems = Object.entries(folderCounts)
-    .sort(([a], [b]) => a.localeCompare(b))
+    .sort((a, b) => {
+      if (folderSortByCount) {
+        return b[1] - a[1]; // Sort by count descending
+      } else {
+        return a[0].localeCompare(b[0]); // Sort alphabetically
+      }
+    })
     .filter(([item]) => 
       !folderSearch || item.toLowerCase().includes(folderSearch.toLowerCase())
     );
 
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-
-  const toggleFolderGroup = (group: string) => {
-    setExpandedFolderGroups(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(group)) {
-        newSet.delete(group);
-      } else {
-        newSet.add(group);
-      }
-      return newSet;
-    });
-  };
 
   return (
     <div style={{
@@ -704,555 +620,152 @@ function CollectionBrowserPage() {
         </>
       )}
 
-      {/* TOP BAR */}
+      {/* ROW 1: ORANGE HEADER */}
       <div style={{
-        background: '#667eea',
+        background: 'linear-gradient(to right, #FF8C00, #FFA500)',
         color: 'white',
-        padding: '12px 24px',
+        padding: '10px 20px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <button
             onClick={() => setSidebarOpen(true)}
             style={{
-              background: 'rgba(255,255,255,0.2)',
+              background: 'none',
               border: 'none',
               color: 'white',
-              padding: '8px 12px',
-              borderRadius: '6px',
               cursor: 'pointer',
-              fontSize: '20px'
+              fontSize: '20px',
+              padding: '4px 8px'
             }}
           >
             ☰
           </button>
-          <span style={{ fontSize: '24px' }}>📚</span>
-          <div>
-            <div style={{ fontSize: '18px', fontWeight: 600 }}>Dead Wax Dialogues</div>
-            <div style={{ fontSize: '13px', opacity: 0.9 }}>
-              {filteredAndSortedAlbums.length} of {albums.length} albums
-            </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '20px' }}>🎵</span>
+            <span style={{ fontSize: '16px', fontWeight: 600 }}>CLZ MUSIC WEB</span>
           </div>
+          <span style={{ fontSize: '14px', marginLeft: '20px' }}>976277's music</span>
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
-          <button
-            onClick={() => setShowColumnSelector(true)}
-            style={{
-              background: 'rgba(255,255,255,0.2)',
-              border: 'none',
-              color: 'white',
-              padding: '8px 16px',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: 500
-            }}
-          >
-            ⚙️ Columns
+          <button style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', fontSize: '18px' }}>
+            ⊞
           </button>
-          <Link
-            href="/admin/manage-tags"
-            style={{
-              background: 'rgba(255,255,255,0.2)',
-              border: 'none',
-              color: 'white',
-              padding: '8px 16px',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: 500,
-              textDecoration: 'none',
-              display: 'inline-block'
-            }}
-          >
-            🏷️ Manage Tags
-          </Link>
+          <button style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', fontSize: '18px' }}>
+            👤
+          </button>
         </div>
       </div>
 
-      {/* TOOLBAR */}
+      {/* ROW 3: MAIN TOOLBAR */}
       <div style={{
-        background: '#fff',
-        borderBottom: '1px solid #ddd',
-        padding: '12px 16px',
+        background: '#3A3A3A',
+        color: 'white',
+        padding: '10px 20px',
         display: 'flex',
         alignItems: 'center',
-        gap: '12px',
-        flexWrap: 'wrap'
+        justifyContent: 'space-between'
       }}>
-        {/* Add Albums Button */}
-        <button
-          onClick={() => setShowAddAlbumsModal(true)}
-          style={{
-            background: '#4CAF50',
-            color: 'white',
-            border: 'none',
-            padding: '8px 16px',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: 600
-          }}
-        >
-          + Add Albums
-        </button>
-
-        {/* Collection Status Dropdown */}
-        <div style={{ position: 'relative' }}>
+        {/* LEFT: Add Albums + Collection Filter */}
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
           <button
-            onClick={() => setShowCollectionDropdown(!showCollectionDropdown)}
+            onClick={() => setShowAddAlbumsModal(true)}
             style={{
-              background: '#f0f0f0',
-              border: '1px solid #ddd',
+              background: '#4CAF50',
+              color: 'white',
+              border: 'none',
               padding: '8px 16px',
-              borderRadius: '6px',
+              borderRadius: '4px',
               cursor: 'pointer',
               fontSize: '14px',
+              fontWeight: 600,
               display: 'flex',
               alignItems: 'center',
-              gap: '8px'
+              gap: '6px'
             }}
           >
-            <span>📚</span>
-            <span>{collectionFilter === 'all' ? 'All' : collectionFilter}</span>
-            <span>▼</span>
+            <span>+</span>
+            <span>Add Albums</span>
           </button>
-          {showCollectionDropdown && (
-            <div style={{
-              position: 'absolute',
-              top: '100%',
-              left: 0,
-              marginTop: '4px',
-              background: 'white',
-              border: '1px solid #ddd',
-              borderRadius: '6px',
-              boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-              zIndex: 100,
-              minWidth: '200px'
-            }}>
-              {['all', 'in-collection', 'for-sale', 'wish-list', 'on-order', 'sold', 'not-in-collection'].map(filter => (
-                <button
-                  key={filter}
-                  onClick={() => {
-                    setCollectionFilter(filter);
-                    setShowCollectionDropdown(false);
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '10px 16px',
-                    background: collectionFilter === filter ? '#e3f2fd' : 'transparent',
-                    border: 'none',
-                    textAlign: 'left',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    color: collectionFilter === filter ? '#1976d2' : '#333'
-                  }}
-                >
-                  {filter === 'all' ? 'All' : 
-                   filter === 'in-collection' ? 'In Collection' :
-                   filter === 'for-sale' ? 'For Sale' :
-                   filter === 'wish-list' ? 'On Wish List' :
-                   filter === 'on-order' ? 'On Order' :
-                   filter === 'sold' ? 'Sold' :
-                   'Not in Collection'}
-                </button>
-              ))}
-            </div>
-          )}
+
+          <div style={{ position: 'relative' }}>
+            <button
+              onClick={() => setShowCollectionDropdown(!showCollectionDropdown)}
+              style={{
+                background: '#2C2C2C',
+                color: 'white',
+                border: '1px solid #555',
+                padding: '8px 16px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+            >
+              <span>📚</span>
+              <span>{collectionFilter === 'all' ? 'All' : collectionFilter}</span>
+              <span>▼</span>
+            </button>
+            {showCollectionDropdown && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                marginTop: '4px',
+                background: 'white',
+                border: '1px solid #ddd',
+                borderRadius: '4px',
+                boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+                zIndex: 100,
+                minWidth: '200px'
+              }}>
+                {['all', 'in-collection', 'for-sale', 'wish-list', 'on-order', 'sold', 'not-in-collection'].map(filter => (
+                  <button
+                    key={filter}
+                    onClick={() => {
+                      setCollectionFilter(filter);
+                      setShowCollectionDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '10px 16px',
+                      background: collectionFilter === filter ? '#e3f2fd' : 'transparent',
+                      border: 'none',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      color: '#333'
+                    }}
+                  >
+                    {filter === 'all' ? 'All' : 
+                     filter === 'in-collection' ? 'In Collection' :
+                     filter === 'for-sale' ? 'For Sale' :
+                     filter === 'wish-list' ? 'On Wish List' :
+                     filter === 'on-order' ? 'On Order' :
+                     filter === 'sold' ? 'Sold' :
+                     'Not in Collection'}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Folder/View Selector Dropdown */}
-        <div style={{ position: 'relative' }}>
-          <button
-            onClick={() => setShowFolderDropdown(!showFolderDropdown)}
-            style={{
-              background: '#f0f0f0',
-              border: '1px solid #ddd',
-              padding: '8px 16px',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '14px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}
-          >
-            <span>📁</span>
-            <span>{FOLDER_OPTIONS.favorites.find(f => f.filter === folderMode)?.name || 'Format'}</span>
-            <span>▼</span>
-          </button>
-          {showFolderDropdown && (
-            <div style={{
-              position: 'absolute',
-              top: '100%',
-              left: 0,
-              marginTop: '4px',
-              background: 'white',
-              border: '1px solid #ddd',
-              borderRadius: '6px',
-              boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-              zIndex: 100,
-              minWidth: '250px',
-              maxHeight: '500px',
-              overflowY: 'auto'
-            }}>
-              {/* Favorites */}
-              <div style={{ padding: '8px 16px', fontSize: '12px', fontWeight: 600, color: '#666', textTransform: 'uppercase' }}>Favorites</div>
-              {FOLDER_OPTIONS.favorites.map(folder => (
-                <button
-                  key={folder.id}
-                  onClick={() => {
-                    setFolderMode(folder.filter);
-                    setSelectedFolderValue(null);
-                    setShowFolderDropdown(false);
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '10px 24px',
-                    background: folderMode === folder.filter ? '#e3f2fd' : 'transparent',
-                    border: 'none',
-                    textAlign: 'left',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    color: folderMode === folder.filter ? '#1976d2' : '#333'
-                  }}
-                >
-                  {folder.name}
-                </button>
-              ))}
-
-              {/* Main */}
-              <div style={{ marginTop: '10px' }}>
-                <button
-                  onClick={() => toggleFolderGroup('main')}
-                  style={{
-                    width: '100%',
-                    padding: '8px 16px',
-                    background: '#f5f5f5',
-                    border: 'none',
-                    textAlign: 'left',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    color: '#666',
-                    textTransform: 'uppercase',
-                    display: 'flex',
-                    justifyContent: 'space-between'
-                  }}
-                >
-                  <span>Main</span>
-                  <span>{expandedFolderGroups.has('main') ? '▼' : '▶'}</span>
-                </button>
-                {expandedFolderGroups.has('main') && FOLDER_OPTIONS.main.map(folder => (
-                  <button
-                    key={folder.filter}
-                    onClick={() => {
-                      setFolderMode(folder.filter);
-                      setSelectedFolderValue(null);
-                      setShowFolderDropdown(false);
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '10px 24px',
-                      background: folderMode === folder.filter ? '#e3f2fd' : 'transparent',
-                      border: 'none',
-                      textAlign: 'left',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      color: folderMode === folder.filter ? '#1976d2' : '#333'
-                    }}
-                  >
-                    {folder.name}
-                  </button>
-                ))}
-              </div>
-
-              {/* Details */}
-              <div style={{ marginTop: '10px' }}>
-                <button
-                  onClick={() => toggleFolderGroup('details')}
-                  style={{
-                    width: '100%',
-                    padding: '8px 16px',
-                    background: '#f5f5f5',
-                    border: 'none',
-                    textAlign: 'left',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    color: '#666',
-                    textTransform: 'uppercase',
-                    display: 'flex',
-                    justifyContent: 'space-between'
-                  }}
-                >
-                  <span>Details</span>
-                  <span>{expandedFolderGroups.has('details') ? '▼' : '▶'}</span>
-                </button>
-                {expandedFolderGroups.has('details') && FOLDER_OPTIONS.details.map(folder => (
-                  <button
-                    key={folder.filter}
-                    onClick={() => {
-                      setFolderMode(folder.filter);
-                      setSelectedFolderValue(null);
-                      setShowFolderDropdown(false);
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '10px 24px',
-                      background: folderMode === folder.filter ? '#e3f2fd' : 'transparent',
-                      border: 'none',
-                      textAlign: 'left',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      color: folderMode === folder.filter ? '#1976d2' : '#333'
-                    }}
-                  >
-                    {folder.name}
-                  </button>
-                ))}
-              </div>
-
-              {/* Classical */}
-              <div style={{ marginTop: '10px' }}>
-                <button
-                  onClick={() => toggleFolderGroup('classical')}
-                  style={{
-                    width: '100%',
-                    padding: '8px 16px',
-                    background: '#f5f5f5',
-                    border: 'none',
-                    textAlign: 'left',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    color: '#666',
-                    textTransform: 'uppercase',
-                    display: 'flex',
-                    justifyContent: 'space-between'
-                  }}
-                >
-                  <span>Classical</span>
-                  <span>{expandedFolderGroups.has('classical') ? '▼' : '▶'}</span>
-                </button>
-                {expandedFolderGroups.has('classical') && FOLDER_OPTIONS.classical.map(folder => (
-                  <button
-                    key={folder.filter}
-                    onClick={() => {
-                      setFolderMode(folder.filter);
-                      setSelectedFolderValue(null);
-                      setShowFolderDropdown(false);
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '10px 24px',
-                      background: folderMode === folder.filter ? '#e3f2fd' : 'transparent',
-                      border: 'none',
-                      textAlign: 'left',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      color: folderMode === folder.filter ? '#1976d2' : '#333'
-                    }}
-                  >
-                    {folder.name}
-                  </button>
-                ))}
-              </div>
-
-              {/* People */}
-              <div style={{ marginTop: '10px' }}>
-                <button
-                  onClick={() => toggleFolderGroup('people')}
-                  style={{
-                    width: '100%',
-                    padding: '8px 16px',
-                    background: '#f5f5f5',
-                    border: 'none',
-                    textAlign: 'left',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    color: '#666',
-                    textTransform: 'uppercase',
-                    display: 'flex',
-                    justifyContent: 'space-between'
-                  }}
-                >
-                  <span>People</span>
-                  <span>{expandedFolderGroups.has('people') ? '▼' : '▶'}</span>
-                </button>
-                {expandedFolderGroups.has('people') && FOLDER_OPTIONS.people.map(folder => (
-                  <button
-                    key={folder.filter}
-                    onClick={() => {
-                      setFolderMode(folder.filter);
-                      setSelectedFolderValue(null);
-                      setShowFolderDropdown(false);
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '10px 24px',
-                      background: folderMode === folder.filter ? '#e3f2fd' : 'transparent',
-                      border: 'none',
-                      textAlign: 'left',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      color: folderMode === folder.filter ? '#1976d2' : '#333'
-                    }}
-                  >
-                    {folder.name}
-                  </button>
-                ))}
-              </div>
-
-              {/* Personal */}
-              <div style={{ marginTop: '10px' }}>
-                <button
-                  onClick={() => toggleFolderGroup('personal')}
-                  style={{
-                    width: '100%',
-                    padding: '8px 16px',
-                    background: '#f5f5f5',
-                    border: 'none',
-                    textAlign: 'left',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    color: '#666',
-                    textTransform: 'uppercase',
-                    display: 'flex',
-                    justifyContent: 'space-between'
-                  }}
-                >
-                  <span>Personal</span>
-                  <span>{expandedFolderGroups.has('personal') ? '▼' : '▶'}</span>
-                </button>
-                {expandedFolderGroups.has('personal') && FOLDER_OPTIONS.personal.map(folder => (
-                  <button
-                    key={folder.filter}
-                    onClick={() => {
-                      setFolderMode(folder.filter);
-                      setSelectedFolderValue(null);
-                      setShowFolderDropdown(false);
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '10px 24px',
-                      background: folderMode === folder.filter ? '#e3f2fd' : 'transparent',
-                      border: 'none',
-                      textAlign: 'left',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      color: folderMode === folder.filter ? '#1976d2' : '#333'
-                    }}
-                  >
-                    {folder.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* View Management Icons */}
-        <div style={{ display: 'flex', gap: '4px' }}>
-          <button
-            style={{
-              background: '#f0f0f0',
-              border: '1px solid #ddd',
-              padding: '8px 12px',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '16px'
-            }}
-            title="View mode (list/grid)"
-          >
-            ☰
-          </button>
-          
-          <button
-            style={{
-              background: '#f0f0f0',
-              border: '1px solid #ddd',
-              padding: '8px 12px',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '16px'
-            }}
-            title={`Manage ${folderMode}`}
-          >
-            ⚙️
-          </button>
-          
-          <button
-            style={{
-              background: '#f0f0f0',
-              border: '1px solid #ddd',
-              padding: '8px 12px',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '16px'
-            }}
-            title="Sort and filter options"
-          >
-            ⋮
-          </button>
-        </div>
-
-        {/* Spacer */}
-        <div style={{ flex: 1 }} />
-
-        {/* Search */}
-        <input
-          type="text"
-          placeholder="Search albums..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          style={{
-            width: '300px',
-            padding: '8px 12px',
-            border: '1px solid #ddd',
-            borderRadius: '6px',
-            fontSize: '14px'
-          }}
-        />
-        
-        {/* Settings */}
-        <button
-          style={{
-            background: '#f0f0f0',
-            border: '1px solid #ddd',
-            padding: '8px 12px',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontSize: '16px'
-          }}
-          title="Settings"
-        >
-          ⚙️
-        </button>
-      </div>
-
-      {/* ALPHABET NAVIGATION */}
-      <div style={{
-        background: '#fff',
-        borderBottom: '1px solid #ddd',
-        padding: '12px 16px'
-      }}>
-        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+        {/* CENTER: Alphabet + Gear */}
+        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
           <button
             onClick={() => setSelectedLetter('all')}
             style={{
-              background: selectedLetter === 'all' ? '#667eea' : '#f0f0f0',
-              color: selectedLetter === 'all' ? 'white' : '#333',
+              background: selectedLetter === 'all' ? '#5A9BD5' : 'transparent',
+              color: 'white',
               border: 'none',
-              padding: '6px 12px',
-              borderRadius: '4px',
+              padding: '6px 10px',
               cursor: 'pointer',
-              fontSize: '13px',
-              fontWeight: 500
+              fontSize: '13px'
             }}
           >
             All
@@ -1260,14 +773,12 @@ function CollectionBrowserPage() {
           <button
             onClick={() => setSelectedLetter('0-9')}
             style={{
-              background: selectedLetter === '0-9' ? '#667eea' : '#f0f0f0',
-              color: selectedLetter === '0-9' ? 'white' : '#333',
+              background: selectedLetter === '0-9' ? '#5A9BD5' : 'transparent',
+              color: 'white',
               border: 'none',
-              padding: '6px 12px',
-              borderRadius: '4px',
+              padding: '6px 10px',
               cursor: 'pointer',
-              fontSize: '13px',
-              fontWeight: 500
+              fontSize: '13px'
             }}
           >
             0-9
@@ -1277,33 +788,122 @@ function CollectionBrowserPage() {
               key={letter}
               onClick={() => setSelectedLetter(letter)}
               style={{
-                background: selectedLetter === letter ? '#667eea' : '#f0f0f0',
-                color: selectedLetter === letter ? 'white' : '#333',
+                background: selectedLetter === letter ? '#5A9BD5' : 'transparent',
+                color: 'white',
                 border: 'none',
-                padding: '6px 10px',
-                borderRadius: '4px',
+                padding: '6px 8px',
                 cursor: 'pointer',
                 fontSize: '13px',
-                fontWeight: 500,
-                minWidth: '32px'
+                minWidth: '24px'
               }}
             >
               {letter}
             </button>
           ))}
+          <button style={{
+            background: 'transparent',
+            color: 'white',
+            border: 'none',
+            padding: '6px 8px',
+            cursor: 'pointer',
+            fontSize: '16px',
+            marginLeft: '8px'
+          }}>
+            ⚙️
+          </button>
+        </div>
+
+        {/* RIGHT: Search */}
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <div style={{ position: 'relative' }}>
+            <button
+              onClick={() => setShowSearchTypeDropdown(!showSearchTypeDropdown)}
+              style={{
+                background: '#2C2C2C',
+                color: 'white',
+                border: '1px solid #555',
+                borderRight: 'none',
+                padding: '8px 12px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                borderRadius: '4px 0 0 4px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+            >
+              <span>🔍</span>
+              <span>▼</span>
+            </button>
+            {showSearchTypeDropdown && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                marginTop: '4px',
+                background: 'white',
+                border: '1px solid #ddd',
+                borderRadius: '4px',
+                boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+                zIndex: 100,
+                minWidth: '180px'
+              }}>
+                {[
+                  { value: 'both', label: 'Albums & Tracks' },
+                  { value: 'albums', label: 'Albums' },
+                  { value: 'tracks', label: 'Tracks' }
+                ].map(type => (
+                  <button
+                    key={type.value}
+                    onClick={() => {
+                      setSearchType(type.value as any);
+                      setShowSearchTypeDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '10px 16px',
+                      background: searchType === type.value ? '#e3f2fd' : 'transparent',
+                      border: 'none',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      color: '#333'
+                    }}
+                  >
+                    {type.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <input
+            type="text"
+            placeholder="Search albums..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{
+              background: '#2C2C2C',
+              color: 'white',
+              border: '1px solid #555',
+              borderLeft: 'none',
+              padding: '8px 12px',
+              borderRadius: '0 4px 4px 0',
+              fontSize: '14px',
+              width: '250px'
+            }}
+          />
         </div>
       </div>
 
       {/* SELECTION TOOLBAR */}
       {selectedAlbumIds.size > 0 && (
         <div style={{
-          background: '#2196F3',
+          background: '#5BA3D0',
           color: 'white',
-          padding: '12px 16px',
+          padding: '10px 20px',
           display: 'flex',
           alignItems: 'center',
-          gap: '12px',
-          borderBottom: '1px solid #1976D2'
+          gap: '12px'
         }}>
           <button
             onClick={clearSelection}
@@ -1372,6 +972,19 @@ function CollectionBrowserPage() {
           >
             📄 Print to PDF
           </button>
+          <button
+            style={{
+              background: 'rgba(255,255,255,0.2)',
+              border: 'none',
+              color: 'white',
+              padding: '6px 12px',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '14px'
+            }}
+          >
+            ⋮
+          </button>
           <div style={{ flex: 1 }} />
           <span style={{ fontSize: '14px', fontWeight: 600 }}>
             {selectedAlbumIds.size} of {filteredAndSortedAlbums.length} selected
@@ -1379,41 +992,98 @@ function CollectionBrowserPage() {
         </div>
       )}
 
-      {/* THREE-PANEL LAYOUT */}
+      {/* THREE-COLUMN BODY */}
       <div style={{
         display: 'flex',
         flex: 1,
         overflow: 'hidden'
       }}>
-        {/* LEFT SIDEBAR - Folder Panel */}
+        {/* LEFT COLUMN: Folder Panel */}
         <div style={{
-          width: '280px',
-          background: '#fff',
-          borderRight: '1px solid #ddd',
+          width: '250px',
+          background: '#2C2C2C',
+          color: 'white',
           display: 'flex',
           flexDirection: 'column',
-          overflow: 'hidden'
+          overflow: 'hidden',
+          borderRight: '1px solid #222'
         }}>
-          {/* Search for folder items */}
-          <div style={{ padding: '16px', borderBottom: '1px solid #ddd' }}>
+          {/* Folder Header */}
+          <div style={{
+            padding: '12px',
+            borderBottom: '1px solid #222',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <button
+              onClick={() => setShowFolderDropdown(!showFolderDropdown)}
+              style={{
+                background: '#3A3A3A',
+                color: 'white',
+                border: '1px solid #555',
+                padding: '6px 12px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '13px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              <span>📁</span>
+              <span>Format</span>
+              <span>▼</span>
+            </button>
+            <button style={{
+              background: 'transparent',
+              color: 'white',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: '16px',
+              padding: '4px 8px'
+            }}>
+              ☰
+            </button>
+          </div>
+
+          {/* Search */}
+          <div style={{ padding: '12px', borderBottom: '1px solid #222' }}>
             <input
               type="text"
-              placeholder={`Search ${folderMode}...`}
+              placeholder="Search format..."
               value={folderSearch}
               onChange={(e) => setFolderSearch(e.target.value)}
               style={{
                 width: '100%',
-                padding: '8px 12px',
-                border: '1px solid #ddd',
-                borderRadius: '6px',
+                padding: '6px 10px',
+                background: '#3A3A3A',
+                color: 'white',
+                border: '1px solid #555',
+                borderRadius: '4px',
                 fontSize: '13px'
               }}
             />
+            <div style={{ marginTop: '8px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <button
+                onClick={() => setFolderSortByCount(!folderSortByCount)}
+                style={{
+                  background: '#3A3A3A',
+                  color: 'white',
+                  border: '1px solid #555',
+                  padding: '4px 8px',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '13px'
+                }}
+              >
+                {folderSortByCount ? '🔢' : '🔤'}
+              </button>
+            </div>
           </div>
 
-          {/* Folder Items List */}
+          {/* Folder List */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
-            {/* All Items button */}
             <button
               onClick={() => setSelectedFolderValue(null)}
               style={{
@@ -1421,22 +1091,23 @@ function CollectionBrowserPage() {
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                padding: '10px 12px',
-                background: !selectedFolderValue ? '#e3f2fd' : 'transparent',
+                padding: '8px 10px',
+                background: !selectedFolderValue ? '#5A9BD5' : 'transparent',
                 border: 'none',
-                borderRadius: '6px',
+                borderRadius: '4px',
                 cursor: 'pointer',
                 marginBottom: '4px',
-                fontSize: '14px',
-                color: !selectedFolderValue ? '#1976d2' : '#333'
+                fontSize: '13px',
+                color: 'white',
+                textAlign: 'left'
               }}
             >
               <span>[All Albums]</span>
               <span style={{
-                background: !selectedFolderValue ? '#1976d2' : '#e0e0e0',
-                color: !selectedFolderValue ? 'white' : '#666',
+                background: !selectedFolderValue ? '#1976d2' : '#555',
+                color: 'white',
                 padding: '2px 8px',
-                borderRadius: '12px',
+                borderRadius: '10px',
                 fontSize: '12px',
                 fontWeight: 600
               }}>
@@ -1444,7 +1115,6 @@ function CollectionBrowserPage() {
               </span>
             </button>
 
-            {/* Individual folder items */}
             {sortedFolderItems.map(([item, count]) => (
               <button
                 key={item}
@@ -1454,23 +1124,23 @@ function CollectionBrowserPage() {
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
-                  padding: '10px 12px',
-                  background: selectedFolderValue === item ? '#e3f2fd' : 'transparent',
+                  padding: '8px 10px',
+                  background: selectedFolderValue === item ? '#5A9BD5' : 'transparent',
                   border: 'none',
-                  borderRadius: '6px',
+                  borderRadius: '4px',
                   cursor: 'pointer',
                   marginBottom: '4px',
-                  fontSize: '14px',
-                  color: selectedFolderValue === item ? '#1976d2' : '#333',
+                  fontSize: '13px',
+                  color: 'white',
                   textAlign: 'left'
                 }}
               >
                 <span>{item}</span>
                 <span style={{
-                  background: selectedFolderValue === item ? '#1976d2' : '#e0e0e0',
-                  color: selectedFolderValue === item ? 'white' : '#666',
+                  background: selectedFolderValue === item ? '#1976d2' : '#555',
+                  color: 'white',
                   padding: '2px 8px',
-                  borderRadius: '12px',
+                  borderRadius: '10px',
                   fontSize: '12px',
                   fontWeight: 600
                 }}>
@@ -1479,25 +1149,9 @@ function CollectionBrowserPage() {
               </button>
             ))}
           </div>
-
-          {/* Manage Collections Button */}
-          <div style={{ padding: '12px', borderTop: '1px solid #ddd' }}>
-            <button style={{
-              width: '100%',
-              padding: '10px',
-              background: '#f0f0f0',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: 500
-            }}>
-              🎵 Manage Collections
-            </button>
-          </div>
         </div>
 
-        {/* CENTER - TABLE */}
+        {/* CENTER COLUMN: Table */}
         <div style={{
           flex: 1,
           display: 'flex',
@@ -1505,41 +1159,53 @@ function CollectionBrowserPage() {
           overflow: 'hidden',
           background: '#fff'
         }}>
-          {/* Sort Controls */}
+          {/* Toolbar above table */}
           <div style={{
-            padding: '12px 16px',
+            padding: '10px 16px',
             borderBottom: '1px solid #ddd',
             display: 'flex',
             alignItems: 'center',
-            gap: '12px'
+            justifyContent: 'space-between',
+            background: '#f5f5f5'
           }}>
-            <label style={{ fontSize: '14px', color: '#666' }}>Sort by:</label>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as SortOption)}
-              style={{
-                padding: '6px 12px',
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <button style={{
+                background: '#fff',
                 border: '1px solid #ddd',
-                borderRadius: '6px',
+                padding: '6px 10px',
+                borderRadius: '4px',
+                cursor: 'pointer',
                 fontSize: '14px'
-              }}
-            >
-              {Object.entries(
-                SORT_OPTIONS.reduce((acc, opt) => {
-                  if (!acc[opt.category]) acc[opt.category] = [];
-                  acc[opt.category].push(opt);
-                  return acc;
-                }, {} as Record<string, typeof SORT_OPTIONS>)
-              ).map(([category, options]) => (
-                <optgroup key={category} label={category}>
-                  {options.map(opt => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
+              }}>
+                ☰
+              </button>
+              <button style={{
+                background: '#fff',
+                border: '1px solid #ddd',
+                padding: '6px 10px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '14px'
+              }}>
+                ↕️
+              </button>
+              <button
+                onClick={() => setShowColumnSelector(true)}
+                style={{
+                  background: '#fff',
+                  border: '1px solid #ddd',
+                  padding: '6px 10px',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '14px'
+                }}
+              >
+                ⚙️
+              </button>
+            </div>
+            <div style={{ fontSize: '14px', color: '#666', fontWeight: 600 }}>
+              {filteredAndSortedAlbums.length} albums
+            </div>
           </div>
 
           {/* Table */}
@@ -1560,7 +1226,7 @@ function CollectionBrowserPage() {
           </div>
         </div>
 
-        {/* RIGHT - DETAIL PANEL */}
+        {/* RIGHT COLUMN: Detail Panel (UNCHANGED - IT WAS CORRECT) */}
         {selectedAlbum && (
           <div style={{
             width: '400px',
@@ -1578,22 +1244,23 @@ function CollectionBrowserPage() {
         )}
       </div>
 
-      {/* BOTTOM COLLECTION TABS */}
+      {/* BOTTOM ROW: Collection Tabs */}
       <div style={{
-        background: '#333',
+        background: '#1a1a1a',
         borderTop: '1px solid #222',
         padding: '0',
         display: 'flex',
-        alignItems: 'center',
-        gap: '0'
+        alignItems: 'stretch',
+        height: '45px'
       }}>
         <button style={{
           background: 'transparent',
           color: 'white',
           border: 'none',
-          padding: '12px 20px',
+          padding: '0 16px',
           cursor: 'pointer',
-          fontSize: '16px'
+          fontSize: '16px',
+          borderRight: '1px solid #333'
         }}>
           ☰
         </button>
@@ -1602,36 +1269,23 @@ function CollectionBrowserPage() {
             key={collection}
             onClick={() => setActiveCollection(collection)}
             style={{
-              background: activeCollection === collection ? '#667eea' : 'transparent',
+              background: activeCollection === collection ? '#FF8C00' : 'transparent',
               color: 'white',
               border: 'none',
-              padding: '12px 24px',
+              padding: '0 20px',
               cursor: 'pointer',
               fontSize: '14px',
               fontWeight: activeCollection === collection ? 600 : 400,
-              borderBottom: activeCollection === collection ? '3px solid #667eea' : 'none'
+              borderBottom: activeCollection === collection ? '3px solid #FF8C00' : 'none'
             }}
           >
             {collection}
           </button>
         ))}
-        
-        <button
-          style={{
-            background: 'transparent',
-            color: '#999',
-            border: 'none',
-            padding: '12px 24px',
-            cursor: 'pointer',
-            fontSize: '14px',
-            marginLeft: 'auto'
-          }}
-        >
-          ⚙️ Manage Collections
-        </button>
       </div>
 
-      {/* ADD ALBUMS MODAL */}
+      {/* MODALS - All existing modals preserved */}
+      
       {showAddAlbumsModal && (
         <div style={{
           position: 'fixed',
@@ -1693,9 +1347,6 @@ function CollectionBrowserPage() {
         </div>
       )}
 
-      {/* EXISTING MODALS */}
-      
-      {/* Column Selector Modal */}
       {showColumnSelector && (
         <ColumnSelector
           visibleColumns={visibleColumns}
@@ -1704,7 +1355,6 @@ function CollectionBrowserPage() {
         />
       )}
 
-      {/* Tag Editor Modal */}
       {editingTagsFor && editingAlbum && (
         <div style={{
           position: 'fixed',
@@ -1914,7 +1564,6 @@ function CollectionBrowserPage() {
         </div>
       )}
 
-      {/* Sale Modal */}
       {saleModalAlbum && (
         <div style={{
           position: 'fixed',
@@ -2104,7 +1753,6 @@ function CollectionBrowserPage() {
   );
 }
 
-// Suspense wrapper
 export default function Page() {
   return (
     <Suspense fallback={
