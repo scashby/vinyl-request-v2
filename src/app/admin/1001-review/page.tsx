@@ -1,60 +1,39 @@
+// src/app/admin/1001-review/page.tsx
+
 "use client";
 
 /**
  * Admin: 1001 Review - COMPACT SPREADSHEET DESIGN
  * Exception-focused interface for matching collection albums to 1001 list
+ * 
+ * WHAT THIS DOES:
+ * - Matches albums from your collection to the "1001 Albums You Must Hear Before You Die" list
+ * - Uses multiple fuzzy-matching algorithms (exact, fuzzy, same-artist, fuzzy-artist)
+ * - Manual search and linking capabilities
+ * - Review workflow for confirming/rejecting matches
  */
 
 import type { ReactElement } from "react";
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import Image from "next/image";
 import { supabase } from "src/lib/supabaseClient";
+import type { Album1001, Collection1001Review, Collection } from "src/types/supabase";
 
 type Id = number;
-
-type A1001 = {
-  id: Id;
-  artist: string;
-  album: string;
-  year: number | null;
-  artist_norm: string | null;
-  album_norm: string | null;
-};
-
-type MatchStatus = "pending" | "linked" | "confirmed";
-
-type MatchRow = {
-  id: Id;
-  album_1001_id: Id;
-  collection_id: Id;
-  review_status: MatchStatus | string;
-  confidence: number | null;
-  notes: string | null;
-};
-
-type CollectionRow = {
-  id: Id;
-  artist: string | null;
-  title: string | null;
-  year: number | null;
-  format: string | null;
-  image_url: string | null;
-};
-
+type MatchStatus = "pending" | "linked" | "confirmed" | "rejected";
 type StatusFilter = "unmatched" | "pending" | "confirmed" | "all";
-
 type Toast = { kind: "info" | "ok" | "err"; msg: string };
 
 export default function Page(): ReactElement {
-  const [rows, setRows] = useState<A1001[]>([]);
-  const [matchesBy, setMatchesBy] = useState<Record<Id, MatchRow[]>>({});
-  const [collectionsBy, setCollectionsBy] = useState<Record<Id, CollectionRow>>({});
+  const [rows, setRows] = useState<Album1001[]>([]);
+  const [matchesBy, setMatchesBy] = useState<Record<Id, Collection1001Review[]>>({});
+  const [collectionsBy, setCollectionsBy] = useState<Record<Id, Collection>>({});
   const [loading, setLoading] = useState<boolean>(true);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("unmatched");
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [running, setRunning] = useState<boolean>(false);
   const [searchInputs, setSearchInputs] = useState<Record<Id, string>>({});
-  const [searchResults, setSearchResults] = useState<Record<Id, CollectionRow[]>>({});
+  const [searchResults, setSearchResults] = useState<Record<Id, Collection[]>>({});
   const [searchLoading, setSearchLoading] = useState<Record<Id, boolean>>({});
   const searchTimeouts = useRef<Record<Id, NodeJS.Timeout>>({});
   const [hasAutoMatchedSession, setHasAutoMatchedSession] = useState(false);
@@ -93,8 +72,7 @@ export default function Page(): ReactElement {
       return;
     }
 
-    const a1001 = [...(batch1 || []), ...(batch2 || [])];
-
+    const a1001 = [...(batch1 || []), ...(batch2 || [])] as Album1001[];
     setRows(a1001);
 
     // Fetch matches
@@ -119,9 +97,10 @@ export default function Page(): ReactElement {
       return;
     }
 
-    const by: Record<Id, MatchRow[]> = {};
+    const typedMatches = mrows as Collection1001Review[];
+    const by: Record<Id, Collection1001Review[]> = {};
     const cids = new Set<Id>();
-    for (const m of mrows) {
+    for (const m of typedMatches) {
       if (!by[m.album_1001_id]) by[m.album_1001_id] = [];
       by[m.album_1001_id].push(m);
       cids.add(m.collection_id);
@@ -129,7 +108,7 @@ export default function Page(): ReactElement {
     setMatchesBy(by);
 
     // Fetch collection rows
-    let cmap: Record<Id, CollectionRow> = {};
+    let cmap: Record<Id, Collection> = {};
     if (cids.size > 0) {
       const { data: crows, error: e3 } = await supabase
         .from("collection")
@@ -139,7 +118,8 @@ export default function Page(): ReactElement {
       if (e3) {
         pushToast({ kind: "err", msg: `Failed loading collection rows: ${e3.message}` });
       } else if (crows) {
-        cmap = crows.reduce<Record<Id, CollectionRow>>((acc, r) => {
+        const typedCollection = crows as Collection[];
+        cmap = typedCollection.reduce<Record<Id, Collection>>((acc, r) => {
           acc[r.id] = r;
           return acc;
         }, {});
@@ -168,9 +148,10 @@ export default function Page(): ReactElement {
 
   const runFuzzy = useCallback(async (threshold = 0.7, yearSlop = 1) => {
     setRunning(true);
+    // @ts-expect-error - Supabase RPC type inference issue
     const { data, error } = await supabase.rpc("match_1001_fuzzy", {
       threshold: parseFloat(threshold.toString()),
-      year_slop: parseInt(yearSlop.toString()),
+      year_slop: parseInt(yearSlop.toString(), 10),
     });
     setRunning(false);
     if (error) {
@@ -184,9 +165,10 @@ export default function Page(): ReactElement {
 
   const runSameArtist = useCallback(async (threshold = 0.6, yearSlop = 1) => {
     setRunning(true);
+    // @ts-expect-error - Supabase RPC type inference issue
     const { data, error } = await supabase.rpc("match_1001_same_artist", {
       threshold: parseFloat(threshold.toString()),
-      year_slop: parseInt(yearSlop.toString()),
+      year_slop: parseInt(yearSlop.toString(), 10),
     });
     setRunning(false);
     if (error) {
@@ -200,6 +182,7 @@ export default function Page(): ReactElement {
 
   const runFuzzyArtist = useCallback(async (threshold = 0.7) => {
     setRunning(true);
+    // @ts-expect-error - Supabase RPC type inference issue
     const { data, error } = await supabase.rpc("match_1001_fuzzy_artist", {
       threshold: parseFloat(threshold.toString()),
     });
@@ -283,7 +266,7 @@ export default function Page(): ReactElement {
   const updateStatus = async (matchId: Id, albumId: Id, review_status: MatchStatus) => {
     const { error } = await supabase
       .from("collection_1001_review")
-      .update({ review_status })
+      .update({ review_status }) // @ts-expect-error - Supabase update type inference issue
       .eq("id", matchId);
     if (error) {
       pushToast({ kind: "err", msg: `Update failed: ${error.message}` });
@@ -299,7 +282,7 @@ export default function Page(): ReactElement {
   const rejectMatch = async (matchId: Id, albumId: Id) => {
     const { error } = await supabase
       .from("collection_1001_review")
-      .update({ review_status: 'rejected' })
+      .update({ review_status: 'rejected' }) // @ts-expect-error - Supabase update type inference issue
       .eq("id", matchId);
     if (error) {
       pushToast({ kind: "err", msg: `Rejection failed: ${error.message}` });
@@ -334,7 +317,7 @@ export default function Page(): ReactElement {
       return;
     }
 
-    setSearchResults((s) => ({ ...s, [albumId]: data || [] }));
+    setSearchResults((s) => ({ ...s, [albumId]: (data || []) as Collection[] }));
   };
 
   const handleSearchInput = (albumId: Id, value: string) => {
@@ -351,6 +334,7 @@ export default function Page(): ReactElement {
 
   const linkFromSearch = async (albumId: Id, collectionId: Id) => {
     // First attempt: normal insert
+    // @ts-expect-error - Supabase insert type inference issue
     const result = await supabase.from("collection_1001_review").insert([
       {
         album_1001_id: albumId,
@@ -381,8 +365,8 @@ export default function Page(): ReactElement {
           return;
         }
 
-        // User confirmed - use upsert to force the insert
-        // We'll use a RPC function to bypass the constraint
+        // User confirmed - use RPC function to bypass the constraint
+        // @ts-expect-error - Supabase RPC type inference issue
         const { error: rpcError } = await supabase.rpc("manual_link_1001", {
           p_album_1001_id: albumId,
           p_collection_id: collectionId,

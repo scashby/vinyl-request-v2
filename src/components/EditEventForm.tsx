@@ -40,6 +40,12 @@ interface TagDefinition {
   description: string;
 }
 
+// Type for database event records
+interface DbEvent extends EventData {
+  id: number;
+  queue_type?: string; // Legacy field
+}
+
 // Utility function to generate recurring events
 function generateRecurringEvents(baseEvent: EventData & { id?: number }): Omit<EventData, 'id'>[] {
   const events: Omit<EventData, 'id'>[] = [];
@@ -135,11 +141,11 @@ export default function EditEventForm() {
 
   useEffect(() => {
     const fetchEvent = async () => {
-      let copiedEvent = null;
+      let copiedEvent: Partial<DbEvent> | null = null;
       if (typeof window !== 'undefined') {
         const stored = sessionStorage.getItem('copiedEvent');
         if (stored) {
-          copiedEvent = JSON.parse(stored);
+          copiedEvent = JSON.parse(stored) as Partial<DbEvent>;
           sessionStorage.removeItem('copiedEvent');
         }
       }
@@ -164,7 +170,7 @@ export default function EditEventForm() {
               ? copiedEvent.allowed_tags.replace(/[{}]/g, '').split(',').map((t: string) => t.trim()).filter(Boolean)
               : [],
           title: copiedEvent.title ? `${copiedEvent.title} (Copy)` : '',
-          date: isTBA ? '9999-12-31' : copiedEvent.date,
+          date: isTBA ? '9999-12-31' : (copiedEvent.date || ''),
           is_recurring: false,
           recurrence_end_date: '',
           parent_event_id: undefined,
@@ -185,39 +191,40 @@ export default function EditEventForm() {
         if (error) {
           console.error('Error fetching event:', error);
         } else if (data) {
-          const isTBA = !data.date || data.date === '' || data.date === '9999-12-31';
+          const dbEvent = data as DbEvent;
+          const isTBA = !dbEvent.date || dbEvent.date === '' || dbEvent.date === '9999-12-31';
           setEventData({
             ...eventData,
-            ...data,
-            allowed_formats: Array.isArray(data.allowed_formats)
-              ? data.allowed_formats
-              : typeof data.allowed_formats === 'string'
-                ? data.allowed_formats.replace(/[{}]/g, '').split(',').map((f: string) => f.trim()).filter(Boolean)
+            ...dbEvent,
+            allowed_formats: Array.isArray(dbEvent.allowed_formats)
+              ? dbEvent.allowed_formats
+              : typeof dbEvent.allowed_formats === 'string'
+                ? dbEvent.allowed_formats.replace(/[{}]/g, '').split(',').map((f: string) => f.trim()).filter(Boolean)
                 : [],
-            queue_types: Array.isArray(data.queue_types)
-              ? data.queue_types
-              : data.queue_type
-                ? [data.queue_type]
+            queue_types: Array.isArray(dbEvent.queue_types)
+              ? dbEvent.queue_types
+              : dbEvent.queue_type
+                ? [dbEvent.queue_type]
                 : [],
-            allowed_tags: Array.isArray(data.allowed_tags)
-              ? data.allowed_tags
-              : typeof data.allowed_tags === 'string'
-                ? data.allowed_tags.replace(/[{}]/g, '').split(',').map((t: string) => t.trim()).filter(Boolean)
+            allowed_tags: Array.isArray(dbEvent.allowed_tags)
+              ? dbEvent.allowed_tags
+              : typeof dbEvent.allowed_tags === 'string'
+                ? dbEvent.allowed_tags.replace(/[{}]/g, '').split(',').map((t: string) => t.trim()).filter(Boolean)
                 : [],
-            is_recurring: data.is_recurring || false,
-            recurrence_pattern: data.recurrence_pattern || 'weekly',
-            recurrence_interval: data.recurrence_interval || 1,
-            recurrence_end_date: data.recurrence_end_date || '',
-            date: isTBA ? '9999-12-31' : data.date,
+            is_recurring: dbEvent.is_recurring || false,
+            recurrence_pattern: dbEvent.recurrence_pattern || 'weekly',
+            recurrence_interval: dbEvent.recurrence_interval || 1,
+            recurrence_end_date: dbEvent.recurrence_end_date || '',
+            date: isTBA ? '9999-12-31' : dbEvent.date,
             // FEATURED flags in DB (still loaded so they survive edits)
-            is_featured_grid: !!data.is_featured_grid,
-            is_featured_upnext: !!data.is_featured_upnext,
-            featured_priority: data.featured_priority ?? null,
+            is_featured_grid: !!dbEvent.is_featured_grid,
+            is_featured_upnext: !!dbEvent.is_featured_upnext,
+            featured_priority: dbEvent.featured_priority ?? null,
           });
           
           // Determine if this is part of a recurring series
-          setIsParentEvent(data.is_recurring === true);
-          setIsPartOfSeries(!!data.parent_event_id);
+          setIsParentEvent(dbEvent.is_recurring === true);
+          setIsPartOfSeries(!!dbEvent.parent_event_id);
         }
       }
     };
@@ -305,7 +312,7 @@ export default function EditEventForm() {
         }
       }
 
-      const payload = {
+      const payload: Record<string, unknown> = {
         title: eventData.title,
         date: isTBA ? '9999-12-31' : eventData.date,
         time: eventData.time,
@@ -344,7 +351,7 @@ export default function EditEventForm() {
       if (id && (isParentEvent || isPartOfSeries)) {
         if (editMode === 'single') {
           // Edit this event only - detach from series
-          const singlePayload = {
+          const singlePayload: Record<string, unknown> = {
             ...payload,
             is_recurring: false,
             recurrence_pattern: null,
@@ -400,9 +407,7 @@ export default function EditEventForm() {
           
           const { error: updateError } = await supabase
             .from('events')
-            .update({
-              ...payload
-            })
+            .update(payload)
             .or(`id.eq.${parentId},parent_event_id.eq.${parentId}`);
 
           if (updateError) throw updateError;
@@ -418,6 +423,7 @@ export default function EditEventForm() {
           .single();
 
         if (saveError) throw saveError;
+        if (!savedEvent) throw new Error('Failed to create event');
 
         console.log('Main event saved:', savedEvent);
 
