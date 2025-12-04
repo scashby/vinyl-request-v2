@@ -108,6 +108,14 @@ type SortOption =
   | 'sides-desc' | 'sides-asc'
   | 'decade-desc' | 'decade-asc';
 
+// View modes that reorganize the entire left sidebar
+type ViewMode = 'format' | 'artist' | 'artist-release-year' | 'genre-artist' | 'label' | 
+                'original-release-date' | 'original-release-month' | 'original-release-year' |
+                'recording-date' | 'recording-month' | 'recording-year';
+
+// Collection filter options
+type CollectionFilter = 'all' | 'in-collection' | 'for-sale' | 'on-wish-list' | 'on-order' | 'sold' | 'not-in-collection';
+
 const PLATFORMS = [
   { value: 'discogs', label: 'Discogs' },
   { value: 'shopify', label: 'Shopify Store' },
@@ -144,37 +152,15 @@ const SORT_OPTIONS: { value: SortOption; label: string; category: string }[] = [
 ];
 
 function toSafeSearchString(value: unknown): string {
-  if (value === null || value === undefined) {
-    return '';
-  }
-  
-  if (typeof value === 'string') {
-    return value.toLowerCase();
-  }
-  
-  if (typeof value === 'number' || typeof value === 'boolean') {
-    return String(value).toLowerCase();
-  }
-  
-  if (Array.isArray(value)) {
-    return value
-      .filter(item => typeof item === 'string')
-      .join(' ')
-      .toLowerCase();
-  }
-  
-  try {
-    return String(value).toLowerCase();
-  } catch {
-    return '';
-  }
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string') return value.toLowerCase();
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value).toLowerCase();
+  if (Array.isArray(value)) return value.filter(item => typeof item === 'string').join(' ').toLowerCase();
+  try { return String(value).toLowerCase(); } catch { return ''; }
 }
 
 function toSafeStringArray(value: unknown): string[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  
+  if (!Array.isArray(value)) return [];
   return value.filter(item => typeof item === 'string' && item.length > 0);
 }
 
@@ -182,16 +168,49 @@ function CollectionBrowserPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
+  // Core data
   const [albums, setAlbums] = useState<Album[]>([]);
   const [loading, setLoading] = useState(true);
+  const [tagDefinitions, setTagDefinitions] = useState<TagDefinition[]>([]);
+  
+  // UI State
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
   const [sortBy, setSortBy] = useState<SortOption>('artist-asc');
   const [selectedLetter, setSelectedLetter] = useState<string>('all');
+  const [viewMode, setViewMode] = useState<ViewMode>('format');
+  const [collectionFilter, setCollectionFilter] = useState<CollectionFilter>('all');
+  const [showCollectionDropdown, setShowCollectionDropdown] = useState(false);
+  const [showViewDropdown, setShowViewDropdown] = useState(false);
   
-  const [selectedAlbumId, setSelectedAlbumId] = useState<number | null>(null);
+  // Selection state
+  const [selectedAlbumIds, setSelectedAlbumIds] = useState<Set<number>>(new Set());
+  const [selectedAlbumId, setSelectedAlbumId] = useState<number | null>(null); // For detail panel
+  
+  // Column management
   const [visibleColumns, setVisibleColumns] = useState<ColumnId[]>(DEFAULT_VISIBLE_COLUMNS);
   const [showColumnSelector, setShowColumnSelector] = useState(false);
   
+  // Format/View filter (dynamic based on view mode)
+  const [selectedViewItem, setSelectedViewItem] = useState<string | null>(null);
+  const [viewItemSearch, setViewItemSearch] = useState('');
+  
+  // Modals
+  const [showAddAlbumsModal, setShowAddAlbumsModal] = useState(false);
+  const [editingTagsFor, setEditingTagsFor] = useState<number | null>(null);
+  const [albumTags, setAlbumTags] = useState<string[]>([]);
+  const [savingTags, setSavingTags] = useState(false);
+  const [newTagInput, setNewTagInput] = useState('');
+  const [saleModalAlbum, setSaleModalAlbum] = useState<Album | null>(null);
+  const [salePrice, setSalePrice] = useState('');
+  const [salePlatform, setSalePlatform] = useState('');
+  const [saleQuantity, setSaleQuantity] = useState('1');
+  const [saleNotes, setSaleNotes] = useState('');
+  const [savingSale, setSavingSale] = useState(false);
+  
+  // Active collection tab (for multiple collections feature)
+  const [activeCollection, setActiveCollection] = useState('music');
+
   // Load column preferences from localStorage
   useEffect(() => {
     const stored = localStorage.getItem('collection-visible-columns');
@@ -204,28 +223,10 @@ function CollectionBrowserPage() {
     }
   }, []);
   
-  // Save column preferences to localStorage
   const handleColumnsChange = (columns: ColumnId[]) => {
     setVisibleColumns(columns);
     localStorage.setItem('collection-visible-columns', JSON.stringify(columns));
   };
-  
-  // Format filter
-  const [selectedFormat, setSelectedFormat] = useState<string | null>(null);
-  const [formatSearch, setFormatSearch] = useState('');
-  
-  const [tagDefinitions, setTagDefinitions] = useState<TagDefinition[]>([]);
-  const [editingTagsFor, setEditingTagsFor] = useState<number | null>(null);
-  const [albumTags, setAlbumTags] = useState<string[]>([]);
-  const [savingTags, setSavingTags] = useState(false);
-  const [newTagInput, setNewTagInput] = useState('');
-  
-  const [saleModalAlbum, setSaleModalAlbum] = useState<Album | null>(null);
-  const [salePrice, setSalePrice] = useState('');
-  const [salePlatform, setSalePlatform] = useState('');
-  const [saleQuantity, setSaleQuantity] = useState('1');
-  const [saleNotes, setSaleNotes] = useState('');
-  const [savingSale, setSavingSale] = useState(false);
 
   const loadAlbums = useCallback(async () => {
     setLoading(true);
@@ -271,8 +272,14 @@ function CollectionBrowserPage() {
     loadAlbums();
   }, [loadAlbums]);
 
+  // Filter and sort albums
   const filteredAndSortedAlbums = albums
     .filter(album => {
+      // Collection filter
+      // TODO: Expand with actual for_sale, wish_list, on_order, sold filtering
+      if (collectionFilter === 'for-sale' && !album.for_sale) return false;
+      if (collectionFilter === 'not-in-collection') return false; // TODO: Add logic
+      
       // Letter filter
       if (selectedLetter !== 'all') {
         const firstChar = (album.artist || '').charAt(0).toUpperCase();
@@ -283,8 +290,10 @@ function CollectionBrowserPage() {
         }
       }
 
-      // Format filter
-      if (selectedFormat && album.format !== selectedFormat) return false;
+      // View item filter (format/artist/etc depending on view mode)
+      // TODO: Expand for other view modes
+      if (viewMode === 'format' && selectedViewItem && album.format !== selectedViewItem) return false;
+      if (viewMode === 'artist' && selectedViewItem && album.artist !== selectedViewItem) return false;
 
       // Search filter
       if (searchQuery) {
@@ -304,63 +313,62 @@ function CollectionBrowserPage() {
     })
     .sort((a, b) => {
       switch (sortBy) {
-        case 'artist-asc':
-          return (a.artist || '').localeCompare(b.artist || '');
-        case 'artist-desc':
-          return (b.artist || '').localeCompare(a.artist || '');
-        case 'title-asc':
-          return (a.title || '').localeCompare(b.title || '');
-        case 'title-desc':
-          return (b.title || '').localeCompare(a.title || '');
-        case 'year-desc':
-          return (b.year_int || 0) - (a.year_int || 0);
-        case 'year-asc':
-          return (a.year_int || 0) - (b.year_int || 0);
-        case 'decade-desc':
-          return (b.decade || 0) - (a.decade || 0);
-        case 'decade-asc':
-          return (a.decade || 0) - (b.decade || 0);
-        case 'added-desc':
-          return (b.date_added || '').localeCompare(a.date_added || '');
-        case 'added-asc':
-          return (a.date_added || '').localeCompare(b.date_added || '');
-        case 'format-asc':
-          return (a.format || '').localeCompare(b.format || '');
-        case 'format-desc':
-          return (b.format || '').localeCompare(a.format || '');
-        case 'folder-asc':
-          return (a.folder || '').localeCompare(b.folder || '');
-        case 'folder-desc':
-          return (b.folder || '').localeCompare(a.folder || '');
-        case 'condition-asc':
-          return (a.media_condition || '').localeCompare(b.media_condition || '');
-        case 'condition-desc':
-          return (b.media_condition || '').localeCompare(a.media_condition || '');
-        case 'tags-count-desc':
-          return toSafeStringArray(b.custom_tags).length - toSafeStringArray(a.custom_tags).length;
-        case 'tags-count-asc':
-          return toSafeStringArray(a.custom_tags).length - toSafeStringArray(b.custom_tags).length;
-        case 'sale-price-desc':
-          return (b.sale_price || 0) - (a.sale_price || 0);
-        case 'sale-price-asc':
-          return (a.sale_price || 0) - (b.sale_price || 0);
-        case 'popularity-desc':
-          return (b.spotify_popularity || 0) - (a.spotify_popularity || 0);
-        case 'popularity-asc':
-          return (a.spotify_popularity || 0) - (b.spotify_popularity || 0);
+        case 'artist-asc': return (a.artist || '').localeCompare(b.artist || '');
+        case 'artist-desc': return (b.artist || '').localeCompare(a.artist || '');
+        case 'title-asc': return (a.title || '').localeCompare(b.title || '');
+        case 'title-desc': return (b.title || '').localeCompare(a.title || '');
+        case 'year-desc': return (b.year_int || 0) - (a.year_int || 0);
+        case 'year-asc': return (a.year_int || 0) - (b.year_int || 0);
+        case 'decade-desc': return (b.decade || 0) - (a.decade || 0);
+        case 'decade-asc': return (a.decade || 0) - (b.decade || 0);
+        case 'added-desc': return (b.date_added || '').localeCompare(a.date_added || '');
+        case 'added-asc': return (a.date_added || '').localeCompare(b.date_added || '');
+        case 'format-asc': return (a.format || '').localeCompare(b.format || '');
+        case 'format-desc': return (b.format || '').localeCompare(a.format || '');
+        case 'folder-asc': return (a.folder || '').localeCompare(b.folder || '');
+        case 'folder-desc': return (b.folder || '').localeCompare(a.folder || '');
+        case 'condition-asc': return (a.media_condition || '').localeCompare(b.media_condition || '');
+        case 'condition-desc': return (b.media_condition || '').localeCompare(a.media_condition || '');
+        case 'tags-count-desc': return toSafeStringArray(b.custom_tags).length - toSafeStringArray(a.custom_tags).length;
+        case 'tags-count-asc': return toSafeStringArray(a.custom_tags).length - toSafeStringArray(b.custom_tags).length;
+        case 'sale-price-desc': return (b.sale_price || 0) - (a.sale_price || 0);
+        case 'sale-price-asc': return (a.sale_price || 0) - (b.sale_price || 0);
+        case 'popularity-desc': return (b.spotify_popularity || 0) - (a.spotify_popularity || 0);
+        case 'popularity-asc': return (a.spotify_popularity || 0) - (b.spotify_popularity || 0);
         case 'sides-desc':
-          const aSides = typeof a.sides === 'number' ? a.sides : 0;
           const bSides = typeof b.sides === 'number' ? b.sides : 0;
+          const aSides = typeof a.sides === 'number' ? a.sides : 0;
           return bSides - aSides;
         case 'sides-asc':
           const aSidesAsc = typeof a.sides === 'number' ? a.sides : 0;
           const bSidesAsc = typeof b.sides === 'number' ? b.sides : 0;
           return aSidesAsc - bSidesAsc;
-        default:
-          return 0;
+        default: return 0;
       }
     });
 
+  // Selection handlers
+  const toggleAlbumSelection = (albumId: number) => {
+    setSelectedAlbumIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(albumId)) {
+        newSet.delete(albumId);
+      } else {
+        newSet.add(albumId);
+      }
+      return newSet;
+    });
+  };
+
+  const selectAllAlbums = () => {
+    setSelectedAlbumIds(new Set(filteredAndSortedAlbums.map(a => a.id)));
+  };
+
+  const clearSelection = () => {
+    setSelectedAlbumIds(new Set());
+  };
+
+  // Tag management
   const openTagEditor = (album: Album) => {
     setEditingTagsFor(album.id);
     setAlbumTags(toSafeStringArray(album.custom_tags));
@@ -388,7 +396,6 @@ function CollectionBrowserPage() {
 
   const saveTags = async () => {
     if (!editingTagsFor) return;
-    
     setSavingTags(true);
     
     const { error } = await supabase
@@ -404,6 +411,7 @@ function CollectionBrowserPage() {
     setSavingTags(false);
   };
 
+  // Sale management
   const openSaleModal = (album: Album) => {
     setSaleModalAlbum(album);
     setSalePrice(album.sale_price?.toString() || '');
@@ -422,7 +430,6 @@ function CollectionBrowserPage() {
 
   const markForSale = async () => {
     if (!saleModalAlbum) return;
-    
     setSavingSale(true);
     
     const { error } = await supabase
@@ -453,17 +460,25 @@ function CollectionBrowserPage() {
   const editingAlbum = albums.find(a => a.id === editingTagsFor);
   const selectedAlbum = albums.find(a => a.id === selectedAlbumId);
 
-  // Format counts for sidebar
-  const formatCounts = albums.reduce((acc, album) => {
-    const format = album.format || 'Unknown';
-    acc[format] = (acc[format] || 0) + 1;
+  // View item counts (formats/artists/etc depending on view mode)
+  // TODO: Expand for other view modes beyond format
+  const viewItemCounts = albums.reduce((acc, album) => {
+    let itemKey = 'Unknown';
+    if (viewMode === 'format') {
+      itemKey = album.format || 'Unknown';
+    } else if (viewMode === 'artist') {
+      itemKey = album.artist || 'Unknown';
+    }
+    // TODO: Add other view modes
+    
+    acc[itemKey] = (acc[itemKey] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
 
-  const sortedFormats = Object.entries(formatCounts)
+  const sortedViewItems = Object.entries(viewItemCounts)
     .sort(([a], [b]) => a.localeCompare(b))
-    .filter(([format]) => 
-      !formatSearch || format.toLowerCase().includes(formatSearch.toLowerCase())
+    .filter(([item]) => 
+      !viewItemSearch || item.toLowerCase().includes(viewItemSearch.toLowerCase())
     );
 
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
@@ -471,330 +486,810 @@ function CollectionBrowserPage() {
   return (
     <div style={{
       display: 'flex',
-      flexDirection: 'column',
       height: '100vh',
       overflow: 'hidden',
       background: '#F9FAFB'
     }}>
-      {/* APP BAR */}
-      <div style={{
-        background: 'linear-gradient(135deg, #667EEA 0%, #764BA2 100%)',
-        color: 'white',
-        padding: '12px 24px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <span style={{ fontSize: '24px' }}>📚</span>
-          <div>
-            <div style={{ fontSize: '18px', fontWeight: 600 }}>Dead Wax Dialogues</div>
-            <div style={{ fontSize: '13px', opacity: 0.9 }}>
-              {filteredAndSortedAlbums.length} of {albums.length} albums
-            </div>
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: '12px' }}>
-          <button
-            onClick={() => setShowColumnSelector(true)}
-            style={{
-              background: 'rgba(255,255,255,0.2)',
-              border: 'none',
-              color: 'white',
-              padding: '8px 16px',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: 500
-            }}
-          >
-            ⚙️ Columns
-          </button>
-          <Link
-            href="/admin/manage-tags"
-            style={{
-              background: 'rgba(255,255,255,0.2)',
-              border: 'none',
-              color: 'white',
-              padding: '8px 16px',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: 500,
-              textDecoration: 'none',
-              display: 'inline-block'
-            }}
-          >
-            🏷️ Manage Tags
-          </Link>
-        </div>
-      </div>
-
-      {/* TOOLBAR WITH ALPHABET */}
-      <div style={{
-        background: '#FFFFFF',
-        borderBottom: '1px solid #E5E7EB',
-        padding: '16px 24px'
-      }}>
-        {/* Alphabet Navigation */}
+      {/* LEFT HAMBURGER SIDEBAR - TODO: Build out full menu structure */}
+      {sidebarOpen && (
         <div style={{
-          display: 'flex',
-          gap: '4px',
-          marginBottom: '12px',
-          flexWrap: 'wrap'
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          bottom: 0,
+          width: '280px',
+          background: '#2C2C2C',
+          color: 'white',
+          zIndex: 2000,
+          overflowY: 'auto',
+          padding: '20px'
         }}>
-          <button
-            onClick={() => setSelectedLetter('all')}
-            style={{
-              background: selectedLetter === 'all' ? '#667EEA' : '#F3F4F6',
-              color: selectedLetter === 'all' ? 'white' : '#374151',
-              border: 'none',
-              padding: '6px 12px',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '13px',
-              fontWeight: 500
-            }}
-          >
-            All
-          </button>
-          <button
-            onClick={() => setSelectedLetter('0-9')}
-            style={{
-              background: selectedLetter === '0-9' ? '#667EEA' : '#F3F4F6',
-              color: selectedLetter === '0-9' ? 'white' : '#374151',
-              border: 'none',
-              padding: '6px 12px',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '13px',
-              fontWeight: 500
-            }}
-          >
-            0-9
-          </button>
-          {alphabet.map(letter => (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+            <div style={{ fontSize: '18px', fontWeight: 600 }}>CLZ MUSIC WEB</div>
             <button
-              key={letter}
-              onClick={() => setSelectedLetter(letter)}
+              onClick={() => setSidebarOpen(false)}
               style={{
-                background: selectedLetter === letter ? '#667EEA' : '#F3F4F6',
-                color: selectedLetter === letter ? 'white' : '#374151',
+                background: 'none',
                 border: 'none',
-                padding: '6px 10px',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '13px',
-                fontWeight: 500,
-                minWidth: '32px'
+                color: 'white',
+                fontSize: '24px',
+                cursor: 'pointer'
               }}
             >
-              {letter}
+              ×
             </button>
-          ))}
+          </div>
+
+          {/* TODO: Build out full sidebar menu with sections:
+              - Collection (Add Albums, Manage Pick Lists, Manage Collections)
+              - Tools (Print to PDF, Statistics, Find Duplicates, Loan Manager)
+              - Customization (CLZ Cloud Sharing, Pre-fill Settings, Settings)
+              - Maintenance (Re-Assign Index Values, Backup/Restore, Clear Database, Transfer Field Data)
+              - Import/Export (Export to CSV/TXT, Export to XML)
+          */}
+          <div style={{ fontSize: '14px', color: '#888', marginTop: '20px' }}>
+            [Full sidebar menu structure to be built - see PROJECT_STATUS.md]
+          </div>
+        </div>
+      )}
+
+      {/* MAIN CONTENT AREA */}
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        flex: 1,
+        overflow: 'hidden'
+      }}>
+        {/* TOP BAR */}
+        <div style={{
+          background: 'linear-gradient(135deg, #667EEA 0%, #764BA2 100%)',
+          color: 'white',
+          padding: '12px 24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            {/* Hamburger Menu Button */}
+            <button
+              onClick={() => setSidebarOpen(true)}
+              style={{
+                background: 'rgba(255,255,255,0.2)',
+                border: 'none',
+                color: 'white',
+                padding: '8px 12px',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '20px'
+              }}
+            >
+              ☰
+            </button>
+            <span style={{ fontSize: '24px' }}>📚</span>
+            <div>
+              <div style={{ fontSize: '18px', fontWeight: 600 }}>Dead Wax Dialogues</div>
+              <div style={{ fontSize: '13px', opacity: 0.9 }}>
+                {filteredAndSortedAlbums.length} of {albums.length} albums
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <button
+              onClick={() => setShowColumnSelector(true)}
+              style={{
+                background: 'rgba(255,255,255,0.2)',
+                border: 'none',
+                color: 'white',
+                padding: '8px 16px',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: 500
+              }}
+            >
+              ⚙️ Columns
+            </button>
+            <Link
+              href="/admin/manage-tags"
+              style={{
+                background: 'rgba(255,255,255,0.2)',
+                border: 'none',
+                color: 'white',
+                padding: '8px 16px',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: 500,
+                textDecoration: 'none',
+                display: 'inline-block'
+              }}
+            >
+              🏷️ Manage Tags
+            </Link>
+          </div>
         </div>
 
-        {/* Search Bar */}
-        <div style={{ maxWidth: '400px' }}>
+        {/* CONTROLS BAR */}
+        <div style={{
+          background: '#FFFFFF',
+          borderBottom: '1px solid #E5E7EB',
+          padding: '12px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px'
+        }}>
+          {/* Add Albums Button */}
+          <button
+            onClick={() => setShowAddAlbumsModal(true)}
+            style={{
+              background: '#667EEA',
+              color: 'white',
+              border: 'none',
+              padding: '8px 16px',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: 600
+            }}
+          >
+            + Add Albums
+          </button>
+
+          {/* Collection Filter Dropdown */}
+          <div style={{ position: 'relative' }}>
+            <button
+              onClick={() => setShowCollectionDropdown(!showCollectionDropdown)}
+              style={{
+                background: '#F3F4F6',
+                border: '1px solid #D1D5DB',
+                padding: '8px 16px',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+            >
+              <span>📚</span>
+              <span>{collectionFilter === 'all' ? 'All' : collectionFilter.replace('-', ' ')}</span>
+              <span>▼</span>
+            </button>
+            {showCollectionDropdown && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                marginTop: '4px',
+                background: 'white',
+                border: '1px solid #D1D5DB',
+                borderRadius: '6px',
+                boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+                zIndex: 100,
+                minWidth: '200px'
+              }}>
+                {/* TODO: Add icons for each filter option */}
+                {['all', 'in-collection', 'for-sale', 'on-wish-list', 'on-order', 'sold', 'not-in-collection'].map(filter => (
+                  <button
+                    key={filter}
+                    onClick={() => {
+                      setCollectionFilter(filter as CollectionFilter);
+                      setShowCollectionDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '10px 16px',
+                      background: collectionFilter === filter ? '#EEF2FF' : 'transparent',
+                      border: 'none',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      color: collectionFilter === filter ? '#667EEA' : '#374151'
+                    }}
+                  >
+                    {filter === 'all' ? 'All' : filter.replace('-', ' ')}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* View Mode Selector (labeled as Format in CLZ) */}
+          <div style={{ position: 'relative' }}>
+            <button
+              onClick={() => setShowViewDropdown(!showViewDropdown)}
+              style={{
+                background: '#F3F4F6',
+                border: '1px solid #D1D5DB',
+                padding: '8px 16px',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+            >
+              <span>📋</span>
+              <span>{viewMode === 'format' ? 'Format' : viewMode.replace('-', ' ')}</span>
+              <span>▼</span>
+            </button>
+            {showViewDropdown && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                marginTop: '4px',
+                background: 'white',
+                border: '1px solid #D1D5DB',
+                borderRadius: '6px',
+                boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+                zIndex: 100,
+                minWidth: '250px'
+              }}>
+                {/* TODO: Organize into expandable sections: Main, Details, Classical, People */}
+                <div style={{ padding: '8px 0' }}>
+                  <div style={{ padding: '8px 16px', fontSize: '12px', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase' }}>Main</div>
+                  {['format', 'artist', 'artist-release-year', 'genre-artist'].map(mode => (
+                    <button
+                      key={mode}
+                      onClick={() => {
+                        setViewMode(mode as ViewMode);
+                        setShowViewDropdown(false);
+                        setSelectedViewItem(null); // Reset filter when changing view
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '10px 24px',
+                        background: viewMode === mode ? '#EEF2FF' : 'transparent',
+                        border: 'none',
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        color: viewMode === mode ? '#667EEA' : '#374151'
+                      }}
+                    >
+                      {mode === 'artist-release-year' ? 'Artist / Release Year' :
+                       mode === 'genre-artist' ? 'Genre / Artist' :
+                       mode.charAt(0).toUpperCase() + mode.slice(1)}
+                    </button>
+                  ))}
+                  {/* TODO: Add Details, Classical, People sections with more view modes */}
+                  <div style={{ padding: '8px 16px', fontSize: '12px', color: '#9CA3AF' }}>
+                    [More view modes to be added - see PROJECT_STATUS.md]
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* View Management Icons */}
+          <div style={{ display: 'flex', gap: '4px' }}>
+            {/* List/Grid Toggle - TODO: Implement grid view */}
+            <button
+              style={{
+                background: '#F3F4F6',
+                border: '1px solid #D1D5DB',
+                padding: '8px 12px',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '16px'
+              }}
+              title="View mode (list/grid)"
+            >
+              ☰
+            </button>
+            
+            {/* Manage Current View - TODO: Open manage modal for current view mode */}
+            <button
+              style={{
+                background: '#F3F4F6',
+                border: '1px solid #D1D5DB',
+                padding: '8px 12px',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '16px'
+              }}
+              title={`Manage ${viewMode === 'format' ? 'Formats' : viewMode === 'artist' ? 'Artists' : 'Items'}`}
+            >
+              ⚙️
+            </button>
+            
+            {/* Sort/Filter Toggle */}
+            <button
+              style={{
+                background: '#F3F4F6',
+                border: '1px solid #D1D5DB',
+                padding: '8px 12px',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '16px'
+              }}
+              title="Sort and filter options"
+            >
+              ⋮
+            </button>
+          </div>
+
+          {/* Spacer */}
+          <div style={{ flex: 1 }} />
+
+          {/* Search and settings */}
           <input
             type="text"
             placeholder="Search albums..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{
-              width: '100%',
-              padding: '10px 16px',
+              width: '300px',
+              padding: '8px 12px',
               border: '1px solid #D1D5DB',
-              borderRadius: '8px',
+              borderRadius: '6px',
               fontSize: '14px'
             }}
           />
+          
+          <button
+            style={{
+              background: '#F3F4F6',
+              border: '1px solid #D1D5DB',
+              padding: '8px 12px',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '16px'
+            }}
+            title="Settings"
+          >
+            ⚙️
+          </button>
         </div>
-      </div>
 
-      {/* THREE-PANEL LAYOUT */}
-      <div style={{
-        display: 'flex',
-        flex: 1,
-        overflow: 'hidden'
-      }}>
-        {/* LEFT SIDEBAR - FORMAT FILTER */}
+        {/* ALPHABET NAVIGATION */}
         <div style={{
-          width: '280px',
           background: '#FFFFFF',
-          borderRight: '1px solid #E5E7EB',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden'
+          borderBottom: '1px solid #E5E7EB',
+          padding: '12px 16px'
         }}>
-          {/* Format Search */}
-          <div style={{ padding: '16px', borderBottom: '1px solid #E5E7EB' }}>
-            <input
-              type="text"
-              placeholder="Search formats..."
-              value={formatSearch}
-              onChange={(e) => setFormatSearch(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                border: '1px solid #D1D5DB',
-                borderRadius: '6px',
-                fontSize: '13px'
-              }}
-            />
-          </div>
-
-          {/* Format List */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
+          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
             <button
-              onClick={() => setSelectedFormat(null)}
+              onClick={() => setSelectedLetter('all')}
               style={{
-                width: '100%',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '10px 12px',
-                background: !selectedFormat ? '#EEF2FF' : 'transparent',
+                background: selectedLetter === 'all' ? '#667EEA' : '#F3F4F6',
+                color: selectedLetter === 'all' ? 'white' : '#374151',
                 border: 'none',
-                borderRadius: '6px',
+                padding: '6px 12px',
+                borderRadius: '4px',
                 cursor: 'pointer',
-                marginBottom: '4px',
-                fontSize: '14px',
-                color: !selectedFormat ? '#667EEA' : '#374151'
+                fontSize: '13px',
+                fontWeight: 500
               }}
             >
-              <span>All Formats</span>
-              <span style={{
-                background: !selectedFormat ? '#667EEA' : '#E5E7EB',
-                color: !selectedFormat ? 'white' : '#6B7280',
-                padding: '2px 8px',
-                borderRadius: '12px',
-                fontSize: '12px',
-                fontWeight: 600
-              }}>
-                {albums.length}
-              </span>
+              All
             </button>
-
-            {sortedFormats.map(([format, count]) => (
+            <button
+              onClick={() => setSelectedLetter('0-9')}
+              style={{
+                background: selectedLetter === '0-9' ? '#667EEA' : '#F3F4F6',
+                color: selectedLetter === '0-9' ? 'white' : '#374151',
+                border: 'none',
+                padding: '6px 12px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '13px',
+                fontWeight: 500
+              }}
+            >
+              0-9
+            </button>
+            {alphabet.map(letter => (
               <button
-                key={format}
-                onClick={() => setSelectedFormat(format)}
+                key={letter}
+                onClick={() => setSelectedLetter(letter)}
+                style={{
+                  background: selectedLetter === letter ? '#667EEA' : '#F3F4F6',
+                  color: selectedLetter === letter ? 'white' : '#374151',
+                  border: 'none',
+                  padding: '6px 10px',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  minWidth: '32px'
+                }}
+              >
+                {letter}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* SELECTION TOOLBAR - Shows when albums are selected */}
+        {selectedAlbumIds.size > 0 && (
+          <div style={{
+            background: '#3B82F6',
+            color: 'white',
+            padding: '12px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            borderBottom: '1px solid #2563EB'
+          }}>
+            <button
+              onClick={clearSelection}
+              style={{
+                background: 'rgba(255,255,255,0.2)',
+                border: 'none',
+                color: 'white',
+                padding: '6px 12px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '14px'
+              }}
+            >
+              ✕ Cancel
+            </button>
+            <button
+              onClick={selectAllAlbums}
+              style={{
+                background: 'rgba(255,255,255,0.2)',
+                border: 'none',
+                color: 'white',
+                padding: '6px 12px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '14px'
+              }}
+            >
+              ☑ All
+            </button>
+            {/* TODO: Add more batch action buttons: Edit, Remove, Print to PDF, etc. */}
+            <button
+              style={{
+                background: 'rgba(255,255,255,0.2)',
+                border: 'none',
+                color: 'white',
+                padding: '6px 12px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '14px'
+              }}
+            >
+              ✏️ Edit
+            </button>
+            <button
+              style={{
+                background: 'rgba(255,255,255,0.2)',
+                border: 'none',
+                color: 'white',
+                padding: '6px 12px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '14px'
+              }}
+            >
+              🗑️ Remove
+            </button>
+            <button
+              style={{
+                background: 'rgba(255,255,255,0.2)',
+                border: 'none',
+                color: 'white',
+                padding: '6px 12px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '14px'
+              }}
+            >
+              📄 Print to PDF
+            </button>
+            <div style={{ flex: 1 }} />
+            <span style={{ fontSize: '14px', fontWeight: 600 }}>
+              {selectedAlbumIds.size} of {filteredAndSortedAlbums.length} selected
+            </span>
+          </div>
+        )}
+
+        {/* THREE-PANEL LAYOUT */}
+        <div style={{
+          display: 'flex',
+          flex: 1,
+          overflow: 'hidden'
+        }}>
+          {/* LEFT SIDEBAR - View Items (Format/Artist/etc) */}
+          <div style={{
+            width: '280px',
+            background: '#FFFFFF',
+            borderRight: '1px solid #E5E7EB',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden'
+          }}>
+            {/* Search for view items */}
+            <div style={{ padding: '16px', borderBottom: '1px solid #E5E7EB' }}>
+              <input
+                type="text"
+                placeholder={`Search ${viewMode}...`}
+                value={viewItemSearch}
+                onChange={(e) => setViewItemSearch(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #D1D5DB',
+                  borderRadius: '6px',
+                  fontSize: '13px'
+                }}
+              />
+            </div>
+
+            {/* View Items List */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
+              {/* All Items button */}
+              <button
+                onClick={() => setSelectedViewItem(null)}
                 style={{
                   width: '100%',
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
                   padding: '10px 12px',
-                  background: selectedFormat === format ? '#EEF2FF' : 'transparent',
+                  background: !selectedViewItem ? '#EEF2FF' : 'transparent',
                   border: 'none',
                   borderRadius: '6px',
                   cursor: 'pointer',
                   marginBottom: '4px',
                   fontSize: '14px',
-                  color: selectedFormat === format ? '#667EEA' : '#374151',
-                  textAlign: 'left'
+                  color: !selectedViewItem ? '#667EEA' : '#374151'
                 }}
               >
-                <span>{format}</span>
+                <span>[All {viewMode === 'format' ? 'Albums' : viewMode === 'artist' ? 'Artists' : 'Items'}]</span>
                 <span style={{
-                  background: selectedFormat === format ? '#667EEA' : '#E5E7EB',
-                  color: selectedFormat === format ? 'white' : '#6B7280',
+                  background: !selectedViewItem ? '#667EEA' : '#E5E7EB',
+                  color: !selectedViewItem ? 'white' : '#6B7280',
                   padding: '2px 8px',
                   borderRadius: '12px',
                   fontSize: '12px',
                   fontWeight: 600
                 }}>
-                  {count}
+                  {albums.length}
                 </span>
               </button>
-            ))}
+
+              {/* Individual view items */}
+              {sortedViewItems.map(([item, count]) => (
+                <button
+                  key={item}
+                  onClick={() => setSelectedViewItem(item)}
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '10px 12px',
+                    background: selectedViewItem === item ? '#EEF2FF' : 'transparent',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    marginBottom: '4px',
+                    fontSize: '14px',
+                    color: selectedViewItem === item ? '#667EEA' : '#374151',
+                    textAlign: 'left'
+                  }}
+                >
+                  <span>{item}</span>
+                  <span style={{
+                    background: selectedViewItem === item ? '#667EEA' : '#E5E7EB',
+                    color: selectedViewItem === item ? 'white' : '#6B7280',
+                    padding: '2px 8px',
+                    borderRadius: '12px',
+                    fontSize: '12px',
+                    fontWeight: 600
+                  }}>
+                    {count}
+                  </span>
+                </button>
+              ))}
+            </div>
           </div>
+
+          {/* CENTER - TABLE WITH SELECTION */}
+          <div style={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            background: '#FFFFFF'
+          }}>
+            {/* Sort Controls */}
+            <div style={{
+              padding: '12px 16px',
+              borderBottom: '1px solid #E5E7EB',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px'
+            }}>
+              <label style={{ fontSize: '14px', color: '#6B7280' }}>Sort by:</label>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as SortOption)}
+                style={{
+                  padding: '6px 12px',
+                  border: '1px solid #D1D5DB',
+                  borderRadius: '6px',
+                  fontSize: '14px'
+                }}
+              >
+                {Object.entries(
+                  SORT_OPTIONS.reduce((acc, opt) => {
+                    if (!acc[opt.category]) acc[opt.category] = [];
+                    acc[opt.category].push(opt);
+                    return acc;
+                  }, {} as Record<string, typeof SORT_OPTIONS>)
+                ).map(([category, options]) => (
+                  <optgroup key={category} label={category}>
+                    {options.map(opt => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            </div>
+
+            {/* Table with checkboxes - TODO: Update CollectionTable to include selection checkboxes */}
+            <div style={{ flex: 1, overflow: 'auto' }}>
+              {loading ? (
+                <div style={{ padding: '40px', textAlign: 'center', color: '#6B7280' }}>
+                  Loading albums...
+                </div>
+              ) : (
+                <div>
+                  {/* TODO: Create new CollectionTableWithSelection component or modify existing CollectionTable
+                      to include checkboxes in first column, handle selection state */}
+                  <CollectionTable
+                    albums={filteredAndSortedAlbums}
+                    visibleColumns={visibleColumns}
+                    onAlbumClick={setSelectedAlbumId}
+                    onSellClick={openSaleModal}
+                    selectedAlbumId={selectedAlbumId}
+                  />
+                  <div style={{ padding: '20px', textAlign: 'center', color: '#9CA3AF', fontSize: '13px' }}>
+                    [Selection checkboxes to be added to table - see PROJECT_STATUS.md]
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* RIGHT - DETAIL PANEL */}
+          {selectedAlbum && (
+            <div style={{
+              width: '400px',
+              background: '#FFFFFF',
+              borderLeft: '1px solid #E5E7EB',
+              overflow: 'auto'
+            }}>
+              <AlbumDetailPanel
+                album={selectedAlbum}
+                onClose={() => setSelectedAlbumId(null)}
+                onEditTags={() => openTagEditor(selectedAlbum)}
+                onMarkForSale={() => openSaleModal(selectedAlbum)}
+              />
+            </div>
+          )}
         </div>
 
-        {/* CENTER - TABLE */}
+        {/* BOTTOM COLLECTION TABS */}
         <div style={{
-          flex: 1,
+          background: '#2C2C2C',
+          borderTop: '1px solid #1F1F1F',
+          padding: '0',
           display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-          background: '#FFFFFF'
+          alignItems: 'center',
+          gap: '0'
         }}>
-          {/* Sort Controls */}
-          <div style={{
-            padding: '12px 16px',
-            borderBottom: '1px solid #E5E7EB',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px'
-          }}>
-            <label style={{ fontSize: '14px', color: '#6B7280' }}>Sort by:</label>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as SortOption)}
+          {/* TODO: Load collections from database/settings */}
+          {['music', 'Vinyl', 'Singles (45s and 12")', 'Sale'].map(collection => (
+            <button
+              key={collection}
+              onClick={() => setActiveCollection(collection)}
               style={{
-                padding: '6px 12px',
-                border: '1px solid #D1D5DB',
-                borderRadius: '6px',
-                fontSize: '14px'
+                background: activeCollection === collection ? '#F97316' : 'transparent',
+                color: 'white',
+                border: 'none',
+                padding: '12px 24px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: activeCollection === collection ? 600 : 400,
+                borderBottom: activeCollection === collection ? '3px solid #F97316' : 'none'
               }}
             >
-              {Object.entries(
-                SORT_OPTIONS.reduce((acc, opt) => {
-                  if (!acc[opt.category]) acc[opt.category] = [];
-                  acc[opt.category].push(opt);
-                  return acc;
-                }, {} as Record<string, typeof SORT_OPTIONS>)
-              ).map(([category, options]) => (
-                <optgroup key={category} label={category}>
-                  {options.map(opt => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-          </div>
-
-          {/* Table */}
-          <div style={{ flex: 1, overflow: 'auto' }}>
-            {loading ? (
-              <div style={{ padding: '40px', textAlign: 'center', color: '#6B7280' }}>
-                Loading albums...
-              </div>
-            ) : (
-              <CollectionTable
-                albums={filteredAndSortedAlbums}
-                visibleColumns={visibleColumns}
-                onAlbumClick={setSelectedAlbumId}
-                onSellClick={openSaleModal}
-                selectedAlbumId={selectedAlbumId}
-              />
-            )}
-          </div>
+              {collection}
+            </button>
+          ))}
+          
+          {/* Manage Collections button */}
+          <button
+            style={{
+              background: 'transparent',
+              color: '#9CA3AF',
+              border: 'none',
+              padding: '12px 24px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              marginLeft: 'auto'
+            }}
+          >
+            ⚙️ Manage Collections
+          </button>
         </div>
-
-        {/* RIGHT - DETAIL PANEL */}
-        {selectedAlbum && (
-          <div style={{
-            width: '400px',
-            background: '#FFFFFF',
-            borderLeft: '1px solid #E5E7EB',
-            overflow: 'auto'
-          }}>
-            <AlbumDetailPanel
-              album={selectedAlbum}
-              onClose={() => setSelectedAlbumId(null)}
-              onEditTags={() => openTagEditor(selectedAlbum)}
-              onMarkForSale={() => openSaleModal(selectedAlbum)}
-            />
-          </div>
-        )}
       </div>
 
-      {/* MODALS - Keep all existing modals */}
+      {/* ADD ALBUMS MODAL - TODO: Build out full add albums interface */}
+      {showAddAlbumsModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: 12,
+            maxWidth: 600,
+            width: '100%',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
+          }}>
+            <div style={{
+              padding: 20,
+              borderBottom: '1px solid #e5e7eb',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <h2 style={{ fontSize: 20, fontWeight: 'bold', margin: 0 }}>
+                Add Albums By:
+              </h2>
+              <button
+                onClick={() => setShowAddAlbumsModal(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '24px',
+                  cursor: 'pointer',
+                  color: '#6B7280'
+                }}
+              >
+                ×
+              </button>
+            </div>
+            <div style={{ padding: 20 }}>
+              {/* TODO: Add tab buttons for Artist & Title, Barcode, Catalog Nr, Add Manually */}
+              <div style={{ fontSize: '14px', color: '#6B7280' }}>
+                [Add Albums interface to be built - see PROJECT_STATUS.md]
+              </div>
+              <div style={{ marginTop: '20px' }}>
+                <p>Options to implement:</p>
+                <ul style={{ fontSize: '14px', color: '#6B7280' }}>
+                  <li>Artist & Title search</li>
+                  <li>Barcode scan/entry</li>
+                  <li>Catalog Number entry</li>
+                  <li>Manual entry form</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* EXISTING MODALS - Keep these */}
       {showColumnSelector && (
         <ColumnSelector
           visibleColumns={visibleColumns}
