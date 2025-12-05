@@ -449,28 +449,25 @@ function CollectionBrowserPage() {
             borderRight: '1px solid #1a1a1a',
             flexShrink: 0
           }}>
-            {/* LEFT COLUMN HEADER - FIXED */}
             <div style={{
-              padding: '8px 10px',
+              padding: '10px',
               borderBottom: '1px solid #1a1a1a',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              flexShrink: 0,
-              background: '#252525',
-              height: '40px'
+              flexShrink: 0
             }}>
               <button style={{
                 background: '#3a3a3a',
                 color: 'white',
                 border: '1px solid #555',
-                padding: '4px 8px',
+                padding: '5px 10px',
                 borderRadius: '3px',
                 cursor: 'pointer',
                 fontSize: '12px',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px'
+                gap: '6px'
               }}>
                 <span>📁</span>
                 <span>Format</span>
@@ -481,7 +478,7 @@ function CollectionBrowserPage() {
                 color: 'white',
                 border: 'none',
                 cursor: 'pointer',
-                fontSize: '14px',
+                fontSize: '16px',
                 padding: '4px'
               }}>☰</button>
             </div>
@@ -594,7 +591,7 @@ function CollectionBrowserPage() {
             background: '#fff',
             minWidth: 0
           }}>
-            {/* CENTER COLUMN TOOLBAR - FIXED */}
+            {/* CENTER COLUMN TOOLBAR - CORRECTED: View/Sort/Columns only */}
             <div style={{
               padding: '6px 12px',
               borderBottom: '1px solid #555',
@@ -606,6 +603,7 @@ function CollectionBrowserPage() {
               flexShrink: 0
             }}>
               <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                {/* View Mode */}
                 <button style={{
                   background: '#3a3a3a',
                   border: '1px solid #555',
@@ -622,6 +620,7 @@ function CollectionBrowserPage() {
                   <span style={{ fontSize: '9px' }}>▼</span>
                 </button>
                 
+                {/* Sort */}
                 <button style={{
                   background: '#3a3a3a',
                   border: '1px solid #555',
@@ -638,6 +637,7 @@ function CollectionBrowserPage() {
                   <span style={{ fontSize: '9px' }}>▼</span>
                 </button>
                 
+                {/* Columns */}
                 <button style={{
                   background: '#3a3a3a',
                   border: '1px solid #555',
@@ -653,49 +653,6 @@ function CollectionBrowserPage() {
                   <span>⊞</span>
                   <span style={{ fontSize: '9px' }}>▼</span>
                 </button>
-
-                <div style={{ width: '1px', height: '24px', background: '#666', margin: '0 4px' }} />
-
-                <button style={{
-                  background: '#3a3a3a',
-                  border: '1px solid #555',
-                  padding: '4px 9px',
-                  borderRadius: '3px',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                  color: 'white'
-                }}>✏️</button>
-
-                <button style={{
-                  background: '#3a3a3a',
-                  border: '1px solid #555',
-                  padding: '4px 9px',
-                  borderRadius: '3px',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                  color: 'white'
-                }}>↗️</button>
-
-                <button style={{
-                  background: '#3a3a3a',
-                  border: '1px solid #555',
-                  padding: '4px 9px',
-                  borderRadius: '3px',
-                  cursor: 'pointer',
-                  fontSize: '11px',
-                  color: 'white',
-                  fontWeight: 600
-                }}>eBay</button>
-
-                <button style={{
-                  background: '#3a3a3a',
-                  border: '1px solid #555',
-                  padding: '4px 9px',
-                  borderRadius: '3px',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                  color: 'white'
-                }}>⋮</button>
               </div>
               <div style={{ fontSize: '12px', color: '#ddd', fontWeight: 600 }}>
                 535 albums
@@ -803,7 +760,7 @@ function CollectionBrowserPage() {
               flexDirection: 'column',
               flexShrink: 0
             }}>
-              {/* RIGHT PANEL HEADER - FIXED */}
+              {/* RIGHT PANEL HEADER */}
               <div style={{
                 padding: '10px 16px',
                 borderBottom: '1px solid #ddd',
@@ -812,7 +769,7 @@ function CollectionBrowserPage() {
                 justifyContent: 'space-between',
                 alignItems: 'center',
                 flexShrink: 0,
-                height: '40px'
+                minHeight: '40px'
               }}>
                 <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#333' }}>
                   Album Details
@@ -834,6 +791,83 @@ function CollectionBrowserPage() {
               </div>
 
               <div style={{ padding: '16px', flex: 1, overflowY: 'auto' }}>
+                {/* Artist Name */}
+                <div style={{ fontSize: '14px', color: '#333', marginBottom: '4px' }}>
+                  ...And You Will Know Us By The Trail Of Dead
+                </div>
+
+                {/* Album Title */}
+                <h4 style={{ color: '#2196F3', margin: '0 0 12px 0', fontSize: '18px', fontWeight: 600 }}>
+                  Source Tags & Codes
+                </h4>
+
+                {/* ACTION TOOLBAR - THIS IS WHERE EDIT/SHARE/EBAY/MORE GO */}
+                <div style={{
+                  display: 'flex',
+                  gap: '8px',
+                  marginBottom: '16px',
+                  paddingBottom: '12px',
+                  borderBottom: '1px solid #e0e0e0'
+                }}>
+                  <button style={{
+                    background: '#f0f0f0',
+                    border: '1px solid #ddd',
+                    padding: '6px 12px',
+                    borderRadius: '3px',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    color: '#333',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}>
+                    <span>✏️</span>
+                    <span>Edit</span>
+                  </button>
+
+                  <button style={{
+                    background: '#f0f0f0',
+                    border: '1px solid #ddd',
+                    padding: '6px 12px',
+                    borderRadius: '3px',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    color: '#333',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}>
+                    <span>↗️</span>
+                    <span>Share</span>
+                  </button>
+
+                  <button style={{
+                    background: '#f0f0f0',
+                    border: '1px solid #ddd',
+                    padding: '6px 12px',
+                    borderRadius: '3px',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    color: '#333',
+                    fontWeight: 600
+                  }}>
+                    eBay
+                  </button>
+
+                  <button style={{
+                    background: '#f0f0f0',
+                    border: '1px solid #ddd',
+                    padding: '6px 12px',
+                    borderRadius: '3px',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    color: '#333'
+                  }}>
+                    ⋮
+                  </button>
+                </div>
+
+                {/* Album Cover */}
                 <div style={{
                   width: '100%',
                   aspectRatio: '1',
@@ -846,9 +880,7 @@ function CollectionBrowserPage() {
                   fontSize: '48px'
                 }}>🎵</div>
 
-                <h4 style={{ color: '#2196F3', margin: '0 0 4px 0', fontSize: '16px' }}>
-                  Source Tags & Codes
-                </h4>
+                {/* Album Info */}
                 <p style={{ margin: '0 0 12px 0', fontSize: '13px', color: '#666' }}>
                   2002 • CD, Album
                 </p>
