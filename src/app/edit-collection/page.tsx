@@ -16,10 +16,86 @@ type Album = {
   folder: string;
   for_sale: boolean;
   sale_price: number | null;
-  date_added: string | null;
-  media_condition: string;
+  sale_platform: string | null;
+  sale_quantity: number | null;
+  sale_notes: string | null;
   custom_tags: string[] | null;
+  media_condition: string;
+  discogs_genres: string[] | null;
+  discogs_styles: string[] | null;
+  spotify_genres: string[] | null;
+  apple_music_genres: string[] | null;
+  spotify_label: string | null;
+  apple_music_label: string | null;
+  apple_music_genre: string | null;
+  decade: number | null;
+  tracklists: string | null;
+  discogs_source: string | null;
+  discogs_notes: string | null;
+  pricing_notes: string | null;
+  notes: string | null;
+  is_1001: boolean;
+  steves_top_200: boolean;
+  this_weeks_top_10: boolean;
+  inner_circle_preferred: boolean;
+  discogs_master_id: string | null;
+  discogs_release_id: string | null;
+  master_release_id: string | null;
+  spotify_id: string | null;
+  apple_music_id: string | null;
+  sides: any | null;
+  is_box_set: boolean;
+  parent_id: string | null;
+  blocked: boolean;
+  blocked_sides: string[] | null;
+  blocked_tracks: any | null;
+  child_album_ids: number[] | null;
+  sell_price: string | null;
+  date_added: string | null;
+  master_release_date: string | null;
+  spotify_url: string | null;
+  spotify_popularity: number | null;
+  spotify_release_date: string | null;
+  spotify_total_tracks: number | null;
+  spotify_image_url: string | null;
+  apple_music_url: string | null;
+  apple_music_release_date: string | null;
+  apple_music_track_count: number | null;
+  apple_music_artwork_url: string | null;
+  last_enriched_at: string | null;
+  enrichment_sources: string[] | null;
+  artist_norm: string | null;
+  album_norm: string | null;
+  artist_album_norm: string | null;
+  title_norm: string | null;
+  year_int: number | null;
+  wholesale_cost: number | null;
+  discogs_price_min: number | null;
+  discogs_price_median: number | null;
+  discogs_price_max: number | null;
+  discogs_price_updated_at: string | null;
+  purchase_date: string | null;
+  purchase_store: string | null;
+  purchase_price: number | null;
+  current_value: number | null;
+  owner: string | null;
+  last_cleaned_date: string | null;
+  signed_by: string[] | null;
+  play_count: number | null;
 };
+
+function toSafeSearchString(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string') return value.toLowerCase();
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value).toLowerCase();
+  if (Array.isArray(value)) return value.filter(item => typeof item === 'string').join(' ').toLowerCase();
+  try { return String(value).toLowerCase(); } catch { return ''; }
+}
+
+function toSafeStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(item => typeof item === 'string' && item.length > 0);
+}
 
 function CollectionBrowserPage() {
   const router = useRouter();
@@ -37,19 +113,113 @@ function CollectionBrowserPage() {
   const [collectionFilter, setCollectionFilter] = useState<string>('All');
   const [showCollectionDropdown, setShowCollectionDropdown] = useState(false);
   const [folderSearch, setFolderSearch] = useState('');
+  const [folderSortByCount, setFolderSortByCount] = useState(false);
   const [selectedAlbumIds, setSelectedAlbumIds] = useState<Set<number>>(new Set());
   const [selectedAlbumId, setSelectedAlbumId] = useState<number | null>(null);
   const [activeCollection, setActiveCollection] = useState('music');
 
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
-  useEffect(() => {
+  // Load albums from Supabase
+  const loadAlbums = useCallback(async () => {
+    setLoading(true);
+    
+    let allRows: Album[] = [];
+    let from = 0;
+    const batchSize = 1000;
+    let keepGoing = true;
+    
+    while (keepGoing) {
+      const { data: batch, error } = await supabase
+        .from('collection')
+        .select('*')
+        .order('artist', { ascending: true })
+        .range(from, from + batchSize - 1);
+      
+      if (error) {
+        console.error('Error loading albums:', error);
+        break;
+      }
+      
+      if (!batch || batch.length === 0) break;
+      
+      allRows = allRows.concat(batch as Album[]);
+      keepGoing = batch.length === batchSize;
+      from += batchSize;
+    }
+    
+    setAlbums(allRows);
     setLoading(false);
   }, []);
 
+  useEffect(() => {
+    loadAlbums();
+  }, [loadAlbums]);
+
+  // Filter albums
+  const filteredAlbums = albums.filter(album => {
+    // Collection filter
+    if (collectionFilter === 'For Sale' && !album.for_sale) return false;
+    
+    // Letter filter
+    if (selectedLetter !== 'All') {
+      const firstChar = (album.artist || '').charAt(0).toUpperCase();
+      if (selectedLetter === '0-9') {
+        if (!/[0-9]/.test(firstChar)) return false;
+      } else {
+        if (firstChar !== selectedLetter) return false;
+      }
+    }
+
+    // Folder filter (format)
+    if (selectedFolderValue) {
+      if (folderMode === 'format' && album.format !== selectedFolderValue) return false;
+      // Add other folder modes as needed
+    }
+
+    // Search filter
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      const searchable = [
+        album.artist,
+        album.title,
+        album.format,
+        album.year,
+        toSafeSearchString(album.custom_tags),
+        toSafeSearchString(album.discogs_genres),
+        toSafeSearchString(album.spotify_label),
+        toSafeSearchString(album.apple_music_label)
+      ].join(' ').toLowerCase();
+      
+      if (!searchable.includes(q)) return false;
+    }
+
+    return true;
+  });
+
+  // Folder counts
+  const folderCounts = albums.reduce((acc, album) => {
+    const itemKey = album.format || 'Unknown';
+    acc[itemKey] = (acc[itemKey] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const sortedFolderItems = Object.entries(folderCounts)
+    .sort((a, b) => {
+      if (folderSortByCount) {
+        return b[1] - a[1];
+      } else {
+        return a[0].localeCompare(b[0]);
+      }
+    })
+    .filter(([item]) => 
+      !folderSearch || item.toLowerCase().includes(folderSearch.toLowerCase())
+    );
+
+  const selectedAlbum = albums.find(a => a.id === selectedAlbumId);
+
   return (
     <>
-      {/* FORCE HIDE ANY PARENT NAVIGATION */}
       <style jsx global>{`
         body > div:first-child > nav,
         body > div:first-child > header:not(.clz-header),
@@ -465,7 +635,7 @@ function CollectionBrowserPage() {
             }}>⋮</button>
             <div style={{ flex: 1 }} />
             <span style={{ fontSize: '12px', fontWeight: 500 }}>
-              {selectedAlbumIds.size} of 535 selected
+              {selectedAlbumIds.size} of {filteredAlbums.length} selected
             </span>
           </div>
         )}
@@ -477,7 +647,7 @@ function CollectionBrowserPage() {
           overflow: 'hidden',
           minHeight: 0
         }}>
-          {/* LEFT COLUMN: Folder Panel */}
+          {/* LEFT COLUMN: Format/Folder Panel */}
           <div style={{
             width: '220px',
             background: '#2C2C2C',
@@ -546,7 +716,8 @@ function CollectionBrowserPage() {
               />
               <div style={{ marginTop: '8px', display: 'flex', gap: '6px' }}>
                 <button 
-                  title="Sort alphabetically"
+                  onClick={() => setFolderSortByCount(!folderSortByCount)}
+                  title={folderSortByCount ? "Sort alphabetically" : "Sort by count"}
                   style={{
                   background: '#3a3a3a',
                   color: 'white',
@@ -555,23 +726,15 @@ function CollectionBrowserPage() {
                   borderRadius: '3px',
                   cursor: 'pointer',
                   fontSize: '12px'
-                }}>🔤</button>
-                <button 
-                  title="Sort by count"
-                  style={{
-                  background: '#3a3a3a',
-                  color: 'white',
-                  border: '1px solid #555',
-                  padding: '4px 8px',
-                  borderRadius: '3px',
-                  cursor: 'pointer',
-                  fontSize: '12px'
-                }}>↕️</button>
+                }}>
+                  {folderSortByCount ? '🔢' : '🔤'}
+                </button>
               </div>
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', padding: '6px', minHeight: 0 }}>
               <button 
+                onClick={() => setSelectedFolderValue(null)}
                 title="Show all albums"
                 style={{
                 width: '100%',
@@ -579,7 +742,7 @@ function CollectionBrowserPage() {
                 justifyContent: 'space-between',
                 alignItems: 'center',
                 padding: '6px 8px',
-                background: '#5A9BD5',
+                background: !selectedFolderValue ? '#5A9BD5' : 'transparent',
                 border: 'none',
                 borderRadius: '3px',
                 cursor: 'pointer',
@@ -590,18 +753,21 @@ function CollectionBrowserPage() {
               }}>
                 <span>[All Albums]</span>
                 <span style={{
-                  background: '#3578b3',
+                  background: !selectedFolderValue ? '#3578b3' : '#555',
                   color: 'white',
                   padding: '2px 7px',
                   borderRadius: '10px',
                   fontSize: '11px',
                   fontWeight: 600
-                }}>535</span>
+                }}>
+                  {albums.length}
+                </span>
               </button>
 
-              {['LP, Album', 'CD, Album', '7", Single', '12", EP'].map((format, idx) => (
+              {sortedFolderItems.map(([format, count]) => (
                 <button
-                  key={idx}
+                  key={format}
+                  onClick={() => setSelectedFolderValue(format)}
                   title={`Filter by ${format}`}
                   style={{
                     width: '100%',
@@ -609,7 +775,7 @@ function CollectionBrowserPage() {
                     justifyContent: 'space-between',
                     alignItems: 'center',
                     padding: '6px 8px',
-                    background: 'transparent',
+                    background: selectedFolderValue === format ? '#5A9BD5' : 'transparent',
                     border: 'none',
                     borderRadius: '3px',
                     cursor: 'pointer',
@@ -621,13 +787,15 @@ function CollectionBrowserPage() {
                 >
                   <span>{format}</span>
                   <span style={{
-                    background: '#555',
+                    background: selectedFolderValue === format ? '#3578b3' : '#555',
                     color: 'white',
                     padding: '2px 7px',
                     borderRadius: '10px',
                     fontSize: '11px',
                     fontWeight: 600
-                  }}>{Math.floor(Math.random() * 100)}</span>
+                  }}>
+                    {count}
+                  </span>
                 </button>
               ))}
             </div>
@@ -642,7 +810,6 @@ function CollectionBrowserPage() {
             background: '#fff',
             minWidth: 0
           }}>
-            {/* CENTER COLUMN TOOLBAR */}
             <div style={{
               padding: '6px 12px',
               borderBottom: '1px solid #555',
@@ -709,103 +876,117 @@ function CollectionBrowserPage() {
                 </button>
               </div>
               <div style={{ fontSize: '12px', color: '#ddd', fontWeight: 600 }}>
-                535 albums
+                {loading ? 'Loading...' : `${filteredAlbums.length} albums`}
               </div>
             </div>
 
             <div style={{ flex: 1, overflow: 'auto', background: '#fff', minHeight: 0 }}>
-              <table style={{
-                width: '100%',
-                borderCollapse: 'collapse',
-                fontSize: '13px'
-              }}>
-                <thead>
-                  <tr style={{
-                    background: '#f5f5f5',
-                    borderBottom: '2px solid #ddd',
-                    position: 'sticky',
-                    top: 0,
-                    zIndex: 10
-                  }}>
-                    <th style={{ width: '30px', padding: '8px', textAlign: 'center', borderRight: '1px solid #e0e0e0', color: '#333' }}>
-                      <input type="checkbox" title="Select all" style={{ cursor: 'pointer' }} />
-                    </th>
-                    <th style={{ width: '30px', padding: '8px 4px', textAlign: 'center', borderRight: '1px solid #e0e0e0', color: '#333', fontWeight: 600 }} title="Owned status">✓</th>
-                    <th style={{ width: '30px', padding: '8px 4px', textAlign: 'center', borderRight: '1px solid #e0e0e0', color: '#333', fontWeight: 600 }} title="For sale">$</th>
-                    <th style={{ width: '30px', padding: '8px 4px', textAlign: 'center', borderRight: '1px solid #e0e0e0', color: '#333', fontWeight: 600 }} title="Quick edit">✏</th>
-                    <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, borderRight: '1px solid #e0e0e0', cursor: 'pointer', color: '#333' }} title="Sort by artist">
-                      Artist <span style={{ fontSize: '10px' }}>▲</span>
-                    </th>
-                    <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, borderRight: '1px solid #e0e0e0', cursor: 'pointer', color: '#333' }} title="Sort by title">
-                      Title <span style={{ fontSize: '10px' }}>▲</span>
-                    </th>
-                    <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, borderRight: '1px solid #e0e0e0', width: '110px', color: '#333' }}>Release Date</th>
-                    <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, borderRight: '1px solid #e0e0e0', width: '150px', color: '#333' }}>Format</th>
-                    <th style={{ padding: '8px', textAlign: 'center', fontWeight: 600, borderRight: '1px solid #e0e0e0', width: '50px', color: '#333' }}>Discs</th>
-                    <th style={{ padding: '8px', textAlign: 'center', fontWeight: 600, borderRight: '1px solid #e0e0e0', width: '60px', color: '#333' }}>Tracks</th>
-                    <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, borderRight: '1px solid #e0e0e0', width: '70px', color: '#333' }}>Length</th>
-                    <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, borderRight: '1px solid #e0e0e0', width: '130px', color: '#333' }}>Genre</th>
-                    <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, borderRight: '1px solid #e0e0e0', width: '130px', color: '#333' }}>Label</th>
-                    <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, width: '110px', color: '#333' }}>Added Date</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[
-                    { artist: '...And You Will Know Us By The Trail Of Dead', title: 'Source Tags & Codes', year: '2002', format: 'CD, Album', discs: 1, tracks: 11, length: '45:54', genre: 'Alternative Rock', label: 'Interscope Records', added: 'Feb 26, 2002' },
-                    { artist: "'Til Tuesday", title: 'Welcome Home', year: '1986', format: 'Cass, Album, Gre', discs: 1, tracks: 10, length: '38:22', genre: 'New Wave', label: 'Epic', added: 'Jan 15, 1986' },
-                    { artist: '"Bonanza" Cast', title: 'Ponderosa Party Time!', year: '1962', format: 'LP, Album, Hol', discs: 1, tracks: 12, length: '32:10', genre: 'Country', label: 'RCA Victor', added: 'Mar 5, 1962' },
-                  ].map((album, idx) => (
-                    <tr 
-                      key={idx}
-                      onClick={() => setSelectedAlbumId(idx)}
-                      style={{
-                        background: selectedAlbumId === idx ? '#d4e9f7' : idx % 2 === 0 ? '#fff' : '#fafafa',
-                        borderBottom: '1px solid #e8e8e8',
-                        cursor: 'pointer'
-                      }}
-                      onMouseEnter={(e) => {
-                        if (selectedAlbumId !== idx) {
-                          e.currentTarget.style.background = '#f5f5f5';
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (selectedAlbumId !== idx) {
-                          e.currentTarget.style.background = idx % 2 === 0 ? '#fff' : '#fafafa';
-                        }
-                      }}
-                    >
-                      <td style={{ padding: '8px', textAlign: 'center', borderRight: '1px solid #e8e8e8' }}>
-                        <input 
-                          type="checkbox" 
-                          title="Select this album"
-                          style={{ cursor: 'pointer' }}
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      </td>
-                      <td style={{ padding: '8px 4px', textAlign: 'center', borderRight: '1px solid #e8e8e8', color: '#4CAF50', fontSize: '14px' }} title="Album owned">✓</td>
-                      <td style={{ padding: '8px 4px', textAlign: 'center', borderRight: '1px solid #e8e8e8', color: '#666' }}></td>
-                      <td style={{ padding: '8px 4px', textAlign: 'center', borderRight: '1px solid #e8e8e8' }}>
-                        <button title="Quick edit album" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: '#2196F3', padding: 0 }}>✏</button>
-                      </td>
-                      <td style={{ padding: '8px', borderRight: '1px solid #e8e8e8', color: '#333' }}>{album.artist}</td>
-                      <td style={{ padding: '8px', borderRight: '1px solid #e8e8e8', color: '#2196F3' }}>{album.title}</td>
-                      <td style={{ padding: '8px', borderRight: '1px solid #e8e8e8', color: '#333' }}>{album.added}</td>
-                      <td style={{ padding: '8px', borderRight: '1px solid #e8e8e8', color: '#333' }}>{album.format}</td>
-                      <td style={{ padding: '8px', textAlign: 'center', borderRight: '1px solid #e8e8e8', color: '#333' }}>{album.discs}</td>
-                      <td style={{ padding: '8px', textAlign: 'center', borderRight: '1px solid #e8e8e8', color: '#333' }}>{album.tracks}</td>
-                      <td style={{ padding: '8px', borderRight: '1px solid #e8e8e8', color: '#333' }}>{album.length}</td>
-                      <td style={{ padding: '8px', borderRight: '1px solid #e8e8e8', color: '#333' }}>{album.genre}</td>
-                      <td style={{ padding: '8px', borderRight: '1px solid #e8e8e8', color: '#333' }}>{album.label}</td>
-                      <td style={{ padding: '8px', color: '#333' }}>{album.added}</td>
+              {loading ? (
+                <div style={{ padding: '40px', textAlign: 'center', color: '#666' }}>
+                  Loading albums...
+                </div>
+              ) : (
+                <table style={{
+                  width: '100%',
+                  borderCollapse: 'collapse',
+                  fontSize: '13px'
+                }}>
+                  <thead>
+                    <tr style={{
+                      background: '#f5f5f5',
+                      borderBottom: '2px solid #ddd',
+                      position: 'sticky',
+                      top: 0,
+                      zIndex: 10
+                    }}>
+                      <th style={{ width: '30px', padding: '8px', textAlign: 'center', borderRight: '1px solid #e0e0e0', color: '#333' }}>
+                        <input type="checkbox" title="Select all" style={{ cursor: 'pointer' }} />
+                      </th>
+                      <th style={{ width: '30px', padding: '8px 4px', textAlign: 'center', borderRight: '1px solid #e0e0e0', color: '#333', fontWeight: 600 }} title="Owned status">✓</th>
+                      <th style={{ width: '30px', padding: '8px 4px', textAlign: 'center', borderRight: '1px solid #e0e0e0', color: '#333', fontWeight: 600 }} title="For sale">$</th>
+                      <th style={{ width: '30px', padding: '8px 4px', textAlign: 'center', borderRight: '1px solid #e0e0e0', color: '#333', fontWeight: 600 }} title="Quick edit">✏</th>
+                      <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, borderRight: '1px solid #e0e0e0', cursor: 'pointer', color: '#333' }} title="Sort by artist">
+                        Artist <span style={{ fontSize: '10px' }}>▲</span>
+                      </th>
+                      <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, borderRight: '1px solid #e0e0e0', cursor: 'pointer', color: '#333' }} title="Sort by title">
+                        Title <span style={{ fontSize: '10px' }}>▲</span>
+                      </th>
+                      <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, borderRight: '1px solid #e0e0e0', width: '110px', color: '#333' }}>Release Date</th>
+                      <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, borderRight: '1px solid #e0e0e0', width: '150px', color: '#333' }}>Format</th>
+                      <th style={{ padding: '8px', textAlign: 'center', fontWeight: 600, borderRight: '1px solid #e0e0e0', width: '50px', color: '#333' }}>Discs</th>
+                      <th style={{ padding: '8px', textAlign: 'center', fontWeight: 600, borderRight: '1px solid #e0e0e0', width: '60px', color: '#333' }}>Tracks</th>
+                      <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, borderRight: '1px solid #e0e0e0', width: '70px', color: '#333' }}>Length</th>
+                      <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, borderRight: '1px solid #e0e0e0', width: '130px', color: '#333' }}>Genre</th>
+                      <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, borderRight: '1px solid #e0e0e0', width: '130px', color: '#333' }}>Label</th>
+                      <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, width: '110px', color: '#333' }}>Added Date</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {filteredAlbums.map((album, idx) => (
+                      <tr 
+                        key={album.id}
+                        onClick={() => setSelectedAlbumId(album.id)}
+                        style={{
+                          background: selectedAlbumId === album.id ? '#d4e9f7' : idx % 2 === 0 ? '#fff' : '#fafafa',
+                          borderBottom: '1px solid #e8e8e8',
+                          cursor: 'pointer'
+                        }}
+                        onMouseEnter={(e) => {
+                          if (selectedAlbumId !== album.id) {
+                            e.currentTarget.style.background = '#f5f5f5';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (selectedAlbumId !== album.id) {
+                            e.currentTarget.style.background = idx % 2 === 0 ? '#fff' : '#fafafa';
+                          }
+                        }}
+                      >
+                        <td style={{ padding: '8px', textAlign: 'center', borderRight: '1px solid #e8e8e8' }}>
+                          <input 
+                            type="checkbox" 
+                            title="Select this album"
+                            style={{ cursor: 'pointer' }}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </td>
+                        <td style={{ padding: '8px 4px', textAlign: 'center', borderRight: '1px solid #e8e8e8', color: '#4CAF50', fontSize: '14px' }} title="Album owned">✓</td>
+                        <td style={{ padding: '8px 4px', textAlign: 'center', borderRight: '1px solid #e8e8e8', color: '#666' }}>
+                          {album.for_sale && <span title="For sale">$</span>}
+                        </td>
+                        <td style={{ padding: '8px 4px', textAlign: 'center', borderRight: '1px solid #e8e8e8' }}>
+                          <button title="Quick edit album" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: '#2196F3', padding: 0 }}>✏</button>
+                        </td>
+                        <td style={{ padding: '8px', borderRight: '1px solid #e8e8e8', color: '#333' }}>{album.artist}</td>
+                        <td style={{ padding: '8px', borderRight: '1px solid #e8e8e8', color: '#2196F3' }}>{album.title}</td>
+                        <td style={{ padding: '8px', borderRight: '1px solid #e8e8e8', color: '#333' }}>
+                          {album.date_added ? new Date(album.date_added).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}
+                        </td>
+                        <td style={{ padding: '8px', borderRight: '1px solid #e8e8e8', color: '#333' }}>{album.format}</td>
+                        <td style={{ padding: '8px', textAlign: 'center', borderRight: '1px solid #e8e8e8', color: '#333' }}>-</td>
+                        <td style={{ padding: '8px', textAlign: 'center', borderRight: '1px solid #e8e8e8', color: '#333' }}>
+                          {album.spotify_total_tracks || album.apple_music_track_count || '-'}
+                        </td>
+                        <td style={{ padding: '8px', borderRight: '1px solid #e8e8e8', color: '#333' }}>-</td>
+                        <td style={{ padding: '8px', borderRight: '1px solid #e8e8e8', color: '#333' }}>
+                          {toSafeStringArray(album.discogs_genres)[0] || toSafeStringArray(album.spotify_genres)[0] || '-'}
+                        </td>
+                        <td style={{ padding: '8px', borderRight: '1px solid #e8e8e8', color: '#333' }}>
+                          {album.spotify_label || album.apple_music_label || '-'}
+                        </td>
+                        <td style={{ padding: '8px', color: '#333' }}>
+                          {album.date_added ? new Date(album.date_added).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
           </div>
 
           {/* RIGHT COLUMN: Detail Panel */}
-          {selectedAlbumId !== null && (
+          {selectedAlbum && (
             <div style={{
               width: '380px',
               background: '#fff',
@@ -815,7 +996,6 @@ function CollectionBrowserPage() {
               flexDirection: 'column',
               flexShrink: 0
             }}>
-              {/* DARK GREY HEADER BAR with toolbar */}
               <div style={{
                 padding: '6px 12px',
                 borderBottom: '1px solid #555',
@@ -897,15 +1077,13 @@ function CollectionBrowserPage() {
               </div>
 
               <div style={{ padding: '16px', flex: 1, overflowY: 'auto', background: '#F8DE77' }}>
-                {/* Artist Name */}
                 <div style={{ fontSize: '14px', color: '#333', marginBottom: '4px' }}>
-                  ...And You Will Know Us By The Trail Of Dead
+                  {selectedAlbum.artist}
                 </div>
 
-                {/* Album Title with checkmark */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
                   <h4 style={{ color: '#2196F3', margin: 0, fontSize: '18px', fontWeight: 600 }}>
-                    Source Tags & Codes
+                    {selectedAlbum.title}
                   </h4>
                   <div style={{
                     background: '#2196F3',
@@ -919,101 +1097,88 @@ function CollectionBrowserPage() {
                   }} title="Album owned">✓</div>
                 </div>
 
-                {/* Album Cover */}
-                <div style={{
-                  width: '100%',
-                  aspectRatio: '1',
-                  background: '#fff',
-                  marginBottom: '12px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#999',
-                  fontSize: '48px',
-                  border: '1px solid #ddd'
-                }}>🎵</div>
-
-                {/* Pagination dots */}
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  marginBottom: '16px'
-                }}>
+                {selectedAlbum.image_url ? (
+                  <img 
+                    src={selectedAlbum.image_url} 
+                    alt={`${selectedAlbum.artist} - ${selectedAlbum.title}`}
+                    style={{
+                      width: '100%',
+                      aspectRatio: '1',
+                      objectFit: 'cover',
+                      marginBottom: '12px',
+                      border: '1px solid #ddd'
+                    }}
+                  />
+                ) : (
                   <div style={{
-                    width: '10px',
-                    height: '10px',
-                    borderRadius: '50%',
-                    background: '#333'
-                  }} title="Image 1 of 2"></div>
-                  <div style={{
-                    width: '10px',
-                    height: '10px',
-                    borderRadius: '50%',
-                    background: '#ccc'
-                  }} title="Image 2 of 2"></div>
-                </div>
+                    width: '100%',
+                    aspectRatio: '1',
+                    background: '#fff',
+                    marginBottom: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#999',
+                    fontSize: '48px',
+                    border: '1px solid #ddd'
+                  }}>🎵</div>
+                )}
 
-                {/* Label */}
                 <div style={{
                   fontSize: '16px',
                   fontWeight: 600,
                   color: '#333',
                   marginBottom: '8px'
                 }}>
-                  Interscope Records (2002)
+                  {selectedAlbum.spotify_label || selectedAlbum.apple_music_label || 'Unknown Label'} 
+                  {selectedAlbum.year && ` (${selectedAlbum.year})`}
                 </div>
 
-                {/* Genres */}
-                <div style={{
-                  fontSize: '14px',
-                  color: '#666',
-                  marginBottom: '16px'
-                }}>
-                  Alternative Rock | Art Rock | Post-Hardcore | Rock
-                </div>
+                {(selectedAlbum.discogs_genres || selectedAlbum.spotify_genres) && (
+                  <div style={{
+                    fontSize: '14px',
+                    color: '#666',
+                    marginBottom: '16px'
+                  }}>
+                    {toSafeStringArray(selectedAlbum.discogs_genres || selectedAlbum.spotify_genres).join(' | ')}
+                  </div>
+                )}
 
-                {/* Barcode */}
-                <div style={{
-                  fontSize: '14px',
-                  color: '#333',
-                  marginBottom: '4px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}>
-                  <span style={{ fontSize: '16px' }}>|||||||</span>
-                  <span>606949323622</span>
-                </div>
-
-                {/* Country */}
-                <div style={{
-                  fontSize: '14px',
-                  color: '#333',
-                  marginBottom: '8px'
-                }}>
-                  US
-                </div>
-
-                {/* Format */}
                 <div style={{
                   fontSize: '14px',
                   color: '#333',
                   marginBottom: '16px',
                   fontWeight: 600
                 }}>
-                  CD, Album | 1 Disc | 11 Tracks | 45:54
+                  {selectedAlbum.format}
+                  {selectedAlbum.spotify_total_tracks && ` | ${selectedAlbum.spotify_total_tracks} Tracks`}
+                  {selectedAlbum.apple_music_track_count && ` | ${selectedAlbum.apple_music_track_count} Tracks`}
                 </div>
 
-                {/* Catalog Number */}
-                <div style={{
-                  fontSize: '13px',
-                  color: '#999',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px'
-                }}>
-                  CAT NO <span style={{ color: '#333', fontWeight: 600 }}>069493236-2</span>
-                </div>
+                {selectedAlbum.media_condition && (
+                  <div style={{ fontSize: '13px', color: '#666', marginBottom: '8px' }}>
+                    <strong>Condition:</strong> {selectedAlbum.media_condition}
+                  </div>
+                )}
+
+                {selectedAlbum.custom_tags && selectedAlbum.custom_tags.length > 0 && (
+                  <div style={{ marginTop: '16px' }}>
+                    <div style={{ fontSize: '13px', fontWeight: 600, color: '#333', marginBottom: '8px' }}>Tags:</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                      {toSafeStringArray(selectedAlbum.custom_tags).map(tag => (
+                        <span key={tag} style={{
+                          padding: '4px 10px',
+                          background: '#8809AC',
+                          color: 'white',
+                          borderRadius: '12px',
+                          fontSize: '12px'
+                        }}>
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
