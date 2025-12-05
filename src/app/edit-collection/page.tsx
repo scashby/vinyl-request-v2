@@ -449,25 +449,28 @@ function CollectionBrowserPage() {
             borderRight: '1px solid #1a1a1a',
             flexShrink: 0
           }}>
+            {/* LEFT COLUMN HEADER - FIXED */}
             <div style={{
-              padding: '10px',
+              padding: '8px 10px',
               borderBottom: '1px solid #1a1a1a',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              flexShrink: 0
+              flexShrink: 0,
+              background: '#252525',
+              height: '40px'
             }}>
               <button style={{
                 background: '#3a3a3a',
                 color: 'white',
                 border: '1px solid #555',
-                padding: '5px 10px',
+                padding: '4px 8px',
                 borderRadius: '3px',
                 cursor: 'pointer',
                 fontSize: '12px',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px'
+                gap: '4px'
               }}>
                 <span>📁</span>
                 <span>Format</span>
@@ -478,7 +481,7 @@ function CollectionBrowserPage() {
                 color: 'white',
                 border: 'none',
                 cursor: 'pointer',
-                fontSize: '16px',
+                fontSize: '14px',
                 padding: '4px'
               }}>☰</button>
             </div>
@@ -591,46 +594,110 @@ function CollectionBrowserPage() {
             background: '#fff',
             minWidth: 0
           }}>
+            {/* CENTER COLUMN TOOLBAR - FIXED */}
             <div style={{
-              padding: '8px 12px',
-              borderBottom: '1px solid #ddd',
+              padding: '6px 12px',
+              borderBottom: '1px solid #555',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              background: '#fafafa',
+              background: '#4a4a4a',
               height: '40px',
               flexShrink: 0
             }}>
               <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                 <button style={{
-                  background: '#fff',
-                  border: '1px solid #ccc',
-                  padding: '4px 8px',
+                  background: '#3a3a3a',
+                  border: '1px solid #555',
+                  padding: '4px 9px',
                   borderRadius: '3px',
                   cursor: 'pointer',
                   fontSize: '12px',
-                  color: '#333'
-                }}>☰</button>
+                  color: 'white',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '3px'
+                }}>
+                  <span>☰</span>
+                  <span style={{ fontSize: '9px' }}>▼</span>
+                </button>
+                
                 <button style={{
-                  background: '#fff',
-                  border: '1px solid #ccc',
-                  padding: '4px 8px',
+                  background: '#3a3a3a',
+                  border: '1px solid #555',
+                  padding: '4px 9px',
                   borderRadius: '3px',
                   cursor: 'pointer',
                   fontSize: '12px',
-                  color: '#333'
-                }}>↕️</button>
+                  color: 'white',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '3px'
+                }}>
+                  <span>↕️</span>
+                  <span style={{ fontSize: '9px' }}>▼</span>
+                </button>
+                
                 <button style={{
-                  background: '#fff',
-                  border: '1px solid #ccc',
-                  padding: '4px 8px',
+                  background: '#3a3a3a',
+                  border: '1px solid #555',
+                  padding: '4px 9px',
                   borderRadius: '3px',
                   cursor: 'pointer',
                   fontSize: '12px',
-                  color: '#333'
-                }}>⚙️</button>
+                  color: 'white',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '3px'
+                }}>
+                  <span>⊞</span>
+                  <span style={{ fontSize: '9px' }}>▼</span>
+                </button>
+
+                <div style={{ width: '1px', height: '24px', background: '#666', margin: '0 4px' }} />
+
+                <button style={{
+                  background: '#3a3a3a',
+                  border: '1px solid #555',
+                  padding: '4px 9px',
+                  borderRadius: '3px',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  color: 'white'
+                }}>✏️</button>
+
+                <button style={{
+                  background: '#3a3a3a',
+                  border: '1px solid #555',
+                  padding: '4px 9px',
+                  borderRadius: '3px',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  color: 'white'
+                }}>↗️</button>
+
+                <button style={{
+                  background: '#3a3a3a',
+                  border: '1px solid #555',
+                  padding: '4px 9px',
+                  borderRadius: '3px',
+                  cursor: 'pointer',
+                  fontSize: '11px',
+                  color: 'white',
+                  fontWeight: 600
+                }}>eBay</button>
+
+                <button style={{
+                  background: '#3a3a3a',
+                  border: '1px solid #555',
+                  padding: '4px 9px',
+                  borderRadius: '3px',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  color: 'white'
+                }}>⋮</button>
               </div>
-              <div style={{ fontSize: '12px', color: '#666', fontWeight: 600 }}>
+              <div style={{ fontSize: '12px', color: '#ddd', fontWeight: 600 }}>
                 535 albums
               </div>
             </div>
@@ -736,14 +803,16 @@ function CollectionBrowserPage() {
               flexDirection: 'column',
               flexShrink: 0
             }}>
+              {/* RIGHT PANEL HEADER - FIXED */}
               <div style={{
-                padding: '12px 16px',
-                borderBottom: '1px solid #e0e0e0',
-                background: '#fafafa',
+                padding: '10px 16px',
+                borderBottom: '1px solid #ddd',
+                background: '#f8f8f8',
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                flexShrink: 0
+                flexShrink: 0,
+                height: '40px'
               }}>
                 <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#333' }}>
                   Album Details
@@ -756,7 +825,8 @@ function CollectionBrowserPage() {
                     fontSize: '20px', 
                     cursor: 'pointer', 
                     color: '#666',
-                    padding: '0 4px'
+                    padding: '0 4px',
+                    lineHeight: 1
                   }}
                 >
                   ×
