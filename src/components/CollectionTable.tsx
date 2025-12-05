@@ -138,18 +138,6 @@ export default function CollectionTable({ albums, visibleColumns, onAlbumClick, 
     const value = album[columnId as keyof Album];
 
     switch (columnId) {
-      case 'image':
-        return (
-          <Image
-            src={album.image_url || '/images/placeholder.png'}
-            alt={album.title}
-            width={50}
-            height={50}
-            style={{ borderRadius: 4, objectFit: 'cover' }}
-            unoptimized
-          />
-        );
-
       case 'custom_tags':
         if (!album.custom_tags || album.custom_tags.length === 0) return <span style={{ color: '#9ca3af' }}>—</span>;
         return (
