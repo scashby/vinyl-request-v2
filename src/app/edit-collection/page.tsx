@@ -591,7 +591,7 @@ function CollectionBrowserPage() {
             background: '#fff',
             minWidth: 0
           }}>
-            {/* CENTER COLUMN TOOLBAR - CORRECTED: View/Sort/Columns only */}
+            {/* CENTER COLUMN TOOLBAR */}
             <div style={{
               padding: '6px 12px',
               borderBottom: '1px solid #555',
@@ -603,7 +603,6 @@ function CollectionBrowserPage() {
               flexShrink: 0
             }}>
               <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                {/* View Mode */}
                 <button style={{
                   background: '#3a3a3a',
                   border: '1px solid #555',
@@ -620,7 +619,6 @@ function CollectionBrowserPage() {
                   <span style={{ fontSize: '9px' }}>▼</span>
                 </button>
                 
-                {/* Sort */}
                 <button style={{
                   background: '#3a3a3a',
                   border: '1px solid #555',
@@ -637,7 +635,6 @@ function CollectionBrowserPage() {
                   <span style={{ fontSize: '9px' }}>▼</span>
                 </button>
                 
-                {/* Columns */}
                 <button style={{
                   background: '#3a3a3a',
                   border: '1px solid #555',
@@ -760,135 +757,194 @@ function CollectionBrowserPage() {
               flexDirection: 'column',
               flexShrink: 0
             }}>
-              {/* RIGHT PANEL HEADER */}
+              {/* DARK GREY HEADER BAR with toolbar */}
               <div style={{
-                padding: '10px 16px',
-                borderBottom: '1px solid #ddd',
-                background: '#f8f8f8',
+                padding: '6px 12px',
+                borderBottom: '1px solid #555',
                 display: 'flex',
-                justifyContent: 'space-between',
                 alignItems: 'center',
-                flexShrink: 0,
-                minHeight: '40px'
+                justifyContent: 'space-between',
+                background: '#4a4a4a',
+                height: '40px',
+                flexShrink: 0
               }}>
-                <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#333' }}>
-                  Album Details
-                </h3>
-                <button 
-                  onClick={() => setSelectedAlbumId(null)}
-                  style={{ 
-                    background: 'none', 
-                    border: 'none', 
-                    fontSize: '20px', 
-                    cursor: 'pointer', 
-                    color: '#666',
-                    padding: '0 4px',
-                    lineHeight: 1
-                  }}
-                >
-                  ×
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                  <button style={{
+                    background: '#3a3a3a',
+                    border: '1px solid #555',
+                    padding: '6px 10px',
+                    borderRadius: '3px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    color: 'white'
+                  }}>✏️</button>
+
+                  <button style={{
+                    background: '#3a3a3a',
+                    border: '1px solid #555',
+                    padding: '6px 10px',
+                    borderRadius: '3px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    color: 'white'
+                  }}>↗️</button>
+
+                  <button style={{
+                    background: '#3a3a3a',
+                    border: '1px solid #555',
+                    padding: '6px 10px',
+                    borderRadius: '3px',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    color: 'white',
+                    fontWeight: 600
+                  }}>eBay</button>
+
+                  <button style={{
+                    background: '#3a3a3a',
+                    border: '1px solid #555',
+                    padding: '6px 10px',
+                    borderRadius: '3px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    color: 'white'
+                  }}>⋮</button>
+                </div>
+                
+                <button style={{
+                  background: '#3a3a3a',
+                  border: '1px solid #555',
+                  padding: '4px 9px',
+                  borderRadius: '3px',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  color: 'white',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '3px'
+                }}>
+                  <span>⊞</span>
+                  <span style={{ fontSize: '9px' }}>▼</span>
                 </button>
               </div>
 
-              <div style={{ padding: '16px', flex: 1, overflowY: 'auto' }}>
+              <div style={{ padding: '16px', flex: 1, overflowY: 'auto', background: '#f5f5f5' }}>
                 {/* Artist Name */}
                 <div style={{ fontSize: '14px', color: '#333', marginBottom: '4px' }}>
                   ...And You Will Know Us By The Trail Of Dead
                 </div>
 
-                {/* Album Title */}
-                <h4 style={{ color: '#2196F3', margin: '0 0 12px 0', fontSize: '18px', fontWeight: 600 }}>
-                  Source Tags & Codes
-                </h4>
-
-                {/* ACTION TOOLBAR - THIS IS WHERE EDIT/SHARE/EBAY/MORE GO */}
-                <div style={{
-                  display: 'flex',
-                  gap: '8px',
-                  marginBottom: '16px',
-                  paddingBottom: '12px',
-                  borderBottom: '1px solid #e0e0e0'
-                }}>
-                  <button style={{
-                    background: '#f0f0f0',
-                    border: '1px solid #ddd',
-                    padding: '6px 12px',
-                    borderRadius: '3px',
-                    cursor: 'pointer',
-                    fontSize: '13px',
-                    color: '#333',
+                {/* Album Title with checkmark */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                  <h4 style={{ color: '#2196F3', margin: 0, fontSize: '18px', fontWeight: 600 }}>
+                    Source Tags & Codes
+                  </h4>
+                  <div style={{
+                    background: '#2196F3',
+                    color: 'white',
+                    borderRadius: '4px',
+                    padding: '4px 8px',
+                    fontSize: '16px',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '4px'
-                  }}>
-                    <span>✏️</span>
-                    <span>Edit</span>
-                  </button>
-
-                  <button style={{
-                    background: '#f0f0f0',
-                    border: '1px solid #ddd',
-                    padding: '6px 12px',
-                    borderRadius: '3px',
-                    cursor: 'pointer',
-                    fontSize: '13px',
-                    color: '#333',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}>
-                    <span>↗️</span>
-                    <span>Share</span>
-                  </button>
-
-                  <button style={{
-                    background: '#f0f0f0',
-                    border: '1px solid #ddd',
-                    padding: '6px 12px',
-                    borderRadius: '3px',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    color: '#333',
-                    fontWeight: 600
-                  }}>
-                    eBay
-                  </button>
-
-                  <button style={{
-                    background: '#f0f0f0',
-                    border: '1px solid #ddd',
-                    padding: '6px 12px',
-                    borderRadius: '3px',
-                    cursor: 'pointer',
-                    fontSize: '13px',
-                    color: '#333'
-                  }}>
-                    ⋮
-                  </button>
+                    justifyContent: 'center'
+                  }}>✓</div>
                 </div>
 
                 {/* Album Cover */}
                 <div style={{
                   width: '100%',
                   aspectRatio: '1',
-                  background: '#f0f0f0',
-                  marginBottom: '16px',
+                  background: '#fff',
+                  marginBottom: '12px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   color: '#999',
-                  fontSize: '48px'
+                  fontSize: '48px',
+                  border: '1px solid #ddd'
                 }}>🎵</div>
 
-                {/* Album Info */}
-                <p style={{ margin: '0 0 12px 0', fontSize: '13px', color: '#666' }}>
-                  2002 • CD, Album
-                </p>
-                
-                <div style={{ marginTop: '16px', fontSize: '13px', color: '#333' }}>
-                  <p><strong>Artist:</strong> ...And You Will Know Us By The Trail Of Dead</p>
-                  <p><strong>Label:</strong> Interscope Records (2002)</p>
-                  <p><strong>Format:</strong> CD, Album | 1 Disc | 11 Tracks | 45:54</p>
+                {/* Pagination dots */}
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  marginBottom: '16px'
+                }}>
+                  <div style={{
+                    width: '10px',
+                    height: '10px',
+                    borderRadius: '50%',
+                    background: '#333'
+                  }}></div>
+                  <div style={{
+                    width: '10px',
+                    height: '10px',
+                    borderRadius: '50%',
+                    background: '#ccc'
+                  }}></div>
+                </div>
+
+                {/* Label */}
+                <div style={{
+                  fontSize: '16px',
+                  fontWeight: 600,
+                  color: '#333',
+                  marginBottom: '8px'
+                }}>
+                  Interscope Records (2002)
+                </div>
+
+                {/* Genres */}
+                <div style={{
+                  fontSize: '14px',
+                  color: '#666',
+                  marginBottom: '16px'
+                }}>
+                  Alternative Rock | Art Rock | Post-Hardcore | Rock
+                </div>
+
+                {/* Barcode */}
+                <div style={{
+                  fontSize: '14px',
+                  color: '#333',
+                  marginBottom: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <span style={{ fontSize: '16px' }}>|||||||</span>
+                  <span>606949323622</span>
+                </div>
+
+                {/* Country */}
+                <div style={{
+                  fontSize: '14px',
+                  color: '#333',
+                  marginBottom: '8px'
+                }}>
+                  US
+                </div>
+
+                {/* Format */}
+                <div style={{
+                  fontSize: '14px',
+                  color: '#333',
+                  marginBottom: '16px',
+                  fontWeight: 600
+                }}>
+                  CD, Album | 1 Disc | 11 Tracks | 45:54
+                </div>
+
+                {/* Catalog Number */}
+                <div style={{
+                  fontSize: '13px',
+                  color: '#999',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}>
+                  CAT NO <span style={{ color: '#333', fontWeight: 600 }}>069493236-2</span>
                 </div>
               </div>
             </div>
