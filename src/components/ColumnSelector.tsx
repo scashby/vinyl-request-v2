@@ -56,7 +56,7 @@ export default function ColumnSelector({ visibleColumns, onColumnsChange, onClos
   };
 
   const resetToDefaults = () => {
-    onColumnsChange(['image', 'artist', 'title', 'year', 'format', 'folder']);
+    onColumnsChange(['artist', 'title', 'year', 'format', 'folder', 'media_condition']);
   };
 
   return (
