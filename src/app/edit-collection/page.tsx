@@ -110,9 +110,10 @@ function CollectionBrowserPage() {
               padding: '20px'
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                <div style={{ fontSize: '18px', fontWeight: 600 }}>CLZ MUSIC WEB</div>
+                <div style={{ fontSize: '18px', fontWeight: 600 }}>DWD COLLECTION</div>
                 <button
                   onClick={() => setSidebarOpen(false)}
+                  title="Close menu"
                   style={{
                     background: 'none',
                     border: 'none',
@@ -127,13 +128,19 @@ function CollectionBrowserPage() {
 
               <div style={{ marginBottom: '20px' }}>
                 <div style={{ fontSize: '11px', fontWeight: 600, color: '#999', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Collection</div>
-                <button style={{ width: '100%', padding: '10px', background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', textAlign: 'left', cursor: 'pointer', marginBottom: '5px', borderRadius: '4px', fontSize: '14px' }}>
+                <button 
+                  title="Add albums from main system"
+                  style={{ width: '100%', padding: '10px', background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', textAlign: 'left', cursor: 'pointer', marginBottom: '5px', borderRadius: '4px', fontSize: '14px' }}>
                   <span style={{ marginRight: '10px' }}>➕</span> Add Albums from Core
                 </button>
-                <button style={{ width: '100%', padding: '10px', background: 'transparent', border: 'none', color: 'white', textAlign: 'left', cursor: 'pointer', marginBottom: '5px', fontSize: '14px' }}>
+                <button 
+                  title="Create and manage pick lists"
+                  style={{ width: '100%', padding: '10px', background: 'transparent', border: 'none', color: 'white', textAlign: 'left', cursor: 'pointer', marginBottom: '5px', fontSize: '14px' }}>
                   <span style={{ marginRight: '10px' }}>📋</span> Manage Pick Lists
                 </button>
-                <button style={{ width: '100%', padding: '10px', background: 'transparent', border: 'none', color: 'white', textAlign: 'left', cursor: 'pointer', marginBottom: '5px', fontSize: '14px' }}>
+                <button 
+                  title="Manage collections"
+                  style={{ width: '100%', padding: '10px', background: 'transparent', border: 'none', color: 'white', textAlign: 'left', cursor: 'pointer', marginBottom: '5px', fontSize: '14px' }}>
                   <span style={{ marginRight: '10px' }}>⚙️</span> Manage Collections
                 </button>
               </div>
@@ -142,16 +149,24 @@ function CollectionBrowserPage() {
 
               <div style={{ marginBottom: '20px' }}>
                 <div style={{ fontSize: '11px', fontWeight: 600, color: '#999', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Tools</div>
-                <button style={{ width: '100%', padding: '10px', background: 'transparent', border: 'none', color: 'white', textAlign: 'left', cursor: 'pointer', marginBottom: '5px', fontSize: '14px' }}>
+                <button 
+                  title="Export collection to PDF"
+                  style={{ width: '100%', padding: '10px', background: 'transparent', border: 'none', color: 'white', textAlign: 'left', cursor: 'pointer', marginBottom: '5px', fontSize: '14px' }}>
                   <span style={{ marginRight: '10px' }}>🖨️</span> Print to PDF
                 </button>
-                <button style={{ width: '100%', padding: '10px', background: 'transparent', border: 'none', color: 'white', textAlign: 'left', cursor: 'pointer', marginBottom: '5px', fontSize: '14px' }}>
+                <button 
+                  title="View collection statistics"
+                  style={{ width: '100%', padding: '10px', background: 'transparent', border: 'none', color: 'white', textAlign: 'left', cursor: 'pointer', marginBottom: '5px', fontSize: '14px' }}>
                   <span style={{ marginRight: '10px' }}>📊</span> Statistics
                 </button>
-                <button style={{ width: '100%', padding: '10px', background: 'transparent', border: 'none', color: 'white', textAlign: 'left', cursor: 'pointer', marginBottom: '5px', fontSize: '14px' }}>
+                <button 
+                  title="Find duplicate albums"
+                  style={{ width: '100%', padding: '10px', background: 'transparent', border: 'none', color: 'white', textAlign: 'left', cursor: 'pointer', marginBottom: '5px', fontSize: '14px' }}>
                   <span style={{ marginRight: '10px' }}>🔍</span> Find Duplicates
                 </button>
-                <button style={{ width: '100%', padding: '10px', background: 'transparent', border: 'none', color: 'white', textAlign: 'left', cursor: 'pointer', marginBottom: '5px', fontSize: '14px' }}>
+                <button 
+                  title="Track loaned albums"
+                  style={{ width: '100%', padding: '10px', background: 'transparent', border: 'none', color: 'white', textAlign: 'left', cursor: 'pointer', marginBottom: '5px', fontSize: '14px' }}>
                   <span style={{ marginRight: '10px' }}>📚</span> Loan Manager
                 </button>
               </div>
@@ -159,9 +174,9 @@ function CollectionBrowserPage() {
           </>
         )}
 
-        {/* ROW 1: ORANGE GRADIENT HEADER */}
+        {/* ROW 1: PURPLE GRADIENT HEADER */}
         <div className="clz-header" style={{
-          background: 'linear-gradient(to right, #FF8C00, #FFA500)',
+          background: 'linear-gradient(to right, #8809AC, #A855F7)',
           color: 'white',
           padding: '8px 16px',
           display: 'flex',
@@ -173,6 +188,7 @@ function CollectionBrowserPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <button
               onClick={() => setSidebarOpen(true)}
+              title="Open menu"
               style={{
                 background: 'none',
                 border: 'none',
@@ -186,14 +202,16 @@ function CollectionBrowserPage() {
             </button>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontSize: '18px' }}>♪</span>
-              <span style={{ fontSize: '15px', fontWeight: 600, letterSpacing: '0.5px' }}>CLZ MUSIC</span>
-              <span style={{ fontSize: '15px', fontWeight: 300 }}>WEB</span>
+              <span style={{ fontSize: '15px', fontWeight: 600, letterSpacing: '0.5px' }}>DWD Collection Management System</span>
             </div>
-            <span style={{ fontSize: '13px', opacity: 0.95 }}>976277's music</span>
           </div>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-            <button style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', fontSize: '18px', padding: '4px' }}>⊞</button>
-            <button style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', fontSize: '18px', padding: '4px' }}>👤</button>
+            <button 
+              title="Grid view"
+              style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', fontSize: '18px', padding: '4px' }}>⊞</button>
+            <button 
+              title="User account"
+              style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', fontSize: '18px', padding: '4px' }}>👤</button>
           </div>
         </div>
 
@@ -210,8 +228,10 @@ function CollectionBrowserPage() {
           flexShrink: 0
         }}>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flex: '0 0 auto' }}>
-            <button style={{
-              background: '#17a2b8',
+            <button 
+              title="Add new albums to collection"
+              style={{
+              background: '#368CF8',
               color: 'white',
               border: 'none',
               padding: '6px 12px',
@@ -231,6 +251,7 @@ function CollectionBrowserPage() {
             <div style={{ position: 'relative' }}>
               <button
                 onClick={() => setShowCollectionDropdown(!showCollectionDropdown)}
+                title="Filter by collection status"
                 style={{
                   background: '#2a2a2a',
                   color: 'white',
@@ -254,6 +275,7 @@ function CollectionBrowserPage() {
           <div style={{ display: 'flex', gap: '2px', alignItems: 'center', flex: '1 1 auto', justifyContent: 'center' }}>
             <button
               onClick={() => setSelectedLetter('All')}
+              title="Show all albums"
               style={{
                 background: selectedLetter === 'All' ? '#5A9BD5' : 'transparent',
                 color: 'white',
@@ -268,6 +290,7 @@ function CollectionBrowserPage() {
             </button>
             <button
               onClick={() => setSelectedLetter('0-9')}
+              title="Filter by numbers"
               style={{
                 background: selectedLetter === '0-9' ? '#5A9BD5' : 'transparent',
                 color: 'white',
@@ -284,6 +307,7 @@ function CollectionBrowserPage() {
               <button
                 key={letter}
                 onClick={() => setSelectedLetter(letter)}
+                title={`Filter by letter ${letter}`}
                 style={{
                   background: selectedLetter === letter ? '#5A9BD5' : 'transparent',
                   color: 'white',
@@ -298,7 +322,9 @@ function CollectionBrowserPage() {
                 {letter}
               </button>
             ))}
-            <button style={{
+            <button 
+              title="Settings"
+              style={{
               background: 'transparent',
               color: 'white',
               border: 'none',
@@ -313,6 +339,7 @@ function CollectionBrowserPage() {
             <div style={{ position: 'relative' }}>
               <button
                 onClick={() => setShowSearchTypeDropdown(!showSearchTypeDropdown)}
+                title="Search type"
                 style={{
                   background: '#2a2a2a',
                   color: 'white',
@@ -337,6 +364,7 @@ function CollectionBrowserPage() {
               placeholder="Search albums..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              title="Search your collection"
               style={{
                 background: '#2a2a2a',
                 color: 'white',
@@ -367,6 +395,7 @@ function CollectionBrowserPage() {
           }}>
             <button
               onClick={() => setSelectedAlbumIds(new Set())}
+              title="Clear selection"
               style={{
                 background: 'rgba(255,255,255,0.2)',
                 border: 'none',
@@ -379,7 +408,9 @@ function CollectionBrowserPage() {
             >
               ✕ Cancel
             </button>
-            <button style={{
+            <button 
+              title="Select all albums"
+              style={{
               background: 'rgba(255,255,255,0.2)',
               border: 'none',
               color: 'white',
@@ -388,7 +419,9 @@ function CollectionBrowserPage() {
               cursor: 'pointer',
               fontSize: '12px'
             }}>☑ All</button>
-            <button style={{
+            <button 
+              title="Edit selected albums"
+              style={{
               background: 'rgba(255,255,255,0.2)',
               border: 'none',
               color: 'white',
@@ -397,7 +430,9 @@ function CollectionBrowserPage() {
               cursor: 'pointer',
               fontSize: '12px'
             }}>✏️ Edit</button>
-            <button style={{
+            <button 
+              title="Remove selected albums"
+              style={{
               background: 'rgba(255,255,255,0.2)',
               border: 'none',
               color: 'white',
@@ -406,7 +441,9 @@ function CollectionBrowserPage() {
               cursor: 'pointer',
               fontSize: '12px'
             }}>🗑 Remove</button>
-            <button style={{
+            <button 
+              title="Export selected to PDF"
+              style={{
               background: 'rgba(255,255,255,0.2)',
               border: 'none',
               color: 'white',
@@ -415,7 +452,9 @@ function CollectionBrowserPage() {
               cursor: 'pointer',
               fontSize: '12px'
             }}>🖨 Print to PDF</button>
-            <button style={{
+            <button 
+              title="More actions"
+              style={{
               background: 'rgba(255,255,255,0.2)',
               border: 'none',
               color: 'white',
@@ -457,7 +496,9 @@ function CollectionBrowserPage() {
               alignItems: 'center',
               flexShrink: 0
             }}>
-              <button style={{
+              <button 
+                title="Change view mode (Format, Artist, Genre, etc.)"
+                style={{
                 background: '#3a3a3a',
                 color: 'white',
                 border: '1px solid #555',
@@ -473,7 +514,9 @@ function CollectionBrowserPage() {
                 <span>Format</span>
                 <span style={{ fontSize: '10px' }}>▼</span>
               </button>
-              <button style={{
+              <button 
+                title="View options"
+                style={{
                 background: 'transparent',
                 color: 'white',
                 border: 'none',
@@ -489,6 +532,7 @@ function CollectionBrowserPage() {
                 placeholder="Search format..."
                 value={folderSearch}
                 onChange={(e) => setFolderSearch(e.target.value)}
+                title="Filter formats"
                 style={{
                   width: '100%',
                   padding: '6px 8px',
@@ -501,7 +545,9 @@ function CollectionBrowserPage() {
                 }}
               />
               <div style={{ marginTop: '8px', display: 'flex', gap: '6px' }}>
-                <button style={{
+                <button 
+                  title="Sort alphabetically"
+                  style={{
                   background: '#3a3a3a',
                   color: 'white',
                   border: '1px solid #555',
@@ -510,7 +556,9 @@ function CollectionBrowserPage() {
                   cursor: 'pointer',
                   fontSize: '12px'
                 }}>🔤</button>
-                <button style={{
+                <button 
+                  title="Sort by count"
+                  style={{
                   background: '#3a3a3a',
                   color: 'white',
                   border: '1px solid #555',
@@ -523,7 +571,9 @@ function CollectionBrowserPage() {
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', padding: '6px', minHeight: 0 }}>
-              <button style={{
+              <button 
+                title="Show all albums"
+                style={{
                 width: '100%',
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -552,6 +602,7 @@ function CollectionBrowserPage() {
               {['LP, Album', 'CD, Album', '7", Single', '12", EP'].map((format, idx) => (
                 <button
                   key={idx}
+                  title={`Filter by ${format}`}
                   style={{
                     width: '100%',
                     display: 'flex',
@@ -603,7 +654,9 @@ function CollectionBrowserPage() {
               flexShrink: 0
             }}>
               <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                <button style={{
+                <button 
+                  title="Change view mode"
+                  style={{
                   background: '#3a3a3a',
                   border: '1px solid #555',
                   padding: '4px 9px',
@@ -619,7 +672,9 @@ function CollectionBrowserPage() {
                   <span style={{ fontSize: '9px' }}>▼</span>
                 </button>
                 
-                <button style={{
+                <button 
+                  title="Change sort order"
+                  style={{
                   background: '#3a3a3a',
                   border: '1px solid #555',
                   padding: '4px 9px',
@@ -635,7 +690,9 @@ function CollectionBrowserPage() {
                   <span style={{ fontSize: '9px' }}>▼</span>
                 </button>
                 
-                <button style={{
+                <button 
+                  title="Select visible columns"
+                  style={{
                   background: '#3a3a3a',
                   border: '1px solid #555',
                   padding: '4px 9px',
@@ -671,15 +728,15 @@ function CollectionBrowserPage() {
                     zIndex: 10
                   }}>
                     <th style={{ width: '30px', padding: '8px', textAlign: 'center', borderRight: '1px solid #e0e0e0', color: '#333' }}>
-                      <input type="checkbox" style={{ cursor: 'pointer' }} />
+                      <input type="checkbox" title="Select all" style={{ cursor: 'pointer' }} />
                     </th>
-                    <th style={{ width: '30px', padding: '8px 4px', textAlign: 'center', borderRight: '1px solid #e0e0e0', color: '#333', fontWeight: 600 }}>✓</th>
-                    <th style={{ width: '30px', padding: '8px 4px', textAlign: 'center', borderRight: '1px solid #e0e0e0', color: '#333', fontWeight: 600 }}>$</th>
-                    <th style={{ width: '30px', padding: '8px 4px', textAlign: 'center', borderRight: '1px solid #e0e0e0', color: '#333', fontWeight: 600 }}>✏</th>
-                    <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, borderRight: '1px solid #e0e0e0', cursor: 'pointer', color: '#333' }}>
+                    <th style={{ width: '30px', padding: '8px 4px', textAlign: 'center', borderRight: '1px solid #e0e0e0', color: '#333', fontWeight: 600 }} title="Owned status">✓</th>
+                    <th style={{ width: '30px', padding: '8px 4px', textAlign: 'center', borderRight: '1px solid #e0e0e0', color: '#333', fontWeight: 600 }} title="For sale">$</th>
+                    <th style={{ width: '30px', padding: '8px 4px', textAlign: 'center', borderRight: '1px solid #e0e0e0', color: '#333', fontWeight: 600 }} title="Quick edit">✏</th>
+                    <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, borderRight: '1px solid #e0e0e0', cursor: 'pointer', color: '#333' }} title="Sort by artist">
                       Artist <span style={{ fontSize: '10px' }}>▲</span>
                     </th>
-                    <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, borderRight: '1px solid #e0e0e0', cursor: 'pointer', color: '#333' }}>
+                    <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, borderRight: '1px solid #e0e0e0', cursor: 'pointer', color: '#333' }} title="Sort by title">
                       Title <span style={{ fontSize: '10px' }}>▲</span>
                     </th>
                     <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, borderRight: '1px solid #e0e0e0', width: '110px', color: '#333' }}>Release Date</th>
@@ -720,14 +777,15 @@ function CollectionBrowserPage() {
                       <td style={{ padding: '8px', textAlign: 'center', borderRight: '1px solid #e8e8e8' }}>
                         <input 
                           type="checkbox" 
+                          title="Select this album"
                           style={{ cursor: 'pointer' }}
                           onClick={(e) => e.stopPropagation()}
                         />
                       </td>
-                      <td style={{ padding: '8px 4px', textAlign: 'center', borderRight: '1px solid #e8e8e8', color: '#4CAF50', fontSize: '14px' }}>✓</td>
+                      <td style={{ padding: '8px 4px', textAlign: 'center', borderRight: '1px solid #e8e8e8', color: '#4CAF50', fontSize: '14px' }} title="Album owned">✓</td>
                       <td style={{ padding: '8px 4px', textAlign: 'center', borderRight: '1px solid #e8e8e8', color: '#666' }}></td>
                       <td style={{ padding: '8px 4px', textAlign: 'center', borderRight: '1px solid #e8e8e8' }}>
-                        <button style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: '#2196F3', padding: 0 }}>✏</button>
+                        <button title="Quick edit album" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: '#2196F3', padding: 0 }}>✏</button>
                       </td>
                       <td style={{ padding: '8px', borderRight: '1px solid #e8e8e8', color: '#333' }}>{album.artist}</td>
                       <td style={{ padding: '8px', borderRight: '1px solid #e8e8e8', color: '#2196F3' }}>{album.title}</td>
@@ -769,7 +827,9 @@ function CollectionBrowserPage() {
                 flexShrink: 0
               }}>
                 <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                  <button style={{
+                  <button 
+                    title="Edit album details"
+                    style={{
                     background: '#3a3a3a',
                     border: '1px solid #555',
                     padding: '6px 10px',
@@ -779,7 +839,9 @@ function CollectionBrowserPage() {
                     color: 'white'
                   }}>✏️</button>
 
-                  <button style={{
+                  <button 
+                    title="Share album"
+                    style={{
                     background: '#3a3a3a',
                     border: '1px solid #555',
                     padding: '6px 10px',
@@ -789,7 +851,9 @@ function CollectionBrowserPage() {
                     color: 'white'
                   }}>↗️</button>
 
-                  <button style={{
+                  <button 
+                    title="Search on eBay"
+                    style={{
                     background: '#3a3a3a',
                     border: '1px solid #555',
                     padding: '6px 10px',
@@ -800,7 +864,9 @@ function CollectionBrowserPage() {
                     fontWeight: 600
                   }}>eBay</button>
 
-                  <button style={{
+                  <button 
+                    title="More actions"
+                    style={{
                     background: '#3a3a3a',
                     border: '1px solid #555',
                     padding: '6px 10px',
@@ -811,7 +877,9 @@ function CollectionBrowserPage() {
                   }}>⋮</button>
                 </div>
                 
-                <button style={{
+                <button 
+                  title="Select visible fields"
+                  style={{
                   background: '#3a3a3a',
                   border: '1px solid #555',
                   padding: '4px 9px',
@@ -828,7 +896,7 @@ function CollectionBrowserPage() {
                 </button>
               </div>
 
-              <div style={{ padding: '16px', flex: 1, overflowY: 'auto', background: '#f5f5f5' }}>
+              <div style={{ padding: '16px', flex: 1, overflowY: 'auto', background: '#F8DE77' }}>
                 {/* Artist Name */}
                 <div style={{ fontSize: '14px', color: '#333', marginBottom: '4px' }}>
                   ...And You Will Know Us By The Trail Of Dead
@@ -848,7 +916,7 @@ function CollectionBrowserPage() {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center'
-                  }}>✓</div>
+                  }} title="Album owned">✓</div>
                 </div>
 
                 {/* Album Cover */}
@@ -877,13 +945,13 @@ function CollectionBrowserPage() {
                     height: '10px',
                     borderRadius: '50%',
                     background: '#333'
-                  }}></div>
+                  }} title="Image 1 of 2"></div>
                   <div style={{
                     width: '10px',
                     height: '10px',
                     borderRadius: '50%',
                     background: '#ccc'
-                  }}></div>
+                  }} title="Image 2 of 2"></div>
                 </div>
 
                 {/* Label */}
@@ -961,7 +1029,9 @@ function CollectionBrowserPage() {
           height: '40px',
           flexShrink: 0
         }}>
-          <button style={{
+          <button 
+            title="Collection menu"
+            style={{
             background: 'transparent',
             color: 'white',
             border: 'none',
@@ -974,11 +1044,12 @@ function CollectionBrowserPage() {
             <button
               key={collection}
               onClick={() => setActiveCollection(collection)}
+              title={`Switch to ${collection} collection`}
               style={{
-                background: activeCollection === collection ? '#FF8C00' : 'transparent',
+                background: activeCollection === collection ? '#8809AC' : 'transparent',
                 color: 'white',
                 border: 'none',
-                borderBottom: activeCollection === collection ? '3px solid #FF8C00' : 'none',
+                borderBottom: activeCollection === collection ? '3px solid #8809AC' : 'none',
                 padding: '0 18px',
                 cursor: 'pointer',
                 fontSize: '13px',
