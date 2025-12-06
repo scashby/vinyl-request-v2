@@ -5,127 +5,51 @@
 import { useCallback, useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '../../lib/supabaseClient';
-import { toSafeSearchString, toSafeStringArray } from '../../types/album';
+import CollectionTable from '../../components/CollectionTable';
 import ColumnSelector from '../../components/ColumnSelector';
-import { ColumnId, COLUMN_DEFINITIONS, DEFAULT_VISIBLE_COLUMNS, getColumnById } from '../../lib/collection-columns';
+import { ColumnId, DEFAULT_VISIBLE_COLUMNS } from '../../lib/collection-columns';
+import { Album, toSafeStringArray, toSafeSearchString } from '../../types/album';
 
-type Album = {
-  id: number;
-  artist: string;
-  title: string;
-  year: string | null;
-  format: string;
-  image_url: string | null;
-  folder: string;
-  for_sale: boolean;
-  sale_price: number | null;
-  sale_platform: string | null;
-  sale_quantity: number | null;
-  sale_notes: string | null;
-  custom_tags: string[] | null;
-  media_condition: string;
-  discogs_genres: string[] | null;
-  discogs_styles: string[] | null;
-  spotify_genres: string[] | null;
-  apple_music_genres: string[] | null;
-  spotify_label: string | null;
-  apple_music_label: string | null;
-  apple_music_genre: string | null;
-  decade: number | null;
-  tracklists: string | null;
-  discogs_source: string | null;
-  discogs_notes: string | null;
-  pricing_notes: string | null;
-  notes: string | null;
-  is_1001: boolean;
-  steves_top_200: boolean;
-  this_weeks_top_10: boolean;
-  inner_circle_preferred: boolean;
-  discogs_master_id: string | null;
-  discogs_release_id: string | null;
-  master_release_id: string | null;
-  spotify_id: string | null;
-  apple_music_id: string | null;
-  sides: any | null;
-  is_box_set: boolean;
-  parent_id: string | null;
-  blocked: boolean;
-  blocked_sides: string[] | null;
-  blocked_tracks: any | null;
-  child_album_ids: number[] | null;
-  sell_price: string | null;
-  date_added: string | null;
-  master_release_date: string | null;
-  spotify_url: string | null;
-  spotify_popularity: number | null;
-  spotify_release_date: string | null;
-  spotify_total_tracks: number | null;
-  spotify_image_url: string | null;
-  apple_music_url: string | null;
-  apple_music_release_date: string | null;
-  apple_music_track_count: number | null;
-  apple_music_artwork_url: string | null;
-  last_enriched_at: string | null;
-  enrichment_sources: string[] | null;
-  artist_norm: string | null;
-  album_norm: string | null;
-  artist_album_norm: string | null;
-  title_norm: string | null;
-  year_int: number | null;
-  wholesale_cost: number | null;
-  discogs_price_min: number | null;
-  discogs_price_median: number | null;
-  discogs_price_max: number | null;
-  discogs_price_updated_at: string | null;
-  purchase_date: string | null;
-  purchase_store: string | null;
-  purchase_price: number | null;
-  current_value: number | null;
-  owner: string | null;
-  last_cleaned_date: string | null;
-  signed_by: string[] | null;
-  play_count: number | null;
-  sort_title: string | null;
-  subtitle: string | null;
-  barcode: string | null;
-  cat_no: string | null;
-  index_number: number | null;
-  discs: number | null;
-  length_seconds: number | null;
-  package_sleeve_condition: string | null;
-  vinyl_color: string | null;
-  vinyl_weight: string | null;
-  rpm: string | null;
-  sound: string | null;
-  spars_code: string | null;
-  packaging: string | null;
-  original_release_date: string | null;
-  original_release_year: number | null;
-  recording_date: string | null;
-  recording_year: number | null;
-  country: string | null;
-  studio: string | null;
-  collection_status: string | null;
-  is_live: boolean | null;
-  extra: string | null;
-  location: string | null;
-  storage_device_slot: string | null;
-  my_rating: number | null;
-  last_played_date: string | null;
-  modified_date: string | null;
-  engineers: string[] | null;
-  musicians: string[] | null;
-  producers: string[] | null;
-  songwriters: string[] | null;
-  chorus: string | null;
-  composer: string | null;
-  composition: string | null;
-  conductor: string | null;
-  orchestra: string | null;
-  due_date: string | null;
-  loan_date: string | null;
-  loaned_to: string | null;
-};
+type SortOption = 
+  | 'artist-asc' | 'artist-desc' 
+  | 'title-asc' | 'title-desc' 
+  | 'year-desc' | 'year-asc' 
+  | 'added-desc' | 'added-asc' 
+  | 'format-asc' | 'format-desc' 
+  | 'tags-count-desc' | 'tags-count-asc' 
+  | 'sale-price-desc' | 'sale-price-asc' 
+  | 'condition-asc' | 'condition-desc'
+  | 'folder-asc' | 'folder-desc'
+  | 'popularity-desc' | 'popularity-asc'
+  | 'sides-desc' | 'sides-asc'
+  | 'decade-desc' | 'decade-asc';
+
+const SORT_OPTIONS: { value: SortOption; label: string; category: string }[] = [
+  { value: 'artist-asc', label: 'Artist (A→Z)', category: 'Basic' },
+  { value: 'artist-desc', label: 'Artist (Z→A)', category: 'Basic' },
+  { value: 'title-asc', label: 'Title (A→Z)', category: 'Basic' },
+  { value: 'title-desc', label: 'Title (Z→A)', category: 'Basic' },
+  { value: 'year-desc', label: 'Year (Newest First)', category: 'Time' },
+  { value: 'year-asc', label: 'Year (Oldest First)', category: 'Time' },
+  { value: 'decade-desc', label: 'Decade (Newest)', category: 'Time' },
+  { value: 'decade-asc', label: 'Decade (Oldest)', category: 'Time' },
+  { value: 'added-desc', label: 'Date Added (Newest)', category: 'Time' },
+  { value: 'added-asc', label: 'Date Added (Oldest)', category: 'Time' },
+  { value: 'format-asc', label: 'Format (A→Z)', category: 'Physical' },
+  { value: 'format-desc', label: 'Format (Z→A)', category: 'Physical' },
+  { value: 'folder-asc', label: 'Folder (A→Z)', category: 'Physical' },
+  { value: 'folder-desc', label: 'Folder (Z→A)', category: 'Physical' },
+  { value: 'condition-asc', label: 'Condition (A→Z)', category: 'Physical' },
+  { value: 'condition-desc', label: 'Condition (Z→A)', category: 'Physical' },
+  { value: 'sides-desc', label: 'Most Sides First', category: 'Physical' },
+  { value: 'sides-asc', label: 'Fewest Sides First', category: 'Physical' },
+  { value: 'tags-count-desc', label: 'Most Tags', category: 'Metadata' },
+  { value: 'tags-count-asc', label: 'Fewest Tags', category: 'Metadata' },
+  { value: 'popularity-desc', label: 'Most Popular (Spotify)', category: 'Metadata' },
+  { value: 'popularity-asc', label: 'Least Popular (Spotify)', category: 'Metadata' },
+  { value: 'sale-price-desc', label: 'Highest Price', category: 'Sales' },
+  { value: 'sale-price-asc', label: 'Lowest Price', category: 'Sales' }
+];
 
 function CollectionBrowserPage() {
   const router = useRouter();
@@ -148,41 +72,77 @@ function CollectionBrowserPage() {
   const [selectedAlbumId, setSelectedAlbumId] = useState<number | null>(null);
   const [activeCollection, setActiveCollection] = useState('music');
   
-  // Column selector state
+  // SORTING STATE
+  const [sortBy, setSortBy] = useState<SortOption>('artist-asc');
+  const [showSortDropdown, setShowSortDropdown] = useState(false);
+
+  // COLUMN SELECTOR STATE
+  const [visibleColumns, setVisibleColumns] = useState<ColumnId[]>(DEFAULT_VISIBLE_COLUMNS);
   const [showColumnSelector, setShowColumnSelector] = useState(false);
-  const [visibleColumns, setVisibleColumns] = useState<ColumnId[]>([
-    'artist',
-    'title',
-    'year',
-    'master_release_date',
-    'format',
-    'discs',
-    'spotify_total_tracks',
-    'length_seconds',
-    'discogs_genres',
-    'spotify_label'
-  ]);
 
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
   // Load column preferences from localStorage
   useEffect(() => {
-    const saved = localStorage.getItem('dwd-visible-columns');
-    if (saved) {
+    const stored = localStorage.getItem('collection-visible-columns');
+    if (stored) {
       try {
-        const parsed = JSON.parse(saved);
-        setVisibleColumns(parsed);
-      } catch (e) {
-        console.error('Failed to parse saved columns:', e);
+        setVisibleColumns(JSON.parse(stored));
+      } catch {
+        // Invalid JSON, use defaults
       }
     }
   }, []);
 
-  // Save column preferences to localStorage whenever they change
-  const handleColumnsChange = useCallback((columns: ColumnId[]) => {
+  // Handle column changes
+  const handleColumnsChange = (columns: ColumnId[]) => {
     setVisibleColumns(columns);
-    localStorage.setItem('dwd-visible-columns', JSON.stringify(columns));
+    localStorage.setItem('collection-visible-columns', JSON.stringify(columns));
+  };
+
+  // Load sort preference from localStorage
+  useEffect(() => {
+    const stored = localStorage.getItem('collection-sort-preference');
+    if (stored && SORT_OPTIONS.some(opt => opt.value === stored)) {
+      setSortBy(stored as SortOption);
+    }
   }, []);
+
+  // Save sort preference to localStorage
+  const handleSortChange = (newSort: SortOption) => {
+    setSortBy(newSort);
+    localStorage.setItem('collection-sort-preference', newSort);
+    setShowSortDropdown(false);
+  };
+
+  // Column header click handler
+  const handleColumnHeaderClick = (column: 'artist' | 'title' | 'year' | 'format') => {
+    const sortMap: Record<typeof column, { asc: SortOption; desc: SortOption }> = {
+      artist: { asc: 'artist-asc', desc: 'artist-desc' },
+      title: { asc: 'title-asc', desc: 'title-desc' },
+      year: { asc: 'year-asc', desc: 'year-desc' },
+      format: { asc: 'format-asc', desc: 'format-desc' }
+    };
+
+    const current = sortMap[column];
+    const newSort = sortBy === current.asc ? current.desc : current.asc;
+    handleSortChange(newSort);
+  };
+
+  // Get sort indicator for column
+  const getSortIndicator = (column: 'artist' | 'title' | 'year' | 'format') => {
+    const sortMap: Record<typeof column, { asc: SortOption; desc: SortOption }> = {
+      artist: { asc: 'artist-asc', desc: 'artist-desc' },
+      title: { asc: 'title-asc', desc: 'title-desc' },
+      year: { asc: 'year-asc', desc: 'year-desc' },
+      format: { asc: 'format-asc', desc: 'format-desc' }
+    };
+
+    const current = sortMap[column];
+    if (sortBy === current.asc) return ' ▲';
+    if (sortBy === current.desc) return ' ▼';
+    return '';
+  };
 
   // Load albums from Supabase
   const loadAlbums = useCallback(async () => {
@@ -220,45 +180,81 @@ function CollectionBrowserPage() {
     loadAlbums();
   }, [loadAlbums]);
 
-  // Filter albums
-  const filteredAlbums = albums.filter(album => {
-    // Collection filter
-    if (collectionFilter === 'For Sale' && !album.for_sale) return false;
-    
-    // Letter filter
-    if (selectedLetter !== 'All') {
-      const firstChar = (album.artist || '').charAt(0).toUpperCase();
-      if (selectedLetter === '0-9') {
-        if (!/[0-9]/.test(firstChar)) return false;
-      } else {
-        if (firstChar !== selectedLetter) return false;
-      }
-    }
-
-    // Folder filter (format)
-    if (selectedFolderValue) {
-      if (folderMode === 'format' && album.format !== selectedFolderValue) return false;
-    }
-
-    // Search filter
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      const searchable = [
-        album.artist,
-        album.title,
-        album.format,
-        album.year,
-        toSafeSearchString(album.custom_tags),
-        toSafeSearchString(album.discogs_genres),
-        toSafeSearchString(album.spotify_label),
-        toSafeSearchString(album.apple_music_label)
-      ].join(' ').toLowerCase();
+  // Filter and sort albums
+  const filteredAndSortedAlbums = albums
+    .filter(album => {
+      // Collection filter
+      if (collectionFilter === 'For Sale' && !album.for_sale) return false;
       
-      if (!searchable.includes(q)) return false;
-    }
+      // Letter filter
+      if (selectedLetter !== 'All') {
+        const firstChar = (album.artist || '').charAt(0).toUpperCase();
+        if (selectedLetter === '0-9') {
+          if (!/[0-9]/.test(firstChar)) return false;
+        } else {
+          if (firstChar !== selectedLetter) return false;
+        }
+      }
 
-    return true;
-  });
+      // Folder filter (format)
+      if (selectedFolderValue) {
+        if (folderMode === 'format' && album.format !== selectedFolderValue) return false;
+      }
+
+      // Search filter
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        const searchable = [
+          album.artist,
+          album.title,
+          album.format,
+          album.year,
+          toSafeSearchString(album.custom_tags),
+          toSafeSearchString(album.discogs_genres),
+          toSafeSearchString(album.spotify_label),
+          toSafeSearchString(album.apple_music_label)
+        ].join(' ').toLowerCase();
+        
+        if (!searchable.includes(q)) return false;
+      }
+
+      return true;
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case 'artist-asc': return (a.artist || '').localeCompare(b.artist || '');
+        case 'artist-desc': return (b.artist || '').localeCompare(a.artist || '');
+        case 'title-asc': return (a.title || '').localeCompare(b.title || '');
+        case 'title-desc': return (b.title || '').localeCompare(a.title || '');
+        case 'year-desc': return (b.year_int || 0) - (a.year_int || 0);
+        case 'year-asc': return (a.year_int || 0) - (b.year_int || 0);
+        case 'decade-desc': return (b.decade || 0) - (a.decade || 0);
+        case 'decade-asc': return (a.decade || 0) - (b.decade || 0);
+        case 'added-desc': return (b.date_added || '').localeCompare(a.date_added || '');
+        case 'added-asc': return (a.date_added || '').localeCompare(b.date_added || '');
+        case 'format-asc': return (a.format || '').localeCompare(b.format || '');
+        case 'format-desc': return (b.format || '').localeCompare(a.format || '');
+        case 'folder-asc': return (a.folder || '').localeCompare(b.folder || '');
+        case 'folder-desc': return (b.folder || '').localeCompare(a.folder || '');
+        case 'condition-asc': return (a.media_condition || '').localeCompare(b.media_condition || '');
+        case 'condition-desc': return (b.media_condition || '').localeCompare(a.media_condition || '');
+        case 'tags-count-desc': return toSafeStringArray(b.custom_tags).length - toSafeStringArray(a.custom_tags).length;
+        case 'tags-count-asc': return toSafeStringArray(a.custom_tags).length - toSafeStringArray(b.custom_tags).length;
+        case 'sale-price-desc': return (b.sale_price || 0) - (a.sale_price || 0);
+        case 'sale-price-asc': return (a.sale_price || 0) - (b.sale_price || 0);
+        case 'popularity-desc': return (b.spotify_popularity || 0) - (a.spotify_popularity || 0);
+        case 'popularity-asc': return (a.spotify_popularity || 0) - (b.spotify_popularity || 0);
+        case 'sides-desc':
+          const bSides = typeof b.sides === 'number' ? b.sides : 0;
+          const aSides = typeof a.sides === 'number' ? a.sides : 0;
+          return bSides - aSides;
+        case 'sides-asc':
+          const aSidesAsc = typeof a.sides === 'number' ? a.sides : 0;
+          const bSidesAsc = typeof b.sides === 'number' ? b.sides : 0;
+          return aSidesAsc - bSidesAsc;
+        default: return 0;
+      }
+    });
 
   // Folder counts
   const folderCounts = albums.reduce((acc, album) => {
@@ -281,121 +277,21 @@ function CollectionBrowserPage() {
 
   const selectedAlbum = albums.find(a => a.id === selectedAlbumId);
 
-  // Get visible column definitions
-  const visibleColumnDefs = visibleColumns
-    .map(id => getColumnById(id))
-    .filter(col => col !== undefined);
+  // Get current sort label
+  const currentSortOption = SORT_OPTIONS.find(opt => opt.value === sortBy);
+  const currentSortLabel = currentSortOption ? currentSortOption.label : 'Sort';
 
-  // Helper function to render cell content
-  const renderCell = (album: Album, columnId: ColumnId) => {
-    switch (columnId) {
-      case 'image_url':
-        return album.image_url ? (
-          <img src={album.image_url} alt="" style={{ width: 60, height: 60, objectFit: 'cover' }} />
-        ) : (
-          <div style={{ width: 60, height: 60, background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>
-            🎵
-          </div>
-        );
-      
-      case 'master_release_date':
-      case 'original_release_date':
-      case 'recording_date':
-      case 'spotify_release_date':
-      case 'apple_music_release_date':
-      case 'date_added':
-      case 'modified_date':
-      case 'purchase_date':
-      case 'last_played_date':
-      case 'last_cleaned_date':
-      case 'loan_date':
-      case 'due_date':
-      case 'discogs_price_updated_at':
-      case 'last_enriched_at':
-        const dateValue = album[columnId];
-        return dateValue 
-          ? new Date(dateValue).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-          : '-';
+  // Group sort options by category
+  const sortOptionsByCategory = SORT_OPTIONS.reduce((acc, opt) => {
+    if (!acc[opt.category]) acc[opt.category] = [];
+    acc[opt.category].push(opt);
+    return acc;
+  }, {} as Record<string, typeof SORT_OPTIONS>);
 
-      case 'discogs_genres':
-      case 'spotify_genres':
-      case 'apple_music_genres':
-        // For genre columns, show first genre only
-        const genreArray = album[columnId];
-        if (Array.isArray(genreArray) && genreArray.length > 0) {
-          return genreArray[0];
-        }
-        return '-';
-
-      case 'discogs_styles':
-      case 'custom_tags':
-      case 'enrichment_sources':
-      case 'signed_by':
-      case 'blocked_sides':
-      case 'child_album_ids':
-      case 'engineers':
-      case 'musicians':
-      case 'producers':
-      case 'songwriters':
-        const arrayValue = album[columnId];
-        return Array.isArray(arrayValue) ? arrayValue.join(', ') || '-' : '-';
-
-      case 'for_sale':
-      case 'is_box_set':
-      case 'is_live':
-      case 'is_1001':
-      case 'steves_top_200':
-      case 'this_weeks_top_10':
-      case 'inner_circle_preferred':
-      case 'blocked':
-        return album[columnId] ? '✓' : '';
-
-      case 'sale_price':
-      case 'sell_price':
-      case 'wholesale_cost':
-      case 'purchase_price':
-      case 'current_value':
-      case 'discogs_price_min':
-      case 'discogs_price_median':
-      case 'discogs_price_max':
-        const priceValue = album[columnId];
-        return priceValue ? `$${Number(priceValue).toFixed(2)}` : '-';
-
-      case 'my_rating':
-        const rating = album.my_rating;
-        return rating ? '⭐'.repeat(rating) : '-';
-
-      case 'length_seconds':
-        const seconds = album.length_seconds;
-        if (!seconds) return '-';
-        const mins = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        return `${mins}:${secs.toString().padStart(2, '0')}`;
-
-      case 'spotify_url':
-      case 'apple_music_url':
-        const url = album[columnId];
-        return url ? (
-          <a href={url} target="_blank" rel="noopener noreferrer" style={{ color: '#2196F3' }}>
-            🔗
-          </a>
-        ) : '-';
-
-      case 'spotify_image_url':
-      case 'apple_music_artwork_url':
-        const imgUrl = album[columnId];
-        return imgUrl ? (
-          <img src={imgUrl} alt="" style={{ width: 40, height: 40, objectFit: 'cover' }} />
-        ) : '-';
-
-      default:
-        const value = album[columnId];
-        if (value === null || value === undefined) return '-';
-        if (Array.isArray(value)) return value.join(', ') || '-';
-        if (typeof value === 'boolean') return value ? '✓' : '';
-        if (typeof value === 'object') return JSON.stringify(value);
-        return String(value);
-    }
+  // Stub for sell click handler
+  const handleSellClick = (album: Album) => {
+    console.log('Mark for sale:', album);
+    // TODO: Implement sale modal
   };
 
   return (
@@ -815,7 +711,7 @@ function CollectionBrowserPage() {
             }}>⋮</button>
             <div style={{ flex: 1 }} />
             <span style={{ fontSize: '12px', fontWeight: 500 }}>
-              {selectedAlbumIds.size} of {filteredAlbums.length} selected
+              {selectedAlbumIds.size} of {filteredAndSortedAlbums.length} selected
             </span>
           </div>
         )}
@@ -1019,24 +915,108 @@ function CollectionBrowserPage() {
                   <span style={{ fontSize: '9px' }}>▼</span>
                 </button>
                 
-                <button 
-                  title="Change sort order"
-                  style={{
-                  background: '#3a3a3a',
-                  border: '1px solid #555',
-                  padding: '4px 9px',
-                  borderRadius: '3px',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                  color: 'white',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '3px'
-                }}>
-                  <span>↕️</span>
-                  <span style={{ fontSize: '9px' }}>▼</span>
-                </button>
+                {/* SORT DROPDOWN */}
+                <div style={{ position: 'relative' }}>
+                  <button 
+                    onClick={() => setShowSortDropdown(!showSortDropdown)}
+                    title="Change sort order"
+                    style={{
+                    background: '#3a3a3a',
+                    border: '1px solid #555',
+                    padding: '4px 9px',
+                    borderRadius: '3px',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    color: 'white',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '3px'
+                  }}>
+                    <span>↕️</span>
+                    <span style={{ fontSize: '9px' }}>▼</span>
+                  </button>
+                  
+                  {showSortDropdown && (
+                    <>
+                      <div
+                        onClick={() => setShowSortDropdown(false)}
+                        style={{
+                          position: 'fixed',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          zIndex: 99
+                        }}
+                      />
+                      <div style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        marginTop: '4px',
+                        background: 'white',
+                        border: '1px solid #ddd',
+                        borderRadius: '4px',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                        zIndex: 100,
+                        minWidth: '240px',
+                        maxHeight: '400px',
+                        overflowY: 'auto'
+                      }}>
+                        {Object.entries(sortOptionsByCategory).map(([category, options]) => (
+                          <div key={category}>
+                            <div style={{
+                              padding: '8px 12px',
+                              fontSize: '11px',
+                              fontWeight: 600,
+                              color: '#999',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.5px',
+                              background: '#f8f8f8',
+                              borderBottom: '1px solid #e8e8e8'
+                            }}>
+                              {category}
+                            </div>
+                            {options.map(opt => (
+                              <button
+                                key={opt.value}
+                                onClick={() => handleSortChange(opt.value)}
+                                style={{
+                                  width: '100%',
+                                  padding: '10px 16px',
+                                  background: sortBy === opt.value ? '#e3f2fd' : 'transparent',
+                                  border: 'none',
+                                  textAlign: 'left',
+                                  cursor: 'pointer',
+                                  fontSize: '13px',
+                                  color: '#333',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between'
+                                }}
+                                onMouseEnter={(e) => {
+                                  if (sortBy !== opt.value) {
+                                    e.currentTarget.style.background = '#f5f5f5';
+                                  }
+                                }}
+                                onMouseLeave={(e) => {
+                                  if (sortBy !== opt.value) {
+                                    e.currentTarget.style.background = 'transparent';
+                                  }
+                                }}
+                              >
+                                <span>{opt.label}</span>
+                                {sortBy === opt.value && <span style={{ color: '#2196F3' }}>✓</span>}
+                              </button>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
                 
+                {/* COLUMN SELECTOR BUTTON */}
                 <button 
                   onClick={() => setShowColumnSelector(true)}
                   title="Select visible columns"
@@ -1057,7 +1037,7 @@ function CollectionBrowserPage() {
                 </button>
               </div>
               <div style={{ fontSize: '12px', color: '#ddd', fontWeight: 600 }}>
-                {loading ? 'Loading...' : `${filteredAlbums.length} albums`}
+                {loading ? 'Loading...' : `${filteredAndSortedAlbums.length} albums`}
               </div>
             </div>
 
@@ -1067,132 +1047,13 @@ function CollectionBrowserPage() {
                   Loading albums...
                 </div>
               ) : (
-                <table style={{
-                  width: '100%',
-                  borderCollapse: 'collapse',
-                  fontSize: '13px'
-                }}>
-                  <thead>
-                    <tr style={{
-                      background: '#f5f5f5',
-                      borderBottom: '2px solid #ddd',
-                      position: 'sticky',
-                      top: 0,
-                      zIndex: 10
-                    }}>
-                      {/* Always-visible UI columns */}
-                      <th style={{ width: 40, padding: '8px', textAlign: 'center', borderRight: '1px solid #e0e0e0' }}>
-                        <input type="checkbox" title="Select all" />
-                      </th>
-                      <th style={{ width: 40, padding: '8px', textAlign: 'center', borderRight: '1px solid #e0e0e0' }} title="Owned">✓</th>
-                      <th style={{ width: 40, padding: '8px', textAlign: 'center', borderRight: '1px solid #e0e0e0' }} title="For Sale">$</th>
-                      <th style={{ width: 40, padding: '8px', textAlign: 'center', borderRight: '1px solid #e0e0e0' }} title="Edit">✏</th>
-                      
-                      {/* Selectable columns */}
-                      {visibleColumnDefs.map(col => (
-                        <th
-                          key={col.id}
-                          style={{
-                            width: col.width,
-                            padding: '8px',
-                            textAlign: 'left',
-                            fontWeight: 600,
-                            borderRight: '1px solid #e0e0e0',
-                            color: '#333',
-                            cursor: col.sortable ? 'pointer' : 'default'
-                          }}
-                          title={col.sortable ? `Sort by ${col.label}` : col.label}
-                        >
-                          {col.label}
-                          {col.sortable && col.id === 'artist' && (
-                            <span style={{ fontSize: '10px', marginLeft: '4px' }}>▲</span>
-                          )}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredAlbums.map((album, idx) => (
-                      <tr 
-                        key={album.id}
-                        onClick={() => setSelectedAlbumId(album.id)}
-                        style={{
-                          background: selectedAlbumId === album.id ? '#d4e9f7' : idx % 2 === 0 ? '#fff' : '#fafafa',
-                          borderBottom: '1px solid #e8e8e8',
-                          cursor: 'pointer'
-                        }}
-                        onMouseEnter={(e) => {
-                          if (selectedAlbumId !== album.id) {
-                            e.currentTarget.style.background = '#f5f5f5';
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          if (selectedAlbumId !== album.id) {
-                            e.currentTarget.style.background = idx % 2 === 0 ? '#fff' : '#fafafa';
-                          }
-                        }}
-                      >
-                        {/* Always-visible UI columns */}
-                        <td style={{ padding: '8px', textAlign: 'center', borderRight: '1px solid #e8e8e8' }}>
-                          <input 
-                            type="checkbox" 
-                            checked={selectedAlbumIds.has(album.id)}
-                            onChange={(e) => {
-                              e.stopPropagation();
-                              const newSet = new Set(selectedAlbumIds);
-                              if (newSet.has(album.id)) {
-                                newSet.delete(album.id);
-                              } else {
-                                newSet.add(album.id);
-                              }
-                              setSelectedAlbumIds(newSet);
-                            }}
-                          />
-                        </td>
-                        <td style={{ padding: '8px', textAlign: 'center', borderRight: '1px solid #e8e8e8', color: '#22c55e', fontSize: '16px' }}>
-                          ✓
-                        </td>
-                        <td style={{ padding: '8px', textAlign: 'center', borderRight: '1px solid #e8e8e8', color: album.for_sale ? '#22c55e' : '#ddd', fontSize: '14px' }}>
-                          {album.for_sale ? '$' : ''}
-                        </td>
-                        <td style={{ padding: '8px', textAlign: 'center', borderRight: '1px solid #e8e8e8' }}>
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              // TODO: Open edit modal
-                            }}
-                            style={{
-                              background: 'none',
-                              border: 'none',
-                              cursor: 'pointer',
-                              fontSize: '14px',
-                              color: '#666',
-                              padding: '4px'
-                            }}
-                            title="Edit album"
-                          >
-                            ✏
-                          </button>
-                        </td>
-                        
-                        {/* Selectable columns */}
-                        {visibleColumnDefs.map(col => (
-                          <td
-                            key={col.id}
-                            style={{
-                              padding: '8px',
-                              textAlign: 'left',
-                              borderRight: '1px solid #e8e8e8',
-                              color: col.id === 'title' ? '#2196F3' : '#333'
-                            }}
-                          >
-                            {renderCell(album, col.id)}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <CollectionTable
+                  albums={filteredAndSortedAlbums}
+                  visibleColumns={visibleColumns}
+                  onAlbumClick={setSelectedAlbumId}
+                  onSellClick={handleSellClick}
+                  selectedAlbumId={selectedAlbumId}
+                />
               )}
             </div>
           </div>
@@ -1439,7 +1300,7 @@ function CollectionBrowserPage() {
         </div>
       </div>
 
-      {/* Column Selector Modal */}
+      {/* COLUMN SELECTOR MODAL */}
       {showColumnSelector && (
         <ColumnSelector
           visibleColumns={visibleColumns}
