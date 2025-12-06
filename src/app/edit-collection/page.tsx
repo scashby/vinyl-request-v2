@@ -51,6 +51,19 @@ const SORT_OPTIONS: { value: SortOption; label: string; category: string }[] = [
   { value: 'sale-price-asc', label: 'Lowest Price', category: 'Sales' }
 ];
 
+function toSafeSearchString(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string') return value.toLowerCase();
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value).toLowerCase();
+  if (Array.isArray(value)) return value.filter(item => typeof item === 'string').join(' ').toLowerCase();
+  try { return String(value).toLowerCase(); } catch { return ''; }
+}
+
+function toSafeStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(item => typeof item === 'string' && item.length > 0);
+}
+
 function CollectionBrowserPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
