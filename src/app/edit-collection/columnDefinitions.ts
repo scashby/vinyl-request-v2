@@ -19,6 +19,15 @@ export type ColumnDefinition = {
   alwaysVisible?: boolean; // Can't be hidden (like checkbox, artist, title)
 };
 
+export interface ColumnGroup {
+  id: string;
+  label: string;
+  icon: string;
+  color: string;
+  columns: ColumnId[];
+  description?: string;
+}
+
 // Default visible columns (matches CLZ defaults)
 export const DEFAULT_VISIBLE_COLUMNS: ColumnId[] = [
   'checkbox',
@@ -770,25 +779,124 @@ export const COLUMN_DEFINITIONS: Record<ColumnId, ColumnDefinition> = {
   }
 };
 
-// Helper function to get columns by category
+// ============================================================================
+// COLUMN GROUPS FOR COLUMN SELECTOR UI
+// ============================================================================
+
+export const COLUMN_GROUPS: ColumnGroup[] = [
+  {
+    id: 'essential',
+    label: 'Essential',
+    icon: '⭐',
+    color: '#f59e0b',
+    description: 'Core fields always needed',
+    columns: ['checkbox', 'owned', 'for_sale', 'edit', 'artist', 'title', 'format']
+  },
+  {
+    id: 'identification',
+    label: 'Identification',
+    icon: '🔖',
+    color: '#3b82f6',
+    description: 'Barcodes, catalog numbers, IDs',
+    columns: ['barcode', 'cat_no', 'index_number', 'sort_title', 'subtitle']
+  },
+  {
+    id: 'physical',
+    label: 'Physical Details',
+    icon: '💿',
+    color: '#8b5cf6',
+    description: 'Physical characteristics',
+    columns: ['discs', 'tracks', 'length', 'vinyl_color', 'vinyl_weight', 'rpm', 'sound', 'spars_code', 'packaging']
+  },
+  {
+    id: 'condition',
+    label: 'Condition',
+    icon: '⭐',
+    color: '#10b981',
+    description: 'Media and packaging condition',
+    columns: ['media_condition', 'package_sleeve_condition']
+  },
+  {
+    id: 'release',
+    label: 'Release Info',
+    icon: '📅',
+    color: '#06b6d4',
+    description: 'Release dates and info',
+    columns: ['release_date', 'release_year', 'master_release', 'original_release_date', 'recording_date', 'country', 'studio']
+  },
+  {
+    id: 'collection',
+    label: 'Collection Status',
+    icon: '📚',
+    color: '#ec4899',
+    description: 'Collection flags',
+    columns: ['collection_status', 'box_set', 'is_live']
+  },
+  {
+    id: 'personal',
+    label: 'Personal Tracking',
+    icon: '👤',
+    color: '#f43f5e',
+    description: 'Personal data and ratings',
+    columns: ['owner', 'my_rating', 'play_count', 'last_played_date', 'last_cleaned_date', 'signed_by', 'location', 'storage_device_slot', 'added_date', 'modified_date']
+  },
+  {
+    id: 'metadata',
+    label: 'Metadata',
+    icon: '🎵',
+    color: '#6366f1',
+    description: 'Genres and labels',
+    columns: ['genre', 'label']
+  },
+  {
+    id: 'people',
+    label: 'People & Credits',
+    icon: '👥',
+    color: '#06b6d4',
+    description: 'Musicians, producers, etc.',
+    columns: ['engineers', 'musicians', 'producers', 'songwriters']
+  },
+  {
+    id: 'classical',
+    label: 'Classical Music',
+    icon: '🎻',
+    color: '#ec4899',
+    description: 'Classical-specific fields',
+    columns: ['chorus', 'composer', 'composition', 'conductor', 'orchestra']
+  },
+  {
+    id: 'loans',
+    label: 'Loan Tracking',
+    icon: '📤',
+    color: '#14b8a6',
+    description: 'Track loaned albums',
+    columns: ['due_date', 'loan_date', 'loaned_to']
+  }
+];
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
 export function getColumnsByCategory(category: ColumnDefinition['category']): ColumnDefinition[] {
   return Object.values(COLUMN_DEFINITIONS).filter(col => col.category === category);
 }
 
-// Helper function to get all categories
 export function getAllCategories(): ColumnDefinition['category'][] {
   return ['Main', 'Details', 'Edition', 'Classical', 'People', 'Personal', 'Loan'];
 }
 
-// Helper function to get visible columns
 export function getVisibleColumns(visibleColumnIds: ColumnId[]): ColumnDefinition[] {
   return visibleColumnIds
     .map(id => COLUMN_DEFINITIONS[id])
     .filter(col => col !== undefined);
 }
 
-// Helper function to check if column can be hidden
 export function canHideColumn(columnId: ColumnId): boolean {
   const col = COLUMN_DEFINITIONS[columnId];
   return col && !col.alwaysVisible;
+}
+
+export function getColumnById(columnId: ColumnId): ColumnDefinition | undefined {
+  return COLUMN_DEFINITIONS[columnId];
 }

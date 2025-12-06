@@ -2,9 +2,8 @@
 'use client';
 
 import { useState } from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
-import { ColumnId } from '../lib/collection-columns';
+import { ColumnId } from '../app/edit-collection/columnDefinitions';
 import { Album } from '../types/album';
 
 interface CollectionTableProps {

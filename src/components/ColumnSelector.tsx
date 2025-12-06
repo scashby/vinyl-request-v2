@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { ColumnId, COLUMN_GROUPS, COLUMN_DEFINITIONS } from '../lib/collection-columns';
+import { ColumnId, COLUMN_DEFINITIONS, COLUMN_GROUPS, canHideColumn } from '../app/edit-collection/columnDefinitions';
 
 interface ColumnSelectorProps {
   visibleColumns: ColumnId[];
@@ -29,6 +29,9 @@ export default function ColumnSelector({ visibleColumns, onColumnsChange, onClos
   };
 
   const toggleColumn = (columnId: ColumnId) => {
+    // Don't allow hiding columns that can't be hidden
+    if (!canHideColumn(columnId)) return;
+    
     if (visibleColumns.includes(columnId)) {
       onColumnsChange(visibleColumns.filter(id => id !== columnId));
     } else {
@@ -37,18 +40,10 @@ export default function ColumnSelector({ visibleColumns, onColumnsChange, onClos
   };
 
   const resetToDefaults = () => {
-    onColumnsChange([
-      'artist',
-      'title',
-      'year',
-      'master_release_date',
-      'format',
-      'discs',
-      'spotify_total_tracks',
-      'length_seconds',
-      'discogs_genres',
-      'spotify_label'
-    ]);
+    const defaultColumns: ColumnId[] = Object.values(COLUMN_DEFINITIONS)
+      .filter(col => col.defaultVisible)
+      .map(col => col.id);
+    onColumnsChange(defaultColumns);
   };
 
   // Filter groups and columns by search query
@@ -57,7 +52,7 @@ export default function ColumnSelector({ visibleColumns, onColumnsChange, onClos
     
     return COLUMN_GROUPS.map(group => {
       const filteredColumns = group.columns.filter(colId => {
-        const col = COLUMN_DEFINITIONS.find(c => c.id === colId);
+        const col = COLUMN_DEFINITIONS[colId];
         return col?.label.toLowerCase().includes(searchQuery.toLowerCase());
       });
       
@@ -67,7 +62,7 @@ export default function ColumnSelector({ visibleColumns, onColumnsChange, onClos
 
   // Get currently visible columns for right panel
   const currentlyVisible = visibleColumns
-    .map(id => COLUMN_DEFINITIONS.find(c => c.id === id))
+    .map(id => COLUMN_DEFINITIONS[id])
     .filter(Boolean);
 
   return (
@@ -183,7 +178,7 @@ export default function ColumnSelector({ visibleColumns, onColumnsChange, onClos
               {filteredGroups.map(group => {
                 if (!group) return null;
                 const groupColumns = group.columns
-                  .map(colId => COLUMN_DEFINITIONS.find(c => c.id === colId))
+                  .map(colId => COLUMN_DEFINITIONS[colId])
                   .filter(Boolean);
                 const isExpanded = expandedGroups.has(group.id);
 
@@ -225,6 +220,8 @@ export default function ColumnSelector({ visibleColumns, onColumnsChange, onClos
                         {groupColumns.map(col => {
                           if (!col) return null;
                           const isVisible = visibleColumns.includes(col.id);
+                          const isDisabled = !canHideColumn(col.id);
+                          
                           return (
                             <label
                               key={col.id}
@@ -233,13 +230,16 @@ export default function ColumnSelector({ visibleColumns, onColumnsChange, onClos
                                 alignItems: 'center',
                                 gap: '8px',
                                 padding: '6px 8px',
-                                cursor: 'pointer',
+                                cursor: isDisabled ? 'not-allowed' : 'pointer',
                                 fontSize: '13px',
                                 borderRadius: '3px',
-                                marginBottom: '2px'
+                                marginBottom: '2px',
+                                opacity: isDisabled ? 0.6 : 1
                               }}
                               onMouseEnter={(e) => {
-                                e.currentTarget.style.background = '#f5f5f5';
+                                if (!isDisabled) {
+                                  e.currentTarget.style.background = '#f5f5f5';
+                                }
                               }}
                               onMouseLeave={(e) => {
                                 e.currentTarget.style.background = 'transparent';
@@ -249,9 +249,11 @@ export default function ColumnSelector({ visibleColumns, onColumnsChange, onClos
                                 type="checkbox"
                                 checked={isVisible}
                                 onChange={() => toggleColumn(col.id)}
-                                style={{ cursor: 'pointer' }}
+                                disabled={isDisabled}
+                                style={{ cursor: isDisabled ? 'not-allowed' : 'pointer' }}
                               />
                               <span>{col.label}</span>
+                              {isDisabled && <span style={{ fontSize: '11px', color: '#999' }}>(always visible)</span>}
                             </label>
                           );
                         })}
@@ -286,7 +288,7 @@ export default function ColumnSelector({ visibleColumns, onColumnsChange, onClos
                 </span>
               </div>
               <div style={{ fontSize: '12px', color: '#666' }}>
-                Columns
+                {currentlyVisible.length} columns selected
               </div>
             </div>
 
@@ -307,6 +309,8 @@ export default function ColumnSelector({ visibleColumns, onColumnsChange, onClos
               ) : (
                 currentlyVisible.map(col => {
                   if (!col) return null;
+                  const isRemovable = canHideColumn(col.id);
+                  
                   return (
                     <div
                       key={col.id}
@@ -325,22 +329,25 @@ export default function ColumnSelector({ visibleColumns, onColumnsChange, onClos
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span>☰</span>
                         <span>{col.label}</span>
+                        {!isRemovable && <span style={{ fontSize: '11px', color: '#999' }}>(locked)</span>}
                       </div>
-                      <button
-                        onClick={() => toggleColumn(col.id)}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: '#999',
-                          cursor: 'pointer',
-                          fontSize: '16px',
-                          padding: '0 4px',
-                          lineHeight: '1'
-                        }}
-                        title="Remove column"
-                      >
-                        ✕
-                      </button>
+                      {isRemovable && (
+                        <button
+                          onClick={() => toggleColumn(col.id)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#999',
+                            cursor: 'pointer',
+                            fontSize: '16px',
+                            padding: '0 4px',
+                            lineHeight: '1'
+                          }}
+                          title="Remove column"
+                        >
+                          ✕
+                        </button>
+                      )}
                     </div>
                   );
                 })

@@ -3,11 +3,11 @@
 'use client';
 
 import { useCallback, useEffect, useState, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import Image from 'next/image';
 import { supabase } from '../../lib/supabaseClient';
 import CollectionTable from '../../components/CollectionTable';
 import ColumnSelector from '../../components/ColumnSelector';
-import { ColumnId, DEFAULT_VISIBLE_COLUMNS } from '../../lib/collection-columns';
+import { ColumnId, DEFAULT_VISIBLE_COLUMNS } from './columnDefinitions';
 import { Album, toSafeStringArray, toSafeSearchString } from '../../types/album';
 
 type SortOption = 
@@ -52,19 +52,15 @@ const SORT_OPTIONS: { value: SortOption; label: string; category: string }[] = [
 ];
 
 function CollectionBrowserPage() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  
   const [albums, setAlbums] = useState<Album[]>([]);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchType, setSearchType] = useState<'both' | 'albums' | 'tracks'>('albums');
   const [showSearchTypeDropdown, setShowSearchTypeDropdown] = useState(false);
   const [selectedLetter, setSelectedLetter] = useState<string>('All');
-  const [folderMode, setFolderMode] = useState<string>('format');
+  const [folderMode] = useState<string>('format');
   const [selectedFolderValue, setSelectedFolderValue] = useState<string | null>(null);
-  const [collectionFilter, setCollectionFilter] = useState<string>('All');
+  const [collectionFilter] = useState<string>('All');
   const [showCollectionDropdown, setShowCollectionDropdown] = useState(false);
   const [folderSearch, setFolderSearch] = useState('');
   const [folderSortByCount, setFolderSortByCount] = useState(false);
@@ -113,35 +109,6 @@ function CollectionBrowserPage() {
     setSortBy(newSort);
     localStorage.setItem('collection-sort-preference', newSort);
     setShowSortDropdown(false);
-  };
-
-  // Column header click handler
-  const handleColumnHeaderClick = (column: 'artist' | 'title' | 'year' | 'format') => {
-    const sortMap: Record<typeof column, { asc: SortOption; desc: SortOption }> = {
-      artist: { asc: 'artist-asc', desc: 'artist-desc' },
-      title: { asc: 'title-asc', desc: 'title-desc' },
-      year: { asc: 'year-asc', desc: 'year-desc' },
-      format: { asc: 'format-asc', desc: 'format-desc' }
-    };
-
-    const current = sortMap[column];
-    const newSort = sortBy === current.asc ? current.desc : current.asc;
-    handleSortChange(newSort);
-  };
-
-  // Get sort indicator for column
-  const getSortIndicator = (column: 'artist' | 'title' | 'year' | 'format') => {
-    const sortMap: Record<typeof column, { asc: SortOption; desc: SortOption }> = {
-      artist: { asc: 'artist-asc', desc: 'artist-desc' },
-      title: { asc: 'title-asc', desc: 'title-desc' },
-      year: { asc: 'year-asc', desc: 'year-desc' },
-      format: { asc: 'format-asc', desc: 'format-desc' }
-    };
-
-    const current = sortMap[column];
-    if (sortBy === current.asc) return ' ▲';
-    if (sortBy === current.desc) return ' ▼';
-    return '';
   };
 
   // Load albums from Supabase
@@ -277,10 +244,6 @@ function CollectionBrowserPage() {
 
   const selectedAlbum = albums.find(a => a.id === selectedAlbumId);
 
-  // Get current sort label
-  const currentSortOption = SORT_OPTIONS.find(opt => opt.value === sortBy);
-  const currentSortLabel = currentSortOption ? currentSortOption.label : 'Sort';
-
   // Group sort options by category
   const sortOptionsByCategory = SORT_OPTIONS.reduce((acc, opt) => {
     if (!acc[opt.category]) acc[opt.category] = [];
@@ -296,7 +259,7 @@ function CollectionBrowserPage() {
 
   return (
     <>
-      <style jsx global>{`
+      <style>{`
         body > div:first-child > nav,
         body > div:first-child > header:not(.clz-header),
         body > nav,
@@ -1171,11 +1134,14 @@ function CollectionBrowserPage() {
                 </div>
 
                 {selectedAlbum.image_url ? (
-                  <img 
+                  <Image 
                     src={selectedAlbum.image_url} 
                     alt={`${selectedAlbum.artist} - ${selectedAlbum.title}`}
+                    width={400}
+                    height={400}
                     style={{
                       width: '100%',
+                      height: 'auto',
                       aspectRatio: '1',
                       objectFit: 'cover',
                       marginBottom: '12px',

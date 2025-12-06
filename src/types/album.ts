@@ -80,7 +80,7 @@ export type Album = {
   inner_circle_preferred: boolean;
   blocked: boolean;
   blocked_sides: string[] | null;
-  blocked_tracks: any | null;
+  blocked_tracks: Record<string, string[]> | null;  // Map of side -> track numbers
   
   // ============================================================================
   // SALES & PRICING
