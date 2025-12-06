@@ -3,8 +3,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { ColumnId } from '../app/edit-collection/columnDefinitions';
 import { Album } from '../types/album';
+import { ColumnId } from '../app/edit-collection/columnDefinitions';
 
 interface CollectionTableProps {
   albums: Album[];
@@ -14,149 +14,338 @@ interface CollectionTableProps {
   selectedAlbumId: number | null;
 }
 
-type SortConfig = {
-  key: ColumnId | null;
-  direction: 'asc' | 'desc';
-};
+type SortField = 'artist' | 'title' | 'year' | 'format' | 'date_added';
+type SortDirection = 'asc' | 'desc';
 
-export default function CollectionTable({ albums, visibleColumns, onAlbumClick, onSellClick, selectedAlbumId }: CollectionTableProps) {
-  const [sortConfig, setSortConfig] = useState<SortConfig>({ key: null, direction: 'asc' });
+export default function CollectionTable({ 
+  albums, 
+  visibleColumns,
+  onAlbumClick, 
+  selectedAlbumId 
+}: CollectionTableProps) {
+  const [sortField, setSortField] = useState<SortField>('artist');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
-  const handleSort = (columnId: ColumnId) => {
-    setSortConfig(prev => ({
-      key: columnId,
-      direction: prev.key === columnId && prev.direction === 'asc' ? 'desc' : 'asc'
-    }));
-  };
-
-  const getSortableValue = (album: Album, columnId: ColumnId): string | number => {
-    const value = album[columnId as keyof Album];
-    
-    if (value === null || value === undefined) return '';
-    if (typeof value === 'string' || typeof value === 'number') return value;
-    if (typeof value === 'boolean') return value ? 1 : 0;
-    if (Array.isArray(value)) return value.length;
-    return String(value);
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
   };
 
   const sortedAlbums = [...albums].sort((a, b) => {
-    if (!sortConfig.key) return 0;
+    let aVal: string | number = '';
+    let bVal: string | number = '';
 
-    const aVal = getSortableValue(a, sortConfig.key);
-    const bVal = getSortableValue(b, sortConfig.key);
+    switch (sortField) {
+      case 'artist':
+        aVal = (a.artist || '').toLowerCase();
+        bVal = (b.artist || '').toLowerCase();
+        break;
+      case 'title':
+        aVal = (a.title || '').toLowerCase();
+        bVal = (b.title || '').toLowerCase();
+        break;
+      case 'year':
+        aVal = a.year_int || 0;
+        bVal = b.year_int || 0;
+        break;
+      case 'format':
+        aVal = (a.format || '').toLowerCase();
+        bVal = (b.format || '').toLowerCase();
+        break;
+      case 'date_added':
+        aVal = a.date_added || '';
+        bVal = b.date_added || '';
+        break;
+    }
 
-    if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
-    if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+    if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+    if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
     return 0;
   });
 
-  const getSidesDisplay = (sides: number | { count: number } | string[] | null): string => {
-    if (!sides) return '—';
-    if (typeof sides === 'number') return String(sides);
-    if (typeof sides === 'object' && !Array.isArray(sides) && 'count' in sides) return String(sides.count);
-    if (Array.isArray(sides)) return String(sides.length);
-    return '—';
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field) return null;
+    return sortDirection === 'asc' ? ' ▲' : ' ▼';
   };
 
-  const renderCell = (album: Album, columnId: ColumnId) => {
-    const value = album[columnId as keyof Album];
+  // Render header cell
+  const renderHeaderCell = (columnId: ColumnId) => {
+    const baseStyle = {
+      padding: '12px 8px',
+      textAlign: 'center' as const,
+      fontWeight: 600,
+      fontSize: 11,
+      color: '#6b7280',
+      borderBottom: '2px solid #e5e7eb'
+    };
+
+    const leftStyle = {
+      ...baseStyle,
+      textAlign: 'left' as const,
+      padding: '12px 16px'
+    };
+
+    const sortableStyle = {
+      ...leftStyle,
+      cursor: 'pointer',
+      userSelect: 'none' as const
+    };
 
     switch (columnId) {
-      case 'custom_tags':
-        if (!album.custom_tags || album.custom_tags.length === 0) return <span style={{ color: '#9ca3af' }}>—</span>;
+      case 'checkbox':
         return (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-            {album.custom_tags.slice(0, 3).map((tag, idx) => (
-              <span key={idx} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 4, background: '#8b5cf6', color: 'white', fontWeight: 600 }}>
-                {tag}
-              </span>
-            ))}
-            {album.custom_tags.length > 3 && (
-              <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 600 }}>+{album.custom_tags.length - 3}</span>
-            )}
-          </div>
+          <th key={columnId} style={{ ...baseStyle, width: 40 }}>
+            <input type="checkbox" style={{ cursor: 'pointer' }} />
+          </th>
         );
-
-      case 'discogs_genres':
-      case 'discogs_styles':
-      case 'spotify_genres':
-      case 'apple_music_genres':
-      case 'signed_by':
-        const arr = value as string[] | null;
-        if (!arr || arr.length === 0) return <span style={{ color: '#9ca3af' }}>—</span>;
-        return (
-          <span style={{ fontSize: 13, color: '#374151' }}>
-            {arr.slice(0, 2).join(', ')}
-            {arr.length > 2 && <span style={{ color: '#6b7280' }}> +{arr.length - 2}</span>}
-          </span>
-        );
-
+      case 'owned':
+        return <th key={columnId} style={{ ...baseStyle, width: 40 }}>✓</th>;
       case 'for_sale':
-      case 'is_1001':
-      case 'steves_top_200':
-      case 'this_weeks_top_10':
-      case 'inner_circle_preferred':
-      case 'is_box_set':
-      case 'blocked':
+        return <th key={columnId} style={{ ...baseStyle, width: 40 }}>$</th>;
+      case 'image':
+        return <th key={columnId} style={{ ...baseStyle, width: 60 }}></th>;
+      case 'artist':
         return (
-          <span style={{ fontSize: 16, color: value ? '#10b981' : '#d1d5db' }}>
-            {value ? '✓' : '—'}
-          </span>
+          <th key={columnId} onClick={() => handleSort('artist')} style={sortableStyle}>
+            Artist{getSortIcon('artist')}
+          </th>
         );
-
-      case 'sale_price':
-      case 'purchase_price':
-      case 'current_value':
-      case 'wholesale_cost':
-      case 'discogs_price_min':
-      case 'discogs_price_median':
-      case 'discogs_price_max':
-        const price = value as number | null;
-        if (!price) return <span style={{ color: '#9ca3af' }}>—</span>;
-        return <span style={{ fontSize: 13, color: '#10b981', fontWeight: 600 }}>${price.toFixed(2)}</span>;
-
-      case 'date_added':
-      case 'purchase_date':
-      case 'last_cleaned_date':
-      case 'master_release_date':
-      case 'spotify_release_date':
-      case 'apple_music_release_date':
-      case 'last_enriched_at':
-      case 'discogs_price_updated_at':
-        if (!value) return <span style={{ color: '#9ca3af' }}>—</span>;
-        return <span style={{ fontSize: 13, color: '#374151' }}>{new Date(value as string).toLocaleDateString()}</span>;
-
-      case 'media_condition':
-        const condition = value as string | null;
-        if (!condition) return <span style={{ color: '#9ca3af' }}>—</span>;
-        const isMint = condition.includes('M') || condition.includes('NM');
-        return <span style={{ fontSize: 13, color: isMint ? '#10b981' : '#374151', fontWeight: isMint ? 600 : 400 }}>{condition}</span>;
-
-      case 'sides':
-        return <span style={{ fontSize: 13, color: '#374151' }}>{getSidesDisplay(album.sides)}</span>;
-
-      case 'decade':
-        if (!album.decade) return <span style={{ color: '#9ca3af' }}>—</span>;
-        return <span style={{ fontSize: 13, color: '#374151' }}>{album.decade}s</span>;
-
-      case 'play_count':
-      case 'spotify_popularity':
-      case 'spotify_total_tracks':
-      case 'apple_music_track_count':
-      case 'sale_quantity':
-      case 'year_int':
-        if (value === null || value === undefined) return <span style={{ color: '#9ca3af' }}>—</span>;
-        return <span style={{ fontSize: 13, color: '#374151' }}>{typeof value === 'object' ? JSON.stringify(value) : String(value)}</span>;
-
+      case 'title':
+        return (
+          <th key={columnId} onClick={() => handleSort('title')} style={sortableStyle}>
+            Title{getSortIcon('title')}
+          </th>
+        );
+      case 'release_date':
+        return <th key={columnId} style={leftStyle}>Release Date</th>;
+      case 'format':
+        return (
+          <th key={columnId} onClick={() => handleSort('format')} style={sortableStyle}>
+            Format{getSortIcon('format')}
+          </th>
+        );
+      case 'discs':
+        return <th key={columnId} style={{ ...baseStyle, width: 60 }}>Discs</th>;
+      case 'tracks':
+        return <th key={columnId} style={{ ...baseStyle, width: 70 }}>Tracks</th>;
+      case 'length':
+        return <th key={columnId} style={{ ...leftStyle, width: 80 }}>Length</th>;
+      case 'genre':
+        return <th key={columnId} style={{ ...leftStyle, width: 120 }}>Genre</th>;
+      case 'label':
+        return <th key={columnId} style={{ ...leftStyle, width: 140 }}>Label</th>;
+      case 'added_date':
+        return (
+          <th key={columnId} onClick={() => handleSort('date_added')} style={{ ...sortableStyle, width: 120 }}>
+            Added Date{getSortIcon('date_added')}
+          </th>
+        );
       default:
-        if (value === null || value === undefined || value === '') return <span style={{ color: '#9ca3af' }}>—</span>;
-        return <span style={{ fontSize: 13, color: '#374151' }}>{String(value)}</span>;
+        return null;
+    }
+  };
+
+  // Render data cell
+  const renderDataCell = (columnId: ColumnId, album: Album) => {
+    const baseCell = {
+      padding: '8px',
+      textAlign: 'center' as const,
+      borderBottom: '1px solid #f3f4f6'
+    };
+
+    const leftCell = {
+      padding: '12px 16px',
+      borderBottom: '1px solid #f3f4f6'
+    };
+
+    switch (columnId) {
+      case 'checkbox':
+        return (
+          <td key={columnId} style={baseCell}>
+            <input 
+              type="checkbox" 
+              onClick={(e) => e.stopPropagation()}
+              style={{ cursor: 'pointer' }}
+            />
+          </td>
+        );
+      
+      case 'owned':
+        return (
+          <td key={columnId} style={baseCell}>
+            <span style={{ color: '#10b981', fontSize: 16 }}>✓</span>
+          </td>
+        );
+      
+      case 'for_sale':
+        return (
+          <td key={columnId} style={baseCell}>
+            {album.for_sale && (
+              <span style={{ color: '#10b981', fontSize: 14 }}>$</span>
+            )}
+          </td>
+        );
+      
+      case 'image':
+        return (
+          <td key={columnId} style={baseCell}>
+            {album.image_url ? (
+              <div style={{
+                width: 40,
+                height: 40,
+                backgroundImage: `url(${album.image_url})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                borderRadius: 2,
+                border: '1px solid #e5e7eb'
+              }} />
+            ) : (
+              <div style={{
+                width: 40,
+                height: 40,
+                background: '#f3f4f6',
+                borderRadius: 2,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#9ca3af',
+                fontSize: 18
+              }}>
+                🎵
+              </div>
+            )}
+          </td>
+        );
+      
+      case 'artist':
+        return (
+          <td key={columnId} style={leftCell}>
+            <span style={{ fontSize: 13, color: '#374151', fontWeight: 500 }}>
+              {album.artist}
+            </span>
+          </td>
+        );
+      
+      case 'title':
+        return (
+          <td key={columnId} style={leftCell}>
+            <Link
+              href={`/admin/edit-entry/${album.id}`}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                color: '#2563eb',
+                textDecoration: 'none',
+                fontSize: 13,
+                fontWeight: 500
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.textDecoration = 'underline';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.textDecoration = 'none';
+              }}
+            >
+              {album.title}
+            </Link>
+          </td>
+        );
+      
+      case 'release_date':
+        return (
+          <td key={columnId} style={leftCell}>
+            <span style={{ fontSize: 13, color: '#6b7280' }}>
+              {album.year || '—'}
+            </span>
+          </td>
+        );
+      
+      case 'format':
+        return (
+          <td key={columnId} style={leftCell}>
+            <span style={{ fontSize: 13, color: '#374151' }}>
+              {album.format}
+            </span>
+          </td>
+        );
+      
+      case 'discs':
+        return (
+          <td key={columnId} style={{ ...leftCell, textAlign: 'center' }}>
+            <span style={{ fontSize: 13, color: '#6b7280' }}>
+              {album.discs || '—'}
+            </span>
+          </td>
+        );
+      
+      case 'tracks':
+        return (
+          <td key={columnId} style={{ ...leftCell, textAlign: 'center' }}>
+            <span style={{ fontSize: 13, color: '#6b7280' }}>
+              {album.spotify_total_tracks || album.apple_music_track_count || '—'}
+            </span>
+          </td>
+        );
+      
+      case 'length':
+        return (
+          <td key={columnId} style={leftCell}>
+            <span style={{ fontSize: 13, color: '#6b7280' }}>
+              {album.length_seconds ? 
+                `${Math.floor(album.length_seconds / 60)}:${String(album.length_seconds % 60).padStart(2, '0')}` 
+                : '—'}
+            </span>
+          </td>
+        );
+      
+      case 'genre':
+        return (
+          <td key={columnId} style={leftCell}>
+            <span style={{ fontSize: 13, color: '#374151' }}>
+              {album.discogs_genres && album.discogs_genres.length > 0 
+                ? album.discogs_genres[0]
+                : album.spotify_genres && album.spotify_genres.length > 0
+                ? album.spotify_genres[0]
+                : '—'}
+            </span>
+          </td>
+        );
+      
+      case 'label':
+        return (
+          <td key={columnId} style={leftCell}>
+            <span style={{ fontSize: 13, color: '#374151' }}>
+              {album.spotify_label || album.apple_music_label || '—'}
+            </span>
+          </td>
+        );
+      
+      case 'added_date':
+        return (
+          <td key={columnId} style={leftCell}>
+            <span style={{ fontSize: 13, color: '#6b7280' }}>
+              {album.date_added 
+                ? new Date(album.date_added).toLocaleDateString('en-US', { 
+                    month: 'short', 
+                    day: 'numeric', 
+                    year: 'numeric' 
+                  })
+                : '—'}
+            </span>
+          </td>
+        );
+      
+      default:
+        return null;
     }
   };
 
   if (albums.length === 0) {
     return (
-      <div style={{ padding: 40, textAlign: 'center', color: '#9ca3af', fontSize: 14 }}>
+      <div style={{ padding: 40, textAlign: 'center', color: '#999', fontSize: 14 }}>
         <div style={{ fontSize: 48, marginBottom: 16 }}>📭</div>
         <div>No albums found</div>
       </div>
@@ -168,60 +357,17 @@ export default function CollectionTable({ albums, visibleColumns, onAlbumClick, 
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
         <thead style={{ position: 'sticky', top: 0, background: '#f9fafb', zIndex: 10 }}>
           <tr>
-            {visibleColumns.map(columnId => (
-              <th
-                key={columnId}
-                onClick={() => handleSort(columnId)}
-                style={{
-                  padding: '12px 16px',
-                  textAlign: 'left',
-                  fontWeight: 600,
-                  fontSize: 12,
-                  color: '#374151',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px',
-                  borderBottom: '2px solid #e5e7eb',
-                  cursor: 'pointer',
-                  userSelect: 'none',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span>{columnId.replace(/_/g, ' ')}</span>
-                  {sortConfig.key === columnId && (
-                    <span style={{ fontSize: 10 }}>
-                      {sortConfig.direction === 'asc' ? '▲' : '▼'}
-                    </span>
-                  )}
-                </div>
-              </th>
-            ))}
-            <th style={{
-              padding: '12px 16px',
-              textAlign: 'left',
-              fontWeight: 600,
-              fontSize: 12,
-              color: '#374151',
-              textTransform: 'uppercase',
-              letterSpacing: '0.5px',
-              borderBottom: '2px solid #e5e7eb',
-              position: 'sticky',
-              right: 0,
-              background: '#f9fafb',
-              whiteSpace: 'nowrap'
-            }}>
-              Actions
-            </th>
+            {visibleColumns.map(col => renderHeaderCell(col))}
           </tr>
         </thead>
         <tbody>
-          {sortedAlbums.map(album => (
+          {sortedAlbums.map((album, index) => (
             <tr
               key={album.id}
               onClick={() => onAlbumClick(album.id)}
               style={{
                 cursor: 'pointer',
-                background: selectedAlbumId === album.id ? '#eff6ff' : album.id % 2 === 0 ? 'white' : '#fafafa',
+                background: selectedAlbumId === album.id ? '#eff6ff' : index % 2 === 0 ? 'white' : '#fafafa',
                 transition: 'background 0.15s'
               }}
               onMouseEnter={e => {
@@ -231,69 +377,11 @@ export default function CollectionTable({ albums, visibleColumns, onAlbumClick, 
               }}
               onMouseLeave={e => {
                 if (selectedAlbumId !== album.id) {
-                  e.currentTarget.style.background = album.id % 2 === 0 ? 'white' : '#fafafa';
+                  e.currentTarget.style.background = index % 2 === 0 ? 'white' : '#fafafa';
                 }
               }}
             >
-              {visibleColumns.map(columnId => (
-                <td
-                  key={columnId}
-                  style={{
-                    padding: '12px 16px',
-                    borderBottom: '1px solid #f3f4f6',
-                    verticalAlign: 'middle'
-                  }}
-                >
-                  {renderCell(album, columnId)}
-                </td>
-              ))}
-              <td style={{
-                padding: '12px 16px',
-                borderBottom: '1px solid #f3f4f6',
-                verticalAlign: 'middle',
-                position: 'sticky',
-                right: 0,
-                background: selectedAlbumId === album.id ? '#eff6ff' : album.id % 2 === 0 ? 'white' : '#fafafa'
-              }}>
-                <div style={{ display: 'flex', gap: 8, whiteSpace: 'nowrap' }}>
-                  <Link
-                    href={`/admin/edit-entry/${album.id}`}
-                    onClick={e => e.stopPropagation()}
-                    style={{
-                      padding: '6px 12px',
-                      background: '#3b82f6',
-                      color: 'white',
-                      borderRadius: 4,
-                      fontSize: 12,
-                      fontWeight: 600,
-                      textDecoration: 'none',
-                      display: 'inline-block'
-                    }}
-                  >
-                    Edit
-                  </Link>
-                  {!album.for_sale && (
-                    <button
-                      onClick={e => {
-                        e.stopPropagation();
-                        onSellClick(album);
-                      }}
-                      style={{
-                        padding: '6px 12px',
-                        background: '#10b981',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: 4,
-                        fontSize: 12,
-                        fontWeight: 600,
-                        cursor: 'pointer'
-                      }}
-                    >
-                      💰
-                    </button>
-                  )}
-                </div>
-              </td>
+              {visibleColumns.map(col => renderDataCell(col, album))}
             </tr>
           ))}
         </tbody>

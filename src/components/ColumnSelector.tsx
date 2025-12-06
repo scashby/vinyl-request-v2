@@ -1,7 +1,7 @@
 // src/components/ColumnSelector.tsx
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { ColumnId, COLUMN_DEFINITIONS, COLUMN_GROUPS, canHideColumn } from '../app/edit-collection/columnDefinitions';
 
 interface ColumnSelectorProps {
@@ -12,9 +12,10 @@ interface ColumnSelectorProps {
 
 export default function ColumnSelector({ visibleColumns, onColumnsChange, onClose }: ColumnSelectorProps) {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
-    new Set(['essential', 'physical']) // Essential and Physical expanded by default
+    new Set(['main', 'details', 'edition']) // Main groups expanded by default
   );
   const [searchQuery, setSearchQuery] = useState('');
+  const [tempVisibleColumns, setTempVisibleColumns] = useState<ColumnId[]>(visibleColumns);
 
   const toggleGroup = (groupId: string) => {
     setExpandedGroups(prev => {
@@ -29,47 +30,56 @@ export default function ColumnSelector({ visibleColumns, onColumnsChange, onClos
   };
 
   const toggleColumn = (columnId: ColumnId) => {
-    // Don't allow hiding columns that can't be hidden
     if (!canHideColumn(columnId)) return;
     
-    if (visibleColumns.includes(columnId)) {
-      onColumnsChange(visibleColumns.filter(id => id !== columnId));
+    if (tempVisibleColumns.includes(columnId)) {
+      setTempVisibleColumns(tempVisibleColumns.filter(id => id !== columnId));
     } else {
-      onColumnsChange([...visibleColumns, columnId]);
+      setTempVisibleColumns([...tempVisibleColumns, columnId]);
     }
   };
 
-  const resetToDefaults = () => {
-    const defaultColumns: ColumnId[] = Object.values(COLUMN_DEFINITIONS)
-      .filter(col => col.defaultVisible)
-      .map(col => col.id);
-    onColumnsChange(defaultColumns);
+  const handleSave = () => {
+    onColumnsChange(tempVisibleColumns);
+    onClose();
   };
 
-  // Filter groups and columns by search query
-  const filteredGroups = useMemo(() => {
-    if (!searchQuery) return COLUMN_GROUPS;
-    
-    return COLUMN_GROUPS.map(group => {
-      const filteredColumns = group.columns.filter(colId => {
-        const col = COLUMN_DEFINITIONS[colId];
-        return col?.label.toLowerCase().includes(searchQuery.toLowerCase());
-      });
-      
-      return filteredColumns.length > 0 ? { ...group, columns: filteredColumns } : null;
-    }).filter(Boolean);
-  }, [searchQuery]);
+  const handleCancel = () => {
+    setTempVisibleColumns(visibleColumns);
+    onClose();
+  };
 
-  // Get currently visible columns for right panel
-  const currentlyVisible = visibleColumns
+  const handleReset = () => {
+    // Reset to all 14 default columns
+    const defaultCols: ColumnId[] = [
+      'checkbox', 'owned', 'for_sale', 'image',
+      'artist', 'title', 'release_date', 'format',
+      'discs', 'tracks', 'length', 'genre', 'label', 'added_date'
+    ];
+    setTempVisibleColumns(defaultCols);
+  };
+
+  // Get currently visible column definitions for right panel
+  const currentlyVisible = tempVisibleColumns
     .map(id => COLUMN_DEFINITIONS[id])
     .filter(Boolean);
+
+  // Filter groups by search query
+  const filteredGroups = searchQuery 
+    ? COLUMN_GROUPS.map(group => {
+        const filteredColumns = group.columns.filter(colId => {
+          const col = COLUMN_DEFINITIONS[colId];
+          return col?.label.toLowerCase().includes(searchQuery.toLowerCase());
+        });
+        return filteredColumns.length > 0 ? { ...group, columns: filteredColumns } : null;
+      }).filter(Boolean)
+    : COLUMN_GROUPS;
 
   return (
     <>
       {/* Backdrop */}
       <div
-        onClick={onClose}
+        onClick={handleCancel}
         style={{
           position: 'fixed',
           top: 0,
@@ -77,7 +87,7 @@ export default function ColumnSelector({ visibleColumns, onColumnsChange, onClos
           right: 0,
           bottom: 0,
           background: 'rgba(0, 0, 0, 0.5)',
-          zIndex: 50000
+          zIndex: 9998
         }}
       />
 
@@ -91,7 +101,7 @@ export default function ColumnSelector({ visibleColumns, onColumnsChange, onClos
         borderRadius: '8px',
         width: '900px',
         maxHeight: '80vh',
-        zIndex: 50001,
+        zIndex: 9999,
         display: 'flex',
         flexDirection: 'column',
         boxShadow: '0 10px 40px rgba(0,0,0,0.3)'
@@ -110,7 +120,7 @@ export default function ColumnSelector({ visibleColumns, onColumnsChange, onClos
             Select Column Fields
           </h3>
           <button
-            onClick={onClose}
+            onClick={handleCancel}
             style={{
               background: 'none',
               border: 'none',
@@ -219,7 +229,7 @@ export default function ColumnSelector({ visibleColumns, onColumnsChange, onClos
                       <div style={{ paddingLeft: '28px', paddingTop: '4px' }}>
                         {groupColumns.map(col => {
                           if (!col) return null;
-                          const isVisible = visibleColumns.includes(col.id);
+                          const isVisible = tempVisibleColumns.includes(col.id);
                           const isDisabled = !canHideColumn(col.id);
                           
                           return (
@@ -366,7 +376,7 @@ export default function ColumnSelector({ visibleColumns, onColumnsChange, onClos
           alignItems: 'center'
         }}>
           <button
-            onClick={resetToDefaults}
+            onClick={handleReset}
             style={{
               padding: '8px 16px',
               background: 'white',
@@ -382,7 +392,7 @@ export default function ColumnSelector({ visibleColumns, onColumnsChange, onClos
           
           <div style={{ display: 'flex', gap: '8px' }}>
             <button
-              onClick={onClose}
+              onClick={handleCancel}
               style={{
                 padding: '8px 20px',
                 background: 'white',
@@ -396,7 +406,7 @@ export default function ColumnSelector({ visibleColumns, onColumnsChange, onClos
               Cancel
             </button>
             <button
-              onClick={onClose}
+              onClick={handleSave}
               style={{
                 padding: '8px 20px',
                 background: '#5BA3D0',
