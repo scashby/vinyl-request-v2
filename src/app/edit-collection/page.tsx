@@ -5,84 +5,10 @@
 import { useCallback, useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '../../lib/supabaseClient';
-
-type Album = {
-  id: number;
-  artist: string;
-  title: string;
-  year: string | null;
-  format: string;
-  image_url: string | null;
-  folder: string;
-  for_sale: boolean;
-  sale_price: number | null;
-  sale_platform: string | null;
-  sale_quantity: number | null;
-  sale_notes: string | null;
-  custom_tags: string[] | null;
-  media_condition: string;
-  discogs_genres: string[] | null;
-  discogs_styles: string[] | null;
-  spotify_genres: string[] | null;
-  apple_music_genres: string[] | null;
-  spotify_label: string | null;
-  apple_music_label: string | null;
-  apple_music_genre: string | null;
-  decade: number | null;
-  tracklists: string | null;
-  discogs_source: string | null;
-  discogs_notes: string | null;
-  pricing_notes: string | null;
-  notes: string | null;
-  is_1001: boolean;
-  steves_top_200: boolean;
-  this_weeks_top_10: boolean;
-  inner_circle_preferred: boolean;
-  discogs_master_id: string | null;
-  discogs_release_id: string | null;
-  master_release_id: string | null;
-  spotify_id: string | null;
-  apple_music_id: string | null;
-  sides: any | null;
-  is_box_set: boolean;
-  parent_id: string | null;
-  blocked: boolean;
-  blocked_sides: string[] | null;
-  blocked_tracks: any | null;
-  child_album_ids: number[] | null;
-  sell_price: string | null;
-  date_added: string | null;
-  master_release_date: string | null;
-  spotify_url: string | null;
-  spotify_popularity: number | null;
-  spotify_release_date: string | null;
-  spotify_total_tracks: number | null;
-  spotify_image_url: string | null;
-  apple_music_url: string | null;
-  apple_music_release_date: string | null;
-  apple_music_track_count: number | null;
-  apple_music_artwork_url: string | null;
-  last_enriched_at: string | null;
-  enrichment_sources: string[] | null;
-  artist_norm: string | null;
-  album_norm: string | null;
-  artist_album_norm: string | null;
-  title_norm: string | null;
-  year_int: number | null;
-  wholesale_cost: number | null;
-  discogs_price_min: number | null;
-  discogs_price_median: number | null;
-  discogs_price_max: number | null;
-  discogs_price_updated_at: string | null;
-  purchase_date: string | null;
-  purchase_store: string | null;
-  purchase_price: number | null;
-  current_value: number | null;
-  owner: string | null;
-  last_cleaned_date: string | null;
-  signed_by: string[] | null;
-  play_count: number | null;
-};
+import CollectionTable from '../../components/CollectionTable';
+import ColumnSelector from '../../components/ColumnSelector';
+import { ColumnId, DEFAULT_VISIBLE_COLUMNS } from '../../lib/collection-columns';
+import { Album, toSafeStringArray, toSafeSearchString } from '../../types/album';
 
 type SortOption = 
   | 'artist-asc' | 'artist-desc' 
@@ -163,7 +89,29 @@ function CollectionBrowserPage() {
   const [sortBy, setSortBy] = useState<SortOption>('artist-asc');
   const [showSortDropdown, setShowSortDropdown] = useState(false);
 
+  // COLUMN SELECTOR STATE
+  const [visibleColumns, setVisibleColumns] = useState<ColumnId[]>(DEFAULT_VISIBLE_COLUMNS);
+  const [showColumnSelector, setShowColumnSelector] = useState(false);
+
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+
+  // Load column preferences from localStorage
+  useEffect(() => {
+    const stored = localStorage.getItem('collection-visible-columns');
+    if (stored) {
+      try {
+        setVisibleColumns(JSON.parse(stored));
+      } catch {
+        // Invalid JSON, use defaults
+      }
+    }
+  }, []);
+
+  // Handle column changes
+  const handleColumnsChange = (columns: ColumnId[]) => {
+    setVisibleColumns(columns);
+    localStorage.setItem('collection-visible-columns', JSON.stringify(columns));
+  };
 
   // Load sort preference from localStorage
   useEffect(() => {
@@ -352,6 +300,12 @@ function CollectionBrowserPage() {
     acc[opt.category].push(opt);
     return acc;
   }, {} as Record<string, typeof SORT_OPTIONS>);
+
+  // Stub for sell click handler
+  const handleSellClick = (album: Album) => {
+    console.log('Mark for sale:', album);
+    // TODO: Implement sale modal
+  };
 
   return (
     <>
@@ -1075,7 +1029,9 @@ function CollectionBrowserPage() {
                   )}
                 </div>
                 
+                {/* COLUMN SELECTOR BUTTON */}
                 <button 
+                  onClick={() => setShowColumnSelector(true)}
                   title="Select visible columns"
                   style={{
                   background: '#3a3a3a',
@@ -1104,155 +1060,13 @@ function CollectionBrowserPage() {
                   Loading albums...
                 </div>
               ) : (
-                <table style={{
-                  width: '100%',
-                  borderCollapse: 'collapse',
-                  fontSize: '13px'
-                }}>
-                  <thead>
-                    <tr style={{
-                      background: '#f5f5f5',
-                      borderBottom: '2px solid #ddd',
-                      position: 'sticky',
-                      top: 0,
-                      zIndex: 10
-                    }}>
-                      <th style={{ width: '30px', padding: '8px', textAlign: 'center', borderRight: '1px solid #e0e0e0', color: '#333' }}>
-                        <input type="checkbox" title="Select all" style={{ cursor: 'pointer' }} />
-                      </th>
-                      <th style={{ width: '30px', padding: '8px 4px', textAlign: 'center', borderRight: '1px solid #e0e0e0', color: '#333', fontWeight: 600 }} title="Owned status">✓</th>
-                      <th style={{ width: '30px', padding: '8px 4px', textAlign: 'center', borderRight: '1px solid #e0e0e0', color: '#333', fontWeight: 600 }} title="For sale">$</th>
-                      <th style={{ width: '30px', padding: '8px 4px', textAlign: 'center', borderRight: '1px solid #e0e0e0', color: '#333', fontWeight: 600 }} title="Quick edit">✏</th>
-                      <th 
-                        onClick={() => handleColumnHeaderClick('artist')}
-                        style={{ 
-                          padding: '8px', 
-                          textAlign: 'left', 
-                          fontWeight: 600, 
-                          borderRight: '1px solid #e0e0e0', 
-                          cursor: 'pointer', 
-                          color: '#333',
-                          userSelect: 'none'
-                        }} 
-                        title="Click to sort by artist"
-                      >
-                        Artist{getSortIndicator('artist')}
-                      </th>
-                      <th 
-                        onClick={() => handleColumnHeaderClick('title')}
-                        style={{ 
-                          padding: '8px', 
-                          textAlign: 'left', 
-                          fontWeight: 600, 
-                          borderRight: '1px solid #e0e0e0', 
-                          cursor: 'pointer', 
-                          color: '#333',
-                          userSelect: 'none'
-                        }} 
-                        title="Click to sort by title"
-                      >
-                        Title{getSortIndicator('title')}
-                      </th>
-                      <th 
-                        onClick={() => handleColumnHeaderClick('year')}
-                        style={{ 
-                          padding: '8px', 
-                          textAlign: 'left', 
-                          fontWeight: 600, 
-                          borderRight: '1px solid #e0e0e0', 
-                          width: '80px', 
-                          color: '#333',
-                          cursor: 'pointer',
-                          userSelect: 'none'
-                        }}
-                        title="Click to sort by year"
-                      >
-                        Year{getSortIndicator('year')}
-                      </th>
-                      <th 
-                        onClick={() => handleColumnHeaderClick('format')}
-                        style={{ 
-                          padding: '8px', 
-                          textAlign: 'left', 
-                          fontWeight: 600, 
-                          borderRight: '1px solid #e0e0e0', 
-                          width: '150px', 
-                          color: '#333',
-                          cursor: 'pointer',
-                          userSelect: 'none'
-                        }}
-                        title="Click to sort by format"
-                      >
-                        Format{getSortIndicator('format')}
-                      </th>
-                      <th style={{ padding: '8px', textAlign: 'center', fontWeight: 600, borderRight: '1px solid #e0e0e0', width: '50px', color: '#333' }}>Discs</th>
-                      <th style={{ padding: '8px', textAlign: 'center', fontWeight: 600, borderRight: '1px solid #e0e0e0', width: '60px', color: '#333' }}>Tracks</th>
-                      <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, borderRight: '1px solid #e0e0e0', width: '70px', color: '#333' }}>Length</th>
-                      <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, borderRight: '1px solid #e0e0e0', width: '130px', color: '#333' }}>Genre</th>
-                      <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, borderRight: '1px solid #e0e0e0', width: '130px', color: '#333' }}>Label</th>
-                      <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, width: '130px', color: '#333' }}>Master Release</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredAndSortedAlbums.map((album, idx) => (
-                      <tr 
-                        key={album.id}
-                        onClick={() => setSelectedAlbumId(album.id)}
-                        style={{
-                          background: selectedAlbumId === album.id ? '#d4e9f7' : idx % 2 === 0 ? '#fff' : '#fafafa',
-                          borderBottom: '1px solid #e8e8e8',
-                          cursor: 'pointer'
-                        }}
-                        onMouseEnter={(e) => {
-                          if (selectedAlbumId !== album.id) {
-                            e.currentTarget.style.background = '#f5f5f5';
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          if (selectedAlbumId !== album.id) {
-                            e.currentTarget.style.background = idx % 2 === 0 ? '#fff' : '#fafafa';
-                          }
-                        }}
-                      >
-                        <td style={{ padding: '8px', textAlign: 'center', borderRight: '1px solid #e8e8e8' }}>
-                          <input 
-                            type="checkbox" 
-                            title="Select this album"
-                            style={{ cursor: 'pointer' }}
-                            onClick={(e) => e.stopPropagation()}
-                          />
-                        </td>
-                        <td style={{ padding: '8px 4px', textAlign: 'center', borderRight: '1px solid #e8e8e8', color: '#4CAF50', fontSize: '14px' }} title="Album owned">✓</td>
-                        <td style={{ padding: '8px 4px', textAlign: 'center', borderRight: '1px solid #e8e8e8', color: '#666' }}>
-                          {album.for_sale && <span title="For sale">$</span>}
-                        </td>
-                        <td style={{ padding: '8px 4px', textAlign: 'center', borderRight: '1px solid #e8e8e8' }}>
-                          <button title="Quick edit album" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: '#2196F3', padding: 0 }}>✏</button>
-                        </td>
-                        <td style={{ padding: '8px', borderRight: '1px solid #e8e8e8', color: '#333' }}>{album.artist}</td>
-                        <td style={{ padding: '8px', borderRight: '1px solid #e8e8e8', color: '#2196F3' }}>{album.title}</td>
-                        <td style={{ padding: '8px', borderRight: '1px solid #e8e8e8', color: '#333' }}>
-                          {album.year || '-'}
-                        </td>
-                        <td style={{ padding: '8px', borderRight: '1px solid #e8e8e8', color: '#333' }}>{album.format}</td>
-                        <td style={{ padding: '8px', textAlign: 'center', borderRight: '1px solid #e8e8e8', color: '#333' }}>-</td>
-                        <td style={{ padding: '8px', textAlign: 'center', borderRight: '1px solid #e8e8e8', color: '#333' }}>
-                          {album.spotify_total_tracks || album.apple_music_track_count || '-'}
-                        </td>
-                        <td style={{ padding: '8px', borderRight: '1px solid #e8e8e8', color: '#333' }}>-</td>
-                        <td style={{ padding: '8px', borderRight: '1px solid #e8e8e8', color: '#333' }}>
-                          {toSafeStringArray(album.discogs_genres)[0] || toSafeStringArray(album.spotify_genres)[0] || '-'}
-                        </td>
-                        <td style={{ padding: '8px', borderRight: '1px solid #e8e8e8', color: '#333' }}>
-                          {album.spotify_label || album.apple_music_label || '-'}
-                        </td>
-                        <td style={{ padding: '8px', color: '#333' }}>
-                          {album.master_release_date ? new Date(album.master_release_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <CollectionTable
+                  albums={filteredAndSortedAlbums}
+                  visibleColumns={visibleColumns}
+                  onAlbumClick={setSelectedAlbumId}
+                  onSellClick={handleSellClick}
+                  selectedAlbumId={selectedAlbumId}
+                />
               )}
             </div>
           </div>
@@ -1498,6 +1312,15 @@ function CollectionBrowserPage() {
           ))}
         </div>
       </div>
+
+      {/* COLUMN SELECTOR MODAL */}
+      {showColumnSelector && (
+        <ColumnSelector
+          visibleColumns={visibleColumns}
+          onColumnsChange={handleColumnsChange}
+          onClose={() => setShowColumnSelector(false)}
+        />
+      )}
     </>
   );
 }
