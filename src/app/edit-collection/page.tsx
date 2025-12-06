@@ -5,6 +5,9 @@
 import { useCallback, useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '../../lib/supabaseClient';
+import { toSafeSearchString, toSafeStringArray } from '../../types/album';
+import ColumnSelector from '../../components/ColumnSelector';
+import { ColumnId, COLUMN_DEFINITIONS, DEFAULT_VISIBLE_COLUMNS, getColumnById } from '../../lib/collection-columns';
 
 type Album = {
   id: number;
@@ -82,20 +85,47 @@ type Album = {
   last_cleaned_date: string | null;
   signed_by: string[] | null;
   play_count: number | null;
+  sort_title: string | null;
+  subtitle: string | null;
+  barcode: string | null;
+  cat_no: string | null;
+  index_number: number | null;
+  discs: number | null;
+  length_seconds: number | null;
+  package_sleeve_condition: string | null;
+  vinyl_color: string | null;
+  vinyl_weight: string | null;
+  rpm: string | null;
+  sound: string | null;
+  spars_code: string | null;
+  packaging: string | null;
+  original_release_date: string | null;
+  original_release_year: number | null;
+  recording_date: string | null;
+  recording_year: number | null;
+  country: string | null;
+  studio: string | null;
+  collection_status: string | null;
+  is_live: boolean | null;
+  extra: string | null;
+  location: string | null;
+  storage_device_slot: string | null;
+  my_rating: number | null;
+  last_played_date: string | null;
+  modified_date: string | null;
+  engineers: string[] | null;
+  musicians: string[] | null;
+  producers: string[] | null;
+  songwriters: string[] | null;
+  chorus: string | null;
+  composer: string | null;
+  composition: string | null;
+  conductor: string | null;
+  orchestra: string | null;
+  due_date: string | null;
+  loan_date: string | null;
+  loaned_to: string | null;
 };
-
-function toSafeSearchString(value: unknown): string {
-  if (value === null || value === undefined) return '';
-  if (typeof value === 'string') return value.toLowerCase();
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value).toLowerCase();
-  if (Array.isArray(value)) return value.filter(item => typeof item === 'string').join(' ').toLowerCase();
-  try { return String(value).toLowerCase(); } catch { return ''; }
-}
-
-function toSafeStringArray(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter(item => typeof item === 'string' && item.length > 0);
-}
 
 function CollectionBrowserPage() {
   const router = useRouter();
@@ -117,8 +147,31 @@ function CollectionBrowserPage() {
   const [selectedAlbumIds, setSelectedAlbumIds] = useState<Set<number>>(new Set());
   const [selectedAlbumId, setSelectedAlbumId] = useState<number | null>(null);
   const [activeCollection, setActiveCollection] = useState('music');
+  
+  // Column selector state
+  const [showColumnSelector, setShowColumnSelector] = useState(false);
+  const [visibleColumns, setVisibleColumns] = useState<ColumnId[]>(DEFAULT_VISIBLE_COLUMNS);
 
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+
+  // Load column preferences from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('dwd-visible-columns');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setVisibleColumns(parsed);
+      } catch (e) {
+        console.error('Failed to parse saved columns:', e);
+      }
+    }
+  }, []);
+
+  // Save column preferences to localStorage whenever they change
+  const handleColumnsChange = useCallback((columns: ColumnId[]) => {
+    setVisibleColumns(columns);
+    localStorage.setItem('dwd-visible-columns', JSON.stringify(columns));
+  }, []);
 
   // Load albums from Supabase
   const loadAlbums = useCallback(async () => {
@@ -174,7 +227,6 @@ function CollectionBrowserPage() {
     // Folder filter (format)
     if (selectedFolderValue) {
       if (folderMode === 'format' && album.format !== selectedFolderValue) return false;
-      // Add other folder modes as needed
     }
 
     // Search filter
@@ -217,6 +269,116 @@ function CollectionBrowserPage() {
     );
 
   const selectedAlbum = albums.find(a => a.id === selectedAlbumId);
+
+  // Get visible column definitions
+  const visibleColumnDefs = visibleColumns
+    .map(id => getColumnById(id))
+    .filter(col => col !== undefined);
+
+  // Helper function to render cell content
+  const renderCell = (album: Album, columnId: ColumnId) => {
+    switch (columnId) {
+      case 'image_url':
+        return album.image_url ? (
+          <img src={album.image_url} alt="" style={{ width: 60, height: 60, objectFit: 'cover' }} />
+        ) : (
+          <div style={{ width: 60, height: 60, background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>
+            🎵
+          </div>
+        );
+      
+      case 'master_release_date':
+      case 'original_release_date':
+      case 'recording_date':
+      case 'spotify_release_date':
+      case 'apple_music_release_date':
+      case 'date_added':
+      case 'modified_date':
+      case 'purchase_date':
+      case 'last_played_date':
+      case 'last_cleaned_date':
+      case 'loan_date':
+      case 'due_date':
+      case 'discogs_price_updated_at':
+      case 'last_enriched_at':
+        const dateValue = album[columnId];
+        return dateValue 
+          ? new Date(dateValue).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+          : '-';
+
+      case 'discogs_genres':
+      case 'discogs_styles':
+      case 'spotify_genres':
+      case 'apple_music_genres':
+      case 'custom_tags':
+      case 'enrichment_sources':
+      case 'signed_by':
+      case 'blocked_sides':
+      case 'child_album_ids':
+      case 'engineers':
+      case 'musicians':
+      case 'producers':
+      case 'songwriters':
+        const arrayValue = album[columnId];
+        return Array.isArray(arrayValue) ? arrayValue.join(', ') || '-' : '-';
+
+      case 'for_sale':
+      case 'is_box_set':
+      case 'is_live':
+      case 'is_1001':
+      case 'steves_top_200':
+      case 'this_weeks_top_10':
+      case 'inner_circle_preferred':
+      case 'blocked':
+        return album[columnId] ? '✓' : '';
+
+      case 'sale_price':
+      case 'sell_price':
+      case 'wholesale_cost':
+      case 'purchase_price':
+      case 'current_value':
+      case 'discogs_price_min':
+      case 'discogs_price_median':
+      case 'discogs_price_max':
+        const priceValue = album[columnId];
+        return priceValue ? `$${Number(priceValue).toFixed(2)}` : '-';
+
+      case 'my_rating':
+        const rating = album.my_rating;
+        return rating ? '⭐'.repeat(rating) : '-';
+
+      case 'length_seconds':
+        const seconds = album.length_seconds;
+        if (!seconds) return '-';
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+
+      case 'spotify_url':
+      case 'apple_music_url':
+        const url = album[columnId];
+        return url ? (
+          <a href={url} target="_blank" rel="noopener noreferrer" style={{ color: '#2196F3' }}>
+            🔗
+          </a>
+        ) : '-';
+
+      case 'spotify_image_url':
+      case 'apple_music_artwork_url':
+        const imgUrl = album[columnId];
+        return imgUrl ? (
+          <img src={imgUrl} alt="" style={{ width: 40, height: 40, objectFit: 'cover' }} />
+        ) : '-';
+
+      default:
+        const value = album[columnId];
+        if (value === null || value === undefined) return '-';
+        if (Array.isArray(value)) return value.join(', ') || '-';
+        if (typeof value === 'boolean') return value ? '✓' : '';
+        if (typeof value === 'object') return JSON.stringify(value);
+        return String(value);
+    }
+  };
 
   return (
     <>
@@ -858,6 +1020,7 @@ function CollectionBrowserPage() {
                 </button>
                 
                 <button 
+                  onClick={() => setShowColumnSelector(true)}
                   title="Select visible columns"
                   style={{
                   background: '#3a3a3a',
@@ -899,26 +1062,26 @@ function CollectionBrowserPage() {
                       top: 0,
                       zIndex: 10
                     }}>
-                      <th style={{ width: '30px', padding: '8px', textAlign: 'center', borderRight: '1px solid #e0e0e0', color: '#333' }}>
-                        <input type="checkbox" title="Select all" style={{ cursor: 'pointer' }} />
-                      </th>
-                      <th style={{ width: '30px', padding: '8px 4px', textAlign: 'center', borderRight: '1px solid #e0e0e0', color: '#333', fontWeight: 600 }} title="Owned status">✓</th>
-                      <th style={{ width: '30px', padding: '8px 4px', textAlign: 'center', borderRight: '1px solid #e0e0e0', color: '#333', fontWeight: 600 }} title="For sale">$</th>
-                      <th style={{ width: '30px', padding: '8px 4px', textAlign: 'center', borderRight: '1px solid #e0e0e0', color: '#333', fontWeight: 600 }} title="Quick edit">✏</th>
-                      <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, borderRight: '1px solid #e0e0e0', cursor: 'pointer', color: '#333' }} title="Sort by artist">
-                        Artist <span style={{ fontSize: '10px' }}>▲</span>
-                      </th>
-                      <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, borderRight: '1px solid #e0e0e0', cursor: 'pointer', color: '#333' }} title="Sort by title">
-                        Title <span style={{ fontSize: '10px' }}>▲</span>
-                      </th>
-                      <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, borderRight: '1px solid #e0e0e0', width: '110px', color: '#333' }}>Release Date</th>
-                      <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, borderRight: '1px solid #e0e0e0', width: '130px', color: '#333' }}>Master Release</th>
-                      <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, borderRight: '1px solid #e0e0e0', width: '150px', color: '#333' }}>Format</th>
-                      <th style={{ padding: '8px', textAlign: 'center', fontWeight: 600, borderRight: '1px solid #e0e0e0', width: '50px', color: '#333' }}>Discs</th>
-                      <th style={{ padding: '8px', textAlign: 'center', fontWeight: 600, borderRight: '1px solid #e0e0e0', width: '60px', color: '#333' }}>Tracks</th>
-                      <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, borderRight: '1px solid #e0e0e0', width: '70px', color: '#333' }}>Length</th>
-                      <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, borderRight: '1px solid #e0e0e0', width: '130px', color: '#333' }}>Genre</th>
-                      <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, width: '130px', color: '#333' }}>Label</th>
+                      {visibleColumnDefs.map(col => (
+                        <th
+                          key={col.id}
+                          style={{
+                            width: col.width,
+                            padding: '8px',
+                            textAlign: 'left',
+                            fontWeight: 600,
+                            borderRight: '1px solid #e0e0e0',
+                            color: '#333',
+                            cursor: col.sortable ? 'pointer' : 'default'
+                          }}
+                          title={col.sortable ? `Sort by ${col.label}` : col.label}
+                        >
+                          {col.label}
+                          {col.sortable && col.id === 'artist' && (
+                            <span style={{ fontSize: '10px', marginLeft: '4px' }}>▲</span>
+                          )}
+                        </th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
@@ -942,41 +1105,19 @@ function CollectionBrowserPage() {
                           }
                         }}
                       >
-                        <td style={{ padding: '8px', textAlign: 'center', borderRight: '1px solid #e8e8e8' }}>
-                          <input 
-                            type="checkbox" 
-                            title="Select this album"
-                            style={{ cursor: 'pointer' }}
-                            onClick={(e) => e.stopPropagation()}
-                          />
-                        </td>
-                        <td style={{ padding: '8px 4px', textAlign: 'center', borderRight: '1px solid #e8e8e8', color: '#4CAF50', fontSize: '14px' }} title="Album owned">✓</td>
-                        <td style={{ padding: '8px 4px', textAlign: 'center', borderRight: '1px solid #e8e8e8', color: '#666' }}>
-                          {album.for_sale && <span title="For sale">$</span>}
-                        </td>
-                        <td style={{ padding: '8px 4px', textAlign: 'center', borderRight: '1px solid #e8e8e8' }}>
-                          <button title="Quick edit album" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', color: '#2196F3', padding: 0 }}>✏</button>
-                        </td>
-                        <td style={{ padding: '8px', borderRight: '1px solid #e8e8e8', color: '#333' }}>{album.artist}</td>
-                        <td style={{ padding: '8px', borderRight: '1px solid #e8e8e8', color: '#2196F3' }}>{album.title}</td>
-                        <td style={{ padding: '8px', borderRight: '1px solid #e8e8e8', color: '#333' }}>
-                          {album.year || '-'}
-                        </td>
-                        <td style={{ padding: '8px', borderRight: '1px solid #e8e8e8', color: '#333' }}>
-                          {album.master_release_date ? new Date(album.master_release_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '-'}
-                        </td>
-                        <td style={{ padding: '8px', borderRight: '1px solid #e8e8e8', color: '#333' }}>{album.format}</td>
-                        <td style={{ padding: '8px', textAlign: 'center', borderRight: '1px solid #e8e8e8', color: '#333' }}>-</td>
-                        <td style={{ padding: '8px', textAlign: 'center', borderRight: '1px solid #e8e8e8', color: '#333' }}>
-                          {album.spotify_total_tracks || album.apple_music_track_count || '-'}
-                        </td>
-                        <td style={{ padding: '8px', borderRight: '1px solid #e8e8e8', color: '#333' }}>-</td>
-                        <td style={{ padding: '8px', borderRight: '1px solid #e8e8e8', color: '#333' }}>
-                          {toSafeStringArray(album.discogs_genres)[0] || toSafeStringArray(album.spotify_genres)[0] || '-'}
-                        </td>
-                        <td style={{ padding: '8px', color: '#333' }}>
-                          {album.spotify_label || album.apple_music_label || '-'}
-                        </td>
+                        {visibleColumnDefs.map(col => (
+                          <td
+                            key={col.id}
+                            style={{
+                              padding: '8px',
+                              textAlign: 'left',
+                              borderRight: '1px solid #e8e8e8',
+                              color: col.id === 'title' ? '#2196F3' : '#333'
+                            }}
+                          >
+                            {renderCell(album, col.id)}
+                          </td>
+                        ))}
                       </tr>
                     ))}
                   </tbody>
@@ -1226,6 +1367,15 @@ function CollectionBrowserPage() {
           ))}
         </div>
       </div>
+
+      {/* Column Selector Modal */}
+      {showColumnSelector && (
+        <ColumnSelector
+          visibleColumns={visibleColumns}
+          onColumnsChange={handleColumnsChange}
+          onClose={() => setShowColumnSelector(false)}
+        />
+      )}
     </>
   );
 }

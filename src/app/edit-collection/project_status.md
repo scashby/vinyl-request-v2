@@ -1,6 +1,6 @@
 # PROJECT_STATUS.md
 # DWD Collection Management System - Collection Browser
-**Last Updated:** 2025-12-05 (Evening - Phase 2.2 Updated)
+**Last Updated:** 2025-12-05 (Evening - Phase 2.2 Column Fixes Complete)
 
 ## Project Overview
 Building an exact CLZ Music Web-inspired interface for Dead Wax Dialogues vinyl management system with custom branding. Strategy: Build complete visual framework first (LOCKED), then add functionality second. This ensures pixel-perfect accuracy before connecting data and logic.
@@ -73,19 +73,39 @@ Building an exact CLZ Music Web-inspired interface for Dead Wax Dialogues vinyl 
   - [x] Sale Price (Highest, Lowest)
 - [x] Remember last sort preference (localStorage)
 
-### Column Fixes Required 🔨 IN PROGRESS
-- [ ] Fix "Release Date" column - Currently displays date_added, should display year (pressing release year)
-- [ ] Remove "Added Date" column from table (not needed in current view)
-- [ ] Add "Master Release Date" column showing master_release_date field
+### Column Fixes ✅ COMPLETE
+- [x] Fixed "Release Date" column - Now displays year (pressing release year) instead of date_added
+- [x] Removed "Added Date" column from table (duplicate, not needed)
+- [x] Added "Master Release Date" column showing master_release_date field formatted as "MMM YYYY"
 
-### Column Selector Implementation (MOVED FROM PHASE 4.1) 🔨 IN PROGRESS
-- [ ] Create column definitions library
-- [ ] Wire up existing ColumnSelector component button
-- [ ] Show/hide columns dynamically based on selection
-- [ ] Save column preferences to localStorage
-- [ ] Load column preferences on mount
-- [ ] Update table to respect visible columns setting
-- [ ] Handle sortable vs non-sortable columns properly
+### Current Table Columns (14 total)
+1. ☑ Checkbox - Selection control
+2. ✓ Owned - Ownership status indicator
+3. $ For Sale - Sale status indicator
+4. ✏ Edit - Quick edit button
+5. Artist - Sortable, primary identifier
+6. Title - Sortable, album name
+7. **Release Date** - Shows pressing year (album.year)
+8. **Master Release** - Shows original release date (album.master_release_date as "MMM YYYY")
+9. Format - Sortable, media format (Vinyl, CD, etc.)
+10. Discs - Number of discs (placeholder for now)
+11. Tracks - Track count from Spotify/Apple Music
+12. Length - Total runtime (placeholder for now)
+13. Genre - Primary genre from Discogs/Spotify
+14. Label - Record label from Spotify/Apple Music
+
+### Column Selector Implementation 🔨 NEXT UP
+- [ ] Create comprehensive column definitions library with all available database fields
+- [ ] Wire up existing ColumnSelector component button (⊞ button in table toolbar)
+- [ ] Build column visibility state management system
+- [ ] Implement show/hide columns dynamically based on user selection
+- [ ] Save column preferences to localStorage (key: 'dwd-visible-columns')
+- [ ] Load column preferences on mount with fallback to defaults
+- [ ] Update table rendering to respect visible columns setting
+- [ ] Handle sortable vs non-sortable columns properly in definitions
+- [ ] Add "Reset to Default" option in column selector
+- [ ] Maintain column order when toggling visibility
+- [ ] Add column width preferences (future enhancement)
 
 ---
 
@@ -205,12 +225,12 @@ Building an exact CLZ Music Web-inspired interface for Dead Wax Dialogues vinyl 
 
 ## 📊 PROGRESS METRICS
 
-### Overall Completion: ~30%
+### Overall Completion: ~35%
 
 **Phase 1 - Framework:** 100% ✅
-**Phase 2 - Data Connection:** 70% 🚧
+**Phase 2 - Data Connection:** 80% 🚧
 - 2.1 Initial Connection: 100% ✅
-- 2.2 Sorting & Columns: 50% 🚧 (Sorting ✅, Column Fixes + Selector 🔨)
+- 2.2 Sorting & Columns: 75% 🚧 (Sorting ✅, Column Fixes ✅, Column Selector 🔨)
 - 2.3 Detail Panel: 40% (basic display working)
 
 **Phase 3 - Selection:** 10% (UI in place, not functional)
@@ -221,6 +241,13 @@ Building an exact CLZ Music Web-inspired interface for Dead Wax Dialogues vinyl 
 
 ## 🔄 CHANGE LOG
 
+- **2025-12-05 (Evening - Update 3):** COLUMN FIXES COMPLETE
+  - Fixed "Release Date" column to show year field instead of date_added
+  - Removed duplicate "Added Date" column from table
+  - Added new "Master Release Date" column with formatted master_release_date
+  - Table now has 14 properly mapped columns
+  - Ready to implement Column Selector next
+  
 - **2025-12-05 (Evening - Update 2):** PHASE 2.2 EXPANDED
   - Moved Column Selector from Phase 4.1 to Phase 2.2
   - Added three critical column mapping fixes to Phase 2.2
@@ -258,36 +285,42 @@ Building an exact CLZ Music Web-inspired interface for Dead Wax Dialogues vinyl 
 
 ## 🎯 IMMEDIATE NEXT STEPS
 
-**Priority 1: Column Fixes (Phase 2.2) - CURRENT WORK**
-1. Fix "Release Date" column to display `year` instead of `date_added`
-2. Remove duplicate "Added Date" column from table
-3. Add new "Master Release Date" column with `master_release_date` data
+**Priority 1: Column Selector Implementation (Phase 2.2) - CURRENT WORK**
+1. Define all available columns with metadata (label, field, sortable, width, defaultVisible)
+2. Create column selector dropdown UI component
+3. Wire up ⊞ button in table toolbar to show/hide selector
+4. Implement column visibility toggle logic
+5. Add localStorage persistence for column preferences
+6. Update table to dynamically render only visible columns
+7. Test with various column combinations
+8. Add "Reset to Default" functionality
 
-**Priority 2: Column Selector (Phase 2.2) - CURRENT WORK**
-1. Create column definitions system
-2. Wire up ColumnSelector component to toolbar button
-3. Implement show/hide column logic in table
-4. Add localStorage persistence for column preferences
-5. Load saved column preferences on mount
-
-**Priority 3: Selection (Phase 3.1) - NEXT UP**
+**Priority 2: Selection System (Phase 3.1) - NEXT UP**
 1. Wire up checkbox state management
-2. Implement select all/none
-3. Maintain selection across filters
+2. Implement select all/none functionality
+3. Maintain selection across filters and sorting
 4. Test with 100+ selected albums
+5. Add keyboard shortcuts
 
-**Priority 4: Detail Panel Polish (Phase 2.3)**
+**Priority 3: Detail Panel Polish (Phase 2.3)**
 1. Add missing metadata fields
-2. Format data better
+2. Format data better (dates, arrays, etc.)
 3. Add clickable links for external services
-4. Improve tag display
+4. Improve tag display with categories
+5. Wire up action buttons
+
+**Priority 4: Batch Operations (Phase 3.2-3.3)**
+1. Enable selection toolbar actions
+2. Create batch edit modal
+3. Implement bulk operations
+4. Add progress indicators
 
 ---
 
 ## 📝 TECHNICAL NOTES
 
 ### Current File Structure
-**Main file:** `src/app/edit-collection/page.tsx` (currently ~900 lines)
+**Main file:** `src/app/edit-collection/page.tsx` (currently ~950 lines)
 - Contains complete UI and data logic
 - Self-contained for now (will extract components later)
 - Uses Supabase client for all queries
@@ -302,25 +335,31 @@ From `collection` table:
 - **Services:** spotify_label, apple_music_label, spotify_total_tracks, apple_music_track_count
 - **Dates:** date_added, master_release_date, purchase_date
 - **Enrichment:** last_enriched_at, enrichment_sources
+- **IDs:** discogs_master_id, discogs_release_id, spotify_id, apple_music_id
 
-### Column Issues Identified
-1. **Release Date column** - Header says "Release Date" but displays `date_added` value
-2. **Need to show** - Pressing year (the `year` field) in Release Date column
-3. **Added Date column** - Currently duplicate of Release Date, should be removed
-4. **Master Release Date** - Need to add this as new column showing `master_release_date`
+### Column Definitions for Selector (Proposed)
+Will need to create a comprehensive library with ~30-40 available columns including:
+- **Basic Info:** Checkbox, Owned, For Sale, Edit, Artist, Title, Year, Master Release, Format
+- **Physical:** Discs, Tracks, Length, Condition, Sides, Weight
+- **Metadata:** Genre, Style, Label, Catalog Number, Barcode, Country
+- **Dates:** Release Date, Master Release, Date Added, Purchase Date, Last Played
+- **Sales:** Sale Price, Wholesale Cost, Current Value, Purchase Price, Platform
+- **Enrichment:** Spotify URL, Apple Music URL, Discogs ID, Popularity
+- **Custom:** Tags, Notes, Owner, Location, Signed By
 
 ### Performance Considerations
 - Batch loading prevents timeout (1000 albums per query)
 - Filters run client-side (fast for <10k albums)
 - Consider server-side filtering/sorting for 50k+ albums
 - Virtual scrolling not yet needed but planned
+- Column selector should not re-render entire table (use React.memo)
 
 ### Known Limitations
-- Column mapping issues in table (3 fixes needed)
-- Selection checkboxes don't work yet
-- Some table columns show placeholders (Discs, Length)
-- No column selector connected yet
-- Collection tabs don't do anything yet
+- Selection checkboxes don't work yet (Phase 3.1)
+- Some table columns show placeholders (Discs, Length) - need calculated values
+- No column selector connected yet (Phase 2.2 in progress)
+- Collection tabs don't do anything yet (Phase 5)
+- No modal dialogs implemented yet (Phase 4)
 
 ---
 
@@ -335,6 +374,7 @@ From `collection` table:
 - [ ] Add PropTypes or improve TypeScript
 - [ ] Add unit tests for filtering logic
 - [ ] Add integration tests for data loading
+- [ ] Extract column definitions to separate file
 
 ### Accessibility Improvements Needed
 - [ ] Full keyboard navigation
@@ -342,6 +382,8 @@ From `collection` table:
 - [ ] Screen reader announcements for dynamic content
 - [ ] High contrast mode support
 - [ ] Better ARIA labels (tooltips are a start)
+- [ ] Proper heading hierarchy
+- [ ] Skip links for main content areas
 
 ---
 
