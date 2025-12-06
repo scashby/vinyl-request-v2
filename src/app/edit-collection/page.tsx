@@ -912,13 +912,13 @@ function CollectionBrowserPage() {
                         Title <span style={{ fontSize: '10px' }}>▲</span>
                       </th>
                       <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, borderRight: '1px solid #e0e0e0', width: '110px', color: '#333' }}>Release Date</th>
+                      <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, borderRight: '1px solid #e0e0e0', width: '130px', color: '#333' }}>Master Release</th>
                       <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, borderRight: '1px solid #e0e0e0', width: '150px', color: '#333' }}>Format</th>
                       <th style={{ padding: '8px', textAlign: 'center', fontWeight: 600, borderRight: '1px solid #e0e0e0', width: '50px', color: '#333' }}>Discs</th>
                       <th style={{ padding: '8px', textAlign: 'center', fontWeight: 600, borderRight: '1px solid #e0e0e0', width: '60px', color: '#333' }}>Tracks</th>
                       <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, borderRight: '1px solid #e0e0e0', width: '70px', color: '#333' }}>Length</th>
                       <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, borderRight: '1px solid #e0e0e0', width: '130px', color: '#333' }}>Genre</th>
-                      <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, borderRight: '1px solid #e0e0e0', width: '130px', color: '#333' }}>Label</th>
-                      <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, width: '110px', color: '#333' }}>Added Date</th>
+                      <th style={{ padding: '8px', textAlign: 'left', fontWeight: 600, width: '130px', color: '#333' }}>Label</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -960,7 +960,10 @@ function CollectionBrowserPage() {
                         <td style={{ padding: '8px', borderRight: '1px solid #e8e8e8', color: '#333' }}>{album.artist}</td>
                         <td style={{ padding: '8px', borderRight: '1px solid #e8e8e8', color: '#2196F3' }}>{album.title}</td>
                         <td style={{ padding: '8px', borderRight: '1px solid #e8e8e8', color: '#333' }}>
-                          {album.date_added ? new Date(album.date_added).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}
+                          {album.year || '-'}
+                        </td>
+                        <td style={{ padding: '8px', borderRight: '1px solid #e8e8e8', color: '#333' }}>
+                          {album.master_release_date ? new Date(album.master_release_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '-'}
                         </td>
                         <td style={{ padding: '8px', borderRight: '1px solid #e8e8e8', color: '#333' }}>{album.format}</td>
                         <td style={{ padding: '8px', textAlign: 'center', borderRight: '1px solid #e8e8e8', color: '#333' }}>-</td>
@@ -971,11 +974,8 @@ function CollectionBrowserPage() {
                         <td style={{ padding: '8px', borderRight: '1px solid #e8e8e8', color: '#333' }}>
                           {toSafeStringArray(album.discogs_genres)[0] || toSafeStringArray(album.spotify_genres)[0] || '-'}
                         </td>
-                        <td style={{ padding: '8px', borderRight: '1px solid #e8e8e8', color: '#333' }}>
-                          {album.spotify_label || album.apple_music_label || '-'}
-                        </td>
                         <td style={{ padding: '8px', color: '#333' }}>
-                          {album.date_added ? new Date(album.date_added).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}
+                          {album.spotify_label || album.apple_music_label || '-'}
                         </td>
                       </tr>
                     ))}
