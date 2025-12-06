@@ -37,7 +37,18 @@ export default function ColumnSelector({ visibleColumns, onColumnsChange, onClos
   };
 
   const resetToDefaults = () => {
-    onColumnsChange(['image_url', 'artist', 'title', 'year', 'format', 'folder', 'media_condition']);
+    onColumnsChange([
+      'artist',
+      'title',
+      'year',
+      'master_release_date',
+      'format',
+      'discs',
+      'spotify_total_tracks',
+      'length_seconds',
+      'discogs_genres',
+      'spotify_label'
+    ]);
   };
 
   // Filter groups and columns by search query

@@ -150,7 +150,18 @@ function CollectionBrowserPage() {
   
   // Column selector state
   const [showColumnSelector, setShowColumnSelector] = useState(false);
-  const [visibleColumns, setVisibleColumns] = useState<ColumnId[]>(DEFAULT_VISIBLE_COLUMNS);
+  const [visibleColumns, setVisibleColumns] = useState<ColumnId[]>([
+    'artist',
+    'title',
+    'year',
+    'master_release_date',
+    'format',
+    'discs',
+    'spotify_total_tracks',
+    'length_seconds',
+    'discogs_genres',
+    'spotify_label'
+  ]);
 
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
@@ -307,9 +318,16 @@ function CollectionBrowserPage() {
           : '-';
 
       case 'discogs_genres':
-      case 'discogs_styles':
       case 'spotify_genres':
       case 'apple_music_genres':
+        // For genre columns, show first genre only
+        const genreArray = album[columnId];
+        if (Array.isArray(genreArray) && genreArray.length > 0) {
+          return genreArray[0];
+        }
+        return '-';
+
+      case 'discogs_styles':
       case 'custom_tags':
       case 'enrichment_sources':
       case 'signed_by':
@@ -1062,6 +1080,15 @@ function CollectionBrowserPage() {
                       top: 0,
                       zIndex: 10
                     }}>
+                      {/* Always-visible UI columns */}
+                      <th style={{ width: 40, padding: '8px', textAlign: 'center', borderRight: '1px solid #e0e0e0' }}>
+                        <input type="checkbox" title="Select all" />
+                      </th>
+                      <th style={{ width: 40, padding: '8px', textAlign: 'center', borderRight: '1px solid #e0e0e0' }} title="Owned">✓</th>
+                      <th style={{ width: 40, padding: '8px', textAlign: 'center', borderRight: '1px solid #e0e0e0' }} title="For Sale">$</th>
+                      <th style={{ width: 40, padding: '8px', textAlign: 'center', borderRight: '1px solid #e0e0e0' }} title="Edit">✏</th>
+                      
+                      {/* Selectable columns */}
                       {visibleColumnDefs.map(col => (
                         <th
                           key={col.id}
@@ -1105,6 +1132,50 @@ function CollectionBrowserPage() {
                           }
                         }}
                       >
+                        {/* Always-visible UI columns */}
+                        <td style={{ padding: '8px', textAlign: 'center', borderRight: '1px solid #e8e8e8' }}>
+                          <input 
+                            type="checkbox" 
+                            checked={selectedAlbumIds.has(album.id)}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              const newSet = new Set(selectedAlbumIds);
+                              if (newSet.has(album.id)) {
+                                newSet.delete(album.id);
+                              } else {
+                                newSet.add(album.id);
+                              }
+                              setSelectedAlbumIds(newSet);
+                            }}
+                          />
+                        </td>
+                        <td style={{ padding: '8px', textAlign: 'center', borderRight: '1px solid #e8e8e8', color: '#22c55e', fontSize: '16px' }}>
+                          ✓
+                        </td>
+                        <td style={{ padding: '8px', textAlign: 'center', borderRight: '1px solid #e8e8e8', color: album.for_sale ? '#22c55e' : '#ddd', fontSize: '14px' }}>
+                          {album.for_sale ? '$' : ''}
+                        </td>
+                        <td style={{ padding: '8px', textAlign: 'center', borderRight: '1px solid #e8e8e8' }}>
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              // TODO: Open edit modal
+                            }}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              fontSize: '14px',
+                              color: '#666',
+                              padding: '4px'
+                            }}
+                            title="Edit album"
+                          >
+                            ✏
+                          </button>
+                        </td>
+                        
+                        {/* Selectable columns */}
                         {visibleColumnDefs.map(col => (
                           <td
                             key={col.id}
