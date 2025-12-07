@@ -2,7 +2,6 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import { Album } from '../types/album';
 import { ColumnId } from '../app/edit-collection/columnDefinitions';
 
@@ -75,18 +74,20 @@ export default function CollectionTable({
   // Render header cell
   const renderHeaderCell = (columnId: ColumnId) => {
     const baseStyle = {
-      padding: '12px 8px',
+      padding: '6px 8px',
       textAlign: 'center' as const,
       fontWeight: 600,
-      fontSize: 11,
+      fontSize: '11px',
       color: '#6b7280',
-      borderBottom: '2px solid #e5e7eb'
+      borderBottom: '2px solid #e5e7eb',
+      borderRight: '1px solid #e5e7eb',
+      background: '#fafafa'
     };
 
     const leftStyle = {
       ...baseStyle,
       textAlign: 'left' as const,
-      padding: '12px 16px'
+      padding: '6px 16px'
     };
 
     const sortableStyle = {
@@ -152,14 +153,18 @@ export default function CollectionTable({
   // Render data cell
   const renderDataCell = (columnId: ColumnId, album: Album) => {
     const baseCell = {
-      padding: '8px',
+      padding: '6px 8px',
       textAlign: 'center' as const,
-      borderBottom: '1px solid #f3f4f6'
+      borderBottom: '1px solid #f3f4f6',
+      borderRight: '1px solid #f3f4f6',
+      fontSize: '12px'
     };
 
     const leftCell = {
-      padding: '12px 16px',
-      borderBottom: '1px solid #f3f4f6'
+      padding: '6px 16px',
+      borderBottom: '1px solid #f3f4f6',
+      borderRight: '1px solid #f3f4f6',
+      fontSize: '12px'
     };
 
     switch (columnId) {
@@ -193,31 +198,7 @@ export default function CollectionTable({
       case 'image':
         return (
           <td key={columnId} style={baseCell}>
-            {album.image_url ? (
-              <div style={{
-                width: 40,
-                height: 40,
-                backgroundImage: `url(${album.image_url})`,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-                borderRadius: 2,
-                border: '1px solid #e5e7eb'
-              }} />
-            ) : (
-              <div style={{
-                width: 40,
-                height: 40,
-                background: '#f3f4f6',
-                borderRadius: 2,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#9ca3af',
-                fontSize: 18
-              }}>
-                🎵
-              </div>
-            )}
+            <span style={{ fontSize: 18 }}>💿</span>
           </td>
         );
       
@@ -233,24 +214,15 @@ export default function CollectionTable({
       case 'title':
         return (
           <td key={columnId} style={leftCell}>
-            <Link
-              href={`/admin/edit-entry/${album.id}`}
-              onClick={(e) => e.stopPropagation()}
+            <span
               style={{
                 color: '#2563eb',
-                textDecoration: 'none',
                 fontSize: 13,
                 fontWeight: 500
               }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.textDecoration = 'underline';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.textDecoration = 'none';
-              }}
             >
               {album.title}
-            </Link>
+            </span>
           </td>
         );
       
@@ -354,8 +326,8 @@ export default function CollectionTable({
 
   return (
     <div style={{ overflowX: 'auto', overflowY: 'auto', height: '100%' }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-        <thead style={{ position: 'sticky', top: 0, background: '#f9fafb', zIndex: 10 }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, border: '1px solid #e5e7eb' }}>
+        <thead style={{ position: 'sticky', top: 0, background: '#f9fafb', zIndex: 1 }}>
           <tr>
             {visibleColumns.map(col => renderHeaderCell(col))}
           </tr>
