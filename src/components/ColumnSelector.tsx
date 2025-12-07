@@ -1,428 +1,322 @@
-// src/components/ColumnSelector.tsx
+// src/components/CollectionTable.tsx
 'use client';
 
-import { useState } from 'react';
-import { ColumnId, COLUMN_DEFINITIONS, COLUMN_GROUPS, canHideColumn } from '../app/edit-collection/columnDefinitions';
+import React, { useState, useMemo } from 'react';
+import { Album } from '../types/album';
+import { 
+  ColumnId, 
+  ColumnDefinition,
+  getVisibleColumns 
+} from '../app/edit-collection/columnDefinitions';
 
-interface ColumnSelectorProps {
+interface CollectionTableProps {
+  albums: Album[];
+  onAlbumClick: (album: Album) => void;
+  selectedAlbums: Set<string>;
+  onSelectionChange: (albumIds: Set<string>) => void;
   visibleColumns: ColumnId[];
-  onColumnsChange: (columns: ColumnId[]) => void;
-  onClose: () => void;
 }
 
-export default function ColumnSelector({ visibleColumns, onColumnsChange, onClose }: ColumnSelectorProps) {
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
-    new Set(['main', 'details', 'edition']) // Main groups expanded by default
-  );
-  const [searchQuery, setSearchQuery] = useState('');
-  const [tempVisibleColumns, setTempVisibleColumns] = useState<ColumnId[]>(visibleColumns);
+type SortConfig = {
+  key: keyof Album | null;
+  direction: 'asc' | 'desc';
+};
 
-  const toggleGroup = (groupId: string) => {
-    setExpandedGroups(prev => {
-      const next = new Set(prev);
-      if (next.has(groupId)) {
-        next.delete(groupId);
-      } else {
-        next.add(groupId);
+export default function CollectionTable({
+  albums,
+  onAlbumClick,
+  selectedAlbums,
+  onSelectionChange,
+  visibleColumns
+}: CollectionTableProps) {
+  const [sortConfig, setSortConfig] = useState<SortConfig>({
+    key: 'artist',
+    direction: 'asc'
+  });
+
+  const columnDefs = useMemo(() => 
+    getVisibleColumns(visibleColumns), 
+    [visibleColumns]
+  );
+
+  const handleSort = (column: ColumnDefinition) => {
+    if (!column.sortable) return;
+
+    setSortConfig(current => ({
+      key: column.field as keyof Album,
+      direction: 
+        current.key === column.field && current.direction === 'asc' 
+          ? 'desc' 
+          : 'asc'
+    }));
+  };
+
+  const sortedAlbums = useMemo(() => {
+    if (!sortConfig.key) return albums;
+
+    return [...albums].sort((a, b) => {
+      const aVal = a[sortConfig.key!];
+      const bVal = b[sortConfig.key!];
+
+      if (aVal === null || aVal === undefined) return 1;
+      if (bVal === null || bVal === undefined) return -1;
+
+      let comparison = 0;
+      if (typeof aVal === 'string' && typeof bVal === 'string') {
+        comparison = aVal.localeCompare(bVal);
+      } else if (typeof aVal === 'number' && typeof bVal === 'number') {
+        comparison = aVal - bVal;
       }
-      return next;
+
+      return sortConfig.direction === 'asc' ? comparison : -comparison;
+    });
+  }, [albums, sortConfig]);
+
+  const handleSelectAlbum = (albumId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    e.stopPropagation();
+    const newSelection = new Set(selectedAlbums);
+    if (e.target.checked) {
+      newSelection.add(albumId);
+    } else {
+      newSelection.delete(albumId);
+    }
+    onSelectionChange(newSelection);
+  };
+
+  const formatLength = (seconds: number | null): string => {
+    if (!seconds) return '—';
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const formatGenres = (genres: string[] | null): string => {
+    if (!genres || genres.length === 0) return '—';
+    return genres.join(', ');
+  };
+
+  const formatDate = (dateString: string | null): string => {
+    if (!dateString) return '—';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric', 
+      year: 'numeric' 
     });
   };
 
-  const toggleColumn = (columnId: ColumnId) => {
-    if (!canHideColumn(columnId)) return;
-    
-    if (tempVisibleColumns.includes(columnId)) {
-      setTempVisibleColumns(tempVisibleColumns.filter(id => id !== columnId));
-    } else {
-      setTempVisibleColumns([...tempVisibleColumns, columnId]);
+  const formatYear = (dateString: string | null): string => {
+    if (!dateString) return '—';
+    const date = new Date(dateString);
+    return date.getFullYear().toString();
+  };
+
+  const renderCellContent = (album: Album, column: ColumnDefinition) => {
+    switch (column.id) {
+      // System columns
+      case 'checkbox':
+        return (
+          <input
+            type="checkbox"
+            checked={selectedAlbums.has(String(album.id))}
+            onChange={(e) => handleSelectAlbum(String(album.id), e)}
+            onClick={(e) => e.stopPropagation()}
+          />
+        );
+
+      case 'owned':
+        return ''; // TODO: Add owned field to Album type
+
+      case 'for_sale':
+        return ''; // TODO: Add for_sale field to Album type
+
+      // Main columns
+      case 'artist':
+        return album.artist || '—';
+
+      case 'title':
+        return (
+          <span
+            style={{
+              color: '#3b82f6',
+              cursor: 'pointer',
+              textDecoration: 'none'
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onAlbumClick(album);
+            }}
+          >
+            {album.title}
+          </span>
+        );
+
+      case 'release_date':
+        return album.year || '—';
+
+      case 'genre':
+        return formatGenres(album.discogs_genres);
+
+      case 'format':
+        return album.format || '—';
+
+      case 'label':
+        return album.spotify_label || '—';
+
+      case 'barcode':
+        return album.barcode || '—';
+
+      case 'cat_no':
+        return '—';
+
+      case 'sort_title':
+        return album.title || '—';
+
+      case 'subtitle':
+        return '—';
+
+      // Edition columns
+      case 'discs':
+        return album.discs || '—';
+
+      case 'tracks':
+        return album.spotify_total_tracks || '—';
+
+      case 'length':
+        return formatLength(album.length_seconds);
+
+      // Personal columns
+      case 'added_date':
+        return formatDate(album.date_added);
+
+      case 'added_year':
+        return formatYear(album.date_added);
+
+      case 'collection_status':
+        return '—'; // TODO: Add owned field to Album type
+
+      case 'modified_date':
+        return formatDate(album.date_added);
+
+      case 'notes':
+        return album.notes ? album.notes.substring(0, 50) + '...' : '—';
+
+      case 'tags':
+        return '—';
+
+      // Details columns (placeholders - add real fields when available)
+      case 'box_set':
+      case 'country':
+      case 'is_live':
+      case 'media_condition':
+      case 'packaging':
+      case 'studio':
+      case 'vinyl_color':
+      case 'vinyl_weight':
+      case 'current_value':
+      case 'ebay_link':
+      case 'last_played':
+      case 'location':
+      case 'my_rating':
+      case 'owner':
+      case 'play_count':
+      case 'purchase_date':
+      case 'purchase_price':
+      case 'purchase_store':
+      case 'purchase_year':
+      case 'quantity':
+        return '—';
+
+      default:
+        return '—';
     }
   };
 
-  const handleSave = () => {
-    onColumnsChange(tempVisibleColumns);
-    onClose();
+  const getSortIndicator = (column: ColumnDefinition) => {
+    if (!column.sortable) return null;
+    if (sortConfig.key !== column.field) return null;
+    return sortConfig.direction === 'asc' ? ' ▲' : ' ▼';
   };
-
-  const handleCancel = () => {
-    setTempVisibleColumns(visibleColumns);
-    onClose();
-  };
-
-  const handleReset = () => {
-    // Reset to all 14 default columns
-    const defaultCols: ColumnId[] = [
-      'checkbox', 'owned', 'for_sale', 'image',
-      'artist', 'title', 'release_date', 'format',
-      'discs', 'tracks', 'length', 'genre', 'label', 'added_date'
-    ];
-    setTempVisibleColumns(defaultCols);
-  };
-
-  // Get currently visible column definitions for right panel
-  const currentlyVisible = tempVisibleColumns
-    .map(id => COLUMN_DEFINITIONS[id])
-    .filter(Boolean);
-
-  // Filter groups by search query
-  const filteredGroups = searchQuery 
-    ? COLUMN_GROUPS.map(group => {
-        const filteredColumns = group.columns.filter(colId => {
-          const col = COLUMN_DEFINITIONS[colId];
-          return col?.label.toLowerCase().includes(searchQuery.toLowerCase());
-        });
-        return filteredColumns.length > 0 ? { ...group, columns: filteredColumns } : null;
-      }).filter(Boolean)
-    : COLUMN_GROUPS;
 
   return (
-    <>
-      {/* Backdrop */}
-      <div
-        onClick={handleCancel}
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0, 0, 0, 0.5)',
-          zIndex: 9998
-        }}
-      />
-
-      {/* Modal */}
-      <div style={{
-        position: 'fixed',
-        top: '50%',
-        left: '50%',
-        transform: 'translate(-50%, -50%)',
-        background: 'white',
-        borderRadius: '8px',
-        width: '900px',
-        maxHeight: '80vh',
-        zIndex: 9999,
-        display: 'flex',
-        flexDirection: 'column',
-        boxShadow: '0 10px 40px rgba(0,0,0,0.3)'
+    <div style={{ 
+      width: '100%', 
+      overflowX: 'auto',
+      border: '1px solid #e5e7eb',
+      borderRadius: '4px'
+    }}>
+      <table style={{ 
+        width: '100%', 
+        borderCollapse: 'collapse',
+        fontSize: '12px'
       }}>
-        {/* Header - CLZ Orange */}
-        <div style={{
-          background: '#FF8C42',
-          color: 'white',
-          padding: '16px 20px',
-          borderRadius: '8px 8px 0 0',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
-          <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>
-            Select Column Fields
-          </h3>
-          <button
-            onClick={handleCancel}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'white',
-              fontSize: '24px',
-              cursor: 'pointer',
-              padding: '0 4px',
-              lineHeight: '1'
-            }}
-          >
-            ×
-          </button>
-        </div>
-
-        {/* Body - Two Panel Layout */}
-        <div style={{
-          display: 'flex',
-          flex: 1,
-          overflow: 'hidden',
-          minHeight: 0
-        }}>
-          {/* Left Panel: Available Columns */}
-          <div style={{
-            flex: 1,
-            borderRight: '1px solid #ddd',
-            display: 'flex',
-            flexDirection: 'column'
-          }}>
-            {/* Search */}
-            <div style={{ padding: '16px', borderBottom: '1px solid #ddd' }}>
-              <div style={{ position: 'relative' }}>
-                <span style={{
-                  position: 'absolute',
-                  left: '12px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  color: '#999',
-                  fontSize: '14px'
-                }}>
-                  🔍
-                </span>
-                <input
-                  type="text"
-                  placeholder="Search columns..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+        <thead>
+          <tr>
+            {columnDefs.map((column) => (
+              <th
+                key={column.id}
+                onClick={() => handleSort(column)}
+                style={{
+                  padding: '6px',
+                  textAlign: column.align || 'left',
+                  backgroundColor: '#fafafa',
+                  fontWeight: 'bold',
+                  fontSize: '11px',
+                  borderRight: '1px solid #e5e7eb',
+                  borderBottom: '1px solid #e5e7eb',
+                  cursor: column.sortable ? 'pointer' : 'default',
+                  position: 'sticky',
+                  top: 0,
+                  zIndex: 1,
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                {column.label}
+                {getSortIndicator(column)}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {sortedAlbums.map((album) => (
+            <tr
+              key={album.id}
+              style={{
+                cursor: 'pointer',
+                backgroundColor: selectedAlbums.has(String(album.id)) ? '#eff6ff' : 'transparent'
+              }}
+              onMouseEnter={(e) => {
+                if (!selectedAlbums.has(String(album.id))) {
+                  e.currentTarget.style.backgroundColor = '#f9fafb';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!selectedAlbums.has(String(album.id))) {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }
+              }}
+            >
+              {columnDefs.map((column) => (
+                <td
+                  key={column.id}
                   style={{
-                    width: '100%',
-                    padding: '8px 12px 8px 36px',
-                    border: '1px solid #ddd',
-                    borderRadius: '4px',
-                    fontSize: '14px',
-                    outline: 'none'
+                    padding: '6px',
+                    textAlign: column.align || 'left',
+                    fontSize: '12px',
+                    borderRight: '1px solid #f3f4f6',
+                    borderBottom: '1px solid #f3f4f6',
+                    whiteSpace: column.id === 'title' || column.id === 'notes' ? 'normal' : 'nowrap',
+                    overflow: column.id === 'title' || column.id === 'notes' ? 'visible' : 'hidden',
+                    textOverflow: column.id === 'title' || column.id === 'notes' ? 'clip' : 'ellipsis'
                   }}
-                />
-              </div>
-            </div>
-
-            {/* Group List */}
-            <div style={{
-              flex: 1,
-              overflowY: 'auto',
-              padding: '8px'
-            }}>
-              {filteredGroups.map(group => {
-                if (!group) return null;
-                const groupColumns = group.columns
-                  .map(colId => COLUMN_DEFINITIONS[colId])
-                  .filter(Boolean);
-                const isExpanded = expandedGroups.has(group.id);
-
-                return (
-                  <div key={group.id} style={{ marginBottom: '4px' }}>
-                    {/* Group Header */}
-                    <button
-                      onClick={() => toggleGroup(group.id)}
-                      style={{
-                        width: '100%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        padding: '8px 12px',
-                        background: isExpanded ? '#2C2C2C' : '#3a3a3a',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        fontSize: '13px',
-                        fontWeight: 600,
-                        textAlign: 'left'
-                      }}
-                    >
-                      <span style={{ 
-                        fontSize: '10px',
-                        transition: 'transform 0.2s',
-                        transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)'
-                      }}>
-                        ▶
-                      </span>
-                      <span>{group.icon}</span>
-                      <span>{group.label}</span>
-                    </button>
-
-                    {/* Column Checkboxes */}
-                    {isExpanded && (
-                      <div style={{ paddingLeft: '28px', paddingTop: '4px' }}>
-                        {groupColumns.map(col => {
-                          if (!col) return null;
-                          const isVisible = tempVisibleColumns.includes(col.id);
-                          const isDisabled = !canHideColumn(col.id);
-                          
-                          return (
-                            <label
-                              key={col.id}
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '8px',
-                                padding: '6px 8px',
-                                cursor: isDisabled ? 'not-allowed' : 'pointer',
-                                fontSize: '13px',
-                                borderRadius: '3px',
-                                marginBottom: '2px',
-                                opacity: isDisabled ? 0.6 : 1
-                              }}
-                              onMouseEnter={(e) => {
-                                if (!isDisabled) {
-                                  e.currentTarget.style.background = '#f5f5f5';
-                                }
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.background = 'transparent';
-                              }}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={isVisible}
-                                onChange={() => toggleColumn(col.id)}
-                                disabled={isDisabled}
-                                style={{ cursor: isDisabled ? 'not-allowed' : 'pointer' }}
-                              />
-                              <span>{col.label}</span>
-                              {isDisabled && <span style={{ fontSize: '11px', color: '#999' }}>(always visible)</span>}
-                            </label>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Right Panel: Currently Visible Columns */}
-          <div style={{
-            width: '300px',
-            background: '#fafafa',
-            display: 'flex',
-            flexDirection: 'column'
-          }}>
-            <div style={{
-              padding: '16px',
-              borderBottom: '1px solid #ddd',
-              background: 'white'
-            }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                marginBottom: '8px'
-              }}>
-                <span style={{ fontSize: '14px', fontWeight: 600, color: '#333' }}>
-                  ☰ My List View columns
-                </span>
-              </div>
-              <div style={{ fontSize: '12px', color: '#666' }}>
-                {currentlyVisible.length} columns selected
-              </div>
-            </div>
-
-            <div style={{
-              flex: 1,
-              overflowY: 'auto',
-              padding: '8px'
-            }}>
-              {currentlyVisible.length === 0 ? (
-                <div style={{
-                  textAlign: 'center',
-                  color: '#999',
-                  fontSize: '13px',
-                  padding: '20px'
-                }}>
-                  No columns selected
-                </div>
-              ) : (
-                currentlyVisible.map(col => {
-                  if (!col) return null;
-                  const isRemovable = canHideColumn(col.id);
-                  
-                  return (
-                    <div
-                      key={col.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '8px 12px',
-                        background: 'white',
-                        border: '1px solid #e0e0e0',
-                        borderRadius: '4px',
-                        marginBottom: '4px',
-                        fontSize: '13px'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span>☰</span>
-                        <span>{col.label}</span>
-                        {!isRemovable && <span style={{ fontSize: '11px', color: '#999' }}>(locked)</span>}
-                      </div>
-                      {isRemovable && (
-                        <button
-                          onClick={() => toggleColumn(col.id)}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            color: '#999',
-                            cursor: 'pointer',
-                            fontSize: '16px',
-                            padding: '0 4px',
-                            lineHeight: '1'
-                          }}
-                          title="Remove column"
-                        >
-                          ✕
-                        </button>
-                      )}
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div style={{
-          padding: '16px 20px',
-          borderTop: '1px solid #ddd',
-          background: '#fafafa',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
-          <button
-            onClick={handleReset}
-            style={{
-              padding: '8px 16px',
-              background: 'white',
-              border: '1px solid #ddd',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '13px',
-              color: '#666'
-            }}
-          >
-            Reset to Default
-          </button>
-          
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button
-              onClick={handleCancel}
-              style={{
-                padding: '8px 20px',
-                background: 'white',
-                border: '1px solid #ddd',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '13px',
-                color: '#666'
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSave}
-              style={{
-                padding: '8px 20px',
-                background: '#5BA3D0',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '13px',
-                color: 'white',
-                fontWeight: 500
-              }}
-            >
-              Save
-            </button>
-          </div>
-        </div>
-      </div>
-    </>
+                >
+                  {renderCellContent(album, column)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
