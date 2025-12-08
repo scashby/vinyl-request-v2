@@ -50,7 +50,6 @@ const SORT_OPTIONS: { value: SortOption; label: string; category: string }[] = [
   { value: 'sale-price-asc', label: 'Lowest Price', category: 'Sales' }
 ];
 
-// CRITICAL FIX #4: Memoized info panel - always mounted, only content updates
 const AlbumInfoPanel = memo(function AlbumInfoPanel({ album }: { album: Album | null }) {
   if (!album) {
     return (
@@ -101,6 +100,7 @@ const AlbumInfoPanel = memo(function AlbumInfoPanel({ album }: { album: Album | 
             marginBottom: '12px',
             border: '1px solid #ddd'
           }}
+          unoptimized
         />
       ) : (
         <div style={{
@@ -196,7 +196,6 @@ function CollectionBrowserPage() {
   const [sortBy, setSortBy] = useState<SortOption>('artist-asc');
   const [showSortDropdown, setShowSortDropdown] = useState(false);
 
-  // CRITICAL FIX #3: Table column sorting state
   const [tableSortState, setTableSortState] = useState<SortState>({
     column: null,
     direction: null
@@ -237,7 +236,6 @@ function CollectionBrowserPage() {
     setTableSortState({ column: null, direction: null });
   }, []);
 
-  // CRITICAL FIX #3: Table column sort handler
   const handleTableSortChange = useCallback((column: ColumnId) => {
     setTableSortState(prev => {
       if (prev.column === column) {
@@ -286,7 +284,6 @@ function CollectionBrowserPage() {
     loadAlbums();
   }, [loadAlbums]);
 
-  // Performance: Memoize filtered/sorted albums
   const filteredAndSortedAlbums = useMemo(() => {
     let filtered = albums.filter(album => {
       if (collectionFilter === 'For Sale' && !album.for_sale) return false;
@@ -323,7 +320,6 @@ function CollectionBrowserPage() {
       return true;
     });
 
-    // Table sort takes precedence
     if (tableSortState.column && tableSortState.direction) {
       const { column, direction } = tableSortState;
       const multiplier = direction === 'asc' ? 1 : -1;
@@ -377,6 +373,13 @@ function CollectionBrowserPage() {
     return filtered;
   }, [albums, collectionFilter, selectedLetter, selectedFolderValue, folderMode, searchQuery, sortBy, tableSortState]);
 
+  // Auto-select first album when filtered list changes
+  useEffect(() => {
+    if (filteredAndSortedAlbums.length > 0 && !selectedAlbumId) {
+      setSelectedAlbumId(filteredAndSortedAlbums[0].id);
+    }
+  }, [filteredAndSortedAlbums, selectedAlbumId]);
+
   const folderCounts = useMemo(() => {
     return albums.reduce((acc, album) => {
       const itemKey = album.format || 'Unknown';
@@ -419,7 +422,6 @@ function CollectionBrowserPage() {
     setSelectedAlbumIds(new Set(Array.from(albumIds).map(id => Number(id))));
   }, []);
 
-  // CRITICAL PERFORMANCE FIX: Memoize selectedAlbums Set to prevent re-creating on every render
   const selectedAlbumsAsStrings = useMemo(() => {
     return new Set(Array.from(selectedAlbumIds).map(id => String(id)));
   }, [selectedAlbumIds]);
@@ -1162,7 +1164,7 @@ function CollectionBrowserPage() {
               </div>
             </div>
 
-            <div style={{ flex: 1, overflow: 'auto', background: '#fff', minHeight: 0 }}>
+            <div style={{ flex: 1, overflow: 'hidden', background: '#fff', minHeight: 0 }}>
               {loading ? (
                 <div style={{ padding: '40px', textAlign: 'center', color: '#666' }}>
                   Loading albums...
@@ -1181,7 +1183,6 @@ function CollectionBrowserPage() {
             </div>
           </div>
 
-          {/* CRITICAL FIX #4: Right panel ALWAYS visible */}
           <div style={{
             width: '380px',
             background: '#fff',
@@ -1212,7 +1213,7 @@ function CollectionBrowserPage() {
                   cursor: 'pointer',
                   fontSize: '14px',
                   color: 'white'
-                }}>✏️</button>
+                }}>✏</button>
 
                 <button 
                   title="Share album"

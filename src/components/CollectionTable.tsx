@@ -1,8 +1,8 @@
 // src/components/CollectionTable.tsx
 'use client';
 
-import React, { memo, useCallback, useMemo, useRef } from 'react';
-import { FixedSizeList as List } from 'react-window';
+import React, { memo, useCallback, useMemo } from 'react';
+import { List } from 'react-window';
 import { Album } from '../types/album';
 import { 
   ColumnId, 
@@ -31,9 +31,6 @@ const CollectionTable = memo(function CollectionTable({
   sortState,
   onSortChange
 }: CollectionTableProps) {
-  const listRef = useRef<List>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  
   const columns = useMemo(() => getVisibleColumns(visibleColumns), [visibleColumns]);
 
   const formatters = useMemo(() => {
@@ -176,7 +173,17 @@ const CollectionTable = memo(function CollectionTable({
     return sortState.direction === 'asc' ? ' ▲' : ' ▼';
   }, [sortState]);
 
-  const Row = useCallback(({ index, style }: { index: number; style: React.CSSProperties }) => {
+  const rowComponentData = useMemo(() => ({
+    albums,
+    columns,
+    formatters,
+    selectedAlbums,
+    onAlbumClick,
+    onSelectionChange
+  }), [albums, columns, formatters, selectedAlbums, onAlbumClick, onSelectionChange]);
+
+  const RowComponent = useCallback((props: { index: number; style: React.CSSProperties } & typeof rowComponentData) => {
+    const { index, style, albums, columns, formatters, selectedAlbums, onAlbumClick, onSelectionChange } = props;
     const album = albums[index];
     const albumId = String(album.id);
     const isSelected = selectedAlbums.has(albumId);
@@ -248,10 +255,10 @@ const CollectionTable = memo(function CollectionTable({
         ))}
       </div>
     );
-  }, [albums, selectedAlbums, columns, formatters, onAlbumClick, onSelectionChange]);
+  }, []);
 
   return (
-    <div ref={containerRef} style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div style={{
         display: 'flex',
         alignItems: 'center',
@@ -313,16 +320,13 @@ const CollectionTable = memo(function CollectionTable({
         ))}
       </div>
       
-      <div style={{ flex: 1, overflow: 'hidden' }}>
+      <div style={{ flex: 1 }}>
         <List
-          ref={listRef}
-          height={containerRef.current?.clientHeight ? containerRef.current.clientHeight - 42 : 600}
-          itemCount={albums.length}
-          itemSize={ROW_HEIGHT}
-          width="100%"
-        >
-          {Row}
-        </List>
+          rowCount={albums.length}
+          rowHeight={ROW_HEIGHT}
+          rowComponent={RowComponent}
+          rowProps={rowComponentData}
+        />
       </div>
     </div>
   );

@@ -2,6 +2,23 @@
 'use client';
 
 import { useState, useMemo, memo } from 'react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { ColumnId, COLUMN_DEFINITIONS, COLUMN_GROUPS, DEFAULT_VISIBLE_COLUMNS } from '../app/edit-collection/columnDefinitions';
 
 interface ColumnSelectorProps {
@@ -10,13 +27,90 @@ interface ColumnSelectorProps {
   onClose: () => void;
 }
 
-// Performance: Memoize the entire component to prevent unnecessary re-renders
+interface SortableItemProps {
+  id: ColumnId;
+  label: string;
+  onRemove: (id: ColumnId) => void;
+}
+
+const SortableItem = memo(function SortableItem({ id, label, onRemove }: SortableItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '8px 12px',
+          background: 'white',
+          border: '1px solid #e0e0e0',
+          borderRadius: '4px',
+          marginBottom: '4px',
+          fontSize: '13px',
+          color: '#333',
+          cursor: isDragging ? 'grabbing' : 'grab'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ color: '#999', cursor: 'grab' }}>☰</span>
+          <span style={{ color: '#333' }}>{label}</span>
+        </div>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove(id);
+          }}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: '#999',
+            cursor: 'pointer',
+            fontSize: '16px',
+            padding: '0 4px',
+            lineHeight: '1'
+          }}
+          title="Remove column"
+        >
+          ✕
+        </button>
+      </div>
+    </div>
+  );
+});
+
 const ColumnSelector = memo(function ColumnSelector({ visibleColumns, onColumnsChange, onClose }: ColumnSelectorProps) {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
     new Set(['main', 'edition'])
   );
   const [searchQuery, setSearchQuery] = useState('');
   const [tempVisibleColumns, setTempVisibleColumns] = useState<ColumnId[]>(visibleColumns);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   const toggleGroup = (groupId: string) => {
     setExpandedGroups(prev => {
@@ -38,6 +132,18 @@ const ColumnSelector = memo(function ColumnSelector({ visibleColumns, onColumnsC
     }
   };
 
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      setTempVisibleColumns((items) => {
+        const oldIndex = items.indexOf(active.id as ColumnId);
+        const newIndex = items.indexOf(over.id as ColumnId);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    }
+  };
+
   const handleSave = () => {
     onColumnsChange(tempVisibleColumns);
     onClose();
@@ -51,14 +157,12 @@ const ColumnSelector = memo(function ColumnSelector({ visibleColumns, onColumnsC
     setTempVisibleColumns([...DEFAULT_VISIBLE_COLUMNS]);
   };
 
-  // Performance: Memoize expensive calculations
   const currentlyVisible = useMemo(() => {
     return tempVisibleColumns
       .map(id => COLUMN_DEFINITIONS[id])
       .filter(Boolean);
   }, [tempVisibleColumns]);
 
-  // Performance: Memoize filtered groups calculation
   const filteredGroups = useMemo(() => {
     if (!searchQuery) return COLUMN_GROUPS;
     
@@ -298,47 +402,28 @@ const ColumnSelector = memo(function ColumnSelector({ visibleColumns, onColumnsC
                   No columns selected
                 </div>
               ) : (
-                currentlyVisible.map(col => {
-                  if (!col) return null;
-                  
-                  return (
-                    <div
-                      key={col.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '8px 12px',
-                        background: 'white',
-                        border: '1px solid #e0e0e0',
-                        borderRadius: '4px',
-                        marginBottom: '4px',
-                        fontSize: '13px',
-                        color: '#333'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ color: '#999' }}>☰</span>
-                        <span style={{ color: '#333' }}>{col.label || col.id}</span>
-                      </div>
-                      <button
-                        onClick={() => toggleColumn(col.id)}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: '#999',
-                          cursor: 'pointer',
-                          fontSize: '16px',
-                          padding: '0 4px',
-                          lineHeight: '1'
-                        }}
-                        title="Remove column"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  );
-                })
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleDragEnd}
+                >
+                  <SortableContext
+                    items={tempVisibleColumns}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    {currentlyVisible.map(col => {
+                      if (!col) return null;
+                      return (
+                        <SortableItem
+                          key={col.id}
+                          id={col.id}
+                          label={col.label || col.id}
+                          onRemove={toggleColumn}
+                        />
+                      );
+                    })}
+                  </SortableContext>
+                </DndContext>
               )}
             </div>
           </div>
