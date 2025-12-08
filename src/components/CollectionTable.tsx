@@ -2,7 +2,6 @@
 'use client';
 
 import React, { memo, useCallback, useMemo } from 'react';
-import Image from 'next/image';
 import { Album } from '../types/album';
 import { 
   ColumnId, 
