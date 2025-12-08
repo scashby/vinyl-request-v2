@@ -2,6 +2,7 @@
 'use client';
 
 import React, { memo, useCallback, useMemo } from 'react';
+import Image from 'next/image';
 import { Album } from '../types/album';
 import { 
   ColumnId, 
@@ -83,7 +84,6 @@ const TableRow = memo(function TableRow({
     </tr>
   );
 }, (prevProps, nextProps) => {
-  // Custom comparison: only re-render if these specific props change
   return (
     prevProps.album.id === nextProps.album.id &&
     prevProps.isSelected === nextProps.isSelected &&
@@ -92,7 +92,7 @@ const TableRow = memo(function TableRow({
   );
 });
 
-export default function CollectionTable({
+function CollectionTable({
   albums,
   onAlbumClick,
   selectedAlbums,
@@ -104,7 +104,7 @@ export default function CollectionTable({
   
   const columns = useMemo(() => getVisibleColumns(visibleColumns), [visibleColumns]);
 
-  // CRITICAL: Stable formatters object
+  // CRITICAL: Stable formatters - mapped to ACTUAL Album type from src/types/album.ts
   const formatters = useMemo(() => {
     const formatLength = (seconds: number | null | undefined): string => {
       if (!seconds) return '—';
@@ -134,17 +134,14 @@ export default function CollectionTable({
     };
 
     return {
+      checkbox: () => null,
       owned: () => <span style={{ color: '#22c55e', fontSize: '14px' }}>✓</span>,
       for_sale_indicator: (album: Album) => album.for_sale ? <span style={{ color: '#f59e0b', fontSize: '14px' }}>$</span> : null,
       menu: () => <span style={{ color: '#2196F3', fontSize: '14px', cursor: 'pointer' }}>✏️</span>,
       artist: (album: Album) => album.artist || '—',
       title: (album: Album) => (
         <span 
-          style={{ 
-            color: '#0066cc', 
-            textDecoration: 'none',
-            cursor: 'pointer'
-          }}
+          style={{ color: '#0066cc', textDecoration: 'none', cursor: 'pointer' }}
           onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
           onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
         >
@@ -221,12 +218,10 @@ export default function CollectionTable({
       discogs_price_median: (album: Album) => formatCurrency(album.discogs_price_median),
       discogs_price_max: (album: Album) => formatCurrency(album.discogs_price_max),
       pricing_notes: (album: Album) => album.pricing_notes || '—',
-      spotify_popularity: (album: Album) => album.spotify_popularity || '—',
-      checkbox: () => null // Handled separately in TableRow
+      spotify_popularity: (album: Album) => album.spotify_popularity || '—'
     } as Record<string, (album: Album) => React.ReactNode>;
   }, []);
 
-  // CRITICAL: Stable callback references
   const handleSelectAll = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     e.stopPropagation();
     if (e.target.checked) {
@@ -319,7 +314,6 @@ export default function CollectionTable({
             const albumId = String(album.id);
             const isSelected = selectedAlbums.has(albumId);
             
-            // CRITICAL: Create stable callbacks per row
             const handleRowClick = () => onAlbumClick(album);
             const handleCheckboxClick = (e: React.ChangeEvent<HTMLInputElement>) => {
               e.stopPropagation();
@@ -350,3 +344,16 @@ export default function CollectionTable({
     </div>
   );
 }
+
+export default memo(CollectionTable, (prevProps, nextProps) => {
+  return (
+    prevProps.albums === nextProps.albums &&
+    prevProps.visibleColumns === nextProps.visibleColumns &&
+    prevProps.selectedAlbums === nextProps.selectedAlbums &&
+    prevProps.onAlbumClick === nextProps.onAlbumClick &&
+    prevProps.onSelectionChange === nextProps.onSelectionChange &&
+    prevProps.sortState.column === nextProps.sortState.column &&
+    prevProps.sortState.direction === nextProps.sortState.direction &&
+    prevProps.onSortChange === nextProps.onSortChange
+  );
+});

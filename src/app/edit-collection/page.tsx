@@ -419,6 +419,11 @@ function CollectionBrowserPage() {
     setSelectedAlbumIds(new Set(Array.from(albumIds).map(id => Number(id))));
   }, []);
 
+  // CRITICAL PERFORMANCE FIX: Memoize selectedAlbums Set to prevent re-creating on every render
+  const selectedAlbumsAsStrings = useMemo(() => {
+    return new Set(Array.from(selectedAlbumIds).map(id => String(id)));
+  }, [selectedAlbumIds]);
+
   return (
     <>
       <style>{`
@@ -1167,7 +1172,7 @@ function CollectionBrowserPage() {
                   albums={filteredAndSortedAlbums}
                   visibleColumns={visibleColumns}
                   onAlbumClick={handleAlbumClick}
-                  selectedAlbums={new Set(Array.from(selectedAlbumIds).map(id => String(id)))}
+                  selectedAlbums={selectedAlbumsAsStrings}
                   onSelectionChange={handleSelectionChange}
                   sortState={tableSortState}
                   onSortChange={handleTableSortChange}
