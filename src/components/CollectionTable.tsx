@@ -1,7 +1,8 @@
 // src/components/CollectionTable.tsx
 'use client';
 
-import React, { memo, useCallback, useMemo } from 'react';
+import React, { memo, useCallback, useMemo, useRef } from 'react';
+import { FixedSizeList as List } from 'react-window';
 import { Album } from '../types/album';
 import { 
   ColumnId, 
@@ -19,79 +20,9 @@ interface CollectionTableProps {
   onSortChange: (column: ColumnId) => void;
 }
 
-// CRITICAL: Memoize row with stable props
-const TableRow = memo(function TableRow({
-  album,
-  index,
-  isSelected,
-  onRowClick,
-  onCheckboxClick,
-  columns,
-  formatters
-}: {
-  album: Album;
-  index: number;
-  isSelected: boolean;
-  onRowClick: () => void;
-  onCheckboxClick: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  columns: ReturnType<typeof getVisibleColumns>;
-  formatters: Record<string, (album: Album) => React.ReactNode>;
-}) {
-  return (
-    <tr
-      onClick={onRowClick}
-      style={{
-        cursor: 'pointer',
-        backgroundColor: isSelected ? '#e3f2fd' : index % 2 === 0 ? 'white' : '#fafafa'
-      }}
-      onMouseEnter={(e) => {
-        if (!isSelected) {
-          e.currentTarget.style.backgroundColor = '#f5f5f5';
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (!isSelected) {
-          e.currentTarget.style.backgroundColor = index % 2 === 0 ? 'white' : '#fafafa';
-        }
-      }}
-    >
-      {columns.map(col => (
-        <td
-          key={col.id}
-          style={{
-            padding: '6px 8px',
-            borderRight: '1px solid #e0e0e0',
-            borderBottom: '1px solid #e0e0e0',
-            color: '#212529',
-            fontSize: '13px',
-            whiteSpace: 'nowrap'
-          }}
-        >
-          {col.id === 'checkbox' ? (
-            <input
-              type="checkbox"
-              checked={isSelected}
-              onChange={onCheckboxClick}
-              onClick={(e) => e.stopPropagation()}
-              style={{ cursor: 'pointer' }}
-            />
-          ) : (
-            formatters[col.id]?.(album) || '—'
-          )}
-        </td>
-      ))}
-    </tr>
-  );
-}, (prevProps, nextProps) => {
-  return (
-    prevProps.album.id === nextProps.album.id &&
-    prevProps.isSelected === nextProps.isSelected &&
-    prevProps.index === nextProps.index &&
-    prevProps.columns === nextProps.columns
-  );
-});
+const ROW_HEIGHT = 32;
 
-function CollectionTable({
+const CollectionTable = memo(function CollectionTable({
   albums,
   onAlbumClick,
   selectedAlbums,
@@ -100,10 +31,11 @@ function CollectionTable({
   sortState,
   onSortChange
 }: CollectionTableProps) {
+  const listRef = useRef<List>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   
   const columns = useMemo(() => getVisibleColumns(visibleColumns), [visibleColumns]);
 
-  // CRITICAL: Stable formatters - mapped to ACTUAL Album type from src/types/album.ts
   const formatters = useMemo(() => {
     const formatLength = (seconds: number | null | undefined): string => {
       if (!seconds) return '—';
@@ -136,7 +68,7 @@ function CollectionTable({
       checkbox: () => null,
       owned: () => <span style={{ color: '#22c55e', fontSize: '14px' }}>✓</span>,
       for_sale_indicator: (album: Album) => album.for_sale ? <span style={{ color: '#f59e0b', fontSize: '14px' }}>$</span> : null,
-      menu: () => <span style={{ color: '#2196F3', fontSize: '14px', cursor: 'pointer' }}>✏️</span>,
+      menu: () => <span style={{ color: '#2196F3', fontSize: '14px', cursor: 'pointer' }}>✏</span>,
       artist: (album: Album) => album.artist || '—',
       title: (album: Album) => (
         <span 
@@ -244,115 +176,164 @@ function CollectionTable({
     return sortState.direction === 'asc' ? ' ▲' : ' ▼';
   }, [sortState]);
 
-  return (
-    <div style={{ width: '100%', height: '100%', overflow: 'auto' }}>
-      <table style={{ 
-        width: '100%', 
-        borderCollapse: 'collapse',
-        fontSize: '13px',
-        border: '1px solid #e0e0e0'
-      }}>
-        <thead style={{ 
-          position: 'sticky', 
-          top: 0, 
-          background: '#e8e8e8',
-          zIndex: 10
-        }}>
-          <tr>
-            {columns.map(col => (
-              <th
-                key={col.id}
-                onClick={() => handleHeaderClick(col.id, col.sortable)}
-                style={{
-                  padding: '8px',
-                  textAlign: 'left',
-                  fontWeight: 600,
-                  color: '#212529',
-                  borderRight: '1px solid #d0d0d0',
-                  borderBottom: '2px solid #d0d0d0',
-                  whiteSpace: 'nowrap',
-                  fontSize: '13px',
-                  cursor: col.sortable ? 'pointer' : 'default',
-                  userSelect: 'none'
-                }}
-              >
-                {col.id === 'checkbox' ? (
-                  <input
-                    type="checkbox"
-                    checked={allSelected}
-                    ref={input => {
-                      if (input) {
-                        input.indeterminate = someSelected;
-                      }
-                    }}
-                    onChange={handleSelectAll}
-                    onClick={(e) => e.stopPropagation()}
-                    style={{ cursor: 'pointer' }}
-                  />
-                ) : (
-                  <>
-                    {col.label}
-                    {col.sortable && (
-                      <span style={{ 
-                        color: sortState.column === col.id ? '#2196F3' : '#999',
-                        fontSize: '11px',
-                        marginLeft: '4px',
-                        fontWeight: 'bold'
-                      }}>
-                        {getSortIndicator(col.id) || '⇅'}
-                      </span>
-                    )}
-                  </>
-                )}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {albums.map((album, index) => {
-            const albumId = String(album.id);
-            const isSelected = selectedAlbums.has(albumId);
-            
-            const handleRowClick = () => onAlbumClick(album);
-            const handleCheckboxClick = (e: React.ChangeEvent<HTMLInputElement>) => {
-              e.stopPropagation();
-              const newSelected = new Set(selectedAlbums);
-              if (e.target.checked) {
-                newSelected.add(albumId);
-              } else {
-                newSelected.delete(albumId);
-              }
-              onSelectionChange(newSelected);
-            };
+  const Row = useCallback(({ index, style }: { index: number; style: React.CSSProperties }) => {
+    const album = albums[index];
+    const albumId = String(album.id);
+    const isSelected = selectedAlbums.has(albumId);
 
-            return (
-              <TableRow
-                key={album.id}
-                album={album}
-                index={index}
-                isSelected={isSelected}
-                onRowClick={handleRowClick}
-                onCheckboxClick={handleCheckboxClick}
-                columns={columns}
-                formatters={formatters}
+    const handleRowClick = () => onAlbumClick(album);
+    const handleCheckboxClick = (e: React.ChangeEvent<HTMLInputElement>) => {
+      e.stopPropagation();
+      const newSelected = new Set(selectedAlbums);
+      if (e.target.checked) {
+        newSelected.add(albumId);
+      } else {
+        newSelected.delete(albumId);
+      }
+      onSelectionChange(newSelected);
+    };
+
+    return (
+      <div
+        style={{
+          ...style,
+          display: 'flex',
+          alignItems: 'center',
+          cursor: 'pointer',
+          backgroundColor: isSelected ? '#e3f2fd' : index % 2 === 0 ? 'white' : '#fafafa',
+          borderBottom: '1px solid #e0e0e0'
+        }}
+        onClick={handleRowClick}
+        onMouseEnter={(e) => {
+          if (!isSelected) {
+            e.currentTarget.style.backgroundColor = '#f5f5f5';
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!isSelected) {
+            e.currentTarget.style.backgroundColor = index % 2 === 0 ? 'white' : '#fafafa';
+          }
+        }}
+      >
+        {columns.map(col => (
+          <div
+            key={col.id}
+            style={{
+              width: col.width,
+              minWidth: col.width,
+              maxWidth: col.width,
+              padding: '6px 8px',
+              borderRight: '1px solid #e0e0e0',
+              color: '#212529',
+              fontSize: '13px',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              display: 'flex',
+              alignItems: 'center'
+            }}
+          >
+            {col.id === 'checkbox' ? (
+              <input
+                type="checkbox"
+                checked={isSelected}
+                onChange={handleCheckboxClick}
+                onClick={(e) => e.stopPropagation()}
+                style={{ cursor: 'pointer' }}
               />
-            );
-          })}
-        </tbody>
-      </table>
+            ) : (
+              formatters[col.id]?.(album) || '—'
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  }, [albums, selectedAlbums, columns, formatters, onAlbumClick, onSelectionChange]);
+
+  return (
+    <div ref={containerRef} style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        background: '#e8e8e8',
+        borderBottom: '2px solid #d0d0d0',
+        position: 'sticky',
+        top: 0,
+        zIndex: 10
+      }}>
+        {columns.map(col => (
+          <div
+            key={col.id}
+            onClick={() => handleHeaderClick(col.id, col.sortable)}
+            style={{
+              width: col.width,
+              minWidth: col.width,
+              maxWidth: col.width,
+              padding: '8px',
+              fontWeight: 600,
+              color: '#212529',
+              borderRight: '1px solid #d0d0d0',
+              whiteSpace: 'nowrap',
+              fontSize: '13px',
+              cursor: col.sortable ? 'pointer' : 'default',
+              userSelect: 'none',
+              display: 'flex',
+              alignItems: 'center'
+            }}
+          >
+            {col.id === 'checkbox' ? (
+              <input
+                type="checkbox"
+                checked={allSelected}
+                ref={input => {
+                  if (input) {
+                    input.indeterminate = someSelected;
+                  }
+                }}
+                onChange={handleSelectAll}
+                onClick={(e) => e.stopPropagation()}
+                style={{ cursor: 'pointer' }}
+              />
+            ) : (
+              <>
+                {col.label}
+                {col.sortable && (
+                  <span style={{ 
+                    color: sortState.column === col.id ? '#2196F3' : '#999',
+                    fontSize: '11px',
+                    marginLeft: '4px',
+                    fontWeight: 'bold'
+                  }}>
+                    {getSortIndicator(col.id) || '⇅'}
+                  </span>
+                )}
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+      
+      <div style={{ flex: 1, overflow: 'hidden' }}>
+        <List
+          ref={listRef}
+          height={containerRef.current?.clientHeight ? containerRef.current.clientHeight - 42 : 600}
+          itemCount={albums.length}
+          itemSize={ROW_HEIGHT}
+          width="100%"
+        >
+          {Row}
+        </List>
+      </div>
     </div>
   );
-}
-
-export default memo(CollectionTable, (prevProps, nextProps) => {
+}, (prevProps, nextProps) => {
   return (
     prevProps.albums === nextProps.albums &&
     prevProps.visibleColumns === nextProps.visibleColumns &&
     prevProps.selectedAlbums === nextProps.selectedAlbums &&
-    prevProps.onAlbumClick === nextProps.onAlbumClick &&
-    prevProps.onSelectionChange === nextProps.onSelectionChange &&
     prevProps.sortState.column === nextProps.sortState.column &&
-    prevProps.sortState.direction === nextProps.sortState.direction &&
-    prevProps.onSortChange === nextProps.onSortChange
+    prevProps.sortState.direction === nextProps.sortState.direction
   );
 });
+
+export default CollectionTable;
