@@ -1,7 +1,7 @@
 // src/app/edit-collection/page.tsx
 'use client';
 
-import { useCallback, useEffect, useState, useMemo, Suspense } from 'react';
+import { useCallback, useEffect, useState, useMemo, Suspense, memo } from 'react';
 import Image from 'next/image';
 import { supabase } from '../../lib/supabaseClient';
 import CollectionTable from '../../components/CollectionTable';
@@ -51,7 +51,7 @@ const SORT_OPTIONS: { value: SortOption; label: string; category: string }[] = [
 ];
 
 // CRITICAL FIX #4: Memoized info panel - always mounted, only content updates
-const AlbumInfoPanel = ({ album }: { album: Album | null }) => {
+const AlbumInfoPanel = memo(function AlbumInfoPanel({ album }: { album: Album | null }) {
   if (!album) {
     return (
       <div style={{
@@ -174,7 +174,7 @@ const AlbumInfoPanel = ({ album }: { album: Album | null }) => {
       )}
     </div>
   );
-};
+});
 
 function CollectionBrowserPage() {
   const [albums, setAlbums] = useState<Album[]>([]);
