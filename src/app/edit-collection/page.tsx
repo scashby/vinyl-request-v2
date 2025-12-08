@@ -1,13 +1,12 @@
 // src/app/edit-collection/page.tsx
-
 'use client';
 
-import { useCallback, useEffect, useState, Suspense } from 'react';
+import { useCallback, useEffect, useState, useMemo, Suspense } from 'react';
 import Image from 'next/image';
 import { supabase } from '../../lib/supabaseClient';
 import CollectionTable from '../../components/CollectionTable';
 import ColumnSelector from '../../components/ColumnSelector';
-import { ColumnId, DEFAULT_VISIBLE_COLUMNS } from './columnDefinitions';
+import { ColumnId, DEFAULT_VISIBLE_COLUMNS, SortState } from './columnDefinitions';
 import { Album, toSafeStringArray, toSafeSearchString } from '../../types/album';
 
 type SortOption = 
@@ -51,6 +50,132 @@ const SORT_OPTIONS: { value: SortOption; label: string; category: string }[] = [
   { value: 'sale-price-asc', label: 'Lowest Price', category: 'Sales' }
 ];
 
+// CRITICAL FIX #4: Memoized info panel - always mounted, only content updates
+const AlbumInfoPanel = ({ album }: { album: Album | null }) => {
+  if (!album) {
+    return (
+      <div style={{
+        padding: '40px 20px',
+        textAlign: 'center',
+        color: '#999',
+        fontSize: '14px'
+      }}>
+        Select an album to view details
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ padding: '16px', flex: 1, overflowY: 'auto', background: '#F8DE77' }}>
+      <div style={{ fontSize: '14px', color: '#333', marginBottom: '4px' }}>
+        {album.artist}
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+        <h4 style={{ color: '#2196F3', margin: 0, fontSize: '18px', fontWeight: 600 }}>
+          {album.title}
+        </h4>
+        <div style={{
+          background: '#2196F3',
+          color: 'white',
+          borderRadius: '4px',
+          padding: '4px 8px',
+          fontSize: '16px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }} title="Album owned">✓</div>
+      </div>
+
+      {album.image_url ? (
+        <Image 
+          src={album.image_url} 
+          alt={`${album.artist} - ${album.title}`}
+          width={400}
+          height={400}
+          style={{
+            width: '100%',
+            height: 'auto',
+            aspectRatio: '1',
+            objectFit: 'cover',
+            marginBottom: '12px',
+            border: '1px solid #ddd'
+          }}
+        />
+      ) : (
+        <div style={{
+          width: '100%',
+          aspectRatio: '1',
+          background: '#fff',
+          marginBottom: '12px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#999',
+          fontSize: '48px',
+          border: '1px solid #ddd'
+        }}>🎵</div>
+      )}
+
+      <div style={{
+        fontSize: '16px',
+        fontWeight: 600,
+        color: '#333',
+        marginBottom: '8px'
+      }}>
+        {album.spotify_label || album.apple_music_label || 'Unknown Label'} 
+        {album.year && ` (${album.year})`}
+      </div>
+
+      {(album.discogs_genres || album.spotify_genres) && (
+        <div style={{
+          fontSize: '14px',
+          color: '#666',
+          marginBottom: '16px'
+        }}>
+          {toSafeStringArray(album.discogs_genres || album.spotify_genres).join(' | ')}
+        </div>
+      )}
+
+      <div style={{
+        fontSize: '14px',
+        color: '#333',
+        marginBottom: '16px',
+        fontWeight: 600
+      }}>
+        {album.format}
+        {album.spotify_total_tracks && ` | ${album.spotify_total_tracks} Tracks`}
+        {album.apple_music_track_count && ` | ${album.apple_music_track_count} Tracks`}
+      </div>
+
+      {album.media_condition && (
+        <div style={{ fontSize: '13px', color: '#666', marginBottom: '8px' }}>
+          <strong>Condition:</strong> {album.media_condition}
+        </div>
+      )}
+
+      {album.custom_tags && album.custom_tags.length > 0 && (
+        <div style={{ marginTop: '16px' }}>
+          <div style={{ fontSize: '13px', fontWeight: 600, color: '#333', marginBottom: '8px' }}>Tags:</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+            {toSafeStringArray(album.custom_tags).map(tag => (
+              <span key={tag} style={{
+                padding: '4px 10px',
+                background: '#8809AC',
+                color: 'white',
+                borderRadius: '12px',
+                fontSize: '12px'
+              }}>
+                {tag}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 function CollectionBrowserPage() {
   const [albums, setAlbums] = useState<Album[]>([]);
   const [loading, setLoading] = useState(true);
@@ -71,6 +196,12 @@ function CollectionBrowserPage() {
   const [sortBy, setSortBy] = useState<SortOption>('artist-asc');
   const [showSortDropdown, setShowSortDropdown] = useState(false);
 
+  // CRITICAL FIX #3: Table column sorting state
+  const [tableSortState, setTableSortState] = useState<SortState>({
+    column: null,
+    direction: null
+  });
+
   const [visibleColumns, setVisibleColumns] = useState<ColumnId[]>(DEFAULT_VISIBLE_COLUMNS);
   const [showColumnSelector, setShowColumnSelector] = useState(false);
 
@@ -87,10 +218,10 @@ function CollectionBrowserPage() {
     }
   }, []);
 
-  const handleColumnsChange = (columns: ColumnId[]) => {
+  const handleColumnsChange = useCallback((columns: ColumnId[]) => {
     setVisibleColumns(columns);
     localStorage.setItem('collection-visible-columns', JSON.stringify(columns));
-  };
+  }, []);
 
   useEffect(() => {
     const stored = localStorage.getItem('collection-sort-preference');
@@ -99,11 +230,26 @@ function CollectionBrowserPage() {
     }
   }, []);
 
-  const handleSortChange = (newSort: SortOption) => {
+  const handleSortChange = useCallback((newSort: SortOption) => {
     setSortBy(newSort);
     localStorage.setItem('collection-sort-preference', newSort);
     setShowSortDropdown(false);
-  };
+    setTableSortState({ column: null, direction: null });
+  }, []);
+
+  // CRITICAL FIX #3: Table column sort handler
+  const handleTableSortChange = useCallback((column: ColumnId) => {
+    setTableSortState(prev => {
+      if (prev.column === column) {
+        if (prev.direction === 'asc') {
+          return { column, direction: 'desc' };
+        } else if (prev.direction === 'desc') {
+          return { column: null, direction: null };
+        }
+      }
+      return { column, direction: 'asc' };
+    });
+  }, []);
 
   const loadAlbums = useCallback(async () => {
     setLoading(true);
@@ -140,8 +286,9 @@ function CollectionBrowserPage() {
     loadAlbums();
   }, [loadAlbums]);
 
-  const filteredAndSortedAlbums = albums
-    .filter(album => {
+  // Performance: Memoize filtered/sorted albums
+  const filteredAndSortedAlbums = useMemo(() => {
+    let filtered = albums.filter(album => {
       if (collectionFilter === 'For Sale' && !album.for_sale) return false;
       
       if (selectedLetter !== 'All') {
@@ -174,68 +321,103 @@ function CollectionBrowserPage() {
       }
 
       return true;
-    })
-    .sort((a, b) => {
-      switch (sortBy) {
-        case 'artist-asc': return (a.artist || '').localeCompare(b.artist || '');
-        case 'artist-desc': return (b.artist || '').localeCompare(a.artist || '');
-        case 'title-asc': return (a.title || '').localeCompare(b.title || '');
-        case 'title-desc': return (b.title || '').localeCompare(a.title || '');
-        case 'year-desc': return (b.year_int || 0) - (a.year_int || 0);
-        case 'year-asc': return (a.year_int || 0) - (b.year_int || 0);
-        case 'decade-desc': return (b.decade || 0) - (a.decade || 0);
-        case 'decade-asc': return (a.decade || 0) - (b.decade || 0);
-        case 'added-desc': return (b.date_added || '').localeCompare(a.date_added || '');
-        case 'added-asc': return (a.date_added || '').localeCompare(b.date_added || '');
-        case 'format-asc': return (a.format || '').localeCompare(b.format || '');
-        case 'format-desc': return (b.format || '').localeCompare(a.format || '');
-        case 'folder-asc': return (a.folder || '').localeCompare(b.folder || '');
-        case 'folder-desc': return (b.folder || '').localeCompare(a.folder || '');
-        case 'condition-asc': return (a.media_condition || '').localeCompare(b.media_condition || '');
-        case 'condition-desc': return (b.media_condition || '').localeCompare(a.media_condition || '');
-        case 'tags-count-desc': return toSafeStringArray(b.custom_tags).length - toSafeStringArray(a.custom_tags).length;
-        case 'tags-count-asc': return toSafeStringArray(a.custom_tags).length - toSafeStringArray(b.custom_tags).length;
-        case 'sale-price-desc': return (b.sale_price || 0) - (a.sale_price || 0);
-        case 'sale-price-asc': return (a.sale_price || 0) - (b.sale_price || 0);
-        case 'popularity-desc': return (b.spotify_popularity || 0) - (a.spotify_popularity || 0);
-        case 'popularity-asc': return (a.spotify_popularity || 0) - (b.spotify_popularity || 0);
-        case 'sides-desc':
-          const bSides = typeof b.sides === 'number' ? b.sides : 0;
-          const aSides = typeof a.sides === 'number' ? a.sides : 0;
-          return bSides - aSides;
-        case 'sides-asc':
-          const aSidesAsc = typeof a.sides === 'number' ? a.sides : 0;
-          const bSidesAsc = typeof b.sides === 'number' ? b.sides : 0;
-          return aSidesAsc - bSidesAsc;
-        default: return 0;
-      }
     });
 
-  const folderCounts = albums.reduce((acc, album) => {
-    const itemKey = album.format || 'Unknown';
-    acc[itemKey] = (acc[itemKey] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+    // Table sort takes precedence
+    if (tableSortState.column && tableSortState.direction) {
+      const { column, direction } = tableSortState;
+      const multiplier = direction === 'asc' ? 1 : -1;
+      
+      filtered = [...filtered].sort((a, b) => {
+        if (column === 'artist') {
+          return multiplier * (a.artist || '').localeCompare(b.artist || '');
+        } else if (column === 'title') {
+          return multiplier * (a.title || '').localeCompare(b.title || '');
+        }
+        return 0;
+      });
+    } else {
+      filtered = [...filtered].sort((a, b) => {
+        switch (sortBy) {
+          case 'artist-asc': return (a.artist || '').localeCompare(b.artist || '');
+          case 'artist-desc': return (b.artist || '').localeCompare(a.artist || '');
+          case 'title-asc': return (a.title || '').localeCompare(b.title || '');
+          case 'title-desc': return (b.title || '').localeCompare(a.title || '');
+          case 'year-desc': return (b.year_int || 0) - (a.year_int || 0);
+          case 'year-asc': return (a.year_int || 0) - (b.year_int || 0);
+          case 'decade-desc': return (b.decade || 0) - (a.decade || 0);
+          case 'decade-asc': return (a.decade || 0) - (b.decade || 0);
+          case 'added-desc': return (b.date_added || '').localeCompare(a.date_added || '');
+          case 'added-asc': return (a.date_added || '').localeCompare(b.date_added || '');
+          case 'format-asc': return (a.format || '').localeCompare(b.format || '');
+          case 'format-desc': return (b.format || '').localeCompare(a.format || '');
+          case 'folder-asc': return (a.folder || '').localeCompare(b.folder || '');
+          case 'folder-desc': return (b.folder || '').localeCompare(a.folder || '');
+          case 'condition-asc': return (a.media_condition || '').localeCompare(b.media_condition || '');
+          case 'condition-desc': return (b.media_condition || '').localeCompare(a.media_condition || '');
+          case 'tags-count-desc': return toSafeStringArray(b.custom_tags).length - toSafeStringArray(a.custom_tags).length;
+          case 'tags-count-asc': return toSafeStringArray(a.custom_tags).length - toSafeStringArray(b.custom_tags).length;
+          case 'sale-price-desc': return (b.sale_price || 0) - (a.sale_price || 0);
+          case 'sale-price-asc': return (a.sale_price || 0) - (b.sale_price || 0);
+          case 'popularity-desc': return (b.spotify_popularity || 0) - (a.spotify_popularity || 0);
+          case 'popularity-asc': return (a.spotify_popularity || 0) - (b.spotify_popularity || 0);
+          case 'sides-desc':
+            const bSides = typeof b.sides === 'number' ? b.sides : 0;
+            const aSides = typeof a.sides === 'number' ? a.sides : 0;
+            return bSides - aSides;
+          case 'sides-asc':
+            const aSidesAsc = typeof a.sides === 'number' ? a.sides : 0;
+            const bSidesAsc = typeof b.sides === 'number' ? b.sides : 0;
+            return aSidesAsc - bSidesAsc;
+          default: return 0;
+        }
+      });
+    }
 
-  const sortedFolderItems = Object.entries(folderCounts)
-    .sort((a, b) => {
-      if (folderSortByCount) {
-        return b[1] - a[1];
-      } else {
-        return a[0].localeCompare(b[0]);
-      }
-    })
-    .filter(([item]) => 
-      !folderSearch || item.toLowerCase().includes(folderSearch.toLowerCase())
-    );
+    return filtered;
+  }, [albums, collectionFilter, selectedLetter, selectedFolderValue, folderMode, searchQuery, sortBy, tableSortState]);
 
-  const selectedAlbum = albums.find(a => a.id === selectedAlbumId);
+  const folderCounts = useMemo(() => {
+    return albums.reduce((acc, album) => {
+      const itemKey = album.format || 'Unknown';
+      acc[itemKey] = (acc[itemKey] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+  }, [albums]);
 
-  const sortOptionsByCategory = SORT_OPTIONS.reduce((acc, opt) => {
-    if (!acc[opt.category]) acc[opt.category] = [];
-    acc[opt.category].push(opt);
-    return acc;
-  }, {} as Record<string, typeof SORT_OPTIONS>);
+  const sortedFolderItems = useMemo(() => {
+    return Object.entries(folderCounts)
+      .sort((a, b) => {
+        if (folderSortByCount) {
+          return b[1] - a[1];
+        } else {
+          return a[0].localeCompare(b[0]);
+        }
+      })
+      .filter(([item]) => 
+        !folderSearch || item.toLowerCase().includes(folderSearch.toLowerCase())
+      );
+  }, [folderCounts, folderSortByCount, folderSearch]);
+
+  const selectedAlbum = useMemo(() => {
+    return albums.find(a => a.id === selectedAlbumId) || null;
+  }, [albums, selectedAlbumId]);
+
+  const sortOptionsByCategory = useMemo(() => {
+    return SORT_OPTIONS.reduce((acc, opt) => {
+      if (!acc[opt.category]) acc[opt.category] = [];
+      acc[opt.category].push(opt);
+      return acc;
+    }, {} as Record<string, typeof SORT_OPTIONS>);
+  }, []);
+
+  const handleAlbumClick = useCallback((album: Album) => {
+    setSelectedAlbumId(album.id);
+  }, []);
+
+  const handleSelectionChange = useCallback((albumIds: Set<string>) => {
+    setSelectedAlbumIds(new Set(Array.from(albumIds).map(id => Number(id))));
+  }, []);
 
   return (
     <>
@@ -984,215 +1166,108 @@ function CollectionBrowserPage() {
                 <CollectionTable
                   albums={filteredAndSortedAlbums}
                   visibleColumns={visibleColumns}
-                  onAlbumClick={(album) => setSelectedAlbumId(album.id)}
+                  onAlbumClick={handleAlbumClick}
                   selectedAlbums={new Set(Array.from(selectedAlbumIds).map(id => String(id)))}
-                  onSelectionChange={(albumIds) => {
-                    setSelectedAlbumIds(new Set(Array.from(albumIds).map(id => Number(id))));
-                  }}
+                  onSelectionChange={handleSelectionChange}
+                  sortState={tableSortState}
+                  onSortChange={handleTableSortChange}
                 />
               )}
             </div>
           </div>
 
-          {selectedAlbum && (
+          {/* CRITICAL FIX #4: Right panel ALWAYS visible */}
+          <div style={{
+            width: '380px',
+            background: '#fff',
+            borderLeft: '1px solid #ddd',
+            overflow: 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+            flexShrink: 0
+          }}>
             <div style={{
-              width: '380px',
-              background: '#fff',
-              borderLeft: '1px solid #ddd',
-              overflow: 'auto',
+              padding: '6px 12px',
+              borderBottom: '1px solid #555',
               display: 'flex',
-              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              background: '#4a4a4a',
+              height: '40px',
               flexShrink: 0
             }}>
-              <div style={{
-                padding: '6px 12px',
-                borderBottom: '1px solid #555',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                background: '#4a4a4a',
-                height: '40px',
-                flexShrink: 0
-              }}>
-                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                  <button 
-                    title="Edit album details"
-                    style={{
-                    background: '#3a3a3a',
-                    border: '1px solid #555',
-                    padding: '6px 10px',
-                    borderRadius: '3px',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    color: 'white'
-                  }}>✏️</button>
-
-                  <button 
-                    title="Share album"
-                    style={{
-                    background: '#3a3a3a',
-                    border: '1px solid #555',
-                    padding: '6px 10px',
-                    borderRadius: '3px',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    color: 'white'
-                  }}>↗️</button>
-
-                  <button 
-                    title="Search on eBay"
-                    style={{
-                    background: '#3a3a3a',
-                    border: '1px solid #555',
-                    padding: '6px 10px',
-                    borderRadius: '3px',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    color: 'white',
-                    fontWeight: 600
-                  }}>eBay</button>
-
-                  <button 
-                    title="More actions"
-                    style={{
-                    background: '#3a3a3a',
-                    border: '1px solid #555',
-                    padding: '6px 10px',
-                    borderRadius: '3px',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    color: 'white'
-                  }}>⋮</button>
-                </div>
-                
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                 <button 
-                  title="Select visible fields"
+                  title="Edit album details"
                   style={{
                   background: '#3a3a3a',
                   border: '1px solid #555',
-                  padding: '4px 9px',
+                  padding: '6px 10px',
+                  borderRadius: '3px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  color: 'white'
+                }}>✏️</button>
+
+                <button 
+                  title="Share album"
+                  style={{
+                  background: '#3a3a3a',
+                  border: '1px solid #555',
+                  padding: '6px 10px',
+                  borderRadius: '3px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  color: 'white'
+                }}>↗️</button>
+
+                <button 
+                  title="Search on eBay"
+                  style={{
+                  background: '#3a3a3a',
+                  border: '1px solid #555',
+                  padding: '6px 10px',
                   borderRadius: '3px',
                   cursor: 'pointer',
                   fontSize: '12px',
                   color: 'white',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '3px'
-                }}>
-                  <span>⊞</span>
-                  <span style={{ fontSize: '9px' }}>▼</span>
-                </button>
-              </div>
-
-              <div style={{ padding: '16px', flex: 1, overflowY: 'auto', background: '#F8DE77' }}>
-                <div style={{ fontSize: '14px', color: '#333', marginBottom: '4px' }}>
-                  {selectedAlbum.artist}
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                  <h4 style={{ color: '#2196F3', margin: 0, fontSize: '18px', fontWeight: 600 }}>
-                    {selectedAlbum.title}
-                  </h4>
-                  <div style={{
-                    background: '#2196F3',
-                    color: 'white',
-                    borderRadius: '4px',
-                    padding: '4px 8px',
-                    fontSize: '16px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }} title="Album owned">✓</div>
-                </div>
-
-                {selectedAlbum.image_url ? (
-                  <Image 
-                    src={selectedAlbum.image_url} 
-                    alt={`${selectedAlbum.artist} - ${selectedAlbum.title}`}
-                    width={400}
-                    height={400}
-                    style={{
-                      width: '100%',
-                      height: 'auto',
-                      aspectRatio: '1',
-                      objectFit: 'cover',
-                      marginBottom: '12px',
-                      border: '1px solid #ddd'
-                    }}
-                  />
-                ) : (
-                  <div style={{
-                    width: '100%',
-                    aspectRatio: '1',
-                    background: '#fff',
-                    marginBottom: '12px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#999',
-                    fontSize: '48px',
-                    border: '1px solid #ddd'
-                  }}>🎵</div>
-                )}
-
-                <div style={{
-                  fontSize: '16px',
-                  fontWeight: 600,
-                  color: '#333',
-                  marginBottom: '8px'
-                }}>
-                  {selectedAlbum.spotify_label || selectedAlbum.apple_music_label || 'Unknown Label'} 
-                  {selectedAlbum.year && ` (${selectedAlbum.year})`}
-                </div>
-
-                {(selectedAlbum.discogs_genres || selectedAlbum.spotify_genres) && (
-                  <div style={{
-                    fontSize: '14px',
-                    color: '#666',
-                    marginBottom: '16px'
-                  }}>
-                    {toSafeStringArray(selectedAlbum.discogs_genres || selectedAlbum.spotify_genres).join(' | ')}
-                  </div>
-                )}
-
-                <div style={{
-                  fontSize: '14px',
-                  color: '#333',
-                  marginBottom: '16px',
                   fontWeight: 600
-                }}>
-                  {selectedAlbum.format}
-                  {selectedAlbum.spotify_total_tracks && ` | ${selectedAlbum.spotify_total_tracks} Tracks`}
-                  {selectedAlbum.apple_music_track_count && ` | ${selectedAlbum.apple_music_track_count} Tracks`}
-                </div>
+                }}>eBay</button>
 
-                {selectedAlbum.media_condition && (
-                  <div style={{ fontSize: '13px', color: '#666', marginBottom: '8px' }}>
-                    <strong>Condition:</strong> {selectedAlbum.media_condition}
-                  </div>
-                )}
-
-                {selectedAlbum.custom_tags && selectedAlbum.custom_tags.length > 0 && (
-                  <div style={{ marginTop: '16px' }}>
-                    <div style={{ fontSize: '13px', fontWeight: 600, color: '#333', marginBottom: '8px' }}>Tags:</div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                      {toSafeStringArray(selectedAlbum.custom_tags).map(tag => (
-                        <span key={tag} style={{
-                          padding: '4px 10px',
-                          background: '#8809AC',
-                          color: 'white',
-                          borderRadius: '12px',
-                          fontSize: '12px'
-                        }}>
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                <button 
+                  title="More actions"
+                  style={{
+                  background: '#3a3a3a',
+                  border: '1px solid #555',
+                  padding: '6px 10px',
+                  borderRadius: '3px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  color: 'white'
+                }}>⋮</button>
               </div>
+              
+              <button 
+                title="Select visible fields"
+                style={{
+                background: '#3a3a3a',
+                border: '1px solid #555',
+                padding: '4px 9px',
+                borderRadius: '3px',
+                cursor: 'pointer',
+                fontSize: '12px',
+                color: 'white',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '3px'
+              }}>
+                <span>⊞</span>
+                <span style={{ fontSize: '9px' }}>▼</span>
+              </button>
             </div>
-          )}
+
+            <AlbumInfoPanel album={selectedAlbum} />
+          </div>
         </div>
 
         <div style={{

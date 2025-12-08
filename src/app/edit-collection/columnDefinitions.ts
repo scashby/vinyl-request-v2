@@ -93,16 +93,18 @@ export interface ColumnDefinition {
   id: ColumnId;
   label: string;
   width: string;
+  sortable?: boolean;
 }
 
+// CRITICAL FIX #1: Checkbox column has EMPTY label (header will render select-all checkbox instead)
 export const COLUMN_DEFINITIONS: Record<ColumnId, ColumnDefinition> = {
   // Main
-  checkbox: { id: 'checkbox', label: 'Select', width: '40px' },
+  checkbox: { id: 'checkbox', label: '', width: '40px' },  // EMPTY for select-all checkbox
   owned: { id: 'owned', label: '✓', width: '40px' },
   for_sale_indicator: { id: 'for_sale_indicator', label: '$', width: '40px' },
   menu: { id: 'menu', label: '≡', width: '40px' },
-  artist: { id: 'artist', label: 'Artist', width: '200px' },
-  title: { id: 'title', label: 'Title', width: '300px' },
+  artist: { id: 'artist', label: 'Artist', width: '200px', sortable: true },
+  title: { id: 'title', label: 'Title', width: '300px', sortable: true },
   year: { id: 'year', label: 'Year', width: '80px' },
   barcode: { id: 'barcode', label: 'Barcode', width: '150px' },
   cat_no: { id: 'cat_no', label: 'Cat No', width: '120px' },
@@ -292,6 +294,15 @@ export const DEFAULT_VISIBLE_COLUMNS: ColumnId[] = [
   'added_date'
 ];
 
+// Performance optimization: pre-calculate visible columns outside component
 export function getVisibleColumns(visibleIds: ColumnId[]): ColumnDefinition[] {
   return visibleIds.map(id => COLUMN_DEFINITIONS[id]).filter(Boolean);
+}
+
+// Sorting types
+export type SortDirection = 'asc' | 'desc' | null;
+
+export interface SortState {
+  column: ColumnId | null;
+  direction: SortDirection;
 }

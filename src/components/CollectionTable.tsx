@@ -1,12 +1,13 @@
 // src/components/CollectionTable.tsx
 'use client';
 
-import React from 'react';
+import React, { memo, useCallback } from 'react';
 import Link from 'next/link';
 import { Album } from '../types/album';
 import { 
   ColumnId, 
-  getVisibleColumns 
+  getVisibleColumns,
+  SortState 
 } from '../app/edit-collection/columnDefinitions';
 
 interface CollectionTableProps {
@@ -15,19 +16,76 @@ interface CollectionTableProps {
   selectedAlbums: Set<string>;
   onSelectionChange: (albumIds: Set<string>) => void;
   visibleColumns: ColumnId[];
+  sortState: SortState;
+  onSortChange: (column: ColumnId) => void;
 }
+
+// Performance: Memoize individual row to prevent re-renders
+const TableRow = memo(function TableRow({
+  album,
+  index,
+  columns,
+  isSelected,
+  onAlbumClick,
+  getCellValue
+}: {
+  album: Album;
+  index: number;
+  columns: ReturnType<typeof getVisibleColumns>;
+  isSelected: boolean;
+  onAlbumClick: (album: Album) => void;
+  getCellValue: (album: Album, columnId: ColumnId) => React.ReactNode;
+}) {
+  return (
+    <tr
+      onClick={() => onAlbumClick(album)}
+      style={{
+        cursor: 'pointer',
+        backgroundColor: isSelected ? '#eff6ff' : index % 2 === 0 ? 'white' : '#f8f9fa',
+        borderBottom: '1px solid #e9ecef'
+      }}
+      onMouseEnter={(e) => {
+        if (!isSelected) {
+          e.currentTarget.style.backgroundColor = '#f1f3f5';
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (!isSelected) {
+          e.currentTarget.style.backgroundColor = index % 2 === 0 ? 'white' : '#f8f9fa';
+        }
+      }}
+    >
+      {columns.map(col => (
+        <td
+          key={col.id}
+          style={{
+            padding: '8px',
+            color: '#212529',
+            whiteSpace: 'nowrap',
+            minWidth: col.width,
+            width: col.width
+          }}
+        >
+          {getCellValue(album, col.id)}
+        </td>
+      ))}
+    </tr>
+  );
+});
 
 export default function CollectionTable({
   albums,
   onAlbumClick,
   selectedAlbums,
   onSelectionChange,
-  visibleColumns
+  visibleColumns,
+  sortState,
+  onSortChange
 }: CollectionTableProps) {
   
   const columns = getVisibleColumns(visibleColumns);
 
-  const handleSelectAlbum = (albumId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSelectAlbum = useCallback((albumId: string, e: React.ChangeEvent<HTMLInputElement>) => {
     e.stopPropagation();
     const newSelected = new Set(selectedAlbums);
     if (e.target.checked) {
@@ -36,7 +94,23 @@ export default function CollectionTable({
       newSelected.delete(albumId);
     }
     onSelectionChange(newSelected);
-  };
+  }, [selectedAlbums, onSelectionChange]);
+
+  // CRITICAL FIX #2: Select-all checkbox functionality
+  const handleSelectAll = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    e.stopPropagation();
+    if (e.target.checked) {
+      // Select all visible albums
+      const allIds = new Set(albums.map(album => String(album.id)));
+      onSelectionChange(allIds);
+    } else {
+      // Deselect all
+      onSelectionChange(new Set());
+    }
+  }, [albums, onSelectionChange]);
+
+  const allSelected = albums.length > 0 && selectedAlbums.size === albums.length;
+  const someSelected = selectedAlbums.size > 0 && selectedAlbums.size < albums.length;
 
   const formatLength = (seconds: number | null | undefined): string => {
     if (!seconds) return '—';
@@ -65,7 +139,7 @@ export default function CollectionTable({
     return arr.join(', ');
   };
 
-  const getCellValue = (album: Album, columnId: ColumnId): React.ReactNode => {
+  const getCellValue = useCallback((album: Album, columnId: ColumnId): React.ReactNode => {
     switch (columnId) {
       case 'checkbox':
         return (
@@ -246,6 +320,18 @@ export default function CollectionTable({
       default:
         return '—';
     }
+  }, [selectedAlbums, handleSelectAlbum, onAlbumClick]);
+
+  // CRITICAL FIX #3: Implement actual sorting functionality
+  const handleHeaderClick = (columnId: ColumnId, sortable?: boolean) => {
+    if (sortable) {
+      onSortChange(columnId);
+    }
+  };
+
+  const getSortIndicator = (columnId: ColumnId) => {
+    if (sortState.column !== columnId) return null;
+    return sortState.direction === 'asc' ? ' ▲' : ' ▼';
   };
 
   return (
@@ -266,6 +352,7 @@ export default function CollectionTable({
             {columns.map(col => (
               <th
                 key={col.id}
+                onClick={() => handleHeaderClick(col.id, col.sortable)}
                 style={{
                   padding: '12px 8px',
                   textAlign: 'left',
@@ -274,12 +361,29 @@ export default function CollectionTable({
                   borderBottom: '2px solid #dee2e6',
                   whiteSpace: 'nowrap',
                   minWidth: col.width,
-                  width: col.width
+                  width: col.width,
+                  cursor: col.sortable ? 'pointer' : 'default'
                 }}
               >
-                {col.label}
-                {(col.id === 'artist' || col.id === 'title') && (
-                  <span style={{ marginLeft: '4px', fontSize: '10px' }}>▲</span>
+                {/* CRITICAL FIX #1: Render select-all checkbox in empty label */}
+                {col.id === 'checkbox' ? (
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    ref={input => {
+                      if (input) {
+                        input.indeterminate = someSelected;
+                      }
+                    }}
+                    onChange={handleSelectAll}
+                    onClick={(e) => e.stopPropagation()}
+                    style={{ cursor: 'pointer' }}
+                  />
+                ) : (
+                  <>
+                    {col.label}
+                    {col.sortable && getSortIndicator(col.id)}
+                  </>
                 )}
               </th>
             ))}
@@ -287,40 +391,15 @@ export default function CollectionTable({
         </thead>
         <tbody>
           {albums.map((album, index) => (
-            <tr
+            <TableRow
               key={album.id}
-              onClick={() => onAlbumClick(album)}
-              style={{
-                cursor: 'pointer',
-                backgroundColor: selectedAlbums.has(String(album.id)) ? '#eff6ff' : index % 2 === 0 ? 'white' : '#f8f9fa',
-                borderBottom: '1px solid #e9ecef'
-              }}
-              onMouseEnter={(e) => {
-                if (!selectedAlbums.has(String(album.id))) {
-                  e.currentTarget.style.backgroundColor = '#f1f3f5';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!selectedAlbums.has(String(album.id))) {
-                  e.currentTarget.style.backgroundColor = index % 2 === 0 ? 'white' : '#f8f9fa';
-                }
-              }}
-            >
-              {columns.map(col => (
-                <td
-                  key={col.id}
-                  style={{
-                    padding: '8px',
-                    color: '#212529',
-                    whiteSpace: 'nowrap',
-                    minWidth: col.width,
-                    width: col.width
-                  }}
-                >
-                  {getCellValue(album, col.id)}
-                </td>
-              ))}
-            </tr>
+              album={album}
+              index={index}
+              columns={columns}
+              isSelected={selectedAlbums.has(String(album.id))}
+              onAlbumClick={onAlbumClick}
+              getCellValue={getCellValue}
+            />
           ))}
         </tbody>
       </table>

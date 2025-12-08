@@ -1,7 +1,7 @@
 // src/components/ColumnSelector.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo, memo } from 'react';
 import { ColumnId, COLUMN_DEFINITIONS, COLUMN_GROUPS, DEFAULT_VISIBLE_COLUMNS } from '../app/edit-collection/columnDefinitions';
 
 interface ColumnSelectorProps {
@@ -10,7 +10,8 @@ interface ColumnSelectorProps {
   onClose: () => void;
 }
 
-export default function ColumnSelector({ visibleColumns, onColumnsChange, onClose }: ColumnSelectorProps) {
+// Performance: Memoize the entire component to prevent unnecessary re-renders
+const ColumnSelector = memo(function ColumnSelector({ visibleColumns, onColumnsChange, onClose }: ColumnSelectorProps) {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
     new Set(['main', 'edition'])
   );
@@ -50,19 +51,25 @@ export default function ColumnSelector({ visibleColumns, onColumnsChange, onClos
     setTempVisibleColumns([...DEFAULT_VISIBLE_COLUMNS]);
   };
 
-  const currentlyVisible = tempVisibleColumns
-    .map(id => COLUMN_DEFINITIONS[id])
-    .filter(Boolean);
+  // Performance: Memoize expensive calculations
+  const currentlyVisible = useMemo(() => {
+    return tempVisibleColumns
+      .map(id => COLUMN_DEFINITIONS[id])
+      .filter(Boolean);
+  }, [tempVisibleColumns]);
 
-  const filteredGroups = searchQuery 
-    ? COLUMN_GROUPS.map(group => {
-        const filteredColumns = group.columns.filter(colId => {
-          const col = COLUMN_DEFINITIONS[colId];
-          return col?.label.toLowerCase().includes(searchQuery.toLowerCase());
-        });
-        return filteredColumns.length > 0 ? { ...group, columns: filteredColumns } : null;
-      }).filter(Boolean)
-    : COLUMN_GROUPS;
+  // Performance: Memoize filtered groups calculation
+  const filteredGroups = useMemo(() => {
+    if (!searchQuery) return COLUMN_GROUPS;
+    
+    return COLUMN_GROUPS.map(group => {
+      const filteredColumns = group.columns.filter(colId => {
+        const col = COLUMN_DEFINITIONS[colId];
+        return col?.label.toLowerCase().includes(searchQuery.toLowerCase());
+      });
+      return filteredColumns.length > 0 ? { ...group, columns: filteredColumns } : null;
+    }).filter(Boolean);
+  }, [searchQuery]);
 
   return (
     <>
@@ -238,7 +245,7 @@ export default function ColumnSelector({ visibleColumns, onColumnsChange, onClos
                                 onChange={() => toggleColumn(col.id)}
                                 style={{ cursor: 'pointer' }}
                               />
-                              <span style={{ color: '#333' }}>{col.label}</span>
+                              <span style={{ color: '#333' }}>{col.label || col.id}</span>
                             </label>
                           );
                         })}
@@ -312,7 +319,7 @@ export default function ColumnSelector({ visibleColumns, onColumnsChange, onClos
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span style={{ color: '#999' }}>☰</span>
-                        <span style={{ color: '#333' }}>{col.label}</span>
+                        <span style={{ color: '#333' }}>{col.label || col.id}</span>
                       </div>
                       <button
                         onClick={() => toggleColumn(col.id)}
@@ -395,4 +402,6 @@ export default function ColumnSelector({ visibleColumns, onColumnsChange, onClos
       </div>
     </>
   );
-}
+});
+
+export default ColumnSelector;
