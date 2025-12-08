@@ -1,11 +1,11 @@
 // src/components/CollectionTable.tsx
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React from 'react';
+import Image from 'next/image';
 import { Album } from '../types/album';
 import { 
   ColumnId, 
-  ColumnDefinition,
   getVisibleColumns 
 } from '../app/edit-collection/columnDefinitions';
 
@@ -17,11 +17,6 @@ interface CollectionTableProps {
   visibleColumns: ColumnId[];
 }
 
-type SortConfig = {
-  key: keyof Album | null;
-  direction: 'asc' | 'desc';
-};
-
 export default function CollectionTable({
   albums,
   onAlbumClick,
@@ -29,91 +24,22 @@ export default function CollectionTable({
   onSelectionChange,
   visibleColumns
 }: CollectionTableProps) {
-  const [sortConfig, setSortConfig] = useState<SortConfig>({
-    key: 'artist',
-    direction: 'asc'
-  });
-
-  const columnDefs = useMemo(() => 
-    getVisibleColumns(visibleColumns), 
-    [visibleColumns]
-  );
-
-  const handleSort = (column: ColumnDefinition) => {
-    if (!column.sortable) return;
-
-    setSortConfig(current => ({
-      key: column.field as keyof Album,
-      direction: 
-        current.key === column.field && current.direction === 'asc' 
-          ? 'desc' 
-          : 'asc'
-    }));
-  };
-
-  const sortedAlbums = useMemo(() => {
-    if (!sortConfig.key) return albums;
-
-    return [...albums].sort((a, b) => {
-      const aVal = a[sortConfig.key!];
-      const bVal = b[sortConfig.key!];
-
-      if (aVal === null || aVal === undefined) return 1;
-      if (bVal === null || bVal === undefined) return -1;
-
-      let comparison = 0;
-      if (typeof aVal === 'string' && typeof bVal === 'string') {
-        comparison = aVal.localeCompare(bVal);
-      } else if (typeof aVal === 'number' && typeof bVal === 'number') {
-        comparison = aVal - bVal;
-      }
-
-      return sortConfig.direction === 'asc' ? comparison : -comparison;
-    });
-  }, [albums, sortConfig]);
+  
+  const columns = getVisibleColumns(visibleColumns);
 
   const handleSelectAlbum = (albumId: string, e: React.ChangeEvent<HTMLInputElement>) => {
     e.stopPropagation();
-    const newSelection = new Set(selectedAlbums);
+    const newSelected = new Set(selectedAlbums);
     if (e.target.checked) {
-      newSelection.add(albumId);
+      newSelected.add(albumId);
     } else {
-      newSelection.delete(albumId);
+      newSelected.delete(albumId);
     }
-    onSelectionChange(newSelection);
+    onSelectionChange(newSelected);
   };
 
-  const formatLength = (seconds: number | null): string => {
-    if (!seconds) return '—';
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const formatGenres = (genres: string[] | null): string => {
-    if (!genres || genres.length === 0) return '—';
-    return genres.join(', ');
-  };
-
-  const formatDate = (dateString: string | null): string => {
-    if (!dateString) return '—';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
-      month: 'short', 
-      day: 'numeric', 
-      year: 'numeric' 
-    });
-  };
-
-  const formatYear = (dateString: string | null): string => {
-    if (!dateString) return '—';
-    const date = new Date(dateString);
-    return date.getFullYear().toString();
-  };
-
-  const renderCellContent = (album: Album, column: ColumnDefinition) => {
-    switch (column.id) {
-      // System columns
+  const getCellValue = (album: Album, columnId: ColumnId): React.ReactNode => {
+    switch (columnId) {
       case 'checkbox':
         return (
           <input
@@ -121,196 +47,122 @@ export default function CollectionTable({
             checked={selectedAlbums.has(String(album.id))}
             onChange={(e) => handleSelectAlbum(String(album.id), e)}
             onClick={(e) => e.stopPropagation()}
+            style={{ cursor: 'pointer' }}
           />
         );
-
       case 'owned':
-        return ''; // TODO: Add owned field to Album type
-
-      case 'for_sale':
-        return ''; // TODO: Add for_sale field to Album type
-
-      // Main columns
-      case 'artist':
-        return album.artist || '—';
-
-      case 'title':
-        return (
-          <span
-            style={{
-              color: '#3b82f6',
-              cursor: 'pointer',
-              textDecoration: 'none'
-            }}
-            onClick={(e) => {
-              e.stopPropagation();
-              onAlbumClick(album);
-            }}
-          >
-            {album.title}
-          </span>
+        return <span style={{ color: '#22c55e', fontSize: '16px' }}>✓</span>;
+      case 'image':
+        return album.image_url ? (
+          <Image 
+            src={album.image_url} 
+            alt="" 
+            width={50}
+            height={50}
+            style={{ width: '50px', height: '50px', objectFit: 'cover', borderRadius: '2px' }}
+          />
+        ) : (
+          <div style={{ width: '50px', height: '50px', background: '#f0f0f0', borderRadius: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>
+            🎵
+          </div>
         );
-
-      case 'release_date':
-        return album.year || '—';
-
-      case 'genre':
-        return formatGenres(album.discogs_genres);
-
-      case 'format':
-        return album.format || '—';
-
-      case 'label':
-        return album.spotify_label || '—';
-
-      case 'barcode':
-        return album.barcode || '—';
-
-      case 'cat_no':
-        return '—';
-
-      case 'sort_title':
-        return album.title || '—';
-
-      case 'subtitle':
-        return '—';
-
-      // Edition columns
-      case 'discs':
-        return album.discs || '—';
-
-      case 'tracks':
-        return album.spotify_total_tracks || '—';
-
-      case 'length':
-        return formatLength(album.length_seconds);
-
-      // Personal columns
-      case 'added_date':
-        return formatDate(album.date_added);
-
-      case 'added_year':
-        return formatYear(album.date_added);
-
-      case 'collection_status':
-        return '—'; // TODO: Add owned field to Album type
-
-      case 'modified_date':
-        return formatDate(album.date_added);
-
-      case 'notes':
-        return album.notes ? album.notes.substring(0, 50) + '...' : '—';
-
-      case 'tags':
-        return '—';
-
-      // Details columns (placeholders - add real fields when available)
-      case 'box_set':
-      case 'country':
-      case 'is_live':
-      case 'media_condition':
-      case 'packaging':
-      case 'studio':
-      case 'vinyl_color':
-      case 'vinyl_weight':
-      case 'current_value':
-      case 'ebay_link':
-      case 'last_played':
-      case 'location':
-      case 'my_rating':
-      case 'owner':
-      case 'play_count':
-      case 'purchase_date':
-      case 'purchase_price':
-      case 'purchase_store':
-      case 'purchase_year':
-      case 'quantity':
-        return '—';
-
-      default:
-        return '—';
+      case 'artist': return album.artist || '';
+      case 'title': return album.title || '';
+      case 'year': return album.year || '';
+      case 'master_release': return album.master_release_date || '—';
+      case 'format': return album.format || '';
+      case 'discs': return album.discs ? String(album.discs) : '—';
+      case 'tracks': return album.spotify_total_tracks ? String(album.spotify_total_tracks) : album.apple_music_track_count ? String(album.apple_music_track_count) : '—';
+      case 'length': return '—';
+      case 'genres': return album.discogs_genres || album.spotify_genres || '—';
+      case 'label': return album.spotify_label || album.apple_music_label || '—';
+      case 'added_date': return album.date_added ? new Date(album.date_added).toLocaleDateString() : '—';
+      case 'catalog_number': return '—';
+      case 'barcode': return album.barcode || '—';
+      case 'media_condition': return album.media_condition || '—';
+      case 'sleeve_condition': return '—';
+      case 'country': return album.country || '—';
+      case 'released': return album.year || '—';
+      case 'spotify_popularity': return album.spotify_popularity ? String(album.spotify_popularity) : '—';
+      case 'apple_music_popularity': return '—';
+      case 'tags': return album.custom_tags && Array.isArray(album.custom_tags) ? album.custom_tags.join(', ') : '—';
+      case 'notes': return album.notes || '—';
+      case 'location': return album.folder || '—';
+      case 'purchase_price': return album.purchase_price ? `$${album.purchase_price}` : '—';
+      case 'current_value': return '—';
+      case 'sale_price': return album.sale_price ? `$${album.sale_price}` : '—';
+      case 'for_sale': return album.for_sale ? 'Yes' : 'No';
+      default: return '—';
     }
   };
 
-  const getSortIndicator = (column: ColumnDefinition) => {
-    if (!column.sortable) return null;
-    if (sortConfig.key !== column.field) return null;
-    return sortConfig.direction === 'asc' ? ' ▲' : ' ▼';
-  };
-
   return (
-    <div style={{ 
-      width: '100%', 
-      overflowX: 'auto',
-      border: '1px solid #e5e7eb',
-      borderRadius: '4px'
-    }}>
+    <div style={{ width: '100%', height: '100%', overflow: 'auto' }}>
       <table style={{ 
         width: '100%', 
         borderCollapse: 'collapse',
-        fontSize: '12px'
+        fontSize: '13px'
       }}>
-        <thead>
+        <thead style={{ 
+          position: 'sticky', 
+          top: 0, 
+          background: '#f8f9fa', 
+          zIndex: 10,
+          borderBottom: '2px solid #dee2e6'
+        }}>
           <tr>
-            {columnDefs.map((column) => (
+            {columns.map(col => (
               <th
-                key={column.id}
-                onClick={() => handleSort(column)}
+                key={col.id}
                 style={{
-                  padding: '6px',
-                  textAlign: column.align || 'left',
-                  backgroundColor: '#fafafa',
-                  fontWeight: 'bold',
-                  fontSize: '11px',
-                  borderRight: '1px solid #e5e7eb',
-                  borderBottom: '1px solid #e5e7eb',
-                  cursor: column.sortable ? 'pointer' : 'default',
-                  position: 'sticky',
-                  top: 0,
-                  zIndex: 1,
-                  whiteSpace: 'nowrap'
+                  padding: '12px 8px',
+                  textAlign: 'left',
+                  fontWeight: 600,
+                  color: '#495057',
+                  borderBottom: '2px solid #dee2e6',
+                  whiteSpace: 'nowrap',
+                  minWidth: col.width,
+                  width: col.width
                 }}
               >
-                {column.label}
-                {getSortIndicator(column)}
+                {col.label}
               </th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {sortedAlbums.map((album) => (
+          {albums.map((album, index) => (
             <tr
               key={album.id}
+              onClick={() => onAlbumClick(album)}
               style={{
                 cursor: 'pointer',
-                backgroundColor: selectedAlbums.has(String(album.id)) ? '#eff6ff' : 'transparent'
+                backgroundColor: selectedAlbums.has(String(album.id)) ? '#eff6ff' : index % 2 === 0 ? 'white' : '#f8f9fa',
+                borderBottom: '1px solid #e9ecef'
               }}
               onMouseEnter={(e) => {
                 if (!selectedAlbums.has(String(album.id))) {
-                  e.currentTarget.style.backgroundColor = '#f9fafb';
+                  e.currentTarget.style.backgroundColor = '#f1f3f5';
                 }
               }}
               onMouseLeave={(e) => {
                 if (!selectedAlbums.has(String(album.id))) {
-                  e.currentTarget.style.backgroundColor = 'transparent';
+                  e.currentTarget.style.backgroundColor = index % 2 === 0 ? 'white' : '#f8f9fa';
                 }
               }}
             >
-              {columnDefs.map((column) => (
+              {columns.map(col => (
                 <td
-                  key={column.id}
+                  key={col.id}
                   style={{
-                    padding: '6px',
-                    textAlign: column.align || 'left',
-                    fontSize: '12px',
-                    borderRight: '1px solid #f3f4f6',
-                    borderBottom: '1px solid #f3f4f6',
-                    whiteSpace: column.id === 'title' || column.id === 'notes' ? 'normal' : 'nowrap',
-                    overflow: column.id === 'title' || column.id === 'notes' ? 'visible' : 'hidden',
-                    textOverflow: column.id === 'title' || column.id === 'notes' ? 'clip' : 'ellipsis'
+                    padding: '8px',
+                    color: '#212529',
+                    whiteSpace: 'nowrap',
+                    minWidth: col.width,
+                    width: col.width
                   }}
                 >
-                  {renderCellContent(album, column)}
+                  {getCellValue(album, col.id)}
                 </td>
               ))}
             </tr>
