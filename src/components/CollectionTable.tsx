@@ -1,8 +1,8 @@
 // src/components/CollectionTable.tsx
 'use client';
 
-import React, { memo, useCallback, useMemo } from 'react';
-import { List } from 'react-window';
+import React, { memo, useCallback, useMemo, useRef } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { Album } from '../types/album';
 import { 
   ColumnId, 
@@ -31,7 +31,15 @@ const CollectionTable = memo(function CollectionTable({
   sortState,
   onSortChange
 }: CollectionTableProps) {
+  const parentRef = useRef<HTMLDivElement>(null);
   const columns = useMemo(() => getVisibleColumns(visibleColumns), [visibleColumns]);
+
+  const virtualizer = useVirtualizer({
+    count: albums.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: 5,
+  });
 
   const formatters = useMemo(() => {
     const formatLength = (seconds: number | null | undefined): string => {
@@ -173,89 +181,22 @@ const CollectionTable = memo(function CollectionTable({
     return sortState.direction === 'asc' ? ' ▲' : ' ▼';
   }, [sortState]);
 
-  const rowComponentData = useMemo(() => ({
-    albums,
-    columns,
-    formatters,
-    selectedAlbums,
-    onAlbumClick,
-    onSelectionChange
-  }), [albums, columns, formatters, selectedAlbums, onAlbumClick, onSelectionChange]);
+  const handleRowClick = useCallback((album: Album) => {
+    onAlbumClick(album);
+  }, [onAlbumClick]);
 
-  const RowComponent = useCallback((props: { index: number; style: React.CSSProperties } & typeof rowComponentData) => {
-    const { index, style, albums, columns, formatters, selectedAlbums, onAlbumClick, onSelectionChange } = props;
-    const album = albums[index];
-    const albumId = String(album.id);
-    const isSelected = selectedAlbums.has(albumId);
+  const handleCheckboxClick = useCallback((e: React.ChangeEvent<HTMLInputElement>, albumId: string) => {
+    e.stopPropagation();
+    const newSelected = new Set(selectedAlbums);
+    if (e.target.checked) {
+      newSelected.add(albumId);
+    } else {
+      newSelected.delete(albumId);
+    }
+    onSelectionChange(newSelected);
+  }, [selectedAlbums, onSelectionChange]);
 
-    const handleRowClick = () => onAlbumClick(album);
-    const handleCheckboxClick = (e: React.ChangeEvent<HTMLInputElement>) => {
-      e.stopPropagation();
-      const newSelected = new Set(selectedAlbums);
-      if (e.target.checked) {
-        newSelected.add(albumId);
-      } else {
-        newSelected.delete(albumId);
-      }
-      onSelectionChange(newSelected);
-    };
-
-    return (
-      <div
-        style={{
-          ...style,
-          display: 'flex',
-          alignItems: 'center',
-          cursor: 'pointer',
-          backgroundColor: isSelected ? '#e3f2fd' : index % 2 === 0 ? 'white' : '#fafafa',
-          borderBottom: '1px solid #e0e0e0'
-        }}
-        onClick={handleRowClick}
-        onMouseEnter={(e) => {
-          if (!isSelected) {
-            e.currentTarget.style.backgroundColor = '#f5f5f5';
-          }
-        }}
-        onMouseLeave={(e) => {
-          if (!isSelected) {
-            e.currentTarget.style.backgroundColor = index % 2 === 0 ? 'white' : '#fafafa';
-          }
-        }}
-      >
-        {columns.map(col => (
-          <div
-            key={col.id}
-            style={{
-              width: col.width,
-              minWidth: col.width,
-              maxWidth: col.width,
-              padding: '6px 8px',
-              borderRight: '1px solid #e0e0e0',
-              color: '#212529',
-              fontSize: '13px',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              display: 'flex',
-              alignItems: 'center'
-            }}
-          >
-            {col.id === 'checkbox' ? (
-              <input
-                type="checkbox"
-                checked={isSelected}
-                onChange={handleCheckboxClick}
-                onClick={(e) => e.stopPropagation()}
-                style={{ cursor: 'pointer' }}
-              />
-            ) : (
-              formatters[col.id]?.(album) || '—'
-            )}
-          </div>
-        ))}
-      </div>
-    );
-  }, []);
+  const virtualItems = virtualizer.getVirtualItems();
 
   return (
     <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -320,13 +261,80 @@ const CollectionTable = memo(function CollectionTable({
         ))}
       </div>
       
-      <div style={{ flex: 1 }}>
-        <List
-          rowCount={albums.length}
-          rowHeight={ROW_HEIGHT}
-          rowComponent={RowComponent}
-          rowProps={rowComponentData}
-        />
+      <div ref={parentRef} style={{ flex: 1, overflow: 'auto', position: 'relative' }}>
+        <div style={{
+          height: `${virtualizer.getTotalSize()}px`,
+          width: '100%',
+          position: 'relative'
+        }}>
+          {virtualItems.map(virtualRow => {
+            const album = albums[virtualRow.index];
+            const albumId = String(album.id);
+            const isSelected = selectedAlbums.has(albumId);
+
+            return (
+              <div
+                key={virtualRow.key}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: `${virtualRow.size}px`,
+                  transform: `translateY(${virtualRow.start}px)`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  cursor: 'pointer',
+                  backgroundColor: isSelected ? '#e3f2fd' : virtualRow.index % 2 === 0 ? 'white' : '#fafafa',
+                  borderBottom: '1px solid #e0e0e0'
+                }}
+                onClick={() => handleRowClick(album)}
+                onMouseEnter={(e) => {
+                  if (!isSelected) {
+                    e.currentTarget.style.backgroundColor = '#f5f5f5';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isSelected) {
+                    e.currentTarget.style.backgroundColor = virtualRow.index % 2 === 0 ? 'white' : '#fafafa';
+                  }
+                }}
+              >
+                {columns.map(col => (
+                  <div
+                    key={col.id}
+                    style={{
+                      width: col.width,
+                      minWidth: col.width,
+                      maxWidth: col.width,
+                      padding: '6px 8px',
+                      borderRight: '1px solid #e0e0e0',
+                      color: '#212529',
+                      fontSize: '13px',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                  >
+                    {col.id === 'checkbox' ? (
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={(e) => handleCheckboxClick(e, albumId)}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ cursor: 'pointer' }}
+                      />
+                    ) : (
+                      formatters[col.id]?.(album) || '—'
+                    )}
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
