@@ -68,17 +68,14 @@ function CollectionBrowserPage() {
   const [selectedAlbumId, setSelectedAlbumId] = useState<number | null>(null);
   const [activeCollection, setActiveCollection] = useState('music');
   
-  // SORTING STATE
   const [sortBy, setSortBy] = useState<SortOption>('artist-asc');
   const [showSortDropdown, setShowSortDropdown] = useState(false);
 
-  // COLUMN SELECTOR STATE
   const [visibleColumns, setVisibleColumns] = useState<ColumnId[]>(DEFAULT_VISIBLE_COLUMNS);
   const [showColumnSelector, setShowColumnSelector] = useState(false);
 
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
-  // Load column preferences from localStorage
   useEffect(() => {
     const stored = localStorage.getItem('collection-visible-columns');
     if (stored) {
@@ -90,13 +87,11 @@ function CollectionBrowserPage() {
     }
   }, []);
 
-  // Handle column changes
   const handleColumnsChange = (columns: ColumnId[]) => {
     setVisibleColumns(columns);
     localStorage.setItem('collection-visible-columns', JSON.stringify(columns));
   };
 
-  // Load sort preference from localStorage
   useEffect(() => {
     const stored = localStorage.getItem('collection-sort-preference');
     if (stored && SORT_OPTIONS.some(opt => opt.value === stored)) {
@@ -104,14 +99,12 @@ function CollectionBrowserPage() {
     }
   }, []);
 
-  // Save sort preference to localStorage
   const handleSortChange = (newSort: SortOption) => {
     setSortBy(newSort);
     localStorage.setItem('collection-sort-preference', newSort);
     setShowSortDropdown(false);
   };
 
-  // Load albums from Supabase
   const loadAlbums = useCallback(async () => {
     setLoading(true);
     
@@ -147,13 +140,10 @@ function CollectionBrowserPage() {
     loadAlbums();
   }, [loadAlbums]);
 
-  // Filter and sort albums
   const filteredAndSortedAlbums = albums
     .filter(album => {
-      // Collection filter
       if (collectionFilter === 'For Sale' && !album.for_sale) return false;
       
-      // Letter filter
       if (selectedLetter !== 'All') {
         const firstChar = (album.artist || '').charAt(0).toUpperCase();
         if (selectedLetter === '0-9') {
@@ -163,12 +153,10 @@ function CollectionBrowserPage() {
         }
       }
 
-      // Folder filter (format)
       if (selectedFolderValue) {
         if (folderMode === 'format' && album.format !== selectedFolderValue) return false;
       }
 
-      // Search filter
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
         const searchable = [
@@ -223,7 +211,6 @@ function CollectionBrowserPage() {
       }
     });
 
-  // Folder counts
   const folderCounts = albums.reduce((acc, album) => {
     const itemKey = album.format || 'Unknown';
     acc[itemKey] = (acc[itemKey] || 0) + 1;
@@ -244,18 +231,11 @@ function CollectionBrowserPage() {
 
   const selectedAlbum = albums.find(a => a.id === selectedAlbumId);
 
-  // Group sort options by category
   const sortOptionsByCategory = SORT_OPTIONS.reduce((acc, opt) => {
     if (!acc[opt.category]) acc[opt.category] = [];
     acc[opt.category].push(opt);
     return acc;
   }, {} as Record<string, typeof SORT_OPTIONS>);
-
-  // Stub for sell click handler
-  const handleSellClick = (album: Album) => {
-    console.log('Mark for sale:', album);
-    // TODO: Implement sale modal
-  };
 
   return (
     <>
@@ -291,7 +271,6 @@ function CollectionBrowserPage() {
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
         zIndex: 9999
       }}>
-        {/* HAMBURGER SIDEBAR */}
         {sidebarOpen && (
           <>
             <div
@@ -383,7 +362,6 @@ function CollectionBrowserPage() {
           </>
         )}
 
-        {/* ROW 1: PURPLE GRADIENT HEADER */}
         <div className="clz-header" style={{
           background: 'linear-gradient(to right, #8809AC, #A855F7)',
           color: 'white',
@@ -424,7 +402,6 @@ function CollectionBrowserPage() {
           </div>
         </div>
 
-        {/* ROW 3: MAIN TOOLBAR */}
         <div style={{
           background: '#3A3A3A',
           color: 'white',
@@ -590,7 +567,6 @@ function CollectionBrowserPage() {
           </div>
         </div>
 
-        {/* SELECTION TOOLBAR */}
         {selectedAlbumIds.size > 0 && (
           <div style={{
             background: '#5BA3D0',
@@ -679,14 +655,12 @@ function CollectionBrowserPage() {
           </div>
         )}
 
-        {/* THREE-COLUMN BODY */}
         <div style={{
           display: 'flex',
           flex: 1,
           overflow: 'hidden',
           minHeight: 0
         }}>
-          {/* LEFT COLUMN: Format/Folder Panel */}
           <div style={{
             width: '220px',
             background: '#2C2C2C',
@@ -840,7 +814,6 @@ function CollectionBrowserPage() {
             </div>
           </div>
 
-          {/* CENTER COLUMN: Table */}
           <div style={{
             flex: 1,
             display: 'flex',
@@ -878,7 +851,6 @@ function CollectionBrowserPage() {
                   <span style={{ fontSize: '9px' }}>▼</span>
                 </button>
                 
-                {/* SORT DROPDOWN */}
                 <div style={{ position: 'relative' }}>
                   <button 
                     onClick={() => setShowSortDropdown(!showSortDropdown)}
@@ -979,7 +951,6 @@ function CollectionBrowserPage() {
                   )}
                 </div>
                 
-                {/* COLUMN SELECTOR BUTTON */}
                 <button 
                   onClick={() => setShowColumnSelector(true)}
                   title="Select visible columns"
@@ -1013,15 +984,16 @@ function CollectionBrowserPage() {
                 <CollectionTable
                   albums={filteredAndSortedAlbums}
                   visibleColumns={visibleColumns}
-                  onAlbumClick={setSelectedAlbumId}
-                  onSellClick={handleSellClick}
-                  selectedAlbumId={selectedAlbumId}
+                  onAlbumClick={(album) => setSelectedAlbumId(album.id)}
+                  selectedAlbums={new Set(Array.from(selectedAlbumIds).map(id => String(id)))}
+                  onSelectionChange={(albumIds) => {
+                    setSelectedAlbumIds(new Set(Array.from(albumIds).map(id => Number(id))));
+                  }}
                 />
               )}
             </div>
           </div>
 
-          {/* RIGHT COLUMN: Detail Panel */}
           {selectedAlbum && (
             <div style={{
               width: '380px',
@@ -1223,7 +1195,6 @@ function CollectionBrowserPage() {
           )}
         </div>
 
-        {/* BOTTOM ROW: Collection Tabs */}
         <div style={{
           background: '#1a1a1a',
           borderTop: '1px solid #000',
@@ -1266,7 +1237,6 @@ function CollectionBrowserPage() {
         </div>
       </div>
 
-      {/* COLUMN SELECTOR MODAL */}
       {showColumnSelector && (
         <ColumnSelector
           visibleColumns={visibleColumns}
