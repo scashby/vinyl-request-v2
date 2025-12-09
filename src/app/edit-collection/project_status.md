@@ -1,9 +1,25 @@
 # PROJECT_STATUS.md
 # DWD Collection Management System - Collection Browser
-**Last Updated:** 2025-12-09 (Evening - Phase 2.2 COMPLETE - Safe Rollback Point ✅)
+**Last Updated:** 2025-12-09 (Evening - Phase 2.3 STARTED - Edit Album Modal Development 🔄)
 
 ## Project Overview
 Building an exact CLZ Music Web-inspired interface for Dead Wax Dialogues vinyl management system with custom branding. Strategy: Build complete visual framework first (LOCKED), then add functionality second. This ensures pixel-perfect accuracy before connecting data and logic.
+
+---
+
+## 📊 Overall Progress: ~45% Complete
+
+```
+Phase 1: Visual Framework         ████████████████████ 100% ✅
+Phase 2.1: Data Connection        ████████████████████ 100% ✅
+Phase 2.2: Sorting & Columns      ████████████████████ 100% ✅ [SAFE ROLLBACK POINT]
+Phase 2.3: Edit Album Modal       ░░░░░░░░░░░░░░░░░░░░   0% 🔄 IN PROGRESS
+Phase 2.4: Detail Panel           ░░░░░░░░░░░░░░░░░░░░   0% (deferred)
+Phase 3: Selection & Batch Ops    ░░░░░░░░░░░░░░░░░░░░   0%
+Phase 4: Advanced Features        ░░░░░░░░░░░░░░░░░░░░   0%
+```
+
+**Current Focus:** Building Edit Album Modal - CLZ Music Web-inspired interface with 8 tabs, universal pickers, and enrichment integration
 
 ---
 
@@ -132,21 +148,239 @@ Building an exact CLZ Music Web-inspired interface for Dead Wax Dialogues vinyl 
 
 ---
 
-## 📋 PHASE 2.3: NEXT - DETAIL PANEL IMPROVEMENTS
+## 🔄 PHASE 2.3: IN PROGRESS - EDIT ALBUM MODAL
 
-### Right Panel Enhancements Needed
+### Decision: Build New vs. Modify Existing
+**✅ DECISION:** Build completely new modal from scratch
+- Keep existing `/admin/edit-entry/[id]/page.tsx` intact as legacy admin tool
+- Build new `/edit-collection/EditAlbumModal.tsx` matching CLZ Music Web interface
+- Clean separation between admin tools and user-facing collection management
+- No legacy constraints or technical debt
+- Purpose-built for the new collection browser
+
+### Reference: CLZ Music Web Interface
+We are replicating the CLZ Music Web interface exactly, featuring:
+- **Orange modal header** (#f97316) with album title
+- **8 tabs:** Main, Details, Classical, People, Tracks, Personal, Cover, Links
+- **Universal picker system** used consistently across all selectors
+- **Universal bottom bar** (on all tabs): Collection Status | Index | Quantity | Location
+- **Previous/Next navigation** buttons
+- **Modal-based pickers** for all complex selections (Genre, Format, Artist, Tags, etc.)
+- **Manage modals** with Edit/Delete/Merge functionality
+
+### Edit Album Modal - Complete Tab Inventory
+
+#### 🎵 Main Tab
+- Title (text input)
+- Sort Title (text input)
+- Subtitle (text input)
+- **Artist** (multi-select picker with +/Manage buttons)
+- Release Date (MM/DD/YYYY dropdowns)
+- Original Release Date (MM/DD/YYYY dropdowns)
+- **Label** (picker)
+- Recording Date (MM/DD/YYYY dropdowns)
+- **Format** (picker - radio buttons)
+- Barcode (text input)
+- Cat No (text input)
+- **Genre** (multi-select picker with tags + +/Manage buttons)
+
+#### ℹ️ Details Tab
+- **Packaging** (picker)
+- **Package/Sleeve Condition** (picker)
+- **Media Condition** (picker)
+- Studio (add/picker)
+- **Country** (picker)
+- Sound (add/picker)
+- Vinyl Color (text input)
+- RPM (33/45/78 buttons)
+- Vinyl Weight (number)
+- Extra (multi-line text)
+- **SPARS** (picker)
+- **Box Set** (picker)
+- Is Live (Yes/No toggle)
+
+#### 🎻 Classical Tab
+- Composer (add/picker)
+- Composition (add/picker)
+- Conductor (add/picker)
+- Orchestra (add/picker)
+- Chorus (add/picker)
+
+#### 👥 People Tab
+- **Credits Section:**
+  - Songwriter (add/picker)
+  - Producer (add/picker)
+  - Engineer (add/picker)
+- **Musicians Section:**
+  - Musician (add/picker)
+
+#### 🎼 Tracks Tab (HIGH PRIORITY)
+- Disc tabs (Disc #1, Disc #2, etc.) if multi-disc
+- Disc Title (text input)
+- **Storage Device** (picker)
+- Matrix Nr Side A / Side B (text inputs)
+- **Tracks table:**
+  - Checkbox column
+  - Drag handle column (≡)
+  - Track # (auto)
+  - Title (text input)
+  - Artist (text input)
+  - Length (text input)
+- **🎵 Import from Spotify** button (ENRICHMENT FEATURE)
+- "Add Header" button
+- "Add Track" button
+- "Add Disc" button (if multi-disc)
+
+#### 👤 Personal Tab
+- Purchase Date (MM/DD/YYYY)
+- **Purchase Store** (picker)
+- Purchase Price ($)
+- Current Value ($)
+- **Owner** (picker)
+- My Rating (10 stars)
+- **Tags** (multi-select picker with tags + +/Manage buttons)
+- Notes (textarea)
+- Last Cleaned Date (MM/DD/YYYY)
+- Signed By (add/picker)
+- Played History (add/picker with date+count)
+
+#### 📀 Cover Tab
+- **Front Cover:**
+  - 🔍 Find Online button (ENRICHMENT FEATURE)
+  - ⬆️ Upload button
+  - 🗑️ Remove button
+  - ✂️ Crop / Rotate button
+  - Image preview
+- **Back Cover:**
+  - (same buttons)
+  - Image preview
+
+#### 🔗 Links Tab
+- URL list (add/remove):
+  - URL (text input)
+  - Description (text input)
+  - Drag handle (≡)
+- "➕ New Link" button
+- **Auto-populate** from Spotify/Apple Music/Discogs/Genius (ENRICHMENT FEATURE)
+
+### Universal Picker System Architecture
+
+All pickers follow the same pattern:
+
+**1. SELECT Modal (Single or Multi-select)**
+- Search bar at top
+- Radio buttons (single) OR Checkboxes (multi)
+- Item counts on right
+- "New [Item]" button (top-right, blue)
+- "Manage [Items]" button (top-right, gray)
+- "Save" button (bottom-right)
+
+**2. MANAGE Modal (triggered from "Manage [Items]")**
+- Search bar at top
+- List with ✏️ edit + ❌ delete per row
+- "Merge Mode" button (bottom-right)
+- "Back" button (bottom-left)
+
+**3. EDIT Modal (triggered from ✏️ in Manage)**
+- Name input field
+- Save / Cancel buttons
+
+**4. MERGE Modal (triggered from "Merge Mode")**
+- Checkboxes to select items to merge
+- Shows preview: "Merge 2 Formats to: [target]"
+- "Merge to" / "Cancel" buttons
+
+### Development Phases
+
+**Phase 1: Core Infrastructure** (Start here)
+- [ ] Base modal shell with orange header
+- [ ] Tab navigation system (8 tabs)
+- [ ] Universal bottom bar (Collection Status, Index, Qty, Location)
+- [ ] Previous/Next navigation buttons
+- [ ] Save/Cancel actions
+- [ ] Wire up ✏️ button in collection table to open modal
+
+**Phase 2: Universal Picker System**
+Build reusable picker components that work for ALL pickers:
+- [ ] `<PickerModal>` - Select items (single/multi)
+- [ ] `<ManageModal>` - Edit/delete/merge
+- [ ] `<EditModal>` - Edit single item
+- [ ] `<MergeModal>` - Merge multiple items
+
+**Phase 3: Main Tab + Basic Pickers**
+- [ ] Main tab layout
+- [ ] Format picker (single-select)
+- [ ] Genre picker (multi-select with tags)
+- [ ] Label picker
+- [ ] Artist picker (multi-select)
+- [ ] Basic text inputs and date dropdowns
+
+**Phase 4: Tracks Tab** (HIGH PRIORITY)
+- [ ] Disc management
+- [ ] Tracklist with drag-drop
+- [ ] Add/remove tracks
+- [ ] **🎵 Import from Spotify** button
+
+**Phase 5: Enrichment Integration**
+- [ ] Spotify search & import (Main tab)
+- [ ] Apple Music search & lyrics (Tracks tab)
+- [ ] Discogs metadata (Main tab)
+- [ ] Genius lyrics (Tracks tab)
+- [ ] Cover art search (Cover tab)
+- [ ] Auto-populate links (Links tab)
+
+**Phase 6: Remaining Tabs**
+- [ ] Details tab with pickers
+- [ ] Classical tab with add/pickers
+- [ ] People tab with add/pickers
+- [ ] Personal tab with pickers
+- [ ] Cover tab with upload/crop
+- [ ] Links tab with URL management
+
+### File Structure for Edit Modal
+
+```
+src/app/edit-collection/
+├── EditAlbumModal.tsx          # Main modal component
+├── tabs/
+│   ├── MainTab.tsx             # Basic info
+│   ├── DetailsTab.tsx          # Extended metadata
+│   ├── ClassicalTab.tsx        # Composer, conductor, etc.
+│   ├── PeopleTab.tsx           # Credits & musicians
+│   ├── TracksTab.tsx           # Tracklist management
+│   ├── PersonalTab.tsx         # Purchase, ratings, tags
+│   ├── CoverTab.tsx            # Front/back cover
+│   └── LinksTab.tsx            # URLs
+├── pickers/
+│   ├── PickerModal.tsx         # Universal picker base
+│   ├── ManageModal.tsx         # Manage items (edit/delete/merge)
+│   ├── EditModal.tsx           # Edit single item
+│   ├── MergeModal.tsx          # Merge multiple items
+│   ├── GenrePicker.tsx         # Genre-specific picker
+│   ├── FormatPicker.tsx        # Format picker
+│   ├── ArtistPicker.tsx        # Artist management
+│   └── TagPicker.tsx           # Tag selector
+├── enrichment/
+│   ├── SpotifyEnrich.tsx       # Spotify integration
+│   ├── AppleEnrich.tsx         # Apple Music integration
+│   ├── DiscogsEnrich.tsx       # Discogs integration
+│   └── GeniusEnrich.tsx        # Genius lyrics integration
+└── components/
+    ├── DateDropdowns.tsx       # MM/DD/YYYY selectors
+    ├── RatingStars.tsx         # 10-star rating
+    └── UniversalBottomBar.tsx  # Status/Index/Qty/Location
+```
+
+---
+
+## 📋 PHASE 2.4: DETAIL PANEL IMPROVEMENTS (Deferred)
+
+### Right Panel Enhancements (Lower Priority - Can Integrate into Modal)
 - [ ] Better formatting for multi-line data
 - [ ] Show all relevant metadata fields
-- [ ] Barcode display if available
-- [ ] Catalog number display
-- [ ] Purchase info if available
-- [ ] Discogs/Spotify/Apple Music links
-- [ ] Better tag display with categories
-- [ ] Condition rating display
-- [ ] Action button functionality (Edit, Share, eBay, More)
-- [ ] Track list display if available
+- [ ] Clickable links for external services
 - [ ] Enhanced album artwork display with zoom
-- [ ] Release history information
+- [ ] Track list display if available
 
 ---
 
@@ -275,6 +509,16 @@ Building an exact CLZ Music Web-inspired interface for Dead Wax Dialogues vinyl 
   - Column locking/sticky positioning working
   - Table rendering optimized with virtual scrolling
   - This is a SAFE ROLLBACK POINT - core table functionality complete
+
+- **2025-12-09 (Evening - Update 4):** PHASE 2.3 PLANNING COMPLETE - EDIT ALBUM MODAL ROADMAP
+  - Analyzed CLZ Music Web screenshots (15 screenshots covering all tabs and pickers)
+  - Cataloged complete tab inventory: 8 tabs with detailed field lists
+  - Documented universal picker system architecture (Select/Manage/Edit/Merge modals)
+  - Mapped 40+ picker instances across all tabs
+  - Designed 6-phase development approach starting with core infrastructure
+  - Decision made: Build new modal from scratch vs. modifying existing edit-entry page
+  - File structure planned for tabs/, pickers/, enrichment/, and components/
+  - Ready to begin Phase 1: Core Infrastructure (modal shell + tabs + bottom bar)
   
 - **2025-12-05 (Evening - Update 3):** COLUMN FIXES COMPLETE
   - Fixed "Release Date" column to show year field instead of date_added
@@ -318,33 +562,73 @@ Building an exact CLZ Music Web-inspired interface for Dead Wax Dialogues vinyl 
 
 ## 🎯 IMMEDIATE NEXT STEPS
 
-**Priority 1: Detail Panel Polish (Phase 2.3) - NEXT UP**
-1. Add missing metadata fields (barcode, catalog number, etc.)
-2. Format data better (dates, arrays, multi-line text)
-3. Add clickable links for external services (Discogs, Spotify, Apple Music)
-4. Improve tag display with category badges
-5. Show track list if available
-6. Add album artwork zoom/expand
-7. Wire up action buttons (Edit, Share, eBay, More)
+**Priority 1: Edit Album Modal - Phase 1 (Core Infrastructure) - STARTING NOW**
+1. Create base EditAlbumModal.tsx component
+2. Implement orange header with album title display
+3. Build tab navigation system (8 tabs with icons)
+4. Create universal bottom bar (Collection Status | Index | Qty | Location)
+5. Add Previous/Next navigation buttons
+6. Wire up ✏️ button in CollectionTable to open modal
+7. Implement Save/Cancel actions with Supabase update
+8. Add modal open/close state management
 
-**Priority 2: Selection System (Phase 3.1) - AFTER DETAIL PANEL**
+**Priority 2: Edit Album Modal - Phase 2 (Universal Picker System)**
+1. Build `<PickerModal>` base component (single/multi-select)
+2. Build `<ManageModal>` component (edit/delete/merge)
+3. Build `<EditModal>` component (edit single item)
+4. Build `<MergeModal>` component (merge multiple items)
+5. Test with Format picker (single-select)
+6. Test with Genre picker (multi-select with tags)
+
+**Priority 3: Edit Album Modal - Phase 3 (Main Tab + Basic Pickers)**
+1. Build MainTab.tsx layout
+2. Implement all text inputs (Title, Sort Title, Subtitle, Barcode, Cat No)
+3. Implement date dropdowns (MM/DD/YYYY selectors)
+4. Wire up Format picker
+5. Wire up Genre picker
+6. Wire up Label picker
+7. Wire up Artist picker (multi-select)
+
+**Priority 4: Edit Album Modal - Phase 4 (Tracks Tab - HIGH PRIORITY)**
+1. Build TracksTab.tsx with disc management
+2. Implement tracklist table with drag-drop
+3. Add/remove tracks functionality
+4. Multi-disc support with disc tabs
+5. **🎵 Add "Import from Spotify" button and integration**
+6. Storage Device picker
+7. Matrix number inputs
+
+**Priority 5: Edit Album Modal - Phase 5 (Enrichment Integration)**
+1. Spotify search & import (Main tab)
+2. Apple Music search & lyrics (Tracks tab)
+3. Discogs metadata fetch (Main tab)
+4. Genius lyrics links (Tracks tab)
+5. Cover art search (Cover tab)
+6. Auto-populate links (Links tab)
+
+**Priority 6: Edit Album Modal - Phase 6 (Remaining Tabs)**
+1. Details tab (pickers for packaging, condition, country, etc.)
+2. Classical tab (add/pickers for composer, conductor, etc.)
+3. People tab (credits & musicians with add/pickers)
+4. Personal tab (purchase info, ratings, tags, notes)
+5. Cover tab (upload, crop, find online)
+6. Links tab (URL management with auto-populate)
+
+**Priority 7: Detail Panel Polish (Phase 2.4) - AFTER MODAL COMPLETE**
+1. Can integrate modal features into detail panel
+2. Or enhance detail panel separately as quick-view
+3. Add clickable links to external services
+4. Better metadata formatting
+
+**Priority 8: Selection System (Phase 3.1)**
 1. Wire up checkbox state management
 2. Implement select all/none functionality
 3. Maintain selection across filters and sorting
-4. Test with 100+ selected albums
-5. Add keyboard shortcuts (Cmd/Ctrl+A)
 
-**Priority 3: Batch Operations (Phase 3.2-3.3)**
+**Priority 9: Batch Operations (Phase 3.2-3.3)**
 1. Enable selection toolbar actions
 2. Create batch edit modal
 3. Implement bulk operations
-4. Add progress indicators
-
-**Priority 4: Modals & Advanced (Phase 4-5)**
-1. Add Albums modal with Discogs search
-2. Tag editor modal
-3. View mode switching
-4. Advanced filters
 
 ---
 
