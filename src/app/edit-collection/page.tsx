@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { supabase } from '../../lib/supabaseClient';
 import CollectionTable from '../../components/CollectionTable';
 import ColumnSelector from '../../components/ColumnSelector';
-import { ColumnId, DEFAULT_VISIBLE_COLUMNS, SortState } from './columnDefinitions';
+import { ColumnId, DEFAULT_VISIBLE_COLUMNS, DEFAULT_LOCKED_COLUMNS, SortState } from './columnDefinitions';
 import { Album, toSafeStringArray, toSafeSearchString } from '../../types/album';
 
 type SortOption = 
@@ -207,6 +207,7 @@ function CollectionBrowserPage() {
   });
 
   const [visibleColumns, setVisibleColumns] = useState<ColumnId[]>(DEFAULT_VISIBLE_COLUMNS);
+  const [lockedColumns, setLockedColumns] = useState<ColumnId[]>(DEFAULT_LOCKED_COLUMNS);
   const [showColumnSelector, setShowColumnSelector] = useState(false);
 
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
@@ -222,9 +223,30 @@ function CollectionBrowserPage() {
     }
   }, []);
 
+  useEffect(() => {
+    const stored = localStorage.getItem('collection-locked-columns');
+    if (stored) {
+      try {
+        setLockedColumns(JSON.parse(stored));
+      } catch {
+        // Invalid JSON, use defaults
+      }
+    }
+  }, []);
+
   const handleColumnsChange = useCallback((columns: ColumnId[]) => {
     setVisibleColumns(columns);
     localStorage.setItem('collection-visible-columns', JSON.stringify(columns));
+  }, []);
+
+  const handleColumnLockToggle = useCallback((columnId: ColumnId) => {
+    setLockedColumns(prev => {
+      const newLocked = prev.includes(columnId)
+        ? prev.filter(id => id !== columnId)
+        : [...prev, columnId];
+      localStorage.setItem('collection-locked-columns', JSON.stringify(newLocked));
+      return newLocked;
+    });
   }, []);
 
   useEffect(() => {
@@ -1178,6 +1200,8 @@ function CollectionBrowserPage() {
                 <CollectionTable
                   albums={filteredAndSortedAlbums}
                   visibleColumns={visibleColumns}
+                  lockedColumns={lockedColumns}
+                  onColumnLockToggle={handleColumnLockToggle}
                   onAlbumClick={handleAlbumClick}
                   selectedAlbums={selectedAlbumsAsStrings}
                   onSelectionChange={handleSelectionChange}
