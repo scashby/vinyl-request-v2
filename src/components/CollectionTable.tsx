@@ -292,6 +292,7 @@ const CollectionTable = memo(function CollectionTable({
   const virtualItems = virtualizer.getVirtualItems();
 
   const lockedWidth = locked.reduce((sum, col) => sum + parseInt(col.width), 0);
+  const unlockedWidth = unlocked.reduce((sum, col) => sum + parseInt(col.width), 0);
 
   return (
     <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -334,7 +335,8 @@ const CollectionTable = memo(function CollectionTable({
               display: 'flex',
               alignItems: 'center',
               background: '#e8e8e8',
-              borderBottom: '2px solid #d0d0d0'
+              borderBottom: '2px solid #d0d0d0',
+              width: `${unlockedWidth}px`
             }}>
               {unlocked.map(col => renderHeaderCell(col))}
             </div>
@@ -424,7 +426,7 @@ const CollectionTable = memo(function CollectionTable({
           <div ref={scrollableRef} style={{ flex: 1, overflow: 'auto', position: 'relative' }}>
             <div style={{
               height: `${virtualizer.getTotalSize()}px`,
-              width: '100%',
+              width: `${unlockedWidth}px`,
               position: 'relative'
             }}>
               {virtualItems.map(virtualRow => {
