@@ -1,7 +1,7 @@
 // src/components/CollectionTable.tsx
 'use client';
 
-import React, { memo, useCallback, useMemo, useRef, useEffect } from 'react';
+import React, { memo, useCallback, useMemo, useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Album } from '../types/album';
 import { 
@@ -35,8 +35,6 @@ const CollectionTable = memo(function CollectionTable({
   onSortChange
 }: CollectionTableProps) {
   const scrollableRef = useRef<HTMLDivElement>(null);
-  const lockedHeaderRef = useRef<HTMLDivElement>(null);
-  const scrollableHeaderRef = useRef<HTMLDivElement>(null);
   
   const allColumns = useMemo(() => getVisibleColumns(visibleColumns), [visibleColumns]);
   const { locked, unlocked } = useMemo(
@@ -50,21 +48,6 @@ const CollectionTable = memo(function CollectionTable({
     estimateSize: () => ROW_HEIGHT,
     overscan: 5,
   });
-
-  // Sync horizontal scroll between scrollable header and body
-  useEffect(() => {
-    const scrollableElement = scrollableRef.current;
-    const headerElement = scrollableHeaderRef.current;
-    
-    if (!scrollableElement || !headerElement) return;
-
-    const handleScroll = () => {
-      headerElement.scrollLeft = scrollableElement.scrollLeft;
-    };
-
-    scrollableElement.addEventListener('scroll', handleScroll);
-    return () => scrollableElement.removeEventListener('scroll', handleScroll);
-  }, []);
 
   const formatters = useMemo(() => {
     const formatLength = (seconds: number | null | undefined): string => {
@@ -295,201 +278,185 @@ const CollectionTable = memo(function CollectionTable({
   const unlockedWidth = unlocked.reduce((sum, col) => sum + parseInt(col.width), 0);
 
   return (
-    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
-      {/* Headers */}
-      <div style={{ display: 'flex', flexShrink: 0 }}>
-        {/* Locked Headers */}
-        {locked.length > 0 && (
-          <div 
-            ref={lockedHeaderRef}
-            style={{
-              width: `${lockedWidth}px`,
-              flexShrink: 0,
-              overflowX: 'hidden',
-              overflowY: 'hidden'
-            }}
-          >
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              background: '#e8e8e8',
-              borderBottom: '2px solid #d0d0d0',
-              borderRight: '2px solid #999'
-            }}>
-              {locked.map(col => renderHeaderCell(col))}
-            </div>
-          </div>
-        )}
-        
-        {/* Scrollable Headers */}
-        {unlocked.length > 0 && (
-          <div 
-            ref={scrollableHeaderRef}
-            style={{
-              flex: 1,
-              overflowX: 'hidden',
-              overflowY: 'hidden'
-            }}
-          >
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              background: '#e8e8e8',
-              borderBottom: '2px solid #d0d0d0',
-              width: `${unlockedWidth}px`
-            }}>
-              {unlocked.map(col => renderHeaderCell(col))}
-            </div>
-          </div>
-        )}
-      </div>
-      
-      {/* Body */}
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
-        {/* Locked Columns Body */}
-        {locked.length > 0 && (
+    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'row' }}>
+      {/* Locked Columns Section */}
+      {locked.length > 0 && (
+        <div style={{
+          width: `${lockedWidth}px`,
+          flexShrink: 0,
+          overflow: 'hidden',
+          position: 'relative',
+          borderRight: '2px solid #999',
+          display: 'flex',
+          flexDirection: 'column'
+        }}>
+          {/* Locked Header - Sticky */}
           <div style={{
-            width: `${lockedWidth}px`,
-            flexShrink: 0,
-            overflow: 'hidden',
-            position: 'relative',
-            borderRight: '2px solid #999'
+            position: 'sticky',
+            top: 0,
+            zIndex: 2,
+            display: 'flex',
+            alignItems: 'center',
+            background: '#e8e8e8',
+            borderBottom: '2px solid #d0d0d0'
           }}>
-            <div style={{
-              height: `${virtualizer.getTotalSize()}px`,
-              width: '100%',
-              position: 'relative'
-            }}>
-              {virtualItems.map(virtualRow => {
-                const album = albums[virtualRow.index];
-                const albumId = String(album.id);
-                const isSelected = selectedAlbums.has(albumId);
-
-                return (
-                  <div
-                    key={`locked-${virtualRow.key}`}
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      width: '100%',
-                      height: `${virtualRow.size}px`,
-                      transform: `translateY(${virtualRow.start}px)`,
-                      display: 'flex',
-                      alignItems: 'center',
-                      cursor: 'pointer',
-                      backgroundColor: isSelected ? '#e3f2fd' : virtualRow.index % 2 === 0 ? 'white' : '#fafafa',
-                      borderBottom: '1px solid #e0e0e0'
-                    }}
-                    onClick={() => handleRowClick(album)}
-                    onMouseEnter={(e) => {
-                      if (!isSelected) {
-                        e.currentTarget.style.backgroundColor = '#f5f5f5';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isSelected) {
-                        e.currentTarget.style.backgroundColor = virtualRow.index % 2 === 0 ? 'white' : '#fafafa';
-                      }
-                    }}
-                  >
-                    {locked.map(col => (
-                      <div
-                        key={col.id}
-                        style={{
-                          width: col.width,
-                          minWidth: col.width,
-                          maxWidth: col.width,
-                          padding: '6px 8px',
-                          borderRight: '1px solid #e0e0e0',
-                          color: '#212529',
-                          fontSize: '13px',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          display: 'flex',
-                          alignItems: 'center'
-                        }}
-                      >
-                        {renderCellContent(col, album, albumId, isSelected)}
-                      </div>
-                    ))}
-                  </div>
-                );
-              })}
-            </div>
+            {locked.map(col => renderHeaderCell(col))}
           </div>
-        )}
-        
-        {/* Scrollable Columns Body */}
-        {unlocked.length > 0 && (
-          <div ref={scrollableRef} style={{ flex: 1, overflow: 'auto', position: 'relative' }}>
-            <div style={{
-              height: `${virtualizer.getTotalSize()}px`,
-              width: `${unlockedWidth}px`,
-              position: 'relative'
-            }}>
-              {virtualItems.map(virtualRow => {
-                const album = albums[virtualRow.index];
-                const albumId = String(album.id);
-                const isSelected = selectedAlbums.has(albumId);
+          
+          {/* Locked Body */}
+          <div style={{
+            height: `${virtualizer.getTotalSize()}px`,
+            width: '100%',
+            position: 'relative'
+          }}>
+            {virtualItems.map(virtualRow => {
+              const album = albums[virtualRow.index];
+              const albumId = String(album.id);
+              const isSelected = selectedAlbums.has(albumId);
 
-                return (
-                  <div
-                    key={`unlocked-${virtualRow.key}`}
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      width: '100%',
-                      height: `${virtualRow.size}px`,
-                      transform: `translateY(${virtualRow.start}px)`,
-                      display: 'flex',
-                      alignItems: 'center',
-                      cursor: 'pointer',
-                      backgroundColor: isSelected ? '#e3f2fd' : virtualRow.index % 2 === 0 ? 'white' : '#fafafa',
-                      borderBottom: '1px solid #e0e0e0'
-                    }}
-                    onClick={() => handleRowClick(album)}
-                    onMouseEnter={(e) => {
-                      if (!isSelected) {
-                        e.currentTarget.style.backgroundColor = '#f5f5f5';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isSelected) {
-                        e.currentTarget.style.backgroundColor = virtualRow.index % 2 === 0 ? 'white' : '#fafafa';
-                      }
-                    }}
-                  >
-                    {unlocked.map(col => (
-                      <div
-                        key={col.id}
-                        style={{
-                          width: col.width,
-                          minWidth: col.width,
-                          maxWidth: col.width,
-                          padding: '6px 8px',
-                          borderRight: '1px solid #e0e0e0',
-                          color: '#212529',
-                          fontSize: '13px',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          display: 'flex',
-                          alignItems: 'center'
-                        }}
-                      >
-                        {renderCellContent(col, album, albumId, isSelected)}
-                      </div>
-                    ))}
-                  </div>
-                );
-              })}
-            </div>
+              return (
+                <div
+                  key={`locked-${virtualRow.key}`}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: `${virtualRow.size}px`,
+                    transform: `translateY(${virtualRow.start}px)`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    cursor: 'pointer',
+                    backgroundColor: isSelected ? '#e3f2fd' : virtualRow.index % 2 === 0 ? 'white' : '#fafafa',
+                    borderBottom: '1px solid #e0e0e0'
+                  }}
+                  onClick={() => handleRowClick(album)}
+                  onMouseEnter={(e) => {
+                    if (!isSelected) {
+                      e.currentTarget.style.backgroundColor = '#f5f5f5';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isSelected) {
+                      e.currentTarget.style.backgroundColor = virtualRow.index % 2 === 0 ? 'white' : '#fafafa';
+                    }
+                  }}
+                >
+                  {locked.map(col => (
+                    <div
+                      key={col.id}
+                      style={{
+                        width: col.width,
+                        minWidth: col.width,
+                        maxWidth: col.width,
+                        padding: '6px 8px',
+                        borderRight: '1px solid #e0e0e0',
+                        color: '#212529',
+                        fontSize: '13px',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        display: 'flex',
+                        alignItems: 'center'
+                      }}
+                    >
+                      {renderCellContent(col, album, albumId, isSelected)}
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
           </div>
-        )}
-      </div>
+        </div>
+      )}
+      
+      {/* Scrollable Columns Section */}
+      {unlocked.length > 0 && (
+        <div ref={scrollableRef} style={{ 
+          flex: 1, 
+          overflow: 'auto', 
+          position: 'relative'
+        }}>
+          {/* Scrollable Header - Sticky */}
+          <div style={{
+            position: 'sticky',
+            top: 0,
+            zIndex: 2,
+            display: 'flex',
+            alignItems: 'center',
+            background: '#e8e8e8',
+            borderBottom: '2px solid #d0d0d0',
+            width: `${unlockedWidth}px`
+          }}>
+            {unlocked.map(col => renderHeaderCell(col))}
+          </div>
+          
+          {/* Scrollable Body */}
+          <div style={{
+            height: `${virtualizer.getTotalSize()}px`,
+            width: `${unlockedWidth}px`,
+            position: 'relative'
+          }}>
+            {virtualItems.map(virtualRow => {
+              const album = albums[virtualRow.index];
+              const albumId = String(album.id);
+              const isSelected = selectedAlbums.has(albumId);
+
+              return (
+                <div
+                  key={`unlocked-${virtualRow.key}`}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: `${virtualRow.size}px`,
+                    transform: `translateY(${virtualRow.start}px)`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    cursor: 'pointer',
+                    backgroundColor: isSelected ? '#e3f2fd' : virtualRow.index % 2 === 0 ? 'white' : '#fafafa',
+                    borderBottom: '1px solid #e0e0e0'
+                  }}
+                  onClick={() => handleRowClick(album)}
+                  onMouseEnter={(e) => {
+                    if (!isSelected) {
+                      e.currentTarget.style.backgroundColor = '#f5f5f5';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isSelected) {
+                      e.currentTarget.style.backgroundColor = virtualRow.index % 2 === 0 ? 'white' : '#fafafa';
+                    }
+                  }}
+                >
+                  {unlocked.map(col => (
+                    <div
+                      key={col.id}
+                      style={{
+                        width: col.width,
+                        minWidth: col.width,
+                        maxWidth: col.width,
+                        padding: '6px 8px',
+                        borderRight: '1px solid #e0e0e0',
+                        color: '#212529',
+                        fontSize: '13px',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        display: 'flex',
+                        alignItems: 'center'
+                      }}
+                    >
+                      {renderCellContent(col, album, albumId, isSelected)}
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }, (prevProps, nextProps) => {
