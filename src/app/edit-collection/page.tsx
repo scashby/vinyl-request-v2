@@ -65,7 +65,12 @@ const AlbumInfoPanel = memo(function AlbumInfoPanel({ album }: { album: Album | 
   }
 
   return (
-    <div style={{ padding: '16px', flex: 1, overflowY: 'auto', background: '#F8DE77' }}>
+    <div style={{ 
+      padding: '16px', 
+      flex: 1, 
+      overflowY: 'auto', 
+      background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)' 
+    }}>
       <div style={{ fontSize: '14px', color: '#333', marginBottom: '4px' }}>
         {album.artist}
       </div>
@@ -1213,7 +1218,7 @@ function CollectionBrowserPage() {
                   cursor: 'pointer',
                   fontSize: '14px',
                   color: 'white'
-                }}>✏</button>
+                }}>✏️</button>
 
                 <button 
                   title="Share album"

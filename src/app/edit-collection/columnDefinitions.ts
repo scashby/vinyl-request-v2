@@ -94,17 +94,18 @@ export interface ColumnDefinition {
   label: string;
   width: string;
   sortable?: boolean;
+  lockable?: boolean;
 }
 
 export const COLUMN_DEFINITIONS: Record<ColumnId, ColumnDefinition> = {
   // Main
-  checkbox: { id: 'checkbox', label: '', width: '40px' },
-  owned: { id: 'owned', label: '✓', width: '40px' },
-  for_sale_indicator: { id: 'for_sale_indicator', label: '$', width: '40px' },
-  menu: { id: 'menu', label: '✏', width: '40px' },
-  artist: { id: 'artist', label: 'Artist', width: '200px', sortable: true },
-  title: { id: 'title', label: 'Title', width: '300px', sortable: true },
-  year: { id: 'year', label: 'Year', width: '80px' },
+  checkbox: { id: 'checkbox', label: '', width: '40px', lockable: true },
+  owned: { id: 'owned', label: '✓', width: '40px', lockable: true },
+  for_sale_indicator: { id: 'for_sale_indicator', label: '$', width: '40px', lockable: true },
+  menu: { id: 'menu', label: '✏', width: '40px', lockable: true },
+  artist: { id: 'artist', label: 'Artist', width: '200px', sortable: true, lockable: true },
+  title: { id: 'title', label: 'Title', width: '300px', sortable: true, lockable: true },
+  year: { id: 'year', label: 'Year', width: '80px', lockable: true },
   barcode: { id: 'barcode', label: 'Barcode', width: '150px' },
   cat_no: { id: 'cat_no', label: 'Cat No', width: '120px' },
   sort_title: { id: 'sort_title', label: 'Sort Title', width: '200px' },
@@ -293,8 +294,35 @@ export const DEFAULT_VISIBLE_COLUMNS: ColumnId[] = [
   'added_date'
 ];
 
+export const DEFAULT_LOCKED_COLUMNS: ColumnId[] = [
+  'checkbox',
+  'owned',
+  'for_sale_indicator',
+  'menu',
+  'artist',
+  'title'
+];
+
 export function getVisibleColumns(visibleIds: ColumnId[]): ColumnDefinition[] {
   return visibleIds.map(id => COLUMN_DEFINITIONS[id]).filter(Boolean);
+}
+
+export function splitColumnsByLock(visibleColumns: ColumnDefinition[], lockedIds: ColumnId[]): {
+  locked: ColumnDefinition[];
+  unlocked: ColumnDefinition[];
+} {
+  const locked: ColumnDefinition[] = [];
+  const unlocked: ColumnDefinition[] = [];
+  
+  visibleColumns.forEach(col => {
+    if (lockedIds.includes(col.id)) {
+      locked.push(col);
+    } else {
+      unlocked.push(col);
+    }
+  });
+  
+  return { locked, unlocked };
 }
 
 export type SortDirection = 'asc' | 'desc' | null;
