@@ -239,16 +239,6 @@ function CollectionBrowserPage() {
     localStorage.setItem('collection-visible-columns', JSON.stringify(columns));
   }, []);
 
-  const handleColumnLockToggle = useCallback((columnId: ColumnId) => {
-    setLockedColumns(prev => {
-      const newLocked = prev.includes(columnId)
-        ? prev.filter(id => id !== columnId)
-        : [...prev, columnId];
-      localStorage.setItem('collection-locked-columns', JSON.stringify(newLocked));
-      return newLocked;
-    });
-  }, []);
-
   useEffect(() => {
     const stored = localStorage.getItem('collection-sort-preference');
     if (stored && SORT_OPTIONS.some(opt => opt.value === stored)) {
@@ -1201,7 +1191,6 @@ function CollectionBrowserPage() {
                   albums={filteredAndSortedAlbums}
                   visibleColumns={visibleColumns}
                   lockedColumns={lockedColumns}
-                  onColumnLockToggle={handleColumnLockToggle}
                   onAlbumClick={handleAlbumClick}
                   selectedAlbums={selectedAlbumsAsStrings}
                   onSelectionChange={handleSelectionChange}

@@ -18,7 +18,6 @@ interface CollectionTableProps {
   onSelectionChange: (albumIds: Set<string>) => void;
   visibleColumns: ColumnId[];
   lockedColumns: ColumnId[];
-  onColumnLockToggle: (columnId: ColumnId) => void;
   sortState: SortState;
   onSortChange: (column: ColumnId) => void;
 }
@@ -32,7 +31,6 @@ const CollectionTable = memo(function CollectionTable({
   onSelectionChange,
   visibleColumns,
   lockedColumns,
-  onColumnLockToggle,
   sortState,
   onSortChange
 }: CollectionTableProps) {
@@ -224,8 +222,6 @@ const CollectionTable = memo(function CollectionTable({
   }, [selectedAlbums, onSelectionChange]);
 
   const renderHeaderCell = useCallback((col: ReturnType<typeof getVisibleColumns>[0]) => {
-    const isColumnLocked = lockedColumns.includes(col.id);
-    
     return (
       <div
         key={col.id}
@@ -244,64 +240,39 @@ const CollectionTable = memo(function CollectionTable({
           userSelect: 'none',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
           gap: '4px'
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: 1, overflow: 'hidden' }}>
-          {col.id === 'checkbox' ? (
-            <input
-              type="checkbox"
-              checked={allSelected}
-              ref={input => {
-                if (input) {
-                  input.indeterminate = someSelected;
-                }
-              }}
-              onChange={handleSelectAll}
-              onClick={(e) => e.stopPropagation()}
-              style={{ cursor: 'pointer' }}
-            />
-          ) : (
-            <>
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{col.label}</span>
-              {col.sortable && (
-                <span style={{ 
-                  color: sortState.column === col.id ? '#2196F3' : '#999',
-                  fontSize: '11px',
-                  fontWeight: 'bold'
-                }}>
-                  {getSortIndicator(col.id) || '⇅'}
-                </span>
-              )}
-            </>
-          )}
-        </div>
-        {col.lockable && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onColumnLockToggle(col.id);
+        {col.id === 'checkbox' ? (
+          <input
+            type="checkbox"
+            checked={allSelected}
+            ref={input => {
+              if (input) {
+                input.indeterminate = someSelected;
+              }
             }}
-            title={isColumnLocked ? 'Unlock column' : 'Lock column'}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: isColumnLocked ? '#2196F3' : '#999',
-              cursor: 'pointer',
-              fontSize: '12px',
-              padding: '2px',
-              display: 'flex',
-              alignItems: 'center',
-              lineHeight: '1'
-            }}
-          >
-            {isColumnLocked ? '🔒' : '🔓'}
-          </button>
+            onChange={handleSelectAll}
+            onClick={(e) => e.stopPropagation()}
+            style={{ cursor: 'pointer' }}
+          />
+        ) : (
+          <>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{col.label}</span>
+            {col.sortable && (
+              <span style={{ 
+                color: sortState.column === col.id ? '#2196F3' : '#999',
+                fontSize: '11px',
+                fontWeight: 'bold'
+              }}>
+                {getSortIndicator(col.id) || '⇅'}
+              </span>
+            )}
+          </>
         )}
       </div>
     );
-  }, [allSelected, someSelected, sortState, lockedColumns, handleSelectAll, handleHeaderClick, getSortIndicator, onColumnLockToggle]);
+  }, [allSelected, someSelected, sortState, handleSelectAll, handleHeaderClick, getSortIndicator]);
 
   const renderCellContent = useCallback((col: ReturnType<typeof getVisibleColumns>[0], album: Album, albumId: string, isSelected: boolean) => {
     if (col.id === 'checkbox') {
