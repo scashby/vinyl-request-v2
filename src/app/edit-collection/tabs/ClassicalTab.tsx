@@ -8,7 +8,7 @@ interface ClassicalTabProps {
   onChange: (field: keyof Album, value: string | number | string[] | null) => void;
 }
 
-export function ClassicalTab({ album: _album, onChange: _onChange }: ClassicalTabProps) {
+export function ClassicalTab({}: ClassicalTabProps) {
   return (
     <div style={{ maxWidth: '900px' }}>
       <div style={{

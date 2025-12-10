@@ -9,7 +9,7 @@ interface CoverTabProps {
   onChange: (field: keyof Album, value: string | number | string[] | null) => void;
 }
 
-export function CoverTab({ album, onChange: _onChange }: CoverTabProps) {
+export function CoverTab({ album }: CoverTabProps) {
   return (
     <div style={{ maxWidth: '900px' }}>
       <div style={{
