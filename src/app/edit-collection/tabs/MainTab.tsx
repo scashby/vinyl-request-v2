@@ -52,6 +52,24 @@ export function MainTab({ album, onChange }: MainTabProps) {
     backgroundColor: 'white',
   };
 
+  // List icon button style - separate bordered button
+  const listButtonStyle: React.CSSProperties = {
+    width: '32px',
+    height: '32px',
+    padding: 0,
+    border: '1px solid #d1d5db',
+    borderRadius: '4px',
+    backgroundColor: 'white',
+    cursor: 'pointer',
+    fontSize: '13px',
+    lineHeight: '1',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: '#9ca3af',
+    flexShrink: 0,
+  };
+
   return (
     <div style={{ 
       display: 'grid', 
@@ -61,7 +79,7 @@ export function MainTab({ album, onChange }: MainTabProps) {
     }}>
       {/* LEFT COLUMN */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        {/* Title */}
+        {/* Title with Aa */}
         <div>
           <label style={labelStyle}>Title</label>
           <div style={{ position: 'relative' }}>
@@ -193,8 +211,6 @@ export function MainTab({ album, onChange }: MainTabProps) {
                 borderRadius: '4px',
                 backgroundColor: 'white',
                 cursor: 'pointer',
-                fontSize: '16px',
-                lineHeight: '1',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -236,8 +252,6 @@ export function MainTab({ album, onChange }: MainTabProps) {
                 borderRadius: '4px',
                 backgroundColor: 'white',
                 cursor: 'pointer',
-                fontSize: '16px',
-                lineHeight: '1',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -257,32 +271,15 @@ export function MainTab({ album, onChange }: MainTabProps) {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <div>
             <label style={labelStyle}>Label</label>
-            <div style={{ position: 'relative' }}>
+            <div style={{ display: 'flex', gap: '6px' }}>
               <select 
                 value={album.spotify_label || album.apple_music_label || ''}
                 onChange={(e) => onChange('spotify_label', e.target.value)}
-                style={selectStyle}
+                style={{ ...selectStyle, flex: 1 }}
               >
                 <option value="">{album.spotify_label || album.apple_music_label || 'Select label'}</option>
               </select>
-              <button
-                style={{
-                  position: 'absolute',
-                  right: '28px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  background: 'transparent',
-                  border: 'none',
-                  color: '#9ca3af',
-                  cursor: 'pointer',
-                  fontSize: '13px',
-                  padding: '4px',
-                  lineHeight: '1',
-                  pointerEvents: 'none',
-                }}
-              >
-                ☰
-              </button>
+              <button style={listButtonStyle}>☰</button>
             </div>
           </div>
           <div>
@@ -311,8 +308,6 @@ export function MainTab({ album, onChange }: MainTabProps) {
                 borderRadius: '4px',
                 backgroundColor: 'white',
                 cursor: 'pointer',
-                fontSize: '16px',
-                lineHeight: '1',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -332,32 +327,15 @@ export function MainTab({ album, onChange }: MainTabProps) {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <div>
             <label style={labelStyle}>Format</label>
-            <div style={{ position: 'relative' }}>
+            <div style={{ display: 'flex', gap: '6px' }}>
               <select 
                 value={album.format}
                 onChange={(e) => onChange('format', e.target.value)}
-                style={selectStyle}
+                style={{ ...selectStyle, flex: 1 }}
               >
                 <option>{album.format}</option>
               </select>
-              <button
-                style={{
-                  position: 'absolute',
-                  right: '28px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  background: 'transparent',
-                  border: 'none',
-                  color: '#9ca3af',
-                  cursor: 'pointer',
-                  fontSize: '13px',
-                  padding: '4px',
-                  lineHeight: '1',
-                  pointerEvents: 'none',
-                }}
-              >
-                ☰
-              </button>
+              <button style={listButtonStyle}>☰</button>
             </div>
           </div>
           <div>
@@ -371,87 +349,73 @@ export function MainTab({ album, onChange }: MainTabProps) {
           </div>
         </div>
 
-        {/* Row 4: Empty | Cat No */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-          <div></div>
-          <div>
-            <label style={labelStyle}>Cat No</label>
-            <input
-              type="text"
-              value={album.cat_no || ''}
-              onChange={(e) => onChange('cat_no', e.target.value)}
-              style={inputStyle}
-            />
-          </div>
+        {/* Row 4: Cat No - FULL WIDTH */}
+        <div>
+          <label style={labelStyle}>Cat No</label>
+          <input
+            type="text"
+            value={album.cat_no || ''}
+            onChange={(e) => onChange('cat_no', e.target.value)}
+            style={inputStyle}
+          />
         </div>
 
-        {/* Row 5: Genre (full width) */}
+        {/* Row 5: Genre - FULL WIDTH */}
         <div>
           <label style={labelStyle}>Genre</label>
           <div style={{
-            padding: '6px 10px',
-            border: '1px solid #d1d5db',
-            borderRadius: '4px',
-            minHeight: '32px',
             display: 'flex',
             gap: '6px',
-            flexWrap: 'wrap',
-            alignItems: 'center',
-            backgroundColor: 'white',
-            position: 'relative',
           }}>
-            {album.discogs_genres && album.discogs_genres.length > 0 ? (
-              <>
-                {album.discogs_genres.map((genre, idx) => (
-                  <span
-                    key={idx}
-                    style={{
-                      backgroundColor: '#e5e7eb',
-                      padding: '3px 8px',
-                      borderRadius: '3px',
-                      fontSize: '12px',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      color: '#374151',
-                    }}
-                  >
-                    {genre}
-                    <button
+            <div style={{
+              flex: 1,
+              padding: '6px 10px',
+              border: '1px solid #d1d5db',
+              borderRadius: '4px',
+              minHeight: '32px',
+              display: 'flex',
+              gap: '6px',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              backgroundColor: 'white',
+            }}>
+              {album.discogs_genres && album.discogs_genres.length > 0 ? (
+                <>
+                  {album.discogs_genres.map((genre, idx) => (
+                    <span
+                      key={idx}
                       style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: '#6b7280',
-                        cursor: 'pointer',
-                        padding: 0,
-                        fontSize: '14px',
-                        lineHeight: '1',
-                        fontWeight: '300',
+                        backgroundColor: '#e5e7eb',
+                        padding: '3px 8px',
+                        borderRadius: '3px',
+                        fontSize: '12px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        color: '#374151',
                       }}
                     >
-                      ×
-                    </button>
-                  </span>
-                ))}
-              </>
-            ) : null}
-            <button
-              style={{
-                position: 'absolute',
-                right: '10px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                background: 'transparent',
-                border: 'none',
-                color: '#9ca3af',
-                cursor: 'pointer',
-                fontSize: '13px',
-                padding: '4px',
-                lineHeight: '1',
-              }}
-            >
-              ☰
-            </button>
+                      {genre}
+                      <button
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          color: '#6b7280',
+                          cursor: 'pointer',
+                          padding: 0,
+                          fontSize: '14px',
+                          lineHeight: '1',
+                          fontWeight: '300',
+                        }}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </>
+              ) : null}
+            </div>
+            <button style={listButtonStyle}>☰</button>
           </div>
         </div>
       </div>
