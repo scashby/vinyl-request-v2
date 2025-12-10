@@ -182,7 +182,7 @@ export default function EditAlbumModal({
     }}>
       <div style={{
         background: 'white',
-        borderRadius: '8px',
+        borderRadius: '4px',
         width: '100%',
         maxWidth: '1200px',
         maxHeight: '90vh',
@@ -194,41 +194,28 @@ export default function EditAlbumModal({
         {/* Solid Orange Header - CLZ Style */}
         <div style={{
           background: '#F7941D',
-          padding: '16px 20px',
+          padding: '14px 20px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          borderTopLeftRadius: '8px',
-          borderTopRightRadius: '8px',
         }}>
-          <div style={{ flex: 1 }}>
-            <h2 style={{
-              margin: 0,
-              color: 'white',
-              fontSize: '18px',
-              fontWeight: '600',
-              marginBottom: '2px',
-            }}>
-              {album.title} / {album.artist}
-            </h2>
-            <p style={{
-              margin: 0,
-              color: 'white',
-              fontSize: '13px',
-              opacity: 0.95,
-            }}>
-              {album.format} • {album.year}
-            </p>
-          </div>
+          <h2 style={{
+            margin: 0,
+            color: 'white',
+            fontSize: '18px',
+            fontWeight: '500',
+          }}>
+            {album.title} / {album.artist}
+          </h2>
           <button
             onClick={handleCancel}
             style={{
               background: 'transparent',
               border: 'none',
               color: 'white',
-              fontSize: '28px',
-              width: '32px',
-              height: '32px',
+              fontSize: '24px',
+              width: '28px',
+              height: '28px',
               borderRadius: '4px',
               cursor: 'pointer',
               display: 'flex',
@@ -236,9 +223,9 @@ export default function EditAlbumModal({
               justifyContent: 'center',
               transition: 'background 0.2s',
               lineHeight: '1',
-              fontWeight: '300',
+              padding: 0,
             }}
-            onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'}
+            onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'}
             onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
           >
             ×
@@ -248,7 +235,7 @@ export default function EditAlbumModal({
         {/* Tab Navigation - CLZ Style */}
         <div style={{
           borderBottom: '1px solid #e5e7eb',
-          background: 'white',
+          background: '#f9fafb',
           display: 'flex',
           overflowX: 'auto',
         }}>
@@ -257,13 +244,13 @@ export default function EditAlbumModal({
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               style={{
-                padding: '12px 20px',
+                padding: '10px 18px',
                 border: 'none',
-                background: 'white',
+                background: activeTab === tab.id ? 'white' : 'transparent',
                 borderBottom: activeTab === tab.id ? '3px solid #F7941D' : '3px solid transparent',
-                color: activeTab === tab.id ? '#F7941D' : '#6b7280',
+                color: activeTab === tab.id ? '#111827' : '#6b7280',
                 fontSize: '13px',
-                fontWeight: '600',
+                fontWeight: '500',
                 cursor: 'pointer',
                 transition: 'all 0.2s',
                 whiteSpace: 'nowrap',
@@ -292,7 +279,7 @@ export default function EditAlbumModal({
         <div style={{
           flex: 1,
           overflowY: 'auto',
-          padding: '24px',
+          padding: '16px',
           background: 'white',
         }}>
           {activeTab === 'main' && (
