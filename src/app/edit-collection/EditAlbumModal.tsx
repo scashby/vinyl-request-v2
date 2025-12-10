@@ -24,13 +24,13 @@ interface EditAlbumModalProps {
 }
 
 const TABS: { id: TabId; label: string; icon: string }[] = [
-  { id: 'main', label: 'Main', icon: '🎵' },
-  { id: 'details', label: 'Details', icon: 'ℹ️' },
-  { id: 'classical', label: 'Classical', icon: '🎻' },
+  { id: 'main', label: 'Main', icon: '♪' },
+  { id: 'details', label: 'Details', icon: 'ⓘ' },
+  { id: 'classical', label: 'Classical', icon: '♬' },
   { id: 'people', label: 'People', icon: '👥' },
-  { id: 'tracks', label: 'Tracks', icon: '📋' },
+  { id: 'tracks', label: 'Tracks', icon: '☰' },
   { id: 'personal', label: 'Personal', icon: '👤' },
-  { id: 'cover', label: 'Cover', icon: '🖼️' },
+  { id: 'cover', label: 'Cover', icon: '📷' },
   { id: 'links', label: 'Links', icon: '🔗' },
 ];
 
@@ -173,7 +173,7 @@ export default function EditAlbumModal({
       left: 0,
       right: 0,
       bottom: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.6)',
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -184,17 +184,17 @@ export default function EditAlbumModal({
         background: 'white',
         borderRadius: '4px',
         width: '100%',
-        maxWidth: '1200px',
+        maxWidth: '1100px',
         maxHeight: '90vh',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
       }}>
-        {/* Solid Orange Header - CLZ Style */}
+        {/* Header */}
         <div style={{
           background: '#F7941D',
-          padding: '14px 20px',
+          padding: '12px 16px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -214,37 +214,32 @@ export default function EditAlbumModal({
               border: 'none',
               color: 'white',
               fontSize: '24px',
-              width: '28px',
-              height: '28px',
-              borderRadius: '4px',
+              width: '24px',
+              height: '24px',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              transition: 'background 0.2s',
               lineHeight: '1',
               padding: 0,
             }}
-            onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'}
-            onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
           >
             ×
           </button>
         </div>
 
-        {/* Tab Navigation - CLZ Style */}
+        {/* Tabs */}
         <div style={{
           borderBottom: '1px solid #e5e7eb',
           background: '#f9fafb',
           display: 'flex',
-          overflowX: 'auto',
         }}>
           {TABS.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               style={{
-                padding: '10px 18px',
+                padding: '10px 16px',
                 border: 'none',
                 background: activeTab === tab.id ? 'white' : 'transparent',
                 borderBottom: activeTab === tab.id ? '3px solid #F7941D' : '3px solid transparent',
@@ -252,24 +247,13 @@ export default function EditAlbumModal({
                 fontSize: '13px',
                 fontWeight: '500',
                 cursor: 'pointer',
-                transition: 'all 0.2s',
                 whiteSpace: 'nowrap',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
               }}
-              onMouseOver={(e) => {
-                if (activeTab !== tab.id) {
-                  e.currentTarget.style.color = '#374151';
-                }
-              }}
-              onMouseOut={(e) => {
-                if (activeTab !== tab.id) {
-                  e.currentTarget.style.color = '#6b7280';
-                }
-              }}
             >
-              <span>{tab.icon}</span>
+              <span style={{ fontSize: '14px' }}>{tab.icon}</span>
               <span>{tab.label}</span>
             </button>
           ))}
@@ -314,32 +298,30 @@ export default function EditAlbumModal({
           onChange={handleFieldChange}
         />
 
-        {/* Footer Actions */}
+        {/* Footer */}
         <div style={{
           borderTop: '1px solid #e5e7eb',
-          padding: '12px 20px',
+          padding: '12px 16px',
           background: '#f9fafb',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
         }}>
-          {/* Previous/Next Navigation */}
+          {/* Previous/Next */}
           <div style={{ display: 'flex', gap: '8px' }}>
             <button
               onClick={handlePrevious}
               disabled={!hasPrevious}
               style={{
-                padding: '8px 16px',
+                padding: '6px 14px',
                 border: '1px solid #d1d5db',
                 borderRadius: '4px',
-                background: hasPrevious ? 'white' : '#f3f4f6',
-                color: hasPrevious ? '#374151' : '#9ca3af',
+                background: '#e5e7eb',
+                color: '#374151',
                 fontSize: '13px',
-                fontWeight: '600',
+                fontWeight: '500',
                 cursor: hasPrevious ? 'pointer' : 'not-allowed',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
+                opacity: hasPrevious ? 1 : 0.5,
               }}
             >
               ◄ Previous
@@ -348,43 +330,34 @@ export default function EditAlbumModal({
               onClick={handleNext}
               disabled={!hasNext}
               style={{
-                padding: '8px 16px',
+                padding: '6px 14px',
                 border: '1px solid #d1d5db',
                 borderRadius: '4px',
-                background: hasNext ? 'white' : '#f3f4f6',
-                color: hasNext ? '#374151' : '#9ca3af',
+                background: '#e5e7eb',
+                color: '#374151',
                 fontSize: '13px',
-                fontWeight: '600',
+                fontWeight: '500',
                 cursor: hasNext ? 'pointer' : 'not-allowed',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
+                opacity: hasNext ? 1 : 0.5,
               }}
             >
               Next ►
             </button>
           </div>
 
-          {/* Save/Cancel Actions */}
-          <div style={{ display: 'flex', gap: '10px' }}>
+          {/* Save/Cancel */}
+          <div style={{ display: 'flex', gap: '8px' }}>
             <button
               onClick={handleCancel}
               style={{
-                padding: '8px 20px',
+                padding: '6px 18px',
                 border: '1px solid #d1d5db',
                 borderRadius: '4px',
-                background: 'white',
+                background: '#e5e7eb',
                 color: '#374151',
                 fontSize: '13px',
-                fontWeight: '600',
+                fontWeight: '500',
                 cursor: 'pointer',
-                transition: 'all 0.2s',
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.background = '#f9fafb';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.background = 'white';
               }}
             >
               Cancel
@@ -393,25 +366,14 @@ export default function EditAlbumModal({
               onClick={handleSave}
               disabled={saving || !hasChanges}
               style={{
-                padding: '8px 24px',
+                padding: '6px 20px',
                 border: 'none',
                 borderRadius: '4px',
                 background: saving || !hasChanges ? '#9ca3af' : '#5DADE2',
                 color: 'white',
                 fontSize: '13px',
-                fontWeight: '700',
+                fontWeight: '600',
                 cursor: saving || !hasChanges ? 'not-allowed' : 'pointer',
-                transition: 'background 0.2s',
-              }}
-              onMouseOver={(e) => {
-                if (!saving && hasChanges) {
-                  e.currentTarget.style.background = '#4A9FD3';
-                }
-              }}
-              onMouseOut={(e) => {
-                if (!saving && hasChanges) {
-                  e.currentTarget.style.background = '#5DADE2';
-                }
               }}
             >
               {saving ? 'Saving...' : 'Save'}
