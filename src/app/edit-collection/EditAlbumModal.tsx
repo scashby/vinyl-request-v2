@@ -26,7 +26,7 @@ interface EditAlbumModalProps {
 const TABS: { id: TabId; label: string; icon: string }[] = [
   { id: 'main', label: 'Main', icon: '♪' },
   { id: 'details', label: 'Details', icon: 'ⓘ' },
-  { id: 'classical', label: 'Classical', icon: '♬' },
+  { id: 'classical', label: 'Classical', icon: '𝄞' },
   { id: 'people', label: 'People', icon: '👥' },
   { id: 'tracks', label: 'Tracks', icon: '☰' },
   { id: 'personal', label: 'Personal', icon: '👤' },
