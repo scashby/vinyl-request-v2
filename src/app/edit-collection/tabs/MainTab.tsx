@@ -27,6 +27,21 @@ export function MainTab({ album, onChange }: MainTabProps) {
     backgroundColor: 'white',
   };
 
+  const selectStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '7px 10px',
+    border: '1px solid #d1d5db',
+    borderRadius: '4px',
+    fontSize: '13px',
+    fontFamily: 'system-ui, -apple-system, sans-serif',
+    backgroundColor: 'white',
+    appearance: 'none',
+    backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'10\' height=\'6\' viewBox=\'0 0 10 6\'%3E%3Cpath fill=\'%23666\' d=\'M0 0l5 6 5-6z\'/%3E%3C/svg%3E")',
+    backgroundRepeat: 'no-repeat',
+    backgroundPosition: 'right 12px center',
+    paddingRight: '32px',
+  };
+
   const dateInputStyle: React.CSSProperties = {
     padding: '7px 6px',
     border: '1px solid #d1d5db',
@@ -137,6 +152,7 @@ export function MainTab({ album, onChange }: MainTabProps) {
                 cursor: 'pointer',
                 color: '#6b7280',
                 fontWeight: '300',
+                flexShrink: 0,
               }}
             >
               +
@@ -157,17 +173,17 @@ export function MainTab({ album, onChange }: MainTabProps) {
                 value={album.year || ''}
                 onChange={(e) => onChange('year', e.target.value)}
                 placeholder="YYYY"
-                style={{ ...dateInputStyle, width: '60px' }}
+                style={{ ...dateInputStyle, width: '62px' }}
               />
               <input
                 type="text"
                 placeholder="MM"
-                style={{ ...dateInputStyle, width: '50px' }}
+                style={{ ...dateInputStyle, width: '48px' }}
               />
               <input
                 type="text"
                 placeholder="DD"
-                style={{ ...dateInputStyle, width: '50px' }}
+                style={{ ...dateInputStyle, width: '48px' }}
               />
               <button style={{
                 width: '32px',
@@ -182,6 +198,7 @@ export function MainTab({ album, onChange }: MainTabProps) {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                flexShrink: 0,
               }}>
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                   <rect x="2" y="3" width="12" height="11" rx="1" stroke="#6b7280" strokeWidth="1.5"/>
@@ -199,17 +216,17 @@ export function MainTab({ album, onChange }: MainTabProps) {
                 value={album.master_release_date || ''}
                 onChange={(e) => onChange('master_release_date', e.target.value)}
                 placeholder="YYYY"
-                style={{ ...dateInputStyle, width: '60px' }}
+                style={{ ...dateInputStyle, width: '62px' }}
               />
               <input
                 type="text"
                 placeholder="MM"
-                style={{ ...dateInputStyle, width: '50px' }}
+                style={{ ...dateInputStyle, width: '48px' }}
               />
               <input
                 type="text"
                 placeholder="DD"
-                style={{ ...dateInputStyle, width: '50px' }}
+                style={{ ...dateInputStyle, width: '48px' }}
               />
               <button style={{
                 width: '32px',
@@ -224,6 +241,7 @@ export function MainTab({ album, onChange }: MainTabProps) {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                flexShrink: 0,
               }}>
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                   <rect x="2" y="3" width="12" height="11" rx="1" stroke="#6b7280" strokeWidth="1.5"/>
@@ -240,23 +258,31 @@ export function MainTab({ album, onChange }: MainTabProps) {
           <div>
             <label style={labelStyle}>Label</label>
             <div style={{ position: 'relative' }}>
-              <input
-                type="text"
+              <select 
                 value={album.spotify_label || album.apple_music_label || ''}
                 onChange={(e) => onChange('spotify_label', e.target.value)}
-                style={inputStyle}
-              />
-              <span style={{
-                position: 'absolute',
-                right: '10px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                color: '#9ca3af',
-                fontSize: '12px',
-                pointerEvents: 'none',
-              }}>
+                style={selectStyle}
+              >
+                <option value="">{album.spotify_label || album.apple_music_label || 'Select label'}</option>
+              </select>
+              <button
+                style={{
+                  position: 'absolute',
+                  right: '28px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#9ca3af',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  padding: '4px',
+                  lineHeight: '1',
+                  pointerEvents: 'none',
+                }}
+              >
                 ☰
-              </span>
+              </button>
             </div>
           </div>
           <div>
@@ -265,17 +291,17 @@ export function MainTab({ album, onChange }: MainTabProps) {
               <input
                 type="text"
                 placeholder="YYYY"
-                style={{ ...dateInputStyle, width: '60px' }}
+                style={{ ...dateInputStyle, width: '62px' }}
               />
               <input
                 type="text"
                 placeholder="MM"
-                style={{ ...dateInputStyle, width: '50px' }}
+                style={{ ...dateInputStyle, width: '48px' }}
               />
               <input
                 type="text"
                 placeholder="DD"
-                style={{ ...dateInputStyle, width: '50px' }}
+                style={{ ...dateInputStyle, width: '48px' }}
               />
               <button style={{
                 width: '32px',
@@ -290,6 +316,7 @@ export function MainTab({ album, onChange }: MainTabProps) {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                flexShrink: 0,
               }}>
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                   <rect x="2" y="3" width="12" height="11" rx="1" stroke="#6b7280" strokeWidth="1.5"/>
@@ -306,23 +333,31 @@ export function MainTab({ album, onChange }: MainTabProps) {
           <div>
             <label style={labelStyle}>Format</label>
             <div style={{ position: 'relative' }}>
-              <input
-                type="text"
+              <select 
                 value={album.format}
                 onChange={(e) => onChange('format', e.target.value)}
-                style={inputStyle}
-              />
-              <span style={{
-                position: 'absolute',
-                right: '10px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                color: '#9ca3af',
-                fontSize: '12px',
-                pointerEvents: 'none',
-              }}>
+                style={selectStyle}
+              >
+                <option>{album.format}</option>
+              </select>
+              <button
+                style={{
+                  position: 'absolute',
+                  right: '28px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#9ca3af',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  padding: '4px',
+                  lineHeight: '1',
+                  pointerEvents: 'none',
+                }}
+              >
                 ☰
-              </span>
+              </button>
             </div>
           </div>
           <div>
@@ -363,6 +398,7 @@ export function MainTab({ album, onChange }: MainTabProps) {
             flexWrap: 'wrap',
             alignItems: 'center',
             backgroundColor: 'white',
+            position: 'relative',
           }}>
             {album.discogs_genres && album.discogs_genres.length > 0 ? (
               <>
@@ -401,12 +437,15 @@ export function MainTab({ album, onChange }: MainTabProps) {
             ) : null}
             <button
               style={{
+                position: 'absolute',
+                right: '10px',
+                top: '50%',
+                transform: 'translateY(-50%)',
                 background: 'transparent',
                 border: 'none',
                 color: '#9ca3af',
                 cursor: 'pointer',
-                fontSize: '12px',
-                marginLeft: 'auto',
+                fontSize: '13px',
                 padding: '4px',
                 lineHeight: '1',
               }}
