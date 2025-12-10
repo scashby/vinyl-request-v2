@@ -299,25 +299,25 @@ export default function EditAlbumModal({
             <MainTab album={album} onChange={handleFieldChange} />
           )}
           {activeTab === 'details' && (
-            <DetailsTab album={album} onChange={handleFieldChange} />
+            <DetailsTab />
           )}
           {activeTab === 'classical' && (
-            <ClassicalTab album={album} onChange={handleFieldChange} />
+            <ClassicalTab />
           )}
           {activeTab === 'people' && (
-            <PeopleTab album={album} onChange={handleFieldChange} />
+            <PeopleTab />
           )}
           {activeTab === 'tracks' && (
-            <TracksTab album={album} onChange={handleFieldChange} />
+            <TracksTab />
           )}
           {activeTab === 'personal' && (
-            <PersonalTab album={album} onChange={handleFieldChange} />
+            <PersonalTab />
           )}
           {activeTab === 'cover' && (
             <CoverTab album={album} onChange={handleFieldChange} />
           )}
           {activeTab === 'links' && (
-            <LinksTab album={album} onChange={handleFieldChange} />
+            <LinksTab />
           )}
         </div>
 
