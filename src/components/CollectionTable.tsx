@@ -218,6 +218,7 @@ const CollectionTable = memo(function CollectionTable({
 
   const renderHeaderCell = useCallback((col: ReturnType<typeof getVisibleColumns>[0], leftPosition?: number) => {
     const isLocked = typeof leftPosition === 'number';
+    const isLastLocked = isLocked && leftPosition + parseInt(col.width) === locked.reduce((sum, c) => sum + parseInt(c.width), 0);
     
     return (
       <div
@@ -230,7 +231,9 @@ const CollectionTable = memo(function CollectionTable({
           padding: '8px',
           fontWeight: 600,
           color: '#212529',
-          borderRight: '1px solid #d0d0d0',
+          borderTop: '1px solid #d0d0d0',
+          borderBottom: '1px solid #d0d0d0',
+          borderRight: isLastLocked ? '2px solid #999' : '1px solid #d0d0d0',
           whiteSpace: 'nowrap',
           fontSize: '13px',
           cursor: col.sortable ? 'pointer' : 'default',
@@ -243,9 +246,6 @@ const CollectionTable = memo(function CollectionTable({
             left: `${leftPosition}px`,
             zIndex: 3,
             background: '#e8e8e8',
-            borderRight: leftPosition + parseInt(col.width) === locked.reduce((sum, c) => sum + parseInt(c.width), 0)
-              ? '2px solid #999'
-              : '1px solid #d0d0d0'
           })
         }}
       >
@@ -348,7 +348,6 @@ const CollectionTable = memo(function CollectionTable({
                 alignItems: 'center',
                 cursor: 'pointer',
                 backgroundColor: isSelected ? '#e3f2fd' : virtualRow.index % 2 === 0 ? 'white' : '#fafafa',
-                borderBottom: '1px solid #e0e0e0'
               }}
               onClick={() => handleRowClick(album)}
               onMouseEnter={(e) => {
@@ -375,8 +374,9 @@ const CollectionTable = memo(function CollectionTable({
                       minWidth: col.width,
                       maxWidth: col.width,
                       padding: '6px 8px',
-                      borderRight: isLastLocked ? '2px solid #999' : '1px solid #e0e0e0',
+                      borderTop: '1px solid #e0e0e0',
                       borderBottom: '1px solid #e0e0e0',
+                      borderRight: isLastLocked ? '2px solid #999' : '1px solid #e0e0e0',
                       color: '#212529',
                       fontSize: '13px',
                       whiteSpace: 'nowrap',
@@ -404,6 +404,8 @@ const CollectionTable = memo(function CollectionTable({
                     minWidth: col.width,
                     maxWidth: col.width,
                     padding: '6px 8px',
+                    borderTop: '1px solid #e0e0e0',
+                    borderBottom: '1px solid #e0e0e0',
                     borderRight: '1px solid #e0e0e0',
                     color: '#212529',
                     fontSize: '13px',

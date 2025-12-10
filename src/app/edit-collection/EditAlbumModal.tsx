@@ -1,4 +1,4 @@
-// src/app/edit-collection/components/EditAlbumModal.tsx
+// src/app/edit-collection/EditAlbumModal.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -38,25 +38,123 @@ export default function EditAlbumModal({ albumId, onClose, onSave }: EditAlbumMo
   const [activeTab, setActiveTab] = useState<TabId>('main');
   const [album, setAlbum] = useState<Album | null>(null);
   const [editedAlbum, setEditedAlbum] = useState<Album | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchAlbum() {
-      const { data } = await supabase
-        .from('collection')
-        .select('*')
-        .eq('id', albumId)
-        .single();
-      
-      if (data) {
-        setAlbum(data as Album);
-        setEditedAlbum(data as Album);
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const { data, error: fetchError } = await supabase
+          .from('collection')
+          .select('*')
+          .eq('id', albumId)
+          .single();
+        
+        if (fetchError) {
+          console.error('Error fetching album:', fetchError);
+          setError('Failed to load album data');
+          return;
+        }
+        
+        if (data) {
+          setAlbum(data as Album);
+          setEditedAlbum(data as Album);
+        } else {
+          setError('Album not found');
+        }
+      } catch (err) {
+        console.error('Unexpected error:', err);
+        setError('An unexpected error occurred');
+      } finally {
+        setLoading(false);
       }
     }
+    
     fetchAlbum();
   }, [albumId]);
 
-  if (!album || !editedAlbum) {
-    return null;
+  // Loading state
+  if (loading) {
+    return (
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+      }}>
+        <div style={{
+          backgroundColor: 'white',
+          borderRadius: '8px',
+          padding: '40px 60px',
+          fontSize: '16px',
+          color: '#333',
+          boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
+          textAlign: 'center',
+        }}>
+          <div style={{ fontSize: '32px', marginBottom: '16px' }}>⏳</div>
+          <div style={{ fontWeight: '600', marginBottom: '8px' }}>Loading Album...</div>
+          <div style={{ fontSize: '14px', color: '#666' }}>Please wait</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error || !album || !editedAlbum) {
+    return (
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+      }}>
+        <div style={{
+          backgroundColor: 'white',
+          borderRadius: '8px',
+          padding: '40px 60px',
+          fontSize: '16px',
+          color: '#333',
+          boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
+          textAlign: 'center',
+        }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px', color: '#ef4444' }}>⚠️</div>
+          <div style={{ fontWeight: '600', marginBottom: '8px', color: '#ef4444' }}>Error</div>
+          <div style={{ fontSize: '14px', color: '#666', marginBottom: '24px' }}>
+            {error || 'Failed to load album data'}
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              padding: '10px 24px',
+              background: '#6b7280',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              fontSize: '14px',
+              fontWeight: '500',
+              cursor: 'pointer',
+            }}
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    );
   }
 
   const handleFieldChange = (field: keyof Album, value: string | number | string[] | null | boolean) => {
