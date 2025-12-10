@@ -8,7 +8,7 @@ interface LinksTabProps {
   onChange: (field: keyof Album, value: string | number | string[] | null) => void;
 }
 
-export function LinksTab({ album: _album, onChange: _onChange }: LinksTabProps) {
+export function LinksTab() {
   return (
     <div style={{ maxWidth: '900px' }}>
       <div style={{

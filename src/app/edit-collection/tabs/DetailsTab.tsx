@@ -8,7 +8,7 @@ interface DetailsTabProps {
   onChange: (field: keyof Album, value: string | number | string[] | null) => void;
 }
 
-export function DetailsTab({ album: _album, onChange: _onChange }: DetailsTabProps) {
+export function DetailsTab() {
   return (
     <div style={{ maxWidth: '900px' }}>
       <div style={{

@@ -8,7 +8,7 @@ interface PersonalTabProps {
   onChange: (field: keyof Album, value: string | number | string[] | null) => void;
 }
 
-export function PersonalTab({ album: _album, onChange: _onChange }: PersonalTabProps) {
+export function PersonalTab() {
   return (
     <div style={{ maxWidth: '900px' }}>
       <div style={{
