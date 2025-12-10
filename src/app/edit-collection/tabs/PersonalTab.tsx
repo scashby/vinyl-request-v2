@@ -1,7 +1,7 @@
-// src/app/edit-collection/tabs/PersonalTab.tsx
+// src/app/edit-collection/tabs/PeopleTab.tsx
 'use client';
 
-export function PersonalTab() {
+export function PeopleTab() {
   return (
     <div style={{ maxWidth: '900px' }}>
       <div style={{
@@ -18,28 +18,29 @@ export function PersonalTab() {
           marginBottom: '12px',
           color: '#111',
         }}>
-          Personal Tab - Coming in Phase 6
+          People Tab - Coming in Phase 6
         </h3>
         <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '16px' }}>
-          This tab will include fields and pickers for:
+          This tab will include add/picker functionality for:
         </p>
-        <ul style={{ 
-          listStyle: 'none', 
-          padding: 0, 
-          color: '#374151',
-          display: 'inline-block',
-          textAlign: 'left',
-        }}>
-          <li style={{ marginBottom: '8px' }}>💰 Purchase Date/Store/Price</li>
-          <li style={{ marginBottom: '8px' }}>📈 Current Value</li>
-          <li style={{ marginBottom: '8px' }}>👤 Owner (picker)</li>
-          <li style={{ marginBottom: '8px' }}>⭐ My Rating (10 stars)</li>
-          <li style={{ marginBottom: '8px' }}>🏷️ Tags (multi-select picker)</li>
-          <li style={{ marginBottom: '8px' }}>📝 Notes</li>
-          <li style={{ marginBottom: '8px' }}>🧼 Last Cleaned</li>
-          <li style={{ marginBottom: '8px' }}>✒️ Signed By (add/picker)</li>
-          <li>📊 Play Count & Last Played</li>
-        </ul>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', maxWidth: '600px', margin: '0 auto' }}>
+          <div>
+            <p style={{ fontWeight: '600', marginBottom: '8px', color: '#111' }}>Credits:</p>
+            <ul style={{ listStyle: 'none', padding: 0, color: '#374151', textAlign: 'left' }}>
+              <li style={{ marginBottom: '8px' }}>✍️ Songwriter</li>
+              <li style={{ marginBottom: '8px' }}>🎧 Producer</li>
+              <li>🎚️ Engineer</li>
+            </ul>
+          </div>
+          <div>
+            <p style={{ fontWeight: '600', marginBottom: '8px', color: '#111' }}>Musicians:</p>
+            <ul style={{ listStyle: 'none', padding: 0, color: '#374151', textAlign: 'left' }}>
+              <li style={{ marginBottom: '8px' }}>🎸 Session Musicians</li>
+              <li style={{ marginBottom: '8px' }}>🎹 Instrumentalists</li>
+              <li>🎤 Vocalists</li>
+            </ul>
+          </div>
+        </div>
       </div>
     </div>
   );

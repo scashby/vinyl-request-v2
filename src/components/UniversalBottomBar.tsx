@@ -1,4 +1,4 @@
-// src/app/edit-collection/components/UniversalBottomBar.tsx
+// components/UniversalBottomBar.tsx
 'use client';
 
 import type { Album } from 'types/album';
@@ -19,10 +19,10 @@ const COLLECTION_STATUS_OPTIONS = [
 
 export function UniversalBottomBar({ album, onChange }: UniversalBottomBarProps) {
   const inputStyle = {
-    padding: '8px 12px',
+    padding: '7px 10px',
     border: '1px solid #d1d5db',
-    borderRadius: '6px',
-    fontSize: '14px',
+    borderRadius: '4px',
+    fontSize: '13px',
     background: 'white',
     color: '#1f2937',
   };
@@ -32,16 +32,16 @@ export function UniversalBottomBar({ album, onChange }: UniversalBottomBarProps)
     fontSize: '12px',
     fontWeight: '600' as const,
     color: '#6b7280',
-    marginBottom: '6px',
+    marginBottom: '5px',
   };
 
   return (
     <div style={{
       borderTop: '2px solid #e5e7eb',
       background: '#f9fafb',
-      padding: '16px 24px',
+      padding: '14px 20px',
       display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+      gridTemplateColumns: '2fr 1fr 1fr 2fr',
       gap: '16px',
       alignItems: 'end',
     }}>
