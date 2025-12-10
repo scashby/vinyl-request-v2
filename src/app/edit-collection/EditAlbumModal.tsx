@@ -1,7 +1,8 @@
 // src/app/edit-collection/components/EditAlbumModal.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { supabase } from 'lib/supabaseClient';
 import type { Album } from 'types/album';
 import { MainTab } from './tabs/MainTab';
 import { DetailsTab } from './tabs/DetailsTab';
@@ -27,24 +28,49 @@ const TABS: { id: TabId; label: string; icon: string }[] = [
 ];
 
 interface EditAlbumModalProps {
-  album: Album;
+  albumId: number;
   onClose: () => void;
-  onSave: (album: Album) => void;
+  onSave: () => void;
+  allAlbumIds: number[];
 }
 
-export function EditAlbumModal({ album, onClose, onSave }: EditAlbumModalProps) {
+export default function EditAlbumModal({ albumId, onClose, onSave }: EditAlbumModalProps) {
   const [activeTab, setActiveTab] = useState<TabId>('main');
-  const [editedAlbum, setEditedAlbum] = useState<Album>(album);
+  const [album, setAlbum] = useState<Album | null>(null);
+  const [editedAlbum, setEditedAlbum] = useState<Album | null>(null);
+
+  useEffect(() => {
+    async function fetchAlbum() {
+      const { data } = await supabase
+        .from('collection')
+        .select('*')
+        .eq('id', albumId)
+        .single();
+      
+      if (data) {
+        setAlbum(data as Album);
+        setEditedAlbum(data as Album);
+      }
+    }
+    fetchAlbum();
+  }, [albumId]);
+
+  if (!album || !editedAlbum) {
+    return null;
+  }
 
   const handleFieldChange = (field: keyof Album, value: string | number | string[] | null | boolean) => {
-    setEditedAlbum(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    setEditedAlbum(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        [field]: value
+      };
+    });
   };
 
   const handleSave = () => {
-    onSave(editedAlbum);
+    onSave();
     onClose();
   };
 
