@@ -8,6 +8,7 @@ import CollectionTable from '../../components/CollectionTable';
 import ColumnSelector from '../../components/ColumnSelector';
 import { ColumnId, DEFAULT_VISIBLE_COLUMNS, DEFAULT_LOCKED_COLUMNS, SortState } from './columnDefinitions';
 import { Album, toSafeStringArray, toSafeSearchString } from '../../types/album';
+import EditAlbumModal from './EditAlbumModal';
 
 type SortOption = 
   | 'artist-asc' | 'artist-desc' 
@@ -197,6 +198,7 @@ function CollectionBrowserPage() {
   const [selectedAlbumIds, setSelectedAlbumIds] = useState<Set<number>>(new Set());
   const [selectedAlbumId, setSelectedAlbumId] = useState<number | null>(null);
   const [activeCollection, setActiveCollection] = useState('music');
+  const [editingAlbumId, setEditingAlbumId] = useState<number | null>(null);
   
   const [sortBy, setSortBy] = useState<SortOption>('artist-asc');
   const [showSortDropdown, setShowSortDropdown] = useState(false);
@@ -437,6 +439,10 @@ function CollectionBrowserPage() {
 
   const handleSelectionChange = useCallback((albumIds: Set<string>) => {
     setSelectedAlbumIds(new Set(Array.from(albumIds).map(id => Number(id))));
+  }, []);
+
+  const handleEditAlbum = useCallback((albumId: number) => {
+    setEditingAlbumId(albumId);
   }, []);
 
   const selectedAlbumsAsStrings = useMemo(() => {
@@ -1196,6 +1202,7 @@ function CollectionBrowserPage() {
                   onSelectionChange={handleSelectionChange}
                   sortState={tableSortState}
                   onSortChange={handleTableSortChange}
+                  onEditAlbum={handleEditAlbum}
                 />
               )}
             </div>
@@ -1222,6 +1229,7 @@ function CollectionBrowserPage() {
             }}>
               <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                 <button 
+                  onClick={() => selectedAlbumId && handleEditAlbum(selectedAlbumId)}
                   title="Edit album details"
                   style={{
                   background: '#3a3a3a',
@@ -1341,6 +1349,18 @@ function CollectionBrowserPage() {
           visibleColumns={visibleColumns}
           onColumnsChange={handleColumnsChange}
           onClose={() => setShowColumnSelector(false)}
+        />
+      )}
+
+      {editingAlbumId && (
+        <EditAlbumModal
+          albumId={editingAlbumId}
+          onClose={() => setEditingAlbumId(null)}
+          onSave={() => {
+            setEditingAlbumId(null);
+            loadAlbums();
+          }}
+          allAlbumIds={filteredAndSortedAlbums.map(a => a.id)}
         />
       )}
     </>

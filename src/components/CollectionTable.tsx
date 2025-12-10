@@ -20,6 +20,7 @@ interface CollectionTableProps {
   lockedColumns: ColumnId[];
   sortState: SortState;
   onSortChange: (column: ColumnId) => void;
+  onEditAlbum: (albumId: number) => void;
 }
 
 const ROW_HEIGHT = 32;
@@ -32,7 +33,8 @@ const CollectionTable = memo(function CollectionTable({
   visibleColumns,
   lockedColumns,
   sortState,
-  onSortChange
+  onSortChange,
+  onEditAlbum
 }: CollectionTableProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   
@@ -81,7 +83,17 @@ const CollectionTable = memo(function CollectionTable({
       checkbox: () => null,
       owned: () => <span style={{ color: '#22c55e', fontSize: '14px' }}>✓</span>,
       for_sale_indicator: (album: Album) => album.for_sale ? <span style={{ color: '#f59e0b', fontSize: '14px' }}>$</span> : null,
-      menu: () => <span style={{ color: '#2196F3', fontSize: '14px', cursor: 'pointer' }}>✏</span>,
+      menu: (album: Album) => (
+        <span 
+          style={{ color: '#2196F3', fontSize: '14px', cursor: 'pointer' }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onEditAlbum(album.id);
+          }}
+        >
+          ✏
+        </span>
+      ),
       artist: (album: Album) => album.artist || '—',
       title: (album: Album) => (
         <span 
@@ -164,7 +176,7 @@ const CollectionTable = memo(function CollectionTable({
       pricing_notes: (album: Album) => album.pricing_notes || '—',
       spotify_popularity: (album: Album) => album.spotify_popularity || '—'
     } as Record<string, (album: Album) => React.ReactNode>;
-  }, []);
+  }, [onEditAlbum]);
 
   const handleSelectAll = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     e.stopPropagation();
@@ -418,7 +430,8 @@ const CollectionTable = memo(function CollectionTable({
     prevProps.lockedColumns === nextProps.lockedColumns &&
     prevProps.selectedAlbums === nextProps.selectedAlbums &&
     prevProps.sortState.column === nextProps.sortState.column &&
-    prevProps.sortState.direction === nextProps.sortState.direction
+    prevProps.sortState.direction === nextProps.sortState.direction &&
+    prevProps.onEditAlbum === nextProps.onEditAlbum
   );
 });
 
