@@ -8,7 +8,7 @@ import CollectionTable from '../../components/CollectionTable';
 import ColumnSelector from '../../components/ColumnSelector';
 import { ColumnId, DEFAULT_VISIBLE_COLUMNS, DEFAULT_LOCKED_COLUMNS, SortState } from './columnDefinitions';
 import { Album, toSafeStringArray, toSafeSearchString } from '../../types/album';
-import EditAlbumModal from './EditAlbumModal';
+import { EditAlbumModal } from './EditAlbumModal';
 
 type SortOption = 
   | 'artist-asc' | 'artist-desc' 
@@ -1352,17 +1352,21 @@ function CollectionBrowserPage() {
         />
       )}
 
-      {editingAlbumId && (
-        <EditAlbumModal
-          albumId={editingAlbumId}
-          onClose={() => setEditingAlbumId(null)}
-          onSave={() => {
-            setEditingAlbumId(null);
-            loadAlbums();
-          }}
-          allAlbumIds={filteredAndSortedAlbums.map(a => a.id)}
-        />
-      )}
+      {editingAlbumId && (() => {
+        const editingAlbum = albums.find(a => a.id === editingAlbumId);
+        if (!editingAlbum) return null;
+        
+        return (
+          <EditAlbumModal
+            album={editingAlbum}
+            onClose={() => setEditingAlbumId(null)}
+            onSave={() => {
+              setEditingAlbumId(null);
+              loadAlbums();
+            }}
+          />
+        );
+      })()}
     </>
   );
 }
