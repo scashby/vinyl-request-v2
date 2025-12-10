@@ -1,13 +1,6 @@
 // src/app/edit-collection/tabs/DetailsTab.tsx
 'use client';
 
-import type { Album } from 'types/album';
-
-interface DetailsTabProps {
-  album: Album;
-  onChange: (field: keyof Album, value: string | number | string[] | null) => void;
-}
-
 export function DetailsTab() {
   return (
     <div style={{ maxWidth: '900px' }}>

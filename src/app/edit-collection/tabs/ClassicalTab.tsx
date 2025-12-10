@@ -1,13 +1,6 @@
 // src/app/edit-collection/tabs/ClassicalTab.tsx
 'use client';
 
-import type { Album } from 'types/album';
-
-interface ClassicalTabProps {
-  album: Album;
-  onChange: (field: keyof Album, value: string | number | string[] | null) => void;
-}
-
 export function ClassicalTab() {
   return (
     <div style={{ maxWidth: '900px' }}>

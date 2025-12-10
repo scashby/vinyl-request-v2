@@ -1,13 +1,6 @@
 // src/app/edit-collection/tabs/LinksTab.tsx
 'use client';
 
-import type { Album } from 'types/album';
-
-interface LinksTabProps {
-  album: Album;
-  onChange: (field: keyof Album, value: string | number | string[] | null) => void;
-}
-
 export function LinksTab() {
   return (
     <div style={{ maxWidth: '900px' }}>

@@ -1,13 +1,6 @@
 // src/app/edit-collection/tabs/PeopleTab.tsx
 'use client';
 
-import type { Album } from 'types/album';
-
-interface PeopleTabProps {
-  album: Album;
-  onChange: (field: keyof Album, value: string | number | string[] | null) => void;
-}
-
 export function PeopleTab() {
   return (
     <div style={{ maxWidth: '900px' }}>
