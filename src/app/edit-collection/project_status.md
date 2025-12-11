@@ -167,7 +167,7 @@ Phase 4: Advanced Features        ░░░░░░░░░░░░░░░�
 - [x] Title input with Aa indicator on label line
 - [x] Sort Title input
 - [x] Subtitle input
-- [x] Artist display with placeholder +/× buttons
+- [x] Artist display with + indicator on label line (plain text, matching Aa style)
 - [x] **Date fields with calendar icons on label line:**
   - [x] Release Date (YYYY—MM—DD with connecting lines)
   - [x] Original Release Date (YYYY—MM—DD with connecting lines)
@@ -176,12 +176,12 @@ Phase 4: Advanced Features        ░░░░░░░░░░░░░░░�
   - [x] **Connector lines**: Fixed 10px width, space-between layout for full-width span
 - [x] **Unified selector styling** (Label, Format, Genre, Location):
   - [x] No gap between dropdown/input and button (0px)
-  - [x] Matching heights (36px for both elements)
+  - [x] Matching heights (36px for single-line fields, auto-sizing for Genre)
   - [x] Connected border-radius (rounded left for field, rounded right for button)
   - [x] Shared border (borderRight: 'none' on field)
   - [x] **Bullet list icon** (Font Awesome style - bullets + lines via SVG)
-  - [x] Genre: Button aligned to top (flex-start) to stay with first row as tags wrap
-  - [x] Location: Added unified selector to UniversalBottomBar
+  - [x] Genre: Button aligned to top (flex-start), minHeight: 40px for slight oversize
+  - [x] Location: Added unified selector to UniversalBottomBar with auto height matching
 - [x] Label selector with unified styling
 - [x] Format selector with unified styling
 - [x] Barcode input
@@ -556,6 +556,12 @@ src/app/edit-collection/
 ---
 
 ## 🔄 CHANGE LOG
+
+- **2025-12-11 (Afternoon - Update 4):** ARTIST + SIMPLIFIED + GENRE BUTTON HEIGHT ADJUSTED
+  - Artist +: Changed from button to plain text indicator (matching Aa style)
+  - Artist +: Now just a `<span>` with color and cursor styling (no border, no background)
+  - Genre button: Reduced from `minHeight: 48px` to `minHeight: 40px` for better proportions
+  - Genre button: Still slightly taller than single-row to accommodate tag wrapping
 
 - **2025-12-11 (Afternoon - Update 3):** HEIGHT MATCHING FIX + ARTIST + BUTTON REPOSITIONED
   - Genre button: Changed from fixed `height: 36px` to `minHeight: 48px` to match expanded field height

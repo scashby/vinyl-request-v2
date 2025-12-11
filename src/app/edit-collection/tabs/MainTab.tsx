@@ -105,26 +105,7 @@ export function MainTab({ album, onChange }: MainTabProps) {
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
             <label style={{ ...labelStyle, marginBottom: '0' }}>Artist</label>
-            <button
-              style={{
-                width: '28px',
-                height: '28px',
-                padding: 0,
-                border: '1px solid #d1d5db',
-                borderRadius: '4px',
-                backgroundColor: 'white',
-                fontSize: '20px',
-                lineHeight: '1',
-                cursor: 'pointer',
-                color: '#6b7280',
-                fontWeight: '300',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              +
-            </button>
+            <span style={{ color: '#9ca3af', fontSize: '20px', fontWeight: '300', cursor: 'pointer' }}>+</span>
           </div>
           <div style={{ 
             flex: 1,
@@ -425,7 +406,7 @@ export function MainTab({ album, onChange }: MainTabProps) {
             </div>
             <button style={{
               width: '36px',
-              minHeight: '48px',
+              minHeight: '40px',
               padding: 0,
               border: '1px solid #d1d5db',
               borderRadius: '0 4px 4px 0',
