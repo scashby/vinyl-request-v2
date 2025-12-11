@@ -7,13 +7,13 @@ Building an exact CLZ Music Web-inspired interface for Dead Wax Dialogues vinyl 
 
 ---
 
-## 📊 Overall Progress: ~50% Complete
+## 📊 Overall Progress: ~52% Complete
 
 ```
 Phase 1: Visual Framework         ████████████████████ 100% ✅
 Phase 2.1: Data Connection        ████████████████████ 100% ✅
 Phase 2.2: Sorting & Columns      ████████████████████ 100% ✅ [SAFE ROLLBACK POINT]
-Phase 2.3: Edit Album Modal       ████████████░░░░░░░░  60% 🔄 IN PROGRESS
+Phase 2.3: Edit Album Modal       ███████████████░░░░░  75% 🔄 IN PROGRESS
 Phase 2.4: Detail Panel           ░░░░░░░░░░░░░░░░░░░░   0% (deferred)
 Phase 3: Selection & Batch Ops    ░░░░░░░░░░░░░░░░░░░░   0%
 Phase 4: Advanced Features        ░░░░░░░░░░░░░░░░░░░░   0%
@@ -148,7 +148,7 @@ Phase 4: Advanced Features        ░░░░░░░░░░░░░░░�
 
 ---
 
-## 🔄 PHASE 2.3: IN PROGRESS - EDIT ALBUM MODAL (~60% Complete)
+## 🔄 PHASE 2.3: IN PROGRESS - EDIT ALBUM MODAL (~75% Complete)
 
 ### ✅ Phase 1: Core Infrastructure - COMPLETE
 - [x] Base modal shell with orange header
@@ -162,16 +162,17 @@ Phase 4: Advanced Features        ░░░░░░░░░░░░░░░�
 - [x] Tab switching functionality
 - [x] All 8 tab component files created
 
-### 🔄 Phase 3: Main Tab + Basic Pickers - IN PROGRESS (~70% Complete)
+### 🔄 Phase 3: Main Tab + Basic Pickers - IN PROGRESS (~75% Complete)
 - [x] Main tab two-column layout
-- [x] Title input with Aa indicator (moved to label line - latest change)
+- [x] Title input with Aa indicator on label line
 - [x] Sort Title input
 - [x] Subtitle input
 - [x] Artist display with placeholder +/× buttons
-- [x] Release Date inputs (YYYY/MM/DD with calendar icon)
-- [x] Original Release Date inputs (YYYY/MM/DD with calendar icon)
+- [x] **Date fields with calendar icons on label line:**
+  - [x] Release Date (YYYY—MM—DD with connecting lines)
+  - [x] Original Release Date (YYYY—MM—DD with connecting lines)
+  - [x] Recording Date (YYYY—MM—DD with connecting lines)
 - [x] Label selector with ☰ button
-- [x] Recording Date inputs (YYYY/MM/DD with calendar icon)
 - [x] Format selector with ☰ button
 - [x] Barcode input
 - [x] Cat No input
@@ -527,13 +528,13 @@ src/app/edit-collection/
 
 ## 📊 PROGRESS METRICS
 
-### Overall Completion: ~50%
+### Overall Completion: ~52%
 
 **Phase 1 - Framework:** 100% ✅
-**Phase 2 - Data & UI Core:** 87% 🚧
+**Phase 2 - Data & UI Core:** 89% 🚧
 - 2.1 Initial Connection: 100% ✅
 - 2.2 Sorting & Columns: 100% ✅ **← SAFE ROLLBACK POINT**
-- 2.3 Edit Album Modal: 60% 🔄 (Core infrastructure complete, Main tab UI complete, pickers pending)
+- 2.3 Edit Album Modal: 75% 🔄 (Core infrastructure + Main tab UI complete, pickers pending)
 - 2.4 Detail Panel: 40% (basic display working)
 
 **Phase 3 - Selection:** 15% (UI in place, checkboxes not functional)
@@ -544,6 +545,13 @@ src/app/edit-collection/
 
 ## 🔄 CHANGE LOG
 
+- **2025-12-11 (Morning - Update 2):** DATE FIELD IMPROVEMENTS COMPLETE
+  - Moved calendar icons from input row to label line for all date fields
+  - Changed calendar buttons to clickable icons (matching CLZ design)
+  - Connected date input boxes with horizontal lines (YYYY—MM—DD pattern)
+  - Applied consistent pattern to Release Date, Original Release Date, and Recording Date
+  - Updated project status: Phase 3 now at 75% complete
+  
 - **2025-12-11 (Morning):** PHASE 2.3 PROGRESS UPDATE
   - Moved "Aa" indicator from inside Title input to label line (matching CLZ design exactly)
   - Updated project status to reflect Edit Modal completion:

@@ -53,20 +53,6 @@ export function MainTab({ album, onChange }: MainTabProps) {
     backgroundColor: 'white',
   };
 
-  const calendarButtonStyle: React.CSSProperties = {
-    width: '32px',
-    height: '36px',
-    padding: 0,
-    border: '1px solid #d1d5db',
-    borderRadius: '4px',
-    backgroundColor: 'white',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  };
-
   const listButtonStyle: React.CSSProperties = {
     width: '32px',
     height: '36px',
@@ -187,61 +173,69 @@ export function MainTab({ album, onChange }: MainTabProps) {
         {/* Row 1: Release Date | Original Release Date */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <div>
-            <label style={labelStyle}>Release Date</label>
-            <div style={{ display: 'flex', gap: '4px', alignItems: 'stretch' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <label style={{ ...labelStyle, marginBottom: '0' }}>Release Date</label>
+              <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#6b7280' }}>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <rect x="2" y="3" width="12" height="11" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+                  <path d="M2 6h12" stroke="currentColor" strokeWidth="1.5"/>
+                  <path d="M5 2v2M11 2v2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
               <input
                 type="text"
                 value={album.year || ''}
                 onChange={(e) => onChange('year', e.target.value)}
                 placeholder="YYYY"
-                style={{ ...dateInputStyle, width: '70px' }}
+                style={{ ...dateInputStyle, width: '70px', borderRadius: '4px 0 0 4px' }}
               />
+              <div style={{ width: '8px', height: '1px', backgroundColor: '#d1d5db' }} />
               <input
                 type="text"
                 placeholder="MM"
-                style={{ ...dateInputStyle, width: '50px' }}
+                style={{ ...dateInputStyle, width: '50px', borderRadius: '0' }}
               />
+              <div style={{ width: '8px', height: '1px', backgroundColor: '#d1d5db' }} />
               <input
                 type="text"
                 placeholder="DD"
-                style={{ ...dateInputStyle, width: '50px' }}
+                style={{ ...dateInputStyle, width: '50px', borderRadius: '0 4px 4px 0' }}
               />
-              <button style={calendarButtonStyle}>
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <rect x="2" y="3" width="12" height="11" rx="1" stroke="#6b7280" strokeWidth="1.5"/>
-                  <path d="M2 6h12" stroke="#6b7280" strokeWidth="1.5"/>
-                  <path d="M5 2v2M11 2v2" stroke="#6b7280" strokeWidth="1.5" strokeLinecap="round"/>
-                </svg>
-              </button>
             </div>
           </div>
           <div>
-            <label style={labelStyle}>Original Release Date</label>
-            <div style={{ display: 'flex', gap: '4px', alignItems: 'stretch' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <label style={{ ...labelStyle, marginBottom: '0' }}>Original Release Date</label>
+              <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#6b7280' }}>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <rect x="2" y="3" width="12" height="11" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+                  <path d="M2 6h12" stroke="currentColor" strokeWidth="1.5"/>
+                  <path d="M5 2v2M11 2v2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
               <input
                 type="text"
                 value={album.master_release_date || ''}
                 onChange={(e) => onChange('master_release_date', e.target.value)}
                 placeholder="YYYY"
-                style={{ ...dateInputStyle, width: '70px' }}
+                style={{ ...dateInputStyle, width: '70px', borderRadius: '4px 0 0 4px' }}
               />
+              <div style={{ width: '8px', height: '1px', backgroundColor: '#d1d5db' }} />
               <input
                 type="text"
                 placeholder="MM"
-                style={{ ...dateInputStyle, width: '50px' }}
+                style={{ ...dateInputStyle, width: '50px', borderRadius: '0' }}
               />
+              <div style={{ width: '8px', height: '1px', backgroundColor: '#d1d5db' }} />
               <input
                 type="text"
                 placeholder="DD"
-                style={{ ...dateInputStyle, width: '50px' }}
+                style={{ ...dateInputStyle, width: '50px', borderRadius: '0 4px 4px 0' }}
               />
-              <button style={calendarButtonStyle}>
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <rect x="2" y="3" width="12" height="11" rx="1" stroke="#6b7280" strokeWidth="1.5"/>
-                  <path d="M2 6h12" stroke="#6b7280" strokeWidth="1.5"/>
-                  <path d="M5 2v2M11 2v2" stroke="#6b7280" strokeWidth="1.5" strokeLinecap="round"/>
-                </svg>
-              </button>
             </div>
           </div>
         </div>
@@ -262,30 +256,34 @@ export function MainTab({ album, onChange }: MainTabProps) {
             </div>
           </div>
           <div>
-            <label style={labelStyle}>Recording Date</label>
-            <div style={{ display: 'flex', gap: '4px', alignItems: 'stretch' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <label style={{ ...labelStyle, marginBottom: '0' }}>Recording Date</label>
+              <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#6b7280' }}>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <rect x="2" y="3" width="12" height="11" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+                  <path d="M2 6h12" stroke="currentColor" strokeWidth="1.5"/>
+                  <path d="M5 2v2M11 2v2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
               <input
                 type="text"
                 placeholder="YYYY"
-                style={{ ...dateInputStyle, width: '70px' }}
+                style={{ ...dateInputStyle, width: '70px', borderRadius: '4px 0 0 4px' }}
               />
+              <div style={{ width: '8px', height: '1px', backgroundColor: '#d1d5db' }} />
               <input
                 type="text"
                 placeholder="MM"
-                style={{ ...dateInputStyle, width: '50px' }}
+                style={{ ...dateInputStyle, width: '50px', borderRadius: '0' }}
               />
+              <div style={{ width: '8px', height: '1px', backgroundColor: '#d1d5db' }} />
               <input
                 type="text"
                 placeholder="DD"
-                style={{ ...dateInputStyle, width: '50px' }}
+                style={{ ...dateInputStyle, width: '50px', borderRadius: '0 4px 4px 0' }}
               />
-              <button style={calendarButtonStyle}>
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <rect x="2" y="3" width="12" height="11" rx="1" stroke="#6b7280" strokeWidth="1.5"/>
-                  <path d="M2 6h12" stroke="#6b7280" strokeWidth="1.5"/>
-                  <path d="M5 2v2M11 2v2" stroke="#6b7280" strokeWidth="1.5" strokeLinecap="round"/>
-                </svg>
-              </button>
             </div>
           </div>
         </div>
