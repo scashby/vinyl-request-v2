@@ -173,12 +173,18 @@ Phase 4: Advanced Features        ░░░░░░░░░░░░░░░�
   - [x] Original Release Date (YYYY—MM—DD with connecting lines)
   - [x] Recording Date (YYYY—MM—DD with connecting lines)
   - [x] **Final width adjustments**: YYYY: 92px, MM: 56px, DD: 56px
-  - [x] **Connector lines reduced by 30%**: maxWidth: 14px (down from ~20px)
-- [x] Label selector with ☰ button
-- [x] Format selector with ☰ button
+  - [x] **Connector lines**: Fixed 10px width, space-between layout for full-width span
+- [x] **Unified selector styling** (Label, Format, Genre):
+  - [x] No gap between dropdown and button (0px)
+  - [x] Matching heights (36px for both elements)
+  - [x] Connected border-radius (rounded left for dropdown, rounded right for button)
+  - [x] Shared border (borderRight: 'none' on dropdown)
+  - [x] Consistent button styling across all selectors
+- [x] Label selector with ☰ button (unified with dropdown)
+- [x] Format selector with ☰ button (unified with dropdown)
 - [x] Barcode input
 - [x] Cat No input
-- [x] Genre multi-tag display with ☰ button
+- [x] Genre multi-tag display with ☰ button (unified with tag container)
 - [x] **CRITICAL FIX**: Added explicit text color to all input styles (prevents white-on-white issue)
 - [ ] **NEXT:** Universal Picker System (Phase 2)
   - [ ] PickerModal component (single/multi-select)
@@ -547,6 +553,15 @@ src/app/edit-collection/
 ---
 
 ## 🔄 CHANGE LOG
+
+- **2025-12-11 (Afternoon):** UNIFIED SELECTOR STYLING - CLZ EXACT MATCH
+  - Removed gap between dropdowns and buttons (0px)
+  - Made all buttons exactly 36px height to match dropdowns
+  - Connected elements with border-radius (rounded left/rounded right pattern)
+  - Removed shared border between dropdown and button (borderRight: 'none')
+  - Applied consistent styling to Label, Format, and Genre selectors
+  - Removed unused listButtonStyle constant (now using inline styles for precision)
+  - Date field connector lines set to fixed 10px width with space-between layout
 
 - **2025-12-11 (Morning - Update 4):** CRITICAL TEXT COLOR FIX + WIDTH BALANCE
   - **FIXED WHITE TEXT ISSUE:** Added explicit `color: '#111827'` to all input styles (inputStyle, selectStyle, dateInputStyle)

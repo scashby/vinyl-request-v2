@@ -56,23 +56,6 @@ export function MainTab({ album, onChange }: MainTabProps) {
     color: '#111827',
   };
 
-  const listButtonStyle: React.CSSProperties = {
-    width: '32px',
-    height: '36px',
-    padding: 0,
-    border: '1px solid #d1d5db',
-    borderRadius: '4px',
-    backgroundColor: 'white',
-    cursor: 'pointer',
-    fontSize: '16px',
-    lineHeight: '1',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    color: '#6b7280',
-    flexShrink: 0,
-  };
-
   return (
     <div style={{ 
       display: 'grid', 
@@ -247,15 +230,36 @@ export function MainTab({ album, onChange }: MainTabProps) {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <div>
             <label style={labelStyle}>Label</label>
-            <div style={{ display: 'flex', gap: '6px', alignItems: 'stretch' }}>
+            <div style={{ display: 'flex', gap: '0', alignItems: 'stretch' }}>
               <select 
                 value={album.spotify_label || album.apple_music_label || ''}
                 onChange={(e) => onChange('spotify_label', e.target.value)}
-                style={{ ...selectStyle, flex: 1, height: '36px' }}
+                style={{ 
+                  ...selectStyle, 
+                  flex: 1, 
+                  height: '36px',
+                  borderRadius: '4px 0 0 4px',
+                  borderRight: 'none'
+                }}
               >
                 <option value="">{album.spotify_label || album.apple_music_label || 'Select label'}</option>
               </select>
-              <button style={listButtonStyle}>☰</button>
+              <button style={{
+                width: '36px',
+                height: '36px',
+                padding: 0,
+                border: '1px solid #d1d5db',
+                borderRadius: '0 4px 4px 0',
+                backgroundColor: 'white',
+                cursor: 'pointer',
+                fontSize: '16px',
+                lineHeight: '1',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#6b7280',
+                flexShrink: 0,
+              }}>☰</button>
             </div>
           </div>
           <div>
@@ -295,15 +299,36 @@ export function MainTab({ album, onChange }: MainTabProps) {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <div>
             <label style={labelStyle}>Format</label>
-            <div style={{ display: 'flex', gap: '6px', alignItems: 'stretch' }}>
+            <div style={{ display: 'flex', gap: '0', alignItems: 'stretch' }}>
               <select 
                 value={album.format}
                 onChange={(e) => onChange('format', e.target.value)}
-                style={{ ...selectStyle, flex: 1, height: '36px' }}
+                style={{ 
+                  ...selectStyle, 
+                  flex: 1, 
+                  height: '36px',
+                  borderRadius: '4px 0 0 4px',
+                  borderRight: 'none'
+                }}
               >
                 <option>{album.format}</option>
               </select>
-              <button style={listButtonStyle}>☰</button>
+              <button style={{
+                width: '36px',
+                height: '36px',
+                padding: 0,
+                border: '1px solid #d1d5db',
+                borderRadius: '0 4px 4px 0',
+                backgroundColor: 'white',
+                cursor: 'pointer',
+                fontSize: '16px',
+                lineHeight: '1',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#6b7280',
+                flexShrink: 0,
+              }}>☰</button>
             </div>
           </div>
           <div>
@@ -331,12 +356,13 @@ export function MainTab({ album, onChange }: MainTabProps) {
         {/* Row 5: Genre - FULL WIDTH */}
         <div>
           <label style={labelStyle}>Genre</label>
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'stretch' }}>
+          <div style={{ display: 'flex', gap: '0', alignItems: 'stretch' }}>
             <div style={{
               flex: 1,
               padding: '6px 10px',
               border: '1px solid #d1d5db',
-              borderRadius: '4px',
+              borderRadius: '4px 0 0 4px',
+              borderRight: 'none',
               minHeight: '36px',
               display: 'flex',
               gap: '6px',
@@ -380,7 +406,22 @@ export function MainTab({ album, onChange }: MainTabProps) {
                 </>
               ) : null}
             </div>
-            <button style={listButtonStyle}>☰</button>
+            <button style={{
+              width: '36px',
+              height: '36px',
+              padding: 0,
+              border: '1px solid #d1d5db',
+              borderRadius: '0 4px 4px 0',
+              backgroundColor: 'white',
+              cursor: 'pointer',
+              fontSize: '16px',
+              lineHeight: '1',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#6b7280',
+              flexShrink: 0,
+            }}>☰</button>
           </div>
         </div>
       </div>
