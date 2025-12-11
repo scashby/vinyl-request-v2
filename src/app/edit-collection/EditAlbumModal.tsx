@@ -2,7 +2,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Music, Info, Music4, Users, ListOrdered, User, Camera, Globe } from 'lucide-react';
 import { supabase } from 'lib/supabaseClient';
 import type { Album } from 'types/album';
 import { MainTab } from './tabs/MainTab';
@@ -17,15 +16,15 @@ import { UniversalBottomBar } from 'components/UniversalBottomBar';
 
 type TabId = 'main' | 'details' | 'classical' | 'people' | 'tracks' | 'personal' | 'cover' | 'links';
 
-const TABS: { id: TabId; label: string; Icon: React.ComponentType<{ size?: number }> }[] = [
-  { id: 'main', label: 'Main', Icon: Music },
-  { id: 'details', label: 'Details', Icon: Info },
-  { id: 'classical', label: 'Classical', Icon: Music4 },
-  { id: 'people', label: 'People', Icon: Users },
-  { id: 'tracks', label: 'Tracks', Icon: ListOrdered },
-  { id: 'personal', label: 'Personal', Icon: User },
-  { id: 'cover', label: 'Cover', Icon: Camera },
-  { id: 'links', label: 'Links', Icon: Globe },
+const TABS: { id: TabId; label: string; icon: string }[] = [
+  { id: 'main', label: 'Main', icon: 'fa-music' },
+  { id: 'details', label: 'Details', icon: 'fa-circle-info' },
+  { id: 'classical', label: 'Classical', icon: 'fa-violin' },
+  { id: 'people', label: 'People', icon: 'fa-users' },
+  { id: 'tracks', label: 'Tracks', icon: 'fa-list-ol' },
+  { id: 'personal', label: 'Personal', icon: 'fa-user' },
+  { id: 'cover', label: 'Cover', icon: 'fa-camera' },
+  { id: 'links', label: 'Links', icon: 'fa-globe' },
 ];
 
 interface EditAlbumModalProps {
@@ -41,6 +40,17 @@ export default function EditAlbumModal({ albumId, onClose, onSave }: EditAlbumMo
   const [editedAlbum, setEditedAlbum] = useState<Album | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Load Font Awesome
+  useEffect(() => {
+    if (!document.getElementById('font-awesome-css')) {
+      const link = document.createElement('link');
+      link.id = 'font-awesome-css';
+      link.rel = 'stylesheet';
+      link.href = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css';
+      document.head.appendChild(link);
+    }
+  }, []);
 
   useEffect(() => {
     async function fetchAlbum() {
@@ -230,51 +240,38 @@ export default function EditAlbumModal({ albumId, onClose, onSave }: EditAlbumMo
           </button>
         </div>
 
-        {/* Tabs - ROUNDED WHITE CONTAINER */}
+        {/* Tabs */}
         <div style={{
           borderBottom: '1px solid #e5e7eb',
           background: '#f9fafb',
-          padding: '12px 16px',
+          padding: '8px 16px',
           display: 'flex',
-          justifyContent: 'center',
+          gap: '4px',
         }}>
-          <div style={{
-            background: 'white',
-            borderRadius: '20px',
-            padding: '4px',
-            display: 'inline-flex',
-            gap: '4px',
-            border: '1px solid #e5e7eb',
-          }}>
-            {TABS.map((tab) => {
-              const IconComponent = tab.Icon;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  style={{
-                    padding: '8px 16px',
-                    border: 'none',
-                    background: activeTab === tab.id ? '#F7941D' : 'transparent',
-                    borderRadius: '16px',
-                    color: activeTab === tab.id ? 'white' : '#6b7280',
-                    fontSize: '13px',
-                    fontWeight: '500',
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    transition: 'all 0.2s',
-                    fontFamily: 'system-ui, -apple-system, sans-serif',
-                  }}
-                >
-                  <IconComponent size={16} />
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
-          </div>
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                padding: '8px 12px',
+                border: 'none',
+                background: activeTab === tab.id ? '#F7941D' : 'transparent',
+                borderRadius: '4px',
+                color: activeTab === tab.id ? 'white' : '#6b7280',
+                fontSize: '13px',
+                fontWeight: activeTab === tab.id ? '500' : '400',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontFamily: 'system-ui, -apple-system, sans-serif',
+              }}
+            >
+              <i className={`fa ${tab.icon}`} style={{ fontSize: '14px' }}></i>
+              <span>{tab.label}</span>
+            </button>
+          ))}
         </div>
 
         {/* Tab Content */}
