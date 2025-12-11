@@ -186,7 +186,7 @@ export function MainTab({ album, onChange }: MainTabProps) {
                 </svg>
               </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+            <div style={{ display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'space-between' }}>
               <input
                 type="text"
                 value={album.year || ''}
@@ -194,13 +194,13 @@ export function MainTab({ album, onChange }: MainTabProps) {
                 placeholder="YYYY"
                 style={{ ...dateInputStyle, width: '92px', borderRadius: '4px' }}
               />
-              <div style={{ flex: 1, height: '1px', backgroundColor: '#d1d5db', minWidth: '8px', maxWidth: '14px' }} />
+              <div style={{ width: '10px', height: '1px', backgroundColor: '#d1d5db' }} />
               <input
                 type="text"
                 placeholder="MM"
                 style={{ ...dateInputStyle, width: '56px', borderRadius: '4px' }}
               />
-              <div style={{ flex: 1, height: '1px', backgroundColor: '#d1d5db', minWidth: '8px', maxWidth: '14px' }} />
+              <div style={{ width: '10px', height: '1px', backgroundColor: '#d1d5db' }} />
               <input
                 type="text"
                 placeholder="DD"
@@ -219,7 +219,7 @@ export function MainTab({ album, onChange }: MainTabProps) {
                 </svg>
               </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+            <div style={{ display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'space-between' }}>
               <input
                 type="text"
                 value={album.master_release_date || ''}
@@ -227,13 +227,13 @@ export function MainTab({ album, onChange }: MainTabProps) {
                 placeholder="YYYY"
                 style={{ ...dateInputStyle, width: '92px', borderRadius: '4px' }}
               />
-              <div style={{ flex: 1, height: '1px', backgroundColor: '#d1d5db', minWidth: '8px', maxWidth: '14px' }} />
+              <div style={{ width: '10px', height: '1px', backgroundColor: '#d1d5db' }} />
               <input
                 type="text"
                 placeholder="MM"
                 style={{ ...dateInputStyle, width: '56px', borderRadius: '4px' }}
               />
-              <div style={{ flex: 1, height: '1px', backgroundColor: '#d1d5db', minWidth: '8px', maxWidth: '14px' }} />
+              <div style={{ width: '10px', height: '1px', backgroundColor: '#d1d5db' }} />
               <input
                 type="text"
                 placeholder="DD"
@@ -269,19 +269,19 @@ export function MainTab({ album, onChange }: MainTabProps) {
                 </svg>
               </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+            <div style={{ display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'space-between' }}>
               <input
                 type="text"
                 placeholder="YYYY"
                 style={{ ...dateInputStyle, width: '92px', borderRadius: '4px' }}
               />
-              <div style={{ flex: 1, height: '1px', backgroundColor: '#d1d5db', minWidth: '8px', maxWidth: '14px' }} />
+              <div style={{ width: '10px', height: '1px', backgroundColor: '#d1d5db' }} />
               <input
                 type="text"
                 placeholder="MM"
                 style={{ ...dateInputStyle, width: '56px', borderRadius: '4px' }}
               />
-              <div style={{ flex: 1, height: '1px', backgroundColor: '#d1d5db', minWidth: '8px', maxWidth: '14px' }} />
+              <div style={{ width: '10px', height: '1px', backgroundColor: '#d1d5db' }} />
               <input
                 type="text"
                 placeholder="DD"
