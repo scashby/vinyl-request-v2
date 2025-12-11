@@ -231,8 +231,7 @@ const CollectionTable = memo(function CollectionTable({
           padding: '8px',
           fontWeight: 600,
           color: '#212529',
-          borderTop: '1px solid #d0d0d0',
-          borderBottom: '1px solid #d0d0d0',
+          borderBottom: '2px solid #d0d0d0',
           borderRight: isLastLocked ? '2px solid #999' : '1px solid #d0d0d0',
           whiteSpace: 'nowrap',
           fontSize: '13px',
@@ -260,7 +259,7 @@ const CollectionTable = memo(function CollectionTable({
             }}
             onChange={handleSelectAll}
             onClick={(e) => e.stopPropagation()}
-            style={{ cursor: 'pointer' }}
+            style={{ cursor: 'pointer', margin: 0 }}
           />
         ) : (
           <>
@@ -288,7 +287,7 @@ const CollectionTable = memo(function CollectionTable({
           checked={isSelected}
           onChange={(e) => handleCheckboxClick(e, albumId)}
           onClick={(e) => e.stopPropagation()}
-          style={{ cursor: 'pointer' }}
+          style={{ cursor: 'pointer', margin: 0 }}
         />
       );
     }
@@ -298,6 +297,7 @@ const CollectionTable = memo(function CollectionTable({
   const virtualItems = virtualizer.getVirtualItems();
 
   const unlockedWidth = unlocked.reduce((sum, col) => sum + parseInt(col.width), 0);
+  const lockedWidth = locked.reduce((sum, col) => sum + parseInt(col.width), 0);
 
   return (
     <div ref={scrollRef} style={{ width: '100%', height: '100%', overflow: 'auto', position: 'relative' }}>
@@ -307,9 +307,8 @@ const CollectionTable = memo(function CollectionTable({
         top: 0,
         zIndex: 2,
         display: 'flex',
-        alignItems: 'center',
+        alignItems: 'stretch',
         background: '#e8e8e8',
-        borderBottom: '2px solid #d0d0d0',
         minWidth: 'fit-content'
       }}>
         {/* Locked Headers */}
@@ -325,7 +324,7 @@ const CollectionTable = memo(function CollectionTable({
       {/* Body */}
       <div style={{
         height: `${virtualizer.getTotalSize()}px`,
-        width: `${unlockedWidth + locked.reduce((sum, col) => sum + parseInt(col.width), 0)}px`,
+        width: `${unlockedWidth + lockedWidth}px`,
         position: 'relative',
         minWidth: 'fit-content'
       }}>
@@ -333,6 +332,7 @@ const CollectionTable = memo(function CollectionTable({
           const album = albums[virtualRow.index];
           const albumId = String(album.id);
           const isSelected = selectedAlbums.has(albumId);
+          const rowBg = isSelected ? '#e3f2fd' : virtualRow.index % 2 === 0 ? 'white' : '#fafafa';
 
           return (
             <div
@@ -345,19 +345,24 @@ const CollectionTable = memo(function CollectionTable({
                 height: `${virtualRow.size}px`,
                 transform: `translateY(${virtualRow.start}px)`,
                 display: 'flex',
-                alignItems: 'center',
+                alignItems: 'stretch',
                 cursor: 'pointer',
-                backgroundColor: isSelected ? '#e3f2fd' : virtualRow.index % 2 === 0 ? 'white' : '#fafafa',
               }}
               onClick={() => handleRowClick(album)}
               onMouseEnter={(e) => {
                 if (!isSelected) {
-                  e.currentTarget.style.backgroundColor = '#f5f5f5';
+                  const cells = e.currentTarget.querySelectorAll('[data-cell]');
+                  cells.forEach((cell) => {
+                    (cell as HTMLElement).style.backgroundColor = '#f5f5f5';
+                  });
                 }
               }}
               onMouseLeave={(e) => {
                 if (!isSelected) {
-                  e.currentTarget.style.backgroundColor = virtualRow.index % 2 === 0 ? 'white' : '#fafafa';
+                  const cells = e.currentTarget.querySelectorAll('[data-cell]');
+                  cells.forEach((cell) => {
+                    (cell as HTMLElement).style.backgroundColor = rowBg;
+                  });
                 }
               }}
             >
@@ -369,12 +374,13 @@ const CollectionTable = memo(function CollectionTable({
                 return (
                   <div
                     key={col.id}
+                    data-cell
                     style={{
                       width: col.width,
                       minWidth: col.width,
                       maxWidth: col.width,
+                      height: '100%',
                       padding: '6px 8px',
-                      borderTop: '1px solid #e0e0e0',
                       borderBottom: '1px solid #e0e0e0',
                       borderRight: isLastLocked ? '2px solid #999' : '1px solid #e0e0e0',
                       color: '#212529',
@@ -387,7 +393,8 @@ const CollectionTable = memo(function CollectionTable({
                       position: 'sticky',
                       left: `${leftPosition}px`,
                       zIndex: 1,
-                      backgroundColor: isSelected ? '#e3f2fd' : virtualRow.index % 2 === 0 ? 'white' : '#fafafa'
+                      backgroundColor: rowBg,
+                      boxSizing: 'border-box',
                     }}
                   >
                     {renderCellContent(col, album, albumId, isSelected)}
@@ -399,12 +406,13 @@ const CollectionTable = memo(function CollectionTable({
               {unlocked.map(col => (
                 <div
                   key={col.id}
+                  data-cell
                   style={{
                     width: col.width,
                     minWidth: col.width,
                     maxWidth: col.width,
+                    height: '100%',
                     padding: '6px 8px',
-                    borderTop: '1px solid #e0e0e0',
                     borderBottom: '1px solid #e0e0e0',
                     borderRight: '1px solid #e0e0e0',
                     color: '#212529',
@@ -413,7 +421,9 @@ const CollectionTable = memo(function CollectionTable({
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     display: 'flex',
-                    alignItems: 'center'
+                    alignItems: 'center',
+                    backgroundColor: rowBg,
+                    boxSizing: 'border-box',
                   }}
                 >
                   {renderCellContent(col, album, albumId, isSelected)}

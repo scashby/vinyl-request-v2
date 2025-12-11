@@ -89,7 +89,7 @@ export default function EditAlbumModal({ albumId, onClose, onSave }: EditAlbumMo
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 1000,
+        zIndex: 20001,
       }}>
         <div style={{
           backgroundColor: 'white',
@@ -121,7 +121,7 @@ export default function EditAlbumModal({ albumId, onClose, onSave }: EditAlbumMo
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 1000,
+        zIndex: 20001,
       }}>
         <div style={{
           backgroundColor: 'white',
@@ -183,7 +183,7 @@ export default function EditAlbumModal({ albumId, onClose, onSave }: EditAlbumMo
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      zIndex: 1000,
+      zIndex: 20001,
     }}>
       <div style={{
         backgroundColor: 'white',
