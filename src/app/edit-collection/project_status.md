@@ -546,10 +546,9 @@ src/app/edit-collection/
 ## 🔄 CHANGE LOG
 
 - **2025-12-11 (Morning - Update 3):** DATE FIELD REFINEMENTS
-  - Stretched all date fields to full column width using flex layout
   - Fixed Release Date YYYY field to display album.year value
-  - Changed border radius from mixed (rounded outer/square inner) to consistent rounded corners
-  - Date inputs now properly align: YYYY aligns left with label, DD aligns right with calendar icon
+  - Changed border radius from mixed (rounded left/right, square middle) to consistent 4px rounded corners on all date inputs
+  - Maintained original column widths (YYYY: 70px, MM: 50px, DD: 50px)
   - Applied consistent styling across Release Date, Original Release Date, and Recording Date
 
 - **2025-12-11 (Morning - Update 2):** DATE FIELD IMPROVEMENTS COMPLETE
