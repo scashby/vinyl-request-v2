@@ -545,16 +545,18 @@ src/app/edit-collection/
 
 ## 🔄 CHANGE LOG
 
-- **2025-12-11 (Morning - Update 3):** DATE FIELD REFINEMENTS
-  - Fixed Release Date YYYY field to display album.year value
-  - Changed border radius from mixed (rounded left/right, square middle) to consistent 4px rounded corners on all date inputs
-  - Maintained original column widths (YYYY: 70px, MM: 50px, DD: 50px)
-  - Applied consistent styling across Release Date, Original Release Date, and Recording Date
+- **2025-12-11 (Morning - Update 3):** DATE FIELD ALIGNMENT FIX
+  - Expanded YYYY field to flex:1 so DD field aligns with right edge (calendar icon)
+  - Added width: '100%' to date field containers for proper full-width spanning
+  - Fixed Release Date to show YYYY placeholder
+  - MM and DD fields remain fixed at 50px width
+  - Applied to Release Date, Original Release Date, and Recording Date
 
 - **2025-12-11 (Morning - Update 2):** DATE FIELD IMPROVEMENTS COMPLETE
   - Moved calendar icons from input row to label line for all date fields
   - Changed calendar buttons to clickable icons (matching CLZ design)
   - Connected date input boxes with horizontal lines (YYYY—MM—DD pattern)
+  - Changed to consistent 4px rounded corners on all date inputs
   - Applied consistent pattern to Release Date, Original Release Date, and Recording Date
   - Updated project status: Phase 3 now at 75% complete
   
