@@ -103,39 +103,12 @@ export function MainTab({ album, onChange }: MainTabProps) {
 
         {/* Artist */}
         <div>
-          <label style={labelStyle}>Artist</label>
-          <div style={{ display: 'flex', gap: '6px' }}>
-            <div style={{ 
-              flex: 1,
-              padding: '8px 10px',
-              border: '1px solid #d1d5db',
-              borderRadius: '4px',
-              fontSize: '14px',
-              backgroundColor: 'white',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-            }}>
-              <span>{album.artist}</span>
-              <button
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: '#9ca3af',
-                  cursor: 'pointer',
-                  padding: 0,
-                  fontSize: '18px',
-                  lineHeight: '1',
-                  fontWeight: '300',
-                }}
-              >
-                ×
-              </button>
-            </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <label style={{ ...labelStyle, marginBottom: '0' }}>Artist</label>
             <button
               style={{
-                width: '36px',
-                height: '36px',
+                width: '28px',
+                height: '28px',
                 padding: 0,
                 border: '1px solid #d1d5db',
                 borderRadius: '4px',
@@ -145,10 +118,39 @@ export function MainTab({ album, onChange }: MainTabProps) {
                 cursor: 'pointer',
                 color: '#6b7280',
                 fontWeight: '300',
-                flexShrink: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
               }}
             >
               +
+            </button>
+          </div>
+          <div style={{ 
+            flex: 1,
+            padding: '8px 10px',
+            border: '1px solid #d1d5db',
+            borderRadius: '4px',
+            fontSize: '14px',
+            backgroundColor: 'white',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}>
+            <span>{album.artist}</span>
+            <button
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#9ca3af',
+                cursor: 'pointer',
+                padding: 0,
+                fontSize: '18px',
+                lineHeight: '1',
+                fontWeight: '300',
+              }}
+            >
+              ×
             </button>
           </div>
         </div>
@@ -383,6 +385,7 @@ export function MainTab({ album, onChange }: MainTabProps) {
               flexWrap: 'wrap',
               alignItems: 'center',
               backgroundColor: 'white',
+              boxSizing: 'border-box',
             }}>
               {album.discogs_genres && album.discogs_genres.length > 0 ? (
                 <>
@@ -422,7 +425,7 @@ export function MainTab({ album, onChange }: MainTabProps) {
             </div>
             <button style={{
               width: '36px',
-              height: '36px',
+              minHeight: '48px',
               padding: 0,
               border: '1px solid #d1d5db',
               borderRadius: '0 4px 4px 0',
@@ -433,6 +436,7 @@ export function MainTab({ album, onChange }: MainTabProps) {
               justifyContent: 'center',
               color: '#6b7280',
               flexShrink: 0,
+              boxSizing: 'border-box',
             }}>
               <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
                 <circle cx="1.5" cy="2.5" r="1"/>

@@ -120,11 +120,12 @@ export function UniversalBottomBar({
                 flex: 1,
                 borderRadius: '4px 0 0 4px',
                 borderRight: 'none',
+                boxSizing: 'border-box',
               }}
             />
             <button style={{
               width: '36px',
-              height: '34px',
+              height: 'auto',
               padding: 0,
               border: '1px solid #d1d5db',
               borderRadius: '0 4px 4px 0',
@@ -135,6 +136,7 @@ export function UniversalBottomBar({
               justifyContent: 'center',
               color: '#6b7280',
               flexShrink: 0,
+              boxSizing: 'border-box',
             }}>
               <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
                 <circle cx="1.5" cy="2.5" r="1"/>

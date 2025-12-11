@@ -557,6 +557,15 @@ src/app/edit-collection/
 
 ## 🔄 CHANGE LOG
 
+- **2025-12-11 (Afternoon - Update 3):** HEIGHT MATCHING FIX + ARTIST + BUTTON REPOSITIONED
+  - Genre button: Changed from fixed `height: 36px` to `minHeight: 48px` to match expanded field height
+  - Genre field: Added `boxSizing: 'border-box'` for accurate height calculation
+  - Location button: Changed to `height: 'auto'` with `alignItems: 'stretch'` to match input exactly
+  - Location input: Added `boxSizing: 'border-box'` for consistent sizing
+  - Artist + button: Moved to label row (matching Title's Aa indicator pattern)
+  - Artist field: Expanded to full width, now only contains artist name + × button
+  - Artist + button: Sized at 28×28px to match other label-line elements
+
 - **2025-12-11 (Afternoon - Update 2):** BULLET LIST ICON + GENRE ALIGNMENT FIX
   - Changed from hamburger icon (☰) to proper bullet list icon (SVG with bullets + lines)
   - Matches Font Awesome's fa-list icon style
