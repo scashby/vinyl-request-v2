@@ -19,12 +19,12 @@ type TabId = 'main' | 'details' | 'classical' | 'people' | 'tracks' | 'personal'
 const TABS: { id: TabId; label: string; icon: string }[] = [
   { id: 'main', label: 'Main', icon: '♪' },
   { id: 'details', label: 'Details', icon: 'ⓘ' },
-  { id: 'classical', label: 'Classical', icon: '𝄞' },
-  { id: 'people', label: 'People', icon: '👥' },
-  { id: 'tracks', label: 'Tracks', icon: '☰' },
-  { id: 'personal', label: 'Personal', icon: '👤' },
-  { id: 'cover', label: 'Cover', icon: '📷' },
-  { id: 'links', label: 'Links', icon: '🔗' },
+  { id: 'classical', label: 'Classical', icon: '♭' },
+  { id: 'people', label: 'People', icon: '👤' },
+  { id: 'tracks', label: 'Tracks', icon: '≡' },
+  { id: 'personal', label: 'Personal', icon: '★' },
+  { id: 'cover', label: 'Cover', icon: '◘' },
+  { id: 'links', label: 'Links', icon: '⌘' },
 ];
 
 interface EditAlbumModalProps {
@@ -76,7 +76,6 @@ export default function EditAlbumModal({ albumId, onClose, onSave }: EditAlbumMo
     fetchAlbum();
   }, [albumId]);
 
-  // Loading state
   if (loading) {
     return (
       <div style={{
@@ -108,7 +107,6 @@ export default function EditAlbumModal({ albumId, onClose, onSave }: EditAlbumMo
     );
   }
 
-  // Error state
   if (error || !album || !editedAlbum) {
     return (
       <div style={{
@@ -229,7 +227,7 @@ export default function EditAlbumModal({ albumId, onClose, onSave }: EditAlbumMo
           </button>
         </div>
 
-        {/* Tabs - ROUNDED WHITE CONTAINER */}
+        {/* Tabs */}
         <div style={{
           borderBottom: '1px solid #e5e7eb',
           background: '#f9fafb',
