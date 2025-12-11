@@ -252,14 +252,21 @@ export function MainTab({ album, onChange }: MainTabProps) {
                 borderRadius: '0 4px 4px 0',
                 backgroundColor: 'white',
                 cursor: 'pointer',
-                fontSize: '16px',
-                lineHeight: '1',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: '#6b7280',
                 flexShrink: 0,
-              }}>☰</button>
+              }}>
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+                  <circle cx="1.5" cy="2.5" r="1"/>
+                  <rect x="4" y="2" width="10" height="1"/>
+                  <circle cx="1.5" cy="7" r="1"/>
+                  <rect x="4" y="6.5" width="10" height="1"/>
+                  <circle cx="1.5" cy="11.5" r="1"/>
+                  <rect x="4" y="11" width="10" height="1"/>
+                </svg>
+              </button>
             </div>
           </div>
           <div>
@@ -321,14 +328,21 @@ export function MainTab({ album, onChange }: MainTabProps) {
                 borderRadius: '0 4px 4px 0',
                 backgroundColor: 'white',
                 cursor: 'pointer',
-                fontSize: '16px',
-                lineHeight: '1',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: '#6b7280',
                 flexShrink: 0,
-              }}>☰</button>
+              }}>
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+                  <circle cx="1.5" cy="2.5" r="1"/>
+                  <rect x="4" y="2" width="10" height="1"/>
+                  <circle cx="1.5" cy="7" r="1"/>
+                  <rect x="4" y="6.5" width="10" height="1"/>
+                  <circle cx="1.5" cy="11.5" r="1"/>
+                  <rect x="4" y="11" width="10" height="1"/>
+                </svg>
+              </button>
             </div>
           </div>
           <div>
@@ -356,7 +370,7 @@ export function MainTab({ album, onChange }: MainTabProps) {
         {/* Row 5: Genre - FULL WIDTH */}
         <div>
           <label style={labelStyle}>Genre</label>
-          <div style={{ display: 'flex', gap: '0', alignItems: 'stretch' }}>
+          <div style={{ display: 'flex', gap: '0', alignItems: 'flex-start' }}>
             <div style={{
               flex: 1,
               padding: '6px 10px',
@@ -414,14 +428,21 @@ export function MainTab({ album, onChange }: MainTabProps) {
               borderRadius: '0 4px 4px 0',
               backgroundColor: 'white',
               cursor: 'pointer',
-              fontSize: '16px',
-              lineHeight: '1',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               color: '#6b7280',
               flexShrink: 0,
-            }}>☰</button>
+            }}>
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+                <circle cx="1.5" cy="2.5" r="1"/>
+                <rect x="4" y="2" width="10" height="1"/>
+                <circle cx="1.5" cy="7" r="1"/>
+                <rect x="4" y="6.5" width="10" height="1"/>
+                <circle cx="1.5" cy="11.5" r="1"/>
+                <rect x="4" y="11" width="10" height="1"/>
+              </svg>
+            </button>
           </div>
         </div>
       </div>

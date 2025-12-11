@@ -174,17 +174,20 @@ Phase 4: Advanced Features        ░░░░░░░░░░░░░░░�
   - [x] Recording Date (YYYY—MM—DD with connecting lines)
   - [x] **Final width adjustments**: YYYY: 92px, MM: 56px, DD: 56px
   - [x] **Connector lines**: Fixed 10px width, space-between layout for full-width span
-- [x] **Unified selector styling** (Label, Format, Genre):
-  - [x] No gap between dropdown and button (0px)
+- [x] **Unified selector styling** (Label, Format, Genre, Location):
+  - [x] No gap between dropdown/input and button (0px)
   - [x] Matching heights (36px for both elements)
-  - [x] Connected border-radius (rounded left for dropdown, rounded right for button)
-  - [x] Shared border (borderRight: 'none' on dropdown)
-  - [x] Consistent button styling across all selectors
-- [x] Label selector with ☰ button (unified with dropdown)
-- [x] Format selector with ☰ button (unified with dropdown)
+  - [x] Connected border-radius (rounded left for field, rounded right for button)
+  - [x] Shared border (borderRight: 'none' on field)
+  - [x] **Bullet list icon** (Font Awesome style - bullets + lines via SVG)
+  - [x] Genre: Button aligned to top (flex-start) to stay with first row as tags wrap
+  - [x] Location: Added unified selector to UniversalBottomBar
+- [x] Label selector with unified styling
+- [x] Format selector with unified styling
 - [x] Barcode input
 - [x] Cat No input
-- [x] Genre multi-tag display with ☰ button (unified with tag container)
+- [x] Genre multi-tag display with unified styling (expandable field)
+- [x] Location field with unified styling (in UniversalBottomBar)
 - [x] **CRITICAL FIX**: Added explicit text color to all input styles (prevents white-on-white issue)
 - [ ] **NEXT:** Universal Picker System (Phase 2)
   - [ ] PickerModal component (single/multi-select)
@@ -554,7 +557,16 @@ src/app/edit-collection/
 
 ## 🔄 CHANGE LOG
 
-- **2025-12-11 (Afternoon):** UNIFIED SELECTOR STYLING - CLZ EXACT MATCH
+- **2025-12-11 (Afternoon - Update 2):** BULLET LIST ICON + GENRE ALIGNMENT FIX
+  - Changed from hamburger icon (☰) to proper bullet list icon (SVG with bullets + lines)
+  - Matches Font Awesome's fa-list icon style
+  - Applied to all selectors: Label, Format, Genre, and Location
+  - Genre field: Changed button alignment from 'stretch' to 'flex-start' 
+  - Genre button now stays aligned with first row of tags as field expands vertically
+  - Location field: Added unified selector styling to UniversalBottomBar
+  - Created UniversalBottomBar.tsx output file with Location updates
+
+- **2025-12-11 (Afternoon - Update 1):** UNIFIED SELECTOR STYLING - CLZ EXACT MATCH
   - Removed gap between dropdowns and buttons (0px)
   - Made all buttons exactly 36px height to match dropdowns
   - Connected elements with border-radius (rounded left/rounded right pattern)

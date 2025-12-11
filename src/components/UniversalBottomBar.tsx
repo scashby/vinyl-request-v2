@@ -109,16 +109,43 @@ export function UniversalBottomBar({
         {/* Location */}
         <div>
           <label style={labelStyle}>Location</label>
-          <input
-            type="text"
-            value={album.location || ''}
-            onChange={(e) => onChange('location', e.target.value)}
-            placeholder="Storage location"
-            style={{
-              ...inputStyle,
-              width: '100%',
-            }}
-          />
+          <div style={{ display: 'flex', gap: '0', alignItems: 'stretch' }}>
+            <input
+              type="text"
+              value={album.location || ''}
+              onChange={(e) => onChange('location', e.target.value)}
+              placeholder="Storage location"
+              style={{
+                ...inputStyle,
+                flex: 1,
+                borderRadius: '4px 0 0 4px',
+                borderRight: 'none',
+              }}
+            />
+            <button style={{
+              width: '36px',
+              height: '34px',
+              padding: 0,
+              border: '1px solid #d1d5db',
+              borderRadius: '0 4px 4px 0',
+              backgroundColor: 'white',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#6b7280',
+              flexShrink: 0,
+            }}>
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+                <circle cx="1.5" cy="2.5" r="1"/>
+                <rect x="4" y="2" width="10" height="1"/>
+                <circle cx="1.5" cy="7" r="1"/>
+                <rect x="4" y="6.5" width="10" height="1"/>
+                <circle cx="1.5" cy="11.5" r="1"/>
+                <rect x="4" y="11" width="10" height="1"/>
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
 
