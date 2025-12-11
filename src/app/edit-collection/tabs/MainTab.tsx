@@ -192,19 +192,19 @@ export function MainTab({ album, onChange }: MainTabProps) {
                 value={album.year || ''}
                 onChange={(e) => onChange('year', e.target.value)}
                 placeholder="YYYY"
-                style={{ ...dateInputStyle, width: '88px', borderRadius: '4px' }}
+                style={{ ...dateInputStyle, width: '92px', borderRadius: '4px' }}
               />
-              <div style={{ flex: 1, height: '1px', backgroundColor: '#d1d5db', minWidth: '8px' }} />
+              <div style={{ flex: 1, height: '1px', backgroundColor: '#d1d5db', minWidth: '8px', maxWidth: '14px' }} />
               <input
                 type="text"
                 placeholder="MM"
-                style={{ ...dateInputStyle, width: '52px', borderRadius: '4px' }}
+                style={{ ...dateInputStyle, width: '56px', borderRadius: '4px' }}
               />
-              <div style={{ flex: 1, height: '1px', backgroundColor: '#d1d5db', minWidth: '8px' }} />
+              <div style={{ flex: 1, height: '1px', backgroundColor: '#d1d5db', minWidth: '8px', maxWidth: '14px' }} />
               <input
                 type="text"
                 placeholder="DD"
-                style={{ ...dateInputStyle, width: '52px', borderRadius: '4px' }}
+                style={{ ...dateInputStyle, width: '56px', borderRadius: '4px' }}
               />
             </div>
           </div>
@@ -225,19 +225,19 @@ export function MainTab({ album, onChange }: MainTabProps) {
                 value={album.master_release_date || ''}
                 onChange={(e) => onChange('master_release_date', e.target.value)}
                 placeholder="YYYY"
-                style={{ ...dateInputStyle, width: '88px', borderRadius: '4px' }}
+                style={{ ...dateInputStyle, width: '92px', borderRadius: '4px' }}
               />
-              <div style={{ flex: 1, height: '1px', backgroundColor: '#d1d5db', minWidth: '8px' }} />
+              <div style={{ flex: 1, height: '1px', backgroundColor: '#d1d5db', minWidth: '8px', maxWidth: '14px' }} />
               <input
                 type="text"
                 placeholder="MM"
-                style={{ ...dateInputStyle, width: '52px', borderRadius: '4px' }}
+                style={{ ...dateInputStyle, width: '56px', borderRadius: '4px' }}
               />
-              <div style={{ flex: 1, height: '1px', backgroundColor: '#d1d5db', minWidth: '8px' }} />
+              <div style={{ flex: 1, height: '1px', backgroundColor: '#d1d5db', minWidth: '8px', maxWidth: '14px' }} />
               <input
                 type="text"
                 placeholder="DD"
-                style={{ ...dateInputStyle, width: '52px', borderRadius: '4px' }}
+                style={{ ...dateInputStyle, width: '56px', borderRadius: '4px' }}
               />
             </div>
           </div>
@@ -273,19 +273,19 @@ export function MainTab({ album, onChange }: MainTabProps) {
               <input
                 type="text"
                 placeholder="YYYY"
-                style={{ ...dateInputStyle, width: '88px', borderRadius: '4px' }}
+                style={{ ...dateInputStyle, width: '92px', borderRadius: '4px' }}
               />
-              <div style={{ flex: 1, height: '1px', backgroundColor: '#d1d5db', minWidth: '8px' }} />
+              <div style={{ flex: 1, height: '1px', backgroundColor: '#d1d5db', minWidth: '8px', maxWidth: '14px' }} />
               <input
                 type="text"
                 placeholder="MM"
-                style={{ ...dateInputStyle, width: '52px', borderRadius: '4px' }}
+                style={{ ...dateInputStyle, width: '56px', borderRadius: '4px' }}
               />
-              <div style={{ flex: 1, height: '1px', backgroundColor: '#d1d5db', minWidth: '8px' }} />
+              <div style={{ flex: 1, height: '1px', backgroundColor: '#d1d5db', minWidth: '8px', maxWidth: '14px' }} />
               <input
                 type="text"
                 placeholder="DD"
-                style={{ ...dateInputStyle, width: '52px', borderRadius: '4px' }}
+                style={{ ...dateInputStyle, width: '56px', borderRadius: '4px' }}
               />
             </div>
           </div>

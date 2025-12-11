@@ -172,11 +172,14 @@ Phase 4: Advanced Features        ░░░░░░░░░░░░░░░�
   - [x] Release Date (YYYY—MM—DD with connecting lines)
   - [x] Original Release Date (YYYY—MM—DD with connecting lines)
   - [x] Recording Date (YYYY—MM—DD with connecting lines)
+  - [x] **Final width adjustments**: YYYY: 92px, MM: 56px, DD: 56px
+  - [x] **Connector lines reduced by 30%**: maxWidth: 14px (down from ~20px)
 - [x] Label selector with ☰ button
 - [x] Format selector with ☰ button
 - [x] Barcode input
 - [x] Cat No input
 - [x] Genre multi-tag display with ☰ button
+- [x] **CRITICAL FIX**: Added explicit text color to all input styles (prevents white-on-white issue)
 - [ ] **NEXT:** Universal Picker System (Phase 2)
   - [ ] PickerModal component (single/multi-select)
   - [ ] ManageModal component (edit/delete/merge)
