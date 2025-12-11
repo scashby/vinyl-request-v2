@@ -95,27 +95,16 @@ export function MainTab({ album, onChange }: MainTabProps) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         {/* Title with Aa */}
         <div>
-          <label style={labelStyle}>Title</label>
-          <div style={{ position: 'relative' }}>
-            <input
-              type="text"
-              value={album.title}
-              onChange={(e) => onChange('title', e.target.value)}
-              style={inputStyle}
-            />
-            <span style={{
-              position: 'absolute',
-              right: '12px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              color: '#9ca3af',
-              fontSize: '12px',
-              fontWeight: '500',
-              pointerEvents: 'none',
-            }}>
-              Aa
-            </span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <label style={{ ...labelStyle, marginBottom: '0' }}>Title</label>
+            <span style={{ color: '#9ca3af', fontSize: '13px', fontWeight: '400' }}>Aa</span>
           </div>
+          <input
+            type="text"
+            value={album.title}
+            onChange={(e) => onChange('title', e.target.value)}
+            style={inputStyle}
+          />
         </div>
 
         {/* Sort Title */}
