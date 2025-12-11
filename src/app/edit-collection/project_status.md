@@ -545,6 +545,14 @@ src/app/edit-collection/
 
 ## 🔄 CHANGE LOG
 
+- **2025-12-11 (Morning - Update 4):** CRITICAL TEXT COLOR FIX + WIDTH BALANCE
+  - **FIXED WHITE TEXT ISSUE:** Added explicit `color: '#111827'` to all input styles (inputStyle, selectStyle, dateInputStyle)
+  - **Why it defaults to white:** Input fields without explicit color inherit from parent container, which has white text on dark/purple background
+  - **Solution:** Always explicitly set text color in input field styles to prevent inheritance
+  - Adjusted date field widths for better balance: YYYY: 70px→88px (+25%), MM/DD: 50px→52px (+5%)
+  - This reduces connector line width proportionally while improving input field usability
+  - Applied to all inputs: Title, Sort Title, Subtitle, all date fields, Label, Format, Barcode, Cat No
+
 - **2025-12-11 (Morning - Update 3):** DATE FIELD ALIGNMENT FIX - FINAL
   - Reverted YYYY back to fixed width (70px) with MM/DD at 50px
   - Expanded horizontal connecting lines to flex: 1 (with minWidth: 8px) to span full width
