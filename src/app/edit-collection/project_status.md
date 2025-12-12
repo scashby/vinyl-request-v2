@@ -189,11 +189,55 @@ Phase 4: Advanced Features        ░░░░░░░░░░░░░░░�
 - [x] Genre multi-tag display with unified styling (expandable field)
 - [x] Location field with unified styling (in UniversalBottomBar)
 - [x] **CRITICAL FIX**: Added explicit text color to all input styles (prevents white-on-white issue)
-- [ ] **NEXT:** Universal Picker System (Phase 2)
-  - [ ] PickerModal component (single/multi-select)
-  - [ ] ManageModal component (edit/delete/merge)
-  - [ ] EditModal component
-  - [ ] MergeModal component
+- [x] **Phase 2 - Universal Picker System STARTED:**
+  - [x] PickerModal component (single/multi-select) ✅ COMPLETE
+    - Single-select mode with radio buttons
+    - Multi-select mode with checkboxes
+    - Search/filter functionality
+    - Item counts display
+    - "New [Item]" button (blue, top-right)
+    - "Manage [Items]" button (gray, top-right)
+    - Save/Cancel buttons
+    - Hover states and selected highlighting
+    - Click-outside-to-close functionality
+    - Higher z-index (30001) than EditAlbumModal
+  - [x] ManageModal component (edit/delete/merge) ✅ COMPLETE
+    - Alphabetically sorted item list with counts
+    - Edit button per row (blue) - opens EditModal
+    - Delete button per row (gray) - inline confirmation
+    - "Merge Mode" toggle button (gray/red when active)
+    - Merge mode: checkboxes for item selection
+    - Yellow banner shows selection count + "Merge Selected" button
+    - Search/filter functionality
+    - Close button
+    - Higher z-index (30002) than PickerModal
+  - [x] EditModal component ✅ COMPLETE
+    - Simple name input with label
+    - Auto-focus and auto-select on open
+    - Enter to save, Escape to cancel
+    - Empty name validation
+    - Save/Cancel buttons
+    - Higher z-index (30003) than ManageModal
+  - [x] MergeModal component ✅ COMPLETE
+    - Radio button selection for primary item
+    - Sorted by count (desc) then name
+    - Yellow info banner explaining merge process
+    - Preview section showing result
+    - Warning about deletion
+    - Total album count display
+    - Merge/Cancel buttons (Merge is red)
+    - Higher z-index (30004) than EditModal
+  - [x] Integration with MainTab selectors ✅ COMPLETE
+    - All 4 modal components imported and wired
+    - Mock data for Labels, Formats, Genres, Locations
+    - Label selector button → PickerModal (single-select)
+    - Format selector button → PickerModal (single-select)
+    - Genre selector button → PickerModal (multi-select)
+    - Location selector (in UniversalBottomBar) → PickerModal (single-select)
+    - Full CRUD operations: Create, Edit, Delete, Merge
+    - State management for modal navigation
+    - Callback handlers for all operations
+    - Proper z-index layering (30001-30004)
 
 ### Tab Status Overview
 - ✅ **MainTab.tsx** - Layout complete, UI built, needs functional pickers
