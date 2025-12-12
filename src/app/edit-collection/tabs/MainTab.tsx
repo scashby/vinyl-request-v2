@@ -1,50 +1,31 @@
 // src/app/edit-collection/tabs/MainTab.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { Album } from 'types/album';
 import { PickerModal } from '../pickers/PickerModal';
 import { ManageModal } from '../pickers/ManageModal';
 import { EditModal } from '../pickers/EditModal';
 import { MergeModal } from '../pickers/MergeModal';
+import {
+  fetchLabels,
+  fetchFormats,
+  fetchGenres,
+  fetchLocations,
+  updateLabel,
+  updateFormat,
+  updateLocation,
+  deleteLabel,
+  mergeLabels,
+  mergeFormats,
+  mergeLocations,
+  type PickerDataItem,
+} from '../pickers/pickerDataUtils';
 
 interface MainTabProps {
   album: Album;
   onChange: (field: keyof Album, value: string | number | string[] | null | boolean) => void;
 }
-
-// Mock data - in production, these would come from database
-const MOCK_LABELS = [
-  { id: '1', name: 'Blue Note', count: 42 },
-  { id: '2', name: 'Columbia', count: 38 },
-  { id: '3', name: 'Def Jam', count: 25 },
-  { id: '4', name: 'Elektra', count: 18 },
-  { id: '5', name: 'Interscope', count: 31 },
-];
-
-const MOCK_FORMATS = [
-  { id: '1', name: 'LP', count: 156 },
-  { id: '2', name: '12"', count: 89 },
-  { id: '3', name: '7"', count: 45 },
-  { id: '4', name: '10"', count: 12 },
-  { id: '5', name: 'Box Set', count: 8 },
-];
-
-const MOCK_GENRES = [
-  { id: '1', name: 'Jazz', count: 78 },
-  { id: '2', name: 'Rock', count: 65 },
-  { id: '3', name: 'Hip Hop', count: 52 },
-  { id: '4', name: 'Electronic', count: 41 },
-  { id: '5', name: 'Soul', count: 34 },
-  { id: '6', name: 'Funk', count: 29 },
-];
-
-const MOCK_LOCATIONS = [
-  { id: '1', name: 'Living Room - Main Shelf', count: 145 },
-  { id: '2', name: 'Bedroom - Upper Cabinet', count: 89 },
-  { id: '3', name: 'Storage - Box A', count: 67 },
-  { id: '4', name: 'Office - Display Case', count: 23 },
-];
 
 type ModalType = 'picker' | 'manage' | 'edit' | 'merge' | null;
 type FieldType = 'spotify_label' | 'format' | 'genre' | 'location';
@@ -56,11 +37,50 @@ export function MainTab({ album, onChange }: MainTabProps) {
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [mergingItemIds, setMergingItemIds] = useState<string[]>([]);
 
-  // Data state (mock - would be from props or context in production)
-  const [labels, setLabels] = useState(MOCK_LABELS);
-  const [formats, setFormats] = useState(MOCK_FORMATS);
-  const [genres, setGenres] = useState(MOCK_GENRES);
-  const [locations, setLocations] = useState(MOCK_LOCATIONS);
+  // Data state - real data from Supabase
+  const [labels, setLabels] = useState<PickerDataItem[]>([]);
+  const [formats, setFormats] = useState<PickerDataItem[]>([]);
+  const [genres, setGenres] = useState<PickerDataItem[]>([]);
+  const [locations, setLocations] = useState<PickerDataItem[]>([]);
+  const [dataLoading, setDataLoading] = useState(false);
+
+  // Fetch real data on mount
+  useEffect(() => {
+    loadAllData();
+  }, []);
+
+  const loadAllData = async () => {
+    setDataLoading(true);
+    const [labelsData, formatsData, genresData, locationsData] = await Promise.all([
+      fetchLabels(),
+      fetchFormats(),
+      fetchGenres(),
+      fetchLocations(),
+    ]);
+    setLabels(labelsData);
+    setFormats(formatsData);
+    setGenres(genresData);
+    setLocations(locationsData);
+    setDataLoading(false);
+  };
+
+  // Reload specific dataset
+  const reloadData = async (field: FieldType) => {
+    switch (field) {
+      case 'spotify_label':
+        setLabels(await fetchLabels());
+        break;
+      case 'format':
+        setFormats(await fetchFormats());
+        break;
+      case 'genre':
+        setGenres(await fetchGenres());
+        break;
+      case 'location':
+        setLocations(await fetchLocations());
+        break;
+    }
+  };
 
   // Get current items based on active field
   const getCurrentItems = () => {
@@ -92,16 +112,6 @@ export function MainTab({ album, onChange }: MainTabProps) {
       case 'genre': return { title: 'Select Genres', itemLabel: 'Genre', mode: 'multi' as const };
       case 'location': return { title: 'Select Location', itemLabel: 'Location', mode: 'single' as const };
       default: return { title: '', itemLabel: '', mode: 'single' as const };
-    }
-  };
-
-  // Update items based on field
-  const updateItems = (items: typeof labels) => {
-    switch (activeField) {
-      case 'spotify_label': setLabels(items); break;
-      case 'format': setFormats(items); break;
-      case 'genre': setGenres(items); break;
-      case 'location': setLocations(items); break;
     }
   };
 
@@ -151,9 +161,20 @@ export function MainTab({ album, onChange }: MainTabProps) {
     setActiveModal('edit');
   };
 
-  const handleDelete = (itemId: string) => {
-    const items = getCurrentItems();
-    updateItems(items.filter(item => item.id !== itemId));
+  const handleDelete = async (itemId: string) => {
+    if (!activeField) return;
+
+    // Delete from database
+    let success = false;
+    if (activeField === 'spotify_label') {
+      success = await deleteLabel(itemId);
+    }
+    // Format, genre, location can't really be "deleted" - they're just values
+    // We'd need to set them to null on albums that have them
+    
+    if (success && activeField) {
+      await reloadData(activeField);
+    }
   };
 
   const handleOpenMerge = (itemIds: string[]) => {
@@ -162,37 +183,68 @@ export function MainTab({ album, onChange }: MainTabProps) {
   };
 
   // EditModal handlers
-  const handleEditSave = (newName: string) => {
+  const handleEditSave = async (newName: string) => {
+    if (!activeField) return;
+
     const items = getCurrentItems();
     
     if (editingItemId) {
       // Edit existing
-      updateItems(items.map(item => 
-        item.id === editingItemId ? { ...item, name: newName } : item
-      ));
+      let success = false;
+      
+      if (activeField === 'spotify_label') {
+        success = await updateLabel(editingItemId, newName);
+      } else if (activeField === 'format') {
+        success = await updateFormat(editingItemId, newName);
+      } else if (activeField === 'location') {
+        success = await updateLocation(editingItemId, newName);
+      }
+      
+      if (success) {
+        await reloadData(activeField);
+      }
     } else {
-      // Create new
-      const newId = String(Math.max(...items.map(i => parseInt(i.id))) + 1);
-      updateItems([...items, { id: newId, name: newName, count: 0 }]);
+      // Create new - just add to local state, it will be created when album is saved with this value
+      const newItem: PickerDataItem = {
+        id: newName,
+        name: newName,
+        count: 0,
+      };
+      
+      switch (activeField) {
+        case 'spotify_label':
+          setLabels([...labels, newItem].sort((a, b) => a.name.localeCompare(b.name)));
+          break;
+        case 'format':
+          setFormats([...formats, newItem].sort((a, b) => a.name.localeCompare(b.name)));
+          break;
+        case 'genre':
+          setGenres([...genres, newItem].sort((a, b) => a.name.localeCompare(b.name)));
+          break;
+        case 'location':
+          setLocations([...locations, newItem].sort((a, b) => a.name.localeCompare(b.name)));
+          break;
+      }
     }
   };
 
   // MergeModal handlers
-  const handleMerge = (primaryId: string, mergeIntoIds: string[]) => {
-    const items = getCurrentItems();
-    const primaryItem = items.find(item => item.id === primaryId);
-    if (!primaryItem) return;
+  const handleMerge = async (primaryId: string, mergeIntoIds: string[]) => {
+    if (!activeField) return;
 
-    // Sum up all counts
-    const mergedCount = items
-      .filter(item => item.id === primaryId || mergeIntoIds.includes(item.id))
-      .reduce((sum, item) => sum + (item.count || 0), 0);
-
-    // Remove merged items and update primary
-    updateItems(items
-      .filter(item => !mergeIntoIds.includes(item.id))
-      .map(item => item.id === primaryId ? { ...item, count: mergedCount } : item)
-    );
+    let success = false;
+    
+    if (activeField === 'spotify_label') {
+      success = await mergeLabels(primaryId, mergeIntoIds);
+    } else if (activeField === 'format') {
+      success = await mergeFormats(primaryId, mergeIntoIds);
+    } else if (activeField === 'location') {
+      success = await mergeLocations(primaryId, mergeIntoIds);
+    }
+    
+    if (success) {
+      await reloadData(activeField);
+    }
   };
 
   // Close all modals
@@ -431,6 +483,7 @@ export function MainTab({ album, onChange }: MainTabProps) {
                 </select>
                 <button 
                   onClick={() => handleOpenPicker('spotify_label')}
+                  disabled={dataLoading}
                   style={{
                     width: '36px',
                     height: '36px',
@@ -438,7 +491,7 @@ export function MainTab({ album, onChange }: MainTabProps) {
                     border: '1px solid #d1d5db',
                     borderRadius: '0 4px 4px 0',
                     backgroundColor: 'white',
-                    cursor: 'pointer',
+                    cursor: dataLoading ? 'wait' : 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -510,6 +563,7 @@ export function MainTab({ album, onChange }: MainTabProps) {
                 </select>
                 <button 
                   onClick={() => handleOpenPicker('format')}
+                  disabled={dataLoading}
                   style={{
                     width: '36px',
                     height: '36px',
@@ -517,7 +571,7 @@ export function MainTab({ album, onChange }: MainTabProps) {
                     border: '1px solid #d1d5db',
                     borderRadius: '0 4px 4px 0',
                     backgroundColor: 'white',
-                    cursor: 'pointer',
+                    cursor: dataLoading ? 'wait' : 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -614,6 +668,7 @@ export function MainTab({ album, onChange }: MainTabProps) {
               </div>
               <button 
                 onClick={() => handleOpenPicker('genre')}
+                disabled={dataLoading}
                 style={{
                   width: '36px',
                   minHeight: '40px',
@@ -621,7 +676,7 @@ export function MainTab({ album, onChange }: MainTabProps) {
                   border: '1px solid #d1d5db',
                   borderRadius: '0 4px 4px 0',
                   backgroundColor: 'white',
-                  cursor: 'pointer',
+                  cursor: dataLoading ? 'wait' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',

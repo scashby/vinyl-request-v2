@@ -9,7 +9,7 @@ interface EditModalProps {
   title: string;
   itemName: string;
   onSave: (newName: string) => void;
-  itemLabel?: string; // e.g., "Label", "Format", "Genre"
+  itemLabel?: string;
 }
 
 export function EditModal({
@@ -24,13 +24,11 @@ export function EditModal({
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Reset local state when modal opens or itemName changes
   useEffect(() => {
     setLocalName(itemName);
     setError(null);
   }, [itemName, isOpen]);
 
-  // Auto-focus input when modal opens
   useEffect(() => {
     if (isOpen && inputRef.current) {
       inputRef.current.focus();
@@ -43,14 +41,12 @@ export function EditModal({
   const handleSave = () => {
     const trimmedName = localName.trim();
     
-    // Validation
     if (!trimmedName) {
       setError(`${itemLabel} name cannot be empty`);
       return;
     }
 
     if (trimmedName === itemName) {
-      // No change - just close
       onClose();
       return;
     }
@@ -60,7 +56,7 @@ export function EditModal({
   };
 
   const handleCancel = () => {
-    setLocalName(itemName); // Reset to original
+    setLocalName(itemName);
     setError(null);
     onClose();
   };
@@ -87,34 +83,33 @@ export function EditModal({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 30003, // Higher than ManageModal (30002)
+        zIndex: 30003,
       }}
       onClick={handleCancel}
     >
       <div
         style={{
           backgroundColor: 'white',
-          borderRadius: '8px',
-          width: '90%',
-          maxWidth: '500px',
+          borderRadius: '6px',
+          width: '450px',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
-          boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
         }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div
           style={{
-            padding: '16px 20px',
+            padding: '12px 16px',
             borderBottom: '1px solid #e5e7eb',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
           }}
         >
-          <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '600', color: '#111827' }}>
+          <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: '#111827' }}>
             {title}
           </h3>
           <button
@@ -123,7 +118,7 @@ export function EditModal({
               background: 'transparent',
               border: 'none',
               color: '#6b7280',
-              fontSize: '24px',
+              fontSize: '20px',
               cursor: 'pointer',
               padding: '0 4px',
               lineHeight: '1',
@@ -134,12 +129,12 @@ export function EditModal({
         </div>
 
         {/* Content */}
-        <div style={{ padding: '20px' }}>
+        <div style={{ padding: '16px' }}>
           <label
             style={{
               display: 'block',
-              marginBottom: '8px',
-              fontSize: '14px',
+              marginBottom: '6px',
+              fontSize: '13px',
               fontWeight: '500',
               color: '#374151',
             }}
@@ -152,15 +147,15 @@ export function EditModal({
             value={localName}
             onChange={(e) => {
               setLocalName(e.target.value);
-              setError(null); // Clear error on change
+              setError(null);
             }}
             onKeyDown={handleKeyDown}
             style={{
               width: '100%',
-              padding: '10px 12px',
+              padding: '8px 10px',
               border: error ? '1px solid #ef4444' : '1px solid #d1d5db',
               borderRadius: '4px',
-              fontSize: '14px',
+              fontSize: '13px',
               outline: 'none',
               boxSizing: 'border-box',
             }}
@@ -169,9 +164,9 @@ export function EditModal({
           {error && (
             <div
               style={{
-                marginTop: '8px',
+                marginTop: '6px',
                 color: '#ef4444',
-                fontSize: '13px',
+                fontSize: '12px',
               }}
             >
               {error}
@@ -182,22 +177,22 @@ export function EditModal({
         {/* Footer */}
         <div
           style={{
-            padding: '16px 20px',
+            padding: '12px 16px',
             borderTop: '1px solid #e5e7eb',
             display: 'flex',
             justifyContent: 'flex-end',
-            gap: '12px',
+            gap: '8px',
           }}
         >
           <button
             onClick={handleCancel}
             style={{
-              padding: '8px 20px',
+              padding: '6px 16px',
               background: '#e5e7eb',
               color: '#374151',
               border: 'none',
               borderRadius: '4px',
-              fontSize: '14px',
+              fontSize: '13px',
               fontWeight: '500',
               cursor: 'pointer',
             }}
@@ -207,12 +202,12 @@ export function EditModal({
           <button
             onClick={handleSave}
             style={{
-              padding: '8px 20px',
+              padding: '6px 16px',
               background: '#3b82f6',
               color: 'white',
               border: 'none',
               borderRadius: '4px',
-              fontSize: '14px',
+              fontSize: '13px',
               fontWeight: '600',
               cursor: 'pointer',
             }}

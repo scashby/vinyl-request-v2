@@ -218,26 +218,46 @@ Phase 4: Advanced Features        ░░░░░░░░░░░░░░░�
     - Empty name validation
     - Save/Cancel buttons
     - Higher z-index (30003) than ManageModal
-  - [x] MergeModal component ✅ COMPLETE
-    - Radio button selection for primary item
-    - Sorted by count (desc) then name
-    - Yellow info banner explaining merge process
-    - Preview section showing result
-    - Warning about deletion
-    - Total album count display
-    - Merge/Cancel buttons (Merge is red)
-    - Higher z-index (30004) than EditModal
-  - [x] Integration with MainTab selectors ✅ COMPLETE
-    - All 4 modal components imported and wired
-    - Mock data for Labels, Formats, Genres, Locations
-    - Label selector button → PickerModal (single-select)
-    - Format selector button → PickerModal (single-select)
-    - Genre selector button → PickerModal (multi-select)
-    - Location selector (in UniversalBottomBar) → PickerModal (single-select)
-    - Full CRUD operations: Create, Edit, Delete, Merge
-    - State management for modal navigation
-    - Callback handlers for all operations
-    - Proper z-index layering (30001-30004)
+- [x] **Phase 2 - Universal Picker System ✅ COMPLETE:**
+  - [x] **PickerModal** - Pixel-perfect CLZ replication
+    - White header (not orange)
+    - Compact 500px width, clean spacing
+    - Search + buttons on same row
+    - Radio/checkbox selection with counts
+    - Cancel/Save buttons
+    - z-index: 30001
+  - [x] **ManageModal** - Dual mode system
+    - **Normal Mode**: White header, pencil/X icons, "Merge Mode" button, "Close" button
+    - **Merge Mode**: Orange header, checkboxes, yellow banner, "Cancel Merge" (red), right panel preview, "Merge to" button
+    - Width: 600px normal, 900px merge
+    - z-index: 30002
+  - [x] **EditModal** - Simple name editor
+    - 450px width
+    - Auto-focus with select-all
+    - Enter to save, Escape to cancel
+    - Empty name validation
+    - z-index: 30003
+  - [x] **MergeModal** - Final merge confirmation
+    - 550px width
+    - Radio selection for primary item
+    - Yellow info banner
+    - Preview section with total counts
+    - Deletion warning
+    - Red "Merge" button
+    - z-index: 30004
+  - [x] **pickerDataUtils.ts** - Real Supabase integration
+    - fetchLabels/Formats/Genres/Locations with actual counts
+    - updateLabel/Format/Location (rename operations)
+    - deleteLabel (set to null)
+    - mergeLabels/Formats/Locations (combine items)
+    - All functions query real collection data
+  - [x] **MainTab.tsx** - Complete integration
+    - Fetches real data on mount from Supabase
+    - Label, Format, Genre, Location pickers fully wired
+    - All CRUD operations: Create, Read, Update, Delete, Merge
+    - Data reloading after operations
+    - Loading states on picker buttons
+    - Proper state management for modal navigation
 
 ### Tab Status Overview
 - ✅ **MainTab.tsx** - Layout complete, UI built, needs functional pickers

@@ -17,8 +17,8 @@ interface ManageModalProps {
   onEdit: (itemId: string) => void;
   onDelete: (itemId: string) => void;
   onMerge: (itemIds: string[]) => void;
-  itemLabel?: string; // e.g., "Label", "Format", "Genre"
-  allowMerge?: boolean; // Some lists may not allow merging
+  itemLabel?: string;
+  allowMerge?: boolean;
 }
 
 export function ManageModal({
@@ -37,7 +37,6 @@ export function ManageModal({
   const [selectedForMerge, setSelectedForMerge] = useState<string[]>([]);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
-  // Reset state when modal closes
   useEffect(() => {
     if (!isOpen) {
       setSearchQuery('');
@@ -49,19 +48,16 @@ export function ManageModal({
 
   if (!isOpen) return null;
 
-  // Filter items based on search
   const filteredItems = items.filter(item =>
     item.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Sort items alphabetically
   const sortedItems = [...filteredItems].sort((a, b) =>
     a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
   );
 
   const handleMergeToggle = () => {
     if (mergeMode) {
-      // Exiting merge mode - clear selections
       setSelectedForMerge([]);
     }
     setMergeMode(!mergeMode);
@@ -108,35 +104,40 @@ export function ManageModal({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 30002, // Higher than PickerModal (30001)
+        zIndex: 30002,
       }}
       onClick={onClose}
     >
       <div
         style={{
           backgroundColor: 'white',
-          borderRadius: '8px',
-          width: '90%',
-          maxWidth: '700px',
-          maxHeight: '80vh',
+          borderRadius: '6px',
+          width: mergeMode ? '900px' : '600px',
+          maxHeight: '600px',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
-          boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
+        {/* Header - WHITE in normal mode, ORANGE in merge mode */}
         <div
           style={{
-            padding: '16px 20px',
+            padding: '12px 16px',
             borderBottom: '1px solid #e5e7eb',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
+            backgroundColor: mergeMode ? '#f59e0b' : 'white',
           }}
         >
-          <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '600', color: '#111827' }}>
+          <h3 style={{ 
+            margin: 0, 
+            fontSize: '16px', 
+            fontWeight: '600', 
+            color: mergeMode ? 'white' : '#111827' 
+          }}>
             {title}
           </h3>
           <button
@@ -144,8 +145,8 @@ export function ManageModal({
             style={{
               background: 'transparent',
               border: 'none',
-              color: '#6b7280',
-              fontSize: '24px',
+              color: mergeMode ? 'white' : '#6b7280',
+              fontSize: '20px',
               cursor: 'pointer',
               padding: '0 4px',
               lineHeight: '1',
@@ -155,13 +156,13 @@ export function ManageModal({
           </button>
         </div>
 
-        {/* Search + Merge Toggle */}
+        {/* Search + Merge Mode Toggle */}
         <div
           style={{
-            padding: '16px 20px',
+            padding: '12px 16px',
             borderBottom: '1px solid #e5e7eb',
             display: 'flex',
-            gap: '12px',
+            gap: '8px',
             alignItems: 'center',
           }}
         >
@@ -172,10 +173,10 @@ export function ManageModal({
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{
               flex: 1,
-              padding: '8px 12px',
+              padding: '6px 10px',
               border: '1px solid #d1d5db',
               borderRadius: '4px',
-              fontSize: '14px',
+              fontSize: '13px',
               outline: 'none',
             }}
           />
@@ -183,13 +184,13 @@ export function ManageModal({
             <button
               onClick={handleMergeToggle}
               style={{
-                padding: '8px 16px',
+                padding: '6px 12px',
                 background: mergeMode ? '#ef4444' : '#6b7280',
                 color: 'white',
                 border: 'none',
                 borderRadius: '4px',
                 fontSize: '13px',
-                fontWeight: '600',
+                fontWeight: '500',
                 cursor: 'pointer',
                 whiteSpace: 'nowrap',
               }}
@@ -199,11 +200,11 @@ export function ManageModal({
           )}
         </div>
 
-        {/* Merge Info Banner */}
+        {/* Yellow Banner in Merge Mode */}
         {mergeMode && (
           <div
             style={{
-              padding: '12px 20px',
+              padding: '10px 16px',
               backgroundColor: '#fef3c7',
               borderBottom: '1px solid #fbbf24',
               display: 'flex',
@@ -211,7 +212,7 @@ export function ManageModal({
               alignItems: 'center',
             }}
           >
-            <span style={{ fontSize: '14px', color: '#92400e', fontWeight: '500' }}>
+            <span style={{ fontSize: '13px', color: '#92400e', fontWeight: '500' }}>
               {selectedForMerge.length === 0
                 ? `Select 2 or more ${itemLabel.toLowerCase()}s to merge`
                 : `${selectedForMerge.length} ${itemLabel.toLowerCase()}${selectedForMerge.length === 1 ? '' : 's'} selected`}
@@ -220,7 +221,7 @@ export function ManageModal({
               <button
                 onClick={handleMergeConfirm}
                 style={{
-                  padding: '6px 16px',
+                  padding: '5px 14px',
                   background: '#3b82f6',
                   color: 'white',
                   border: 'none',
@@ -236,175 +237,261 @@ export function ManageModal({
           </div>
         )}
 
-        {/* Items List */}
-        <div
-          style={{
-            flex: 1,
-            overflowY: 'auto',
-            padding: '8px 20px',
-          }}
-        >
-          {sortedItems.length === 0 ? (
-            <div
-              style={{
-                padding: '40px 20px',
-                textAlign: 'center',
-                color: '#9ca3af',
-                fontSize: '14px',
-              }}
-            >
-              {searchQuery ? 'No items match your search' : 'No items available'}
-            </div>
-          ) : (
-            sortedItems.map((item) => {
-              const isDeleteConfirming = deleteConfirmId === item.id;
-              const isSelectedForMerge = selectedForMerge.includes(item.id);
+        {/* Content Area */}
+        <div style={{ 
+          flex: 1, 
+          display: 'flex', 
+          overflow: 'hidden' 
+        }}>
+          {/* Items List */}
+          <div
+            style={{
+              flex: mergeMode ? '0 0 60%' : '1',
+              overflowY: 'auto',
+              padding: '8px 16px',
+              borderRight: mergeMode ? '1px solid #e5e7eb' : 'none',
+            }}
+          >
+            {sortedItems.length === 0 ? (
+              <div
+                style={{
+                  padding: '40px 20px',
+                  textAlign: 'center',
+                  color: '#9ca3af',
+                  fontSize: '13px',
+                }}
+              >
+                {searchQuery ? 'No items match your search' : 'No items available'}
+              </div>
+            ) : (
+              sortedItems.map((item) => {
+                const isDeleteConfirming = deleteConfirmId === item.id;
+                const isSelectedForMerge = selectedForMerge.includes(item.id);
 
-              return (
-                <div
-                  key={item.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '10px 12px',
-                    borderRadius: '4px',
-                    backgroundColor: isSelectedForMerge ? '#f0f9ff' : 'transparent',
-                    marginBottom: '2px',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
-                    {mergeMode && (
-                      <input
-                        type="checkbox"
-                        checked={isSelectedForMerge}
-                        onChange={() => handleMergeSelection(item.id)}
-                        style={{
-                          width: '16px',
-                          height: '16px',
-                          cursor: 'pointer',
-                          accentColor: '#3b82f6',
-                        }}
-                      />
-                    )}
-                    <span style={{ fontSize: '14px', color: '#111827', flex: 1 }}>
-                      {item.name}
-                    </span>
-                    {item.count !== undefined && (
-                      <span
-                        style={{
-                          fontSize: '13px',
-                          color: '#6b7280',
-                          fontWeight: '500',
-                          marginRight: '12px',
-                        }}
-                      >
-                        {item.count}
+                return (
+                  <div
+                    key={item.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '6px 8px',
+                      borderRadius: '3px',
+                      backgroundColor: isSelectedForMerge ? '#eff6ff' : 'transparent',
+                      marginBottom: '1px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
+                      {mergeMode && (
+                        <input
+                          type="checkbox"
+                          checked={isSelectedForMerge}
+                          onChange={() => handleMergeSelection(item.id)}
+                          style={{
+                            width: '16px',
+                            height: '16px',
+                            cursor: 'pointer',
+                            margin: 0,
+                          }}
+                        />
+                      )}
+                      <span style={{ fontSize: '13px', color: '#111827', flex: 1 }}>
+                        {item.name}
                       </span>
-                    )}
-                  </div>
-
-                  {!mergeMode && (
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      {isDeleteConfirming ? (
-                        <>
-                          <button
-                            onClick={() => handleDeleteConfirm(item.id)}
-                            style={{
-                              padding: '6px 12px',
-                              background: '#ef4444',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '4px',
-                              fontSize: '12px',
-                              fontWeight: '600',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            Confirm
-                          </button>
-                          <button
-                            onClick={handleDeleteCancel}
-                            style={{
-                              padding: '6px 12px',
-                              background: '#e5e7eb',
-                              color: '#374151',
-                              border: 'none',
-                              borderRadius: '4px',
-                              fontSize: '12px',
-                              fontWeight: '500',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            Cancel
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            onClick={() => onEdit(item.id)}
-                            style={{
-                              padding: '6px 12px',
-                              background: '#3b82f6',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '4px',
-                              fontSize: '12px',
-                              fontWeight: '600',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleDeleteClick(item.id)}
-                            style={{
-                              padding: '6px 12px',
-                              background: '#e5e7eb',
-                              color: '#374151',
-                              border: 'none',
-                              borderRadius: '4px',
-                              fontSize: '12px',
-                              fontWeight: '500',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            Delete
-                          </button>
-                        </>
+                      {item.count !== undefined && (
+                        <span
+                          style={{
+                            fontSize: '13px',
+                            color: '#6b7280',
+                            fontWeight: '400',
+                            marginRight: '8px',
+                          }}
+                        >
+                          {item.count}
+                        </span>
                       )}
                     </div>
-                  )}
-                </div>
-              );
-            })
+
+                    {!mergeMode && (
+                      <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                        {isDeleteConfirming ? (
+                          <>
+                            <button
+                              onClick={() => handleDeleteConfirm(item.id)}
+                              style={{
+                                padding: '4px 10px',
+                                background: '#ef4444',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '3px',
+                                fontSize: '12px',
+                                fontWeight: '500',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              Confirm
+                            </button>
+                            <button
+                              onClick={handleDeleteCancel}
+                              style={{
+                                padding: '4px 10px',
+                                background: '#e5e7eb',
+                                color: '#374151',
+                                border: 'none',
+                                borderRadius: '3px',
+                                fontSize: '12px',
+                                fontWeight: '500',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              Cancel
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            {/* Pencil Icon */}
+                            <button
+                              onClick={() => onEdit(item.id)}
+                              style={{
+                                background: 'transparent',
+                                border: 'none',
+                                cursor: 'pointer',
+                                padding: '4px',
+                                color: '#6b7280',
+                                display: 'flex',
+                                alignItems: 'center',
+                              }}
+                              title="Edit"
+                            >
+                              <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+                                <path d="M11.5 1.5l1 1-8 8-1.5.5.5-1.5 8-8zm1.5-.5c-.3-.3-.7-.3-1 0l-1 1 1 1 1-1c.3-.3.3-.7 0-1l-.5-.5-.5.5zm-10 11l1-3 2 2-3 1z"/>
+                              </svg>
+                            </button>
+                            {/* X Icon */}
+                            <button
+                              onClick={() => handleDeleteClick(item.id)}
+                              style={{
+                                background: 'transparent',
+                                border: 'none',
+                                cursor: 'pointer',
+                                padding: '4px',
+                                color: '#6b7280',
+                                display: 'flex',
+                                alignItems: 'center',
+                                fontSize: '16px',
+                                lineHeight: '1',
+                              }}
+                              title="Delete"
+                            >
+                              ×
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Right Panel in Merge Mode */}
+          {mergeMode && selectedForMerge.length > 0 && (
+            <div style={{ 
+              flex: '0 0 40%', 
+              padding: '16px',
+              backgroundColor: '#f9fafb',
+              overflowY: 'auto',
+            }}>
+              <div style={{ fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '12px' }}>
+                Checkbox the {itemLabel}s you want to merge:
+              </div>
+              {selectedForMerge.map(id => {
+                const item = items.find(i => i.id === id);
+                if (!item) return null;
+                return (
+                  <div key={id} style={{
+                    padding: '6px 8px',
+                    backgroundColor: 'white',
+                    borderRadius: '3px',
+                    marginBottom: '4px',
+                    fontSize: '13px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                  }}>
+                    <span>{item.name}</span>
+                    <span style={{ color: '#6b7280' }}>{item.count}</span>
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
 
         {/* Footer */}
         <div
           style={{
-            padding: '16px 20px',
+            padding: '12px 16px',
             borderTop: '1px solid #e5e7eb',
             display: 'flex',
-            justifyContent: 'flex-end',
+            justifyContent: mergeMode ? 'space-between' : 'center',
+            gap: '8px',
           }}
         >
-          <button
-            onClick={onClose}
-            style={{
-              padding: '8px 20px',
-              background: '#e5e7eb',
-              color: '#374151',
-              border: 'none',
-              borderRadius: '4px',
-              fontSize: '14px',
-              fontWeight: '500',
-              cursor: 'pointer',
-            }}
-          >
-            Close
-          </button>
+          {mergeMode ? (
+            <>
+              <button
+                onClick={() => {
+                  setMergeMode(false);
+                  setSelectedForMerge([]);
+                }}
+                style={{
+                  padding: '6px 16px',
+                  background: '#e5e7eb',
+                  color: '#374151',
+                  border: 'none',
+                  borderRadius: '4px',
+                  fontSize: '13px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleMergeConfirm}
+                disabled={selectedForMerge.length < 2}
+                style={{
+                  padding: '6px 16px',
+                  background: selectedForMerge.length >= 2 ? '#3b82f6' : '#d1d5db',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  cursor: selectedForMerge.length >= 2 ? 'pointer' : 'not-allowed',
+                }}
+              >
+                Merge to
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={onClose}
+              style={{
+                padding: '6px 20px',
+                background: '#e5e7eb',
+                color: '#374151',
+                border: 'none',
+                borderRadius: '4px',
+                fontSize: '13px',
+                fontWeight: '500',
+                cursor: 'pointer',
+              }}
+            >
+              Close
+            </button>
+          )}
         </div>
       </div>
     </div>

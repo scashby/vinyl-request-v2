@@ -20,7 +20,7 @@ interface PickerModalProps {
   onManage: () => void;
   onNew: () => void;
   searchPlaceholder?: string;
-  itemLabel?: string; // e.g., "Label", "Format", "Genre" for button text
+  itemLabel?: string;
 }
 
 export function PickerModal({
@@ -39,12 +39,10 @@ export function PickerModal({
   const [searchQuery, setSearchQuery] = useState('');
   const [localSelectedIds, setLocalSelectedIds] = useState<string | string[]>(selectedIds);
 
-  // Reset local selection when modal opens or selectedIds prop changes
   useEffect(() => {
     setLocalSelectedIds(selectedIds);
   }, [selectedIds, isOpen]);
 
-  // Reset search when modal closes
   useEffect(() => {
     if (!isOpen) {
       setSearchQuery('');
@@ -53,17 +51,14 @@ export function PickerModal({
 
   if (!isOpen) return null;
 
-  // Filter items based on search
   const filteredItems = items.filter(item =>
     item.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Handle selection changes
   const handleSelectionChange = (itemId: string) => {
     if (mode === 'single') {
       setLocalSelectedIds(itemId);
     } else {
-      // Multi-select
       const currentIds = Array.isArray(localSelectedIds) ? localSelectedIds : [];
       if (currentIds.includes(itemId)) {
         setLocalSelectedIds(currentIds.filter(id => id !== itemId));
@@ -79,7 +74,7 @@ export function PickerModal({
   };
 
   const handleCancel = () => {
-    setLocalSelectedIds(selectedIds); // Reset to original
+    setLocalSelectedIds(selectedIds);
     onClose();
   };
 
@@ -95,35 +90,35 @@ export function PickerModal({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 30001, // Higher than EditAlbumModal (20001)
+        zIndex: 30001,
       }}
       onClick={handleCancel}
     >
       <div
         style={{
           backgroundColor: 'white',
-          borderRadius: '8px',
-          width: '90%',
-          maxWidth: '600px',
-          maxHeight: '80vh',
+          borderRadius: '6px',
+          width: '500px',
+          maxHeight: '600px',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
-          boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
+        {/* Header - WHITE like CLZ */}
         <div
           style={{
-            padding: '16px 20px',
+            padding: '12px 16px',
             borderBottom: '1px solid #e5e7eb',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
+            backgroundColor: 'white',
           }}
         >
-          <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '600', color: '#111827' }}>
+          <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: '#111827' }}>
             {title}
           </h3>
           <button
@@ -132,7 +127,7 @@ export function PickerModal({
               background: 'transparent',
               border: 'none',
               color: '#6b7280',
-              fontSize: '24px',
+              fontSize: '20px',
               cursor: 'pointer',
               padding: '0 4px',
               lineHeight: '1',
@@ -142,13 +137,13 @@ export function PickerModal({
           </button>
         </div>
 
-        {/* Search + Action Buttons */}
+        {/* Search + Buttons Row */}
         <div
           style={{
-            padding: '16px 20px',
+            padding: '12px 16px',
             borderBottom: '1px solid #e5e7eb',
             display: 'flex',
-            gap: '12px',
+            gap: '8px',
             alignItems: 'center',
           }}
         >
@@ -159,23 +154,23 @@ export function PickerModal({
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{
               flex: 1,
-              padding: '8px 12px',
+              padding: '6px 10px',
               border: '1px solid #d1d5db',
               borderRadius: '4px',
-              fontSize: '14px',
+              fontSize: '13px',
               outline: 'none',
             }}
           />
           <button
             onClick={onNew}
             style={{
-              padding: '8px 16px',
+              padding: '6px 12px',
               background: '#3b82f6',
               color: 'white',
               border: 'none',
               borderRadius: '4px',
               fontSize: '13px',
-              fontWeight: '600',
+              fontWeight: '500',
               cursor: 'pointer',
               whiteSpace: 'nowrap',
             }}
@@ -185,13 +180,13 @@ export function PickerModal({
           <button
             onClick={onManage}
             style={{
-              padding: '8px 16px',
+              padding: '6px 12px',
               background: '#6b7280',
               color: 'white',
               border: 'none',
               borderRadius: '4px',
               fontSize: '13px',
-              fontWeight: '600',
+              fontWeight: '500',
               cursor: 'pointer',
               whiteSpace: 'nowrap',
             }}
@@ -205,7 +200,7 @@ export function PickerModal({
           style={{
             flex: 1,
             overflowY: 'auto',
-            padding: '8px 20px',
+            padding: '8px 16px',
           }}
         >
           {filteredItems.length === 0 ? (
@@ -214,7 +209,7 @@ export function PickerModal({
                 padding: '40px 20px',
                 textAlign: 'center',
                 color: '#9ca3af',
-                fontSize: '14px',
+                fontSize: '13px',
               }}
             >
               {searchQuery ? 'No items match your search' : 'No items available'}
@@ -233,24 +228,20 @@ export function PickerModal({
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    padding: '10px 12px',
+                    padding: '6px 8px',
                     cursor: 'pointer',
-                    borderRadius: '4px',
-                    transition: 'background-color 0.15s',
-                    backgroundColor: isSelected ? '#f0f9ff' : 'transparent',
+                    borderRadius: '3px',
+                    marginBottom: '1px',
+                    backgroundColor: 'transparent',
                   }}
                   onMouseEnter={(e) => {
-                    if (!isSelected) {
-                      e.currentTarget.style.backgroundColor = '#f9fafb';
-                    }
+                    e.currentTarget.style.backgroundColor = '#f3f4f6';
                   }}
                   onMouseLeave={(e) => {
-                    if (!isSelected) {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                    }
+                    e.currentTarget.style.backgroundColor = 'transparent';
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
                     <input
                       type={mode === 'single' ? 'radio' : 'checkbox'}
                       checked={isSelected}
@@ -259,17 +250,17 @@ export function PickerModal({
                         width: '16px',
                         height: '16px',
                         cursor: 'pointer',
-                        accentColor: '#3b82f6',
+                        margin: 0,
                       }}
                     />
-                    <span style={{ fontSize: '14px', color: '#111827' }}>{item.name}</span>
+                    <span style={{ fontSize: '13px', color: '#111827' }}>{item.name}</span>
                   </div>
                   {item.count !== undefined && (
                     <span
                       style={{
                         fontSize: '13px',
                         color: '#6b7280',
-                        fontWeight: '500',
+                        fontWeight: '400',
                       }}
                     >
                       {item.count}
@@ -284,22 +275,22 @@ export function PickerModal({
         {/* Footer */}
         <div
           style={{
-            padding: '16px 20px',
+            padding: '12px 16px',
             borderTop: '1px solid #e5e7eb',
             display: 'flex',
             justifyContent: 'flex-end',
-            gap: '12px',
+            gap: '8px',
           }}
         >
           <button
             onClick={handleCancel}
             style={{
-              padding: '8px 20px',
+              padding: '6px 16px',
               background: '#e5e7eb',
               color: '#374151',
               border: 'none',
               borderRadius: '4px',
-              fontSize: '14px',
+              fontSize: '13px',
               fontWeight: '500',
               cursor: 'pointer',
             }}
@@ -309,12 +300,12 @@ export function PickerModal({
           <button
             onClick={handleSave}
             style={{
-              padding: '8px 20px',
+              padding: '6px 16px',
               background: '#3b82f6',
               color: 'white',
               border: 'none',
               borderRadius: '4px',
-              fontSize: '14px',
+              fontSize: '13px',
               fontWeight: '600',
               cursor: 'pointer',
             }}
