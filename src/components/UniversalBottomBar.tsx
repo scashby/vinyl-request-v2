@@ -10,16 +10,8 @@ interface UniversalBottomBarProps {
   onNext: () => void;
   onCancel: () => void;
   onSave: () => void;
+  onOpenLocationPicker?: () => void;
 }
-
-const COLLECTION_STATUS_OPTIONS = [
-  { value: 'in_collection', label: 'In Collection' },
-  { value: 'for_sale', label: 'For Sale' },
-  { value: 'wish_list', label: 'On Wish List' },
-  { value: 'on_order', label: 'On Order' },
-  { value: 'sold', label: 'Sold' },
-  { value: 'not_in_collection', label: 'Not in Collection' },
-];
 
 export function UniversalBottomBar({ 
   album, 
@@ -27,7 +19,8 @@ export function UniversalBottomBar({
   onPrevious, 
   onNext, 
   onCancel, 
-  onSave 
+  onSave,
+  onOpenLocationPicker,
 }: UniversalBottomBarProps) {
   const inputStyle = {
     padding: '7px 10px',
@@ -68,11 +61,18 @@ export function UniversalBottomBar({
               cursor: 'pointer',
             }}
           >
-            {COLLECTION_STATUS_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
+            <optgroup label="Collection">
+              <option value="in_collection">In Collection</option>
+              <option value="for_sale">For Sale</option>
+            </optgroup>
+            <optgroup label="Wish List">
+              <option value="wish_list">On Wish List</option>
+              <option value="on_order">On Order</option>
+            </optgroup>
+            <optgroup label="Not in Collection">
+              <option value="sold">Sold</option>
+              <option value="not_in_collection">Not in Collection</option>
+            </optgroup>
           </select>
         </div>
 
@@ -123,21 +123,24 @@ export function UniversalBottomBar({
                 boxSizing: 'border-box',
               }}
             />
-            <button style={{
-              width: '36px',
-              height: 'auto',
-              padding: 0,
-              border: '1px solid #d1d5db',
-              borderRadius: '0 4px 4px 0',
-              backgroundColor: 'white',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#6b7280',
-              flexShrink: 0,
-              boxSizing: 'border-box',
-            }}>
+            <button 
+              onClick={onOpenLocationPicker}
+              style={{
+                width: '36px',
+                height: 'auto',
+                padding: 0,
+                border: '1px solid #d1d5db',
+                borderRadius: '0 4px 4px 0',
+                backgroundColor: 'white',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#6b7280',
+                flexShrink: 0,
+                boxSizing: 'border-box',
+              }}
+            >
               <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
                 <circle cx="1.5" cy="2.5" r="1"/>
                 <rect x="4" y="2" width="10" height="1"/>

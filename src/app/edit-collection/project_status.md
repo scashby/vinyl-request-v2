@@ -1,6 +1,6 @@
 # PROJECT_STATUS.md
 # DWD Collection Management System - Collection Browser
-**Last Updated:** 2025-12-12 (Bug Fixes - Picker Integration)
+**Last Updated:** 2025-12-12 (UniversalBottomBar Improvements)
 
 ## Project Overview
 Building an exact CLZ Music Web-inspired interface for Dead Wax Dialogues vinyl management system with custom branding. Strategy: Build complete visual framework first (LOCKED), then add functionality second. This ensures pixel-perfect accuracy before connecting data and logic.
@@ -235,6 +235,14 @@ Phase 4: Advanced Features        ░░░░░░░░░░░░░░░�
   - Removed unused 'supabase' variables in merge functions (mergeLabels, mergeFormats, mergeLocations)
   - Removed unused 'items' variable in MainTab.tsx handleEditSave function
   - All ESLint errors resolved
+- [x] **UniversalBottomBar.tsx** - Collection Status & Location Improvements (2025-12-12):
+  - Added sectioned dropdown for Collection Status with optgroup organization:
+    - **Collection**: In Collection, For Sale
+    - **Wish List**: On Wish List, On Order
+    - **Not in Collection**: Sold, Not in Collection
+  - Added `onOpenLocationPicker` optional callback prop for location picker integration
+  - Wired Location button onClick to call picker callback when provided
+  - Maintains all existing functionality (Previous/Next/Cancel/Save buttons, all fields)
 
 ### Tab Status Overview
 - ✅ **MainTab.tsx** - Layout complete, UI built, pickers fully integrated
@@ -596,6 +604,15 @@ src/app/edit-collection/
 
 ## 🔄 CHANGE LOG
 
+- **2025-12-12 (UniversalBottomBar Improvements):** COLLECTION STATUS SECTIONED + LOCATION PICKER
+  - Added sectioned dropdown for Collection Status using `<optgroup>`:
+    - Collection: In Collection, For Sale
+    - Wish List: On Wish List, On Order
+    - Not in Collection: Sold, Not in Collection
+  - Added optional `onOpenLocationPicker` callback prop for location picker integration
+  - Wired Location button onClick to trigger picker modal
+  - All existing functionality preserved (Previous/Next/Cancel/Save buttons, all input fields)
+  
 - **2025-12-12 (Bug Fixes):** PICKER INTEGRATION ERRORS RESOLVED
   - Fixed import path in `pickerDataUtils.ts` from '@/utils/supabase/client' to 'lib/supabaseClient'
   - Removed unused 'supabase' variable declarations in merge functions (mergeLabels, mergeFormats, mergeLocations)
@@ -843,14 +860,12 @@ To create this as a safe rollback point, run:
 git add .
 
 # Commit with descriptive message
-git commit -m "Phase 2.3 Progress: Picker Integration Bug Fixes [CHECKPOINT]
+git commit -m "Phase 2.3 Progress: UniversalBottomBar Improvements [CHECKPOINT]
 
 ✅ COMPLETED:
-- Fixed import path in pickerDataUtils.ts
-- Removed unused variables in merge functions
-- Removed unused items variable in MainTab.tsx
-- All ESLint errors resolved
-- Pickers now fully operational
+- Added sectioned Collection Status dropdown (Collection, Wish List, Not in Collection)
+- Wired up Location picker button callback
+- All existing functionality preserved
 
 🔄 IN PROGRESS:
 - Main Tab pickers (Label, Format, Genre, Location) fully wired and functional
@@ -858,10 +873,10 @@ git commit -m "Phase 2.3 Progress: Picker Integration Bug Fixes [CHECKPOINT]
 
 🎯 READY FOR: Artist picker integration
 
-This commit represents stable picker integration with all bugs resolved."
+This commit represents stable bottom bar improvements with sectioned dropdown."
 
 # Create a named tag for easy reference
-git tag -a phase-2.3-pickers-wired -m "Picker integration bug fixes checkpoint"
+git tag -a phase-2.3-bottombar-improved -m "UniversalBottomBar improvements checkpoint"
 
 # Optional: Push to remote
 git push origin main --tags
