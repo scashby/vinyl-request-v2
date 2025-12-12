@@ -1,5 +1,5 @@
 // src/app/edit-collection/pickers/pickerDataUtils.ts
-import { createClient } from '@/utils/supabase/client';
+import { supabase } from 'lib/supabaseClient';
 
 export interface PickerDataItem {
   id: string;
@@ -11,7 +11,6 @@ export interface PickerDataItem {
  * Fetch all unique labels with counts from collection
  */
 export async function fetchLabels(): Promise<PickerDataItem[]> {
-  const supabase = createClient();
   
   // Get all albums with their labels
   const { data: albums, error } = await supabase
@@ -49,7 +48,6 @@ export async function fetchLabels(): Promise<PickerDataItem[]> {
  * Fetch all unique formats with counts from collection
  */
 export async function fetchFormats(): Promise<PickerDataItem[]> {
-  const supabase = createClient();
   
   const { data: albums, error } = await supabase
     .from('collection')
@@ -84,7 +82,6 @@ export async function fetchFormats(): Promise<PickerDataItem[]> {
  * Fetch all unique genres with counts from collection
  */
 export async function fetchGenres(): Promise<PickerDataItem[]> {
-  const supabase = createClient();
   
   const { data: albums, error } = await supabase
     .from('collection')
@@ -123,7 +120,6 @@ export async function fetchGenres(): Promise<PickerDataItem[]> {
  * Fetch all unique locations with counts from collection
  */
 export async function fetchLocations(): Promise<PickerDataItem[]> {
-  const supabase = createClient();
   
   const { data: albums, error } = await supabase
     .from('collection')
@@ -158,7 +154,6 @@ export async function fetchLocations(): Promise<PickerDataItem[]> {
  * Update a label across all albums
  */
 export async function updateLabel(oldName: string, newName: string): Promise<boolean> {
-  const supabase = createClient();
   
   const { error: spotifyError } = await supabase
     .from('collection')
@@ -182,7 +177,6 @@ export async function updateLabel(oldName: string, newName: string): Promise<boo
  * Update a format across all albums
  */
 export async function updateFormat(oldName: string, newName: string): Promise<boolean> {
-  const supabase = createClient();
   
   const { error } = await supabase
     .from('collection')
@@ -201,7 +195,6 @@ export async function updateFormat(oldName: string, newName: string): Promise<bo
  * Update a location across all albums
  */
 export async function updateLocation(oldName: string, newName: string): Promise<boolean> {
-  const supabase = createClient();
   
   const { error } = await supabase
     .from('collection')
@@ -220,7 +213,6 @@ export async function updateLocation(oldName: string, newName: string): Promise<
  * Delete a label (set to null across all albums)
  */
 export async function deleteLabel(name: string): Promise<boolean> {
-  const supabase = createClient();
   
   const { error: spotifyError } = await supabase
     .from('collection')
@@ -244,8 +236,6 @@ export async function deleteLabel(name: string): Promise<boolean> {
  * Merge labels - update all albums with mergeFrom labels to mergeTo label
  */
 export async function mergeLabels(primaryName: string, mergeFromNames: string[]): Promise<boolean> {
-  const supabase = createClient();
-  
   for (const oldName of mergeFromNames) {
     const success = await updateLabel(oldName, primaryName);
     if (!success) return false;
@@ -258,8 +248,6 @@ export async function mergeLabels(primaryName: string, mergeFromNames: string[])
  * Merge formats
  */
 export async function mergeFormats(primaryName: string, mergeFromNames: string[]): Promise<boolean> {
-  const supabase = createClient();
-  
   for (const oldName of mergeFromNames) {
     const success = await updateFormat(oldName, primaryName);
     if (!success) return false;
@@ -272,8 +260,6 @@ export async function mergeFormats(primaryName: string, mergeFromNames: string[]
  * Merge locations
  */
 export async function mergeLocations(primaryName: string, mergeFromNames: string[]): Promise<boolean> {
-  const supabase = createClient();
-  
   for (const oldName of mergeFromNames) {
     const success = await updateLocation(oldName, primaryName);
     if (!success) return false;

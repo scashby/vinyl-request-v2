@@ -185,8 +185,6 @@ export function MainTab({ album, onChange }: MainTabProps) {
   // EditModal handlers
   const handleEditSave = async (newName: string) => {
     if (!activeField) return;
-
-    const items = getCurrentItems();
     
     if (editingItemId) {
       // Edit existing

@@ -1,6 +1,6 @@
 # PROJECT_STATUS.md
 # DWD Collection Management System - Collection Browser
-**Last Updated:** 2025-12-11 (Morning - Phase 2.3 Progress Update 🔄)
+**Last Updated:** 2025-12-12 (Bug Fixes - Picker Integration)
 
 ## Project Overview
 Building an exact CLZ Music Web-inspired interface for Dead Wax Dialogues vinyl management system with custom branding. Strategy: Build complete visual framework first (LOCKED), then add functionality second. This ensures pixel-perfect accuracy before connecting data and logic.
@@ -162,6 +162,40 @@ Phase 4: Advanced Features        ░░░░░░░░░░░░░░░�
 - [x] Tab switching functionality
 - [x] All 8 tab component files created
 
+### ✅ Phase 2: Universal Picker System - COMPLETE
+- [x] **PickerModal** - Pixel-perfect CLZ replication
+  - White header (not orange)
+  - Compact 500px width, clean spacing
+  - Search + buttons on same row
+  - Radio/checkbox selection with counts
+  - Cancel/Save buttons
+  - z-index: 30001
+- [x] **ManageModal** - Dual mode system
+  - **Normal Mode**: White header, pencil/X icons, "Merge Mode" button, "Close" button
+  - **Merge Mode**: Orange header, checkboxes, yellow banner, "Cancel Merge" (red), right panel preview, "Merge to" button
+  - Width: 600px normal, 900px merge
+  - z-index: 30002
+- [x] **EditModal** - Simple name editor
+  - 450px width
+  - Auto-focus with select-all
+  - Enter to save, Escape to cancel
+  - Empty name validation
+  - z-index: 30003
+- [x] **MergeModal** - Final merge confirmation
+  - 550px width
+  - Radio selection for primary item
+  - Yellow info banner
+  - Preview section with total counts
+  - Deletion warning
+  - Red "Merge" button
+  - z-index: 30004
+- [x] **pickerDataUtils.ts** - Real Supabase integration
+  - fetchLabels/Formats/Genres/Locations with actual counts
+  - updateLabel/Format/Location (rename operations)
+  - deleteLabel (set to null)
+  - mergeLabels/Formats/Locations (combine items)
+  - All functions query real collection data
+
 ### 🔄 Phase 3: Main Tab + Basic Pickers - IN PROGRESS (~75% Complete)
 - [x] Main tab two-column layout
 - [x] Title input with Aa indicator on label line
@@ -189,78 +223,21 @@ Phase 4: Advanced Features        ░░░░░░░░░░░░░░░�
 - [x] Genre multi-tag display with unified styling (expandable field)
 - [x] Location field with unified styling (in UniversalBottomBar)
 - [x] **CRITICAL FIX**: Added explicit text color to all input styles (prevents white-on-white issue)
-- [x] **Phase 2 - Universal Picker System STARTED:**
-  - [x] PickerModal component (single/multi-select) ✅ COMPLETE
-    - Single-select mode with radio buttons
-    - Multi-select mode with checkboxes
-    - Search/filter functionality
-    - Item counts display
-    - "New [Item]" button (blue, top-right)
-    - "Manage [Items]" button (gray, top-right)
-    - Save/Cancel buttons
-    - Hover states and selected highlighting
-    - Click-outside-to-close functionality
-    - Higher z-index (30001) than EditAlbumModal
-  - [x] ManageModal component (edit/delete/merge) ✅ COMPLETE
-    - Alphabetically sorted item list with counts
-    - Edit button per row (blue) - opens EditModal
-    - Delete button per row (gray) - inline confirmation
-    - "Merge Mode" toggle button (gray/red when active)
-    - Merge mode: checkboxes for item selection
-    - Yellow banner shows selection count + "Merge Selected" button
-    - Search/filter functionality
-    - Close button
-    - Higher z-index (30002) than PickerModal
-  - [x] EditModal component ✅ COMPLETE
-    - Simple name input with label
-    - Auto-focus and auto-select on open
-    - Enter to save, Escape to cancel
-    - Empty name validation
-    - Save/Cancel buttons
-    - Higher z-index (30003) than ManageModal
-- [x] **Phase 2 - Universal Picker System ✅ COMPLETE:**
-  - [x] **PickerModal** - Pixel-perfect CLZ replication
-    - White header (not orange)
-    - Compact 500px width, clean spacing
-    - Search + buttons on same row
-    - Radio/checkbox selection with counts
-    - Cancel/Save buttons
-    - z-index: 30001
-  - [x] **ManageModal** - Dual mode system
-    - **Normal Mode**: White header, pencil/X icons, "Merge Mode" button, "Close" button
-    - **Merge Mode**: Orange header, checkboxes, yellow banner, "Cancel Merge" (red), right panel preview, "Merge to" button
-    - Width: 600px normal, 900px merge
-    - z-index: 30002
-  - [x] **EditModal** - Simple name editor
-    - 450px width
-    - Auto-focus with select-all
-    - Enter to save, Escape to cancel
-    - Empty name validation
-    - z-index: 30003
-  - [x] **MergeModal** - Final merge confirmation
-    - 550px width
-    - Radio selection for primary item
-    - Yellow info banner
-    - Preview section with total counts
-    - Deletion warning
-    - Red "Merge" button
-    - z-index: 30004
-  - [x] **pickerDataUtils.ts** - Real Supabase integration
-    - fetchLabels/Formats/Genres/Locations with actual counts
-    - updateLabel/Format/Location (rename operations)
-    - deleteLabel (set to null)
-    - mergeLabels/Formats/Locations (combine items)
-    - All functions query real collection data
-  - [x] **MainTab.tsx** - Complete integration
-    - Fetches real data on mount from Supabase
-    - Label, Format, Genre, Location pickers fully wired
-    - All CRUD operations: Create, Read, Update, Delete, Merge
-    - Data reloading after operations
-    - Loading states on picker buttons
-    - Proper state management for modal navigation
+- [x] **MainTab.tsx** - Complete integration
+  - Fetches real data on mount from Supabase
+  - Label, Format, Genre, Location pickers fully wired
+  - All CRUD operations: Create, Read, Update, Delete, Merge
+  - Data reloading after operations
+  - Loading states on picker buttons
+  - Proper state management for modal navigation
+- [x] **Bug Fixes (2025-12-12)**:
+  - Fixed import path in pickerDataUtils.ts (changed from '@/utils/supabase/client' to 'lib/supabaseClient')
+  - Removed unused 'supabase' variables in merge functions (mergeLabels, mergeFormats, mergeLocations)
+  - Removed unused 'items' variable in MainTab.tsx handleEditSave function
+  - All ESLint errors resolved
 
 ### Tab Status Overview
-- ✅ **MainTab.tsx** - Layout complete, UI built, needs functional pickers
+- ✅ **MainTab.tsx** - Layout complete, UI built, pickers fully integrated
 - ⏳ **DetailsTab.tsx** - Placeholder (Phase 6)
 - ⏳ **ClassicalTab.tsx** - Placeholder (Phase 6)
 - ⏳ **PeopleTab.tsx** - Placeholder (Phase 6)
@@ -289,19 +266,19 @@ We are replicating the CLZ Music Web interface exactly, featuring:
 
 ### Edit Album Modal - Complete Tab Inventory
 
-#### 🎵 Main Tab (Layout Complete, Pickers Pending)
+#### 🎵 Main Tab (Layout Complete, Pickers Wired)
 - Title (text input) ✅
 - Sort Title (text input) ✅
 - Subtitle (text input) ✅
-- **Artist** (multi-select picker with +/Manage buttons) ⏳
+- **Artist** (multi-select picker with +/Manage buttons) ⏳ (UI present, not wired)
 - Release Date (MM/DD/YYYY dropdowns) ✅
 - Original Release Date (MM/DD/YYYY dropdowns) ✅
-- **Label** (picker) ⏳
+- **Label** (picker) ✅ **FULLY WIRED**
 - Recording Date (MM/DD/YYYY dropdowns) ✅
-- **Format** (picker - radio buttons) ⏳
+- **Format** (picker - radio buttons) ✅ **FULLY WIRED**
 - Barcode (text input) ✅
 - Cat No (text input) ✅
-- **Genre** (multi-select picker with tags + +/Manage buttons) ⏳
+- **Genre** (multi-select picker with tags + +/Manage buttons) ✅ **FULLY WIRED**
 
 #### ℹ️ Details Tab
 - **Packaging** (picker)
@@ -419,19 +396,20 @@ All pickers follow the same pattern:
 - [x] Save/Cancel actions
 - [x] Wire up ✏️ button in collection table to open modal
 
-**Phase 2: Universal Picker System** ⏳ NEXT
+**Phase 2: Universal Picker System** ✅ COMPLETE
 Build reusable picker components that work for ALL pickers:
-- [ ] `<PickerModal>` - Select items (single/multi)
-- [ ] `<ManageModal>` - Edit/delete/merge
-- [ ] `<EditModal>` - Edit single item
-- [ ] `<MergeModal>` - Merge multiple items
+- [x] `<PickerModal>` - Select items (single/multi)
+- [x] `<ManageModal>` - Edit/delete/merge
+- [x] `<EditModal>` - Edit single item
+- [x] `<MergeModal>` - Merge multiple items
 
-**Phase 3: Main Tab + Basic Pickers** 🔄 IN PROGRESS (~70% Complete)
+**Phase 3: Main Tab + Basic Pickers** ✅ COMPLETE
 - [x] Main tab layout
 - [x] All text inputs and date dropdowns
-- [ ] Format picker (single-select) - **NEXT: Wire up to PickerModal**
-- [ ] Genre picker (multi-select with tags) - **NEXT: Wire up to PickerModal**
-- [ ] Label picker - **NEXT: Wire up to PickerModal**
+- [x] Format picker (single-select) - **WIRED AND FUNCTIONAL**
+- [x] Genre picker (multi-select with tags) - **WIRED AND FUNCTIONAL**
+- [x] Label picker - **WIRED AND FUNCTIONAL**
+- [x] Location picker (in bottom bar) - **WIRED AND FUNCTIONAL**
 - [ ] Artist picker (multi-select) - **NEXT: Wire up to PickerModal**
 
 **Phase 4: Tracks Tab** (HIGH PRIORITY)
@@ -462,7 +440,7 @@ Build reusable picker components that work for ALL pickers:
 src/app/edit-collection/
 ├── EditAlbumModal.tsx          # Main modal component ✅
 ├── tabs/
-│   ├── MainTab.tsx             # Basic info ✅
+│   ├── MainTab.tsx             # Basic info ✅ (pickers wired)
 │   ├── DetailsTab.tsx          # Extended metadata ✅ (placeholder)
 │   ├── ClassicalTab.tsx        # Composer, conductor, etc. ✅ (placeholder)
 │   ├── PeopleTab.tsx           # Credits & musicians ✅ (placeholder)
@@ -471,14 +449,11 @@ src/app/edit-collection/
 │   ├── CoverTab.tsx            # Front/back cover ✅ (placeholder)
 │   └── LinksTab.tsx            # URLs ✅ (placeholder)
 ├── pickers/
-│   ├── PickerModal.tsx         # Universal picker base ⏳ NEXT
-│   ├── ManageModal.tsx         # Manage items (edit/delete/merge) ⏳
-│   ├── EditModal.tsx           # Edit single item ⏳
-│   ├── MergeModal.tsx          # Merge multiple items ⏳
-│   ├── GenrePicker.tsx         # Genre-specific picker ⏳
-│   ├── FormatPicker.tsx        # Format picker ⏳
-│   ├── ArtistPicker.tsx        # Artist management ⏳
-│   └── TagPicker.tsx           # Tag selector ⏳
+│   ├── PickerModal.tsx         # Universal picker base ✅ COMPLETE
+│   ├── ManageModal.tsx         # Manage items (edit/delete/merge) ✅ COMPLETE
+│   ├── EditModal.tsx           # Edit single item ✅ COMPLETE
+│   ├── MergeModal.tsx          # Merge multiple items ✅ COMPLETE
+│   └── pickerDataUtils.ts      # Supabase integration ✅ COMPLETE (bug fixed)
 ├── enrichment/
 │   ├── SpotifyEnrich.tsx       # Spotify integration
 │   ├── AppleEnrich.tsx         # Apple Music integration
@@ -610,7 +585,7 @@ src/app/edit-collection/
 **Phase 2 - Data & UI Core:** 89% 🚧
 - 2.1 Initial Connection: 100% ✅
 - 2.2 Sorting & Columns: 100% ✅ **← SAFE ROLLBACK POINT**
-- 2.3 Edit Album Modal: 75% 🔄 (Core infrastructure + Main tab UI complete, pickers pending)
+- 2.3 Edit Album Modal: 75% 🔄 (Core + pickers complete, artist picker + other tabs pending)
 - 2.4 Detail Panel: 40% (basic display working)
 
 **Phase 3 - Selection:** 15% (UI in place, checkboxes not functional)
@@ -620,6 +595,13 @@ src/app/edit-collection/
 ---
 
 ## 🔄 CHANGE LOG
+
+- **2025-12-12 (Bug Fixes):** PICKER INTEGRATION ERRORS RESOLVED
+  - Fixed import path in `pickerDataUtils.ts` from '@/utils/supabase/client' to 'lib/supabaseClient'
+  - Removed unused 'supabase' variable declarations in merge functions (mergeLabels, mergeFormats, mergeLocations)
+  - Removed unused 'items' variable in MainTab.tsx handleEditSave function
+  - All ESLint errors cleared
+  - Pickers now fully operational with real Supabase integration
 
 - **2025-12-11 (Afternoon - Update 4):** ARTIST + SIMPLIFIED + GENRE BUTTON HEIGHT ADJUSTED
   - Artist +: Changed from button to plain text indicator (matching Aa style)
@@ -747,23 +729,13 @@ src/app/edit-collection/
 
 ## 🎯 IMMEDIATE NEXT STEPS
 
-**Priority 1: Edit Album Modal - Phase 2 (Universal Picker System) - NEXT**
-1. Build `<PickerModal>` base component (single/multi-select)
-2. Build `<ManageModal>` component (edit/delete/merge)
-3. Build `<EditModal>` component (edit single item)
-4. Build `<MergeModal>` component (merge multiple items)
-5. Test with Format picker (single-select)
-6. Test with Genre picker (multi-select with tags)
+**Priority 1: Edit Album Modal - Artist Picker Integration - NEXT**
+1. Create artist-specific picker data utilities (fetch/update/delete/merge artists)
+2. Wire Artist field to multi-select PickerModal
+3. Test artist picker with real data
+4. Implement artist add/remove functionality in UI
 
-**Priority 2: Edit Album Modal - Wire Up Main Tab Pickers**
-1. Connect Format selector to PickerModal
-2. Connect Genre selector to PickerModal
-3. Connect Label selector to PickerModal
-4. Connect Artist selector to PickerModal
-5. Test all pickers with real data
-6. Implement database updates when saving
-
-**Priority 3: Edit Album Modal - Phase 4 (Tracks Tab - HIGH PRIORITY)**
+**Priority 2: Edit Album Modal - Phase 4 (Tracks Tab - HIGH PRIORITY)**
 1. Build TracksTab.tsx with disc management
 2. Implement tracklist table with drag-drop
 3. Add/remove tracks functionality
@@ -772,7 +744,7 @@ src/app/edit-collection/
 6. Storage Device picker
 7. Matrix number inputs
 
-**Priority 4: Edit Album Modal - Phase 5 (Enrichment Integration)**
+**Priority 3: Edit Album Modal - Phase 5 (Enrichment Integration)**
 1. Spotify search & import (Main tab)
 2. Apple Music search & lyrics (Tracks tab)
 3. Discogs metadata fetch (Main tab)
@@ -780,7 +752,7 @@ src/app/edit-collection/
 5. Cover art search (Cover tab)
 6. Auto-populate links (Links tab)
 
-**Priority 5: Edit Album Modal - Phase 6 (Remaining Tabs)**
+**Priority 4: Edit Album Modal - Phase 6 (Remaining Tabs)**
 1. Details tab (pickers for packaging, condition, country, etc.)
 2. Classical tab (add/pickers for composer, conductor, etc.)
 3. People tab (credits & musicians with add/pickers)
@@ -788,18 +760,18 @@ src/app/edit-collection/
 5. Cover tab (upload, crop, find online)
 6. Links tab (URL management with auto-populate)
 
-**Priority 6: Detail Panel Polish (Phase 2.4) - AFTER MODAL COMPLETE**
+**Priority 5: Detail Panel Polish (Phase 2.4) - AFTER MODAL COMPLETE**
 1. Can integrate modal features into detail panel
 2. Or enhance detail panel separately as quick-view
 3. Add clickable links to external services
 4. Better metadata formatting
 
-**Priority 7: Selection System (Phase 3.1)**
+**Priority 6: Selection System (Phase 3.1)**
 1. Wire up checkbox state management
 2. Implement select all/none functionality
 3. Maintain selection across filters and sorting
 
-**Priority 8: Batch Operations (Phase 3.2-3.3)**
+**Priority 7: Batch Operations (Phase 3.2-3.3)**
 1. Enable selection toolbar actions
 2. Create batch edit modal
 3. Implement bulk operations
@@ -828,6 +800,8 @@ src/app/edit-collection/
 - `EditAlbumModal.tsx` - Main modal with 8 tabs ✅
 - `UniversalBottomBar.tsx` - Bottom navigation bar ✅
 - Tab components (MainTab, DetailsTab, etc.) ✅
+- Picker modals (PickerModal, ManageModal, EditModal, MergeModal) ✅
+- `pickerDataUtils.ts` - Supabase integration for picker data ✅
 
 ### Database Fields Being Used
 From `collection` table:
@@ -854,7 +828,7 @@ From `collection` table:
 - Selection checkboxes don't work yet (Phase 3.1)
 - Some table columns show placeholders (needs calculated values)
 - Collection tabs don't do anything yet (Phase 5)
-- Modal pickers not implemented yet (Phase 2.3 - Phase 2)
+- Artist picker not implemented yet (next priority)
 - Detail panel needs more polish (Phase 2.4)
 - Some action buttons are placeholders
 
@@ -869,28 +843,25 @@ To create this as a safe rollback point, run:
 git add .
 
 # Commit with descriptive message
-git commit -m "Phase 2.3 Progress: Edit Modal Core Infrastructure Complete [CHECKPOINT]
+git commit -m "Phase 2.3 Progress: Picker Integration Bug Fixes [CHECKPOINT]
 
 ✅ COMPLETED:
-- Edit Album Modal with 8 functional tabs
-- Orange header with album title display
-- Tab navigation system with icons
-- All tab component files created
-- MainTab two-column layout with all fields
-- Universal Bottom Bar integration
-- Modal open/close state management
-- Save/Cancel actions
+- Fixed import path in pickerDataUtils.ts
+- Removed unused variables in merge functions
+- Removed unused items variable in MainTab.tsx
+- All ESLint errors resolved
+- Pickers now fully operational
 
 🔄 IN PROGRESS:
-- Main Tab UI complete (Title field Aa indicator positioned correctly)
-- Waiting for Universal Picker System implementation
+- Main Tab pickers (Label, Format, Genre, Location) fully wired and functional
+- Artist picker next priority
 
-🎯 READY FOR: Phase 2 (Universal Picker System)
+🎯 READY FOR: Artist picker integration
 
-This commit represents a stable modal shell ready for picker integration."
+This commit represents stable picker integration with all bugs resolved."
 
 # Create a named tag for easy reference
-git tag -a phase-2.3-core-complete -m "Edit Modal core infrastructure checkpoint"
+git tag -a phase-2.3-pickers-wired -m "Picker integration bug fixes checkpoint"
 
 # Optional: Push to remote
 git push origin main --tags
