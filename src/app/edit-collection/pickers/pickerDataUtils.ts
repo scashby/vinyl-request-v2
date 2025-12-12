@@ -267,3 +267,77 @@ export async function mergeLocations(primaryName: string, mergeFromNames: string
 
   return true;
 }
+
+/**
+ * Fetch all unique artists with counts from collection
+ */
+export async function fetchArtists(): Promise<PickerDataItem[]> {
+  
+  // Get all albums with their artists
+  const { data: albums, error } = await supabase
+    .from('collection')
+    .select('artist')
+    .not('artist', 'is', null);
+
+  if (error || !albums) {
+    console.error('Error fetching artists:', error);
+    return [];
+  }
+
+  // Aggregate counts
+  const artistCounts = new Map<string, number>();
+  
+  albums.forEach(album => {
+    const artist = album.artist;
+    if (artist) {
+      artistCounts.set(artist, (artistCounts.get(artist) || 0) + 1);
+    }
+  });
+
+  // Convert to array and sort
+  return Array.from(artistCounts.entries())
+    .map(([name, count]) => ({
+      id: name,
+      name,
+      count,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/**
+ * Update artist name (rename)
+ */
+export async function updateArtist(oldName: string, newName: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('collection')
+    .update({ artist: newName })
+    .eq('artist', oldName);
+
+  if (error) {
+    console.error('Error updating artist:', error);
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Delete artist (set to null) - NOT IMPLEMENTED YET
+ * Artists are core data, deletion not supported
+ */
+export async function deleteArtist(): Promise<boolean> {
+  console.warn('Artist deletion not supported');
+  return false;
+}
+
+/**
+ * Merge artists
+ */
+export async function mergeArtists(primaryName: string, mergeFromNames: string[]): Promise<boolean> {
+  for (const oldName of mergeFromNames) {
+    const success = await updateArtist(oldName, primaryName);
+    if (!success) return false;
+  }
+
+  return true;
+}

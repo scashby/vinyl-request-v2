@@ -7,18 +7,22 @@ import { PickerModal } from '../pickers/PickerModal';
 import { ManageModal } from '../pickers/ManageModal';
 import { EditModal } from '../pickers/EditModal';
 import { MergeModal } from '../pickers/MergeModal';
+import { DatePicker } from 'components/DatePicker';
 import {
   fetchLabels,
   fetchFormats,
   fetchGenres,
   fetchLocations,
+  fetchArtists,
   updateLabel,
   updateFormat,
   updateLocation,
+  updateArtist,
   deleteLabel,
   mergeLabels,
   mergeFormats,
   mergeLocations,
+  mergeArtists,
   type PickerDataItem,
 } from '../pickers/pickerDataUtils';
 
@@ -28,7 +32,7 @@ interface MainTabProps {
 }
 
 type ModalType = 'picker' | 'manage' | 'edit' | 'merge' | null;
-type FieldType = 'spotify_label' | 'format' | 'genre' | 'location';
+type FieldType = 'spotify_label' | 'format' | 'genre' | 'location' | 'artist';
 
 export interface MainTabRef {
   openLocationPicker: () => void;
@@ -46,7 +50,16 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
   const [formats, setFormats] = useState<PickerDataItem[]>([]);
   const [genres, setGenres] = useState<PickerDataItem[]>([]);
   const [locations, setLocations] = useState<PickerDataItem[]>([]);
+  const [artists, setArtists] = useState<PickerDataItem[]>([]);
   const [dataLoading, setDataLoading] = useState(false);
+
+  // Date picker state
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [datePickerField, setDatePickerField] = useState<'release' | 'original' | 'recording' | null>(null);
+  const [datePickerPosition, setDatePickerPosition] = useState({ top: 0, left: 0 });
+
+  // Autocap state
+  const [autocapEnabled, setAutocapEnabled] = useState(true);
 
   // Fetch real data on mount
   useEffect(() => {
@@ -60,16 +73,18 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
 
   const loadAllData = async () => {
     setDataLoading(true);
-    const [labelsData, formatsData, genresData, locationsData] = await Promise.all([
+    const [labelsData, formatsData, genresData, locationsData, artistsData] = await Promise.all([
       fetchLabels(),
       fetchFormats(),
       fetchGenres(),
       fetchLocations(),
+      fetchArtists(),
     ]);
     setLabels(labelsData);
     setFormats(formatsData);
     setGenres(genresData);
     setLocations(locationsData);
+    setArtists(artistsData);
     setDataLoading(false);
   };
 
@@ -88,6 +103,9 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
       case 'location':
         setLocations(await fetchLocations());
         break;
+      case 'artist':
+        setArtists(await fetchArtists());
+        break;
     }
   };
 
@@ -98,6 +116,7 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
       case 'format': return formats;
       case 'genre': return genres;
       case 'location': return locations;
+      case 'artist': return artists;
       default: return [];
     }
   };
@@ -109,6 +128,7 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
       case 'format': return album.format || '';
       case 'genre': return album.discogs_genres || [];
       case 'location': return album.location || '';
+      case 'artist': return album.artist || '';
       default: return '';
     }
   };
@@ -120,6 +140,7 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
       case 'format': return { title: 'Select Format', itemLabel: 'Format', mode: 'single' as const };
       case 'genre': return { title: 'Select Genres', itemLabel: 'Genre', mode: 'multi' as const };
       case 'location': return { title: 'Select Location', itemLabel: 'Location', mode: 'single' as const };
+      case 'artist': return { title: 'Select Artists', itemLabel: 'Artist', mode: 'single' as const };
       default: return { title: '', itemLabel: '', mode: 'single' as const };
     }
   };
@@ -151,6 +172,8 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
         onChange('format', selectedName);
       } else if (activeField === 'location') {
         onChange('location', selectedName);
+      } else if (activeField === 'artist') {
+        onChange('artist', selectedName);
       }
     }
   };
@@ -205,6 +228,8 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
         success = await updateFormat(editingItemId, newName);
       } else if (activeField === 'location') {
         success = await updateLocation(editingItemId, newName);
+      } else if (activeField === 'artist') {
+        success = await updateArtist(editingItemId, newName);
       }
       
       if (success) {
@@ -231,6 +256,9 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
         case 'location':
           setLocations([...locations, newItem].sort((a, b) => a.name.localeCompare(b.name)));
           break;
+        case 'artist':
+          setArtists([...artists, newItem].sort((a, b) => a.name.localeCompare(b.name)));
+          break;
       }
     }
   };
@@ -247,6 +275,8 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
       success = await mergeFormats(primaryId, mergeIntoIds);
     } else if (activeField === 'location') {
       success = await mergeLocations(primaryId, mergeIntoIds);
+    } else if (activeField === 'artist') {
+      success = await mergeArtists(primaryId, mergeIntoIds);
     }
     
     if (success) {
@@ -259,6 +289,40 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
     setActiveModal(null);
     setEditingItemId(null);
     setMergingItemIds([]);
+  };
+
+  // Date picker handlers
+  const handleOpenDatePicker = (field: 'release' | 'original' | 'recording', event: React.MouseEvent) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    setDatePickerPosition({
+      top: rect.bottom + 4,
+      left: rect.left,
+    });
+    setDatePickerField(field);
+    setShowDatePicker(true);
+  };
+
+  const handleDateChange = (date: { year: number | null; month: number | null; day: number | null }) => {
+    if (datePickerField === 'release') {
+      if (date.year) onChange('year', date.year.toString());
+      // Month and day would need separate fields in the Album type
+    } else if (datePickerField === 'original') {
+      // Would need original_release_date fields
+    } else if (datePickerField === 'recording') {
+      // Would need recording_date fields
+    }
+    setShowDatePicker(false);
+  };
+
+  // Autocap handler for Title field
+  const handleTitleChange = (value: string) => {
+    if (autocapEnabled) {
+      // Capitalize first letter of each word
+      const capitalized = value.replace(/\b\w/g, (char) => char.toUpperCase());
+      onChange('title', capitalized);
+    } else {
+      onChange('title', value);
+    }
   };
 
   const labelStyle: React.CSSProperties = {
@@ -327,12 +391,23 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
               <label style={{ ...labelStyle, marginBottom: '0' }}>Title</label>
-              <span style={{ color: '#9ca3af', fontSize: '13px', fontWeight: '400' }}>Aa</span>
+              <span 
+                onClick={() => setAutocapEnabled(!autocapEnabled)}
+                style={{ 
+                  color: autocapEnabled ? '#3b82f6' : '#9ca3af', 
+                  fontSize: '13px', 
+                  fontWeight: '400',
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                }}
+              >
+                Aa
+              </span>
             </div>
             <input
               type="text"
               value={album.title}
-              onChange={(e) => onChange('title', e.target.value)}
+              onChange={(e) => handleTitleChange(e.target.value)}
               style={inputStyle}
             />
           </div>
@@ -363,7 +438,12 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
               <label style={{ ...labelStyle, marginBottom: '0' }}>Artist</label>
-              <span style={{ color: '#9ca3af', fontSize: '20px', fontWeight: '300', cursor: 'pointer' }}>+</span>
+              <span 
+                onClick={() => handleOpenPicker('artist')}
+                style={{ color: '#9ca3af', fontSize: '20px', fontWeight: '300', cursor: 'pointer' }}
+              >
+                +
+              </span>
             </div>
             <div style={{ 
               flex: 1,
@@ -378,6 +458,7 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
             }}>
               <span>{album.artist}</span>
               <button
+                onClick={() => onChange('artist', '')}
                 style={{
                   background: 'transparent',
                   border: 'none',
@@ -402,7 +483,10 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                 <label style={{ ...labelStyle, marginBottom: '0' }}>Release Date</label>
-                <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#6b7280' }}>
+                <div 
+                  onClick={(e) => handleOpenDatePicker('release', e)}
+                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#6b7280' }}
+                >
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                     <rect x="2" y="3" width="12" height="11" rx="1" stroke="currentColor" strokeWidth="1.5"/>
                     <path d="M2 6h12" stroke="currentColor" strokeWidth="1.5"/>
@@ -435,7 +519,10 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                 <label style={{ ...labelStyle, marginBottom: '0' }}>Original Release Date</label>
-                <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#6b7280' }}>
+                <div 
+                  onClick={(e) => handleOpenDatePicker('original', e)}
+                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#6b7280' }}
+                >
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                     <rect x="2" y="3" width="12" height="11" rx="1" stroke="currentColor" strokeWidth="1.5"/>
                     <path d="M2 6h12" stroke="currentColor" strokeWidth="1.5"/>
@@ -520,7 +607,10 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                 <label style={{ ...labelStyle, marginBottom: '0' }}>Recording Date</label>
-                <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#6b7280' }}>
+                <div 
+                  onClick={(e) => handleOpenDatePicker('recording', e)}
+                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#6b7280' }}
+                >
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                     <rect x="2" y="3" width="12" height="11" rx="1" stroke="currentColor" strokeWidth="1.5"/>
                     <path d="M2 6h12" stroke="currentColor" strokeWidth="1.5"/>
@@ -756,6 +846,16 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
           items={mergingItems}
           onMerge={handleMerge}
           itemLabel={fieldConfig.itemLabel}
+        />
+      )}
+
+      {/* Date Picker */}
+      {showDatePicker && (
+        <DatePicker
+          value={{ year: album.year ? parseInt(album.year.toString()) : null, month: null, day: null }}
+          onChange={handleDateChange}
+          onClose={() => setShowDatePicker(false)}
+          position={datePickerPosition}
         />
       )}
     </>

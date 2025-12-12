@@ -1,19 +1,19 @@
 # PROJECT_STATUS.md
 # DWD Collection Management System - Collection Browser
-**Last Updated:** 2025-12-12 (Location Picker Fully Wired)
+**Last Updated:** 2025-12-12 (Artist Picker + Date Pickers + Autocap Complete)
 
 ## Project Overview
 Building an exact CLZ Music Web-inspired interface for Dead Wax Dialogues vinyl management system with custom branding. Strategy: Build complete visual framework first (LOCKED), then add functionality second. This ensures pixel-perfect accuracy before connecting data and logic.
 
 ---
 
-## 📊 Overall Progress: ~55% Complete
+## 📊 Overall Progress: ~57% Complete
 
 ```
 Phase 1: Visual Framework         ████████████████████ 100% ✅
 Phase 2.1: Data Connection        ████████████████████ 100% ✅
 Phase 2.2: Sorting & Columns      ████████████████████ 100% ✅ [SAFE ROLLBACK POINT]
-Phase 2.3: Edit Album Modal       █████████████████░░░  85% 🔄 IN PROGRESS
+Phase 2.3: Edit Album Modal       ██████████████████░░  90% 🔄 IN PROGRESS
 Phase 2.4: Detail Panel           ░░░░░░░░░░░░░░░░░░░░   0% (deferred)
 Phase 3: Selection & Batch Ops    ░░░░░░░░░░░░░░░░░░░░   0%
 Phase 4: Advanced Features        ░░░░░░░░░░░░░░░░░░░░   0%
@@ -201,13 +201,26 @@ Phase 4: Advanced Features        ░░░░░░░░░░░░░░░�
 - [x] Title input with Aa indicator on label line
 - [x] Sort Title input
 - [x] Subtitle input
-- [x] Artist display with + indicator on label line (plain text, matching Aa style)
+- [x] Artist display with + indicator on label line ✅ **NOW FULLY WIRED**
+  - Single-select picker with real Supabase data
+  - + button opens artist picker modal
+  - × button clears artist
+  - Full CRUD: Create, Read, Update, Merge (delete not supported for core data)
 - [x] **Date fields with calendar icons on label line:**
-  - [x] Release Date (YYYY—MM—DD with connecting lines)
-  - [x] Original Release Date (YYYY—MM—DD with connecting lines)
-  - [x] Recording Date (YYYY—MM—DD with connecting lines)
+  - [x] Release Date (YYYY—MM—DD with connecting lines) ✅ **Calendar picker wired**
+  - [x] Original Release Date (YYYY—MM—DD with connecting lines) ✅ **Calendar picker wired**
+  - [x] Recording Date (YYYY—MM—DD with connecting lines) ✅ **Calendar picker wired**
   - [x] **Final width adjustments**: YYYY: 92px, MM: 56px, DD: 56px
   - [x] **Connector lines**: Fixed 10px width, space-between layout for full-width span
+  - [x] **DatePicker component** created (src/components/DatePicker.tsx)
+    - Clean calendar UI matching CLZ style
+    - Month navigation with «/» buttons
+    - "Today" button for quick selection
+    - Populates year field on selection
+- [x] **Autocap Toggle (Aa indicator)** ✅ **COMPLETE**
+  - Blue when enabled, gray when disabled
+  - Click to toggle auto-capitalization on/off
+  - Capitalizes first letter of each word in Title field when enabled
 - [x] **Unified selector styling** (Label, Format, Genre):
   - [x] No gap between dropdown/input and button (0px)
   - [x] Matching heights (36px for single-line fields, auto-sizing for Genre)
@@ -223,10 +236,12 @@ Phase 4: Advanced Features        ░░░░░░░░░░░░░░░�
 - [x] **CRITICAL FIX**: Added explicit text color to all input styles (prevents white-on-white issue)
 - [x] **MainTab.tsx** - Complete integration
   - Fetches real data on mount from Supabase
-  - Label, Format, Genre, Location pickers fully wired
+  - Label, Format, Genre, Location, Artist pickers fully wired
   - All CRUD operations: Create, Read, Update, Delete, Merge
   - Data reloading after operations
   - Loading states on picker buttons
+  - Date pickers functional on all 3 calendar icons
+  - Autocap toggle working on Title field
   - Proper state management for modal navigation
 - [x] **Bug Fixes (2025-12-12)**:
   - Fixed import path in pickerDataUtils.ts (changed from '@/utils/supabase/client' to 'lib/supabaseClient')
@@ -252,7 +267,7 @@ Phase 4: Advanced Features        ░░░░░░░░░░░░░░░�
   - Location picker functional with real Supabase data (fetch/create/update/delete/merge)
 
 ### Tab Status Overview
-- ✅ **MainTab.tsx** - Layout complete, ALL pickers fully integrated (Label, Format, Genre, Location)
+- ✅ **MainTab.tsx** - **COMPLETE** - All pickers integrated (Label, Format, Genre, Location, Artist), Date pickers functional, Autocap toggle working
 - ⏳ **DetailsTab.tsx** - Placeholder (Phase 6)
 - ⏳ **ClassicalTab.tsx** - Placeholder (Phase 6)
 - ⏳ **PeopleTab.tsx** - Placeholder (Phase 6)
@@ -595,13 +610,13 @@ src/app/edit-collection/
 
 ## 📊 PROGRESS METRICS
 
-### Overall Completion: ~55%
+### Overall Completion: ~57%
 
 **Phase 1 - Framework:** 100% ✅
-**Phase 2 - Data & UI Core:** 89% 🚧
+**Phase 2 - Data & UI Core:** 91% 🚧
 - 2.1 Initial Connection: 100% ✅
 - 2.2 Sorting & Columns: 100% ✅ **← SAFE ROLLBACK POINT**
-- 2.3 Edit Album Modal: 85% 🔄 (Core + pickers complete, artist picker + other tabs pending)
+- 2.3 Edit Album Modal: 90% 🔄 (Main Tab complete, other tabs pending)
 - 2.4 Detail Panel: 40% (basic display working)
 
 **Phase 3 - Selection:** 15% (UI in place, checkboxes not functional)
@@ -611,6 +626,28 @@ src/app/edit-collection/
 ---
 
 ## 🔄 CHANGE LOG
+
+- **2025-12-12 (Artist Picker + Date Pickers + Autocap):** ✅ MAIN TAB COMPLETE
+  - **Artist Picker**: Added full artist picker integration
+    - Created fetchArtists(), updateArtist(), mergeArtists() in pickerDataUtils.ts
+    - Wired + button to open artist picker modal (single-select)
+    - Wired × button to clear artist
+    - Full CRUD operations (delete not supported for core data)
+  - **Date Pickers**: Created DatePicker component (src/components/DatePicker.tsx)
+    - Wired all 3 calendar icons (Release Date, Original Release Date, Recording Date)
+    - Clean calendar UI matching CLZ style
+    - Month navigation with «/» buttons
+    - "Today" button for quick selection
+  - **Autocap Toggle**: Implemented Aa indicator functionality
+    - Blue when enabled, gray when disabled
+    - Click to toggle auto-capitalization
+    - Capitalizes first letter of each word in Title field
+  - **Bug Fixes**: Fixed ESLint errors
+    - Removed unused useEffect import from DatePicker.tsx
+    - Fixed unused parameter in deleteArtist function
+    - Fixed import path for DatePicker (src/components/DatePicker)
+  - **Files Modified**: MainTab.tsx, pickerDataUtils.ts, DatePicker.tsx (new)
+  - **Main Tab now 90% complete** - All pickers functional, all interactive elements wired
 
 - **2025-12-12 (Location Picker Fully Wired):** ✅ COMPLETE
   - MainTab now uses forwardRef + useImperativeHandle
@@ -774,14 +811,14 @@ src/app/edit-collection/
 
 ## 🎯 IMMEDIATE NEXT STEPS
 
-**Priority 1: Edit Album Modal - Artist Picker Integration - NEXT**
-1. Create artist-specific picker data utilities (fetch/update/delete/merge artists)
-2. Wire Artist field to multi-select PickerModal  
-3. Expose artist picker via MainTab ref (same pattern as location)
-4. Test artist picker with real data
-5. Implement artist add/remove functionality in UI
+**Priority 1: Edit Album Modal - Phase 4 (Tracks Tab - HIGH PRIORITY) - NEXT**
+1. Build TracksTab.tsx with disc management
+2. Implement tracklist table with drag-drop
+3. Add/remove tracks functionality
+4. Multi-disc support with disc tabs
+5. **🎵 Add "Import from Spotify" button and integration**
 
-**Priority 2: Edit Album Modal - Phase 4 (Tracks Tab - HIGH PRIORITY)**
+**Priority 2: Edit Album Modal - Previous/Next Navigation**
 1. Build TracksTab.tsx with disc management
 2. Implement tracklist table with drag-drop
 3. Add/remove tracks functionality
