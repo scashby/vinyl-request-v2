@@ -1,19 +1,19 @@
 # PROJECT_STATUS.md
 # DWD Collection Management System - Collection Browser
-**Last Updated:** 2025-12-12 (UniversalBottomBar Architecture)
+**Last Updated:** 2025-12-12 (Location Picker Fully Wired)
 
 ## Project Overview
 Building an exact CLZ Music Web-inspired interface for Dead Wax Dialogues vinyl management system with custom branding. Strategy: Build complete visual framework first (LOCKED), then add functionality second. This ensures pixel-perfect accuracy before connecting data and logic.
 
 ---
 
-## 📊 Overall Progress: ~52% Complete
+## 📊 Overall Progress: ~55% Complete
 
 ```
 Phase 1: Visual Framework         ████████████████████ 100% ✅
 Phase 2.1: Data Connection        ████████████████████ 100% ✅
 Phase 2.2: Sorting & Columns      ████████████████████ 100% ✅ [SAFE ROLLBACK POINT]
-Phase 2.3: Edit Album Modal       ███████████████░░░░░  75% 🔄 IN PROGRESS
+Phase 2.3: Edit Album Modal       █████████████████░░░  85% 🔄 IN PROGRESS
 Phase 2.4: Detail Panel           ░░░░░░░░░░░░░░░░░░░░   0% (deferred)
 Phase 3: Selection & Batch Ops    ░░░░░░░░░░░░░░░░░░░░   0%
 Phase 4: Advanced Features        ░░░░░░░░░░░░░░░░░░░░   0%
@@ -148,7 +148,7 @@ Phase 4: Advanced Features        ░░░░░░░░░░░░░░░�
 
 ---
 
-## 🔄 PHASE 2.3: IN PROGRESS - EDIT ALBUM MODAL (~75% Complete)
+## 🔄 PHASE 2.3: IN PROGRESS - EDIT ALBUM MODAL (~85% Complete)
 
 ### ✅ Phase 1: Core Infrastructure - COMPLETE
 - [x] Base modal shell with orange header
@@ -172,7 +172,7 @@ Phase 4: Advanced Features        ░░░░░░░░░░░░░░░�
   - z-index: 30001
 - [x] **ManageModal** - Dual mode system
   - **Normal Mode**: White header, pencil/X icons, "Merge Mode" button, "Close" button
-  - **Merge Mode**: Orange header, checkboxes, yellow banner, "Cancel Merge" (red), right panel preview, "Merge to" button
+  - **Merge Mode**: Orange header, checkboxes, yellow banner, right panel preview, "Cancel Merge" (red), "Merge to" button
   - Width: 600px normal, 900px merge
   - z-index: 30002
 - [x] **EditModal** - Simple name editor
@@ -196,7 +196,7 @@ Phase 4: Advanced Features        ░░░░░░░░░░░░░░░�
   - mergeLabels/Formats/Locations (combine items)
   - All functions query real collection data
 
-### 🔄 Phase 3: Main Tab + Basic Pickers - IN PROGRESS (~75% Complete)
+### ✅ Phase 3: Main Tab + Basic Pickers - COMPLETE
 - [x] Main tab two-column layout
 - [x] Title input with Aa indicator on label line
 - [x] Sort Title input
@@ -223,7 +223,7 @@ Phase 4: Advanced Features        ░░░░░░░░░░░░░░░�
 - [x] **CRITICAL FIX**: Added explicit text color to all input styles (prevents white-on-white issue)
 - [x] **MainTab.tsx** - Complete integration
   - Fetches real data on mount from Supabase
-  - Label, Format, Genre pickers fully wired
+  - Label, Format, Genre, Location pickers fully wired
   - All CRUD operations: Create, Read, Update, Delete, Merge
   - Data reloading after operations
   - Loading states on picker buttons
@@ -238,14 +238,21 @@ Phase 4: Advanced Features        ░░░░░░░░░░░░░░░�
     - **Collection**: In Collection, For Sale
     - **Wish List**: On Wish List, On Order
     - **Not in Collection**: Sold, Not in Collection
-  - Location field with picker button integration
+  - Location field with picker button integration ✅ **NOW FULLY WIRED**
   - All four fields: Collection Status, Index, Qty, Location
   - Bottom buttons: Previous, Next, Cancel, Save
   - **ARCHITECTURE DECISION**: Used by EditAlbumModal, NOT by individual tabs
-  - Location picker callback will be passed from modal → to active tab's handleOpenPicker
+- [x] **Location Picker Integration** - ✅ **COMPLETE**
+  - MainTab uses forwardRef + useImperativeHandle
+  - Exports MainTabRef interface with openLocationPicker() method
+  - EditAlbumModal creates mainTabRef using useRef<MainTabRef>
+  - Passes ref to MainTab component
+  - UniversalBottomBar location button → Modal callback → MainTab.openLocationPicker()
+  - Full callback chain working: Button → Modal → MainTab → PickerModal
+  - Location picker functional with real Supabase data (fetch/create/update/delete/merge)
 
 ### Tab Status Overview
-- ✅ **MainTab.tsx** - Layout complete, UI built, pickers fully integrated (Label, Format, Genre)
+- ✅ **MainTab.tsx** - Layout complete, ALL pickers fully integrated (Label, Format, Genre, Location)
 - ⏳ **DetailsTab.tsx** - Placeholder (Phase 6)
 - ⏳ **ClassicalTab.tsx** - Placeholder (Phase 6)
 - ⏳ **PeopleTab.tsx** - Placeholder (Phase 6)
@@ -287,6 +294,7 @@ We are replicating the CLZ Music Web interface exactly, featuring:
 - Barcode (text input) ✅
 - Cat No (text input) ✅
 - **Genre** (multi-select picker with tags + +/Manage buttons) ✅ **FULLY WIRED**
+- **Location** (in bottom bar) ✅ **FULLY WIRED**
 
 #### ℹ️ Details Tab
 - **Packaging** (picker)
@@ -411,14 +419,14 @@ Build reusable picker components that work for ALL pickers:
 - [x] `<EditModal>` - Edit single item
 - [x] `<MergeModal>` - Merge multiple items
 
-**Phase 3: Main Tab + Basic Pickers** 🔄 IN PROGRESS (~75%)
+**Phase 3: Main Tab + Basic Pickers** ✅ COMPLETE
 - [x] Main tab layout
 - [x] All text inputs and date dropdowns
 - [x] Format picker (single-select) - **WIRED AND FUNCTIONAL**
 - [x] Genre picker (multi-select with tags) - **WIRED AND FUNCTIONAL**
 - [x] Label picker - **WIRED AND FUNCTIONAL**
-- [ ] Location picker (in bottom bar) - **NEXT: Wire through modal to tab**
-- [ ] Artist picker (multi-select) - **Wire up to PickerModal**
+- [x] Location picker (in bottom bar) - **WIRED AND FUNCTIONAL**
+- [ ] Artist picker (multi-select) - **NEXT: Wire up to PickerModal**
 
 **Phase 4: Tracks Tab** (HIGH PRIORITY)
 - [ ] Disc management
@@ -448,7 +456,7 @@ Build reusable picker components that work for ALL pickers:
 src/app/edit-collection/
 ├── EditAlbumModal.tsx          # Main modal component ✅
 ├── tabs/
-│   ├── MainTab.tsx             # Basic info ✅ (Label/Format/Genre pickers wired)
+│   ├── MainTab.tsx             # Basic info ✅ (Label/Format/Genre/Location pickers wired)
 │   ├── DetailsTab.tsx          # Extended metadata ✅ (placeholder)
 │   ├── ClassicalTab.tsx        # Composer, conductor, etc. ✅ (placeholder)
 │   ├── PeopleTab.tsx           # Credits & musicians ✅ (placeholder)
@@ -470,7 +478,7 @@ src/app/edit-collection/
 └── components/
     ├── DateDropdowns.tsx       # MM/DD/YYYY selectors
     ├── RatingStars.tsx         # 10-star rating
-    └── UniversalBottomBar.tsx  # Status/Index/Qty/Location ✅ (ready for modal)
+    └── UniversalBottomBar.tsx  # Status/Index/Qty/Location ✅ (integrated in modal)
 ```
 
 ---
@@ -587,13 +595,13 @@ src/app/edit-collection/
 
 ## 📊 PROGRESS METRICS
 
-### Overall Completion: ~52%
+### Overall Completion: ~55%
 
 **Phase 1 - Framework:** 100% ✅
 **Phase 2 - Data & UI Core:** 89% 🚧
 - 2.1 Initial Connection: 100% ✅
 - 2.2 Sorting & Columns: 100% ✅ **← SAFE ROLLBACK POINT**
-- 2.3 Edit Album Modal: 75% 🔄 (Core + pickers complete, artist/location + other tabs pending)
+- 2.3 Edit Album Modal: 85% 🔄 (Core + pickers complete, artist picker + other tabs pending)
 - 2.4 Detail Panel: 40% (basic display working)
 
 **Phase 3 - Selection:** 15% (UI in place, checkboxes not functional)
@@ -603,6 +611,16 @@ src/app/edit-collection/
 ---
 
 ## 🔄 CHANGE LOG
+
+- **2025-12-12 (Location Picker Fully Wired):** ✅ COMPLETE
+  - MainTab now uses forwardRef + useImperativeHandle
+  - Exports MainTabRef interface with openLocationPicker() method
+  - EditAlbumModal creates mainTabRef using useRef<MainTabRef>
+  - Passes ref to MainTab component
+  - UniversalBottomBar's onOpenLocationPicker callback now calls mainTabRef.current?.openLocationPicker()
+  - **Full callback chain working**: Location button → Modal → MainTab → PickerModal opens
+  - Location picker now functional with real Supabase data (fetch/create/update/delete/merge)
+  - **Files Modified**: MainTab.tsx (added forwardRef), EditAlbumModal.tsx (added ref handling)
 
 - **2025-12-12 (UniversalBottomBar Architecture):** ARCHITECTURAL DECISION
   - **DECISION**: UniversalBottomBar used by EditAlbumModal, NOT by individual tabs
@@ -756,18 +774,14 @@ src/app/edit-collection/
 
 ## 🎯 IMMEDIATE NEXT STEPS
 
-**Priority 1: Edit Album Modal - Location Picker Integration**
-1. EditAlbumModal needs to render UniversalBottomBar
-2. Modal passes onOpenLocationPicker callback that routes to active tab's handleOpenPicker('location')
-3. Test location picker through modal→tab chain
-
-**Priority 2: Edit Album Modal - Artist Picker Integration**
+**Priority 1: Edit Album Modal - Artist Picker Integration - NEXT**
 1. Create artist-specific picker data utilities (fetch/update/delete/merge artists)
-2. Wire Artist field to multi-select PickerModal
-3. Test artist picker with real data
-4. Implement artist add/remove functionality in UI
+2. Wire Artist field to multi-select PickerModal  
+3. Expose artist picker via MainTab ref (same pattern as location)
+4. Test artist picker with real data
+5. Implement artist add/remove functionality in UI
 
-**Priority 3: Edit Album Modal - Phase 4 (Tracks Tab - HIGH PRIORITY)**
+**Priority 2: Edit Album Modal - Phase 4 (Tracks Tab - HIGH PRIORITY)**
 1. Build TracksTab.tsx with disc management
 2. Implement tracklist table with drag-drop
 3. Add/remove tracks functionality
@@ -775,6 +789,12 @@ src/app/edit-collection/
 5. **🎵 Add "Import from Spotify" button and integration**
 6. Storage Device picker
 7. Matrix number inputs
+
+**Priority 3: Edit Album Modal - Previous/Next Navigation**
+1. Wire up Previous/Next buttons in UniversalBottomBar
+2. Implement album navigation in EditAlbumModal
+3. Handle edge cases (first/last album)
+4. Persist edited changes when navigating
 
 **Priority 4: Edit Album Modal - Phase 5 (Enrichment Integration)**
 1. Spotify search & import (Main tab)
@@ -856,12 +876,23 @@ From `collection` table:
 - Filters run client-side (fast for <10k albums)
 - Consider server-side filtering/sorting for 50k+ albums
 
+### Recent Architecture Pattern - Ref Exposure
+**Location Picker Solution:**
+- MainTab uses `forwardRef` and `useImperativeHandle`
+- Exposes `MainTabRef` interface with `openLocationPicker()` method
+- EditAlbumModal creates ref and passes to MainTab
+- Callback chain: Button click → Modal → Ref method → Picker opens
+
+**This pattern can be reused for:**
+- Artist picker
+- Any other picker needed from bottom bar or external triggers
+- Future tab-specific functionality that needs external triggering
+
 ### Known Limitations
 - Selection checkboxes don't work yet (Phase 3.1)
 - Some table columns show placeholders (needs calculated values)
 - Collection tabs don't do anything yet (Phase 5)
-- Artist picker not implemented yet (Priority 2)
-- Location picker needs modal integration (Priority 1)
+- Artist picker not implemented yet (Priority 1)
 - Detail panel needs more polish (Phase 2.4)
 - Some action buttons are placeholders
 
@@ -876,25 +907,25 @@ To create this as a safe rollback point, run:
 git add .
 
 # Commit with descriptive message
-git commit -m "Phase 2.3 Progress: UniversalBottomBar Architecture Decision [CHECKPOINT]
+git commit -m "Phase 2.3 Progress: Location Picker Fully Wired [CHECKPOINT]
 
 ✅ COMPLETED:
-- UniversalBottomBar component ready with sectioned Collection Status
-- Architectural decision: Used by EditAlbumModal, not individual tabs
-- Location picker button ready for modal integration
-- Removed from MainTab.tsx (will be modal-level)
+- Location picker fully functional via forwardRef pattern
+- MainTab exposes openLocationPicker() method
+- EditAlbumModal captures and calls via ref
+- Full callback chain: Button → Modal → MainTab → PickerModal
+- All Main Tab pickers now wired: Label, Format, Genre, Location
 
 🔄 IN PROGRESS:
-- Main Tab pickers (Label, Format, Genre) fully wired and functional
-- Location picker needs modal→tab callback chain
-- Artist picker next priority
+- Artist picker next (will use same ref exposure pattern)
+- Tracks tab with Spotify import (high priority)
 
-🎯 READY FOR: Modal integration of UniversalBottomBar
+🎯 READY FOR: Artist picker integration
 
-This commit represents architectural clarity for bottom bar placement."
+This commit represents complete basic picker integration for Main Tab."
 
 # Create a named tag for easy reference
-git tag -a phase-2.3-bottombar-architecture -m "UniversalBottomBar architecture checkpoint"
+git tag -a phase-2.3-location-picker-complete -m "Location picker fully wired checkpoint"
 
 # Optional: Push to remote
 git push origin main --tags
