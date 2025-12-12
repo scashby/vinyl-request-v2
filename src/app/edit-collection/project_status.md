@@ -1,19 +1,19 @@
 # PROJECT_STATUS.md
 # DWD Collection Management System - Collection Browser
-**Last Updated:** 2025-12-12 (EditAlbumModal Integration Complete)
+**Last Updated:** 2025-12-12 (UniversalBottomBar Architecture)
 
 ## Project Overview
 Building an exact CLZ Music Web-inspired interface for Dead Wax Dialogues vinyl management system with custom branding. Strategy: Build complete visual framework first (LOCKED), then add functionality second. This ensures pixel-perfect accuracy before connecting data and logic.
 
 ---
 
-## 📊 Overall Progress: ~54% Complete
+## 📊 Overall Progress: ~52% Complete
 
 ```
 Phase 1: Visual Framework         ████████████████████ 100% ✅
 Phase 2.1: Data Connection        ████████████████████ 100% ✅
 Phase 2.2: Sorting & Columns      ████████████████████ 100% ✅ [SAFE ROLLBACK POINT]
-Phase 2.3: Edit Album Modal       ████████████████░░░░  80% 🔄 IN PROGRESS
+Phase 2.3: Edit Album Modal       ███████████████░░░░░  75% 🔄 IN PROGRESS
 Phase 2.4: Detail Panel           ░░░░░░░░░░░░░░░░░░░░   0% (deferred)
 Phase 3: Selection & Batch Ops    ░░░░░░░░░░░░░░░░░░░░   0%
 Phase 4: Advanced Features        ░░░░░░░░░░░░░░░░░░░░   0%
@@ -110,23 +110,57 @@ Phase 4: Advanced Features        ░░░░░░░░░░░░░░░�
 - [x] Real-time preview of column selection
 - [x] Save/Cancel/Reset actions
 
+### Column Groups Available
+1. 📋 **Main** - Checkbox, Owned, For Sale, Edit, Artist, Title, Year, Barcode, Cat No, Sort Title, Subtitle, Index
+2. 💿 **Edition** - Format, Discs, Tracks, Length
+3. 📝 **Details** - Box Set, Country, Extra, Is Live, Media Condition, Package/Sleeve Condition, Packaging, RPM, Sound, SPARS, Storage Slot, Studio, Vinyl Color, Vinyl Weight
+4. 📊 **Metadata** - Genres, Styles, Label, Original Release Date/Year, Recording Date/Year, Master Release Date
+5. 🎻 **Classical** - Chorus, Composer, Composition, Conductor, Orchestra
+6. 👥 **People** - Engineers, Musicians, Producers, Songwriters
+7. 👤 **Personal** - Added Date, Collection Status, Folder, Location, My Rating, Notes, Owner, Play Count, Last Played, Last Cleaned, Signed By, Tags, Modified Date
+8. 📤 **Loan** - Due Date, Loan Date, Loaned To
+9. 💰 **Value** - For Sale, Purchase Date/Store/Price, Current Value, Sale Price/Platform/Quantity, Wholesale Cost, Discogs Prices (Min/Median/Max), Pricing Notes
+10. 🔥 **Popularity** - Spotify Popularity
+
+### Default Visible Columns (14 total)
+1. ☑ Checkbox - Selection control (locked)
+2. ✓ Owned - Ownership status indicator (locked)
+3. $ For Sale - Sale status indicator (locked)
+4. ✏ Edit - Quick edit button (locked)
+5. Artist - Sortable, primary identifier (locked)
+6. Title - Sortable, album name (locked)
+7. Master Release Date - Shows original release date
+8. Format - Sortable, media format
+9. Discs - Number of discs
+10. Tracks - Track count from Spotify/Apple Music
+11. Length - Total runtime
+12. Genre - Primary genre from Discogs/Spotify
+13. Label - Record label
+14. Added Date - When added to collection
+
+### Technical Implementation
+- Virtual scrolling for performance with @tanstack/react-virtual
+- Memoized components to prevent unnecessary re-renders
+- Split locked/unlocked columns for proper sticky positioning
+- LocalStorage persistence for user preferences
+- Proper TypeScript types throughout
+- Clean separation of concerns (definitions, rendering, state management)
+
 ---
 
-## 🔄 PHASE 2.3: IN PROGRESS - EDIT ALBUM MODAL (~80% Complete)
+## 🔄 PHASE 2.3: IN PROGRESS - EDIT ALBUM MODAL (~75% Complete)
 
 ### ✅ Phase 1: Core Infrastructure - COMPLETE
-- [x] Base modal shell with orange header (#F7941D)
-- [x] Tab navigation system (8 tabs with SVG icons)
-- [x] Universal bottom bar (Collection Status, Index, Qty, Location) ✅ **NOW INTEGRATED**
-- [x] Previous/Next navigation buttons (placeholder handlers)
+- [x] Base modal shell with orange header
+- [x] Tab navigation system (8 tabs with icons)
+- [x] Universal bottom bar (Collection Status, Index, Qty, Location) 
+- [x] Previous/Next navigation buttons
 - [x] Wire up ✏️ button in collection table to open modal
 - [x] Modal open/close state management
-- [x] Save/Cancel actions fully wired
-- [x] Loading/error states with proper UI
+- [x] Save/Cancel actions
+- [x] Loading/error states
 - [x] Tab switching functionality
 - [x] All 8 tab component files created
-- [x] Supabase album fetching on modal open
-- [x] **EditAlbumModal.tsx** - UniversalBottomBar now rendered at modal level
 
 ### ✅ Phase 2: Universal Picker System - COMPLETE
 - [x] **PickerModal** - Pixel-perfect CLZ replication
@@ -162,7 +196,7 @@ Phase 4: Advanced Features        ░░░░░░░░░░░░░░░�
   - mergeLabels/Formats/Locations (combine items)
   - All functions query real collection data
 
-### 🔄 Phase 3: Main Tab + Basic Pickers - IN PROGRESS (~80% Complete)
+### 🔄 Phase 3: Main Tab + Basic Pickers - IN PROGRESS (~75% Complete)
 - [x] Main tab two-column layout
 - [x] Title input with Aa indicator on label line
 - [x] Sort Title input
@@ -174,14 +208,13 @@ Phase 4: Advanced Features        ░░░░░░░░░░░░░░░�
   - [x] Recording Date (YYYY—MM—DD with connecting lines)
   - [x] **Final width adjustments**: YYYY: 92px, MM: 56px, DD: 56px
   - [x] **Connector lines**: Fixed 10px width, space-between layout for full-width span
-- [x] **Unified selector styling** (Label, Format, Genre, Location):
+- [x] **Unified selector styling** (Label, Format, Genre):
   - [x] No gap between dropdown/input and button (0px)
   - [x] Matching heights (36px for single-line fields, auto-sizing for Genre)
   - [x] Connected border-radius (rounded left for field, rounded right for button)
   - [x] Shared border (borderRight: 'none' on field)
   - [x] **Bullet list icon** (Font Awesome style - bullets + lines via SVG)
   - [x] Genre: Button aligned to top (flex-start), minHeight: 40px for slight oversize
-  - [x] Location: Unified selector styling in UniversalBottomBar (in modal)
 - [x] Label selector with unified styling
 - [x] Format selector with unified styling
 - [x] Barcode input
@@ -200,18 +233,16 @@ Phase 4: Advanced Features        ░░░░░░░░░░░░░░░�
   - Removed unused 'supabase' variables in merge functions (mergeLabels, mergeFormats, mergeLocations)
   - Removed unused 'items' variable in MainTab.tsx handleEditSave function
   - All ESLint errors resolved
-- [x] **UniversalBottomBar.tsx** - Component integrated at modal level:
+- [x] **UniversalBottomBar.tsx** - Component ready for modal integration:
   - Sectioned Collection Status dropdown with optgroup organization:
     - **Collection**: In Collection, For Sale
     - **Wish List**: On Wish List, On Order
     - **Not in Collection**: Sold, Not in Collection
-  - Location field with picker button
+  - Location field with picker button integration
   - All four fields: Collection Status, Index, Qty, Location
   - Bottom buttons: Previous, Next, Cancel, Save
-  - **INTEGRATED**: Now rendered in EditAlbumModal.tsx
-  - **WIRED**: Cancel → onClose, Save → handleSave
-  - **PLACEHOLDER**: Previous/Next navigation (console.log)
-  - **PENDING**: Location picker callback needs MainTab exposure via ref/callback
+  - **ARCHITECTURE DECISION**: Used by EditAlbumModal, NOT by individual tabs
+  - Location picker callback will be passed from modal → to active tab's handleOpenPicker
 
 ### Tab Status Overview
 - ✅ **MainTab.tsx** - Layout complete, UI built, pickers fully integrated (Label, Format, Genre)
@@ -223,25 +254,355 @@ Phase 4: Advanced Features        ░░░░░░░░░░░░░░░�
 - ⏳ **CoverTab.tsx** - Placeholder with current cover display (Phase 6)
 - ⏳ **LinksTab.tsx** - Placeholder (Phase 6)
 
+### Decision: Build New vs. Modify Existing
+**✅ DECISION:** Build completely new modal from scratch
+- Keep existing `/admin/edit-entry/[id]/page.tsx` intact as legacy admin tool
+- Build new `/edit-collection/EditAlbumModal.tsx` matching CLZ Music Web interface
+- Clean separation between admin tools and user-facing collection management
+- No legacy constraints or technical debt
+- Purpose-built for the new collection browser
+
+### Reference: CLZ Music Web Interface
+We are replicating the CLZ Music Web interface exactly, featuring:
+- **Orange modal header** (#f97316) with album title
+- **8 tabs:** Main, Details, Classical, People, Tracks, Personal, Cover, Links
+- **Universal picker system** used consistently across all selectors
+- **Universal bottom bar** (on all tabs): Collection Status | Index | Quantity | Location
+- **Previous/Next navigation** buttons
+- **Modal-based pickers** for all complex selections (Genre, Format, Artist, Tags, etc.)
+- **Manage modals** with Edit/Delete/Merge functionality
+
+### Edit Album Modal - Complete Tab Inventory
+
+#### 🎵 Main Tab (Layout Complete, Most Pickers Wired)
+- Title (text input) ✅
+- Sort Title (text input) ✅
+- Subtitle (text input) ✅
+- **Artist** (multi-select picker with +/Manage buttons) ⏳ (UI present, not wired)
+- Release Date (MM/DD/YYYY dropdowns) ✅
+- Original Release Date (MM/DD/YYYY dropdowns) ✅
+- **Label** (picker) ✅ **FULLY WIRED**
+- Recording Date (MM/DD/YYYY dropdowns) ✅
+- **Format** (picker - radio buttons) ✅ **FULLY WIRED**
+- Barcode (text input) ✅
+- Cat No (text input) ✅
+- **Genre** (multi-select picker with tags + +/Manage buttons) ✅ **FULLY WIRED**
+
+#### ℹ️ Details Tab
+- **Packaging** (picker)
+- **Package/Sleeve Condition** (picker)
+- **Media Condition** (picker)
+- Studio (add/picker)
+- **Country** (picker)
+- Sound (add/picker)
+- Vinyl Color (text input)
+- RPM (33/45/78 buttons)
+- Vinyl Weight (number)
+- Extra (multi-line text)
+- **SPARS** (picker)
+- **Box Set** (picker)
+- Is Live (Yes/No toggle)
+
+#### 🎻 Classical Tab
+- Composer (add/picker)
+- Composition (add/picker)
+- Conductor (add/picker)
+- Orchestra (add/picker)
+- Chorus (add/picker)
+
+#### 👥 People Tab
+- **Credits Section:**
+  - Songwriter (add/picker)
+  - Producer (add/picker)
+  - Engineer (add/picker)
+- **Musicians Section:**
+  - Musician (add/picker)
+
+#### 🎼 Tracks Tab (HIGH PRIORITY)
+- Disc tabs (Disc #1, Disc #2, etc.) if multi-disc
+- Disc Title (text input)
+- **Storage Device** (picker)
+- Matrix Nr Side A / Side B (text inputs)
+- **Tracks table:**
+  - Checkbox column
+  - Drag handle column (≡)
+  - Track # (auto)
+  - Title (text input)
+  - Artist (text input)
+  - Length (text input)
+- **🎵 Import from Spotify** button (ENRICHMENT FEATURE)
+- "Add Header" button
+- "Add Track" button
+- "Add Disc" button (if multi-disc)
+
+#### 👤 Personal Tab
+- Purchase Date (MM/DD/YYYY)
+- **Purchase Store** (picker)
+- Purchase Price ($)
+- Current Value ($)
+- **Owner** (picker)
+- My Rating (10 stars)
+- **Tags** (multi-select picker with tags + +/Manage buttons)
+- Notes (textarea)
+- Last Cleaned Date (MM/DD/YYYY)
+- Signed By (add/picker)
+- Played History (add/picker with date+count)
+
+#### 📀 Cover Tab
+- **Front Cover:**
+  - 🔍 Find Online button (ENRICHMENT FEATURE)
+  - ⬆️ Upload button
+  - 🗑️ Remove button
+  - ✂️ Crop / Rotate button
+  - Image preview
+- **Back Cover:**
+  - (same buttons)
+  - Image preview
+
+#### 🔗 Links Tab
+- URL list (add/remove):
+  - URL (text input)
+  - Description (text input)
+  - Drag handle (≡)
+- "➕ New Link" button
+- **Auto-populate** from Spotify/Apple Music/Discogs/Genius (ENRICHMENT FEATURE)
+
+### Universal Picker System Architecture
+
+All pickers follow the same pattern:
+
+**1. SELECT Modal (Single or Multi-select)**
+- Search bar at top
+- Radio buttons (single) OR Checkboxes (multi)
+- Item counts on right
+- "New [Item]" button (top-right, blue)
+- "Manage [Items]" button (top-right, gray)
+- "Save" button (bottom-right)
+
+**2. MANAGE Modal (triggered from "Manage [Items]")**
+- Search bar at top
+- List with ✏️ edit + ❌ delete per row
+- "Merge Mode" button (bottom-right)
+- "Back" button (bottom-left)
+
+**3. EDIT Modal (triggered from ✏️ in Manage)**
+- Name input field
+- Save / Cancel buttons
+
+**4. MERGE Modal (triggered from "Merge Mode")**
+- Checkboxes to select items to merge
+- Shows preview: "Merge 2 Formats to: [target]"
+- "Merge to" / "Cancel" buttons
+
+### Development Phases
+
+**Phase 1: Core Infrastructure** ✅ COMPLETE
+- [x] Base modal shell with orange header
+- [x] Tab navigation system (8 tabs)
+- [x] Universal bottom bar (Collection Status, Index, Qty, Location)
+- [x] Previous/Next navigation buttons
+- [x] Save/Cancel actions
+- [x] Wire up ✏️ button in collection table to open modal
+
+**Phase 2: Universal Picker System** ✅ COMPLETE
+Build reusable picker components that work for ALL pickers:
+- [x] `<PickerModal>` - Select items (single/multi)
+- [x] `<ManageModal>` - Edit/delete/merge
+- [x] `<EditModal>` - Edit single item
+- [x] `<MergeModal>` - Merge multiple items
+
+**Phase 3: Main Tab + Basic Pickers** 🔄 IN PROGRESS (~75%)
+- [x] Main tab layout
+- [x] All text inputs and date dropdowns
+- [x] Format picker (single-select) - **WIRED AND FUNCTIONAL**
+- [x] Genre picker (multi-select with tags) - **WIRED AND FUNCTIONAL**
+- [x] Label picker - **WIRED AND FUNCTIONAL**
+- [ ] Location picker (in bottom bar) - **NEXT: Wire through modal to tab**
+- [ ] Artist picker (multi-select) - **Wire up to PickerModal**
+
+**Phase 4: Tracks Tab** (HIGH PRIORITY)
+- [ ] Disc management
+- [ ] Tracklist with drag-drop
+- [ ] Add/remove tracks
+- [ ] **🎵 Import from Spotify** button
+
+**Phase 5: Enrichment Integration**
+- [ ] Spotify search & import (Main tab)
+- [ ] Apple Music search & lyrics (Tracks tab)
+- [ ] Discogs metadata (Main tab)
+- [ ] Genius lyrics (Tracks tab)
+- [ ] Cover art search (Cover tab)
+- [ ] Auto-populate links (Links tab)
+
+**Phase 6: Remaining Tabs**
+- [ ] Details tab with pickers
+- [ ] Classical tab with add/pickers
+- [ ] People tab with add/pickers
+- [ ] Personal tab with pickers
+- [ ] Cover tab with upload/crop
+- [ ] Links tab with URL management
+
+### File Structure for Edit Modal
+
+```
+src/app/edit-collection/
+├── EditAlbumModal.tsx          # Main modal component ✅
+├── tabs/
+│   ├── MainTab.tsx             # Basic info ✅ (Label/Format/Genre pickers wired)
+│   ├── DetailsTab.tsx          # Extended metadata ✅ (placeholder)
+│   ├── ClassicalTab.tsx        # Composer, conductor, etc. ✅ (placeholder)
+│   ├── PeopleTab.tsx           # Credits & musicians ✅ (placeholder)
+│   ├── TracksTab.tsx           # Tracklist management ✅ (placeholder)
+│   ├── PersonalTab.tsx         # Purchase, ratings, tags ✅ (placeholder)
+│   ├── CoverTab.tsx            # Front/back cover ✅ (placeholder)
+│   └── LinksTab.tsx            # URLs ✅ (placeholder)
+├── pickers/
+│   ├── PickerModal.tsx         # Universal picker base ✅ COMPLETE
+│   ├── ManageModal.tsx         # Manage items (edit/delete/merge) ✅ COMPLETE
+│   ├── EditModal.tsx           # Edit single item ✅ COMPLETE
+│   ├── MergeModal.tsx          # Merge multiple items ✅ COMPLETE
+│   └── pickerDataUtils.ts      # Supabase integration ✅ COMPLETE (bug fixed)
+├── enrichment/
+│   ├── SpotifyEnrich.tsx       # Spotify integration
+│   ├── AppleEnrich.tsx         # Apple Music integration
+│   ├── DiscogsEnrich.tsx       # Discogs integration
+│   └── GeniusEnrich.tsx        # Genius lyrics integration
+└── components/
+    ├── DateDropdowns.tsx       # MM/DD/YYYY selectors
+    ├── RatingStars.tsx         # 10-star rating
+    └── UniversalBottomBar.tsx  # Status/Index/Qty/Location ✅ (ready for modal)
+```
+
+---
+
+## 📋 PHASE 2.4: DETAIL PANEL IMPROVEMENTS (Deferred)
+
+### Right Panel Enhancements (Lower Priority - Can Integrate into Modal)
+- [ ] Better formatting for multi-line data
+- [ ] Show all relevant metadata fields
+- [ ] Clickable links for external services
+- [ ] Enhanced album artwork display with zoom
+- [ ] Track list display if available
+
+---
+
+## 📋 PHASE 3: SELECTION & BATCH OPERATIONS
+
+### 3.1 Selection System
+- [ ] Implement row checkbox functionality
+- [ ] Implement header "select all" checkbox
+- [ ] Add selectedAlbumIds state management (infrastructure in place, needs wiring)
+- [ ] Visual feedback for selected rows (partially done)
+- [ ] Selection count display (showing, needs to be accurate)
+- [ ] Maintain selection across sorting/filtering
+- [ ] Keyboard shortcuts (Cmd/Ctrl+A for select all)
+
+### 3.2 Selection Toolbar Actions
+- [ ] Show/hide selection toolbar based on selection (already shows)
+- [ ] "Cancel" button - clear selection (already wired)
+- [ ] "All" button - select all visible albums
+- [ ] "Edit" button - batch edit modal
+- [ ] "Remove" button - batch delete with confirmation
+- [ ] "Print to PDF" - export selected albums
+- [ ] "More" button - additional batch actions
+
+### 3.3 Batch Edit Modal
+- [ ] Create modal component
+- [ ] Change format in bulk
+- [ ] Change folder/collection in bulk
+- [ ] Add tags in bulk
+- [ ] Change condition in bulk
+- [ ] Apply changes to all selected
+- [ ] Show progress indicator
+
+---
+
+## 📋 PHASE 4: MODALS & ADVANCED FEATURES
+
+### 4.1 View Mode Dropdown
+- [ ] Create view mode selector
+- [ ] List all view modes (Format, Artist, Genre, Label, Year, etc.)
+- [ ] Switch between view modes
+- [ ] Update left sidebar based on view mode
+- [ ] Persist view mode preference
+
+### 4.2 Add Albums Modal
+- [ ] Create tabbed modal interface
+- [ ] Artist & Title tab - search Discogs
+- [ ] Barcode tab - lookup by barcode
+- [ ] Catalog Number tab - search by catalog
+- [ ] Add Manually tab - full form
+- [ ] Duplicate detection
+- [ ] Success/error feedback
+
+### 4.3 Tag Editor Modal
+- [ ] Create tag editor component
+- [ ] Show for single album or batch
+- [ ] Category-based tag organization
+- [ ] Add new tags
+- [ ] Remove tags
+- [ ] Save changes to database
+
+### 4.4 Sale Modal
+- [ ] Create sale modal component
+- [ ] Mark albums for sale
+- [ ] Set sale price
+- [ ] Add sale notes
+- [ ] Remove from sale
+- [ ] Batch sale operations
+
+---
+
+## 📋 PHASE 5: REMAINING FEATURES
+
+### Collection Filters
+- [ ] "In Collection" filter logic
+- [ ] "For Sale" filter logic (partially done)
+- [ ] "Wish List" filter logic
+- [ ] "On Order" filter logic
+- [ ] "Sold" filter logic
+- [ ] "Not in Collection" filter logic
+
+### Hamburger Sidebar
+- [ ] Wire up all menu items
+- [ ] Add Albums from Core functionality
+- [ ] Manage Pick Lists functionality
+- [ ] Print to PDF functionality
+- [ ] Statistics dashboard
+- [ ] Find Duplicates tool
+- [ ] Loan Manager
+- [ ] Settings panel
+
+### Advanced Features
+- [ ] Grid view mode toggle
+- [ ] Multiple view modes (Artist, Genre, Label, Year, etc.)
+- [ ] Advanced search builder
+- [ ] Saved searches
+- [ ] Recently played tracking
+- [ ] Play count tracking
+- [ ] Favorites system
+- [ ] Star ratings
+
+---
+
+## 📊 PROGRESS METRICS
+
+### Overall Completion: ~52%
+
+**Phase 1 - Framework:** 100% ✅
+**Phase 2 - Data & UI Core:** 89% 🚧
+- 2.1 Initial Connection: 100% ✅
+- 2.2 Sorting & Columns: 100% ✅ **← SAFE ROLLBACK POINT**
+- 2.3 Edit Album Modal: 75% 🔄 (Core + pickers complete, artist/location + other tabs pending)
+- 2.4 Detail Panel: 40% (basic display working)
+
+**Phase 3 - Selection:** 15% (UI in place, checkboxes not functional)
+**Phase 4 - Modals:** 0%
+**Phase 5 - Advanced:** 0%
+
 ---
 
 ## 🔄 CHANGE LOG
-
-- **2025-12-12 (EditAlbumModal Integration):** UNIVERSALBOTTOMBAR NOW INTEGRATED IN MODAL
-  - EditAlbumModal.tsx now renders UniversalBottomBar at bottom of modal
-  - Preserved all existing functionality:
-    - Album fetching from Supabase
-    - Loading and error states
-    - All 8 tabs with SVG icons
-    - Tab switching
-    - Modal structure and styling
-  - Added UniversalBottomBar rendering:
-    - Wired Cancel button to modal onClose
-    - Wired Save button to modal handleSave
-    - Added placeholder handlers for Previous/Next navigation
-    - Added placeholder for location picker callback (needs MainTab ref exposure)
-  - Architecture: Bottom bar at modal level, not in individual tabs
-  - Next step: Wire location picker callback from modal → MainTab's handleOpenPicker
 
 - **2025-12-12 (UniversalBottomBar Architecture):** ARCHITECTURAL DECISION
   - **DECISION**: UniversalBottomBar used by EditAlbumModal, NOT by individual tabs
@@ -251,6 +612,7 @@ Phase 4: Advanced Features        ░░░░░░░░░░░░░░░�
     - Location picker button ready for modal→tab callback chain
     - All fields: Collection Status, Index, Qty, Location
     - Bottom buttons: Previous, Next, Cancel, Save
+  - Architecture: Modal will pass onOpenLocationPicker callback to active tab's handleOpenPicker
   
 - **2025-12-12 (UniversalBottomBar Improvements):** COLLECTION STATUS SECTIONED + LOCATION PICKER
   - Added sectioned dropdown for Collection Status using `<optgroup>`:
@@ -263,19 +625,141 @@ Phase 4: Advanced Features        ░░░░░░░░░░░░░░░�
   
 - **2025-12-12 (Bug Fixes):** PICKER INTEGRATION ERRORS RESOLVED
   - Fixed import path in `pickerDataUtils.ts` from '@/utils/supabase/client' to 'lib/supabaseClient'
-  - Removed unused 'supabase' variable declarations in merge functions
+  - Removed unused 'supabase' variable declarations in merge functions (mergeLabels, mergeFormats, mergeLocations)
   - Removed unused 'items' variable in MainTab.tsx handleEditSave function
   - All ESLint errors cleared
   - Pickers now fully operational with real Supabase integration
+
+- **2025-12-11 (Afternoon - Update 4):** ARTIST + SIMPLIFIED + GENRE BUTTON HEIGHT ADJUSTED
+  - Artist +: Changed from button to plain text indicator (matching Aa style)
+  - Artist +: Now just a `<span>` with color and cursor styling (no border, no background)
+  - Genre button: Reduced from `minHeight: 48px` to `minHeight: 40px` for better proportions
+  - Genre button: Still slightly taller than single-row to accommodate tag wrapping
+
+- **2025-12-11 (Afternoon - Update 3):** HEIGHT MATCHING FIX + ARTIST + BUTTON REPOSITIONED
+  - Genre button: Changed from fixed `height: 36px` to `minHeight: 48px` to match expanded field height
+  - Genre field: Added `boxSizing: 'border-box'` for accurate height calculation
+  - Location button: Changed to `height: 'auto'` with `alignItems: 'stretch'` to match input exactly
+  - Location input: Added `boxSizing: 'border-box'` for consistent sizing
+  - Artist + button: Moved to label row (matching Title's Aa indicator pattern)
+  - Artist field: Expanded to full width, now only contains artist name + × button
+  - Artist + button: Sized at 28×28px to match other label-line elements
+
+- **2025-12-11 (Afternoon - Update 2):** BULLET LIST ICON + GENRE ALIGNMENT FIX
+  - Changed from hamburger icon (☰) to proper bullet list icon (SVG with bullets + lines)
+  - Matches Font Awesome's fa-list icon style
+  - Applied to all selectors: Label, Format, Genre, and Location
+  - Genre field: Changed button alignment from 'stretch' to 'flex-start' 
+  - Genre button now stays aligned with first row of tags as field expands vertically
+  - Location field: Added unified selector styling to UniversalBottomBar
+  - Created UniversalBottomBar.tsx output file with Location updates
+
+- **2025-12-11 (Afternoon - Update 1):** UNIFIED SELECTOR STYLING - CLZ EXACT MATCH
+  - Removed gap between dropdowns and buttons (0px)
+  - Made all buttons exactly 36px height to match dropdowns
+  - Connected elements with border-radius (rounded left/rounded right pattern)
+  - Removed shared border between dropdown and button (borderRight: 'none')
+  - Applied consistent styling to Label, Format, and Genre selectors
+  - Removed unused listButtonStyle constant (now using inline styles for precision)
+  - Date field connector lines set to fixed 10px width with space-between layout
+
+- **2025-12-11 (Morning - Update 4):** CRITICAL TEXT COLOR FIX + WIDTH BALANCE
+  - **FIXED WHITE TEXT ISSUE:** Added explicit `color: '#111827'` to all input styles (inputStyle, selectStyle, dateInputStyle)
+  - **Why it defaults to white:** Input fields without explicit color inherit from parent container, which has white text on dark/purple background
+  - **Solution:** Always explicitly set text color in input field styles to prevent inheritance
+  - Adjusted date field widths for better balance: YYYY: 70px→88px (+25%), MM/DD: 50px→52px (+5%)
+  - This reduces connector line width proportionally while improving input field usability
+  - Applied to all inputs: Title, Sort Title, Subtitle, all date fields, Label, Format, Barcode, Cat No
+
+- **2025-12-11 (Morning - Update 3):** DATE FIELD ALIGNMENT FIX - FINAL
+  - Reverted YYYY back to fixed width (70px) with MM/DD at 50px
+  - Expanded horizontal connecting lines to flex: 1 (with minWidth: 8px) to span full width
+  - Now date fields properly span from label to calendar icon via expanded connectors
+  - Release Date YYYY placeholder displays correctly
+  - Applied to Release Date, Original Release Date, and Recording Date
+
+- **2025-12-11 (Morning - Update 2):** DATE FIELD IMPROVEMENTS COMPLETE
+  - Moved calendar icons from input row to label line for all date fields
+  - Changed calendar buttons to clickable icons (matching CLZ design)
+  - Connected date input boxes with horizontal lines (YYYY—MM—DD pattern)
+  - Changed to consistent 4px rounded corners on all date inputs
+  - Applied consistent pattern to Release Date, Original Release Date, and Recording Date
+  - Updated project status: Phase 3 now at 75% complete
+  
+- **2025-12-11 (Morning):** PHASE 2.3 PROGRESS UPDATE
+  - Moved "Aa" indicator from inside Title input to label line (matching CLZ design exactly)
+  - Updated project status to reflect Edit Modal completion:
+    - Phase 1 (Core Infrastructure): 100% ✅
+    - Phase 3 (Main Tab UI): 70% 🔄
+    - All 8 tab components exist with proper structure
+    - MainTab has complete two-column layout with all fields
+    - Ready for Phase 2: Universal Picker System implementation
+
+- **2025-12-09 (Evening - Rollback Point Created):** PHASE 2.2 COMPLETE
+  - All sorting functionality working perfectly (24 options, categorized)
+  - Column selector fully implemented with drag-drop reordering
+  - 14 column groups with 80+ available columns
+  - Column visibility persistence via localStorage
+  - Column locking/sticky positioning working
+  - Table rendering optimized with virtual scrolling
+  - This is a SAFE ROLLBACK POINT - core table functionality complete
+
+- **2025-12-09 (Evening - Update 4):** PHASE 2.3 PLANNING COMPLETE - EDIT ALBUM MODAL ROADMAP
+  - Analyzed CLZ Music Web screenshots (15 screenshots covering all tabs and pickers)
+  - Cataloged complete tab inventory: 8 tabs with detailed field lists
+  - Documented universal picker system architecture (Select/Manage/Edit/Merge modals)
+  - Mapped 40+ picker instances across all tabs
+  - Designed 6-phase development approach starting with core infrastructure
+  - Decision made: Build new modal from scratch vs. modifying existing edit-entry page
+  - File structure planned for tabs/, pickers/, enrichment/, and components/
+  - Ready to begin Phase 1: Core Infrastructure (modal shell + tabs + bottom bar)
+  
+- **2025-12-05 (Evening - Update 3):** COLUMN FIXES COMPLETE
+  - Fixed "Release Date" column to show year field instead of date_added
+  - Removed duplicate "Added Date" column from table
+  - Added new "Master Release Date" column with formatted master_release_date
+  - Table now has 14 properly mapped columns
+  
+- **2025-12-05 (Evening - Update 2):** PHASE 2.2 EXPANDED
+  - Moved Column Selector from Phase 4.1 to Phase 2.2
+  - Added three critical column mapping fixes to Phase 2.2
+  - Sorting implementation marked complete (24 options working)
+  
+- **2025-12-05 (Evening - Update 1):** SORTING COMPLETE
+  - Implemented all 24 sort options with category organization
+  - Column header click sorting working (Artist, Title, Year, Format)
+  - Visual sort indicators (▲/▼) displaying correctly
+  - localStorage persistence for sort preference
+  - Sort dropdown UI with 4 categories (Basic, Time, Physical, Metadata, Sales)
+  
+- **2025-12-05 (Evening):** DATA CONNECTION COMPLETE
+  - Connected to Supabase `collection` table
+  - Real albums loading with batch queries
+  - Letter, format, and search filters working
+  - Album detail panel showing real data
+  - Format counts displaying from live data
+  - Album covers loading from image_url
+  - Proper data type handling for arrays and nulls
+  
+- **2025-12-05 (Morning):** Framework customization complete
+  - Changed color scheme to purple/yellow
+  - Updated branding to DWD
+  - Added comprehensive tooltips
+  - Framework locked and ready for data
+  
+- **2025-12-04 (Late):** Visual framework locked
+  - Complete CLZ-inspired layout
+  - Three-panel structure perfected
+  - All UI elements in correct positions
 
 ---
 
 ## 🎯 IMMEDIATE NEXT STEPS
 
-**Priority 1: Edit Album Modal - Location Picker Wiring - NEXT**
-1. MainTab needs to expose handleOpenPicker method (via forwardRef or callback prop)
-2. EditAlbumModal passes location picker callback to MainTab
-3. Test full callback chain: Bottom bar button → Modal → MainTab → PickerModal
+**Priority 1: Edit Album Modal - Location Picker Integration**
+1. EditAlbumModal needs to render UniversalBottomBar
+2. Modal passes onOpenLocationPicker callback that routes to active tab's handleOpenPicker('location')
+3. Test location picker through modal→tab chain
 
 **Priority 2: Edit Album Modal - Artist Picker Integration**
 1. Create artist-specific picker data utilities (fetch/update/delete/merge artists)
@@ -300,31 +784,150 @@ Phase 4: Advanced Features        ░░░░░░░░░░░░░░░�
 5. Cover art search (Cover tab)
 6. Auto-populate links (Links tab)
 
+**Priority 5: Edit Album Modal - Phase 6 (Remaining Tabs)**
+1. Details tab (pickers for packaging, condition, country, etc.)
+2. Classical tab (add/pickers for composer, conductor, etc.)
+3. People tab (credits & musicians with add/pickers)
+4. Personal tab (purchase info, ratings, tags, notes)
+5. Cover tab (upload, crop, find online)
+6. Links tab (URL management with auto-populate)
+
+**Priority 6: Detail Panel Polish (Phase 2.4) - AFTER MODAL COMPLETE**
+1. Can integrate modal features into detail panel
+2. Or enhance detail panel separately as quick-view
+3. Add clickable links to external services
+4. Better metadata formatting
+
+**Priority 7: Selection System (Phase 3.1)**
+1. Wire up checkbox state management
+2. Implement select all/none functionality
+3. Maintain selection across filters and sorting
+
+**Priority 8: Batch Operations (Phase 3.2-3.3)**
+1. Enable selection toolbar actions
+2. Create batch edit modal
+3. Implement bulk operations
+
 ---
 
 ## 📝 TECHNICAL NOTES
 
 ### Current File Structure
-**Main files:**
-- `src/app/edit-collection/page.tsx` (~1050 lines) - Main collection browser
-- `src/app/edit-collection/EditAlbumModal.tsx` - Modal with 8 tabs + bottom bar ✅
-- `src/app/edit-collection/columnDefinitions.ts` - 80+ column definitions
+**Main file:** `src/app/edit-collection/page.tsx` (~1050 lines)
+- Contains complete UI and data logic
+- Self-contained for now (will extract components later)
+- Uses Supabase client for all queries
+- Implements batch loading for performance
+
+**Column Definitions:** `src/app/edit-collection/columnDefinitions.ts`
+- 80+ column definitions with full metadata
+- 14 organized groups
+- Type-safe ColumnId type
+- Helper functions for column management
 
 **Components:**
 - `CollectionTable.tsx` - Virtualized table with sticky columns
 - `ColumnSelector.tsx` - Drag-drop column picker with groups
 - `AlbumInfoPanel` - Memoized detail panel component (inline)
-- `UniversalBottomBar.tsx` - Bottom navigation bar ✅ (integrated in modal)
+- `EditAlbumModal.tsx` - Main modal with 8 tabs ✅
+- `UniversalBottomBar.tsx` - Bottom navigation bar ✅ (for modal use)
 - Tab components (MainTab, DetailsTab, etc.) ✅
 - Picker modals (PickerModal, ManageModal, EditModal, MergeModal) ✅
 - `pickerDataUtils.ts` - Supabase integration for picker data ✅
 
+### Database Fields Being Used
+From `collection` table:
+- **Core:** id, artist, title, year, year_int, format, folder
+- **Media:** media_condition, image_url, package_sleeve_condition
+- **Sales:** for_sale, sale_price, sale_platform, sale_notes, sale_quantity
+- **Metadata:** custom_tags, discogs_genres, spotify_genres
+- **Services:** spotify_label, apple_music_label, spotify_total_tracks, apple_music_track_count
+- **Dates:** date_added, master_release_date, purchase_date
+- **Enrichment:** last_enriched_at, enrichment_sources
+- **IDs:** discogs_master_id, discogs_release_id, spotify_id, apple_music_id
+- **Physical:** discs, sides, length_seconds, rpm, vinyl_color, vinyl_weight
+- **Value:** wholesale_cost, discogs_price_min/median/max, current_value, purchase_price
+
+### Performance Considerations
+- Batch loading prevents timeout (1000 albums per query)
+- Virtual scrolling handles large datasets efficiently
+- Memoized components prevent unnecessary re-renders
+- Column visibility changes don't re-render entire table
+- Filters run client-side (fast for <10k albums)
+- Consider server-side filtering/sorting for 50k+ albums
+
 ### Known Limitations
 - Selection checkboxes don't work yet (Phase 3.1)
-- Location picker callback needs MainTab ref exposure (next priority)
+- Some table columns show placeholders (needs calculated values)
+- Collection tabs don't do anything yet (Phase 5)
 - Artist picker not implemented yet (Priority 2)
-- Previous/Next navigation in modal are placeholders
+- Location picker needs modal integration (Priority 1)
 - Detail panel needs more polish (Phase 2.4)
+- Some action buttons are placeholders
+
+---
+
+## 🔧 GIT ROLLBACK COMMAND
+
+To create this as a safe rollback point, run:
+
+```bash
+# Stage all changes
+git add .
+
+# Commit with descriptive message
+git commit -m "Phase 2.3 Progress: UniversalBottomBar Architecture Decision [CHECKPOINT]
+
+✅ COMPLETED:
+- UniversalBottomBar component ready with sectioned Collection Status
+- Architectural decision: Used by EditAlbumModal, not individual tabs
+- Location picker button ready for modal integration
+- Removed from MainTab.tsx (will be modal-level)
+
+🔄 IN PROGRESS:
+- Main Tab pickers (Label, Format, Genre) fully wired and functional
+- Location picker needs modal→tab callback chain
+- Artist picker next priority
+
+🎯 READY FOR: Modal integration of UniversalBottomBar
+
+This commit represents architectural clarity for bottom bar placement."
+
+# Create a named tag for easy reference
+git tag -a phase-2.3-bottombar-architecture -m "UniversalBottomBar architecture checkpoint"
+
+# Optional: Push to remote
+git push origin main --tags
+```
+
+**To rollback to Phase 2.2 (last safe point) if needed:**
+```bash
+git reset --hard phase-2.2-complete
+```
+
+---
+
+## 🔧 CODE QUALITY NOTES
+
+### To Refactor Later
+- [ ] Extract table into separate component ✅ (Already done)
+- [ ] Extract detail panel into separate component (AlbumInfoPanel inline, could extract)
+- [ ] Extract left sidebar into separate component
+- [ ] Move inline styles to CSS modules
+- [ ] Create reusable button components
+- [ ] Add PropTypes or improve TypeScript
+- [ ] Add unit tests for filtering logic
+- [ ] Add integration tests for data loading
+- [ ] Consider moving more state to URL params for shareability
+
+### Accessibility Improvements Needed
+- [ ] Full keyboard navigation
+- [ ] Focus management in modals
+- [ ] Screen reader announcements for dynamic content
+- [ ] High contrast mode support
+- [ ] Better ARIA labels (tooltips are a start)
+- [ ] Proper heading hierarchy
+- [ ] Skip links for main content areas
 
 ---
 

@@ -1,7 +1,7 @@
 // src/app/edit-collection/tabs/MainTab.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import type { Album } from 'types/album';
 import { PickerModal } from '../pickers/PickerModal';
 import { ManageModal } from '../pickers/ManageModal';
@@ -30,7 +30,11 @@ interface MainTabProps {
 type ModalType = 'picker' | 'manage' | 'edit' | 'merge' | null;
 type FieldType = 'spotify_label' | 'format' | 'genre' | 'location';
 
-export function MainTab({ album, onChange }: MainTabProps) {
+export interface MainTabRef {
+  openLocationPicker: () => void;
+}
+
+export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ album, onChange }, ref) {
   // Modal state
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [activeField, setActiveField] = useState<FieldType | null>(null);
@@ -48,6 +52,11 @@ export function MainTab({ album, onChange }: MainTabProps) {
   useEffect(() => {
     loadAllData();
   }, []);
+
+  // Expose method to parent via ref
+  useImperativeHandle(ref, () => ({
+    openLocationPicker: () => handleOpenPicker('location'),
+  }));
 
   const loadAllData = async () => {
     setDataLoading(true);
@@ -751,4 +760,4 @@ export function MainTab({ album, onChange }: MainTabProps) {
       )}
     </>
   );
-}
+});

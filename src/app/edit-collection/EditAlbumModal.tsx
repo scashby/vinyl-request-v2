@@ -1,10 +1,10 @@
 // src/app/edit-collection/EditAlbumModal.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from 'lib/supabaseClient';
 import type { Album } from 'types/album';
-import { MainTab } from './tabs/MainTab';
+import { MainTab, type MainTabRef } from './tabs/MainTab';
 import { DetailsTab } from './tabs/DetailsTab';
 import { ClassicalTab } from './tabs/ClassicalTab';
 import { PeopleTab } from './tabs/PeopleTab';
@@ -84,6 +84,7 @@ export default function EditAlbumModal({ albumId, onClose, onSave }: EditAlbumMo
   const [editedAlbum, setEditedAlbum] = useState<Album | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const mainTabRef = useRef<MainTabRef>(null);
 
   useEffect(() => {
     async function fetchAlbum() {
@@ -317,7 +318,7 @@ export default function EditAlbumModal({ albumId, onClose, onSave }: EditAlbumMo
           background: 'white',
         }}>
           {activeTab === 'main' && (
-            <MainTab album={editedAlbum} onChange={handleFieldChange} />
+            <MainTab ref={mainTabRef} album={editedAlbum} onChange={handleFieldChange} />
           )}
           {activeTab === 'details' && (
             <DetailsTab />
@@ -356,8 +357,7 @@ export default function EditAlbumModal({ albumId, onClose, onSave }: EditAlbumMo
             onCancel={onClose}
             onSave={handleSave}
             onOpenLocationPicker={() => {
-              // Location picker will be wired when MainTab exposes picker handler
-              console.log('Location picker - to be wired');
+              mainTabRef.current?.openLocationPicker();
             }}
           />
         </div>
