@@ -342,7 +342,7 @@ export default function EditAlbumModal({ albumId, onClose, onSave }: EditAlbumMo
           )}
         </div>
 
-        {/* Bottom Bar */}
+        {/* Bottom Bar - ADDED */}
         <div style={{
           borderTop: '1px solid #e5e7eb',
           padding: '12px 16px',
@@ -355,6 +355,10 @@ export default function EditAlbumModal({ albumId, onClose, onSave }: EditAlbumMo
             onNext={() => console.log('Next')}
             onCancel={onClose}
             onSave={handleSave}
+            onOpenLocationPicker={() => {
+              // Location picker will be wired when MainTab exposes picker handler
+              console.log('Location picker - to be wired');
+            }}
           />
         </div>
       </div>
