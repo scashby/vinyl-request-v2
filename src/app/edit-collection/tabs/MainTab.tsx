@@ -1,4 +1,4 @@
-// src/app/edit-collection/tabs/MainTab.tsx (UPDATED)
+// src/app/edit-collection/tabs/MainTab.tsx - FIXED: Aa toggles auto-cap, dark text everywhere
 'use client';
 
 import { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
@@ -61,6 +61,7 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
   const [datePickerPosition, setDatePickerPosition] = useState({ top: 0, left: 0 });
 
   // Auto Cap state
+  const [autoCapEnabled, setAutoCapEnabled] = useState(true);
   const [showAutoCapSettings, setShowAutoCapSettings] = useState(false);
   const [showAutoCapExceptions, setShowAutoCapExceptions] = useState(false);
   const [autoCapMode, setAutoCapMode] = useState<AutoCapMode>(() => {
@@ -332,7 +333,7 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
 
   // Auto Cap handlers
   const handleTitleChange = (value: string) => {
-    const capitalized = applyAutoCap(value, autoCapMode, autoCapExceptions);
+    const capitalized = autoCapEnabled ? applyAutoCap(value, autoCapMode, autoCapExceptions) : value;
     onChange('title', capitalized);
   };
 
@@ -413,19 +414,23 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
               <label style={{ ...labelStyle, marginBottom: '0' }}>Title</label>
               <span 
-                onClick={() => setShowAutoCapSettings(true)}
+                onClick={() => setAutoCapEnabled(!autoCapEnabled)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  setShowAutoCapSettings(true);
+                }}
                 style={{ 
-                  color: '#3b82f6',
+                  color: autoCapEnabled ? '#3b82f6' : '#9ca3af',
                   fontSize: '13px', 
                   fontWeight: '600',
                   cursor: 'pointer',
                   userSelect: 'none',
                   padding: '2px 6px',
                   borderRadius: '3px',
-                  backgroundColor: '#eff6ff',
-                  border: '1px solid #3b82f6',
+                  backgroundColor: autoCapEnabled ? '#eff6ff' : '#f3f4f6',
+                  border: `1px solid ${autoCapEnabled ? '#3b82f6' : '#d1d5db'}`,
                 }}
-                title="Auto Capitalization Settings"
+                title={`Auto Capitalization ${autoCapEnabled ? 'ON' : 'OFF'} - Click to toggle, right-click for settings`}
               >
                 Aa
               </span>
@@ -481,6 +486,7 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
+              color: '#111827',
             }}>
               <span>{album.artist}</span>
               <button

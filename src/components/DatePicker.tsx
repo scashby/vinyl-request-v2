@@ -1,4 +1,4 @@
-// src/components/DatePicker.tsx
+// src/components/DatePicker.tsx - FIXED: Dark text on white background
 'use client';
 
 import { useState } from 'react';
@@ -11,27 +11,41 @@ interface DatePickerProps {
 }
 
 export function DatePicker({ value, onChange, onClose, position }: DatePickerProps) {
-  const [viewYear, setViewYear] = useState(value.year || new Date().getFullYear());
-  const [viewMonth, setViewMonth] = useState(value.month || new Date().getMonth() + 1);
+  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
+  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
 
-  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'];
+  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+  const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay();
 
-  const getDaysInMonth = (year: number, month: number) => {
-    return new Date(year, month, 0).getDate();
-  };
-
-  const getFirstDayOfMonth = (year: number, month: number) => {
-    return new Date(year, month - 1, 1).getDay();
-  };
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
 
   const handleDayClick = (day: number) => {
     onChange({
-      year: viewYear,
-      month: viewMonth,
-      day: day,
+      year: currentYear,
+      month: currentMonth + 1,
+      day: day
     });
-    onClose();
+  };
+
+  const handlePreviousMonth = () => {
+    if (currentMonth === 0) {
+      setCurrentMonth(11);
+      setCurrentYear(currentYear - 1);
+    } else {
+      setCurrentMonth(currentMonth - 1);
+    }
+  };
+
+  const handleNextMonth = () => {
+    if (currentMonth === 11) {
+      setCurrentMonth(0);
+      setCurrentYear(currentYear + 1);
+    } else {
+      setCurrentMonth(currentMonth + 1);
+    }
   };
 
   const handleToday = () => {
@@ -39,104 +53,111 @@ export function DatePicker({ value, onChange, onClose, position }: DatePickerPro
     onChange({
       year: today.getFullYear(),
       month: today.getMonth() + 1,
-      day: today.getDate(),
+      day: today.getDate()
     });
-    onClose();
   };
 
-  const previousMonth = () => {
-    if (viewMonth === 1) {
-      setViewMonth(12);
-      setViewYear(viewYear - 1);
-    } else {
-      setViewMonth(viewMonth - 1);
-    }
-  };
-
-  const nextMonth = () => {
-    if (viewMonth === 12) {
-      setViewMonth(1);
-      setViewYear(viewYear + 1);
-    } else {
-      setViewMonth(viewMonth + 1);
-    }
-  };
-
-  const daysInMonth = getDaysInMonth(viewYear, viewMonth);
-  const firstDay = getFirstDayOfMonth(viewYear, viewMonth);
-  const days: (number | null)[] = [];
-
-  // Add empty cells for days before month starts
-  for (let i = 0; i < firstDay; i++) {
-    days.push(null);
+  const days = [];
+  for (let i = 0; i < firstDayOfMonth; i++) {
+    days.push(<div key={`empty-${i}`} style={{ padding: '8px' }} />);
   }
-
-  // Add days of month
   for (let day = 1; day <= daysInMonth; day++) {
-    days.push(day);
+    const isSelected = value.year === currentYear && value.month === currentMonth + 1 && value.day === day;
+    days.push(
+      <div
+        key={day}
+        onClick={() => handleDayClick(day)}
+        style={{
+          padding: '8px',
+          textAlign: 'center',
+          cursor: 'pointer',
+          borderRadius: '4px',
+          backgroundColor: isSelected ? '#3b82f6' : 'transparent',
+          color: isSelected ? 'white' : '#111827',
+          fontWeight: isSelected ? '600' : '400',
+          fontSize: '13px',
+        }}
+        onMouseEnter={(e) => {
+          if (!isSelected) {
+            e.currentTarget.style.backgroundColor = '#f3f4f6';
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!isSelected) {
+            e.currentTarget.style.backgroundColor = 'transparent';
+          }
+        }}
+      >
+        {day}
+      </div>
+    );
   }
 
   return (
     <>
-      {/* Backdrop */}
       <div
+        onClick={onClose}
         style={{
           position: 'fixed',
           top: 0,
           left: 0,
           right: 0,
           bottom: 0,
-          zIndex: 40000,
+          zIndex: 9998,
         }}
-        onClick={onClose}
       />
-
-      {/* Calendar */}
       <div
         style={{
           position: 'fixed',
           top: position.top,
           left: position.left,
-          zIndex: 40001,
-          background: 'white',
+          backgroundColor: 'white',
           border: '1px solid #d1d5db',
-          borderRadius: '8px',
-          boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+          borderRadius: '6px',
           padding: '12px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          zIndex: 9999,
           width: '280px',
         }}
       >
-        {/* Header */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '12px',
-          padding: '0 4px',
-        }}>
+        {/* Header with month/year navigation */}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '12px',
+            paddingBottom: '8px',
+            borderBottom: '1px solid #e5e7eb',
+          }}
+        >
           <button
-            onClick={previousMonth}
+            onClick={handlePreviousMonth}
             style={{
               background: 'transparent',
               border: 'none',
               cursor: 'pointer',
-              fontSize: '18px',
+              fontSize: '16px',
               color: '#6b7280',
               padding: '4px 8px',
             }}
           >
             «
           </button>
-          <div style={{ fontSize: '14px', fontWeight: '600' }}>
-            {monthNames[viewMonth - 1]} {viewYear}
+          <div style={{ 
+            fontSize: '14px', 
+            fontWeight: '600',
+            color: '#111827'
+          }}>
+            {monthNames[currentMonth]} {currentYear}
           </div>
           <button
-            onClick={nextMonth}
+            onClick={handleNextMonth}
             style={{
               background: 'transparent',
               border: 'none',
               cursor: 'pointer',
-              fontSize: '18px',
+              fontSize: '16px',
               color: '#6b7280',
               padding: '4px 8px',
             }}
@@ -145,60 +166,40 @@ export function DatePicker({ value, onChange, onClose, position }: DatePickerPro
           </button>
         </div>
 
-        {/* Day headers */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(7, 1fr)',
-          gap: '4px',
-          marginBottom: '4px',
-        }}>
+        {/* Day names header */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(7, 1fr)',
+            marginBottom: '4px',
+          }}
+        >
           {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(day => (
-            <div key={day} style={{
-              textAlign: 'center',
-              fontSize: '11px',
-              fontWeight: '600',
-              color: '#9ca3af',
-              padding: '4px',
-            }}>
+            <div
+              key={day}
+              style={{
+                padding: '4px',
+                textAlign: 'center',
+                fontSize: '11px',
+                fontWeight: '600',
+                color: '#6b7280',
+              }}
+            >
               {day}
             </div>
           ))}
         </div>
 
-        {/* Days grid */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(7, 1fr)',
-          gap: '2px',
-          marginBottom: '8px',
-        }}>
-          {days.map((day, index) => (
-            <div key={index}>
-              {day ? (
-                <button
-                  onClick={() => handleDayClick(day)}
-                  style={{
-                    width: '100%',
-                    aspectRatio: '1',
-                    border: 'none',
-                    borderRadius: '4px',
-                    background: day === value.day && viewMonth === value.month && viewYear === value.year
-                      ? '#3b82f6'
-                      : 'transparent',
-                    color: day === value.day && viewMonth === value.month && viewYear === value.year
-                      ? 'white'
-                      : '#1f2937',
-                    cursor: 'pointer',
-                    fontSize: '13px',
-                  }}
-                >
-                  {day}
-                </button>
-              ) : (
-                <div style={{ width: '100%', aspectRatio: '1' }} />
-              )}
-            </div>
-          ))}
+        {/* Calendar grid */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(7, 1fr)',
+            gap: '2px',
+            marginBottom: '8px',
+          }}
+        >
+          {days}
         </div>
 
         {/* Today button */}
@@ -206,13 +207,20 @@ export function DatePicker({ value, onChange, onClose, position }: DatePickerPro
           onClick={handleToday}
           style={{
             width: '100%',
-            padding: '8px',
+            padding: '6px',
+            background: '#f3f4f6',
             border: '1px solid #d1d5db',
             borderRadius: '4px',
-            background: 'white',
             cursor: 'pointer',
             fontSize: '13px',
             fontWeight: '500',
+            color: '#111827',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = '#e5e7eb';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = '#f3f4f6';
           }}
         >
           Today
