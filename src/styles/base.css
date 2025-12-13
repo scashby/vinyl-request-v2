@@ -3,11 +3,9 @@
 html, body {
   margin: 0;
   padding: 0;
-  font-family: system-ui, sans-serif;
-  background: #000;
-  color: #111; /* Changed from #fff to #111 - black text is the better default */
 }
 
+/* Optional wrapper helpers used across pages */
 .page-wrapper {
   width: 100%;
   margin: 0;

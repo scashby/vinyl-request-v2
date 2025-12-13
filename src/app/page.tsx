@@ -1,3 +1,5 @@
+// Home page ("/") — Landing for Dead Wax Dialogues
+
 "use client";
 
 import Link from "next/link";
@@ -8,7 +10,7 @@ export default function Page() {
   const { session } = useSession();
 
   return (
-    <div className="landing-page">
+    <div className="landing-page dark">
       <header className="hero">
         <video autoPlay muted loop playsInline className="hero-video">
           <source src="/videos/header-video.mp4" type="video/mp4" />
