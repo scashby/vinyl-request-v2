@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>CSS Audit Dashboard</title>
+  <style>
+    :root { --bg:#0b0c10; --panel:#11131a; --muted:#a8b0c0; --text:#e7eaf0; --border:#23283a; --accent:#7aa2ff; }
+    body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; background: var(--bg); color: var(--text); }
+    header { padding: 20px 24px; border-bottom: 1px solid var(--border); background: linear-gradient(180deg, rgba(122,162,255,.12), rgba(0,0,0,0)); }
+    h1 { margin: 0; font-size: 20px; letter-spacing: .2px; }
+    main { display:grid; grid-template-columns: 360px 1fr; gap:16px; padding: 16px; }
+    @media (max-width: 960px){ main{ grid-template-columns: 1fr; } }
+    .card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 14px; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+    .row { display:flex; gap:10px; flex-wrap: wrap; align-items: center; }
+    label { font-size: 12px; color: var(--muted); display:block; margin-bottom: 6px; }
+    input[type="text"], select { width:100%; padding: 10px 10px; border-radius: 10px; border: 1px solid var(--border); background: #0d0f16; color: var(--text); outline:none; }
+    input[type="text"]:focus, select:focus { border-color: rgba(122,162,255,.7); box-shadow: 0 0 0 3px rgba(122,162,255,.12); }
+    .pill { display:inline-flex; align-items:center; gap:8px; padding: 6px 10px; border-radius: 999px; border:1px solid var(--border); background:#0d0f16; color: var(--muted); font-size: 12px; }
+    .pill b { color: var(--text); font-weight: 600; }
+    .list { margin: 0; padding-left: 18px; color: var(--text); }
+    .muted { color: var(--muted); }
+    .k { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; }
+    .section-title { margin: 0 0 8px 0; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+    details { border: 1px solid var(--border); border-radius: 12px; background: #0d0f16; padding: 10px 10px; }
+    details + details { margin-top: 10px; }
+    summary { cursor:pointer; list-style:none; display:flex; align-items:center; justify-content: space-between; gap: 12px; }
+    summary::-webkit-details-marker { display:none; }
+    .badge { font-size: 11px; padding: 2px 8px; border-radius: 999px; border:1px solid var(--border); color: var(--muted); }
+    .badge.accent { color: var(--accent); border-color: rgba(122,162,255,.35); background: rgba(122,162,255,.08); }
+    .rule { margin-top: 10px; padding: 10px; border-radius: 12px; border:1px solid var(--border); background: rgba(255,255,255,.02); }
+    .rule .top { display:flex; justify-content: space-between; gap: 10px; align-items: center; }
+    .rule .sel { font-weight: 600; }
+    .rule pre { margin: 8px 0 0 0; white-space: pre-wrap; word-break: break-word; color: var(--muted); }
+    .small { font-size: 12px; }
+    .split { display:grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    @media (max-width: 960px){ .split{ grid-template-columns: 1fr; } }
+    .footer-note { padding: 14px 16px; color: var(--muted); border-top:1px solid var(--border); font-size: 12px; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>CSS Audit Dashboard <span class="muted small">— route → stylesheets → elements → sources</span></h1>
+</header>
+
+<main>
+  <section class="card">
+    <div class="split">
+      <div>
+        <label for="route">Route</label>
+        <select id="route"></select>
+      </div>
+      <div>
+        <label for="element">Element</label>
+        <select id="element"></select>
+      </div>
+    </div>
+
+    <div style="margin-top:10px">
+      <label for="search">Filter rules (selector text or stylesheet path)</label>
+      <input id="search" type="text" placeholder="e.g. .event-hero h1  |  internal.css  |  #media-grading"/>
+    </div>
+
+    <div class="row" style="margin-top:12px">
+      <span class="pill"><b id="routeCount">—</b> routes</span>
+      <span class="pill"><b id="elementCount">—</b> element types</span>
+      <span class="pill"><b id="inlineCount">—</b> inline style objects on this route</span>
+    </div>
+
+    <div style="margin-top:14px">
+      <div class="section-title">Stylesheets in order</div>
+      <ol class="list k" id="sheetOrder"></ol>
+    </div>
+
+    <div style="margin-top:14px">
+      <div class="section-title">Element sources for this route</div>
+      <div class="muted small">This is a static map based on selectors found in stylesheets that are loaded on the route. The final winner for any given property still depends on specificity, load order, and inline styles.</div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="row" style="justify-content: space-between; margin-bottom: 8px;">
+      <div>
+        <div class="section-title" style="margin-bottom:6px">Matches</div>
+        <div class="muted small" id="contextLine">—</div>
+      </div>
+      <span class="badge accent" id="matchBadge">0 rules</span>
+    </div>
+
+    <div id="rules"></div>
+
+    <div class="footer-note">
+      Tip: for “ground truth”, inspect the element in Chrome DevTools → <b>Computed</b> → click a property to jump to the winning rule.
+      This dashboard is for narrowing suspects and spotting redundancy.
+    </div>
+  </section>
+</main>
+
+<script>
+const ROUTE_JSON = './route-style-element-map.json';
+
+function uniq(arr){ return [...new Set(arr)].sort((a,b)=>a.localeCompare(b)); }
+
+function esc(s){
+  return (s ?? '').toString()
+    .replaceAll('&','&amp;')
+    .replaceAll('<','&lt;')
+    .replaceAll('>','&gt;');
+}
+
+let ROUTES = [];
+let ROUTE_BY_PATH = new Map();
+let ALL_ELEMENTS = [];
+
+async function init(){
+  const payload = await fetch(ROUTE_JSON).then(r => r.json());
+  ROUTES = payload;
+  ROUTE_BY_PATH = new Map(ROUTES.map(r => [r.route, r]));
+  document.getElementById('routeCount').textContent = ROUTES.length;
+
+  // union of all element keys
+  const elemSet = new Set();
+  for (const r of ROUTES){
+    if (r.elements){
+      Object.keys(r.elements).forEach(k => elemSet.add(k));
+    }
+  }
+  ALL_ELEMENTS = uniq([...elemSet]);
+  document.getElementById('elementCount').textContent = ALL_ELEMENTS.length;
+
+  // populate route select
+  const routeSel = document.getElementById('route');
+  routeSel.innerHTML = ROUTES
+    .map(r => `<option value="${esc(r.route)}">${esc(r.route)}</option>`)
+    .join('');
+
+  // populate element select
+  const elSel = document.getElementById('element');
+  elSel.innerHTML = ALL_ELEMENTS
+    .map(e => `<option value="${esc(e)}">${esc('<'+e+'>')}</option>`)
+    .join('');
+
+  // default
+  routeSel.value = ROUTES[0]?.route ?? '';
+  elSel.value = 'h1';
+  if (!ALL_ELEMENTS.includes('h1')) elSel.value = ALL_ELEMENTS[0] ?? '';
+
+  routeSel.addEventListener('change', render);
+  elSel.addEventListener('change', render);
+  document.getElementById('search').addEventListener('input', render);
+
+  render();
+}
+
+function render(){
+  const route = document.getElementById('route').value;
+  const element = document.getElementById('element').value;
+  const filter = document.getElementById('search').value.trim().toLowerCase();
+
+  const r = ROUTE_BY_PATH.get(route);
+  if (!r){
+    document.getElementById('sheetOrder').innerHTML = '';
+    document.getElementById('rules').innerHTML = '';
+    document.getElementById('matchBadge').textContent = '0 rules';
+    document.getElementById('contextLine').textContent = 'No data';
+    return;
+  }
+
+  // inline style object count (static scan)
+  document.getElementById('inlineCount').textContent = r.inline_style_objects ?? 0;
+
+  // stylesheets order
+  const order = r.stylesheets_in_order ?? [];
+  document.getElementById('sheetOrder').innerHTML = order.map(s => `<li>${esc(s)}</li>`).join('');
+
+  // element data for this route
+  const ed = (r.elements && r.elements[element]) ? r.elements[element] : null;
+  const sources = ed?.sources ?? [];
+  const rules = ed?.rules ?? [];
+
+  document.getElementById('contextLine').textContent =
+    `${route} • <${element}> • ${sources.length} source(s)`;
+
+  // filter rules by selector/file
+  const filtered = rules.filter(rule => {
+    if (!filter) return true;
+    const hay = ((rule.selector ?? '') + ' ' + (rule.file ?? '')).toLowerCase();
+    return hay.includes(filter);
+  });
+
+  document.getElementById('matchBadge').textContent = `${filtered.length} rules`;
+
+  // render rules
+  const rulesDiv = document.getElementById('rules');
+  if (!ed){
+    rulesDiv.innerHTML = `<div class="muted small">No mapped CSS selectors for &lt;${esc(element)}&gt; on this route.</div>`;
+    return;
+  }
+
+  const srcBadges = sources.map(s => `<span class="badge">${esc(s)}</span>`).join(' ');
+  const header = `
+    <div class="row" style="margin-bottom:10px; flex-wrap:wrap;">
+      <span class="muted small">Sources:</span> ${srcBadges || '<span class="muted small">None</span>'}
+    </div>
+  `;
+
+  const blocks = filtered.map(rule => {
+    const decl = rule.declarations ?? '';
+    return `
+      <div class="rule">
+        <div class="top">
+          <div class="sel k">${esc(rule.selector)}</div>
+          <span class="badge">${esc(rule.file)}</span>
+        </div>
+        ${decl ? `<pre class="k">${esc(decl)}</pre>` : `<div class="muted small">No declarations captured.</div>`}
+      </div>
+    `;
+  }).join('');
+
+  rulesDiv.innerHTML = header + (blocks || `<div class="muted small">No rules matched your filter.</div>`);
+}
+
+init().catch(err => {
+  document.getElementById('rules').innerHTML =
+    `<div class="muted small">Failed to load JSON. Run a local server (see README). Error: ${esc(err)}</div>`;
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,740 @@
+{
+  "h1": [
+    {
+      "selector": ".hero h1",
+      "file": "public/deadwax.css",
+      "declarations": "font-family: 'Playfair Display', serif;\n  font-size: 3.5rem;\n  margin: 0;\n  color: #ffffff;"
+    },
+    {
+      "selector": ".about-hero h1",
+      "file": "src/styles/about.css",
+      "declarations": "font-family: 'Playfair Display', serif;\n  font-size: 2.75rem;\n  font-weight: bold;\n  color: #ffffff;\n  margin: 0;\n  text-align: center;"
+    },
+    {
+      "selector": ".about-body-row h1",
+      "file": "src/styles/about.css",
+      "declarations": "color: #240042;"
+    },
+    {
+      "selector": ".about-sidebar h1",
+      "file": "src/styles/about.css",
+      "declarations": "color: #111;"
+    },
+    {
+      "selector": ".admin-edit-queue-page h1",
+      "file": "src/styles/admin-edit-queue.css",
+      "declarations": "color: #1f2937 !important;"
+    },
+    {
+      "selector": ".event-hero h1",
+      "file": "src/styles/events.css",
+      "declarations": "font-family: 'Playfair Display', serif;\n  font-size: 2.75rem;\n  font-weight: bold;\n  color: white;\n  margin: 0;\n  text-align: center;"
+    },
+    {
+      "selector": ".event-hero h1",
+      "file": "src/styles/internal.css",
+      "declarations": "font-family: 'Playfair Display', serif;\n  font-size: 2.75rem;\n  font-weight: bold;\n  color: white;\n  margin: 0;\n  text-align: center;"
+    },
+    {
+      "selector": ".hero-content h1",
+      "file": "src/styles/landing.css",
+      "declarations": "font-family: 'Playfair Display', serif;\n  font-size: 4rem;\n  margin: 0;\n  color: white;"
+    },
+    {
+      "selector": "#media-grading .mg-header h1",
+      "file": "src/styles/media-grading.css",
+      "declarations": "margin: 0 0 4px 0;\n  font-size: 20px;"
+    }
+  ],
+  "h2": [
+    {
+      "selector": ".about-body-row h2",
+      "file": "src/styles/about.css",
+      "declarations": "color: #240042;"
+    },
+    {
+      "selector": ".about-sidebar h2",
+      "file": "src/styles/about.css",
+      "declarations": "color: #111;"
+    },
+    {
+      "selector": ".admin-edit-queue-page h2",
+      "file": "src/styles/admin-edit-queue.css",
+      "declarations": "color: #1f2937 !important;"
+    },
+    {
+      "selector": ".event-card h2",
+      "file": "src/styles/events.css",
+      "declarations": "margin: 1rem 0 0.5rem;\n  font-size: 1.25rem;\n  color: #6b3fa0;\n  font-weight: bold;\n  display: block;"
+    },
+    {
+      "selector": ".card h2",
+      "file": "src/styles/global.css",
+      "declarations": "font-size: 1.25rem;\n  color: #f2f2f2;\n  margin-bottom: 0.5rem;"
+    },
+    {
+      "selector": ".event-section h2",
+      "file": "src/styles/internal.css",
+      "declarations": "color: #111;\n  margin-top: 0;"
+    }
+  ],
+  "h3": [
+    {
+      "selector": ".about-social-feed h3",
+      "file": "src/styles/about.css",
+      "declarations": "font-size: 1.1rem;\n  margin-bottom: 0.5rem;"
+    },
+    {
+      "selector": ".about-body-row h3",
+      "file": "src/styles/about.css",
+      "declarations": "color: #240042;"
+    },
+    {
+      "selector": ".about-sidebar h3",
+      "file": "src/styles/about.css",
+      "declarations": "color: #111;"
+    },
+    {
+      "selector": ".admin-edit-queue-page h3",
+      "file": "src/styles/admin-edit-queue.css",
+      "declarations": "color: #1f2937 !important;"
+    },
+    {
+      "selector": ".empty-state h3",
+      "file": "src/styles/dj-sets.css",
+      "declarations": "font-size: 1.5rem;\n  margin: 0 0 1rem 0;\n  color: #374151;"
+    },
+    {
+      "selector": ".event-info-card h3",
+      "file": "src/styles/global.css",
+      "declarations": "margin-top: 0;\n  font-size: 1.5rem;\n  font-weight: 600;\n  color: #111;\n  margin-bottom: 1rem;"
+    },
+    {
+      "selector": ".queue-section h3",
+      "file": "src/styles/global.css",
+      "declarations": "margin-top: 0;\n  font-size: 1.5rem;\n  font-weight: 600;\n  color: #111;\n  margin-bottom: 1rem;"
+    },
+    {
+      "selector": ".queue-section h3",
+      "file": "src/styles/global.css",
+      "declarations": "font-size: 1.5rem;\n  font-weight: 600;\n  color: #111;\n  margin-bottom: 1rem;"
+    },
+    {
+      "selector": ".queue-wrapper h3",
+      "file": "src/styles/global.css",
+      "declarations": "font-size: 1.5rem;\n  font-weight: 600;\n  color: #111;\n  margin-bottom: 1rem;"
+    },
+    {
+      "selector": ".queue-section h3",
+      "file": "src/styles/global.css",
+      "declarations": "font-size: 1.5rem;\n  font-weight: 600;\n  color: #111;\n  margin-bottom: 1rem;"
+    },
+    {
+      "selector": ".queue-wrapper h3",
+      "file": "src/styles/global.css",
+      "declarations": "color: white !important;"
+    },
+    {
+      "selector": ".queue-section h3",
+      "file": "src/styles/queue.css",
+      "declarations": "margin-top: 0;"
+    }
+  ],
+  "h4": [
+    {
+      "selector": ".social-card h4",
+      "file": "src/styles/about.css",
+      "declarations": "margin: 0 0 0.5rem;\n  font-size: 0.85rem;\n  color: #2563eb;"
+    },
+    {
+      "selector": ".admin-edit-queue-page h4",
+      "file": "src/styles/admin-edit-queue.css",
+      "declarations": "color: #1f2937 !important;"
+    },
+    {
+      "selector": "#media-grading .panel.explanation h4",
+      "file": "src/styles/media-grading.css",
+      "declarations": "margin: 10px 0 4px 0;"
+    }
+  ],
+  "p": [
+    {
+      "selector": ".about-body-container p",
+      "file": "src/styles/about.css",
+      "declarations": "font-size: 1rem;\n  color: #333;\n  line-height: 1.6;\n  margin-bottom: 1.25rem;"
+    },
+    {
+      "selector": ".social-card p",
+      "file": "src/styles/about.css",
+      "declarations": "font-size: 0.875rem;\n  color: #333;\n  margin: 0 0 0.5rem;"
+    },
+    {
+      "selector": ".empty-state p",
+      "file": "src/styles/dj-sets.css",
+      "declarations": "font-size: 1rem;\n  margin: 0;\n  line-height: 1.6;"
+    },
+    {
+      "selector": ".event-card p",
+      "file": "src/styles/events.css",
+      "declarations": "font-size: 0.9rem;\n  color: #2e4cb4;\n  margin-bottom: 1.5rem;"
+    },
+    {
+      "selector": ".card p",
+      "file": "src/styles/global.css",
+      "declarations": "color: #b0b0b0;\n  font-size: 0.95rem;"
+    },
+    {
+      "selector": ".event-section p",
+      "file": "src/styles/internal.css",
+      "declarations": "color: #111;\n  margin-bottom: 1rem;"
+    },
+    {
+      "selector": ".hero-content p",
+      "file": "src/styles/landing.css",
+      "declarations": "font-size: 1.5rem;\n  margin: 1rem 0 2rem;\n  color: white;"
+    }
+  ],
+  "a": [
+    {
+      "selector": "nav a",
+      "file": "public/deadwax.css",
+      "declarations": "display: inline-block;\n  margin: 0 1rem;\n  text-decoration: none;\n  color: #fff;\n  font-weight: 500;\n  font-size: 1rem;\n  padding: 0.6rem 1.25rem;\n  border-radius: 999px;\n  background-color: rgba(255,255,255,0.15);\n  transition: background 0.3s ease;"
+    },
+    {
+      "selector": "nav a:hover",
+      "file": "public/deadwax.css",
+      "declarations": "background-color: rgba(255,255,255,0.4);"
+    },
+    {
+      "selector": ".about-mostwanted a",
+      "file": "src/styles/about.css",
+      "declarations": "color: #1e40af;\n  text-decoration: underline;"
+    },
+    {
+      "selector": ".about-wishlist a",
+      "file": "src/styles/about.css",
+      "declarations": "display: block;\n  margin-bottom: 0.5rem;\n  color: #2563eb;\n  text-decoration: underline;"
+    },
+    {
+      "selector": ".dialogues-more-link a",
+      "file": "src/styles/dialogues.css",
+      "declarations": "color: #2563eb;\n  font-size: 1rem;"
+    },
+    {
+      "selector": ".event-info-card a",
+      "file": "src/styles/global.css",
+      "declarations": "color: #2563eb;\n  text-decoration: underline;\n  font-weight: 500;"
+    },
+    {
+      "selector": ".event-section a",
+      "file": "src/styles/internal.css",
+      "declarations": "color: #2563eb;"
+    },
+    {
+      "selector": ".hero-nav a",
+      "file": "src/styles/landing.css",
+      "declarations": "padding: 0.5rem 1rem;\n  background: #222;\n  color: #fff;\n  border-radius: 2rem;\n  text-decoration: none;\n  font-weight: 500;\n  transition: background 0.3s ease;"
+    },
+    {
+      "selector": ".hero-nav a:hover",
+      "file": "src/styles/landing.css",
+      "declarations": "background: #444;"
+    },
+    {
+      "selector": "/* Focus visibility */\n#media-grading a:focus",
+      "file": "src/styles/media-grading.css",
+      "declarations": "outline: 3px solid #a7b6ea;\n  outline-offset: 1px;"
+    },
+    {
+      "selector": ".menu-panel a",
+      "file": "src/styles/navigation-menu.css",
+      "declarations": "display: block;\n  padding: 0.35rem 0.25rem;\n  font-size: 0.875rem;\n  color: black;\n  text-decoration: none;\n  line-height: 1.2;\n  transition: color 0.2s ease;"
+    },
+    {
+      "selector": ".menu-panel a:hover",
+      "file": "src/styles/navigation-menu.css",
+      "declarations": "color: #2563eb;"
+    }
+  ],
+  "button": [
+    {
+      "selector": "/* UPDATED: Improved search filter bar to accommodate inline suggest button */\n.search-filter-bar",
+      "file": "src/styles/album-browse.css",
+      "declarations": "display: flex;\n  flex-wrap: wrap;\n  gap: 12px;\n  align-items: center;\n  margin-bottom: 24px;\n  padding: 16px;\n  background: #f8fafc;\n  border-radius: 8px;\n  border: 1px solid #e5e7eb;"
+    },
+    {
+      "selector": ".search-filter-bar button",
+      "file": "src/styles/album-browse.css",
+      "declarations": "width: 100%;\n    margin-bottom: 8px;"
+    },
+    {
+      "selector": ".search-filter-bar button:last-child",
+      "file": "src/styles/album-browse.css",
+      "declarations": "margin-bottom: 0;"
+    },
+    {
+      "selector": "/* Vote button & count */\n.queue-plus-btn",
+      "file": "src/styles/browse-queue.css",
+      "declarations": "background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:#fff;border:0;border-radius:6px;\n  padding:6px 10px;font:700 16px/1 Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;\n  cursor:pointer;transition:transform .15s ease"
+    },
+    {
+      "selector": "/* NEW: reset button */\n#media-grading .btn.reset",
+      "file": "src/styles/media-grading.css",
+      "declarations": "background: #475569; color: #fff;"
+    },
+    {
+      "selector": "#media-grading button:focus",
+      "file": "src/styles/media-grading.css",
+      "declarations": "outline: 3px solid #a7b6ea;\n  outline-offset: 1px;"
+    },
+    {
+      "selector": "/* Plus button */\n.queue-plus",
+      "file": "src/styles/queue.css",
+      "declarations": "font-size: 1.25rem;\n  color: #ccc;\n  text-align: center;\n  vertical-align: middle;\n  padding: 0;\n  white-space: nowrap;"
+    }
+  ],
+  "input": [
+    {
+      "selector": ".search-filter-bar input[type=\"text\"]",
+      "file": "src/styles/album-browse.css",
+      "declarations": "flex: 2;\n  min-width: 200px;\n  padding: 10px 12px;\n  border: 1px solid #d1d5db;\n  border-radius: 6px;\n  font-size: 14px;\n  outline: none;"
+    },
+    {
+      "selector": ".search-filter-bar input[type=\"text\"]",
+      "file": "src/styles/album-browse.css",
+      "declarations": "width: 100%;\n    margin-bottom: 8px;"
+    },
+    {
+      "selector": ".just-added-filter input[type=\"checkbox\"]",
+      "file": "src/styles/album-browse.css",
+      "declarations": "accent-color: #059669;\n  transform: scale(1.2);"
+    },
+    {
+      "selector": "#media-grading input[type=\"checkbox\"]",
+      "file": "src/styles/media-grading.css",
+      "declarations": "width: 16px; height: 16px; cursor: pointer;"
+    },
+    {
+      "selector": "#media-grading input[type=\"radio\"]",
+      "file": "src/styles/media-grading.css",
+      "declarations": "width: 16px; height: 16px; cursor: pointer;"
+    },
+    {
+      "selector": "#media-grading .tracks input[type=\"number\"]",
+      "file": "src/styles/media-grading.css",
+      "declarations": "width: 80px;\n  border: 1px solid var(--mg-border);\n  border-radius: 8px;\n  padding: 6px 8px;\n  font-size: 14px;"
+    },
+    {
+      "selector": "#media-grading input:focus",
+      "file": "src/styles/media-grading.css",
+      "declarations": "outline: 3px solid #a7b6ea;\n  outline-offset: 1px;"
+    },
+    {
+      "selector": ".staff-picks-form input",
+      "file": "src/styles/staff-picks.css",
+      "declarations": "width: 100%;\n  padding: 8px 12px;\n  border: 1px solid #d1d5db;\n  border-radius: 6px;\n  font-size: 14px;\n  outline: none;\n  transition: border-color 0.2s ease;"
+    },
+    {
+      "selector": ".staff-picks-form input:focus",
+      "file": "src/styles/staff-picks.css",
+      "declarations": "border-color: #2563eb;\n  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);"
+    }
+  ],
+  "textarea": [
+    {
+      "selector": "#media-grading textarea",
+      "file": "src/styles/media-grading.css",
+      "declarations": "width: 100%;\n  border: 1px solid var(--mg-border);\n  border-radius: 10px;\n  padding: 10px;\n  resize: vertical;\n  font-size: 14px;"
+    },
+    {
+      "selector": "#media-grading textarea:focus",
+      "file": "src/styles/media-grading.css",
+      "declarations": "outline: 3px solid #a7b6ea;\n  outline-offset: 1px;"
+    },
+    {
+      "selector": ".staff-picks-form textarea",
+      "file": "src/styles/staff-picks.css",
+      "declarations": "width: 100%;\n  padding: 8px 12px;\n  border: 1px solid #d1d5db;\n  border-radius: 6px;\n  font-size: 14px;\n  outline: none;\n  transition: border-color 0.2s ease;"
+    },
+    {
+      "selector": ".staff-picks-form textarea:focus",
+      "file": "src/styles/staff-picks.css",
+      "declarations": "border-color: #2563eb;\n  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);"
+    }
+  ],
+  "select": [
+    {
+      "selector": ".search-filter-bar select",
+      "file": "src/styles/album-browse.css",
+      "declarations": "flex: 1;\n  min-width: 120px;\n  padding: 10px 12px;\n  border: 1px solid #d1d5db;\n  border-radius: 6px;\n  font-size: 14px;\n  background-color: white;\n  outline: none;"
+    },
+    {
+      "selector": ".search-filter-bar select",
+      "file": "src/styles/album-browse.css",
+      "declarations": "width: 100%;\n    margin-bottom: 8px;"
+    },
+    {
+      "selector": ".staff-picks-form select",
+      "file": "src/styles/staff-picks.css",
+      "declarations": "width: 100%;\n  padding: 8px 12px;\n  border: 1px solid #d1d5db;\n  border-radius: 6px;\n  font-size: 14px;\n  outline: none;\n  transition: border-color 0.2s ease;"
+    },
+    {
+      "selector": ".staff-picks-form select:focus",
+      "file": "src/styles/staff-picks.css",
+      "declarations": "border-color: #2563eb;\n  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);"
+    }
+  ],
+  "label": [
+    {
+      "selector": ".staff-picks-form label",
+      "file": "src/styles/staff-picks.css",
+      "declarations": "display: block;\n  margin-bottom: 4px;\n  font-weight: bold;\n  color: #374151;"
+    }
+  ],
+  "ul": [
+    {
+      "selector": ".menu-panel ul",
+      "file": "src/styles/navigation-menu.css",
+      "declarations": "list-style: none;\n  margin: 0;\n  padding: 0;"
+    }
+  ],
+  "li": [
+    {
+      "selector": ".about-mostwanted li",
+      "file": "src/styles/about.css",
+      "declarations": "margin-bottom: 0.5rem;"
+    },
+    {
+      "selector": ".menu-panel li",
+      "file": "src/styles/navigation-menu.css",
+      "declarations": "margin: 0;"
+    }
+  ],
+  "table": [
+    {
+      "selector": "/* Queue table */\n.queue-table-container",
+      "file": "src/styles/admin-edit-queue.css",
+      "declarations": "background: #ffffff;\n  border-radius: 12px;\n  border: 2px solid #e2e8f0;\n  overflow: hidden;\n  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);"
+    },
+    {
+      "selector": "/* Browse Queue \u2014 clean table version */\n\n/* Layout */\n.browse-queue",
+      "file": "src/styles/browse-queue.css",
+      "declarations": "display:flex;gap:2rem;padding:2rem;align-items:flex-start"
+    },
+    {
+      "selector": "/* Card around table */\n.queue-wrapper",
+      "file": "src/styles/browse-queue.css",
+      "declarations": "background:linear-gradient(135deg,#1a1a1a,#2d2d2d);\n  color:#fff;padding:1.5rem;border-radius:12px;overflow-x:auto;\n  box-shadow:0 8px 32px rgba(0,0,0,.3);border:1px solid #333"
+    },
+    {
+      "selector": "/* TRUE table */\n.queue-table",
+      "file": "src/styles/browse-queue.css",
+      "declarations": "width:100%;border-collapse:collapse;table-layout:fixed"
+    },
+    {
+      "selector": "/* Hard override: keep TDs as table cells */\n.queue-table td",
+      "file": "src/styles/browse-queue.css",
+      "declarations": "display:table-cell!important"
+    }
+  ],
+  "thead": [
+    {
+      "selector": ".queue-table thead th",
+      "file": "src/styles/browse-queue.css",
+      "declarations": "font:700 0.75rem/1.2 Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;\n  color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;\n  padding:.75rem .5rem 1rem;text-align:left;border:none"
+    },
+    {
+      "selector": ".queue-table thead th",
+      "file": "src/styles/queue.css",
+      "declarations": "font-size: 0.75rem;\n  font-weight: bold;\n  color: #888;\n  text-transform: uppercase;\n  padding: 0 0 0.25rem 0;\n  border: none;\n  text-align: left;"
+    }
+  ],
+  "tbody": [
+    {
+      "selector": ".queue-table tbody td",
+      "file": "src/styles/browse-queue.css",
+      "declarations": "padding:.75rem .5rem;vertical-align:middle;\n  border-bottom:1px solid rgba(255,255,255,.1)"
+    },
+    {
+      "selector": ".queue-table tbody tr:last-child td",
+      "file": "src/styles/browse-queue.css",
+      "declarations": "border-bottom:none"
+    },
+    {
+      "selector": ".queue-table tbody tr:hover",
+      "file": "src/styles/browse-queue.css",
+      "declarations": "background:rgba(255,255,255,.05)"
+    },
+    {
+      "selector": ".queue-table tbody td",
+      "file": "src/styles/queue.css",
+      "declarations": "padding: 0.15rem 0;\n  vertical-align: middle;"
+    }
+  ],
+  "tr": [
+    {
+      "selector": ".queue-table tbody tr:last-child td",
+      "file": "src/styles/browse-queue.css",
+      "declarations": "border-bottom:none"
+    },
+    {
+      "selector": ".queue-table tbody tr:hover",
+      "file": "src/styles/browse-queue.css",
+      "declarations": "background:rgba(255,255,255,.05)"
+    }
+  ],
+  "th": [
+    {
+      "selector": ".queue-table thead th",
+      "file": "src/styles/browse-queue.css",
+      "declarations": "font:700 0.75rem/1.2 Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;\n  color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;\n  padding:.75rem .5rem 1rem;text-align:left;border:none"
+    },
+    {
+      "selector": "/* Column sizes */\n.queue-table th:nth-child(1)",
+      "file": "src/styles/browse-queue.css",
+      "declarations": "width:50px;text-align:center"
+    },
+    {
+      "selector": ".queue-table th:nth-child(2)",
+      "file": "src/styles/browse-queue.css",
+      "declarations": "width:60px"
+    },
+    {
+      "selector": ".queue-table th:nth-child(3)",
+      "file": "src/styles/browse-queue.css",
+      "declarations": "min-width:200px"
+    },
+    {
+      "selector": ".queue-table th:nth-child(4)",
+      "file": "src/styles/browse-queue.css",
+      "declarations": "width:60px;text-align:center"
+    },
+    {
+      "selector": ".queue-table th:nth-child(5)",
+      "file": "src/styles/browse-queue.css",
+      "declarations": "width:60px;text-align:center"
+    },
+    {
+      "selector": ".queue-table th:nth-child(6)",
+      "file": "src/styles/browse-queue.css",
+      "declarations": "width:80px;text-align:right;padding-right:.5rem"
+    },
+    {
+      "selector": ".queue-table th:nth-child(3)",
+      "file": "src/styles/browse-queue.css",
+      "declarations": "min-width:150px"
+    },
+    {
+      "selector": ".queue-table thead th",
+      "file": "src/styles/queue.css",
+      "declarations": "font-size: 0.75rem;\n  font-weight: bold;\n  color: #888;\n  text-transform: uppercase;\n  padding: 0 0 0.25rem 0;\n  border: none;\n  text-align: left;"
+    },
+    {
+      "selector": ".queue-table th:nth-child(1)",
+      "file": "src/styles/queue.css",
+      "declarations": "width: 5%;\n  text-align: center;"
+    },
+    {
+      "selector": ".queue-table th:nth-child(2)",
+      "file": "src/styles/queue.css",
+      "declarations": "width: 3.2rem;"
+    },
+    {
+      "selector": ".queue-table th:nth-child(3)",
+      "file": "src/styles/queue.css",
+      "declarations": "width: auto;"
+    },
+    {
+      "selector": ".queue-table th:nth-child(4)",
+      "file": "src/styles/queue.css",
+      "declarations": "width: 10%;\n  text-align: center;"
+    },
+    {
+      "selector": ".queue-table th:nth-child(5)",
+      "file": "src/styles/queue.css",
+      "declarations": "width: 1.5rem;\n  text-align: center;"
+    },
+    {
+      "selector": ".queue-table th:nth-child(6)",
+      "file": "src/styles/queue.css",
+      "declarations": "width: 3.5rem;\n  text-align: right;"
+    }
+  ],
+  "td": [
+    {
+      "selector": ".queue-table tbody td",
+      "file": "src/styles/browse-queue.css",
+      "declarations": "padding:.75rem .5rem;vertical-align:middle;\n  border-bottom:1px solid rgba(255,255,255,.1)"
+    },
+    {
+      "selector": ".queue-table tbody tr:last-child td",
+      "file": "src/styles/browse-queue.css",
+      "declarations": "border-bottom:none"
+    },
+    {
+      "selector": ".queue-table td:nth-child(1)",
+      "file": "src/styles/browse-queue.css",
+      "declarations": "width:50px;text-align:center"
+    },
+    {
+      "selector": ".queue-table td:nth-child(2)",
+      "file": "src/styles/browse-queue.css",
+      "declarations": "width:60px"
+    },
+    {
+      "selector": ".queue-table td:nth-child(3)",
+      "file": "src/styles/browse-queue.css",
+      "declarations": "min-width:200px"
+    },
+    {
+      "selector": ".queue-table td:nth-child(4)",
+      "file": "src/styles/browse-queue.css",
+      "declarations": "width:60px;text-align:center"
+    },
+    {
+      "selector": ".queue-table td:nth-child(5)",
+      "file": "src/styles/browse-queue.css",
+      "declarations": "width:60px;text-align:center"
+    },
+    {
+      "selector": ".queue-table td:nth-child(6)",
+      "file": "src/styles/browse-queue.css",
+      "declarations": "width:80px;text-align:right;padding-right:.5rem"
+    },
+    {
+      "selector": "/* Hard override: keep TDs as table cells */\n.queue-table td",
+      "file": "src/styles/browse-queue.css",
+      "declarations": "display:table-cell!important"
+    },
+    {
+      "selector": ".queue-table td:nth-child(3)",
+      "file": "src/styles/browse-queue.css",
+      "declarations": "min-width:150px"
+    },
+    {
+      "selector": ".queue-table tbody td",
+      "file": "src/styles/queue.css",
+      "declarations": "padding: 0.15rem 0;\n  vertical-align: middle;"
+    },
+    {
+      "selector": "/* # column */\n.queue-table td.queue-index",
+      "file": "src/styles/queue.css",
+      "declarations": "width: 1.2rem;\n  text-align: center;\n  color: #888;\n  font-size: 0.875rem;"
+    },
+    {
+      "selector": ".queue-table td:nth-child(1)",
+      "file": "src/styles/queue.css",
+      "declarations": "width: 5%;\n  text-align: center;"
+    },
+    {
+      "selector": "/* Cover image */\n.queue-table td.queue-image",
+      "file": "src/styles/queue.css",
+      "declarations": "width: 3rem;\n  padding-left: 0.15rem;\n  padding-right: 0.15rem;"
+    },
+    {
+      "selector": ".queue-table td img.queue-cover",
+      "file": "src/styles/queue.css",
+      "declarations": "width: 48px;\n  height: 48px;\n  object-fit: cover;\n  display: block;"
+    },
+    {
+      "selector": ".queue-table td:nth-child(2)",
+      "file": "src/styles/queue.css",
+      "declarations": "width: 3.2rem;"
+    },
+    {
+      "selector": "/* Album/Artist */\n.queue-table td.queue-meta",
+      "file": "src/styles/queue.css",
+      "declarations": "width: auto;\n  padding-left: 0.25rem;\n  padding-right: 0.25rem;\n  min-width: 0;\n  overflow: hidden;\n  vertical-align: top;"
+    },
+    {
+      "selector": ".queue-table td:nth-child(3)",
+      "file": "src/styles/queue.css",
+      "declarations": "width: auto;"
+    },
+    {
+      "selector": ".queue-table td:nth-child(4)",
+      "file": "src/styles/queue.css",
+      "declarations": "width: 10%;\n  text-align: center;"
+    },
+    {
+      "selector": ".queue-table td:nth-child(5)",
+      "file": "src/styles/queue.css",
+      "declarations": "width: 1.5rem;\n  text-align: center;"
+    },
+    {
+      "selector": ".queue-table td:nth-child(6)",
+      "file": "src/styles/queue.css",
+      "declarations": "width: 3.5rem;\n  text-align: right;"
+    },
+    {
+      "selector": ".queue-table td.queue-votes",
+      "file": "src/styles/queue.css",
+      "declarations": "vertical-align: middle;"
+    }
+  ],
+  "nav": [
+    {
+      "selector": "nav",
+      "file": "public/deadwax.css",
+      "declarations": "margin-top: 2rem;"
+    },
+    {
+      "selector": "nav a",
+      "file": "public/deadwax.css",
+      "declarations": "display: inline-block;\n  margin: 0 1rem;\n  text-decoration: none;\n  color: #fff;\n  font-weight: 500;\n  font-size: 1rem;\n  padding: 0.6rem 1.25rem;\n  border-radius: 999px;\n  background-color: rgba(255,255,255,0.15);\n  transition: background 0.3s ease;"
+    },
+    {
+      "selector": "nav a:hover",
+      "file": "public/deadwax.css",
+      "declarations": "background-color: rgba(255,255,255,0.4);"
+    }
+  ],
+  "header": [
+    {
+      "selector": "/* Queue management header */\n.queue-management-header",
+      "file": "src/styles/admin-edit-queue.css",
+      "declarations": "display: flex;\n  align-items: center;\n  justify-content: space-between;\n  margin-bottom: 2rem;\n  padding: 1.5rem;\n  background: #f8fafc;\n  border-radius: 12px;\n  border-bottom: 3px solid #e2e8f0;"
+    }
+  ],
+  "main": [
+    {
+      "selector": "main",
+      "file": "src/styles/global.css",
+      "declarations": "padding: 0;"
+    }
+  ],
+  "section": [
+    {
+      "selector": ".events-page-body > section",
+      "file": "src/styles/events.css",
+      "declarations": "max-width: 960px;\n  margin: 0 auto;"
+    },
+    {
+      "selector": ".event-content-grid > section",
+      "file": "src/styles/global.css",
+      "declarations": "flex: 1;\n  min-width: 0;"
+    }
+  ],
+  "img": [
+    {
+      "selector": ".album-card img",
+      "file": "src/styles/album-browse.css",
+      "declarations": "width: 100%;\n  aspect-ratio: 1;\n  object-fit: cover;"
+    },
+    {
+      "selector": ".event-card img",
+      "file": "src/styles/events.css",
+      "declarations": "width: 100%;\n  height: auto;\n  display: block;\n  border-top-left-radius: 10px;\n  border-top-right-radius: 10px;"
+    },
+    {
+      "selector": ".event-card img",
+      "file": "src/styles/global.css",
+      "declarations": "border: none;\n  outline: none;"
+    },
+    {
+      "selector": ".queue-table td img.queue-cover",
+      "file": "src/styles/queue.css",
+      "declarations": "width: 48px;\n  height: 48px;\n  object-fit: cover;\n  display: block;"
+    }
+  ]
+}
