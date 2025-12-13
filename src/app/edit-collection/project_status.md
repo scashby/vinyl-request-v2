@@ -1,6 +1,6 @@
 # PROJECT_STATUS.md
 # DWD Collection Management System - Collection Browser
-**Last Updated:** 2025-12-12 (Artist Picker + Date Pickers + Autocap Complete)
+**Last Updated:** 2025-12-13 (Global CSS Fix + Settings Infrastructure)
 
 ## Project Overview
 Building an exact CLZ Music Web-inspired interface for Dead Wax Dialogues vinyl management system with custom branding. Strategy: Build complete visual framework first (LOCKED), then add functionality second. This ensures pixel-perfect accuracy before connecting data and logic.
@@ -8,7 +8,6 @@ Building an exact CLZ Music Web-inspired interface for Dead Wax Dialogues vinyl 
 ---
 
 ## 📊 Overall Progress: ~57% Complete
-
 ```
 Phase 1: Visual Framework         ████████████████████ 100% ✅
 Phase 2.1: Data Connection        ████████████████████ 100% ✅
@@ -20,6 +19,56 @@ Phase 4: Advanced Features        ░░░░░░░░░░░░░░░�
 ```
 
 **Current Focus:** Building Edit Album Modal - CLZ Music Web-inspired interface with 8 tabs, universal pickers, and enrichment integration
+
+---
+
+## 🔧 RECENT CHANGES (2025-12-13)
+
+### Global CSS Fix - White Text Issue RESOLVED ✅
+**Problem:** White text appearing on white background due to dark mode CSS variables being applied
+**Root Cause:** `globals.css` had `@media (prefers-color-scheme: dark)` setting light foreground color
+**Solution:** Forced light mode with `color-scheme: light` directive, removed @theme block causing CSS validation errors
+
+**Files Modified:**
+1. `src/app/globals.css` - Simplified and added `color-scheme: light` to force light mode site-wide
+
+**Impact:** Site-wide fix - all pages now display dark text on white background correctly
+
+---
+
+### Settings Infrastructure Created ✅
+**New Feature:** Global Settings accessible from hamburger menu and top toolbar
+
+**New Files Created:**
+1. `src/app/edit-collection/settings/SettingsModal.tsx` - Main settings hub
+   - Navigation-based modal with expandable sections
+   - Currently contains Auto Capitalization settings
+   - Placeholder sections for future settings (Display Preferences, Data & Sync)
+   - z-index: 30000 (top-level modal, below AutoCap modals)
+
+**Files Modified:**
+2. `src/app/edit-collection/page.tsx` - Settings integration
+   - Added `showSettings` state
+   - Imported SettingsModal component
+   - Wired Settings button in hamburger menu sidebar
+   - Wired Settings (⚙️) button in top alphabet navigation bar
+   - Added SettingsModal at bottom of component tree
+
+**Architecture:**
+- SettingsModal acts as hub/router for all application settings
+- Clicking "Auto Capitalization" opens AutoCapSettings modal
+- AutoCapSettings can open AutoCapExceptions modal
+- Navigation flow: Settings → Auto Cap → Exceptions (with back navigation)
+- All Auto Cap functionality now accessible from:
+  1. Title field Aa button (direct to AutoCapSettings)
+  2. Hamburger menu → Settings → Auto Capitalization
+  3. Top toolbar ⚙️ button → Settings → Auto Capitalization
+
+**Future Settings Planned:**
+- Display Preferences (theme, font size, column defaults)
+- Data & Sync (backup, import/export, sync settings)
+- Collection defaults (default format, location, etc.)
+- Enrichment preferences (API keys, auto-enrichment options)
 
 ---
 
@@ -148,7 +197,7 @@ Phase 4: Advanced Features        ░░░░░░░░░░░░░░░�
 
 ---
 
-## 🔄 PHASE 2.3: IN PROGRESS - EDIT ALBUM MODAL (~85% Complete)
+## 🔄 PHASE 2.3: IN PROGRESS - EDIT ALBUM MODAL (~90% Complete)
 
 ### ✅ Phase 1: Core Infrastructure - COMPLETE
 - [x] Base modal shell with orange header
@@ -300,7 +349,7 @@ We are replicating the CLZ Music Web interface exactly, featuring:
 - Title (text input) ✅
 - Sort Title (text input) ✅
 - Subtitle (text input) ✅
-- **Artist** (multi-select picker with +/Manage buttons) ⏳ (UI present, not wired)
+- **Artist** (multi-select picker with +/Manage buttons) ✅ **FULLY WIRED**
 - Release Date (MM/DD/YYYY dropdowns) ✅
 - Original Release Date (MM/DD/YYYY dropdowns) ✅
 - **Label** (picker) ✅ **FULLY WIRED**
@@ -441,7 +490,7 @@ Build reusable picker components that work for ALL pickers:
 - [x] Genre picker (multi-select with tags) - **WIRED AND FUNCTIONAL**
 - [x] Label picker - **WIRED AND FUNCTIONAL**
 - [x] Location picker (in bottom bar) - **WIRED AND FUNCTIONAL**
-- [ ] Artist picker (multi-select) - **NEXT: Wire up to PickerModal**
+- [x] Artist picker (single-select) - **WIRED AND FUNCTIONAL**
 
 **Phase 4: Tracks Tab** (HIGH PRIORITY)
 - [ ] Disc management
@@ -466,12 +515,11 @@ Build reusable picker components that work for ALL pickers:
 - [ ] Links tab with URL management
 
 ### File Structure for Edit Modal
-
 ```
 src/app/edit-collection/
 ├── EditAlbumModal.tsx          # Main modal component ✅
 ├── tabs/
-│   ├── MainTab.tsx             # Basic info ✅ (Label/Format/Genre/Location pickers wired)
+│   ├── MainTab.tsx             # Basic info ✅ (All pickers wired)
 │   ├── DetailsTab.tsx          # Extended metadata ✅ (placeholder)
 │   ├── ClassicalTab.tsx        # Composer, conductor, etc. ✅ (placeholder)
 │   ├── PeopleTab.tsx           # Credits & musicians ✅ (placeholder)
@@ -484,7 +532,11 @@ src/app/edit-collection/
 │   ├── ManageModal.tsx         # Manage items (edit/delete/merge) ✅ COMPLETE
 │   ├── EditModal.tsx           # Edit single item ✅ COMPLETE
 │   ├── MergeModal.tsx          # Merge multiple items ✅ COMPLETE
-│   └── pickerDataUtils.ts      # Supabase integration ✅ COMPLETE (bug fixed)
+│   └── pickerDataUtils.ts      # Supabase integration ✅ COMPLETE
+├── settings/
+│   ├── SettingsModal.tsx       # Global settings hub ✅ NEW
+│   ├── AutoCapSettings.tsx     # Auto cap configuration ✅
+│   └── AutoCapExceptions.tsx   # Exception management ✅
 ├── enrichment/
 │   ├── SpotifyEnrich.tsx       # Spotify integration
 │   ├── AppleEnrich.tsx         # Apple Music integration
@@ -594,7 +646,7 @@ src/app/edit-collection/
 - [ ] Statistics dashboard
 - [ ] Find Duplicates tool
 - [ ] Loan Manager
-- [ ] Settings panel
+- [x] Settings panel ✅ COMPLETE
 
 ### Advanced Features
 - [ ] Grid view mode toggle
@@ -626,6 +678,19 @@ src/app/edit-collection/
 ---
 
 ## 🔄 CHANGE LOG
+
+- **2025-12-13 (Global CSS Fix + Settings Infrastructure):** ✅ COMPLETE
+  - **Global CSS Fix**: Resolved white-on-white text issue
+    - Removed @theme block causing CSS validation errors
+    - Added `color-scheme: light` to force light mode site-wide
+    - Simplified globals.css for better CSS validation
+  - **Settings Infrastructure**: Created global settings system
+    - New SettingsModal.tsx - main settings hub with section navigation
+    - Wired Settings button in hamburger menu and top toolbar (⚙️)
+    - Navigation flow: Settings → Auto Cap → Exceptions
+    - Future-ready for Display Preferences, Data & Sync, etc.
+  - **Files Created**: SettingsModal.tsx
+  - **Files Modified**: globals.css, page.tsx
 
 - **2025-12-12 (Artist Picker + Date Pickers + Autocap):** ✅ MAIN TAB COMPLETE
   - **Artist Picker**: Added full artist picker integration
@@ -819,21 +884,12 @@ src/app/edit-collection/
 5. **🎵 Add "Import from Spotify" button and integration**
 
 **Priority 2: Edit Album Modal - Previous/Next Navigation**
-1. Build TracksTab.tsx with disc management
-2. Implement tracklist table with drag-drop
-3. Add/remove tracks functionality
-4. Multi-disc support with disc tabs
-5. **🎵 Add "Import from Spotify" button and integration**
-6. Storage Device picker
-7. Matrix number inputs
-
-**Priority 3: Edit Album Modal - Previous/Next Navigation**
 1. Wire up Previous/Next buttons in UniversalBottomBar
 2. Implement album navigation in EditAlbumModal
 3. Handle edge cases (first/last album)
 4. Persist edited changes when navigating
 
-**Priority 4: Edit Album Modal - Phase 5 (Enrichment Integration)**
+**Priority 3: Edit Album Modal - Phase 5 (Enrichment Integration)**
 1. Spotify search & import (Main tab)
 2. Apple Music search & lyrics (Tracks tab)
 3. Discogs metadata fetch (Main tab)
@@ -841,7 +897,7 @@ src/app/edit-collection/
 5. Cover art search (Cover tab)
 6. Auto-populate links (Links tab)
 
-**Priority 5: Edit Album Modal - Phase 6 (Remaining Tabs)**
+**Priority 4: Edit Album Modal - Phase 6 (Remaining Tabs)**
 1. Details tab (pickers for packaging, condition, country, etc.)
 2. Classical tab (add/pickers for composer, conductor, etc.)
 3. People tab (credits & musicians with add/pickers)
@@ -849,18 +905,18 @@ src/app/edit-collection/
 5. Cover tab (upload, crop, find online)
 6. Links tab (URL management with auto-populate)
 
-**Priority 6: Detail Panel Polish (Phase 2.4) - AFTER MODAL COMPLETE**
+**Priority 5: Detail Panel Polish (Phase 2.4) - AFTER MODAL COMPLETE**
 1. Can integrate modal features into detail panel
 2. Or enhance detail panel separately as quick-view
 3. Add clickable links to external services
 4. Better metadata formatting
 
-**Priority 7: Selection System (Phase 3.1)**
+**Priority 6: Selection System (Phase 3.1)**
 1. Wire up checkbox state management
 2. Implement select all/none functionality
 3. Maintain selection across filters and sorting
 
-**Priority 8: Batch Operations (Phase 3.2-3.3)**
+**Priority 7: Batch Operations (Phase 3.2-3.3)**
 1. Enable selection toolbar actions
 2. Create batch edit modal
 3. Implement bulk operations
@@ -870,7 +926,7 @@ src/app/edit-collection/
 ## 📝 TECHNICAL NOTES
 
 ### Current File Structure
-**Main file:** `src/app/edit-collection/page.tsx` (~1050 lines)
+**Main file:** `src/app/edit-collection/page.tsx` (~1200 lines)
 - Contains complete UI and data logic
 - Self-contained for now (will extract components later)
 - Uses Supabase client for all queries
@@ -891,6 +947,7 @@ src/app/edit-collection/
 - Tab components (MainTab, DetailsTab, etc.) ✅
 - Picker modals (PickerModal, ManageModal, EditModal, MergeModal) ✅
 - `pickerDataUtils.ts` - Supabase integration for picker data ✅
+- `SettingsModal.tsx` - Global settings hub ✅ NEW
 
 ### Database Fields Being Used
 From `collection` table:
@@ -929,7 +986,6 @@ From `collection` table:
 - Selection checkboxes don't work yet (Phase 3.1)
 - Some table columns show placeholders (needs calculated values)
 - Collection tabs don't do anything yet (Phase 5)
-- Artist picker not implemented yet (Priority 1)
 - Detail panel needs more polish (Phase 2.4)
 - Some action buttons are placeholders
 
@@ -938,31 +994,30 @@ From `collection` table:
 ## 🔧 GIT ROLLBACK COMMAND
 
 To create this as a safe rollback point, run:
-
 ```bash
 # Stage all changes
 git add .
 
 # Commit with descriptive message
-git commit -m "Phase 2.3 Progress: Location Picker Fully Wired [CHECKPOINT]
+git commit -m "Phase 2.3 Progress: Settings Infrastructure Complete [CHECKPOINT]
 
 ✅ COMPLETED:
-- Location picker fully functional via forwardRef pattern
-- MainTab exposes openLocationPicker() method
-- EditAlbumModal captures and calls via ref
-- Full callback chain: Button → Modal → MainTab → PickerModal
-- All Main Tab pickers now wired: Label, Format, Genre, Location
+- Global CSS fix - resolved white-on-white text issue
+- Settings infrastructure created (SettingsModal.tsx)
+- Wired Settings button in hamburger menu and top toolbar
+- Auto Cap settings now accessible from 3 locations
+- Ready for future settings sections
 
 🔄 IN PROGRESS:
-- Artist picker next (will use same ref exposure pattern)
-- Tracks tab with Spotify import (high priority)
+- Tracks tab (high priority)
+- Remaining 6 tabs (Phase 6)
 
-🎯 READY FOR: Artist picker integration
+🎯 READY FOR: Tracks Tab implementation with Spotify import
 
-This commit represents complete basic picker integration for Main Tab."
+This commit represents complete settings infrastructure and global CSS fixes."
 
 # Create a named tag for easy reference
-git tag -a phase-2.3-location-picker-complete -m "Location picker fully wired checkpoint"
+git tag -a phase-2.3-settings-complete -m "Settings infrastructure complete"
 
 # Optional: Push to remote
 git push origin main --tags

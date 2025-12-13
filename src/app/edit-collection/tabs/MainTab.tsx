@@ -1,4 +1,4 @@
-// src/app/edit-collection/tabs/MainTab.tsx
+// src/app/edit-collection/tabs/MainTab.tsx (UPDATED)
 'use client';
 
 import { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
@@ -8,6 +8,8 @@ import { ManageModal } from '../pickers/ManageModal';
 import { EditModal } from '../pickers/EditModal';
 import { MergeModal } from '../pickers/MergeModal';
 import { DatePicker } from 'components/DatePicker';
+import { AutoCapSettings, type AutoCapMode } from '../settings/AutoCapSettings';
+import { AutoCapExceptions, applyAutoCap, DEFAULT_EXCEPTIONS } from '../settings/AutoCapExceptions';
 import {
   fetchLabels,
   fetchFormats,
@@ -58,8 +60,22 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
   const [datePickerField, setDatePickerField] = useState<'release' | 'original' | 'recording' | null>(null);
   const [datePickerPosition, setDatePickerPosition] = useState({ top: 0, left: 0 });
 
-  // Autocap state
-  const [autocapEnabled, setAutocapEnabled] = useState(true);
+  // Auto Cap state
+  const [showAutoCapSettings, setShowAutoCapSettings] = useState(false);
+  const [showAutoCapExceptions, setShowAutoCapExceptions] = useState(false);
+  const [autoCapMode, setAutoCapMode] = useState<AutoCapMode>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('autoCapMode') as AutoCapMode) || 'FirstExceptions';
+    }
+    return 'FirstExceptions';
+  });
+  const [autoCapExceptions, setAutoCapExceptions] = useState<string[]>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('autoCapExceptions');
+      return stored ? JSON.parse(stored) : DEFAULT_EXCEPTIONS;
+    }
+    return DEFAULT_EXCEPTIONS;
+  });
 
   // Fetch real data on mount
   useEffect(() => {
@@ -314,15 +330,20 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
     setShowDatePicker(false);
   };
 
-  // Autocap handler for Title field
+  // Auto Cap handlers
   const handleTitleChange = (value: string) => {
-    if (autocapEnabled) {
-      // Capitalize first letter of each word
-      const capitalized = value.replace(/\b\w/g, (char) => char.toUpperCase());
-      onChange('title', capitalized);
-    } else {
-      onChange('title', value);
-    }
+    const capitalized = applyAutoCap(value, autoCapMode, autoCapExceptions);
+    onChange('title', capitalized);
+  };
+
+  const handleAutoCapModeChange = (mode: AutoCapMode) => {
+    setAutoCapMode(mode);
+    localStorage.setItem('autoCapMode', mode);
+  };
+
+  const handleAutoCapExceptionsChange = (exceptions: string[]) => {
+    setAutoCapExceptions(exceptions);
+    localStorage.setItem('autoCapExceptions', JSON.stringify(exceptions));
   };
 
   const labelStyle: React.CSSProperties = {
@@ -392,14 +413,19 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
               <label style={{ ...labelStyle, marginBottom: '0' }}>Title</label>
               <span 
-                onClick={() => setAutocapEnabled(!autocapEnabled)}
+                onClick={() => setShowAutoCapSettings(true)}
                 style={{ 
-                  color: autocapEnabled ? '#3b82f6' : '#9ca3af', 
+                  color: '#3b82f6',
                   fontSize: '13px', 
-                  fontWeight: '400',
+                  fontWeight: '600',
                   cursor: 'pointer',
                   userSelect: 'none',
+                  padding: '2px 6px',
+                  borderRadius: '3px',
+                  backgroundColor: '#eff6ff',
+                  border: '1px solid #3b82f6',
                 }}
+                title="Auto Capitalization Settings"
               >
                 Aa
               </span>
@@ -858,6 +884,26 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
           position={datePickerPosition}
         />
       )}
+
+      {/* Auto Cap Settings */}
+      <AutoCapSettings
+        isOpen={showAutoCapSettings}
+        onClose={() => setShowAutoCapSettings(false)}
+        currentMode={autoCapMode}
+        onSave={handleAutoCapModeChange}
+        onManageExceptions={() => {
+          setShowAutoCapSettings(false);
+          setShowAutoCapExceptions(true);
+        }}
+      />
+
+      {/* Auto Cap Exceptions */}
+      <AutoCapExceptions
+        isOpen={showAutoCapExceptions}
+        onClose={() => setShowAutoCapExceptions(false)}
+        exceptions={autoCapExceptions}
+        onSave={handleAutoCapExceptionsChange}
+      />
     </>
   );
 });

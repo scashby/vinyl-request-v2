@@ -1,4 +1,4 @@
-// src/app/edit-collection/page.tsx
+// src/app/edit-collection/page.tsx - COMPLETE FILE WITH SETTINGS INTEGRATION
 'use client';
 
 import { useCallback, useEffect, useState, useMemo, Suspense, memo } from 'react';
@@ -9,6 +9,7 @@ import ColumnSelector from '../../components/ColumnSelector';
 import { ColumnId, DEFAULT_VISIBLE_COLUMNS, DEFAULT_LOCKED_COLUMNS, SortState } from './columnDefinitions';
 import { Album, toSafeStringArray, toSafeSearchString } from '../../types/album';
 import EditAlbumModal from './EditAlbumModal';
+import { SettingsModal } from './settings/SettingsModal';
 
 type SortOption = 
   | 'artist-asc' | 'artist-desc' 
@@ -199,6 +200,7 @@ function CollectionBrowserPage() {
   const [selectedAlbumId, setSelectedAlbumId] = useState<number | null>(null);
   const [activeCollection, setActiveCollection] = useState('music');
   const [editingAlbumId, setEditingAlbumId] = useState<number | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
   
   const [sortBy, setSortBy] = useState<SortOption>('artist-asc');
   const [showSortDropdown, setShowSortDropdown] = useState(false);
@@ -569,6 +571,15 @@ function CollectionBrowserPage() {
                   style={{ width: '100%', padding: '10px', background: 'transparent', border: 'none', color: 'white', textAlign: 'left', cursor: 'pointer', marginBottom: '5px', fontSize: '14px' }}>
                   <span style={{ marginRight: '10px' }}>📚</span> Loan Manager
                 </button>
+                <button 
+                  onClick={() => {
+                    setSidebarOpen(false);
+                    setShowSettings(true);
+                  }}
+                  title="Application settings"
+                  style={{ width: '100%', padding: '10px', background: 'transparent', border: 'none', color: 'white', textAlign: 'left', cursor: 'pointer', marginBottom: '5px', fontSize: '14px' }}>
+                  <span style={{ marginRight: '10px' }}>⚙️</span> Settings
+                </button>
               </div>
             </div>
           </>
@@ -721,6 +732,7 @@ function CollectionBrowserPage() {
               </button>
             ))}
             <button 
+              onClick={() => setShowSettings(true)}
               title="Settings"
               style={{
               background: 'transparent',
@@ -1361,6 +1373,13 @@ function CollectionBrowserPage() {
             loadAlbums();
           }}
           allAlbumIds={filteredAndSortedAlbums.map(a => a.id)}
+        />
+      )}
+
+      {showSettings && (
+        <SettingsModal
+          isOpen={showSettings}
+          onClose={() => setShowSettings(false)}
         />
       )}
     </>
