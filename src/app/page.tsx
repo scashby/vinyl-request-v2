@@ -10,30 +10,31 @@ export default function Page() {
   const { session } = useSession();
 
   return (
-    <header className="hero">
+    <header className="landing-page hero">
       <video autoPlay muted loop playsInline className="hero-video">
         <source src="/videos/header-video.mp4" type="video/mp4" />
         Your browser does not support the video tag.
       </video>
-      <div className="overlay"></div>
+
       <div className="hero-content">
-        <h1 className="text-white">Dead Wax Dialogues</h1>
-        <p className="text-white">Drop the needle. Let the side play.</p>
+        <h1>Dead Wax Dialogues</h1>
+        <p>A vinyl-focused listening lounge, jukebox, and community.</p>
+
         <nav className="hero-nav">
-          <Link href="/events/events-page">Events</Link>
-          <Link href="/dj-sets">DJ Sets</Link>
-          <Link href="/browse/browse-albums">Browse Collection</Link>
-          <Link href="/dialogues">Dialogues</Link>
-          <Link href="/about">About</Link>
-          <a href="https://shop.deadwaxdialogues.com" target="_blank" rel="noopener noreferrer">
-            Merch
-          </a>
+          <a href="/browse/browse-queue">Browse Queue</a>
+          <a href="/browse/browse-albums">Browse Albums</a>
+          <a href="/events/events-page">Events</a>
+          <a href="/dialogues">Dialogues</a>
+
           {session && (
-            <Link href="/admin/admin-dashboard" style={{ 
-              backgroundColor: 'rgba(37, 99, 235, 0.8)',
-              padding: '0.5rem 1rem',
-              borderRadius: '4px'
-            }}>
+            <Link
+              href="/admin/admin-dashboard"
+              style={{
+                backgroundColor: "rgba(37, 99, 235, 0.8)",
+                padding: "0.5rem 1rem",
+                borderRadius: "4px",
+              }}
+            >
               Admin
             </Link>
           )}
