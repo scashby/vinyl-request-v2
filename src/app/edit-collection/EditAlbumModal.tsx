@@ -330,7 +330,7 @@ export default function EditAlbumModal({ albumId, onClose, onSave }: EditAlbumMo
             <PeopleTab />
           )}
           {activeTab === 'tracks' && (
-            <TracksTab />
+            <TracksTab album={editedAlbum} onChange={handleFieldChange} />
           )}
           {activeTab === 'personal' && (
             <PersonalTab />

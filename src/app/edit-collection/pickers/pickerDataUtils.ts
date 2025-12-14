@@ -1,343 +1,391 @@
 // src/app/edit-collection/pickers/pickerDataUtils.ts
-import { supabase } from 'lib/supabaseClient';
+'use client';
+
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 export interface PickerDataItem {
   id: string;
   name: string;
-  count: number;
+  count?: number;
 }
 
-/**
- * Fetch all unique labels with counts from collection
- */
+// Storage Devices
+export async function fetchStorageDevices(): Promise<PickerDataItem[]> {
+  try {
+    const supabase = createClientComponentClient();
+    
+    // Fetch unique storage devices from collection table
+    const { data, error } = await supabase
+      .from('collection')
+      .select('storage_device')
+      .not('storage_device', 'is', null)
+      .not('storage_device', 'eq', '');
+
+    if (error) {
+      console.error('Error fetching storage devices:', error);
+      return [];
+    }
+
+    // Count occurrences and create picker items
+    const deviceCounts = new Map<string, number>();
+    data?.forEach(row => {
+      if (row.storage_device) {
+        deviceCounts.set(
+          row.storage_device,
+          (deviceCounts.get(row.storage_device) || 0) + 1
+        );
+      }
+    });
+
+    // Convert to PickerDataItem array
+    return Array.from(deviceCounts.entries())
+      .map(([name, count]) => ({
+        id: name,
+        name,
+        count,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch (error) {
+    console.error('Error in fetchStorageDevices:', error);
+    return [];
+  }
+}
+
+// Labels
 export async function fetchLabels(): Promise<PickerDataItem[]> {
-  
-  // Get all albums with their labels
-  const { data: albums, error } = await supabase
-    .from('collection')
-    .select('spotify_label, apple_music_label')
-    .not('spotify_label', 'is', null)
-    .or('spotify_label.neq.null,apple_music_label.neq.null');
+  try {
+    const supabase = createClientComponentClient();
+    
+    const { data, error } = await supabase
+      .from('collection')
+      .select('spotify_label')
+      .not('spotify_label', 'is', null)
+      .not('spotify_label', 'eq', '');
 
-  if (error || !albums) {
-    console.error('Error fetching labels:', error);
+    if (error) {
+      console.error('Error fetching labels:', error);
+      return [];
+    }
+
+    const labelCounts = new Map<string, number>();
+    data?.forEach(row => {
+      if (row.spotify_label) {
+        labelCounts.set(
+          row.spotify_label,
+          (labelCounts.get(row.spotify_label) || 0) + 1
+        );
+      }
+    });
+
+    return Array.from(labelCounts.entries())
+      .map(([name, count]) => ({
+        id: name,
+        name,
+        count,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch (error) {
+    console.error('Error in fetchLabels:', error);
     return [];
   }
-
-  // Aggregate counts
-  const labelCounts = new Map<string, number>();
-  
-  albums.forEach(album => {
-    const label = album.spotify_label || album.apple_music_label;
-    if (label) {
-      labelCounts.set(label, (labelCounts.get(label) || 0) + 1);
-    }
-  });
-
-  // Convert to array and sort
-  return Array.from(labelCounts.entries())
-    .map(([name, count]) => ({
-      id: name, // Use name as ID for now
-      name,
-      count,
-    }))
-    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/**
- * Fetch all unique formats with counts from collection
- */
+// Formats
 export async function fetchFormats(): Promise<PickerDataItem[]> {
-  
-  const { data: albums, error } = await supabase
-    .from('collection')
-    .select('format')
-    .not('format', 'is', null);
+  try {
+    const supabase = createClientComponentClient();
+    
+    const { data, error } = await supabase
+      .from('collection')
+      .select('format')
+      .not('format', 'is', null)
+      .not('format', 'eq', '');
 
-  if (error || !albums) {
-    console.error('Error fetching formats:', error);
+    if (error) {
+      console.error('Error fetching formats:', error);
+      return [];
+    }
+
+    const formatCounts = new Map<string, number>();
+    data?.forEach(row => {
+      if (row.format) {
+        formatCounts.set(
+          row.format,
+          (formatCounts.get(row.format) || 0) + 1
+        );
+      }
+    });
+
+    return Array.from(formatCounts.entries())
+      .map(([name, count]) => ({
+        id: name,
+        name,
+        count,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch (error) {
+    console.error('Error in fetchFormats:', error);
     return [];
   }
-
-  // Aggregate counts
-  const formatCounts = new Map<string, number>();
-  
-  albums.forEach(album => {
-    if (album.format) {
-      formatCounts.set(album.format, (formatCounts.get(album.format) || 0) + 1);
-    }
-  });
-
-  // Convert to array and sort
-  return Array.from(formatCounts.entries())
-    .map(([name, count]) => ({
-      id: name,
-      name,
-      count,
-    }))
-    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/**
- * Fetch all unique genres with counts from collection
- */
+// Genres
 export async function fetchGenres(): Promise<PickerDataItem[]> {
-  
-  const { data: albums, error } = await supabase
-    .from('collection')
-    .select('discogs_genres')
-    .not('discogs_genres', 'is', null);
+  try {
+    const supabase = createClientComponentClient();
+    
+    const { data, error } = await supabase
+      .from('collection')
+      .select('discogs_genres, spotify_genres')
+      .not('discogs_genres', 'is', null)
+      .not('spotify_genres', 'is', null);
 
-  if (error || !albums) {
-    console.error('Error fetching genres:', error);
-    return [];
-  }
+    if (error) {
+      console.error('Error fetching genres:', error);
+      return [];
+    }
 
-  // Aggregate counts (genres are arrays)
-  const genreCounts = new Map<string, number>();
-  
-  albums.forEach(album => {
-    if (album.discogs_genres && Array.isArray(album.discogs_genres)) {
-      album.discogs_genres.forEach(genre => {
+    const genreCounts = new Map<string, number>();
+    data?.forEach(row => {
+      const allGenres = [
+        ...(row.discogs_genres || []),
+        ...(row.spotify_genres || [])
+      ];
+      allGenres.forEach(genre => {
         if (genre) {
-          genreCounts.set(genre, (genreCounts.get(genre) || 0) + 1);
+          genreCounts.set(
+            genre,
+            (genreCounts.get(genre) || 0) + 1
+          );
         }
       });
-    }
-  });
+    });
 
-  // Convert to array and sort
-  return Array.from(genreCounts.entries())
-    .map(([name, count]) => ({
-      id: name,
-      name,
-      count,
-    }))
-    .sort((a, b) => a.name.localeCompare(b.name));
-}
-
-/**
- * Fetch all unique locations with counts from collection
- */
-export async function fetchLocations(): Promise<PickerDataItem[]> {
-  
-  const { data: albums, error } = await supabase
-    .from('collection')
-    .select('location')
-    .not('location', 'is', null);
-
-  if (error || !albums) {
-    console.error('Error fetching locations:', error);
+    return Array.from(genreCounts.entries())
+      .map(([name, count]) => ({
+        id: name,
+        name,
+        count,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch (error) {
+    console.error('Error in fetchGenres:', error);
     return [];
   }
-
-  // Aggregate counts
-  const locationCounts = new Map<string, number>();
-  
-  albums.forEach(album => {
-    if (album.location) {
-      locationCounts.set(album.location, (locationCounts.get(album.location) || 0) + 1);
-    }
-  });
-
-  // Convert to array and sort
-  return Array.from(locationCounts.entries())
-    .map(([name, count]) => ({
-      id: name,
-      name,
-      count,
-    }))
-    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/**
- * Update a label across all albums
- */
-export async function updateLabel(oldName: string, newName: string): Promise<boolean> {
-  
-  const { error: spotifyError } = await supabase
-    .from('collection')
-    .update({ spotify_label: newName })
-    .eq('spotify_label', oldName);
+// Locations
+export async function fetchLocations(): Promise<PickerDataItem[]> {
+  try {
+    const supabase = createClientComponentClient();
+    
+    const { data, error } = await supabase
+      .from('collection')
+      .select('folder')
+      .not('folder', 'is', null)
+      .not('folder', 'eq', '');
 
-  const { error: appleError } = await supabase
-    .from('collection')
-    .update({ apple_music_label: newName })
-    .eq('apple_music_label', oldName);
+    if (error) {
+      console.error('Error fetching locations:', error);
+      return [];
+    }
 
-  if (spotifyError || appleError) {
-    console.error('Error updating label:', spotifyError || appleError);
+    const locationCounts = new Map<string, number>();
+    data?.forEach(row => {
+      if (row.folder) {
+        locationCounts.set(
+          row.folder,
+          (locationCounts.get(row.folder) || 0) + 1
+        );
+      }
+    });
+
+    return Array.from(locationCounts.entries())
+      .map(([name, count]) => ({
+        id: name,
+        name,
+        count,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch (error) {
+    console.error('Error in fetchLocations:', error);
+    return [];
+  }
+}
+
+// Artists
+export async function fetchArtists(): Promise<PickerDataItem[]> {
+  try {
+    const supabase = createClientComponentClient();
+    
+    const { data, error } = await supabase
+      .from('collection')
+      .select('artist')
+      .not('artist', 'is', null)
+      .not('artist', 'eq', '');
+
+    if (error) {
+      console.error('Error fetching artists:', error);
+      return [];
+    }
+
+    const artistCounts = new Map<string, number>();
+    data?.forEach(row => {
+      if (row.artist) {
+        artistCounts.set(
+          row.artist,
+          (artistCounts.get(row.artist) || 0) + 1
+        );
+      }
+    });
+
+    return Array.from(artistCounts.entries())
+      .map(([name, count]) => ({
+        id: name,
+        name,
+        count,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch (error) {
+    console.error('Error in fetchArtists:', error);
+    return [];
+  }
+}
+
+// Update functions
+export async function updateLabel(id: string, newName: string): Promise<boolean> {
+  try {
+    const supabase = createClientComponentClient();
+    const { error } = await supabase
+      .from('collection')
+      .update({ spotify_label: newName })
+      .eq('spotify_label', id);
+    
+    return !error;
+  } catch (error) {
+    console.error('Error updating label:', error);
     return false;
   }
-
-  return true;
 }
 
-/**
- * Update a format across all albums
- */
-export async function updateFormat(oldName: string, newName: string): Promise<boolean> {
-  
-  const { error } = await supabase
-    .from('collection')
-    .update({ format: newName })
-    .eq('format', oldName);
-
-  if (error) {
+export async function updateFormat(id: string, newName: string): Promise<boolean> {
+  try {
+    const supabase = createClientComponentClient();
+    const { error } = await supabase
+      .from('collection')
+      .update({ format: newName })
+      .eq('format', id);
+    
+    return !error;
+  } catch (error) {
     console.error('Error updating format:', error);
     return false;
   }
-
-  return true;
 }
 
-/**
- * Update a location across all albums
- */
-export async function updateLocation(oldName: string, newName: string): Promise<boolean> {
-  
-  const { error } = await supabase
-    .from('collection')
-    .update({ location: newName })
-    .eq('location', oldName);
-
-  if (error) {
+export async function updateLocation(id: string, newName: string): Promise<boolean> {
+  try {
+    const supabase = createClientComponentClient();
+    const { error } = await supabase
+      .from('collection')
+      .update({ folder: newName })
+      .eq('folder', id);
+    
+    return !error;
+  } catch (error) {
     console.error('Error updating location:', error);
     return false;
   }
-
-  return true;
 }
 
-/**
- * Delete a label (set to null across all albums)
- */
-export async function deleteLabel(name: string): Promise<boolean> {
-  
-  const { error: spotifyError } = await supabase
-    .from('collection')
-    .update({ spotify_label: null })
-    .eq('spotify_label', name);
-
-  const { error: appleError } = await supabase
-    .from('collection')
-    .update({ apple_music_label: null })
-    .eq('apple_music_label', name);
-
-  if (spotifyError || appleError) {
-    console.error('Error deleting label:', spotifyError || appleError);
-    return false;
-  }
-
-  return true;
-}
-
-/**
- * Merge labels - update all albums with mergeFrom labels to mergeTo label
- */
-export async function mergeLabels(primaryName: string, mergeFromNames: string[]): Promise<boolean> {
-  for (const oldName of mergeFromNames) {
-    const success = await updateLabel(oldName, primaryName);
-    if (!success) return false;
-  }
-
-  return true;
-}
-
-/**
- * Merge formats
- */
-export async function mergeFormats(primaryName: string, mergeFromNames: string[]): Promise<boolean> {
-  for (const oldName of mergeFromNames) {
-    const success = await updateFormat(oldName, primaryName);
-    if (!success) return false;
-  }
-
-  return true;
-}
-
-/**
- * Merge locations
- */
-export async function mergeLocations(primaryName: string, mergeFromNames: string[]): Promise<boolean> {
-  for (const oldName of mergeFromNames) {
-    const success = await updateLocation(oldName, primaryName);
-    if (!success) return false;
-  }
-
-  return true;
-}
-
-/**
- * Fetch all unique artists with counts from collection
- */
-export async function fetchArtists(): Promise<PickerDataItem[]> {
-  
-  // Get all albums with their artists
-  const { data: albums, error } = await supabase
-    .from('collection')
-    .select('artist')
-    .not('artist', 'is', null);
-
-  if (error || !albums) {
-    console.error('Error fetching artists:', error);
-    return [];
-  }
-
-  // Aggregate counts
-  const artistCounts = new Map<string, number>();
-  
-  albums.forEach(album => {
-    const artist = album.artist;
-    if (artist) {
-      artistCounts.set(artist, (artistCounts.get(artist) || 0) + 1);
-    }
-  });
-
-  // Convert to array and sort
-  return Array.from(artistCounts.entries())
-    .map(([name, count]) => ({
-      id: name,
-      name,
-      count,
-    }))
-    .sort((a, b) => a.name.localeCompare(b.name));
-}
-
-/**
- * Update artist name (rename)
- */
-export async function updateArtist(oldName: string, newName: string): Promise<boolean> {
-  const { error } = await supabase
-    .from('collection')
-    .update({ artist: newName })
-    .eq('artist', oldName);
-
-  if (error) {
+export async function updateArtist(id: string, newName: string): Promise<boolean> {
+  try {
+    const supabase = createClientComponentClient();
+    const { error } = await supabase
+      .from('collection')
+      .update({ artist: newName })
+      .eq('artist', id);
+    
+    return !error;
+  } catch (error) {
     console.error('Error updating artist:', error);
     return false;
   }
-
-  return true;
 }
 
-/**
- * Delete artist (set to null) - NOT IMPLEMENTED YET
- * Artists are core data, deletion not supported
- */
-export async function deleteArtist(): Promise<boolean> {
-  console.warn('Artist deletion not supported');
-  return false;
-}
-
-/**
- * Merge artists
- */
-export async function mergeArtists(primaryName: string, mergeFromNames: string[]): Promise<boolean> {
-  for (const oldName of mergeFromNames) {
-    const success = await updateArtist(oldName, primaryName);
-    if (!success) return false;
+// Delete functions
+export async function deleteLabel(id: string): Promise<boolean> {
+  try {
+    const supabase = createClientComponentClient();
+    const { error } = await supabase
+      .from('collection')
+      .update({ spotify_label: null })
+      .eq('spotify_label', id);
+    
+    return !error;
+  } catch (error) {
+    console.error('Error deleting label:', error);
+    return false;
   }
+}
 
-  return true;
+// Merge functions
+export async function mergeLabels(sourceIds: string[], targetId: string): Promise<boolean> {
+  try {
+    const supabase = createClientComponentClient();
+    const { error } = await supabase
+      .from('collection')
+      .update({ spotify_label: targetId })
+      .in('spotify_label', sourceIds);
+    
+    return !error;
+  } catch (error) {
+    console.error('Error merging labels:', error);
+    return false;
+  }
+}
+
+export async function mergeFormats(sourceIds: string[], targetId: string): Promise<boolean> {
+  try {
+    const supabase = createClientComponentClient();
+    const { error } = await supabase
+      .from('collection')
+      .update({ format: targetId })
+      .in('format', sourceIds);
+    
+    return !error;
+  } catch (error) {
+    console.error('Error merging formats:', error);
+    return false;
+  }
+}
+
+export async function mergeLocations(sourceIds: string[], targetId: string): Promise<boolean> {
+  try {
+    const supabase = createClientComponentClient();
+    const { error } = await supabase
+      .from('collection')
+      .update({ folder: targetId })
+      .in('folder', sourceIds);
+    
+    return !error;
+  } catch (error) {
+    console.error('Error merging locations:', error);
+    return false;
+  }
+}
+
+export async function mergeArtists(sourceIds: string[], targetId: string): Promise<boolean> {
+  try {
+    const supabase = createClientComponentClient();
+    const { error } = await supabase
+      .from('collection')
+      .update({ artist: targetId })
+      .in('artist', sourceIds);
+    
+    return !error;
+  } catch (error) {
+    console.error('Error merging artists:', error);
+    return false;
+  }
 }

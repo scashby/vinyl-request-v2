@@ -1,0 +1,258 @@
+/* src/styles/tracks-tab.css */
+
+.tracks-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+}
+
+.disc-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.disc-tab {
+  padding: 8px 16px;
+  background: #f3f4f6;
+  border: 1px solid #d1d5db;
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
+  cursor: pointer;
+  font-size: 14px;
+  color: #374151;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.disc-tab.active {
+  background: white;
+  border-bottom: 2px solid white;
+  margin-bottom: -1px;
+  font-weight: 500;
+}
+
+.disc-tab.add-disc {
+  background: transparent;
+  border: none;
+  color: #3b82f6;
+  font-weight: 500;
+}
+
+.disc-tab-close {
+  color: #9ca3af;
+  font-size: 18px;
+  line-height: 1;
+  margin-left: 4px;
+}
+
+.disc-tab-close:hover {
+  color: #ef4444;
+}
+
+.disc-metadata {
+  background: #f9fafb;
+  padding: 16px;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.disc-metadata-row {
+  display: flex;
+  gap: 16px;
+}
+
+.disc-metadata-field {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.disc-metadata-field label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.disc-metadata-field input,
+.disc-metadata-field select {
+  padding: 6px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.picker-input {
+  display: flex;
+  gap: 4px;
+}
+
+.picker-input select {
+  flex: 1;
+}
+
+.picker-button {
+  padding: 6px 12px;
+  background: #f3f4f6;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.selection-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: #60a5fa;
+  border-radius: 4px;
+}
+
+.selection-cancel {
+  background: transparent;
+  border: none;
+  color: white;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.selection-all {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: white;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.selection-count {
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.selection-action {
+  padding: 4px 12px;
+  background: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #374151;
+}
+
+.selection-action.delete {
+  margin-left: auto;
+}
+
+.tracks-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.tracks-header-row {
+  display: grid;
+  grid-template-columns: 40px 40px 60px 1fr 200px 80px;
+  padding: 8px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #6b7280;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.track-row {
+  display: grid;
+  grid-template-columns: 40px 40px 60px 1fr 200px 80px;
+  padding: 8px 0;
+  border-bottom: 1px solid #f3f4f6;
+  align-items: center;
+}
+
+.track-row.header-row {
+  background: #f9fafb;
+  border-top: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.track-checkbox {
+  display: flex;
+  justify-content: center;
+}
+
+.track-drag {
+  display: flex;
+  justify-content: center;
+  cursor: grab;
+}
+
+.drag-handle {
+  color: #9ca3af;
+  font-size: 16px;
+}
+
+.track-drag:active {
+  cursor: grabbing;
+}
+
+.track-position {
+  text-align: center;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.track-title input,
+.track-artist input,
+.track-length input {
+  width: 100%;
+  padding: 4px 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 3px;
+  font-size: 14px;
+}
+
+.track-title input:focus,
+.track-artist input:focus,
+.track-length input:focus {
+  outline: none;
+  border-color: #3b82f6;
+}
+
+.tracks-add-buttons {
+  display: flex;
+  gap: 12px;
+  padding: 16px 0;
+}
+
+.add-header-button,
+.add-track-button {
+  padding: 8px 16px;
+  background: #f3f4f6;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #374151;
+}
+
+.add-header-button:hover,
+.add-track-button:hover {
+  background: #e5e7eb;
+}
+
+.add-track-button {
+  background: #3b82f6;
+  color: white;
+  border-color: #3b82f6;
+}
+
+.add-track-button:hover {
+  background: #2563eb;
+}
