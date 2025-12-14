@@ -5,12 +5,15 @@
   flex-direction: column;
   gap: 16px;
   padding: 20px;
+  background: white;
+  color: #111827;
 }
 
 .disc-tabs {
   display: flex;
   gap: 4px;
   border-bottom: 1px solid #e5e7eb;
+  background: white;
 }
 
 .disc-tab {
@@ -21,7 +24,7 @@
   border-radius: 4px 4px 0 0;
   cursor: pointer;
   font-size: 14px;
-  color: #374151;
+  color: #374151 !important;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -32,24 +35,25 @@
   border-bottom: 2px solid white;
   margin-bottom: -1px;
   font-weight: 500;
+  color: #111827 !important;
 }
 
 .disc-tab.add-disc {
   background: transparent;
   border: none;
-  color: #3b82f6;
+  color: #3b82f6 !important;
   font-weight: 500;
 }
 
 .disc-tab-close {
-  color: #9ca3af;
+  color: #9ca3af !important;
   font-size: 18px;
   line-height: 1;
   margin-left: 4px;
 }
 
 .disc-tab-close:hover {
-  color: #ef4444;
+  color: #ef4444 !important;
 }
 
 .disc-metadata {
@@ -76,7 +80,7 @@
 .disc-metadata-field label {
   font-size: 12px;
   font-weight: 500;
-  color: #6b7280;
+  color: #6b7280 !important;
 }
 
 .disc-metadata-field input,
@@ -85,6 +89,8 @@
   border: 1px solid #d1d5db;
   border-radius: 4px;
   font-size: 14px;
+  background: white !important;
+  color: #111827 !important;
 }
 
 .picker-input {
@@ -94,15 +100,22 @@
 
 .picker-input select {
   flex: 1;
+  background: white !important;
+  color: #111827 !important;
 }
 
 .picker-button {
   padding: 6px 12px;
-  background: #f3f4f6;
+  background: #f3f4f6 !important;
   border: 1px solid #d1d5db;
   border-radius: 4px;
   cursor: pointer;
   font-size: 14px;
+  color: #374151 !important;
+}
+
+.picker-button:hover {
+  background: #e5e7eb !important;
 }
 
 .selection-toolbar {
@@ -117,7 +130,7 @@
 .selection-cancel {
   background: transparent;
   border: none;
-  color: white;
+  color: white !important;
   cursor: pointer;
   font-size: 14px;
   font-weight: 500;
@@ -127,25 +140,33 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  color: white;
+  color: white !important;
   font-size: 14px;
   cursor: pointer;
 }
 
+.selection-all input[type="checkbox"] {
+  cursor: pointer;
+}
+
 .selection-count {
-  color: white;
+  color: white !important;
   font-size: 14px;
   font-weight: 500;
 }
 
 .selection-action {
   padding: 4px 12px;
-  background: white;
+  background: white !important;
   border: none;
   border-radius: 4px;
   cursor: pointer;
   font-size: 13px;
-  color: #374151;
+  color: #374151 !important;
+}
+
+.selection-action:hover {
+  background: #f3f4f6 !important;
 }
 
 .selection-action.delete {
@@ -155,6 +176,7 @@
 .tracks-section {
   display: flex;
   flex-direction: column;
+  background: white;
 }
 
 .tracks-header-row {
@@ -163,7 +185,7 @@
   padding: 8px 0;
   font-size: 13px;
   font-weight: 600;
-  color: #6b7280;
+  color: #6b7280 !important;
   background: #f9fafb;
   border-bottom: 1px solid #e5e7eb;
 }
@@ -174,17 +196,23 @@
   padding: 8px 0;
   border-bottom: 1px solid #f3f4f6;
   align-items: center;
+  background: white;
 }
 
 .track-row.header-row {
   background: #f9fafb;
   border-top: 1px solid #e5e7eb;
   border-bottom: 1px solid #e5e7eb;
+  color: #6b7280 !important;
 }
 
 .track-checkbox {
   display: flex;
   justify-content: center;
+}
+
+.track-checkbox input[type="checkbox"] {
+  cursor: pointer;
 }
 
 .track-drag {
@@ -194,7 +222,7 @@
 }
 
 .drag-handle {
-  color: #9ca3af;
+  color: #9ca3af !important;
   font-size: 16px;
 }
 
@@ -204,7 +232,7 @@
 
 .track-position {
   text-align: center;
-  color: #6b7280;
+  color: #6b7280 !important;
   font-size: 14px;
 }
 
@@ -216,6 +244,14 @@
   border: 1px solid #e5e7eb;
   border-radius: 3px;
   font-size: 14px;
+  background: white !important;
+  color: #111827 !important;
+}
+
+.track-title input::placeholder,
+.track-artist input::placeholder,
+.track-length input::placeholder {
+  color: #9ca3af !important;
 }
 
 .track-title input:focus,
@@ -223,6 +259,8 @@
 .track-length input:focus {
   outline: none;
   border-color: #3b82f6;
+  background: white !important;
+  color: #111827 !important;
 }
 
 .tracks-add-buttons {
@@ -234,25 +272,26 @@
 .add-header-button,
 .add-track-button {
   padding: 8px 16px;
-  background: #f3f4f6;
+  background: #f3f4f6 !important;
   border: 1px solid #d1d5db;
   border-radius: 4px;
   cursor: pointer;
   font-size: 14px;
-  color: #374151;
+  color: #374151 !important;
 }
 
 .add-header-button:hover,
 .add-track-button:hover {
-  background: #e5e7eb;
+  background: #e5e7eb !important;
 }
 
 .add-track-button {
-  background: #3b82f6;
-  color: white;
+  background: #3b82f6 !important;
+  color: white !important;
   border-color: #3b82f6;
 }
 
 .add-track-button:hover {
-  background: #2563eb;
+  background: #2563eb !important;
+  color: white !important;
 }
