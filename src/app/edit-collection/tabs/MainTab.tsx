@@ -1,4 +1,4 @@
-// src/app/edit-collection/tabs/MainTab.tsx - FIXED: Aa toggles auto-cap, dark text everywhere
+// src/app/edit-collection/tabs/MainTab.tsx - FIXED: Aa applies capitalization immediately based on settings
 'use client';
 
 import { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
@@ -61,7 +61,6 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
   const [datePickerPosition, setDatePickerPosition] = useState({ top: 0, left: 0 });
 
   // Auto Cap state
-  const [autoCapEnabled, setAutoCapEnabled] = useState(true);
   const [showAutoCapSettings, setShowAutoCapSettings] = useState(false);
   const [showAutoCapExceptions, setShowAutoCapExceptions] = useState(false);
   const [autoCapMode, setAutoCapMode] = useState<AutoCapMode>(() => {
@@ -218,8 +217,6 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
     if (activeField === 'spotify_label') {
       success = await deleteLabel(itemId);
     }
-    // Format, genre, location can't really be "deleted" - they're just values
-    // We'd need to set them to null on albums that have them
     
     if (success && activeField) {
       await reloadData(activeField);
@@ -253,7 +250,7 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
         await reloadData(activeField);
       }
     } else {
-      // Create new - just add to local state, it will be created when album is saved with this value
+      // Create new
       const newItem: PickerDataItem = {
         id: newName,
         name: newName,
@@ -322,18 +319,21 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
   const handleDateChange = (date: { year: number | null; month: number | null; day: number | null }) => {
     if (datePickerField === 'release') {
       if (date.year) onChange('year', date.year.toString());
-      // Month and day would need separate fields in the Album type
-    } else if (datePickerField === 'original') {
-      // Would need original_release_date fields
-    } else if (datePickerField === 'recording') {
-      // Would need recording_date fields
     }
     setShowDatePicker(false);
   };
 
-  // Auto Cap handlers
-  const handleTitleChange = (value: string) => {
-    const capitalized = autoCapEnabled ? applyAutoCap(value, autoCapMode, autoCapExceptions) : value;
+  // Auto Cap handler - Apply capitalization immediately when clicked
+  const handleApplyAutoCap = () => {
+    // Read current settings
+    const mode = (localStorage.getItem('autoCapMode') as AutoCapMode) || autoCapMode;
+    const exceptionsStr = localStorage.getItem('autoCapExceptions');
+    const exceptions = exceptionsStr ? JSON.parse(exceptionsStr) : autoCapExceptions;
+    
+    // Apply capitalization to current title
+    const capitalized = applyAutoCap(album.title || '', mode, exceptions);
+    
+    // Update the title
     onChange('title', capitalized);
   };
 
@@ -414,23 +414,23 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
               <label style={{ ...labelStyle, marginBottom: '0' }}>Title</label>
               <span 
-                onClick={() => setAutoCapEnabled(!autoCapEnabled)}
+                onClick={handleApplyAutoCap}
                 onContextMenu={(e) => {
                   e.preventDefault();
                   setShowAutoCapSettings(true);
                 }}
                 style={{ 
-                  color: autoCapEnabled ? '#3b82f6' : '#9ca3af',
+                  color: '#9ca3af',
                   fontSize: '13px', 
                   fontWeight: '600',
                   cursor: 'pointer',
                   userSelect: 'none',
                   padding: '2px 6px',
                   borderRadius: '3px',
-                  backgroundColor: autoCapEnabled ? '#eff6ff' : '#f3f4f6',
-                  border: `1px solid ${autoCapEnabled ? '#3b82f6' : '#d1d5db'}`,
+                  backgroundColor: '#f3f4f6',
+                  border: '1px solid #d1d5db',
                 }}
-                title={`Auto Capitalization ${autoCapEnabled ? 'ON' : 'OFF'} - Click to toggle, right-click for settings`}
+                title="Click to capitalize title - Right-click for settings"
               >
                 Aa
               </span>
@@ -438,7 +438,7 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
             <input
               type="text"
               value={album.title}
-              onChange={(e) => handleTitleChange(e.target.value)}
+              onChange={(e) => onChange('title', e.target.value)}
               style={inputStyle}
             />
           </div>
