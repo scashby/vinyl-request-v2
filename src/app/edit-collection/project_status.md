@@ -1,6 +1,6 @@
 # PROJECT_STATUS.md
 # DWD Collection Management System - Collection Browser
-**Last Updated:** 2025-12-14 (Auto-Cap Functionality Fix)
+**Last Updated:** 2025-12-14 (Auto-Cap Aa Button Behavior & Exceptions Fix)
 
 ## Project Overview
 Building an exact CLZ Music Web-inspired interface for Dead Wax Dialogues vinyl management system with custom branding. Strategy: Build complete visual framework first (LOCKED), then add functionality second. This ensures pixel-perfect accuracy before connecting data and logic.
@@ -22,7 +22,42 @@ Phase 4: Advanced Features        ░░░░░░░░░░░░░░░�
 
 ---
 
-## 🔧 RECENT CHANGES (2025-12-13)
+## 🔧 RECENT CHANGES (2025-12-14)
+
+### Auto-Cap Aa Button Behavior Fix ✅
+**Problem:** Aa button was implemented as a toggle (blue when on, gray when off) requiring user to type after enabling
+**User Expectation:** Click Aa → Immediately capitalize the title based on settings
+**Solution:** Changed Aa button to immediate action button
+
+**Files Modified:**
+1. `MainTab.tsx` - Aa button behavior changes:
+   - Removed `autoCapEnabled` state (no longer a toggle)
+   - Changed `handleApplyAutoCap` to read settings and immediately apply capitalization
+   - Aa button now always gray (no blue/gray toggle states)
+   - Right-click still opens settings modal
+   - Clicking Aa reads current mode from localStorage and applies capitalization instantly
+
+2. `SettingsModal.tsx` - TypeScript error fixes:
+   - Fixed AutoCapMode comparison values (line 155)
+   - Changed from invalid 'UPPER'/'lower' to correct 'All'/'First'/'FirstExceptions'
+   - Updated display text to match: "Capitalize All Words", "First Word Only", "First Word + Exceptions"
+
+3. `AutoCapExceptions.tsx` - Exception list correction:
+   - **REMOVED INCORRECT EXCEPTIONS:** an, and, as, at, but, by, from, **into**, nor, off, onto, or, out, so, to, up, via, yet
+   - **CORRECTED TO MATCH CLZ EXACTLY:**
+     - Articles: a, the
+     - Prepositions: in, of, for, with, on (only these 5)
+     - Contractions: ve, re, ll, m, t, s, i
+     - Roman numerals: II, III, IV, V, VI, VII, IX, X
+
+**Result:** 
+- Type "ride into the sun" → Click Aa → Becomes "Ride Into the Sun" ✅
+- Word "into" now correctly capitalizes (was incorrectly in exceptions list)
+- Immediate action, no toggle required
+
+---
+
+## 🔧 PREVIOUS CHANGES (2025-12-13)
 
 ### Global CSS Fix - White Text Issue RESOLVED ✅
 **Problem:** White text appearing on white background due to dark mode CSS variables being applied
@@ -1016,25 +1051,25 @@ To create this as a safe rollback point, run:
 git add .
 
 # Commit with descriptive message
-git commit -m "Phase 2.3 Progress: Auto-Cap Functionality Complete [CHECKPOINT]
+git commit -m "Phase 2.3 Progress: Auto-Cap Complete - Aa Button & Exceptions Fixed [CHECKPOINT]
 
 ✅ COMPLETED:
-- Auto-cap Aa button now toggles on/off (blue when enabled, gray when disabled)
-- Implemented complete applyAutoCap function with 3 modes
-- Real-time capitalization working in Title field
-- Exception word handling functional
-- Settings accessible via right-click or Settings modal
+- Auto-cap Aa button changed from toggle to immediate action
+- Click Aa now instantly applies capitalization based on settings
+- Exception list corrected to match CLZ exactly (removed 18 incorrect words)
+- TypeScript errors in SettingsModal resolved
+- Complete auto-capitalization functionality working perfectly
 
 🔄 IN PROGRESS:
-- Tracks tab (high priority)
+- Tracks tab (high priority next)
 - Remaining 6 tabs (Phase 6)
 
 🎯 READY FOR: Tracks Tab implementation with Spotify import
 
-This commit represents complete auto-capitalization functionality."
+This commit represents complete and correct auto-capitalization functionality."
 
 # Create a named tag for easy reference
-git tag -a phase-2.3-autocap-complete -m "Auto-capitalization fully functional"
+git tag -a phase-2.3-autocap-complete -m "Auto-capitalization fully functional with correct behavior"
 
 # Optional: Push to remote
 git push origin main --tags
