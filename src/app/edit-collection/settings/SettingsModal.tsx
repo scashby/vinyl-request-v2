@@ -1,4 +1,4 @@
-// src/app/edit-collection/settings/SettingsModal.tsx - NEW
+// src/app/edit-collection/settings/SettingsModal.tsx - FIXED: Correct AutoCapMode values
 'use client';
 
 import { useState } from 'react';
@@ -152,7 +152,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   Auto Capitalization
                 </div>
                 <div style={{ fontSize: '13px', color: '#6b7280' }}>
-                  Current mode: <strong>{autoCapMode === 'UPPER' ? 'UPPER CASE' : autoCapMode === 'lower' ? 'lower case' : autoCapMode === 'First' ? 'First letter only' : 'First Letter of Each Word with Exceptions'}</strong>
+                  Current mode: <strong>{autoCapMode === 'All' ? 'Capitalize All Words' : autoCapMode === 'First' ? 'First Word Only' : 'First Word + Exceptions'}</strong>
                 </div>
               </div>
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#6b7280" strokeWidth="2">
