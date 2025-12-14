@@ -5,8 +5,9 @@ import { useState } from 'react';
 import type { AutoCapMode } from './AutoCapSettings';
 
 export const DEFAULT_EXCEPTIONS = [
-  'a', 'an', 'and', 'as', 'at', 'but', 'by', 'for', 'from', 'in', 'into', 'nor', 
-  'of', 'off', 'on', 'onto', 'or', 'out', 'so', 'the', 'to', 'up', 'via', 'with', 'yet'
+  'a', 'the', 'in', 'of', 'for', 'with', 'on',
+  've', 're', 'll', 'm', 't', 's', 'i',
+  'II', 'III', 'IV', 'V', 'VI', 'VII', 'IX', 'X'
 ];
 
 interface AutoCapExceptionsProps {
