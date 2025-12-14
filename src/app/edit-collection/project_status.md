@@ -1,6 +1,6 @@
 # PROJECT_STATUS.md
 # DWD Collection Management System - Collection Browser
-**Last Updated:** 2025-12-13 (Global CSS Fix + Settings Infrastructure)
+**Last Updated:** 2025-12-14 (Auto-Cap Functionality Fix)
 
 ## Project Overview
 Building an exact CLZ Music Web-inspired interface for Dead Wax Dialogues vinyl management system with custom branding. Strategy: Build complete visual framework first (LOCKED), then add functionality second. This ensures pixel-perfect accuracy before connecting data and logic.
@@ -679,6 +679,23 @@ src/app/edit-collection/
 
 ## 🔄 CHANGE LOG
 
+- **2025-12-14 (Auto-Cap Functionality Fix):** ✅ COMPLETE
+  - **Fixed Aa Button**: Now toggles auto-capitalization on/off (was incorrectly opening settings)
+    - Blue background when enabled, gray when disabled
+    - Left-click to toggle, right-click to open settings
+    - Visual state feedback for user
+  - **Implemented applyAutoCap Function**: Complete working capitalization logic
+    - Three modes: All (every word), First (first word only), FirstExceptions (smart capitalization)
+    - Exception word handling (a, an, and, the, etc.)
+    - First and last words always capitalized in FirstExceptions mode
+    - Proper word-by-word processing with toLowerCase/toUpperCase
+  - **Auto-Cap Integration**: Title field now applies capitalization in real-time when enabled
+    - Only applies when Aa button is in enabled state (blue)
+    - Respects user's selected mode from settings
+    - Honors exception word list from localStorage
+  - **Files Modified**: AutoCapExceptions.tsx (added working applyAutoCap), AutoCapSettings.tsx, MainTab.tsx
+  - **Result**: Auto-capitalization now fully functional - typing "ride into the sun" becomes "Ride Into the Sun"
+
 - **2025-12-13 (Global CSS Fix + Settings Infrastructure):** ✅ COMPLETE
   - **Global CSS Fix**: Resolved white-on-white text issue
     - Removed @theme block causing CSS validation errors
@@ -999,14 +1016,14 @@ To create this as a safe rollback point, run:
 git add .
 
 # Commit with descriptive message
-git commit -m "Phase 2.3 Progress: Settings Infrastructure Complete [CHECKPOINT]
+git commit -m "Phase 2.3 Progress: Auto-Cap Functionality Complete [CHECKPOINT]
 
 ✅ COMPLETED:
-- Global CSS fix - resolved white-on-white text issue
-- Settings infrastructure created (SettingsModal.tsx)
-- Wired Settings button in hamburger menu and top toolbar
-- Auto Cap settings now accessible from 3 locations
-- Ready for future settings sections
+- Auto-cap Aa button now toggles on/off (blue when enabled, gray when disabled)
+- Implemented complete applyAutoCap function with 3 modes
+- Real-time capitalization working in Title field
+- Exception word handling functional
+- Settings accessible via right-click or Settings modal
 
 🔄 IN PROGRESS:
 - Tracks tab (high priority)
@@ -1014,10 +1031,10 @@ git commit -m "Phase 2.3 Progress: Settings Infrastructure Complete [CHECKPOINT]
 
 🎯 READY FOR: Tracks Tab implementation with Spotify import
 
-This commit represents complete settings infrastructure and global CSS fixes."
+This commit represents complete auto-capitalization functionality."
 
 # Create a named tag for easy reference
-git tag -a phase-2.3-settings-complete -m "Settings infrastructure complete"
+git tag -a phase-2.3-autocap-complete -m "Auto-capitalization fully functional"
 
 # Optional: Push to remote
 git push origin main --tags

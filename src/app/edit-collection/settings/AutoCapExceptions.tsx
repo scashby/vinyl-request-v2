@@ -1,12 +1,12 @@
 // src/app/edit-collection/settings/AutoCapExceptions.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import type { AutoCapMode } from './AutoCapSettings';
 
-// Default exceptions from CLZ
-const DEFAULT_EXCEPTIONS = [
-  't', 's', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'IX', 'X',
-  'the', 'in', 'of', 'a', 'for', 'with', 'on', 've', 're', 'll', 'm'
+export const DEFAULT_EXCEPTIONS = [
+  'a', 'an', 'and', 'as', 'at', 'but', 'by', 'for', 'from', 'in', 'into', 'nor', 
+  'of', 'off', 'on', 'onto', 'or', 'out', 'so', 'the', 'to', 'up', 'via', 'with', 'yet'
 ];
 
 interface AutoCapExceptionsProps {
@@ -16,41 +16,69 @@ interface AutoCapExceptionsProps {
   onSave: (exceptions: string[]) => void;
 }
 
-export function AutoCapExceptions({
-  isOpen,
-  onClose,
-  exceptions,
-  onSave,
-}: AutoCapExceptionsProps) {
+export function applyAutoCap(text: string, mode: AutoCapMode, exceptions: string[]): string {
+  if (!text) return text;
+
+  const words = text.split(' ');
+  
+  return words.map((word, index) => {
+    // First and last word always capitalize
+    if (index === 0 || index === words.length - 1) {
+      return capitalizeWord(word);
+    }
+
+    const lowerWord = word.toLowerCase();
+    
+    switch (mode) {
+      case 'All':
+        // Capitalize every word
+        return capitalizeWord(word);
+        
+      case 'First':
+        // Only first word (already handled above)
+        return word;
+        
+      case 'FirstExceptions':
+        // Capitalize first word and all others except exceptions
+        if (exceptions.includes(lowerWord)) {
+          return lowerWord;
+        }
+        return capitalizeWord(word);
+        
+      default:
+        return word;
+    }
+  }).join(' ');
+}
+
+function capitalizeWord(word: string): string {
+  if (!word) return word;
+  return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+}
+
+export function AutoCapExceptions({ isOpen, onClose, exceptions, onSave }: AutoCapExceptionsProps) {
   const [localExceptions, setLocalExceptions] = useState<string[]>(exceptions);
   const [newException, setNewException] = useState('');
 
-  useEffect(() => {
-    setLocalExceptions(exceptions);
-  }, [exceptions, isOpen]);
-
   if (!isOpen) return null;
 
-  const handleAddException = () => {
-    const trimmed = newException.trim();
-    if (trimmed && !localExceptions.includes(trimmed)) {
-      setLocalExceptions([...localExceptions, trimmed].sort());
+  const handleAdd = () => {
+    if (newException.trim() && !localExceptions.includes(newException.trim().toLowerCase())) {
+      setLocalExceptions([...localExceptions, newException.trim().toLowerCase()].sort());
       setNewException('');
     }
   };
 
-  const handleRemoveException = (exception: string) => {
+  const handleRemove = (exception: string) => {
     setLocalExceptions(localExceptions.filter(e => e !== exception));
+  };
+
+  const handleReset = () => {
+    setLocalExceptions(DEFAULT_EXCEPTIONS);
   };
 
   const handleSave = () => {
     onSave(localExceptions);
-    onClose();
-  };
-
-  const handleCancel = () => {
-    setLocalExceptions(exceptions);
-    setNewException('');
     onClose();
   };
 
@@ -66,45 +94,44 @@ export function AutoCapExceptions({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 30006,
+        zIndex: 10000,
       }}
-      onClick={handleCancel}
+      onClick={onClose}
     >
       <div
+        onClick={(e) => e.stopPropagation()}
         style={{
           backgroundColor: 'white',
-          borderRadius: '6px',
-          width: '550px',
+          borderRadius: '8px',
+          width: '500px',
           maxHeight: '600px',
           display: 'flex',
           flexDirection: 'column',
-          overflow: 'hidden',
           boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
         }}
-        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div
           style={{
-            padding: '12px 16px',
+            padding: '20px 24px',
             borderBottom: '1px solid #e5e7eb',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
           }}
         >
-          <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: '#111827' }}>
-            Auto Cap Exceptions
-          </h3>
+          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '600', color: '#111827' }}>
+            Auto Capitalization Exceptions
+          </h2>
           <button
-            onClick={handleCancel}
+            onClick={onClose}
             style={{
               background: 'transparent',
               border: 'none',
-              color: '#6b7280',
-              fontSize: '20px',
+              fontSize: '24px',
               cursor: 'pointer',
-              padding: '0 4px',
+              color: '#6b7280',
+              padding: '0',
               lineHeight: '1',
             }}
           >
@@ -112,131 +139,136 @@ export function AutoCapExceptions({
           </button>
         </div>
 
-        {/* Add New Exception */}
-        <div
-          style={{
-            padding: '12px 16px',
-            borderBottom: '1px solid #e5e7eb',
-            display: 'flex',
-            gap: '8px',
-            alignItems: 'center',
-          }}
-        >
-          <input
-            type="text"
-            placeholder="Add new exception..."
-            value={newException}
-            onChange={(e) => setNewException(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                handleAddException();
-              }
-            }}
+        {/* Content */}
+        <div style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>
+          <p style={{ margin: '0 0 16px 0', fontSize: '14px', color: '#6b7280' }}>
+            Words in this list will not be capitalized (except when they are the first or last word).
+          </p>
+
+          {/* Add new exception */}
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+            <input
+              type="text"
+              value={newException}
+              onChange={(e) => setNewException(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleAdd();
+                }
+              }}
+              placeholder="Add new exception..."
+              style={{
+                flex: 1,
+                padding: '8px 12px',
+                border: '1px solid #d1d5db',
+                borderRadius: '4px',
+                fontSize: '14px',
+                color: '#111827',
+              }}
+            />
+            <button
+              onClick={handleAdd}
+              style={{
+                padding: '8px 16px',
+                backgroundColor: '#3b82f6',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: 'pointer',
+              }}
+            >
+              Add
+            </button>
+          </div>
+
+          {/* Exception list */}
+          <div
             style={{
-              flex: 1,
-              padding: '6px 10px',
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: '8px',
+              padding: '12px',
+              backgroundColor: '#f9fafb',
+              borderRadius: '6px',
+              minHeight: '100px',
+              maxHeight: '300px',
+              overflowY: 'auto',
+            }}
+          >
+            {localExceptions.map((exception) => (
+              <div
+                key={exception}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 12px',
+                  backgroundColor: 'white',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '4px',
+                  fontSize: '13px',
+                  color: '#374151',
+                }}
+              >
+                {exception}
+                <button
+                  onClick={() => handleRemove(exception)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#9ca3af',
+                    cursor: 'pointer',
+                    padding: '0',
+                    fontSize: '16px',
+                    lineHeight: '1',
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+
+          {/* Reset button */}
+          <button
+            onClick={handleReset}
+            style={{
+              marginTop: '12px',
+              padding: '6px 12px',
+              backgroundColor: '#f3f4f6',
+              color: '#374151',
               border: '1px solid #d1d5db',
               borderRadius: '4px',
               fontSize: '13px',
-              outline: 'none',
-            }}
-          />
-          <button
-            onClick={handleAddException}
-            disabled={!newException.trim()}
-            style={{
-              padding: '6px 12px',
-              background: newException.trim() ? '#3b82f6' : '#d1d5db',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              fontSize: '13px',
-              fontWeight: '500',
-              cursor: newException.trim() ? 'pointer' : 'not-allowed',
-              whiteSpace: 'nowrap',
+              cursor: 'pointer',
             }}
           >
-            Add
+            Reset to Defaults
           </button>
-        </div>
-
-        {/* Exceptions List */}
-        <div
-          style={{
-            flex: 1,
-            overflowY: 'auto',
-            padding: '8px 16px',
-          }}
-        >
-          {localExceptions.length === 0 ? (
-            <div
-              style={{
-                padding: '40px 20px',
-                textAlign: 'center',
-                color: '#9ca3af',
-                fontSize: '13px',
-              }}
-            >
-              No exceptions configured
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-              {localExceptions.map((exception) => (
-                <div
-                  key={exception}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '6px 10px',
-                    background: '#f3f4f6',
-                    borderRadius: '4px',
-                    fontSize: '13px',
-                    color: '#111827',
-                  }}
-                >
-                  <span>{exception}</span>
-                  <button
-                    onClick={() => handleRemoveException(exception)}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      color: '#6b7280',
-                      cursor: 'pointer',
-                      padding: 0,
-                      fontSize: '16px',
-                      lineHeight: '1',
-                      fontWeight: '300',
-                    }}
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
 
         {/* Footer */}
         <div
           style={{
-            padding: '12px 16px',
+            padding: '16px 24px',
             borderTop: '1px solid #e5e7eb',
             display: 'flex',
             justifyContent: 'flex-end',
-            gap: '8px',
+            gap: '12px',
           }}
         >
           <button
-            onClick={handleCancel}
+            onClick={onClose}
             style={{
-              padding: '6px 16px',
-              background: '#e5e7eb',
+              padding: '8px 16px',
+              backgroundColor: '#f3f4f6',
               color: '#374151',
               border: 'none',
               borderRadius: '4px',
-              fontSize: '13px',
+              fontSize: '14px',
               fontWeight: '500',
               cursor: 'pointer',
             }}
@@ -246,13 +278,13 @@ export function AutoCapExceptions({
           <button
             onClick={handleSave}
             style={{
-              padding: '6px 16px',
-              background: '#3b82f6',
+              padding: '8px 16px',
+              backgroundColor: '#3b82f6',
               color: 'white',
               border: 'none',
               borderRadius: '4px',
-              fontSize: '13px',
-              fontWeight: '600',
+              fontSize: '14px',
+              fontWeight: '500',
               cursor: 'pointer',
             }}
           >
@@ -263,45 +295,3 @@ export function AutoCapExceptions({
     </div>
   );
 }
-
-// Helper function to apply auto-cap with exceptions
-export function applyAutoCap(text: string, mode: 'UPPER' | 'lower' | 'First' | 'FirstExceptions', exceptions: string[]): string {
-  if (!text) return text;
-
-  switch (mode) {
-    case 'UPPER':
-      return text.toUpperCase();
-    
-    case 'lower':
-      return text.toLowerCase();
-    
-    case 'First':
-      return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
-    
-    case 'FirstExceptions':
-      return text.split(' ').map((word, index) => {
-        // First word always capitalized
-        if (index === 0) {
-          return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
-        }
-        
-        // Check if word is an exception
-        if (exceptions.includes(word.toLowerCase())) {
-          return word.toLowerCase();
-        }
-        
-        // Check if word is all caps (like roman numerals)
-        if (exceptions.includes(word.toUpperCase())) {
-          return word.toUpperCase();
-        }
-        
-        // Default: capitalize first letter
-        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
-      }).join(' ');
-    
-    default:
-      return text;
-  }
-}
-
-export { DEFAULT_EXCEPTIONS };
