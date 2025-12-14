@@ -330,7 +330,7 @@ export async function deleteLabel(id: string): Promise<boolean> {
 }
 
 // Merge functions
-export async function mergeLabels(sourceIds: string[], targetId: string): Promise<boolean> {
+export async function mergeLabels(targetId: string, sourceIds: string[]): Promise<boolean> {
   try {
     const supabase = createClientComponentClient();
     const { error } = await supabase
@@ -345,7 +345,7 @@ export async function mergeLabels(sourceIds: string[], targetId: string): Promis
   }
 }
 
-export async function mergeFormats(sourceIds: string[], targetId: string): Promise<boolean> {
+export async function mergeFormats(targetId: string, sourceIds: string[]): Promise<boolean> {
   try {
     const supabase = createClientComponentClient();
     const { error } = await supabase
@@ -360,7 +360,7 @@ export async function mergeFormats(sourceIds: string[], targetId: string): Promi
   }
 }
 
-export async function mergeLocations(sourceIds: string[], targetId: string): Promise<boolean> {
+export async function mergeLocations(targetId: string, sourceIds: string[]): Promise<boolean> {
   try {
     const supabase = createClientComponentClient();
     const { error } = await supabase
@@ -375,7 +375,7 @@ export async function mergeLocations(sourceIds: string[], targetId: string): Pro
   }
 }
 
-export async function mergeArtists(sourceIds: string[], targetId: string): Promise<boolean> {
+export async function mergeArtists(targetId: string, sourceIds: string[]): Promise<boolean> {
   try {
     const supabase = createClientComponentClient();
     const { error } = await supabase
