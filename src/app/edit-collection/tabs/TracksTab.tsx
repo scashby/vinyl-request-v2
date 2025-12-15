@@ -446,10 +446,14 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
 
       const reorderedDiscTracks = arrayMove(activeDiscTracks, oldIndex, newIndex);
 
-      // Update positions
+      // Calculate starting position based on tracks from previous discs
+      const tracksBeforeThisDisc = tracks.filter(t => t.disc_number < activeDisc);
+      const startingPosition = tracksBeforeThisDisc.length + 1;
+
+      // Update positions starting from the correct position
       const updatedDiscTracks = reorderedDiscTracks.map((track, index) => ({
         ...track,
-        position: index + 1,
+        position: startingPosition + index,
       }));
 
       // Merge with tracks from other discs

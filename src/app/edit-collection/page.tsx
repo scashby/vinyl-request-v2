@@ -161,6 +161,119 @@ const AlbumInfoPanel = memo(function AlbumInfoPanel({ album }: { album: Album | 
         </div>
       )}
 
+      {/* Track Listings */}
+      {(() => {
+        if (!album.tracks || album.tracks.length === 0) return null;
+
+        // Group tracks by disc
+        const discMap = new Map<number, typeof album.tracks>();
+        album.tracks.forEach(track => {
+          if (!discMap.has(track.disc_number)) {
+            discMap.set(track.disc_number, []);
+          }
+          discMap.get(track.disc_number)!.push(track);
+        });
+
+        // Sort each disc's tracks by position
+        discMap.forEach(tracks => {
+          tracks.sort((a, b) => parseInt(a.position) - parseInt(b.position));
+        });
+
+        const sortedDiscs = Array.from(discMap.entries()).sort(([a], [b]) => a - b);
+
+        return (
+          <div style={{ marginTop: '16px', borderTop: '1px solid #e5e7eb', paddingTop: '16px' }}>
+            <div style={{ fontSize: '13px', fontWeight: 600, color: '#333', marginBottom: '12px' }}>
+              Tracks:
+            </div>
+            {sortedDiscs.map(([discNumber, tracks]) => {
+              const discMeta = album.disc_metadata?.find(d => d.disc_number === discNumber);
+              const discTitle = discMeta?.title || `Disc ${discNumber}`;
+
+              return (
+                <div key={discNumber} style={{ marginBottom: '16px' }}>
+                  <div style={{ 
+                    fontSize: '12px', 
+                    fontWeight: 700, 
+                    color: '#1f2937', 
+                    marginBottom: '8px',
+                    padding: '6px 10px',
+                    background: '#f3f4f6',
+                    borderRadius: '4px',
+                    borderLeft: '3px solid #8809AC'
+                  }}>
+                    {discTitle}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                    {tracks.map((track, idx) => {
+                      if (track.type === 'header') {
+                        return (
+                          <div 
+                            key={idx}
+                            style={{ 
+                              fontSize: '11px', 
+                              fontWeight: 600, 
+                              color: '#6b7280',
+                              padding: '5px 8px',
+                              background: '#fafafa',
+                              marginTop: idx > 0 ? 6 : 0
+                            }}
+                          >
+                            {track.title}
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div 
+                          key={idx}
+                          style={{ 
+                            display: 'flex', 
+                            alignItems: 'center',
+                            padding: '4px 8px',
+                            fontSize: '11px',
+                            borderRadius: '2px',
+                            background: idx % 2 === 0 ? 'white' : '#fafafa'
+                          }}
+                        >
+                          <div style={{ 
+                            minWidth: 24, 
+                            color: '#9ca3af',
+                            fontWeight: 500,
+                            fontSize: '10px'
+                          }}>
+                            {track.position}
+                          </div>
+                          <div style={{ 
+                            flex: 1, 
+                            color: '#374151',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                          }}>
+                            {track.title}
+                          </div>
+                          {track.duration && (
+                            <div style={{ 
+                              marginLeft: 6,
+                              color: '#9ca3af',
+                              fontSize: '10px',
+                              fontFamily: 'monospace'
+                            }}>
+                              {track.duration}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
+
       {album.custom_tags && album.custom_tags.length > 0 && (
         <div style={{ marginTop: '16px' }}>
           <div style={{ fontSize: '13px', fontWeight: 600, color: '#333', marginBottom: '8px' }}>Tags:</div>
