@@ -228,6 +228,13 @@ export default function EditAlbumModal({ albumId, onClose, onSave }: EditAlbumMo
         ...editedAlbum,
       };
       
+      // Remove GENERATED columns (computed by database)
+      delete albumUpdateData.album_norm;
+      delete albumUpdateData.artist_norm;
+      delete albumUpdateData.title_norm;
+      delete albumUpdateData.artist_album_norm;
+      delete albumUpdateData.year_int;
+      
       // Add tracks JSONB fields if we have tracks data
       if (tracksData) {
         // Store tracks in JSONB format
