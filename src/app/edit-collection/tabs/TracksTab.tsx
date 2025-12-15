@@ -272,8 +272,42 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
 
   // Load data from album on mount
   useEffect(() => {
-    // Load discs from album
-    if (album.discs && album.discs > 1) {
+    // Load existing tracks and disc metadata from album
+    if (album.tracks && Array.isArray(album.tracks) && album.tracks.length > 0) {
+      console.log('📀 Loading existing tracks from album:', album.tracks);
+      
+      // Convert database tracks to internal Track format
+      const loadedTracks: Track[] = album.tracks.map((dbTrack, index) => ({
+        id: `track-${index}`,
+        position: parseInt(dbTrack.position || '0'),
+        title: dbTrack.title || '',
+        artist: dbTrack.artist || '',
+        duration: dbTrack.duration || '',
+        disc_number: dbTrack.disc_number || 1,
+        side: dbTrack.side || 'A',
+        is_header: dbTrack.type === 'header',
+      }));
+      setTracks(loadedTracks);
+      
+      // Load disc metadata if available
+      if (album.disc_metadata && Array.isArray(album.disc_metadata)) {
+        const loadedDiscs: Disc[] = album.disc_metadata.map((dbDisc) => {
+          const discNum = dbDisc.disc_number || 1;
+          const matrixData = album.matrix_numbers?.[discNum.toString()];
+          
+          return {
+            disc_number: discNum,
+            title: dbDisc.title || `Disc #${discNum}`,
+            storage_device: dbDisc.storage_device || '',
+            slot: dbDisc.slot || '',
+            matrix_side_a: matrixData?.side_a || '',
+            matrix_side_b: matrixData?.side_b || '',
+          };
+        });
+        setDiscs(loadedDiscs);
+      }
+    } else if (album.discs && album.discs > 1) {
+      // No saved tracks - initialize empty discs based on disc count
       const newDiscs: Disc[] = [];
       for (let i = 1; i <= album.discs; i++) {
         newDiscs.push({
@@ -286,12 +320,6 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
         });
       }
       setDiscs(newDiscs);
-    }
-
-    // Load tracks from album (assuming tracks field is JSON array)
-    // TODO: Parse actual track data from album when database structure is known
-    if (album.spotify_total_tracks || album.apple_music_track_count) {
-      // Placeholder - will be replaced with actual track data
     }
   }, [album]);
 
