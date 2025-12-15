@@ -28,6 +28,11 @@ import {
   type PickerDataItem,
 } from '../pickers/pickerDataUtils';
 import { applyAutoCap, DEFAULT_EXCEPTIONS } from '../settings/AutoCapExceptions';
+import {
+  importTracksFromDiscogs,
+  importTracksFromSpotify,
+  getSpotifyAccessToken,
+} from './trackImportUtils';
 import type { AutoCapMode } from '../settings/AutoCapSettings';
 
 interface Track {
@@ -37,6 +42,7 @@ interface Track {
   artist: string;
   duration: string;
   disc_number: number;
+  side?: string; // Vinyl side (A, B, C, D, etc.)
   is_header?: boolean;
 }
 
@@ -177,6 +183,12 @@ export function TracksTab({ album, onChange }: TracksTabProps) {
   const [showStoragePicker, setShowStoragePicker] = useState(false);
   const [showManageStorage, setShowManageStorage] = useState(false);
   const [storageDevices, setStorageDevices] = useState<PickerDataItem[]>([]);
+
+  // Track import state
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importSource, setImportSource] = useState<'discogs' | 'spotify'>('discogs');
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
 
   // Drag and drop sensors
   const sensors = useSensors(
@@ -388,6 +400,68 @@ export function TracksTab({ album, onChange }: TracksTabProps) {
     ));
   };
 
+  // Track import handlers
+  const handleImportTracks = async () => {
+    setImporting(true);
+    setImportError(null);
+
+    try {
+      let importedTracks: Track[] = [];
+
+      if (importSource === 'discogs') {
+        // Try to get Discogs release ID from album
+        const discogsId = album.discogs_release_id || album.discogs_id;
+        if (!discogsId) {
+          throw new Error('No Discogs release ID found for this album');
+        }
+
+        importedTracks = await importTracksFromDiscogs(discogsId);
+      } else if (importSource === 'spotify') {
+        // Try to get Spotify album ID from album
+        const spotifyId = album.spotify_id || album.spotify_album_id;
+        if (!spotifyId) {
+          throw new Error('No Spotify album ID found for this album');
+        }
+
+        const accessToken = await getSpotifyAccessToken();
+        importedTracks = await importTracksFromSpotify(spotifyId, accessToken);
+      }
+
+      if (importedTracks.length === 0) {
+        throw new Error('No tracks found in API response');
+      }
+
+      // Replace existing tracks
+      setTracks(importedTracks);
+
+      // Update disc count if multi-disc album detected
+      const maxDiscNum = Math.max(...importedTracks.map(t => t.disc_number || 1));
+      if (maxDiscNum > 1 && maxDiscNum !== discs.length) {
+        const newDiscs: Disc[] = [];
+        for (let i = 1; i <= maxDiscNum; i++) {
+          newDiscs.push({
+            disc_number: i,
+            title: `Disc #${i}`,
+            storage_device: '',
+            slot: '',
+            matrix_side_a: '',
+            matrix_side_b: '',
+          });
+        }
+        setDiscs(newDiscs);
+        onChange('discs', maxDiscNum);
+      }
+
+      setShowImportModal(false);
+      alert(`Successfully imported ${importedTracks.length} tracks from ${importSource === 'discogs' ? 'Discogs' : 'Spotify'}`);
+    } catch (error) {
+      console.error('Import error:', error);
+      setImportError(error instanceof Error ? error.message : 'Failed to import tracks');
+    } finally {
+      setImporting(false);
+    }
+  };
+
   // Get current disc
   const currentDisc = discs.find(d => d.disc_number === activeDisc) || discs[0];
 
@@ -560,6 +634,13 @@ export function TracksTab({ album, onChange }: TracksTabProps) {
           <button className="add-track-button" onClick={handleAddTrack}>
             + Add Track
           </button>
+          <button 
+            className="import-tracks-button" 
+            onClick={() => setShowImportModal(true)}
+            style={{ marginLeft: 'auto' }}
+          >
+            📥 Import Tracks
+          </button>
         </div>
       </div>
 
@@ -616,6 +697,160 @@ export function TracksTab({ album, onChange }: TracksTabProps) {
           itemLabel="Storage Device"
           allowMerge={true}
         />
+      )}
+
+      {/* Import Tracks Modal */}
+      {showImportModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 30000,
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '8px',
+            padding: '24px',
+            maxWidth: '500px',
+            width: '90%',
+          }}>
+            <h3 style={{ margin: '0 0 16px 0', color: '#111827', fontSize: '18px', fontWeight: '600' }}>
+              Import Tracks
+            </h3>
+
+            {importError && (
+              <div style={{
+                padding: '12px',
+                background: '#fee2e2',
+                border: '1px solid #fca5a5',
+                borderRadius: '4px',
+                marginBottom: '16px',
+                color: '#991b1b',
+                fontSize: '14px',
+              }}>
+                {importError}
+              </div>
+            )}
+
+            <div style={{ marginBottom: '20px' }}>
+              <p style={{ margin: '0 0 12px 0', color: '#6b7280', fontSize: '14px' }}>
+                Choose a source to import track listings:
+              </p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '12px',
+                  border: `2px solid ${importSource === 'discogs' ? '#3b82f6' : '#e5e7eb'}`,
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  backgroundColor: importSource === 'discogs' ? '#eff6ff' : 'white',
+                }}>
+                  <input
+                    type="radio"
+                    name="importSource"
+                    value="discogs"
+                    checked={importSource === 'discogs'}
+                    onChange={(e) => setImportSource(e.target.value as 'discogs')}
+                    style={{ marginRight: '12px' }}
+                  />
+                  <div>
+                    <div style={{ fontWeight: '600', color: '#111827', marginBottom: '4px' }}>
+                      Discogs (Recommended)
+                    </div>
+                    <div style={{ fontSize: '13px', color: '#6b7280' }}>
+                      Most accurate for vinyl - exact pressing-specific track listings
+                    </div>
+                  </div>
+                </label>
+
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '12px',
+                  border: `2px solid ${importSource === 'spotify' ? '#3b82f6' : '#e5e7eb'}`,
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  backgroundColor: importSource === 'spotify' ? '#eff6ff' : 'white',
+                }}>
+                  <input
+                    type="radio"
+                    name="importSource"
+                    value="spotify"
+                    checked={importSource === 'spotify'}
+                    onChange={(e) => setImportSource(e.target.value as 'spotify')}
+                    style={{ marginRight: '12px' }}
+                  />
+                  <div>
+                    <div style={{ fontWeight: '600', color: '#111827', marginBottom: '4px' }}>
+                      Spotify (Fallback)
+                    </div>
+                    <div style={{ fontSize: '13px', color: '#6b7280' }}>
+                      Generic CD/streaming version - may differ from vinyl
+                    </div>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <div style={{
+              padding: '12px',
+              background: '#fef3c7',
+              border: '1px solid #fde68a',
+              borderRadius: '4px',
+              marginBottom: '20px',
+              fontSize: '13px',
+              color: '#92400e',
+            }}>
+              ⚠️ This will replace all existing tracks for this album
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => {
+                  setShowImportModal(false);
+                  setImportError(null);
+                }}
+                disabled={importing}
+                style={{
+                  padding: '8px 16px',
+                  background: '#f3f4f6',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '4px',
+                  cursor: importing ? 'not-allowed' : 'pointer',
+                  fontSize: '14px',
+                  color: '#374151',
+                  opacity: importing ? 0.5 : 1,
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleImportTracks}
+                disabled={importing}
+                style={{
+                  padding: '8px 16px',
+                  background: importing ? '#9ca3af' : '#3b82f6',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: importing ? 'not-allowed' : 'pointer',
+                  fontSize: '14px',
+                  color: 'white',
+                  fontWeight: '500',
+                }}
+              >
+                {importing ? 'Importing...' : 'Import Tracks'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

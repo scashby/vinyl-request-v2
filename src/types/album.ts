@@ -18,56 +18,56 @@ export type Album = {
   // ============================================================================
   format: string;
   folder: string;
-  discs: number | null;                    // Number of physical discs (NEW)
-  sides: number | { count: number } | string[] | null;  // Sides per disc
-  barcode: string | null;                  // UPC/EAN barcode (NEW)
-  cat_no: string | null;                   // Catalog number (NEW)
+  discs: number | null;
+  sides: number | { count: number } | string[] | null;
+  barcode: string | null;
+  cat_no: string | null;
   
   // ============================================================================
   // VISUAL & AUDIO
   // ============================================================================
   image_url: string | null;
-  length_seconds: number | null;           // Total length in seconds (NEW)
-  tracklists: string | null;               // JSON string of track data
+  length_seconds: number | null;
+  tracklists: string | null;
   
   // ============================================================================
   // CONDITION & GRADING
   // ============================================================================
   media_condition: string;
-  package_sleeve_condition: string | null; // Sleeve/packaging condition (NEW)
+  package_sleeve_condition: string | null;
   
   // ============================================================================
   // VINYL-SPECIFIC FIELDS
   // ============================================================================
-  vinyl_color: string | null;              // Color of vinyl (NEW)
-  vinyl_weight: string | null;             // Weight (e.g., "180g") (NEW)
-  rpm: string | null;                      // Speed (33⅓, 45, 78) (NEW)
+  vinyl_color: string | null;
+  vinyl_weight: string | null;
+  rpm: string | null;
   
   // ============================================================================
   // TECHNICAL SPECIFICATIONS
   // ============================================================================
-  sound: string | null;                    // Mono/Stereo/Quadrophonic (NEW)
-  spars_code: string | null;               // Digital/Analog indicator (NEW)
-  packaging: string | null;                // Gatefold, jewel case, etc. (NEW)
+  sound: string | null;
+  spars_code: string | null;
+  packaging: string | null;
   
   // ============================================================================
   // RELEASE INFORMATION
   // ============================================================================
-  original_release_date: string | null;   // Original first release (NEW)
-  original_release_year: number | null;   // Original year (NEW)
-  recording_date: string | null;          // When recorded (NEW)
-  recording_year: number | null;          // Recording year (NEW)
+  original_release_date: string | null;
+  original_release_year: number | null;
+  recording_date: string | null;
+  recording_year: number | null;
   master_release_date: string | null;
-  country: string | null;                  // Country of pressing (NEW)
-  studio: string | null;                   // Recording studio (NEW)
+  country: string | null;
+  studio: string | null;
   
   // ============================================================================
   // COLLECTION MANAGEMENT
   // ============================================================================
-  collection_status: 'in_collection' | 'for_sale' | 'wish_list' | 'on_order' | 'sold' | 'not_in_collection' | null; // (NEW)
+  collection_status: 'in_collection' | 'for_sale' | 'wish_list' | 'on_order' | 'sold' | 'not_in_collection' | null;
   for_sale: boolean;
   is_box_set: boolean;
-  is_live: boolean | null;                 // Live album flag (NEW)
+  is_live: boolean | null;
   parent_id: string | null;
   child_album_ids: number[] | null;
   
@@ -80,7 +80,7 @@ export type Album = {
   inner_circle_preferred: boolean;
   blocked: boolean;
   blocked_sides: string[] | null;
-  blocked_tracks: Record<string, string[]> | null;  // Map of side -> track numbers
+  blocked_tracks: Record<string, string[]> | null;
   
   // ============================================================================
   // SALES & PRICING
@@ -92,7 +92,6 @@ export type Album = {
   sell_price: string | null;
   wholesale_cost: number | null;
   
-  // Discogs pricing intelligence
   discogs_price_min: number | null;
   discogs_price_median: number | null;
   discogs_price_max: number | null;
@@ -111,20 +110,20 @@ export type Album = {
   // PERSONAL TRACKING
   // ============================================================================
   owner: string | null;
-  my_rating: number | null;                // 1-5 star rating (NEW)
+  my_rating: number | null;
   play_count: number | null;
-  last_played_date: string | null;         // Last played date (NEW)
+  last_played_date: string | null;
   last_cleaned_date: string | null;
   signed_by: string[] | null;
-  location: string | null;                 // Physical storage location (NEW)
-  storage_device_slot: string | null;      // Specific slot/position (NEW)
-  index_number: number | null;             // CLZ index for ordering (NEW)
+  location: string | null;
+  storage_device_slot: string | null;
+  index_number: number | null;
   
   // ============================================================================
   // DATES & METADATA
   // ============================================================================
   date_added: string | null;
-  modified_date: string | null;            // Auto-updated on changes (NEW)
+  modified_date: string | null;
   decade: number | null;
   
   // ============================================================================
@@ -148,12 +147,14 @@ export type Album = {
   // Discogs
   discogs_master_id: string | null;
   discogs_release_id: string | null;
+  discogs_id: string | null;              // Alias for compatibility
   master_release_id: string | null;
   discogs_source: string | null;
   discogs_notes: string | null;
   
   // Spotify
   spotify_id: string | null;
+  spotify_album_id: string | null;       // Alias for compatibility
   spotify_url: string | null;
   spotify_popularity: number | null;
   spotify_release_date: string | null;
@@ -167,40 +168,39 @@ export type Album = {
   apple_music_track_count: number | null;
   apple_music_artwork_url: string | null;
   
-  // Enrichment tracking
-  last_enriched_at: string | null;
   enrichment_sources: string[] | null;
+  last_enriched_at: string | null;
   
   // ============================================================================
   // TAGS & NOTES
   // ============================================================================
   custom_tags: string[] | null;
   notes: string | null;
-  extra: string | null;                    // Miscellaneous info (NEW)
+  extra: string | null;
   
   // ============================================================================
   // PEOPLE & CREDITS
   // ============================================================================
-  engineers: string[] | null;              // Recording engineers (NEW)
-  musicians: string[] | null;              // Session musicians (NEW)
-  producers: string[] | null;              // Producers (NEW)
-  songwriters: string[] | null;            // Songwriters (NEW)
+  engineers: string[] | null;
+  musicians: string[] | null;
+  producers: string[] | null;
+  songwriters: string[] | null;
   
   // ============================================================================
   // CLASSICAL MUSIC FIELDS
   // ============================================================================
-  chorus: string | null;                   // Chorus/choir (NEW)
-  composer: string | null;                 // Composer (NEW)
-  composition: string | null;              // Composition name (NEW)
-  conductor: string | null;                // Conductor (NEW)
-  orchestra: string | null;                // Orchestra (NEW)
+  chorus: string | null;
+  composer: string | null;
+  composition: string | null;
+  conductor: string | null;
+  orchestra: string | null;
   
   // ============================================================================
   // LOAN TRACKING
   // ============================================================================
-  due_date: string | null;                 // When loan is due (NEW)
-  loan_date: string | null;                // When loaned out (NEW)
-  loaned_to: string | null;                // Who borrowed it (NEW)
+  due_date: string | null;
+  loan_date: string | null;
+  loaned_to: string | null;
   
   // ============================================================================
   // NORMALIZED FIELDS (SEARCH OPTIMIZATION)
@@ -211,10 +211,7 @@ export type Album = {
   artist_album_norm: string | null;
 };
 
-// ============================================================================
 // TYPE GUARDS
-// ============================================================================
-
 export function isValidRating(rating: number | null): rating is 1 | 2 | 3 | 4 | 5 | null {
   return rating === null || (rating >= 1 && rating <= 5);
 }
@@ -224,16 +221,11 @@ export function isValidCollectionStatus(
 ): status is Album['collection_status'] {
   return (
     status === null ||
-    ['in_collection', 'for_sale', 'wish_list', 'on_order', 'sold', 'not_in_collection'].includes(
-      status
-    )
+    ['in_collection', 'for_sale', 'wish_list', 'on_order', 'sold', 'not_in_collection'].includes(status)
   );
 }
 
-// ============================================================================
 // UTILITY FUNCTIONS
-// ============================================================================
-
 export function formatLength(seconds: number | null): string {
   if (!seconds) return '—';
   const hours = Math.floor(seconds / 3600);
@@ -248,15 +240,11 @@ export function formatLength(seconds: number | null): string {
 
 export function parseLength(lengthString: string | null): number | null {
   if (!lengthString) return null;
-  
-  // Parse formats like "1:23:45" or "45:30"
   const parts = lengthString.split(':').map(Number);
   
   if (parts.length === 3) {
-    // H:MM:SS
     return parts[0] * 3600 + parts[1] * 60 + parts[2];
   } else if (parts.length === 2) {
-    // MM:SS
     return parts[0] * 60 + parts[1];
   }
   
@@ -276,10 +264,6 @@ export function getSidesCount(sides: Album['sides']): number {
 export function getDiscsCount(album: Album): number {
   return album.discs || 1;
 }
-
-// ============================================================================
-// HELPER FUNCTIONS FOR SAFE DATA ACCESS
-// ============================================================================
 
 export function toSafeSearchString(value: unknown): string {
   if (value === null || value === undefined) return '';
