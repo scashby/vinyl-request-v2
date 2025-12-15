@@ -171,6 +171,10 @@ function SortableTrackRow({
           value={track.title}
           onChange={(e) => onUpdate(track.id, 'title', e.target.value)}
           placeholder="Track title"
+          style={{
+            color: '#111827',
+            backgroundColor: 'white',
+          }}
         />
       </div>
       <div className="track-artist">
@@ -179,6 +183,10 @@ function SortableTrackRow({
           value={track.artist}
           onChange={(e) => onUpdate(track.id, 'artist', e.target.value)}
           placeholder="Artist"
+          style={{
+            color: '#111827',
+            backgroundColor: 'white',
+          }}
         />
       </div>
       <div className="track-length">
@@ -187,6 +195,10 @@ function SortableTrackRow({
           value={track.duration}
           onChange={(e) => onUpdate(track.id, 'duration', e.target.value)}
           placeholder="0:00"
+          style={{
+            color: '#111827',
+            backgroundColor: 'white',
+          }}
         />
       </div>
     </div>
@@ -608,6 +620,10 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
               value={currentDisc.title}
               onChange={(e) => handleUpdateDisc(activeDisc, 'title', e.target.value)}
               placeholder="Disc #1"
+              style={{
+                color: '#111827',
+                backgroundColor: 'white',
+              }}
             />
           </div>
           <div className="disc-metadata-field">
@@ -621,6 +637,10 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
                   } else {
                     handleUpdateDisc(activeDisc, 'storage_device', e.target.value);
                   }
+                }}
+                style={{
+                  color: '#111827',
+                  backgroundColor: 'white',
                 }}
               >
                 <option value="">Select...</option>
@@ -644,6 +664,10 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
               value={currentDisc.slot}
               onChange={(e) => handleUpdateDisc(activeDisc, 'slot', e.target.value)}
               placeholder="Slot"
+              style={{
+                color: '#111827',
+                backgroundColor: 'white',
+              }}
             />
           </div>
         </div>
@@ -655,6 +679,10 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
               value={currentDisc.matrix_side_a}
               onChange={(e) => handleUpdateDisc(activeDisc, 'matrix_side_a', e.target.value)}
               placeholder="Side A matrix"
+              style={{
+                color: '#111827',
+                backgroundColor: 'white',
+              }}
             />
           </div>
           <div className="disc-metadata-field">
@@ -664,6 +692,10 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
               value={currentDisc.matrix_side_b}
               onChange={(e) => handleUpdateDisc(activeDisc, 'matrix_side_b', e.target.value)}
               placeholder="Side B matrix"
+              style={{
+                color: '#111827',
+                backgroundColor: 'white',
+              }}
             />
           </div>
         </div>
@@ -821,7 +853,7 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
             backgroundColor: 'white',
             borderRadius: '8px',
             padding: '24px',
-            maxWidth: '500px',
+            maxWidth: '550px',
             width: '90%',
           }}>
             <h3 style={{ margin: '0 0 16px 0', color: '#111827', fontSize: '18px', fontWeight: '600' }}>
@@ -841,6 +873,63 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
                 {importError}
               </div>
             )}
+
+            {/* Preview Links */}
+            <div style={{ 
+              marginBottom: '20px', 
+              padding: '12px', 
+              background: '#f9fafb', 
+              borderRadius: '6px',
+              border: '1px solid #e5e7eb'
+            }}>
+              <div style={{ fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
+                Preview track listings:
+              </div>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                {(album.discogs_release_id || album.discogs_id) && (
+                  <a
+                    href={`https://www.discogs.com/release/${album.discogs_release_id || album.discogs_id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      flex: 1,
+                      padding: '8px 12px',
+                      background: 'white',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '4px',
+                      textDecoration: 'none',
+                      color: '#3b82f6',
+                      fontSize: '13px',
+                      textAlign: 'center',
+                      fontWeight: '500',
+                    }}
+                  >
+                    🎵 View on Discogs
+                  </a>
+                )}
+                {(album.spotify_id || album.spotify_album_id) && (
+                  <a
+                    href={`https://open.spotify.com/album/${album.spotify_id || album.spotify_album_id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      flex: 1,
+                      padding: '8px 12px',
+                      background: 'white',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '4px',
+                      textDecoration: 'none',
+                      color: '#1ed760',
+                      fontSize: '13px',
+                      textAlign: 'center',
+                      fontWeight: '500',
+                    }}
+                  >
+                    🎧 View on Spotify
+                  </a>
+                )}
+              </div>
+            </div>
 
             <div style={{ marginBottom: '20px' }}>
               <p style={{ margin: '0 0 12px 0', color: '#6b7280', fontSize: '14px' }}>
@@ -865,7 +954,7 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
                     onChange={(e) => setImportSource(e.target.value as 'discogs')}
                     style={{ marginRight: '12px' }}
                   />
-                  <div>
+                  <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: '600', color: '#111827', marginBottom: '4px' }}>
                       Discogs (Recommended)
                     </div>
@@ -892,7 +981,7 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
                     onChange={(e) => setImportSource(e.target.value as 'spotify')}
                     style={{ marginRight: '12px' }}
                   />
-                  <div>
+                  <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: '600', color: '#111827', marginBottom: '4px' }}>
                       Spotify (Fallback)
                     </div>

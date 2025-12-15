@@ -378,7 +378,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
   // Save and close handler
   const handleSave = async () => {
     await performSave();
-    onClose();
+    // Note: Modal stays open - user can click X or Cancel to close
   };
 
   return (
