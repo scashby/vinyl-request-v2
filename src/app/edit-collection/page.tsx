@@ -1481,10 +1481,8 @@ function CollectionBrowserPage() {
         <EditAlbumModal
           albumId={editingAlbumId}
           onClose={() => setEditingAlbumId(null)}
-          onSave={() => {
-            setEditingAlbumId(null);
-            loadAlbums();
-          }}
+          onRefresh={loadAlbums}
+          onNavigate={(newAlbumId) => setEditingAlbumId(newAlbumId)}
           allAlbumIds={filteredAndSortedAlbums.map(a => a.id)}
         />
       )}

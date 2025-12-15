@@ -74,11 +74,12 @@ const TABS: { id: TabId; label: string; IconComponent: () => React.ReactElement 
 interface EditAlbumModalProps {
   albumId: number;
   onClose: () => void;
-  onSave: () => void;
+  onRefresh: () => void;
+  onNavigate: (newAlbumId: number) => void;
   allAlbumIds: number[];
 }
 
-export default function EditAlbumModal({ albumId, onClose, onSave }: EditAlbumModalProps) {
+export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate, allAlbumIds }: EditAlbumModalProps) {
   const [activeTab, setActiveTab] = useState<TabId>('main');
   const [album, setAlbum] = useState<Album | null>(null);
   const [editedAlbum, setEditedAlbum] = useState<Album | null>(null);
@@ -86,6 +87,38 @@ export default function EditAlbumModal({ albumId, onClose, onSave }: EditAlbumMo
   const [error, setError] = useState<string | null>(null);
   const mainTabRef = useRef<MainTabRef>(null);
   const tracksTabRef = useRef<TracksTabRef>(null);
+
+  // Calculate current position and navigation availability
+  const currentIndex = allAlbumIds.indexOf(albumId);
+  const hasPrevious = currentIndex > 0;
+  const hasNext = currentIndex < allAlbumIds.length - 1;
+
+  // Navigation handlers
+  const handlePrevious = async () => {
+    if (!hasPrevious) return;
+    
+    // Save current changes first (without closing)
+    if (editedAlbum) {
+      await performSave();
+    }
+    
+    // Navigate to previous album
+    const previousAlbumId = allAlbumIds[currentIndex - 1];
+    onNavigate(previousAlbumId);
+  };
+
+  const handleNext = async () => {
+    if (!hasNext) return;
+    
+    // Save current changes first (without closing)
+    if (editedAlbum) {
+      await performSave();
+    }
+    
+    // Navigate to next album
+    const nextAlbumId = allAlbumIds[currentIndex + 1];
+    onNavigate(nextAlbumId);
+  };
 
   useEffect(() => {
     async function fetchAlbum() {
@@ -213,7 +246,8 @@ export default function EditAlbumModal({ albumId, onClose, onSave }: EditAlbumMo
     });
   };
 
-  const handleSave = async () => {
+  // Core save logic - can be called with or without closing modal
+  const performSave = async () => {
     if (!editedAlbum) return;
     
     try {
@@ -333,12 +367,18 @@ export default function EditAlbumModal({ albumId, onClose, onSave }: EditAlbumMo
       }
       
       console.log('✅ Save complete!');
-      onSave(); // Notify parent to refresh
-      onClose();
+      onRefresh(); // Notify parent to refresh data
     } catch (err) {
       console.error('❌ Save failed:', err);
       alert(`Failed to save: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      throw err; // Re-throw so navigation handlers know save failed
     }
+  };
+
+  // Save and close handler
+  const handleSave = async () => {
+    await performSave();
+    onClose();
   };
 
   return (
@@ -476,8 +516,10 @@ export default function EditAlbumModal({ albumId, onClose, onSave }: EditAlbumMo
           <UniversalBottomBar
             album={editedAlbum}
             onChange={handleFieldChange}
-            onPrevious={() => console.log('Previous')}
-            onNext={() => console.log('Next')}
+            onPrevious={handlePrevious}
+            onNext={handleNext}
+            hasPrevious={hasPrevious}
+            hasNext={hasNext}
             onCancel={onClose}
             onSave={handleSave}
             onOpenLocationPicker={() => {

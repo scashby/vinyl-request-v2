@@ -8,6 +8,8 @@ interface UniversalBottomBarProps {
   onChange: (field: keyof Album, value: string | number | null | boolean) => void;
   onPrevious: () => void;
   onNext: () => void;
+  hasPrevious?: boolean;
+  hasNext?: boolean;
   onCancel: () => void;
   onSave: () => void;
   onOpenLocationPicker?: () => void;
@@ -17,7 +19,9 @@ export function UniversalBottomBar({
   album, 
   onChange, 
   onPrevious, 
-  onNext, 
+  onNext,
+  hasPrevious = true,
+  hasNext = true,
   onCancel, 
   onSave,
   onOpenLocationPicker,
@@ -167,30 +171,34 @@ export function UniversalBottomBar({
         <div style={{ display: 'flex', gap: '8px' }}>
           <button
             onClick={onPrevious}
+            disabled={!hasPrevious}
             style={{
               padding: '8px 16px',
-              background: '#6b7280',
-              color: 'white',
+              background: hasPrevious ? '#6b7280' : '#d1d5db',
+              color: hasPrevious ? 'white' : '#9ca3af',
               border: 'none',
               borderRadius: '4px',
               fontSize: '13px',
               fontWeight: '500',
-              cursor: 'pointer',
+              cursor: hasPrevious ? 'pointer' : 'not-allowed',
+              opacity: hasPrevious ? 1 : 0.6,
             }}
           >
             ◀ Previous
           </button>
           <button
             onClick={onNext}
+            disabled={!hasNext}
             style={{
               padding: '8px 16px',
-              background: '#6b7280',
-              color: 'white',
+              background: hasNext ? '#6b7280' : '#d1d5db',
+              color: hasNext ? 'white' : '#9ca3af',
               border: 'none',
               borderRadius: '4px',
               fontSize: '13px',
               fontWeight: '500',
-              cursor: 'pointer',
+              cursor: hasNext ? 'pointer' : 'not-allowed',
+              opacity: hasNext ? 1 : 0.6,
             }}
           >
             Next ▶
