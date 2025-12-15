@@ -164,7 +164,9 @@ function SortableTrackRow({
       <div className="track-drag" {...attributes} {...listeners}>
         <span className="drag-handle">≡</span>
       </div>
-      <div className="track-position">{track.position}</div>
+      <div className="track-position">
+        {track.side ? `${track.side}${track.position}` : track.position}
+      </div>
       <div className="track-title">
         <input
           type="text"
