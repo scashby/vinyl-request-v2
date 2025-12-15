@@ -8,7 +8,7 @@ import { MainTab, type MainTabRef } from './tabs/MainTab';
 import { DetailsTab } from './tabs/DetailsTab';
 import { ClassicalTab } from './tabs/ClassicalTab';
 import { PeopleTab } from './tabs/PeopleTab';
-import { TracksTab } from './tabs/TracksTab';
+import { TracksTab, type TracksTabRef } from './tabs/TracksTab';
 import { PersonalTab } from './tabs/PersonalTab';
 import { CoverTab } from './tabs/CoverTab';
 import { LinksTab } from './tabs/LinksTab';
@@ -85,6 +85,7 @@ export default function EditAlbumModal({ albumId, onClose, onSave }: EditAlbumMo
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const mainTabRef = useRef<MainTabRef>(null);
+  const tracksTabRef = useRef<TracksTabRef>(null);
 
   useEffect(() => {
     async function fetchAlbum() {
@@ -212,9 +213,125 @@ export default function EditAlbumModal({ albumId, onClose, onSave }: EditAlbumMo
     });
   };
 
-  const handleSave = () => {
-    onSave();
-    onClose();
+  const handleSave = async () => {
+    if (!editedAlbum) return;
+    
+    try {
+      console.log('💾 Starting save operation...');
+      
+      // 1. Get tracks data from TracksTab (if available)
+      const tracksData = tracksTabRef.current?.getTracksData();
+      console.log('📊 Tracks data:', tracksData);
+      
+      // 2. Update collection table - main album fields
+      const albumUpdateData: Partial<Album> = {
+        ...editedAlbum,
+      };
+      
+      // Add tracks JSONB fields if we have tracks data
+      if (tracksData) {
+        // Store tracks in JSONB format
+        albumUpdateData.tracks = tracksData.tracks;
+        albumUpdateData.disc_metadata = tracksData.disc_metadata;
+        albumUpdateData.matrix_numbers = tracksData.matrix_numbers;
+        
+        // Update disc count
+        albumUpdateData.discs = tracksData.disc_metadata.length || 1;
+      }
+      
+      console.log('📝 Updating collection table...');
+      const { error: updateError } = await supabase
+        .from('collection')
+        .update(albumUpdateData)
+        .eq('id', albumId);
+      
+      if (updateError) {
+        console.error('❌ Failed to update collection:', updateError);
+        alert(`Failed to save album: ${updateError.message}`);
+        return;
+      }
+      
+      console.log('✅ Collection updated');
+      
+      // 3. Sync tracks to tracks table (if we have tracks data)
+      if (tracksData && tracksData.tracks.length > 0) {
+        console.log('🔄 Syncing tracks to tracks table...');
+        
+        // Get existing tracks for this album
+        const { data: existingTracks } = await supabase
+          .from('tracks')
+          .select('id, position')
+          .eq('album_id', albumId);
+        
+        const existingPositions = new Set(existingTracks?.map(t => t.position) || []);
+        const newPositions = new Set(tracksData.tracks.map(t => t.position));
+        
+        // Delete tracks no longer in the list
+        const positionsToDelete = Array.from(existingPositions).filter(
+          pos => !newPositions.has(pos)
+        );
+        
+        if (positionsToDelete.length > 0) {
+          console.log(`🗑️  Deleting ${positionsToDelete.length} removed tracks...`);
+          await supabase
+            .from('tracks')
+            .delete()
+            .eq('album_id', albumId)
+            .in('position', positionsToDelete);
+        }
+        
+        // Insert or update tracks
+        let tracksAdded = 0;
+        let tracksUpdated = 0;
+        
+        for (const track of tracksData.tracks) {
+          const trackData = {
+            album_id: albumId,
+            position: track.position,
+            title: track.title,
+            duration: track.duration,
+            artist: track.artist,
+            type: track.type === 'header' ? 'header' : 'track',
+          };
+          
+          if (existingPositions.has(track.position)) {
+            // Update existing track
+            await supabase
+              .from('tracks')
+              .update(trackData)
+              .eq('album_id', albumId)
+              .eq('position', track.position);
+            tracksUpdated++;
+          } else {
+            // Insert new track
+            await supabase
+              .from('tracks')
+              .insert([trackData]);
+            tracksAdded++;
+          }
+        }
+        
+        console.log(`✅ Tracks synced: ${tracksAdded} added, ${tracksUpdated} updated, ${positionsToDelete.length} deleted`);
+        
+        // Log sync operation
+        await supabase
+          .from('track_sync_log')
+          .insert([{
+            album_id: albumId,
+            tracks_added: tracksAdded,
+            tracks_updated: tracksUpdated,
+            tracks_deleted: positionsToDelete.length,
+            status: 'success',
+          }]);
+      }
+      
+      console.log('✅ Save complete!');
+      onSave(); // Notify parent to refresh
+      onClose();
+    } catch (err) {
+      console.error('❌ Save failed:', err);
+      alert(`Failed to save: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
   };
 
   return (
@@ -330,7 +447,7 @@ export default function EditAlbumModal({ albumId, onClose, onSave }: EditAlbumMo
             <PeopleTab />
           )}
           {activeTab === 'tracks' && (
-            <TracksTab album={editedAlbum} onChange={handleFieldChange} />
+            <TracksTab ref={tracksTabRef} album={editedAlbum} onChange={handleFieldChange} />
           )}
           {activeTab === 'personal' && (
             <PersonalTab />

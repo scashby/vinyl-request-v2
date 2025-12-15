@@ -1,7 +1,7 @@
 // src/app/edit-collection/tabs/TracksTab.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import type { Album } from 'types/album';
 import 'styles/tracks-tab.css';
 import {
@@ -58,6 +58,36 @@ interface Disc {
 interface TracksTabProps {
   album: Album;
   onChange: (field: keyof Album, value: string | number | string[] | null | boolean | Track[]) => void;
+}
+
+// Export interface for parent component
+export interface TracksTabRef {
+  getTracksData: () => TracksData;
+}
+
+// Data structure for saving tracks
+export interface TracksData {
+  tracks: Array<{
+    position: string;
+    title: string;
+    artist: string | null;
+    duration: string | null;
+    type: 'track' | 'header';
+    disc_number: number;
+    side?: string;
+  }>;
+  disc_metadata: Array<{
+    disc_number: number;
+    title: string;
+    storage_device: string | null;
+    slot: string | null;
+  }>;
+  matrix_numbers: {
+    [disc_number: string]: {
+      side_a: string;
+      side_b: string;
+    };
+  };
 }
 
 // Sortable Track Row Component
@@ -163,7 +193,8 @@ function SortableTrackRow({
   );
 }
 
-export function TracksTab({ album, onChange }: TracksTabProps) {
+export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
+  function TracksTab({ album, onChange }, ref) {
   // State for discs and tracks
   const [discs, setDiscs] = useState<Disc[]>([
     {
@@ -197,6 +228,47 @@ export function TracksTab({ album, onChange }: TracksTabProps) {
       coordinateGetter: sortableKeyboardCoordinates,
     })
   );
+
+  // Expose getTracksData method to parent via ref
+  useImperativeHandle(ref, () => ({
+    getTracksData: (): TracksData => {
+      // Format tracks for database
+      const formattedTracks = tracks.map((track) => ({
+        position: track.position.toString(),
+        title: track.title,
+        artist: track.artist || null,
+        duration: track.duration || null,
+        type: track.is_header ? ('header' as const) : ('track' as const),
+        disc_number: track.disc_number,
+        side: track.side,
+      }));
+
+      // Format disc metadata
+      const disc_metadata = discs.map((disc) => ({
+        disc_number: disc.disc_number,
+        title: disc.title,
+        storage_device: disc.storage_device || null,
+        slot: disc.slot || null,
+      }));
+
+      // Format matrix numbers
+      const matrix_numbers: TracksData['matrix_numbers'] = {};
+      discs.forEach((disc) => {
+        if (disc.matrix_side_a || disc.matrix_side_b) {
+          matrix_numbers[disc.disc_number.toString()] = {
+            side_a: disc.matrix_side_a || '',
+            side_b: disc.matrix_side_b || '',
+          };
+        }
+      });
+
+      return {
+        tracks: formattedTracks,
+        disc_metadata,
+        matrix_numbers,
+      };
+    },
+  }));
 
   // Load data from album on mount
   useEffect(() => {
@@ -854,4 +926,4 @@ export function TracksTab({ album, onChange }: TracksTabProps) {
       )}
     </div>
   );
-}
+});

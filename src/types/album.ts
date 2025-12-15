@@ -28,7 +28,34 @@ export type Album = {
   // ============================================================================
   image_url: string | null;
   length_seconds: number | null;
-  tracklists: string | null;
+  tracklists: string | null; // Legacy text field
+  
+  // ============================================================================
+  // TRACKS & DISC DATA (JSONB fields)
+  // ============================================================================
+  tracks: Array<{
+    position: string;
+    title: string;
+    artist: string | null;
+    duration: string | null;
+    type: 'track' | 'header';
+    disc_number: number;
+    side?: string;
+  }> | null;
+  disc_metadata: Array<{
+    disc_number: number;
+    title: string;
+    storage_device: string | null;
+    slot: string | null;
+  }> | null;
+  matrix_numbers: {
+    [disc_number: string]: {
+      side_a: string;
+      side_b: string;
+    };
+  } | null;
+  storage_device: string | null; // Single storage device
+  slot: string | null; // Single slot
   
   // ============================================================================
   // CONDITION & GRADING
