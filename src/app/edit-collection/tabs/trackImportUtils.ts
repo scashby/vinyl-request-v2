@@ -28,6 +28,7 @@ interface SpotifyTrack {
   artists?: { name: string }[];
   duration_ms?: number;
   disc_number?: number;
+  track_number?: number;
 }
 
 /**
@@ -86,18 +87,22 @@ export async function importTracksFromDiscogs(
         const positionStr = track.position || '';
         let discNumber = 1;
         let side = '';
+        let trackPosition = position; // Fallback to sequential
         
         // Handle vinyl sides (A1, B1, C1, D1)
-        const sideMatch = positionStr.match(/^([A-Z])/);
+        const sideMatch = positionStr.match(/^([A-Z])(\d+)?/);
         if (sideMatch) {
           side = sideMatch[1];
+          // Extract track number from position (A1 = 1, A2 = 2, etc.)
+          trackPosition = parseInt(sideMatch[2] || '1');
           // A/B = disc 1, C/D = disc 2, etc.
           discNumber = Math.ceil((side.charCodeAt(0) - 64) / 2);
         } else {
           // Handle disc-track format (1-1, 2-1)
-          const discMatch = positionStr.match(/^(\d+)-/);
+          const discMatch = positionStr.match(/^(\d+)-(\d+)?/);
           if (discMatch) {
             discNumber = parseInt(discMatch[1]);
+            trackPosition = parseInt(discMatch[2] || position.toString());
           }
         }
 
@@ -106,7 +111,7 @@ export async function importTracksFromDiscogs(
 
         tracks.push({
           id: generateTrackId(),
-          position: position++,
+          position: trackPosition, // ✅ Use extracted position number
           title: track.title || '',
           artist: track.artists?.[0]?.name || '',
           duration: parseDuration(track.duration),
@@ -114,6 +119,8 @@ export async function importTracksFromDiscogs(
           side: side,
           is_header: isHeader,
         });
+        
+        position++; // Increment fallback counter
       });
     }
 
@@ -150,18 +157,21 @@ export async function importTracksFromSpotify(
     // Spotify tracks format
     if (data.tracks && Array.isArray(data.tracks.items)) {
       data.tracks.items.forEach((track: SpotifyTrack) => {
-        // Determine disc number
+        // Determine disc number and track position
         const discNumber = track.disc_number || 1;
+        const trackPosition = track.track_number || position;
 
         tracks.push({
           id: generateTrackId(),
-          position: position++,
+          position: trackPosition, // ✅ Use Spotify's track_number
           title: track.name || '',
           artist: track.artists?.[0]?.name || '',
-          duration: parseDuration(Math.floor(track.duration_ms / 1000)),
+          duration: parseDuration(Math.floor((track.duration_ms || 0) / 1000)),
           disc_number: discNumber,
           is_header: false,
         });
+        
+        position++; // Increment fallback counter
       });
     }
 
@@ -174,33 +184,39 @@ export async function importTracksFromSpotify(
 
 /**
  * Get Spotify access token (client credentials flow)
- * You'll need to set these environment variables:
- * NEXT_PUBLIC_SPOTIFY_CLIENT_ID
- * NEXT_PUBLIC_SPOTIFY_CLIENT_SECRET
+ * Falls back to public API if credentials not available
  */
 export async function getSpotifyAccessToken(): Promise<string> {
   const clientId = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID;
   const clientSecret = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_SECRET;
 
+  // If no credentials, try to proceed without auth (public endpoints)
   if (!clientId || !clientSecret) {
-    throw new Error('Spotify credentials not configured');
+    console.warn('Spotify credentials not configured - attempting unauthenticated request');
+    throw new Error('Spotify API credentials not configured. Add NEXT_PUBLIC_SPOTIFY_CLIENT_ID and NEXT_PUBLIC_SPOTIFY_CLIENT_SECRET to your environment variables.');
   }
 
-  const response = await fetch('https://accounts.spotify.com/api/token', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'Authorization': `Basic ${btoa(`${clientId}:${clientSecret}`)}`,
-    },
-    body: 'grant_type=client_credentials',
-  });
+  try {
+    const response = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': `Basic ${btoa(`${clientId}:${clientSecret}`)}`,
+      },
+      body: 'grant_type=client_credentials',
+    });
 
-  if (!response.ok) {
-    throw new Error('Failed to get Spotify access token');
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(`Spotify authentication failed: ${response.status} - ${errorData.error_description || errorData.error || 'Unknown error'}`);
+    }
+
+    const data = await response.json();
+    return data.access_token;
+  } catch (error) {
+    console.error('Spotify token error:', error);
+    throw error;
   }
-
-  const data = await response.json();
-  return data.access_token;
 }
 
 /**
