@@ -242,7 +242,7 @@ const AlbumInfoPanel = memo(function AlbumInfoPanel({ album }: { album: Album | 
                             fontWeight: 500,
                             fontSize: '10px'
                           }}>
-                            {track.position}
+                            {track.side ? `${track.side}${track.position}` : track.position}
                           </div>
                           <div style={{ 
                             flex: 1, 

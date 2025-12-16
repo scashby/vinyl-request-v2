@@ -321,13 +321,21 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
           console.log(`🗑️  Deleting ${keysToDelete.length} removed tracks...`);
           for (const key of keysToDelete) {
             const [disc, side, pos] = key.split('-');
-            await supabase
+            let query = supabase
               .from('tracks')
               .delete()
               .eq('album_id', albumId)
               .eq('disc_number', parseInt(disc))
-              .eq('side', side || null)
               .eq('position', parseInt(pos));
+            
+            // Handle side: use .is() for null, .eq() for non-null
+            if (side) {
+              query = query.eq('side', side);
+            } else {
+              query = query.is('side', null);
+            }
+            
+            await query;
           }
         }
         
@@ -351,13 +359,21 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
           
           if (existingKeys.has(trackKey)) {
             // Update existing track
-            await supabase
+            let query = supabase
               .from('tracks')
               .update(trackData)
               .eq('album_id', albumId)
               .eq('disc_number', track.disc_number || 1)
-              .eq('side', track.side || null)
               .eq('position', track.position);
+            
+            // Handle side: use .is() for null, .eq() for non-null
+            if (track.side) {
+              query = query.eq('side', track.side);
+            } else {
+              query = query.is('side', null);
+            }
+            
+            await query;
             tracksUpdated++;
           } else {
             // Insert new track
