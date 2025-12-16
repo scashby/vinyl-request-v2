@@ -66,7 +66,7 @@ export type Album = {
   // ============================================================================
   // VINYL-SPECIFIC FIELDS
   // ============================================================================
-  vinyl_color: string | null;
+  vinyl_color: string[] | null;
   vinyl_weight: string | null;
   rpm: string | null;
   

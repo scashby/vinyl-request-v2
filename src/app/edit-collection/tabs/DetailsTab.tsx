@@ -15,6 +15,7 @@ import {
   fetchCountries,
   fetchSounds,
   fetchVinylColors,
+  fetchVinylWeights,
   fetchSPARS,
   fetchBoxSets,
   updatePackaging,
@@ -45,6 +46,7 @@ type FieldType =
   | 'country' 
   | 'sound'
   | 'vinyl_color'
+  | 'vinyl_weight'
   | 'spars_code'
   | 'box_set';
 
@@ -63,6 +65,7 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
   const [countries, setCountries] = useState<PickerDataItem[]>([]);
   const [sounds, setSounds] = useState<PickerDataItem[]>([]);
   const [vinylColors, setVinylColors] = useState<PickerDataItem[]>([]);
+  const [vinylWeights, setVinylWeights] = useState<PickerDataItem[]>([]);
   const [spars, setSPARS] = useState<PickerDataItem[]>([]);
   const [boxSets, setBoxSets] = useState<PickerDataItem[]>([]);
   const [dataLoading, setDataLoading] = useState(false);
@@ -87,6 +90,7 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
       countriesData,
       soundsData,
       vinylColorsData,
+      vinylWeightsData,
       sparsData,
       boxSetsData,
     ] = await Promise.all([
@@ -97,6 +101,7 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
       fetchCountries(),
       fetchSounds(),
       fetchVinylColors(),
+      fetchVinylWeights(),
       fetchSPARS(),
       fetchBoxSets(),
     ]);
@@ -107,6 +112,7 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
     setCountries(countriesData);
     setSounds(soundsData);
     setVinylColors(vinylColorsData);
+    setVinylWeights(vinylWeightsData);
     setSPARS(sparsData);
     setBoxSets(boxSetsData);
     setDataLoading(false);
@@ -136,6 +142,9 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
       case 'vinyl_color':
         setVinylColors(await fetchVinylColors());
         break;
+      case 'vinyl_weight':
+        setVinylWeights(await fetchVinylWeights());
+        break;
       case 'spars_code':
         setSPARS(await fetchSPARS());
         break;
@@ -155,6 +164,7 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
       case 'country': return countries;
       case 'sound': return sounds;
       case 'vinyl_color': return vinylColors;
+      case 'vinyl_weight': return vinylWeights;
       case 'spars_code': return spars;
       case 'box_set': return boxSets;
       default: return [];
@@ -170,7 +180,8 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
       case 'studio': return album.studio || '';
       case 'country': return album.country || '';
       case 'sound': return album.sound || '';
-      case 'vinyl_color': return album.vinyl_color || '';
+      case 'vinyl_color': return album.vinyl_color || [];
+      case 'vinyl_weight': return album.vinyl_weight || '';
       case 'spars_code': return album.spars_code || '';
       case 'box_set': return album.box_set || '';
       default: return '';
@@ -186,7 +197,8 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
       case 'studio': return { title: 'Select Studio', itemLabel: 'Studio', mode: 'single' as const };
       case 'country': return { title: 'Select Country', itemLabel: 'Country', mode: 'single' as const };
       case 'sound': return { title: 'Select Sound', itemLabel: 'Sound', mode: 'single' as const };
-      case 'vinyl_color': return { title: 'Select Vinyl Color', itemLabel: 'Vinyl Color', mode: 'single' as const };
+      case 'vinyl_color': return { title: 'Select Vinyl Colors', itemLabel: 'Vinyl Color', mode: 'multi' as const };
+      case 'vinyl_weight': return { title: 'Select Vinyl Weight', itemLabel: 'Vinyl Weight', mode: 'single' as const };
       case 'spars_code': return { title: 'Select SPARS', itemLabel: 'SPARS', mode: 'single' as const };
       case 'box_set': return { title: 'Select Box Set', itemLabel: 'Box Set', mode: 'single' as const };
       default: return { title: '', itemLabel: '', mode: 'single' as const };
@@ -208,35 +220,41 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
     if (!activeField) return;
 
     const items = getCurrentItems();
-    const selectedName = Array.isArray(selectedIds) 
-      ? items.find(item => item.id === selectedIds[0])?.name || ''
-      : items.find(item => item.id === selectedIds)?.name || '';
     
-    switch (activeField) {
-      case 'packaging':
-        onChange('packaging', selectedName);
-        break;
-      case 'media_condition':
-        onChange('media_condition', selectedName);
-        break;
-      case 'package_sleeve_condition':
-        onChange('package_sleeve_condition', selectedName);
-        break;
-      case 'studio':
-        onChange('studio', selectedName);
-        break;
-      case 'country':
-        onChange('country', selectedName);
-        break;
-      case 'sound':
-        onChange('sound', selectedName);
-        break;
-      case 'vinyl_color':
-        onChange('vinyl_color', selectedName);
-        break;
-      case 'spars_code':
-        onChange('spars_code', selectedName);
-        break;
+    if (Array.isArray(selectedIds)) {
+      // Multi-select (vinyl colors)
+      const selectedNames = selectedIds.map(id => items.find(item => item.id === id)?.name || '');
+      onChange('vinyl_color', selectedNames);
+    } else {
+      // Single-select
+      const selectedName = items.find(item => item.id === selectedIds)?.name || '';
+      
+      switch (activeField) {
+        case 'packaging':
+          onChange('packaging', selectedName);
+          break;
+        case 'media_condition':
+          onChange('media_condition', selectedName);
+          break;
+        case 'package_sleeve_condition':
+          onChange('package_sleeve_condition', selectedName);
+          break;
+        case 'studio':
+          onChange('studio', selectedName);
+          break;
+        case 'country':
+          onChange('country', selectedName);
+          break;
+        case 'sound':
+          onChange('sound', selectedName);
+          break;
+        case 'vinyl_weight':
+          onChange('vinyl_weight', selectedName);
+          break;
+        case 'spars_code':
+          onChange('spars_code', selectedName);
+          break;
+      }
     }
   };
 
@@ -322,6 +340,9 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
           break;
         case 'vinyl_color':
           setVinylColors([...vinylColors, newItem].sort((a, b) => a.name.localeCompare(b.name)));
+          break;
+        case 'vinyl_weight':
+          setVinylWeights([...vinylWeights, newItem].sort((a, b) => a.name.localeCompare(b.name)));
           break;
         case 'spars_code':
           setSPARS([...spars, newItem].sort((a, b) => a.name.localeCompare(b.name)));
@@ -718,13 +739,102 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
             Vinyl
           </div>
 
-          {/* Vinyl Color */}
+          {/* Vinyl Color - MULTI-SELECT */}
           <div>
             <label style={labelStyle}>Vinyl Color</label>
+            <div style={{ display: 'flex', gap: '0', alignItems: 'flex-start' }}>
+              <div style={{
+                flex: 1,
+                padding: '6px 10px',
+                border: '1px solid #d1d5db',
+                borderRadius: '4px 0 0 4px',
+                borderRight: 'none',
+                minHeight: '36px',
+                display: 'flex',
+                gap: '6px',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                backgroundColor: 'white',
+                boxSizing: 'border-box',
+              }}>
+                {album.vinyl_color && album.vinyl_color.length > 0 ? (
+                  <>
+                    {album.vinyl_color.map((color, idx) => (
+                      <span
+                        key={idx}
+                        style={{
+                          backgroundColor: '#e5e7eb',
+                          padding: '4px 10px',
+                          borderRadius: '4px',
+                          fontSize: '13px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          color: '#374151',
+                        }}
+                      >
+                        {color}
+                        <button
+                          onClick={() => {
+                            const newColors = album.vinyl_color?.filter((_, i) => i !== idx) || [];
+                            onChange('vinyl_color', newColors);
+                          }}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: '#6b7280',
+                            cursor: 'pointer',
+                            padding: 0,
+                            fontSize: '16px',
+                            lineHeight: '1',
+                            fontWeight: '300',
+                          }}
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </>
+                ) : null}
+              </div>
+              <button 
+                onClick={() => handleOpenPicker('vinyl_color')}
+                disabled={dataLoading}
+                style={{
+                  width: '36px',
+                  minHeight: '40px',
+                  padding: 0,
+                  border: '1px solid #d1d5db',
+                  borderRadius: '0 4px 4px 0',
+                  backgroundColor: 'white',
+                  cursor: dataLoading ? 'wait' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#6b7280',
+                  flexShrink: 0,
+                  boxSizing: 'border-box',
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+                  <circle cx="1.5" cy="2.5" r="1"/>
+                  <rect x="4" y="2" width="10" height="1"/>
+                  <circle cx="1.5" cy="7" r="1"/>
+                  <rect x="4" y="6.5" width="10" height="1"/>
+                  <circle cx="1.5" cy="11.5" r="1"/>
+                  <rect x="4" y="11" width="10" height="1"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          {/* Vinyl Weight - DROPDOWN */}
+          <div>
+            <label style={labelStyle}>Vinyl Weight</label>
             <div style={{ display: 'flex', gap: '0', alignItems: 'stretch' }}>
               <select 
-                value={album.vinyl_color || ''}
-                onChange={(e) => onChange('vinyl_color', e.target.value)}
+                value={album.vinyl_weight || ''}
+                onChange={(e) => onChange('vinyl_weight', e.target.value)}
                 style={{ 
                   ...selectStyle, 
                   flex: 1, 
@@ -734,10 +844,10 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
                 }}
               >
                 <option value="">Select...</option>
-                <option>{album.vinyl_color || 'Select...'}</option>
+                <option>{album.vinyl_weight || 'Select...'}</option>
               </select>
               <button 
-                onClick={() => handleOpenPicker('vinyl_color')}
+                onClick={() => handleOpenPicker('vinyl_weight')}
                 disabled={dataLoading}
                 style={{
                   width: '36px',
@@ -766,18 +876,6 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
             </div>
           </div>
 
-          {/* Vinyl Weight */}
-          <div>
-            <label style={labelStyle}>Vinyl Weight</label>
-            <input
-              type="number"
-              value={album.vinyl_weight || ''}
-              onChange={(e) => onChange('vinyl_weight', e.target.value)}
-              style={inputStyle}
-              placeholder="0"
-            />
-          </div>
-
           {/* RPM */}
           <div>
             <label style={labelStyle}>RPM</label>
@@ -804,49 +902,19 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
             </div>
           </div>
 
-          {/* Extra */}
+          {/* Extra - NO PICKER BUTTON */}
           <div>
             <label style={labelStyle}>Extra</label>
-            <div style={{ display: 'flex', gap: '0', alignItems: 'flex-start' }}>
-              <textarea
-                value={album.extra || ''}
-                onChange={(e) => onChange('extra', e.target.value)}
-                style={{
-                  ...inputStyle,
-                  flex: 1,
-                  minHeight: '80px',
-                  resize: 'vertical',
-                  borderRadius: '4px 0 0 4px',
-                  borderRight: 'none',
-                }}
-                placeholder="Additional details..."
-              />
-              <button 
-                style={{
-                  width: '36px',
-                  height: '36px',
-                  padding: 0,
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0 4px 4px 0',
-                  backgroundColor: 'white',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#6b7280',
-                  flexShrink: 0,
-                }}
-              >
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
-                  <circle cx="1.5" cy="2.5" r="1"/>
-                  <rect x="4" y="2" width="10" height="1"/>
-                  <circle cx="1.5" cy="7" r="1"/>
-                  <rect x="4" y="6.5" width="10" height="1"/>
-                  <circle cx="1.5" cy="11.5" r="1"/>
-                  <rect x="4" y="11" width="10" height="1"/>
-                </svg>
-              </button>
-            </div>
+            <textarea
+              value={album.extra || ''}
+              onChange={(e) => onChange('extra', e.target.value)}
+              style={{
+                ...inputStyle,
+                minHeight: '80px',
+                resize: 'vertical',
+              }}
+              placeholder="Additional details..."
+            />
           </div>
 
           {/* SPARS */}

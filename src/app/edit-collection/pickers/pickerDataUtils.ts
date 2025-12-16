@@ -621,8 +621,17 @@ export async function mergeStudios(targetId: string, sourceIds: string[]): Promi
   }
 }
 
-// Countries
+// Countries - UPDATED WITH STANDARD LIST
 export async function fetchCountries(): Promise<PickerDataItem[]> {
+  // Standard country list
+  const standardCountries = [
+    'US', 'UK', 'Canada', 'Germany', 'France', 'Italy', 'Spain', 'Netherlands',
+    'Belgium', 'Sweden', 'Norway', 'Denmark', 'Finland', 'Austria', 'Switzerland',
+    'Japan', 'Australia', 'New Zealand', 'Brazil', 'Mexico', 'Argentina', 'Russia',
+    'Poland', 'Czech Republic', 'Hungary', 'Portugal', 'Greece', 'Ireland', 'Israel',
+    'South Korea', 'China', 'India', 'Europe', 'UK & Europe', 'USA & Canada',
+  ];
+
   try {
     const supabase = createClientComponentClient();
     
@@ -634,7 +643,7 @@ export async function fetchCountries(): Promise<PickerDataItem[]> {
 
     if (error) {
       console.error('Error fetching countries:', error);
-      return [];
+      return standardCountries.map(name => ({ id: name, name, count: 0 }));
     }
 
     const countryCounts = new Map<string, number>();
@@ -647,16 +656,19 @@ export async function fetchCountries(): Promise<PickerDataItem[]> {
       }
     });
 
-    return Array.from(countryCounts.entries())
-      .map(([name, count]) => ({
+    // Combine standard countries with database countries
+    const allCountries = new Set([...standardCountries, ...countryCounts.keys()]);
+
+    return Array.from(allCountries)
+      .map(name => ({
         id: name,
         name,
-        count,
+        count: countryCounts.get(name) || 0,
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
   } catch (error) {
     console.error('Error in fetchCountries:', error);
-    return [];
+    return standardCountries.map(name => ({ id: name, name, count: 0 }));
   }
 }
 
@@ -729,42 +741,55 @@ export async function mergeSounds(targetId: string, sourceIds: string[]): Promis
   }
 }
 
-// Vinyl Colors
+// Vinyl Colors - UPDATED WITH STANDARD LIST AND MULTI-SELECT SUPPORT
 export async function fetchVinylColors(): Promise<PickerDataItem[]> {
+  // Standard vinyl colors
+  const standardColors = [
+    'Black', 'Red', 'Blue', 'Yellow', 'Orange', 'Green', 'Purple', 'Pink',
+    'White', 'Transparent', 'Brown', 'Gold', 'Metallic', 'Marbled', 'Swirl',
+    'Glow-in-the-Dark', 'Picture', 'Color-in-Color', 'Starburst', 'Splatter',
+    'Liquid-Filled',
+  ];
+
   try {
     const supabase = createClientComponentClient();
     
     const { data, error } = await supabase
       .from('collection')
       .select('vinyl_color')
-      .not('vinyl_color', 'is', null)
-      .not('vinyl_color', 'eq', '');
+      .not('vinyl_color', 'is', null);
 
     if (error) {
       console.error('Error fetching vinyl colors:', error);
-      return [];
+      return standardColors.map(name => ({ id: name, name, count: 0 }));
     }
 
     const colorCounts = new Map<string, number>();
     data?.forEach(row => {
       if (row.vinyl_color) {
-        colorCounts.set(
-          row.vinyl_color,
-          (colorCounts.get(row.vinyl_color) || 0) + 1
-        );
+        // Handle both array and string values
+        const colors = Array.isArray(row.vinyl_color) ? row.vinyl_color : [row.vinyl_color];
+        colors.forEach(color => {
+          if (color) {
+            colorCounts.set(color, (colorCounts.get(color) || 0) + 1);
+          }
+        });
       }
     });
 
-    return Array.from(colorCounts.entries())
-      .map(([name, count]) => ({
+    // Combine standard colors with database colors
+    const allColors = new Set([...standardColors, ...colorCounts.keys()]);
+
+    return Array.from(allColors)
+      .map(name => ({
         id: name,
         name,
-        count,
+        count: colorCounts.get(name) || 0,
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
   } catch (error) {
     console.error('Error in fetchVinylColors:', error);
-    return [];
+    return standardColors.map(name => ({ id: name, name, count: 0 }));
   }
 }
 
@@ -795,6 +820,64 @@ export async function mergeVinylColors(targetId: string, sourceIds: string[]): P
   } catch (error) {
     console.error('Error merging vinyl colors:', error);
     return false;
+  }
+}
+
+// Vinyl Weights - NEW FUNCTION WITH STANDARD WEIGHTS
+export async function fetchVinylWeights(): Promise<PickerDataItem[]> {
+  // Standard vinyl weights
+  const standardWeights = [
+    '80 gram vinyl',
+    '100 gram vinyl',
+    '120 gram vinyl',
+    '140 gram vinyl',
+    '160 gram vinyl',
+    '180 gram vinyl',
+    '200 gram vinyl',
+  ];
+
+  try {
+    const supabase = createClientComponentClient();
+    
+    const { data, error } = await supabase
+      .from('collection')
+      .select('vinyl_weight')
+      .not('vinyl_weight', 'is', null)
+      .not('vinyl_weight', 'eq', '');
+
+    if (error) {
+      console.error('Error fetching vinyl weights:', error);
+      return standardWeights.map(name => ({ id: name, name, count: 0 }));
+    }
+
+    const weightCounts = new Map<string, number>();
+    data?.forEach(row => {
+      if (row.vinyl_weight) {
+        weightCounts.set(
+          row.vinyl_weight,
+          (weightCounts.get(row.vinyl_weight) || 0) + 1
+        );
+      }
+    });
+
+    // Combine standard weights with database weights
+    const allWeights = new Set([...standardWeights, ...weightCounts.keys()]);
+
+    return Array.from(allWeights)
+      .map(name => ({
+        id: name,
+        name,
+        count: weightCounts.get(name) || 0,
+      }))
+      .sort((a, b) => {
+        // Sort by numeric value first
+        const aNum = parseInt(a.name.match(/\d+/)?.[0] || '0');
+        const bNum = parseInt(b.name.match(/\d+/)?.[0] || '0');
+        return aNum - bNum;
+      });
+  } catch (error) {
+    console.error('Error in fetchVinylWeights:', error);
+    return standardWeights.map(name => ({ id: name, name, count: 0 }));
   }
 }
 
