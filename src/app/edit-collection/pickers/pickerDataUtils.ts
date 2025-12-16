@@ -643,7 +643,14 @@ export async function fetchCountries(): Promise<PickerDataItem[]> {
 
     if (error) {
       console.error('Error fetching countries:', error);
-      return standardCountries.map(name => ({ id: name, name, count: 0 }));
+      return standardCountries.map(name => ({ id: name, name, count: 0 }))
+        .sort((a, b) => {
+          // Put US at the top
+          if (a.name === 'US') return -1;
+          if (b.name === 'US') return 1;
+          // Sort rest alphabetically
+          return a.name.localeCompare(b.name);
+        });
     }
 
     const countryCounts = new Map<string, number>();
@@ -665,10 +672,23 @@ export async function fetchCountries(): Promise<PickerDataItem[]> {
         name,
         count: countryCounts.get(name) || 0,
       }))
-      .sort((a, b) => a.name.localeCompare(b.name));
+      .sort((a, b) => {
+        // Put US at the top
+        if (a.name === 'US') return -1;
+        if (b.name === 'US') return 1;
+        // Sort rest alphabetically
+        return a.name.localeCompare(b.name);
+      });
   } catch (error) {
     console.error('Error in fetchCountries:', error);
-    return standardCountries.map(name => ({ id: name, name, count: 0 }));
+    return standardCountries.map(name => ({ id: name, name, count: 0 }))
+      .sort((a, b) => {
+        // Put US at the top
+        if (a.name === 'US') return -1;
+        if (b.name === 'US') return 1;
+        // Sort rest alphabetically
+        return a.name.localeCompare(b.name);
+      });
   }
 }
 
