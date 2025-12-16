@@ -86,6 +86,36 @@ const AlbumInfoPanel = memo(function AlbumInfoPanel({ album }: { album: Album | 
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
+  // Calculate TOTAL runtime from all tracks
+  const getTotalRuntime = (): string => {
+    if (!album.tracks || album.tracks.length === 0) {
+      // Fallback to album.length_seconds if no tracks
+      if (album.length_seconds) {
+        const minutes = Math.floor(album.length_seconds / 60);
+        const seconds = album.length_seconds % 60;
+        return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+      }
+      return '—';
+    }
+    
+    const allTracks = album.tracks.filter(t => t.type === 'track');
+    let totalSeconds = 0;
+    allTracks.forEach(track => {
+      if (track.duration) {
+        const parts = track.duration.split(':');
+        if (parts.length === 2) {
+          totalSeconds += parseInt(parts[0]) * 60 + parseInt(parts[1]);
+        }
+      }
+    });
+    
+    if (totalSeconds === 0) return '—';
+    
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+
   // Format date as "Feb 26, 2002"
   const formatDate = (dateStr: string | null): string => {
     if (!dateStr) return '';
@@ -119,9 +149,7 @@ const AlbumInfoPanel = memo(function AlbumInfoPanel({ album }: { album: Album | 
   const totalTracks = album.tracks?.filter(t => t.type === 'track').length || album.spotify_total_tracks || album.apple_music_track_count || 0;
 
   // Format total runtime
-  const totalRuntime = album.length_seconds 
-    ? `${Math.floor(album.length_seconds / 60)}:${String(album.length_seconds % 60).padStart(2, '0')}`
-    : '';
+  const totalRuntime = getTotalRuntime();
 
   return (
     <div style={{ 
@@ -234,55 +262,49 @@ const AlbumInfoPanel = memo(function AlbumInfoPanel({ album }: { album: Album | 
         </div>
       )}
 
-      {/* Barcode */}
-      {album.barcode && (
-        <div style={{
-          fontSize: '12px',
-          color: '#333',
-          marginBottom: '8px',
-          fontFamily: 'monospace',
-          fontWeight: 400
-        }}>
-          ||||| {album.barcode}
-        </div>
-      )}
+      {/* Barcode - ALWAYS SHOW */}
+      <div style={{
+        fontSize: '12px',
+        color: '#333',
+        marginBottom: '8px',
+        fontFamily: 'monospace',
+        fontWeight: 400
+      }}>
+        ||||| {album.barcode || '—'}
+      </div>
 
-      {/* Country */}
-      {album.country && (
-        <div style={{
-          fontSize: '13px',
-          color: '#333',
-          marginBottom: '8px',
-          fontWeight: 400
-        }}>
-          {album.country}
-        </div>
-      )}
+      {/* Country - ALWAYS SHOW */}
+      <div style={{
+        fontSize: '13px',
+        color: '#333',
+        marginBottom: '8px',
+        fontWeight: 400
+      }}>
+        {album.country || '—'}
+      </div>
 
-      {/* Format | Discs | Tracks | Time */}
+      {/* Format | Discs | Tracks | Time - ALWAYS SHOW ALL */}
       <div style={{
         fontSize: '13px',
         color: '#333',
         marginBottom: '12px',
         fontWeight: 400
       }}>
-        {album.format}
-        {album.discs && ` | ${album.discs} Disc${album.discs > 1 ? 's' : ''}`}
-        {totalTracks > 0 && ` | ${totalTracks} Tracks`}
-        {totalRuntime && ` | ${totalRuntime}`}
+        {album.format || '—'}
+        {' | '}{album.discs ? `${album.discs} Disc${album.discs > 1 ? 's' : ''}` : '—'}
+        {' | '}{totalTracks > 0 ? `${totalTracks} Tracks` : '—'}
+        {' | '}{totalRuntime}
       </div>
 
-      {/* Cat No */}
-      {album.cat_no && (
-        <div style={{
-          fontSize: '13px',
-          color: '#666',
-          marginBottom: '12px',
-          fontWeight: 400
-        }}>
-          <span style={{ fontWeight: 600 }}>CAT NO</span> {album.cat_no}
-        </div>
-      )}
+      {/* Cat No - ALWAYS SHOW */}
+      <div style={{
+        fontSize: '13px',
+        color: '#666',
+        marginBottom: '12px',
+        fontWeight: 400
+      }}>
+        <span style={{ fontWeight: 600 }}>CAT NO</span> {album.cat_no || '—'}
+      </div>
 
       {/* eBay Link */}
       <a 
