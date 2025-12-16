@@ -183,39 +183,23 @@ export async function importTracksFromSpotify(
 }
 
 /**
- * Get Spotify access token (client credentials flow)
- * Falls back to public API if credentials not available
+ * Get Spotify access token via server-side API route
+ * This avoids exposing credentials in client-side code
  */
 export async function getSpotifyAccessToken(): Promise<string> {
-  const clientId = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID;
-  const clientSecret = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_SECRET;
-
-  // If no credentials, try to proceed without auth (public endpoints)
-  if (!clientId || !clientSecret) {
-    console.warn('Spotify credentials not configured - attempting unauthenticated request');
-    throw new Error('Spotify API credentials not configured. Add NEXT_PUBLIC_SPOTIFY_CLIENT_ID and NEXT_PUBLIC_SPOTIFY_CLIENT_SECRET to your environment variables.');
-  }
-
   try {
-    const response = await fetch('https://accounts.spotify.com/api/token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': `Basic ${btoa(`${clientId}:${clientSecret}`)}`,
-      },
-      body: 'grant_type=client_credentials',
-    });
-
+    const response = await fetch('/api/spotify-token');
+    
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(`Spotify authentication failed: ${response.status} - ${errorData.error_description || errorData.error || 'Unknown error'}`);
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to get Spotify access token');
     }
 
     const data = await response.json();
     return data.access_token;
   } catch (error) {
     console.error('Spotify token error:', error);
-    throw error;
+    throw new Error('Spotify API credentials not configured or authentication failed. Please check your environment variables in Vercel.');
   }
 }
 
