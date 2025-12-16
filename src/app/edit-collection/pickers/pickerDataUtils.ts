@@ -1,7 +1,7 @@
 // src/app/edit-collection/pickers/pickerDataUtils.ts
 'use client';
 
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { supabase } from "../../../lib/supabaseClient";
 
 export interface PickerDataItem {
   id: string;
@@ -12,7 +12,6 @@ export interface PickerDataItem {
 // Storage Devices
 export async function fetchStorageDevices(): Promise<PickerDataItem[]> {
   try {
-    const supabase = createClientComponentClient();
     
     // Fetch unique storage devices from collection table
     const { data, error } = await supabase
@@ -54,7 +53,6 @@ export async function fetchStorageDevices(): Promise<PickerDataItem[]> {
 // Labels
 export async function fetchLabels(): Promise<PickerDataItem[]> {
   try {
-    const supabase = createClientComponentClient();
     
     const { data, error } = await supabase
       .from('collection')
@@ -93,7 +91,6 @@ export async function fetchLabels(): Promise<PickerDataItem[]> {
 // Formats
 export async function fetchFormats(): Promise<PickerDataItem[]> {
   try {
-    const supabase = createClientComponentClient();
     
     const { data, error } = await supabase
       .from('collection')
@@ -132,7 +129,6 @@ export async function fetchFormats(): Promise<PickerDataItem[]> {
 // Genres
 export async function fetchGenres(): Promise<PickerDataItem[]> {
   try {
-    const supabase = createClientComponentClient();
     
     const { data, error } = await supabase
       .from('collection')
@@ -177,7 +173,6 @@ export async function fetchGenres(): Promise<PickerDataItem[]> {
 // Locations
 export async function fetchLocations(): Promise<PickerDataItem[]> {
   try {
-    const supabase = createClientComponentClient();
     
     const { data, error } = await supabase
       .from('collection')
@@ -216,7 +211,6 @@ export async function fetchLocations(): Promise<PickerDataItem[]> {
 // Artists
 export async function fetchArtists(): Promise<PickerDataItem[]> {
   try {
-    const supabase = createClientComponentClient();
     
     const { data, error } = await supabase
       .from('collection')
@@ -255,7 +249,6 @@ export async function fetchArtists(): Promise<PickerDataItem[]> {
 // Update functions
 export async function updateLabel(id: string, newName: string): Promise<boolean> {
   try {
-    const supabase = createClientComponentClient();
     const { error } = await supabase
       .from('collection')
       .update({ spotify_label: newName })
@@ -270,7 +263,6 @@ export async function updateLabel(id: string, newName: string): Promise<boolean>
 
 export async function updateFormat(id: string, newName: string): Promise<boolean> {
   try {
-    const supabase = createClientComponentClient();
     const { error } = await supabase
       .from('collection')
       .update({ format: newName })
@@ -285,7 +277,6 @@ export async function updateFormat(id: string, newName: string): Promise<boolean
 
 export async function updateLocation(id: string, newName: string): Promise<boolean> {
   try {
-    const supabase = createClientComponentClient();
     const { error } = await supabase
       .from('collection')
       .update({ folder: newName })
@@ -300,7 +291,6 @@ export async function updateLocation(id: string, newName: string): Promise<boole
 
 export async function updateArtist(id: string, newName: string): Promise<boolean> {
   try {
-    const supabase = createClientComponentClient();
     const { error } = await supabase
       .from('collection')
       .update({ artist: newName })
@@ -316,7 +306,6 @@ export async function updateArtist(id: string, newName: string): Promise<boolean
 // Delete functions
 export async function deleteLabel(id: string): Promise<boolean> {
   try {
-    const supabase = createClientComponentClient();
     const { error } = await supabase
       .from('collection')
       .update({ spotify_label: null })
@@ -332,7 +321,6 @@ export async function deleteLabel(id: string): Promise<boolean> {
 // Merge functions
 export async function mergeLabels(targetId: string, sourceIds: string[]): Promise<boolean> {
   try {
-    const supabase = createClientComponentClient();
     const { error } = await supabase
       .from('collection')
       .update({ spotify_label: targetId })
@@ -347,7 +335,6 @@ export async function mergeLabels(targetId: string, sourceIds: string[]): Promis
 
 export async function mergeFormats(targetId: string, sourceIds: string[]): Promise<boolean> {
   try {
-    const supabase = createClientComponentClient();
     const { error } = await supabase
       .from('collection')
       .update({ format: targetId })
@@ -362,7 +349,6 @@ export async function mergeFormats(targetId: string, sourceIds: string[]): Promi
 
 export async function mergeLocations(targetId: string, sourceIds: string[]): Promise<boolean> {
   try {
-    const supabase = createClientComponentClient();
     const { error } = await supabase
       .from('collection')
       .update({ folder: targetId })
@@ -377,7 +363,6 @@ export async function mergeLocations(targetId: string, sourceIds: string[]): Pro
 
 export async function mergeArtists(targetId: string, sourceIds: string[]): Promise<boolean> {
   try {
-    const supabase = createClientComponentClient();
     const { error } = await supabase
       .from('collection')
       .update({ artist: targetId })
@@ -393,7 +378,6 @@ export async function mergeArtists(targetId: string, sourceIds: string[]): Promi
 // Packaging
 export async function fetchPackaging(): Promise<PickerDataItem[]> {
   try {
-    const supabase = createClientComponentClient();
     
     const { data, error } = await supabase
       .from('collection')
@@ -431,7 +415,6 @@ export async function fetchPackaging(): Promise<PickerDataItem[]> {
 
 export async function updatePackaging(id: string, newName: string): Promise<boolean> {
   try {
-    const supabase = createClientComponentClient();
     const { error } = await supabase
       .from('collection')
       .update({ packaging: newName })
@@ -446,7 +429,6 @@ export async function updatePackaging(id: string, newName: string): Promise<bool
 
 export async function deletePackaging(id: string): Promise<boolean> {
   try {
-    const supabase = createClientComponentClient();
     const { error } = await supabase
       .from('collection')
       .update({ packaging: null })
@@ -461,7 +443,6 @@ export async function deletePackaging(id: string): Promise<boolean> {
 
 export async function mergePackaging(targetId: string, sourceIds: string[]): Promise<boolean> {
   try {
-    const supabase = createClientComponentClient();
     const { error } = await supabase
       .from('collection')
       .update({ packaging: targetId })
@@ -489,7 +470,6 @@ export async function fetchMediaConditions(): Promise<PickerDataItem[]> {
   ];
 
   try {
-    const supabase = createClientComponentClient();
     const { data } = await supabase
       .from('collection')
       .select('media_condition')
@@ -529,7 +509,6 @@ export async function fetchPackageConditions(): Promise<PickerDataItem[]> {
   ];
 
   try {
-    const supabase = createClientComponentClient();
     const { data } = await supabase
       .from('collection')
       .select('package_sleeve_condition')
@@ -555,7 +534,6 @@ export async function fetchPackageConditions(): Promise<PickerDataItem[]> {
 // Studios
 export async function fetchStudios(): Promise<PickerDataItem[]> {
   try {
-    const supabase = createClientComponentClient();
     
     const { data, error } = await supabase
       .from('collection')
@@ -593,7 +571,6 @@ export async function fetchStudios(): Promise<PickerDataItem[]> {
 
 export async function updateStudio(id: string, newName: string): Promise<boolean> {
   try {
-    const supabase = createClientComponentClient();
     const { error } = await supabase
       .from('collection')
       .update({ studio: newName })
@@ -608,7 +585,6 @@ export async function updateStudio(id: string, newName: string): Promise<boolean
 
 export async function mergeStudios(targetId: string, sourceIds: string[]): Promise<boolean> {
   try {
-    const supabase = createClientComponentClient();
     const { error } = await supabase
       .from('collection')
       .update({ studio: targetId })
@@ -633,7 +609,6 @@ export async function fetchCountries(): Promise<PickerDataItem[]> {
   ];
 
   try {
-    const supabase = createClientComponentClient();
     
     const { data, error } = await supabase
       .from('collection')
@@ -695,7 +670,6 @@ export async function fetchCountries(): Promise<PickerDataItem[]> {
 // Sounds
 export async function fetchSounds(): Promise<PickerDataItem[]> {
   try {
-    const supabase = createClientComponentClient();
     
     const { data, error } = await supabase
       .from('collection')
@@ -733,7 +707,6 @@ export async function fetchSounds(): Promise<PickerDataItem[]> {
 
 export async function updateSound(id: string, newName: string): Promise<boolean> {
   try {
-    const supabase = createClientComponentClient();
     const { error } = await supabase
       .from('collection')
       .update({ sound: newName })
@@ -748,7 +721,6 @@ export async function updateSound(id: string, newName: string): Promise<boolean>
 
 export async function mergeSounds(targetId: string, sourceIds: string[]): Promise<boolean> {
   try {
-    const supabase = createClientComponentClient();
     const { error } = await supabase
       .from('collection')
       .update({ sound: targetId })
@@ -772,7 +744,6 @@ export async function fetchVinylColors(): Promise<PickerDataItem[]> {
   ];
 
   try {
-    const supabase = createClientComponentClient();
     
     const { data, error } = await supabase
       .from('collection')
@@ -815,7 +786,6 @@ export async function fetchVinylColors(): Promise<PickerDataItem[]> {
 
 export async function updateVinylColor(id: string, newName: string): Promise<boolean> {
   try {
-    const supabase = createClientComponentClient();
     const { error } = await supabase
       .from('collection')
       .update({ vinyl_color: newName })
@@ -830,7 +800,6 @@ export async function updateVinylColor(id: string, newName: string): Promise<boo
 
 export async function mergeVinylColors(targetId: string, sourceIds: string[]): Promise<boolean> {
   try {
-    const supabase = createClientComponentClient();
     const { error } = await supabase
       .from('collection')
       .update({ vinyl_color: targetId })
@@ -857,7 +826,6 @@ export async function fetchVinylWeights(): Promise<PickerDataItem[]> {
   ];
 
   try {
-    const supabase = createClientComponentClient();
     
     const { data, error } = await supabase
       .from('collection')
@@ -904,7 +872,6 @@ export async function fetchVinylWeights(): Promise<PickerDataItem[]> {
 // SPARS
 export async function fetchSPARS(): Promise<PickerDataItem[]> {
   try {
-    const supabase = createClientComponentClient();
     
     const { data, error } = await supabase
       .from('collection')
@@ -942,7 +909,6 @@ export async function fetchSPARS(): Promise<PickerDataItem[]> {
 
 export async function updateSPARS(id: string, newName: string): Promise<boolean> {
   try {
-    const supabase = createClientComponentClient();
     const { error } = await supabase
       .from('collection')
       .update({ spars_code: newName })
@@ -957,7 +923,6 @@ export async function updateSPARS(id: string, newName: string): Promise<boolean>
 
 export async function mergeSPARS(targetId: string, sourceIds: string[]): Promise<boolean> {
   try {
-    const supabase = createClientComponentClient();
     const { error } = await supabase
       .from('collection')
       .update({ spars_code: targetId })
@@ -973,7 +938,6 @@ export async function mergeSPARS(targetId: string, sourceIds: string[]): Promise
 // Box Sets
 export async function fetchBoxSets(): Promise<PickerDataItem[]> {
   try {
-    const supabase = createClientComponentClient();
     
     const { data, error } = await supabase
       .from('collection')
@@ -1005,6 +969,245 @@ export async function fetchBoxSets(): Promise<PickerDataItem[]> {
       .sort((a, b) => a.name.localeCompare(b.name));
   } catch (error) {
     console.error('Error in fetchBoxSets:', error);
+    return [];
+  }
+}
+
+// Purchase Stores
+export async function fetchPurchaseStores(): Promise<PickerDataItem[]> {
+  try {
+    
+    const { data, error } = await supabase
+      .from('collection')
+      .select('purchase_store')
+      .not('purchase_store', 'is', null)
+      .not('purchase_store', 'eq', '');
+
+    if (error) {
+      console.error('Error fetching purchase stores:', error);
+      return [];
+    }
+
+    const storeCounts = new Map<string, number>();
+    data?.forEach(row => {
+      if (row.purchase_store) {
+        storeCounts.set(
+          row.purchase_store,
+          (storeCounts.get(row.purchase_store) || 0) + 1
+        );
+      }
+    });
+
+    return Array.from(storeCounts.entries())
+      .map(([name, count]) => ({
+        id: name,
+        name,
+        count,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch (error) {
+    console.error('Error in fetchPurchaseStores:', error);
+    return [];
+  }
+}
+
+export async function updatePurchaseStore(id: string, newName: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('collection')
+      .update({ purchase_store: newName })
+      .eq('purchase_store', id);
+    
+    return !error;
+  } catch (error) {
+    console.error('Error updating purchase store:', error);
+    return false;
+  }
+}
+
+export async function deletePurchaseStore(id: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('collection')
+      .update({ purchase_store: null })
+      .eq('purchase_store', id);
+    
+    return !error;
+  } catch (error) {
+    console.error('Error deleting purchase store:', error);
+    return false;
+  }
+}
+
+export async function mergePurchaseStores(targetId: string, sourceIds: string[]): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('collection')
+      .update({ purchase_store: targetId })
+      .in('purchase_store', sourceIds);
+    
+    return !error;
+  } catch (error) {
+    console.error('Error merging purchase stores:', error);
+    return false;
+  }
+}
+
+// Owners
+export async function fetchOwners(): Promise<PickerDataItem[]> {
+  try {
+    
+    const { data, error } = await supabase
+      .from('collection')
+      .select('owner')
+      .not('owner', 'is', null)
+      .not('owner', 'eq', '');
+
+    if (error) {
+      console.error('Error fetching owners:', error);
+      return [];
+    }
+
+    const ownerCounts = new Map<string, number>();
+    data?.forEach(row => {
+      if (row.owner) {
+        ownerCounts.set(
+          row.owner,
+          (ownerCounts.get(row.owner) || 0) + 1
+        );
+      }
+    });
+
+    return Array.from(ownerCounts.entries())
+      .map(([name, count]) => ({
+        id: name,
+        name,
+        count,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch (error) {
+    console.error('Error in fetchOwners:', error);
+    return [];
+  }
+}
+
+export async function updateOwner(id: string, newName: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('collection')
+      .update({ owner: newName })
+      .eq('owner', id);
+    
+    return !error;
+  } catch (error) {
+    console.error('Error updating owner:', error);
+    return false;
+  }
+}
+
+export async function deleteOwner(id: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('collection')
+      .update({ owner: null })
+      .eq('owner', id);
+    
+    return !error;
+  } catch (error) {
+    console.error('Error deleting owner:', error);
+    return false;
+  }
+}
+
+export async function mergeOwners(targetId: string, sourceIds: string[]): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('collection')
+      .update({ owner: targetId })
+      .in('owner', sourceIds);
+    
+    return !error;
+  } catch (error) {
+    console.error('Error merging owners:', error);
+    return false;
+  }
+}
+
+// Signees (for "Signed By")
+export async function fetchSignees(): Promise<PickerDataItem[]> {
+  try {
+    
+    const { data, error } = await supabase
+      .from('collection')
+      .select('signed_by')
+      .not('signed_by', 'is', null);
+
+    if (error) {
+      console.error('Error fetching signees:', error);
+      return [];
+    }
+
+    const signeeCounts = new Map<string, number>();
+    data?.forEach(row => {
+      if (row.signed_by) {
+        // Handle both array and string values
+        const signees = Array.isArray(row.signed_by) ? row.signed_by : [row.signed_by];
+        signees.forEach(signee => {
+          if (signee) {
+            signeeCounts.set(signee, (signeeCounts.get(signee) || 0) + 1);
+          }
+        });
+      }
+    });
+
+    return Array.from(signeeCounts.entries())
+      .map(([name, count]) => ({
+        id: name,
+        name,
+        count,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch (error) {
+    console.error('Error in fetchSignees:', error);
+    return [];
+  }
+}
+
+// Tags (already exists, but adding explicit fetch for consistency)
+export async function fetchTags(): Promise<PickerDataItem[]> {
+  try {
+    
+    const { data, error } = await supabase
+      .from('collection')
+      .select('custom_tags')
+      .not('custom_tags', 'is', null);
+
+    if (error) {
+      console.error('Error fetching tags:', error);
+      return [];
+    }
+
+    const tagCounts = new Map<string, number>();
+    data?.forEach(row => {
+      if (row.custom_tags) {
+        const tags = Array.isArray(row.custom_tags) ? row.custom_tags : [row.custom_tags];
+        tags.forEach(tag => {
+          if (tag) {
+            tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+          }
+        });
+      }
+    });
+
+    return Array.from(tagCounts.entries())
+      .map(([name, count]) => ({
+        id: name,
+        name,
+        count,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch (error) {
+    console.error('Error in fetchTags:', error);
     return [];
   }
 }

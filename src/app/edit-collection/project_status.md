@@ -1,7 +1,7 @@
 # PROJECT_STATUS.md
 # DWD Collection Management System - Collection Browser
 
-**Last Updated:** 2025-12-16 (Detail Panel Enhancement Complete)
+**Last Updated:** 2025-12-16 (PersonalTab Complete with UniversalPicker System)
 
 ---
 
@@ -47,6 +47,13 @@ Phase 4: Advanced Features        ░░░░░░░░░░░░░░░�
 ---
 
 ## 🔧 RECENT CHANGES (Last 7 Days)
+
+### 2025-12-16: PersonalTab Complete with UniversalPicker System ✅
+- Created UniversalPicker component integrating PickerModal, ManageModal, EditModal, MergeModal
+- Implemented all PersonalTab features: purchase info, 10-star rating, tags, notes, play history, signed-by
+- Fixed pickerDataUtils.ts to use correct Supabase import path (`../../../lib/supabaseClient`)
+- Added `played_history` field to Album type for tracking play dates and counts
+- **Result:** PersonalTab fully functional with all pickers and data entry fields working
 
 ### 2025-12-16: Previous/Next Navigation Complete ✅
 - Wired up Previous/Next buttons in UniversalBottomBar
@@ -136,8 +143,8 @@ Implemented 24 sort options, column selector with drag-drop, 14 column groups wi
 - ✅ **MainTab** - COMPLETE (all pickers functional)
 - ✅ **TracksTab** - COMPLETE (import from Discogs/Spotify working)
 - ✅ **DetailsTab** - COMPLETE (all pickers, dropdowns, multi-select functional)
-- ⏳ **PersonalTab** - NEXT PRIORITY (Phase 6)
-- ⏳ **CoverTab** - Placeholder (Phase 6)
+- ✅ **PersonalTab** - COMPLETE (purchase info, ratings, tags, notes, play history)
+- ⏳ **CoverTab** - NEXT PRIORITY (Phase 6)
 - ⏳ **PeopleTab** - Placeholder (Phase 6)
 - ⏳ **LinksTab** - Placeholder (Phase 6)
 - ⏳ **ClassicalTab** - LOWEST PRIORITY (Phase 6)
@@ -243,21 +250,16 @@ Can integrate additional modal features into detail panel after remaining tabs c
 
 ## 🎯 IMMEDIATE NEXT STEPS
 
-**Priority 1: PersonalTab (Next in sequence)**
-1. Purchase info fields (date, store, price, current value)
-2. Owner picker
-3. Star rating system (10 stars)
-4. Tags multi-select picker
-5. Notes textarea
-6. Last cleaned date picker
-7. Signed by picker
-8. Played history with date+count
+**Priority 1: CoverTab (Next in sequence)**
+1. Front cover upload and crop
+2. Back cover upload and crop
+3. Find cover online (search services)
+4. Cover art metadata display
 
-**Priority 2: Remaining Tabs (In order: Cover > People > Links > Classical)**
-1. Cover tab (upload, crop, find online)
-2. People tab (credits & musicians)
-3. Links tab (URL management)
-4. Classical tab (composer, conductor, orchestra, etc.) - LOWEST PRIORITY
+**Priority 2: Remaining Tabs (In order: People > Links > Classical)**
+1. People tab (credits & musicians with roles)
+2. Links tab (URL management with drag-drop)
+3. Classical tab (composer, conductor, orchestra) - LOWEST PRIORITY
 
 **Priority 3: Edit Album Modal - Phase 5 (Enrichment Integration)**
 1. Spotify search & import (Main tab)

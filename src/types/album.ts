@@ -27,7 +27,6 @@ export type Album = {
   // VISUAL & AUDIO
   // ============================================================================
   image_url: string | null;
-  back_image_url: string | null;
   length_seconds: number | null;
   tracklists: string | null; // Legacy text field
   
@@ -144,6 +143,7 @@ export type Album = {
   last_played_date: string | null;
   last_cleaned_date: string | null;
   signed_by: string[] | null;
+  played_history: string | null; // JSON string of PlayedHistoryEntry[]
   location: string | null;
   storage_device_slot: string | null;
   index_number: number | null;

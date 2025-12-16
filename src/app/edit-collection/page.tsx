@@ -479,19 +479,66 @@ const AlbumInfoPanel = memo(function AlbumInfoPanel({ album }: { album: Album | 
         </div>
         <div style={{ background: 'white', padding: '12px', borderRadius: '4px' }}>
           <div style={{ fontSize: '13px', color: '#1f2937', marginBottom: '8px', display: 'flex', fontWeight: 400 }}>
-            <span style={{ fontWeight: 600, minWidth: '120px' }}>Quantity</span>
+            <span style={{ fontWeight: 600, minWidth: '140px' }}>Quantity</span>
             <span>1</span>
           </div>
           <div style={{ fontSize: '13px', color: '#1f2937', marginBottom: '8px', display: 'flex', fontWeight: 400 }}>
-            <span style={{ fontWeight: 600, minWidth: '120px' }}>Index</span>
+            <span style={{ fontWeight: 600, minWidth: '140px' }}>Index</span>
             <span>{album.index_number || '—'}</span>
           </div>
           <div style={{ fontSize: '13px', color: '#1f2937', marginBottom: '8px', display: 'flex', fontWeight: 400 }}>
-            <span style={{ fontWeight: 600, minWidth: '120px' }}>Added Date</span>
+            <span style={{ fontWeight: 600, minWidth: '140px' }}>Purchase Date</span>
+            <span>{album.purchase_date ? formatDate(album.purchase_date) : '—'}</span>
+          </div>
+          <div style={{ fontSize: '13px', color: '#1f2937', marginBottom: '8px', display: 'flex', fontWeight: 400 }}>
+            <span style={{ fontWeight: 600, minWidth: '140px' }}>Purchase Store</span>
+            <span>{album.purchase_store || '—'}</span>
+          </div>
+          <div style={{ fontSize: '13px', color: '#1f2937', marginBottom: '8px', display: 'flex', fontWeight: 400 }}>
+            <span style={{ fontWeight: 600, minWidth: '140px' }}>Purchase Price</span>
+            <span>{album.purchase_price ? `$${album.purchase_price.toFixed(2)}` : '—'}</span>
+          </div>
+          <div style={{ fontSize: '13px', color: '#1f2937', marginBottom: '8px', display: 'flex', fontWeight: 400 }}>
+            <span style={{ fontWeight: 600, minWidth: '140px' }}>Current Value</span>
+            <span>{album.current_value ? `$${album.current_value.toFixed(2)}` : '—'}</span>
+          </div>
+          <div style={{ fontSize: '13px', color: '#1f2937', marginBottom: '8px', display: 'flex', fontWeight: 400 }}>
+            <span style={{ fontWeight: 600, minWidth: '140px' }}>Owner</span>
+            <span>{album.owner || '—'}</span>
+          </div>
+          <div style={{ fontSize: '13px', color: '#1f2937', marginBottom: '8px', display: 'flex', fontWeight: 400 }}>
+            <span style={{ fontWeight: 600, minWidth: '140px' }}>My Rating</span>
+            <span>
+              {album.my_rating ? (
+                <span style={{ display: 'flex', gap: '2px' }}>
+                  {Array.from({ length: album.my_rating }).map((_, i) => (
+                    <span key={i} style={{ color: '#fbbf24', fontSize: '14px' }}>★</span>
+                  ))}
+                  {Array.from({ length: 10 - album.my_rating }).map((_, i) => (
+                    <span key={i} style={{ color: '#d1d5db', fontSize: '14px' }}>★</span>
+                  ))}
+                </span>
+              ) : '—'}
+            </span>
+          </div>
+          <div style={{ fontSize: '13px', color: '#1f2937', marginBottom: '8px', display: 'flex', fontWeight: 400 }}>
+            <span style={{ fontWeight: 600, minWidth: '140px' }}>Last Cleaned</span>
+            <span>{album.last_cleaned_date ? formatDate(album.last_cleaned_date) : '—'}</span>
+          </div>
+          <div style={{ fontSize: '13px', color: '#1f2937', marginBottom: '8px', display: 'flex', fontWeight: 400 }}>
+            <span style={{ fontWeight: 600, minWidth: '140px' }}>Signed By</span>
+            <span>
+              {album.signed_by && Array.isArray(album.signed_by) && album.signed_by.length > 0 
+                ? album.signed_by.join(', ') 
+                : '—'}
+            </span>
+          </div>
+          <div style={{ fontSize: '13px', color: '#1f2937', marginBottom: '8px', display: 'flex', fontWeight: 400 }}>
+            <span style={{ fontWeight: 600, minWidth: '140px' }}>Added Date</span>
             <span>{album.date_added ? formatDateTime(album.date_added) : '—'}</span>
           </div>
           <div style={{ fontSize: '13px', color: '#1f2937', display: 'flex', fontWeight: 400 }}>
-            <span style={{ fontWeight: 600, minWidth: '120px' }}>Modified Date</span>
+            <span style={{ fontWeight: 600, minWidth: '140px' }}>Modified Date</span>
             <span>{album.modified_date ? formatDateTime(album.modified_date) : '—'}</span>
           </div>
         </div>

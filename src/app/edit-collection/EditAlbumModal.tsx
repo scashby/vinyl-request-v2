@@ -529,7 +529,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
             <TracksTab ref={tracksTabRef} album={editedAlbum} onChange={handleFieldChange} />
           )}
           {activeTab === 'personal' && (
-            <PersonalTab />
+            <PersonalTab album={editedAlbum} onChange={handleFieldChange} />
           )}
           {activeTab === 'cover' && (
             <CoverTab album={editedAlbum} onChange={handleFieldChange} />
