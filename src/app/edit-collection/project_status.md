@@ -48,6 +48,13 @@ Phase 4: Advanced Features        ░░░░░░░░░░░░░░░�
 
 ## 🔧 RECENT CHANGES (Last 7 Days)
 
+### 2025-12-16: Previous/Next Navigation Complete ✅
+- Wired up Previous/Next buttons in UniversalBottomBar
+- Implemented album navigation in EditAlbumModal (handlePrevious/handleNext)
+- Edge cases handled (first/last album - buttons disabled when unavailable)
+- Persists edited changes when navigating between albums
+- **Result:** Users can navigate through collection without closing modal
+
 ### 2025-12-16: Detail Panel Enhancement - Details/Personal/Notes Sections Added ✅
 - Added Details section showing Release Date, Original Release Date, Conditions
 - Added Personal section showing Quantity, Index, Added/Modified dates
@@ -125,15 +132,15 @@ Implemented 24 sort options, column selector with drag-drop, 14 column groups wi
 ✅ **TracksTab** - Built with Discogs/Spotify import, multi-disc support, track management
 ✅ **DetailsTab** - All fields functional with pre-populated lists and multi-select vinyl colors
 
-### Tab Status:
+### Tab Status (Priority Order: Details > Personal > Cover > People > Links > Classical):
 - ✅ **MainTab** - COMPLETE (all pickers functional)
 - ✅ **TracksTab** - COMPLETE (import from Discogs/Spotify working)
 - ✅ **DetailsTab** - COMPLETE (all pickers, dropdowns, multi-select functional)
-- ⏳ **ClassicalTab** - Placeholder (Phase 6)
-- ⏳ **PeopleTab** - Placeholder (Phase 6)
-- ⏳ **PersonalTab** - Placeholder (Phase 6)
+- ⏳ **PersonalTab** - NEXT PRIORITY (Phase 6)
 - ⏳ **CoverTab** - Placeholder (Phase 6)
+- ⏳ **PeopleTab** - Placeholder (Phase 6)
 - ⏳ **LinksTab** - Placeholder (Phase 6)
+- ⏳ **ClassicalTab** - LOWEST PRIORITY (Phase 6)
 
 **Details:** See TABS_REFERENCE.md for complete tab inventory
 
@@ -236,18 +243,21 @@ Can integrate additional modal features into detail panel after remaining tabs c
 
 ## 🎯 IMMEDIATE NEXT STEPS
 
-**Priority 1: Previous/Next Navigation**
-1. Wire up Previous/Next buttons in UniversalBottomBar
-2. Implement album navigation in EditAlbumModal
-3. Handle edge cases (first/last album)
-4. Persist edited changes when navigating
+**Priority 1: PersonalTab (Next in sequence)**
+1. Purchase info fields (date, store, price, current value)
+2. Owner picker
+3. Star rating system (10 stars)
+4. Tags multi-select picker
+5. Notes textarea
+6. Last cleaned date picker
+7. Signed by picker
+8. Played history with date+count
 
-**Priority 2: Edit Album Modal - Phase 6 (Remaining Tabs)**
-1. Classical tab (composer, conductor, orchestra, etc.)
+**Priority 2: Remaining Tabs (In order: Cover > People > Links > Classical)**
+1. Cover tab (upload, crop, find online)
 2. People tab (credits & musicians)
-3. Personal tab (purchase info, ratings, tags, notes)
-4. Cover tab (upload, crop, find online)
-5. Links tab (URL management)
+3. Links tab (URL management)
+4. Classical tab (composer, conductor, orchestra, etc.) - LOWEST PRIORITY
 
 **Priority 3: Edit Album Modal - Phase 5 (Enrichment Integration)**
 1. Spotify search & import (Main tab)
