@@ -472,7 +472,9 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
                 }}
               >
                 <option value="">Select...</option>
-                <option>{album.packaging || 'Select...'}</option>
+                {packaging.map(item => (
+                  <option key={item.id} value={item.id}>{item.name}</option>
+                ))}
               </select>
               <button 
                 onClick={() => handleOpenPicker('packaging')}
@@ -520,7 +522,9 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
                 }}
               >
                 <option value="">Select...</option>
-                <option>{album.package_sleeve_condition || 'Select...'}</option>
+                {packageConditions.map(item => (
+                  <option key={item.id} value={item.id}>{item.name}</option>
+                ))}
               </select>
               <button 
                 onClick={() => handleOpenPicker('package_sleeve_condition')}
@@ -568,7 +572,9 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
                 }}
               >
                 <option value="">Select...</option>
-                <option>{album.media_condition || 'Select...'}</option>
+                {mediaConditions.map(item => (
+                  <option key={item.id} value={item.id}>{item.name}</option>
+                ))}
               </select>
               <button 
                 onClick={() => handleOpenPicker('media_condition')}
@@ -645,7 +651,9 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
                 }}
               >
                 <option value="">Select...</option>
-                <option>{album.country || 'Select...'}</option>
+                {countries.map(item => (
+                  <option key={item.id} value={item.id}>{item.name}</option>
+                ))}
               </select>
               <button 
                 onClick={() => handleOpenPicker('country')}
@@ -693,7 +701,9 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
                 }}
               >
                 <option value="">Select...</option>
-                <option>{album.sound || 'Select...'}</option>
+                {sounds.map(item => (
+                  <option key={item.id} value={item.id}>{item.name}</option>
+                ))}
               </select>
               <button 
                 onClick={() => handleOpenPicker('sound')}
@@ -844,7 +854,9 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
                 }}
               >
                 <option value="">Select...</option>
-                <option>{album.vinyl_weight || 'Select...'}</option>
+                {vinylWeights.map(item => (
+                  <option key={item.id} value={item.id}>{item.name}</option>
+                ))}
               </select>
               <button 
                 onClick={() => handleOpenPicker('vinyl_weight')}
@@ -933,7 +945,9 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
                 }}
               >
                 <option value="">Select...</option>
-                <option>{album.spars_code || 'Select...'}</option>
+                {spars.map(item => (
+                  <option key={item.id} value={item.id}>{item.name}</option>
+                ))}
               </select>
               <button 
                 onClick={() => handleOpenPicker('spars_code')}
@@ -981,7 +995,9 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
                 }}
               >
                 <option value="">Select...</option>
-                <option>{album.box_set || 'Select...'}</option>
+                {boxSets.map(item => (
+                  <option key={item.id} value={item.id}>{item.name}</option>
+                ))}
               </select>
               <button 
                 onClick={() => handleOpenPicker('box_set')}
