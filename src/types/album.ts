@@ -94,6 +94,7 @@ export type Album = {
   collection_status: 'in_collection' | 'for_sale' | 'wish_list' | 'on_order' | 'sold' | 'not_in_collection' | null;
   for_sale: boolean;
   is_box_set: boolean;
+  box_set: string | null;
   is_live: boolean | null;
   parent_id: string | null;
   child_album_ids: number[] | null;

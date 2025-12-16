@@ -517,7 +517,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
             <MainTab ref={mainTabRef} album={editedAlbum} onChange={handleFieldChange} />
           )}
           {activeTab === 'details' && (
-            <DetailsTab />
+            <DetailsTab album={editedAlbum} onChange={handleFieldChange} />
           )}
           {activeTab === 'classical' && (
             <ClassicalTab />
