@@ -97,11 +97,31 @@ const AlbumInfoPanel = memo(function AlbumInfoPanel({ album }: { album: Album | 
     }
   };
 
+  // Format datetime as "Jan 29, 2025 19:00:00"
+  const formatDateTime = (dateStr: string | null): string => {
+    if (!dateStr) return '';
+    try {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' ' +
+             date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+    } catch {
+      return dateStr;
+    }
+  };
+
   // Generate eBay search URL for sold listings
   const getEbayUrl = (): string => {
     const query = `${album.artist} ${album.title}`.replace(/\s+/g, '+');
     return `https://www.ebay.com/sch/i.html?_nkw=${query}&LH_Sold=1&LH_Complete=1`;
   };
+
+  // Count total tracks
+  const totalTracks = album.tracks?.filter(t => t.type === 'track').length || album.spotify_total_tracks || album.apple_music_track_count || 0;
+
+  // Format total runtime
+  const totalRuntime = album.length_seconds 
+    ? `${Math.floor(album.length_seconds / 60)}:${String(album.length_seconds % 60).padStart(2, '0')}`
+    : '';
 
   return (
     <div style={{ 
@@ -248,9 +268,8 @@ const AlbumInfoPanel = memo(function AlbumInfoPanel({ album }: { album: Album | 
       }}>
         {album.format}
         {album.discs && ` | ${album.discs} Disc${album.discs > 1 ? 's' : ''}`}
-        {(album.spotify_total_tracks || album.apple_music_track_count) && 
-          ` | ${album.spotify_total_tracks || album.apple_music_track_count} Tracks`}
-        {album.length_seconds && ` | ${Math.floor(album.length_seconds / 60)}:${String(album.length_seconds % 60).padStart(2, '0')}`}
+        {totalTracks > 0 && ` | ${totalTracks} Tracks`}
+        {totalRuntime && ` | ${totalRuntime}`}
       </div>
 
       {/* Cat No */}
@@ -397,44 +416,34 @@ const AlbumInfoPanel = memo(function AlbumInfoPanel({ album }: { album: Album | 
       })()}
 
       {/* Details Section */}
-      {(album.year || album.original_release_date || album.package_sleeve_condition || album.media_condition) && (
-        <div style={{ marginBottom: '16px' }}>
-          <div style={{ 
-            fontSize: '16px', 
-            fontWeight: 700, 
-            color: '#2196F3',
-            marginBottom: '12px'
-          }}>
-            Details
+      <div style={{ marginBottom: '16px' }}>
+        <div style={{ 
+          fontSize: '16px', 
+          fontWeight: 700, 
+          color: '#2196F3',
+          marginBottom: '12px'
+        }}>
+          Details
+        </div>
+        <div style={{ background: 'white', padding: '12px', borderRadius: '4px' }}>
+          <div style={{ fontSize: '13px', color: '#1f2937', marginBottom: '8px', display: 'flex', fontWeight: 400 }}>
+            <span style={{ fontWeight: 600, minWidth: '180px' }}>Release Date</span>
+            <span>{album.year || '—'}</span>
           </div>
-          <div style={{ background: 'white', padding: '12px', borderRadius: '4px' }}>
-            {album.year && (
-              <div style={{ fontSize: '13px', color: '#1f2937', marginBottom: '8px', display: 'flex', fontWeight: 400 }}>
-                <span style={{ fontWeight: 600, minWidth: '180px' }}>Release Date</span>
-                <span>{album.year}</span>
-              </div>
-            )}
-            {album.original_release_date && (
-              <div style={{ fontSize: '13px', color: '#1f2937', marginBottom: '8px', display: 'flex', fontWeight: 400 }}>
-                <span style={{ fontWeight: 600, minWidth: '180px' }}>Original Release Date</span>
-                <span>{formatDate(album.original_release_date)}</span>
-              </div>
-            )}
-            {album.package_sleeve_condition && (
-              <div style={{ fontSize: '13px', color: '#1f2937', marginBottom: '8px', display: 'flex', fontWeight: 400 }}>
-                <span style={{ fontWeight: 600, minWidth: '180px' }}>Package/Sleeve Condition</span>
-                <span>{album.package_sleeve_condition}</span>
-              </div>
-            )}
-            {album.media_condition && (
-              <div style={{ fontSize: '13px', color: '#1f2937', display: 'flex', fontWeight: 400 }}>
-                <span style={{ fontWeight: 600, minWidth: '180px' }}>Media Condition</span>
-                <span>{album.media_condition}</span>
-              </div>
-            )}
+          <div style={{ fontSize: '13px', color: '#1f2937', marginBottom: '8px', display: 'flex', fontWeight: 400 }}>
+            <span style={{ fontWeight: 600, minWidth: '180px' }}>Original Release Date</span>
+            <span>{album.original_release_date ? formatDate(album.original_release_date) : '—'}</span>
+          </div>
+          <div style={{ fontSize: '13px', color: '#1f2937', marginBottom: '8px', display: 'flex', fontWeight: 400 }}>
+            <span style={{ fontWeight: 600, minWidth: '180px' }}>Package/Sleeve Condition</span>
+            <span>{album.package_sleeve_condition || '—'}</span>
+          </div>
+          <div style={{ fontSize: '13px', color: '#1f2937', display: 'flex', fontWeight: 400 }}>
+            <span style={{ fontWeight: 600, minWidth: '180px' }}>Media Condition</span>
+            <span>{album.media_condition || '—'}</span>
           </div>
         </div>
-      )}
+      </div>
 
       {/* Personal Section */}
       <div style={{ marginBottom: '16px' }}>
@@ -451,63 +460,56 @@ const AlbumInfoPanel = memo(function AlbumInfoPanel({ album }: { album: Album | 
             <span style={{ fontWeight: 600, minWidth: '120px' }}>Quantity</span>
             <span>1</span>
           </div>
-          {album.index_number && (
-            <div style={{ fontSize: '13px', color: '#1f2937', marginBottom: '8px', display: 'flex', fontWeight: 400 }}>
-              <span style={{ fontWeight: 600, minWidth: '120px' }}>Index</span>
-              <span>{album.index_number}</span>
-            </div>
-          )}
-          {album.date_added && (
-            <div style={{ fontSize: '13px', color: '#1f2937', marginBottom: '8px', display: 'flex', fontWeight: 400 }}>
-              <span style={{ fontWeight: 600, minWidth: '120px' }}>Added Date</span>
-              <span>{new Date(album.date_added).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} {new Date(album.date_added).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}</span>
-            </div>
-          )}
-          {album.modified_date && (
-            <div style={{ fontSize: '13px', color: '#1f2937', display: 'flex', fontWeight: 400 }}>
-              <span style={{ fontWeight: 600, minWidth: '120px' }}>Modified Date</span>
-              <span>{new Date(album.modified_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} {new Date(album.modified_date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}</span>
-            </div>
-          )}
+          <div style={{ fontSize: '13px', color: '#1f2937', marginBottom: '8px', display: 'flex', fontWeight: 400 }}>
+            <span style={{ fontWeight: 600, minWidth: '120px' }}>Index</span>
+            <span>{album.index_number || '—'}</span>
+          </div>
+          <div style={{ fontSize: '13px', color: '#1f2937', marginBottom: '8px', display: 'flex', fontWeight: 400 }}>
+            <span style={{ fontWeight: 600, minWidth: '120px' }}>Added Date</span>
+            <span>{album.date_added ? formatDateTime(album.date_added) : '—'}</span>
+          </div>
+          <div style={{ fontSize: '13px', color: '#1f2937', display: 'flex', fontWeight: 400 }}>
+            <span style={{ fontWeight: 600, minWidth: '120px' }}>Modified Date</span>
+            <span>{album.modified_date ? formatDateTime(album.modified_date) : '—'}</span>
+          </div>
         </div>
       </div>
 
       {/* Notes Section */}
-      {album.notes && (
-        <div style={{ marginBottom: '16px' }}>
-          <div style={{ 
-            fontSize: '16px', 
-            fontWeight: 700, 
-            color: '#2196F3',
-            marginBottom: '12px'
-          }}>
-            Notes
-          </div>
-          <div style={{ 
-            fontSize: '13px', 
-            color: '#1f2937', 
-            lineHeight: '1.6',
-            background: 'white',
-            padding: '12px',
-            borderRadius: '4px',
-            fontWeight: 400
-          }}>
-            {album.notes}
-          </div>
+      <div style={{ marginBottom: '16px' }}>
+        <div style={{ 
+          fontSize: '16px', 
+          fontWeight: 700, 
+          color: '#2196F3',
+          marginBottom: '12px'
+        }}>
+          Notes
         </div>
-      )}
+        <div style={{ 
+          fontSize: '13px', 
+          color: '#1f2937', 
+          lineHeight: '1.6',
+          background: 'white',
+          padding: '12px',
+          borderRadius: '4px',
+          fontWeight: 400,
+          minHeight: '40px'
+        }}>
+          {album.notes || '—'}
+        </div>
+      </div>
 
       {/* Tags Section */}
-      {album.custom_tags && album.custom_tags.length > 0 && (
-        <div>
-          <div style={{ 
-            fontSize: '16px', 
-            fontWeight: 700, 
-            color: '#2196F3',
-            marginBottom: '12px'
-          }}>
-            Tags
-          </div>
+      <div>
+        <div style={{ 
+          fontSize: '16px', 
+          fontWeight: 700, 
+          color: '#2196F3',
+          marginBottom: '12px'
+        }}>
+          Tags
+        </div>
+        {album.custom_tags && album.custom_tags.length > 0 ? (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
             {toSafeStringArray(album.custom_tags).map(tag => (
               <span key={tag} style={{
@@ -522,8 +524,16 @@ const AlbumInfoPanel = memo(function AlbumInfoPanel({ album }: { album: Album | 
               </span>
             ))}
           </div>
-        </div>
-      )}
+        ) : (
+          <div style={{
+            fontSize: '13px',
+            color: '#9ca3af',
+            fontWeight: 400
+          }}>
+            No tags
+          </div>
+        )}
+      </div>
     </div>
   );
 });
