@@ -53,6 +53,8 @@ const SORT_OPTIONS: { value: SortOption; label: string; category: string }[] = [
 ];
 
 const AlbumInfoPanel = memo(function AlbumInfoPanel({ album }: { album: Album | null }) {
+  const [imageIndex, setImageIndex] = useState(0);
+
   if (!album) {
     return (
       <div style={{
@@ -66,6 +68,41 @@ const AlbumInfoPanel = memo(function AlbumInfoPanel({ album }: { album: Album | 
     );
   }
 
+  // Calculate disc runtimes
+  const getDiscRuntime = (discNumber: number): string => {
+    if (!album.tracks) return '';
+    const discTracks = album.tracks.filter(t => t.disc_number === discNumber && t.type !== 'header');
+    let totalSeconds = 0;
+    discTracks.forEach(track => {
+      if (track.duration) {
+        const parts = track.duration.split(':');
+        if (parts.length === 2) {
+          totalSeconds += parseInt(parts[0]) * 60 + parseInt(parts[1]);
+        }
+      }
+    });
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  // Format date as "Feb 26, 2002"
+  const formatDate = (dateStr: string | null): string => {
+    if (!dateStr) return '';
+    try {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    } catch {
+      return dateStr;
+    }
+  };
+
+  // Generate eBay search URL for sold listings
+  const getEbayUrl = (): string => {
+    const query = `${album.artist} ${album.title}`.replace(/\s+/g, '+');
+    return `https://www.ebay.com/sch/i.html?_nkw=${query}&LH_Sold=1&LH_Complete=1`;
+  };
+
   return (
     <div style={{ 
       padding: '16px', 
@@ -73,12 +110,14 @@ const AlbumInfoPanel = memo(function AlbumInfoPanel({ album }: { album: Album | 
       overflowY: 'auto', 
       background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)' 
     }}>
-      <div style={{ fontSize: '14px', color: '#333', marginBottom: '4px' }}>
+      {/* Artist */}
+      <div style={{ fontSize: '14px', color: '#333', marginBottom: '4px', fontWeight: 400 }}>
         {album.artist}
       </div>
 
+      {/* Title with checkmark */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-        <h4 style={{ color: '#2196F3', margin: 0, fontSize: '18px', fontWeight: 600 }}>
+        <h4 style={{ color: '#2196F3', margin: 0, fontSize: '18px', fontWeight: 400 }}>
           {album.title}
         </h4>
         <div style={{
@@ -93,40 +132,69 @@ const AlbumInfoPanel = memo(function AlbumInfoPanel({ album }: { album: Album | 
         }} title="Album owned">✓</div>
       </div>
 
-      {album.image_url ? (
-        <Image 
-          src={album.image_url} 
-          alt={`${album.artist} - ${album.title}`}
-          width={400}
-          height={400}
-          style={{
+      {/* Image Carousel */}
+      <div style={{ position: 'relative', marginBottom: '12px' }}>
+        {(imageIndex === 0 ? album.image_url : album.back_image_url) ? (
+          <Image 
+            src={(imageIndex === 0 ? album.image_url : album.back_image_url) || ''} 
+            alt={`${album.artist} - ${album.title} ${imageIndex === 0 ? 'front' : 'back'}`}
+            width={400}
+            height={400}
+            style={{
+              width: '100%',
+              height: 'auto',
+              aspectRatio: '1',
+              objectFit: 'cover',
+              border: '1px solid #ddd'
+            }}
+            unoptimized
+          />
+        ) : (
+          <div style={{
             width: '100%',
-            height: 'auto',
             aspectRatio: '1',
-            objectFit: 'cover',
-            marginBottom: '12px',
+            background: '#fff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#999',
+            fontSize: '48px',
             border: '1px solid #ddd'
-          }}
-          unoptimized
-        />
-      ) : (
-        <div style={{
-          width: '100%',
-          aspectRatio: '1',
-          background: '#fff',
-          marginBottom: '12px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: '#999',
-          fontSize: '48px',
-          border: '1px solid #ddd'
-        }}>🎵</div>
-      )}
+          }}>🎵</div>
+        )}
+        
+        {/* Carousel dots - only show second dot if back image exists */}
+        {album.back_image_url && (
+          <div style={{
+            position: 'absolute',
+            bottom: '8px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            display: 'flex',
+            gap: '6px'
+          }}>
+            <div style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              background: imageIndex === 0 ? '#333' : '#999',
+              cursor: 'pointer'
+            }} onClick={() => setImageIndex(0)} />
+            <div style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              background: imageIndex === 1 ? '#333' : '#999',
+              cursor: 'pointer'
+            }} onClick={() => setImageIndex(1)} />
+          </div>
+        )}
+      </div>
 
+      {/* Label (Year) */}
       <div style={{
-        fontSize: '16px',
-        fontWeight: 600,
+        fontSize: '14px',
+        fontWeight: 400,
         color: '#333',
         marginBottom: '8px'
       }}>
@@ -134,113 +202,85 @@ const AlbumInfoPanel = memo(function AlbumInfoPanel({ album }: { album: Album | 
         {album.year && ` (${album.year})`}
       </div>
 
+      {/* Genres */}
       {(album.discogs_genres || album.spotify_genres) && (
         <div style={{
-          fontSize: '14px',
+          fontSize: '13px',
           color: '#666',
-          marginBottom: '16px'
+          marginBottom: '12px',
+          fontWeight: 400
         }}>
           {toSafeStringArray(album.discogs_genres || album.spotify_genres).join(' | ')}
         </div>
       )}
 
-      <div style={{
-        fontSize: '14px',
-        color: '#333',
-        marginBottom: '16px',
-        fontWeight: 600
-      }}>
-        {album.format}
-        {album.spotify_total_tracks && ` | ${album.spotify_total_tracks} Tracks`}
-        {album.apple_music_track_count && ` | ${album.apple_music_track_count} Tracks`}
-      </div>
-
-      {/* Details Section */}
-      <div style={{ marginTop: '16px', borderTop: '1px solid #e5e7eb', paddingTop: '16px' }}>
-        <div style={{ 
-          fontSize: '16px', 
-          fontWeight: 700, 
-          color: '#2196F3',
-          marginBottom: '12px'
+      {/* Barcode */}
+      {album.barcode && (
+        <div style={{
+          fontSize: '12px',
+          color: '#333',
+          marginBottom: '8px',
+          fontFamily: 'monospace',
+          fontWeight: 400
         }}>
-          Details
-        </div>
-        {album.year && (
-          <div style={{ fontSize: '13px', color: '#333', marginBottom: '6px', display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ fontWeight: 600 }}>Release Date</span>
-            <span>{album.year}</span>
-          </div>
-        )}
-        {album.original_release_date && (
-          <div style={{ fontSize: '13px', color: '#333', marginBottom: '6px', display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ fontWeight: 600 }}>Original Release Date</span>
-            <span>{album.original_release_date}</span>
-          </div>
-        )}
-        {album.package_sleeve_condition && (
-          <div style={{ fontSize: '13px', color: '#333', marginBottom: '6px', display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ fontWeight: 600 }}>Package/Sleeve Condition</span>
-            <span>{album.package_sleeve_condition}</span>
-          </div>
-        )}
-        {album.media_condition && (
-          <div style={{ fontSize: '13px', color: '#333', marginBottom: '6px', display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ fontWeight: 600 }}>Media Condition</span>
-            <span>{album.media_condition}</span>
-          </div>
-        )}
-      </div>
-
-      {/* Personal Section */}
-      <div style={{ marginTop: '16px', borderTop: '1px solid #e5e7eb', paddingTop: '16px' }}>
-        <div style={{ 
-          fontSize: '16px', 
-          fontWeight: 700, 
-          color: '#2196F3',
-          marginBottom: '12px'
-        }}>
-          Personal
-        </div>
-        <div style={{ fontSize: '13px', color: '#333', marginBottom: '6px', display: 'flex', justifyContent: 'space-between' }}>
-          <span style={{ fontWeight: 600 }}>Quantity</span>
-          <span>1</span>
-        </div>
-        {album.index_number && (
-          <div style={{ fontSize: '13px', color: '#333', marginBottom: '6px', display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ fontWeight: 600 }}>Index</span>
-            <span>{album.index_number}</span>
-          </div>
-        )}
-        {album.date_added && (
-          <div style={{ fontSize: '13px', color: '#333', marginBottom: '6px', display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ fontWeight: 600 }}>Added Date</span>
-            <span>{new Date(album.date_added).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>
-          </div>
-        )}
-        {album.modified_date && (
-          <div style={{ fontSize: '13px', color: '#333', marginBottom: '6px', display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ fontWeight: 600 }}>Modified Date</span>
-            <span>{new Date(album.modified_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>
-          </div>
-        )}
-      </div>
-
-      {/* Notes Section */}
-      {album.notes && (
-        <div style={{ marginTop: '16px', borderTop: '1px solid #e5e7eb', paddingTop: '16px' }}>
-          <div style={{ 
-            fontSize: '16px', 
-            fontWeight: 700, 
-            color: '#2196F3',
-            marginBottom: '12px'
-          }}>
-            Notes
-          </div>
-          <div style={{ fontSize: '13px', color: '#333', lineHeight: '1.6' }}>
-            {album.notes}
-          </div>
+          ||||| {album.barcode}
         </div>
       )}
+
+      {/* Country */}
+      {album.country && (
+        <div style={{
+          fontSize: '13px',
+          color: '#333',
+          marginBottom: '8px',
+          fontWeight: 400
+        }}>
+          {album.country}
+        </div>
+      )}
+
+      {/* Format | Discs | Tracks | Time */}
+      <div style={{
+        fontSize: '13px',
+        color: '#333',
+        marginBottom: '12px',
+        fontWeight: 400
+      }}>
+        {album.format}
+        {album.discs && ` | ${album.discs} Disc${album.discs > 1 ? 's' : ''}`}
+        {(album.spotify_total_tracks || album.apple_music_track_count) && 
+          ` | ${album.spotify_total_tracks || album.apple_music_track_count} Tracks`}
+        {album.length_seconds && ` | ${Math.floor(album.length_seconds / 60)}:${String(album.length_seconds % 60).padStart(2, '0')}`}
+      </div>
+
+      {/* Cat No */}
+      {album.cat_no && (
+        <div style={{
+          fontSize: '13px',
+          color: '#666',
+          marginBottom: '12px',
+          fontWeight: 400
+        }}>
+          <span style={{ fontWeight: 600 }}>CAT NO</span> {album.cat_no}
+        </div>
+      )}
+
+      {/* eBay Link */}
+      <a 
+        href={getEbayUrl()}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
+          fontSize: '13px',
+          color: '#2196F3',
+          marginBottom: '16px',
+          display: 'block',
+          textDecoration: 'none',
+          fontWeight: 400
+        }}
+      >
+        Find solid listings on eBay
+      </a>
 
       {/* Track Listings */}
       {(() => {
@@ -263,29 +303,30 @@ const AlbumInfoPanel = memo(function AlbumInfoPanel({ album }: { album: Album | 
         const sortedDiscs = Array.from(discMap.entries()).sort(([a], [b]) => a - b);
 
         return (
-          <div style={{ marginTop: '16px', borderTop: '1px solid #e5e7eb', paddingTop: '16px' }}>
-            <div style={{ fontSize: '13px', fontWeight: 600, color: '#333', marginBottom: '12px' }}>
-              Tracks:
-            </div>
+          <div style={{ marginBottom: '16px' }}>
             {sortedDiscs.map(([discNumber, tracks]) => {
               const discMeta = album.disc_metadata?.find(d => d.disc_number === discNumber);
-              const discTitle = discMeta?.title || `Disc ${discNumber}`;
+              const discTitle = discMeta?.title || `Disc #${discNumber}`;
+              const runtime = getDiscRuntime(discNumber);
 
               return (
                 <div key={discNumber} style={{ marginBottom: '16px' }}>
                   <div style={{ 
-                    fontSize: '12px', 
+                    fontSize: '14px', 
                     fontWeight: 700, 
-                    color: '#1f2937', 
+                    color: 'white', 
                     marginBottom: '8px',
-                    padding: '6px 10px',
-                    background: '#f3f4f6',
+                    padding: '8px 12px',
+                    background: '#2196F3',
                     borderRadius: '4px',
-                    borderLeft: '3px solid #8809AC'
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
                   }}>
-                    {discTitle}
+                    <span>{discTitle}</span>
+                    {runtime && <span>{runtime}</span>}
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
                     {tracks.map((track, idx) => {
                       if (track.type === 'header') {
                         return (
@@ -295,9 +336,9 @@ const AlbumInfoPanel = memo(function AlbumInfoPanel({ album }: { album: Album | 
                               fontSize: '11px', 
                               fontWeight: 600, 
                               color: '#6b7280',
-                              padding: '5px 8px',
-                              background: '#fafafa',
-                              marginTop: idx > 0 ? 6 : 0
+                              padding: '6px 8px',
+                              background: '#f3f4f6',
+                              marginTop: idx > 0 ? 4 : 0
                             }}
                           >
                             {track.title}
@@ -311,35 +352,35 @@ const AlbumInfoPanel = memo(function AlbumInfoPanel({ album }: { album: Album | 
                           style={{ 
                             display: 'flex', 
                             alignItems: 'center',
-                            padding: '4px 8px',
-                            fontSize: '11px',
-                            borderRadius: '2px',
-                            background: idx % 2 === 0 ? 'white' : '#fafafa'
+                            padding: '6px 8px',
+                            fontSize: '13px',
+                            background: idx % 2 === 0 ? 'white' : '#f9fafb',
+                            fontWeight: 400
                           }}
                         >
                           <div style={{ 
-                            minWidth: 24, 
-                            color: '#9ca3af',
-                            fontWeight: 500,
-                            fontSize: '10px'
+                            minWidth: 28, 
+                            color: '#6b7280',
+                            fontSize: '13px'
                           }}>
-                            {track.side ? `${track.side}${track.position}` : track.position}
+                            {track.position}
                           </div>
                           <div style={{ 
                             flex: 1, 
-                            color: '#374151',
+                            color: '#1f2937',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap'
+                            whiteSpace: 'nowrap',
+                            paddingRight: '8px'
                           }}>
                             {track.title}
                           </div>
                           {track.duration && (
                             <div style={{ 
-                              marginLeft: 6,
-                              color: '#9ca3af',
-                              fontSize: '10px',
-                              fontFamily: 'monospace'
+                              color: '#6b7280',
+                              fontSize: '13px',
+                              minWidth: '40px',
+                              textAlign: 'right'
                             }}>
                               {track.duration}
                             </div>
@@ -355,17 +396,127 @@ const AlbumInfoPanel = memo(function AlbumInfoPanel({ album }: { album: Album | 
         );
       })()}
 
+      {/* Details Section */}
+      {(album.year || album.original_release_date || album.package_sleeve_condition || album.media_condition) && (
+        <div style={{ marginBottom: '16px' }}>
+          <div style={{ 
+            fontSize: '16px', 
+            fontWeight: 700, 
+            color: '#2196F3',
+            marginBottom: '12px'
+          }}>
+            Details
+          </div>
+          <div style={{ background: 'white', padding: '12px', borderRadius: '4px' }}>
+            {album.year && (
+              <div style={{ fontSize: '13px', color: '#1f2937', marginBottom: '8px', display: 'flex', fontWeight: 400 }}>
+                <span style={{ fontWeight: 600, minWidth: '180px' }}>Release Date</span>
+                <span>{album.year}</span>
+              </div>
+            )}
+            {album.original_release_date && (
+              <div style={{ fontSize: '13px', color: '#1f2937', marginBottom: '8px', display: 'flex', fontWeight: 400 }}>
+                <span style={{ fontWeight: 600, minWidth: '180px' }}>Original Release Date</span>
+                <span>{formatDate(album.original_release_date)}</span>
+              </div>
+            )}
+            {album.package_sleeve_condition && (
+              <div style={{ fontSize: '13px', color: '#1f2937', marginBottom: '8px', display: 'flex', fontWeight: 400 }}>
+                <span style={{ fontWeight: 600, minWidth: '180px' }}>Package/Sleeve Condition</span>
+                <span>{album.package_sleeve_condition}</span>
+              </div>
+            )}
+            {album.media_condition && (
+              <div style={{ fontSize: '13px', color: '#1f2937', display: 'flex', fontWeight: 400 }}>
+                <span style={{ fontWeight: 600, minWidth: '180px' }}>Media Condition</span>
+                <span>{album.media_condition}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Personal Section */}
+      <div style={{ marginBottom: '16px' }}>
+        <div style={{ 
+          fontSize: '16px', 
+          fontWeight: 700, 
+          color: '#2196F3',
+          marginBottom: '12px'
+        }}>
+          Personal
+        </div>
+        <div style={{ background: 'white', padding: '12px', borderRadius: '4px' }}>
+          <div style={{ fontSize: '13px', color: '#1f2937', marginBottom: '8px', display: 'flex', fontWeight: 400 }}>
+            <span style={{ fontWeight: 600, minWidth: '120px' }}>Quantity</span>
+            <span>1</span>
+          </div>
+          {album.index_number && (
+            <div style={{ fontSize: '13px', color: '#1f2937', marginBottom: '8px', display: 'flex', fontWeight: 400 }}>
+              <span style={{ fontWeight: 600, minWidth: '120px' }}>Index</span>
+              <span>{album.index_number}</span>
+            </div>
+          )}
+          {album.date_added && (
+            <div style={{ fontSize: '13px', color: '#1f2937', marginBottom: '8px', display: 'flex', fontWeight: 400 }}>
+              <span style={{ fontWeight: 600, minWidth: '120px' }}>Added Date</span>
+              <span>{new Date(album.date_added).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} {new Date(album.date_added).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}</span>
+            </div>
+          )}
+          {album.modified_date && (
+            <div style={{ fontSize: '13px', color: '#1f2937', display: 'flex', fontWeight: 400 }}>
+              <span style={{ fontWeight: 600, minWidth: '120px' }}>Modified Date</span>
+              <span>{new Date(album.modified_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} {new Date(album.modified_date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Notes Section */}
+      {album.notes && (
+        <div style={{ marginBottom: '16px' }}>
+          <div style={{ 
+            fontSize: '16px', 
+            fontWeight: 700, 
+            color: '#2196F3',
+            marginBottom: '12px'
+          }}>
+            Notes
+          </div>
+          <div style={{ 
+            fontSize: '13px', 
+            color: '#1f2937', 
+            lineHeight: '1.6',
+            background: 'white',
+            padding: '12px',
+            borderRadius: '4px',
+            fontWeight: 400
+          }}>
+            {album.notes}
+          </div>
+        </div>
+      )}
+
+      {/* Tags Section */}
       {album.custom_tags && album.custom_tags.length > 0 && (
-        <div style={{ marginTop: '16px' }}>
-          <div style={{ fontSize: '13px', fontWeight: 600, color: '#333', marginBottom: '8px' }}>Tags:</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+        <div>
+          <div style={{ 
+            fontSize: '16px', 
+            fontWeight: 700, 
+            color: '#2196F3',
+            marginBottom: '12px'
+          }}>
+            Tags
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
             {toSafeStringArray(album.custom_tags).map(tag => (
               <span key={tag} style={{
-                padding: '4px 10px',
-                background: '#8809AC',
-                color: 'white',
-                borderRadius: '12px',
-                fontSize: '12px'
+                padding: '6px 12px',
+                background: '#e5e7eb',
+                color: '#374151',
+                borderRadius: '16px',
+                fontSize: '13px',
+                fontWeight: 400
               }}>
                 {tag}
               </span>

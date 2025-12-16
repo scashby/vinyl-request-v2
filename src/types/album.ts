@@ -27,6 +27,7 @@ export type Album = {
   // VISUAL & AUDIO
   // ============================================================================
   image_url: string | null;
+  back_image_url: string | null;
   length_seconds: number | null;
   tracklists: string | null; // Legacy text field
   
