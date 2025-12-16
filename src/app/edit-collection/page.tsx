@@ -42,7 +42,7 @@ const SORT_OPTIONS: { value: SortOption; label: string; category: string }[] = [
   { value: 'folder-desc', label: 'Folder (Z→A)', category: 'Physical' },
   { value: 'condition-asc', label: 'Condition (A→Z)', category: 'Physical' },
   { value: 'condition-desc', label: 'Condition (Z→A)', category: 'Physical' },
-  { value: 'sides-desc', label: 'Most Sides First', category: 'Physical' },
+  { value: 'sides-desc', label: 'Most Sides First)', category: 'Physical' },
   { value: 'sides-asc', label: 'Fewest Sides First', category: 'Physical' },
   { value: 'tags-count-desc', label: 'Most Tags', category: 'Metadata' },
   { value: 'tags-count-asc', label: 'Fewest Tags', category: 'Metadata' },
@@ -155,9 +155,90 @@ const AlbumInfoPanel = memo(function AlbumInfoPanel({ album }: { album: Album | 
         {album.apple_music_track_count && ` | ${album.apple_music_track_count} Tracks`}
       </div>
 
-      {album.media_condition && (
-        <div style={{ fontSize: '13px', color: '#666', marginBottom: '8px' }}>
-          <strong>Condition:</strong> {album.media_condition}
+      {/* Details Section */}
+      <div style={{ marginTop: '16px', borderTop: '1px solid #e5e7eb', paddingTop: '16px' }}>
+        <div style={{ 
+          fontSize: '16px', 
+          fontWeight: 700, 
+          color: '#2196F3',
+          marginBottom: '12px'
+        }}>
+          Details
+        </div>
+        {album.year && (
+          <div style={{ fontSize: '13px', color: '#333', marginBottom: '6px', display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ fontWeight: 600 }}>Release Date</span>
+            <span>{album.year}</span>
+          </div>
+        )}
+        {album.original_release_date && (
+          <div style={{ fontSize: '13px', color: '#333', marginBottom: '6px', display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ fontWeight: 600 }}>Original Release Date</span>
+            <span>{album.original_release_date}</span>
+          </div>
+        )}
+        {album.package_sleeve_condition && (
+          <div style={{ fontSize: '13px', color: '#333', marginBottom: '6px', display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ fontWeight: 600 }}>Package/Sleeve Condition</span>
+            <span>{album.package_sleeve_condition}</span>
+          </div>
+        )}
+        {album.media_condition && (
+          <div style={{ fontSize: '13px', color: '#333', marginBottom: '6px', display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ fontWeight: 600 }}>Media Condition</span>
+            <span>{album.media_condition}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Personal Section */}
+      <div style={{ marginTop: '16px', borderTop: '1px solid #e5e7eb', paddingTop: '16px' }}>
+        <div style={{ 
+          fontSize: '16px', 
+          fontWeight: 700, 
+          color: '#2196F3',
+          marginBottom: '12px'
+        }}>
+          Personal
+        </div>
+        <div style={{ fontSize: '13px', color: '#333', marginBottom: '6px', display: 'flex', justifyContent: 'space-between' }}>
+          <span style={{ fontWeight: 600 }}>Quantity</span>
+          <span>1</span>
+        </div>
+        {album.index_number && (
+          <div style={{ fontSize: '13px', color: '#333', marginBottom: '6px', display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ fontWeight: 600 }}>Index</span>
+            <span>{album.index_number}</span>
+          </div>
+        )}
+        {album.date_added && (
+          <div style={{ fontSize: '13px', color: '#333', marginBottom: '6px', display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ fontWeight: 600 }}>Added Date</span>
+            <span>{new Date(album.date_added).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>
+          </div>
+        )}
+        {album.modified_date && (
+          <div style={{ fontSize: '13px', color: '#333', marginBottom: '6px', display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ fontWeight: 600 }}>Modified Date</span>
+            <span>{new Date(album.modified_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Notes Section */}
+      {album.notes && (
+        <div style={{ marginTop: '16px', borderTop: '1px solid #e5e7eb', paddingTop: '16px' }}>
+          <div style={{ 
+            fontSize: '16px', 
+            fontWeight: 700, 
+            color: '#2196F3',
+            marginBottom: '12px'
+          }}>
+            Notes
+          </div>
+          <div style={{ fontSize: '13px', color: '#333', lineHeight: '1.6' }}>
+            {album.notes}
+          </div>
         </div>
       )}
 
