@@ -389,3 +389,519 @@ export async function mergeArtists(targetId: string, sourceIds: string[]): Promi
     return false;
   }
 }
+
+// Packaging
+export async function fetchPackaging(): Promise<PickerDataItem[]> {
+  try {
+    const supabase = createClientComponentClient();
+    
+    const { data, error } = await supabase
+      .from('collection')
+      .select('packaging')
+      .not('packaging', 'is', null)
+      .not('packaging', 'eq', '');
+
+    if (error) {
+      console.error('Error fetching packaging:', error);
+      return [];
+    }
+
+    const packagingCounts = new Map<string, number>();
+    data?.forEach(row => {
+      if (row.packaging) {
+        packagingCounts.set(
+          row.packaging,
+          (packagingCounts.get(row.packaging) || 0) + 1
+        );
+      }
+    });
+
+    return Array.from(packagingCounts.entries())
+      .map(([name, count]) => ({
+        id: name,
+        name,
+        count,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch (error) {
+    console.error('Error in fetchPackaging:', error);
+    return [];
+  }
+}
+
+export async function updatePackaging(id: string, newName: string): Promise<boolean> {
+  try {
+    const supabase = createClientComponentClient();
+    const { error } = await supabase
+      .from('collection')
+      .update({ packaging: newName })
+      .eq('packaging', id);
+    
+    return !error;
+  } catch (error) {
+    console.error('Error updating packaging:', error);
+    return false;
+  }
+}
+
+export async function deletePackaging(id: string): Promise<boolean> {
+  try {
+    const supabase = createClientComponentClient();
+    const { error } = await supabase
+      .from('collection')
+      .update({ packaging: null })
+      .eq('packaging', id);
+    
+    return !error;
+  } catch (error) {
+    console.error('Error deleting packaging:', error);
+    return false;
+  }
+}
+
+export async function mergePackaging(targetId: string, sourceIds: string[]): Promise<boolean> {
+  try {
+    const supabase = createClientComponentClient();
+    const { error } = await supabase
+      .from('collection')
+      .update({ packaging: targetId })
+      .in('packaging', sourceIds);
+    
+    return !error;
+  } catch (error) {
+    console.error('Error merging packaging:', error);
+    return false;
+  }
+}
+
+// Media Conditions
+export async function fetchMediaConditions(): Promise<PickerDataItem[]> {
+  // Standard grading system
+  const conditions = [
+    { id: 'Mint (M)', name: 'Mint (M)', count: 0 },
+    { id: 'Near Mint (NM or M-)', name: 'Near Mint (NM or M-)', count: 0 },
+    { id: 'Very Good Plus (VG+)', name: 'Very Good Plus (VG+)', count: 0 },
+    { id: 'Very Good (VG)', name: 'Very Good (VG)', count: 0 },
+    { id: 'Good Plus (G+)', name: 'Good Plus (G+)', count: 0 },
+    { id: 'Good (G)', name: 'Good (G)', count: 0 },
+    { id: 'Fair (F)', name: 'Fair (F)', count: 0 },
+    { id: 'Poor (P)', name: 'Poor (P)', count: 0 },
+  ];
+
+  try {
+    const supabase = createClientComponentClient();
+    const { data } = await supabase
+      .from('collection')
+      .select('media_condition')
+      .not('media_condition', 'is', null);
+
+    const counts = new Map<string, number>();
+    data?.forEach(row => {
+      if (row.media_condition) {
+        counts.set(row.media_condition, (counts.get(row.media_condition) || 0) + 1);
+      }
+    });
+
+    return conditions.map(condition => ({
+      ...condition,
+      count: counts.get(condition.id) || 0,
+    }));
+  } catch (error) {
+    console.error('Error in fetchMediaConditions:', error);
+    return conditions;
+  }
+}
+
+// Package Conditions
+export async function fetchPackageConditions(): Promise<PickerDataItem[]> {
+  // Standard grading system (same as media)
+  const conditions = [
+    { id: 'Mint (M)', name: 'Mint (M)', count: 0 },
+    { id: 'Near Mint (NM or M-)', name: 'Near Mint (NM or M-)', count: 0 },
+    { id: 'Very Good Plus (VG+)', name: 'Very Good Plus (VG+)', count: 0 },
+    { id: 'Very Good (VG)', name: 'Very Good (VG)', count: 0 },
+    { id: 'Good Plus (G+)', name: 'Good Plus (G+)', count: 0 },
+    { id: 'Good (G)', name: 'Good (G)', count: 0 },
+    { id: 'Fair (F)', name: 'Fair (F)', count: 0 },
+    { id: 'Poor (P)', name: 'Poor (P)', count: 0 },
+    { id: 'Generic', name: 'Generic', count: 0 },
+    { id: 'No Cover', name: 'No Cover', count: 0 },
+  ];
+
+  try {
+    const supabase = createClientComponentClient();
+    const { data } = await supabase
+      .from('collection')
+      .select('package_sleeve_condition')
+      .not('package_sleeve_condition', 'is', null);
+
+    const counts = new Map<string, number>();
+    data?.forEach(row => {
+      if (row.package_sleeve_condition) {
+        counts.set(row.package_sleeve_condition, (counts.get(row.package_sleeve_condition) || 0) + 1);
+      }
+    });
+
+    return conditions.map(condition => ({
+      ...condition,
+      count: counts.get(condition.id) || 0,
+    }));
+  } catch (error) {
+    console.error('Error in fetchPackageConditions:', error);
+    return conditions;
+  }
+}
+
+// Studios
+export async function fetchStudios(): Promise<PickerDataItem[]> {
+  try {
+    const supabase = createClientComponentClient();
+    
+    const { data, error } = await supabase
+      .from('collection')
+      .select('studio')
+      .not('studio', 'is', null)
+      .not('studio', 'eq', '');
+
+    if (error) {
+      console.error('Error fetching studios:', error);
+      return [];
+    }
+
+    const studioCounts = new Map<string, number>();
+    data?.forEach(row => {
+      if (row.studio) {
+        studioCounts.set(
+          row.studio,
+          (studioCounts.get(row.studio) || 0) + 1
+        );
+      }
+    });
+
+    return Array.from(studioCounts.entries())
+      .map(([name, count]) => ({
+        id: name,
+        name,
+        count,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch (error) {
+    console.error('Error in fetchStudios:', error);
+    return [];
+  }
+}
+
+export async function updateStudio(id: string, newName: string): Promise<boolean> {
+  try {
+    const supabase = createClientComponentClient();
+    const { error } = await supabase
+      .from('collection')
+      .update({ studio: newName })
+      .eq('studio', id);
+    
+    return !error;
+  } catch (error) {
+    console.error('Error updating studio:', error);
+    return false;
+  }
+}
+
+export async function mergeStudios(targetId: string, sourceIds: string[]): Promise<boolean> {
+  try {
+    const supabase = createClientComponentClient();
+    const { error } = await supabase
+      .from('collection')
+      .update({ studio: targetId })
+      .in('studio', sourceIds);
+    
+    return !error;
+  } catch (error) {
+    console.error('Error merging studios:', error);
+    return false;
+  }
+}
+
+// Countries
+export async function fetchCountries(): Promise<PickerDataItem[]> {
+  try {
+    const supabase = createClientComponentClient();
+    
+    const { data, error } = await supabase
+      .from('collection')
+      .select('country')
+      .not('country', 'is', null)
+      .not('country', 'eq', '');
+
+    if (error) {
+      console.error('Error fetching countries:', error);
+      return [];
+    }
+
+    const countryCounts = new Map<string, number>();
+    data?.forEach(row => {
+      if (row.country) {
+        countryCounts.set(
+          row.country,
+          (countryCounts.get(row.country) || 0) + 1
+        );
+      }
+    });
+
+    return Array.from(countryCounts.entries())
+      .map(([name, count]) => ({
+        id: name,
+        name,
+        count,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch (error) {
+    console.error('Error in fetchCountries:', error);
+    return [];
+  }
+}
+
+// Sounds
+export async function fetchSounds(): Promise<PickerDataItem[]> {
+  try {
+    const supabase = createClientComponentClient();
+    
+    const { data, error } = await supabase
+      .from('collection')
+      .select('sound')
+      .not('sound', 'is', null)
+      .not('sound', 'eq', '');
+
+    if (error) {
+      console.error('Error fetching sounds:', error);
+      return [];
+    }
+
+    const soundCounts = new Map<string, number>();
+    data?.forEach(row => {
+      if (row.sound) {
+        soundCounts.set(
+          row.sound,
+          (soundCounts.get(row.sound) || 0) + 1
+        );
+      }
+    });
+
+    return Array.from(soundCounts.entries())
+      .map(([name, count]) => ({
+        id: name,
+        name,
+        count,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch (error) {
+    console.error('Error in fetchSounds:', error);
+    return [];
+  }
+}
+
+export async function updateSound(id: string, newName: string): Promise<boolean> {
+  try {
+    const supabase = createClientComponentClient();
+    const { error } = await supabase
+      .from('collection')
+      .update({ sound: newName })
+      .eq('sound', id);
+    
+    return !error;
+  } catch (error) {
+    console.error('Error updating sound:', error);
+    return false;
+  }
+}
+
+export async function mergeSounds(targetId: string, sourceIds: string[]): Promise<boolean> {
+  try {
+    const supabase = createClientComponentClient();
+    const { error } = await supabase
+      .from('collection')
+      .update({ sound: targetId })
+      .in('sound', sourceIds);
+    
+    return !error;
+  } catch (error) {
+    console.error('Error merging sounds:', error);
+    return false;
+  }
+}
+
+// Vinyl Colors
+export async function fetchVinylColors(): Promise<PickerDataItem[]> {
+  try {
+    const supabase = createClientComponentClient();
+    
+    const { data, error } = await supabase
+      .from('collection')
+      .select('vinyl_color')
+      .not('vinyl_color', 'is', null)
+      .not('vinyl_color', 'eq', '');
+
+    if (error) {
+      console.error('Error fetching vinyl colors:', error);
+      return [];
+    }
+
+    const colorCounts = new Map<string, number>();
+    data?.forEach(row => {
+      if (row.vinyl_color) {
+        colorCounts.set(
+          row.vinyl_color,
+          (colorCounts.get(row.vinyl_color) || 0) + 1
+        );
+      }
+    });
+
+    return Array.from(colorCounts.entries())
+      .map(([name, count]) => ({
+        id: name,
+        name,
+        count,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch (error) {
+    console.error('Error in fetchVinylColors:', error);
+    return [];
+  }
+}
+
+export async function updateVinylColor(id: string, newName: string): Promise<boolean> {
+  try {
+    const supabase = createClientComponentClient();
+    const { error } = await supabase
+      .from('collection')
+      .update({ vinyl_color: newName })
+      .eq('vinyl_color', id);
+    
+    return !error;
+  } catch (error) {
+    console.error('Error updating vinyl color:', error);
+    return false;
+  }
+}
+
+export async function mergeVinylColors(targetId: string, sourceIds: string[]): Promise<boolean> {
+  try {
+    const supabase = createClientComponentClient();
+    const { error } = await supabase
+      .from('collection')
+      .update({ vinyl_color: targetId })
+      .in('vinyl_color', sourceIds);
+    
+    return !error;
+  } catch (error) {
+    console.error('Error merging vinyl colors:', error);
+    return false;
+  }
+}
+
+// SPARS
+export async function fetchSPARS(): Promise<PickerDataItem[]> {
+  try {
+    const supabase = createClientComponentClient();
+    
+    const { data, error } = await supabase
+      .from('collection')
+      .select('spars_code')
+      .not('spars_code', 'is', null)
+      .not('spars_code', 'eq', '');
+
+    if (error) {
+      console.error('Error fetching SPARS:', error);
+      return [];
+    }
+
+    const sparsCounts = new Map<string, number>();
+    data?.forEach(row => {
+      if (row.spars_code) {
+        sparsCounts.set(
+          row.spars_code,
+          (sparsCounts.get(row.spars_code) || 0) + 1
+        );
+      }
+    });
+
+    return Array.from(sparsCounts.entries())
+      .map(([name, count]) => ({
+        id: name,
+        name,
+        count,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch (error) {
+    console.error('Error in fetchSPARS:', error);
+    return [];
+  }
+}
+
+export async function updateSPARS(id: string, newName: string): Promise<boolean> {
+  try {
+    const supabase = createClientComponentClient();
+    const { error } = await supabase
+      .from('collection')
+      .update({ spars_code: newName })
+      .eq('spars_code', id);
+    
+    return !error;
+  } catch (error) {
+    console.error('Error updating SPARS:', error);
+    return false;
+  }
+}
+
+export async function mergeSPARS(targetId: string, sourceIds: string[]): Promise<boolean> {
+  try {
+    const supabase = createClientComponentClient();
+    const { error } = await supabase
+      .from('collection')
+      .update({ spars_code: targetId })
+      .in('spars_code', sourceIds);
+    
+    return !error;
+  } catch (error) {
+    console.error('Error merging SPARS:', error);
+    return false;
+  }
+}
+
+// Box Sets
+export async function fetchBoxSets(): Promise<PickerDataItem[]> {
+  try {
+    const supabase = createClientComponentClient();
+    
+    const { data, error } = await supabase
+      .from('collection')
+      .select('box_set')
+      .not('box_set', 'is', null)
+      .not('box_set', 'eq', '');
+
+    if (error) {
+      console.error('Error fetching box sets:', error);
+      return [];
+    }
+
+    const boxSetCounts = new Map<string, number>();
+    data?.forEach(row => {
+      if (row.box_set) {
+        boxSetCounts.set(
+          row.box_set,
+          (boxSetCounts.get(row.box_set) || 0) + 1
+        );
+      }
+    });
+
+    return Array.from(boxSetCounts.entries())
+      .map(([name, count]) => ({
+        id: name,
+        name,
+        count,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch (error) {
+    console.error('Error in fetchBoxSets:', error);
+    return [];
+  }
+}
