@@ -301,24 +301,34 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
         // Get existing tracks for this album
         const { data: existingTracks } = await supabase
           .from('tracks')
-          .select('id, position')
+          .select('id, position, disc_number, side')
           .eq('album_id', albumId);
         
-        const existingPositions = new Set(existingTracks?.map(t => t.position) || []);
-        const newPositions = new Set(tracksData.tracks.map(t => t.position));
-        
-        // Delete tracks no longer in the list
-        const positionsToDelete = Array.from(existingPositions).filter(
-          pos => !newPositions.has(pos)
+        // Create composite key for tracking (disc_number-side-position or disc_number-position)
+        const existingKeys = new Set(
+          existingTracks?.map(t => `${t.disc_number || 1}-${t.side || ''}-${t.position}`) || []
+        );
+        const newKeys = new Set(
+          tracksData.tracks.map(t => `${t.disc_number || 1}-${t.side || ''}-${t.position}`)
         );
         
-        if (positionsToDelete.length > 0) {
-          console.log(`🗑️  Deleting ${positionsToDelete.length} removed tracks...`);
-          await supabase
-            .from('tracks')
-            .delete()
-            .eq('album_id', albumId)
-            .in('position', positionsToDelete);
+        // Delete tracks no longer in the list
+        const keysToDelete = Array.from(existingKeys).filter(
+          key => !newKeys.has(key)
+        );
+        
+        if (keysToDelete.length > 0) {
+          console.log(`🗑️  Deleting ${keysToDelete.length} removed tracks...`);
+          for (const key of keysToDelete) {
+            const [disc, side, pos] = key.split('-');
+            await supabase
+              .from('tracks')
+              .delete()
+              .eq('album_id', albumId)
+              .eq('disc_number', parseInt(disc))
+              .eq('side', side || null)
+              .eq('position', parseInt(pos));
+          }
         }
         
         // Insert or update tracks
@@ -329,18 +339,24 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
           const trackData = {
             album_id: albumId,
             position: track.position,
+            disc_number: track.disc_number || 1,
+            side: track.side || null,
             title: track.title,
             duration: track.duration,
             artist: track.artist,
             type: track.type === 'header' ? 'header' : 'track',
           };
           
-          if (existingPositions.has(track.position)) {
+          const trackKey = `${track.disc_number || 1}-${track.side || ''}-${track.position}`;
+          
+          if (existingKeys.has(trackKey)) {
             // Update existing track
             await supabase
               .from('tracks')
               .update(trackData)
               .eq('album_id', albumId)
+              .eq('disc_number', track.disc_number || 1)
+              .eq('side', track.side || null)
               .eq('position', track.position);
             tracksUpdated++;
           } else {
@@ -352,7 +368,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
           }
         }
         
-        console.log(`✅ Tracks synced: ${tracksAdded} added, ${tracksUpdated} updated, ${positionsToDelete.length} deleted`);
+        console.log(`✅ Tracks synced: ${tracksAdded} added, ${tracksUpdated} updated, ${keysToDelete.length} deleted`);
         
         // Log sync operation
         await supabase
@@ -361,7 +377,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
             album_id: albumId,
             tracks_added: tracksAdded,
             tracks_updated: tracksUpdated,
-            tracks_deleted: positionsToDelete.length,
+            tracks_deleted: keysToDelete.length,
             status: 'success',
           }]);
       }

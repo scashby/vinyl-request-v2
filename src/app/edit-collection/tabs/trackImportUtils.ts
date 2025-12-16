@@ -106,8 +106,8 @@ export async function importTracksFromDiscogs(
           }
         }
 
-        // Check if this is a heading/header (no duration usually means header)
-        const isHeader = track.type_ === 'heading' || (!track.duration && track.title && track.title.length > 0);
+        // Check if this is a heading/header (only if Discogs explicitly marks it)
+        const isHeader = track.type_ === 'heading';
 
         tracks.push({
           id: generateTrackId(),
