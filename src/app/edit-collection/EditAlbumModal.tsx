@@ -236,7 +236,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
     );
   }
 
-  const handleFieldChange = (field: keyof Album, value: string | number | string[] | null | boolean) => {
+  const handleFieldChange = <K extends keyof Album>(field: K, value: Album[K]) => {
     setEditedAlbum(prev => {
       if (!prev) return prev;
       return {
@@ -520,10 +520,10 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
             <DetailsTab album={editedAlbum} onChange={handleFieldChange} />
           )}
           {activeTab === 'classical' && (
-            <ClassicalTab />
+            <ClassicalTab album={editedAlbum} onChange={handleFieldChange} />
           )}
           {activeTab === 'people' && (
-            <PeopleTab />
+            <PeopleTab album={editedAlbum} onChange={handleFieldChange} />
           )}
           {activeTab === 'tracks' && (
             <TracksTab ref={tracksTabRef} album={editedAlbum} onChange={handleFieldChange} />
@@ -535,7 +535,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
             <CoverTab album={editedAlbum} onChange={handleFieldChange} />
           )}
           {activeTab === 'links' && (
-            <LinksTab />
+            <LinksTab album={editedAlbum} onChange={handleFieldChange} />
           )}
         </div>
 

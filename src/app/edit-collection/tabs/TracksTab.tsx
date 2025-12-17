@@ -57,7 +57,7 @@ interface Disc {
 
 interface TracksTabProps {
   album: Album;
-  onChange: (field: keyof Album, value: string | number | string[] | null | boolean | Track[]) => void;
+  onChange: <K extends keyof Album>(field: K, value: Album[K]) => void;
 }
 
 // Export interface for parent component
