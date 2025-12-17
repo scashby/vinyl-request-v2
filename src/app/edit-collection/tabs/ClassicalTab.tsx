@@ -3,7 +3,24 @@
 
 import React, { useState } from 'react';
 import type { Album } from 'types/album';
-import { PickerModal } from '../pickers/PickerModal';
+import { UniversalPicker } from '../pickers/UniversalPicker';
+import {
+  fetchComposers,
+  fetchConductors,
+  fetchChoruses,
+  fetchCompositions,
+  fetchOrchestras,
+  updateComposer,
+  updateConductor,
+  updateChorus,
+  updateComposition,
+  updateOrchestra,
+  mergeComposers,
+  mergeConductors,
+  mergeChorus,
+  mergeCompositions,
+  mergeOrchestras,
+} from '../pickers/pickerDataUtils';
 
 interface ClassicalTabProps {
   album: Album;
@@ -21,12 +38,59 @@ export default function ClassicalTab({ album, onChange }: ClassicalTabProps) {
     setShowPicker(true);
   };
 
-  const handlePickerSelect = (selectedItem: { name: string }) => {
-    if (currentField) {
-      onChange(currentField, selectedItem.name as Album[ClassicalField]);
+  const handlePickerSelect = (selectedItems: string[]) => {
+    if (currentField && selectedItems.length > 0) {
+      onChange(currentField, selectedItems[0] as Album[ClassicalField]);
     }
     setShowPicker(false);
     setCurrentField(null);
+  };
+
+  const getFieldConfig = () => {
+    switch (currentField) {
+      case 'composer':
+        return {
+          title: 'Select Composer',
+          fetchItems: fetchComposers,
+          onUpdate: updateComposer,
+          onMerge: mergeComposers,
+          label: 'Composer',
+        };
+      case 'conductor':
+        return {
+          title: 'Select Conductor',
+          fetchItems: fetchConductors,
+          onUpdate: updateConductor,
+          onMerge: mergeConductors,
+          label: 'Conductor',
+        };
+      case 'chorus':
+        return {
+          title: 'Select Chorus',
+          fetchItems: fetchChoruses,
+          onUpdate: updateChorus,
+          onMerge: mergeChorus,
+          label: 'Chorus',
+        };
+      case 'composition':
+        return {
+          title: 'Select Composition',
+          fetchItems: fetchCompositions,
+          onUpdate: updateComposition,
+          onMerge: mergeCompositions,
+          label: 'Composition',
+        };
+      case 'orchestra':
+        return {
+          title: 'Select Orchestra',
+          fetchItems: fetchOrchestras,
+          onUpdate: updateOrchestra,
+          onMerge: mergeOrchestras,
+          label: 'Orchestra',
+        };
+      default:
+        return null;
+    }
   };
 
   const renderField = (label: string, field: ClassicalField) => {
@@ -67,6 +131,8 @@ export default function ClassicalTab({ album, onChange }: ClassicalTabProps) {
     );
   };
 
+  const fieldConfig = getFieldConfig();
+
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="p-6 space-y-6">
@@ -77,19 +143,24 @@ export default function ClassicalTab({ album, onChange }: ClassicalTabProps) {
         {renderField('Orchestra', 'orchestra')}
       </div>
 
-      {/* Picker Modal */}
-      {showPicker && currentField && (
-        <PickerModal
+      {/* Universal Picker */}
+      {showPicker && currentField && fieldConfig && (
+        <UniversalPicker
+          title={fieldConfig.title}
           isOpen={showPicker}
           onClose={() => {
             setShowPicker(false);
             setCurrentField(null);
           }}
-          title={`Select ${currentField.charAt(0).toUpperCase() + currentField.slice(1)}`}
-          type={currentField}
+          fetchItems={fieldConfig.fetchItems}
+          selectedItems={album[currentField] ? [album[currentField] as string] : []}
           onSelect={handlePickerSelect}
-          allowMultiple={false}
-          selectedItems={album[currentField] ? [{ name: album[currentField] as string }] : []}
+          multiSelect={false}
+          canManage={true}
+          onUpdate={fieldConfig.onUpdate}
+          onMerge={fieldConfig.onMerge}
+          newItemLabel={fieldConfig.label}
+          manageItemsLabel={`Manage ${fieldConfig.label}s`}
         />
       )}
     </div>

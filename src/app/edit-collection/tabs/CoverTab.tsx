@@ -1,215 +1,168 @@
-// src/app/edit-collection/tabs/CoverTab.tsx
+// src/app/edit-collection/tabs/PeopleTab.tsx
 'use client';
 
 import React, { useState } from 'react';
-import Image from 'next/image';
 import type { Album } from 'types/album';
-import { supabase } from 'lib/supabaseClient';
-import { CropRotateModal } from '../enrichment/CropRotateModal';
+import { UniversalPicker } from '../pickers/UniversalPicker';
+import {
+  fetchSongwriters,
+  fetchProducers,
+  fetchEngineers,
+  fetchMusicians,
+} from '../pickers/pickerDataUtils';
 
-interface CoverTabProps {
+interface PeopleTabProps {
   album: Album;
   onChange: <K extends keyof Album>(field: K, value: Album[K]) => void;
 }
 
-export default function CoverTab({ album, onChange }: CoverTabProps) {
-  const [uploading, setUploading] = useState<'front' | 'back' | null>(null);
-  const [showCropModal, setShowCropModal] = useState(false);
-  const [cropImageUrl, setCropImageUrl] = useState<string | null>(null);
-  const [cropCoverType, setCropCoverType] = useState<'front' | 'back'>('front');
+type PeopleField = 'songwriters' | 'producers' | 'engineers' | 'musicians';
 
-  const handleUpload = async (coverType: 'front' | 'back') => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    
-    input.onchange = async (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (!file) return;
+export default function PeopleTab({ album, onChange }: PeopleTabProps) {
+  const [showPicker, setShowPicker] = useState(false);
+  const [currentField, setCurrentField] = useState<PeopleField | null>(null);
 
-      try {
-        setUploading(coverType);
-
-        // Generate unique filename
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${album.id || Date.now()}-${coverType}-${Date.now()}.${fileExt}`;
-        const filePath = `album-covers/${fileName}`;
-
-        // Upload to Supabase Storage
-        const { error: uploadError } = await supabase.storage
-          .from('album-images')
-          .upload(filePath, file, {
-            cacheControl: '3600',
-            upsert: false
-          });
-
-        if (uploadError) throw uploadError;
-
-        // Get public URL
-        const { data: { publicUrl } } = supabase.storage
-          .from('album-images')
-          .getPublicUrl(filePath);
-
-        // Update album with new image URL
-        const field = coverType === 'front' ? 'image_url' : 'back_image_url';
-        onChange(field, publicUrl as Album[typeof field]);
-
-        console.log(`✅ ${coverType} cover uploaded:`, publicUrl);
-      } catch (error) {
-        console.error(`Error uploading ${coverType} cover:`, error);
-        alert(`Failed to upload ${coverType} cover. Please try again.`);
-      } finally {
-        setUploading(null);
-      }
-    };
-
-    input.click();
+  const handleOpenPicker = (field: PeopleField) => {
+    setCurrentField(field);
+    setShowPicker(true);
   };
 
-  const handleRemove = async (coverType: 'front' | 'back') => {
-    const field = coverType === 'front' ? 'image_url' : 'back_image_url';
-    const currentUrl = album[field];
-
-    if (currentUrl && currentUrl.includes('album-images/')) {
-      try {
-        // Extract file path from URL
-        const urlParts = currentUrl.split('/album-images/');
-        if (urlParts.length > 1) {
-          const filePath = `album-images/${urlParts[1].split('?')[0]}`;
-          
-          // Delete from storage
-          const { error } = await supabase.storage
-            .from('album-images')
-            .remove([filePath]);
-
-          if (error) console.error('Error deleting file:', error);
-        }
-      } catch (error) {
-        console.error('Error removing file:', error);
-      }
+  const handlePickerSelect = (selectedItems: string[]) => {
+    if (currentField) {
+      onChange(currentField, selectedItems.length > 0 ? selectedItems : null as Album[PeopleField]);
     }
-
-    onChange(field, null as Album[typeof field]);
+    setShowPicker(false);
+    setCurrentField(null);
   };
 
-  const handleFindOnline = () => {
-    // Open search URL based on album info
-    const searchQuery = encodeURIComponent(`${album.artist} ${album.title} ${album.year || ''} album cover`);
-    const googleImagesUrl = `https://www.google.com/search?tbm=isch&q=${searchQuery}`;
-    window.open(googleImagesUrl, '_blank');
+  const handleRemoveItem = (field: PeopleField, index: number) => {
+    const currentArray = (album[field] as string[]) || [];
+    const newArray = currentArray.filter((_, i) => i !== index);
+    onChange(field, newArray.length > 0 ? newArray : null as Album[PeopleField]);
   };
 
-  const handleCropRotate = (coverType: 'front' | 'back') => {
-    const imageUrl = coverType === 'front' ? album.image_url : album.back_image_url;
-    if (imageUrl) {
-      setCropImageUrl(imageUrl);
-      setCropCoverType(coverType);
-      setShowCropModal(true);
+  const getFieldConfig = () => {
+    switch (currentField) {
+      case 'songwriters':
+        return {
+          title: 'Select Songwriters',
+          fetchItems: fetchSongwriters,
+          label: 'Songwriter',
+        };
+      case 'producers':
+        return {
+          title: 'Select Producers',
+          fetchItems: fetchProducers,
+          label: 'Producer',
+        };
+      case 'engineers':
+        return {
+          title: 'Select Engineers',
+          fetchItems: fetchEngineers,
+          label: 'Engineer',
+        };
+      case 'musicians':
+        return {
+          title: 'Select Musicians',
+          fetchItems: fetchMusicians,
+          label: 'Musician',
+        };
+      default:
+        return null;
     }
   };
 
-  const handleCropSave = (newImageUrl: string) => {
-    const field = cropCoverType === 'front' ? 'image_url' : 'back_image_url';
-    onChange(field, newImageUrl as Album[typeof field]);
-  };
-
-  const renderCoverSection = (
-    title: string,
-    coverType: 'front' | 'back',
-    imageUrl: string | null | undefined
+  const renderMultiValueField = (
+    label: string,
+    field: PeopleField,
+    values: string[] | undefined
   ) => {
-    const isUploading = uploading === coverType;
-
     return (
-      <div className="space-y-3">
-        <h3 className="text-[13px] font-semibold text-[#e8e6e3]">{title}</h3>
-        
-        {/* Image Display Area */}
-        <div className="w-[300px] h-[300px] bg-[#1a1a1a] border border-[#555555] rounded flex items-center justify-center relative overflow-hidden">
-          {isUploading ? (
-            <div className="text-[#e8e6e3] text-[13px] text-center">
-              <div className="mb-2">Uploading...</div>
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#e8e6e3] mx-auto"></div>
+      <div className="flex items-start gap-3">
+        <label className="text-[13px] text-[#e8e6e3] w-[120px] text-right flex-shrink-0 pt-[5px]">
+          {label}:
+        </label>
+        <div className="flex-1 flex flex-col gap-2">
+          {values && values.length > 0 ? (
+            <div className="flex flex-col gap-1">
+              {values.map((value, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <div className="h-[26px] px-3 bg-[#2a2a2a] text-[#e8e6e3] text-[13px] border border-[#555555] rounded flex items-center flex-1">
+                    {value}
+                  </div>
+                  <button
+                    type="button"
+                    className="h-[26px] w-[26px] bg-[#3a3a3a] hover:bg-[#444444] text-[#e8e6e3] border border-[#555555] rounded flex items-center justify-center transition-colors"
+                    onClick={() => handleRemoveItem(field, index)}
+                    title={`Remove ${value}`}
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
             </div>
-          ) : imageUrl ? (
-            <Image 
-              src={imageUrl} 
-              alt={`${title} artwork`}
-              fill
-              className="object-contain"
-              unoptimized
-            />
-          ) : (
-            <div className="text-[#666666] text-[13px] text-center">
-              No {coverType} cover
-            </div>
-          )}
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex gap-2">
+          ) : null}
           <button
             type="button"
-            className="h-[26px] px-3 bg-[#3a3a3a] hover:bg-[#444444] text-[#e8e6e3] text-[12px] border border-[#555555] rounded transition-colors disabled:opacity-50"
-            onClick={handleFindOnline}
-            disabled={isUploading}
+            className="h-[26px] px-3 bg-[#3a3a3a] hover:bg-[#444444] text-[#e8e6e3] text-[13px] border border-[#555555] rounded flex items-center justify-between min-w-[200px] transition-colors self-start"
+            onClick={() => handleOpenPicker(field)}
           >
-            Find Online
+            <span className="text-[#999999]">Select...</span>
+            <svg className="w-3 h-3 ml-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
           </button>
-          <button
-            type="button"
-            className="h-[26px] px-3 bg-[#3a3a3a] hover:bg-[#444444] text-[#e8e6e3] text-[12px] border border-[#555555] rounded transition-colors disabled:opacity-50"
-            onClick={() => handleUpload(coverType)}
-            disabled={isUploading}
-          >
-            Upload
-          </button>
-          {imageUrl && (
-            <>
-              <button
-                type="button"
-                className="h-[26px] px-3 bg-[#3a3a3a] hover:bg-[#444444] text-[#e8e6e3] text-[12px] border border-[#555555] rounded transition-colors disabled:opacity-50"
-                onClick={() => handleRemove(coverType)}
-                disabled={isUploading}
-              >
-                Remove
-              </button>
-              <button
-                type="button"
-                className="h-[26px] px-3 bg-[#3a3a3a] hover:bg-[#444444] text-[#e8e6e3] text-[12px] border border-[#555555] rounded transition-colors disabled:opacity-50"
-                onClick={() => handleCropRotate(coverType)}
-                disabled={isUploading}
-              >
-                Crop/Rotate
-              </button>
-            </>
-          )}
         </div>
       </div>
     );
   };
 
+  const fieldConfig = getFieldConfig();
+
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="p-6 space-y-8">
-        {/* Front Cover */}
-        {renderCoverSection('Front Cover', 'front', album.image_url)}
-        
-        {/* Back Cover */}
-        {renderCoverSection('Back Cover', 'back', album.back_image_url)}
+        {/* Credits Section */}
+        <div className="space-y-4">
+          <h3 className="text-[14px] font-semibold text-[#e8e6e3] pb-2 border-b border-[#555555]">
+            Credits
+          </h3>
+          <div className="space-y-6">
+            {renderMultiValueField('Songwriter', 'songwriters', album.songwriters as string[])}
+            {renderMultiValueField('Producer', 'producers', album.producers as string[])}
+            {renderMultiValueField('Engineer', 'engineers', album.engineers as string[])}
+          </div>
+        </div>
+
+        {/* Musicians Section */}
+        <div className="space-y-4">
+          <h3 className="text-[14px] font-semibold text-[#e8e6e3] pb-2 border-b border-[#555555]">
+            Musicians
+          </h3>
+          <div className="space-y-6">
+            {renderMultiValueField('Musician', 'musicians', album.musicians as string[])}
+          </div>
+        </div>
       </div>
 
-      {/* Crop/Rotate Modal */}
-      {showCropModal && cropImageUrl && (
-        <CropRotateModal
-          imageUrl={cropImageUrl}
-          albumId={String(album.id || Date.now())}
-          coverType={cropCoverType}
-          onSave={handleCropSave}
+      {/* Universal Picker */}
+      {showPicker && currentField && fieldConfig && (
+        <UniversalPicker
+          title={fieldConfig.title}
+          isOpen={showPicker}
           onClose={() => {
-            setShowCropModal(false);
-            setCropImageUrl(null);
+            setShowPicker(false);
+            setCurrentField(null);
           }}
+          fetchItems={fieldConfig.fetchItems}
+          selectedItems={(album[currentField] as string[]) || []}
+          onSelect={handlePickerSelect}
+          multiSelect={true}
+          canManage={true}
+          newItemLabel={fieldConfig.label}
+          manageItemsLabel={`Manage ${fieldConfig.label}s`}
         />
       )}
     </div>

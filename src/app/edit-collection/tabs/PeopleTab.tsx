@@ -3,7 +3,13 @@
 
 import React, { useState } from 'react';
 import type { Album } from 'types/album';
-import { PickerModal } from '../pickers/PickerModal';
+import { UniversalPicker } from '../pickers/UniversalPicker';
+import {
+  fetchSongwriters,
+  fetchProducers,
+  fetchEngineers,
+  fetchMusicians,
+} from '../pickers/pickerDataUtils';
 
 interface PeopleTabProps {
   album: Album;
@@ -21,15 +27,9 @@ export default function PeopleTab({ album, onChange }: PeopleTabProps) {
     setShowPicker(true);
   };
 
-  const handlePickerSelect = (selectedItems: { name: string }[]) => {
+  const handlePickerSelect = (selectedItems: string[]) => {
     if (currentField) {
-      const currentValues = (album[currentField] as string[]) || [];
-      const newValue = selectedItems[0]?.name;
-      
-      if (newValue && !currentValues.includes(newValue)) {
-        const updatedValues = [...currentValues, newValue];
-        onChange(currentField, updatedValues as Album[PeopleField]);
-      }
+      onChange(currentField, selectedItems.length > 0 ? selectedItems : null as Album[PeopleField]);
     }
     setShowPicker(false);
     setCurrentField(null);
@@ -38,7 +38,38 @@ export default function PeopleTab({ album, onChange }: PeopleTabProps) {
   const handleRemoveItem = (field: PeopleField, index: number) => {
     const currentArray = (album[field] as string[]) || [];
     const newArray = currentArray.filter((_, i) => i !== index);
-    onChange(field, newArray as Album[PeopleField]);
+    onChange(field, newArray.length > 0 ? newArray : null as Album[PeopleField]);
+  };
+
+  const getFieldConfig = () => {
+    switch (currentField) {
+      case 'songwriters':
+        return {
+          title: 'Select Songwriters',
+          fetchItems: fetchSongwriters,
+          label: 'Songwriter',
+        };
+      case 'producers':
+        return {
+          title: 'Select Producers',
+          fetchItems: fetchProducers,
+          label: 'Producer',
+        };
+      case 'engineers':
+        return {
+          title: 'Select Engineers',
+          fetchItems: fetchEngineers,
+          label: 'Engineer',
+        };
+      case 'musicians':
+        return {
+          title: 'Select Musicians',
+          fetchItems: fetchMusicians,
+          label: 'Musician',
+        };
+      default:
+        return null;
+    }
   };
 
   const renderMultiValueField = (
@@ -88,6 +119,8 @@ export default function PeopleTab({ album, onChange }: PeopleTabProps) {
     );
   };
 
+  const fieldConfig = getFieldConfig();
+
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="p-6 space-y-8">
@@ -114,21 +147,22 @@ export default function PeopleTab({ album, onChange }: PeopleTabProps) {
         </div>
       </div>
 
-      {/* Picker Modal */}
-      {showPicker && currentField && (
-        <PickerModal
+      {/* Universal Picker */}
+      {showPicker && currentField && fieldConfig && (
+        <UniversalPicker
+          title={fieldConfig.title}
           isOpen={showPicker}
           onClose={() => {
             setShowPicker(false);
             setCurrentField(null);
           }}
-          title={`Select ${currentField.charAt(0).toUpperCase() + currentField.slice(1, -1)}`}
-          type={currentField === 'songwriters' ? 'songwriter' : 
-                currentField === 'producers' ? 'producer' :
-                currentField === 'engineers' ? 'engineer' : 'musician'}
+          fetchItems={fieldConfig.fetchItems}
+          selectedItems={(album[currentField] as string[]) || []}
           onSelect={handlePickerSelect}
-          allowMultiple={false}
-          selectedItems={[]}
+          multiSelect={true}
+          canManage={true}
+          newItemLabel={fieldConfig.label}
+          manageItemsLabel={`Manage ${fieldConfig.label}s`}
         />
       )}
     </div>
