@@ -15,7 +15,7 @@ interface LinksTabProps {
   onChange: <K extends keyof Album>(field: K, value: Album[K]) => void;
 }
 
-export default function LinksTab({ album, onChange }: LinksTabProps) {
+export function LinksTab({ album, onChange }: LinksTabProps) {
   // Parse links from album.extra (stored as JSON string)
   const [links, setLinks] = useState<Link[]>(() => {
     if (!album.extra) return [];

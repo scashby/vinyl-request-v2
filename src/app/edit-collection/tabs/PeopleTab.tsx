@@ -18,7 +18,7 @@ interface PeopleTabProps {
 
 type PeopleField = 'songwriters' | 'producers' | 'engineers' | 'musicians';
 
-export default function PeopleTab({ album, onChange }: PeopleTabProps) {
+export function PeopleTab({ album, onChange }: PeopleTabProps) {
   const [showPicker, setShowPicker] = useState(false);
   const [currentField, setCurrentField] = useState<PeopleField | null>(null);
 

@@ -1,170 +1,227 @@
-// src/app/edit-collection/tabs/PeopleTab.tsx
+// src/app/edit-collection/enrichment/CropRotateModal.tsx
 'use client';
 
-import React, { useState } from 'react';
-import type { Album } from 'types/album';
-import { UniversalPicker } from '../pickers/UniversalPicker';
-import {
-  fetchSongwriters,
-  fetchProducers,
-  fetchEngineers,
-  fetchMusicians,
-} from '../pickers/pickerDataUtils';
+import React, { useState, useCallback } from 'react';
+import Cropper, { Area } from 'react-easy-crop';
+import { supabase } from 'lib/supabaseClient';
 
-interface PeopleTabProps {
-  album: Album;
-  onChange: <K extends keyof Album>(field: K, value: Album[K]) => void;
+interface CropRotateModalProps {
+  imageUrl: string;
+  albumId: string;
+  coverType: 'front' | 'back';
+  onSave: (newImageUrl: string) => void;
+  onClose: () => void;
 }
 
-type PeopleField = 'songwriters' | 'producers' | 'engineers' | 'musicians';
+export function CropRotateModal({
+  imageUrl,
+  albumId,
+  coverType,
+  onSave,
+  onClose,
+}: CropRotateModalProps) {
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [rotation, setRotation] = useState(0);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
+  const [saving, setSaving] = useState(false);
 
-export default function PeopleTab({ album, onChange }: PeopleTabProps) {
-  const [showPicker, setShowPicker] = useState(false);
-  const [currentField, setCurrentField] = useState<PeopleField | null>(null);
+  const onCropComplete = useCallback((_croppedArea: Area, croppedAreaPixels: Area) => {
+    setCroppedAreaPixels(croppedAreaPixels);
+  }, []);
 
-  const handleOpenPicker = (field: PeopleField) => {
-    setCurrentField(field);
-    setShowPicker(true);
-  };
+  const createImage = (url: string): Promise<HTMLImageElement> =>
+    new Promise((resolve, reject) => {
+      const image = new Image();
+      image.addEventListener('load', () => resolve(image));
+      image.addEventListener('error', (error) => reject(error));
+      image.setAttribute('crossOrigin', 'anonymous');
+      image.src = url;
+    });
 
-  const handlePickerSelect = (selectedItems: string[]) => {
-    if (currentField) {
-      onChange(currentField, selectedItems.length > 0 ? selectedItems : null as Album[PeopleField]);
+  const getCroppedImg = async (
+    imageSrc: string,
+    pixelCrop: Area,
+    rotation: number
+  ): Promise<Blob> => {
+    const image = await createImage(imageSrc);
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    if (!ctx) {
+      throw new Error('No 2d context');
     }
-    setShowPicker(false);
-    setCurrentField(null);
+
+    const maxSize = Math.max(image.width, image.height);
+    const safeArea = 2 * ((maxSize / 2) * Math.sqrt(2));
+
+    canvas.width = safeArea;
+    canvas.height = safeArea;
+
+    ctx.translate(safeArea / 2, safeArea / 2);
+    ctx.rotate((rotation * Math.PI) / 180);
+    ctx.translate(-safeArea / 2, -safeArea / 2);
+
+    ctx.drawImage(
+      image,
+      safeArea / 2 - image.width * 0.5,
+      safeArea / 2 - image.height * 0.5
+    );
+
+    const data = ctx.getImageData(0, 0, safeArea, safeArea);
+
+    canvas.width = pixelCrop.width;
+    canvas.height = pixelCrop.height;
+
+    ctx.putImageData(
+      data,
+      Math.round(0 - safeArea / 2 + image.width * 0.5 - pixelCrop.x),
+      Math.round(0 - safeArea / 2 + image.height * 0.5 - pixelCrop.y)
+    );
+
+    return new Promise((resolve) => {
+      canvas.toBlob((blob) => {
+        if (blob) resolve(blob);
+      }, 'image/jpeg');
+    });
   };
 
-  const handleRemoveItem = (field: PeopleField, index: number) => {
-    const currentArray = (album[field] as string[]) || [];
-    const newArray = currentArray.filter((_, i) => i !== index);
-    onChange(field, newArray.length > 0 ? newArray : null as Album[PeopleField]);
-  };
+  const handleSave = async () => {
+    if (!croppedAreaPixels) return;
 
-  const getFieldConfig = () => {
-    switch (currentField) {
-      case 'songwriters':
-        return {
-          title: 'Select Songwriters',
-          fetchItems: fetchSongwriters,
-          label: 'Songwriter',
-        };
-      case 'producers':
-        return {
-          title: 'Select Producers',
-          fetchItems: fetchProducers,
-          label: 'Producer',
-        };
-      case 'engineers':
-        return {
-          title: 'Select Engineers',
-          fetchItems: fetchEngineers,
-          label: 'Engineer',
-        };
-      case 'musicians':
-        return {
-          title: 'Select Musicians',
-          fetchItems: fetchMusicians,
-          label: 'Musician',
-        };
-      default:
-        return null;
+    try {
+      setSaving(true);
+
+      // Create cropped image blob
+      const croppedBlob = await getCroppedImg(imageUrl, croppedAreaPixels, rotation);
+
+      // Generate unique filename
+      const fileName = `${albumId}-${coverType}-${Date.now()}.jpg`;
+      const filePath = `album-covers/${fileName}`;
+
+      // Upload to Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from('album-images')
+        .upload(filePath, croppedBlob, {
+          cacheControl: '3600',
+          upsert: false,
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from('album-images').getPublicUrl(filePath);
+
+      // Delete old image if it exists and is in our storage
+      if (imageUrl.includes('album-images/')) {
+        const urlParts = imageUrl.split('/album-images/');
+        if (urlParts.length > 1) {
+          const oldFilePath = `album-images/${urlParts[1].split('?')[0]}`;
+          await supabase.storage.from('album-images').remove([oldFilePath]);
+        }
+      }
+
+      onSave(publicUrl);
+      onClose();
+    } catch (error) {
+      console.error('Error saving cropped image:', error);
+      alert('Failed to save cropped image. Please try again.');
+    } finally {
+      setSaving(false);
     }
   };
 
-  const renderMultiValueField = (
-    label: string,
-    field: PeopleField,
-    values: string[] | undefined
-  ) => {
-    return (
-      <div className="flex items-start gap-3">
-        <label className="text-[13px] text-[#e8e6e3] w-[120px] text-right flex-shrink-0 pt-[5px]">
-          {label}:
-        </label>
-        <div className="flex-1 flex flex-col gap-2">
-          {values && values.length > 0 ? (
-            <div className="flex flex-col gap-1">
-              {values.map((value, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  <div className="h-[26px] px-3 bg-[#2a2a2a] text-[#e8e6e3] text-[13px] border border-[#555555] rounded flex items-center flex-1">
-                    {value}
-                  </div>
-                  <button
-                    type="button"
-                    className="h-[26px] w-[26px] bg-[#3a3a3a] hover:bg-[#444444] text-[#e8e6e3] border border-[#555555] rounded flex items-center justify-center transition-colors"
-                    onClick={() => handleRemoveItem(field, index)}
-                    title={`Remove ${value}`}
-                  >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              ))}
-            </div>
-          ) : null}
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[30006]">
+      <div className="bg-[#2a2a2a] border border-[#555555] rounded-lg w-[800px] h-[600px] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-[#555555]">
+          <h2 className="text-[16px] font-semibold text-[#e8e6e3]">Crop & Rotate Cover</h2>
           <button
             type="button"
-            className="h-[26px] px-3 bg-[#3a3a3a] hover:bg-[#444444] text-[#e8e6e3] text-[13px] border border-[#555555] rounded flex items-center justify-between min-w-[200px] transition-colors self-start"
-            onClick={() => handleOpenPicker(field)}
+            className="text-[#999999] hover:text-[#e8e6e3] transition-colors"
+            onClick={onClose}
+            disabled={saving}
           >
-            <span className="text-[#999999]">Select...</span>
-            <svg className="w-3 h-3 ml-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
-      </div>
-    );
-  };
 
-  const fieldConfig = getFieldConfig();
-
-  return (
-    <div className="flex-1 overflow-y-auto">
-      <div className="p-6 space-y-8">
-        {/* Credits Section */}
-        <div className="space-y-4">
-          <h3 className="text-[14px] font-semibold text-[#e8e6e3] pb-2 border-b border-[#555555]">
-            Credits
-          </h3>
-          <div className="space-y-6">
-            {renderMultiValueField('Songwriter', 'songwriters', album.songwriters as string[])}
-            {renderMultiValueField('Producer', 'producers', album.producers as string[])}
-            {renderMultiValueField('Engineer', 'engineers', album.engineers as string[])}
-          </div>
+        {/* Cropper Area */}
+        <div className="flex-1 relative bg-[#1a1a1a]">
+          <Cropper
+            image={imageUrl}
+            crop={crop}
+            zoom={zoom}
+            rotation={rotation}
+            aspect={1}
+            onCropChange={setCrop}
+            onZoomChange={setZoom}
+            onRotationChange={setRotation}
+            onCropComplete={onCropComplete}
+          />
         </div>
 
-        {/* Musicians Section */}
-        <div className="space-y-4">
-          <h3 className="text-[14px] font-semibold text-[#e8e6e3] pb-2 border-b border-[#555555]">
-            Musicians
-          </h3>
-          <div className="space-y-6">
-            {renderMultiValueField('Musician', 'musicians', album.musicians as string[])}
+        {/* Controls */}
+        <div className="p-4 border-t border-[#555555] space-y-4">
+          {/* Zoom Control */}
+          <div className="space-y-2">
+            <label className="text-[13px] text-[#e8e6e3]">Zoom</label>
+            <input
+              type="range"
+              min={1}
+              max={3}
+              step={0.1}
+              value={zoom}
+              onChange={(e) => setZoom(Number(e.target.value))}
+              className="w-full"
+            />
+          </div>
+
+          {/* Rotation Control */}
+          <div className="space-y-2">
+            <label className="text-[13px] text-[#e8e6e3]">Rotation</label>
+            <input
+              type="range"
+              min={0}
+              max={360}
+              step={1}
+              value={rotation}
+              onChange={(e) => setRotation(Number(e.target.value))}
+              className="w-full"
+            />
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              className="px-4 py-2 bg-[#3a3a3a] hover:bg-[#444444] text-[#e8e6e3] text-[13px] rounded transition-colors disabled:opacity-50"
+              onClick={onClose}
+              disabled={saving}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="px-4 py-2 bg-[#4a7ba7] hover:bg-[#5a8bc7] text-white text-[13px] rounded transition-colors disabled:opacity-50"
+              onClick={handleSave}
+              disabled={saving}
+            >
+              {saving ? 'Saving...' : 'Save'}
+            </button>
           </div>
         </div>
       </div>
-
-      {/* Universal Picker */}
-      {showPicker && currentField && fieldConfig && (
-        <UniversalPicker
-          title={fieldConfig.title}
-          isOpen={showPicker}
-          onClose={() => {
-            setShowPicker(false);
-            setCurrentField(null);
-          }}
-          fetchItems={fieldConfig.fetchItems}
-          selectedItems={(album[currentField] as string[]) || []}
-          onSelect={handlePickerSelect}
-          multiSelect={true}
-          canManage={true}
-          newItemLabel={fieldConfig.label}
-          manageItemsLabel={`Manage ${fieldConfig.label}s`}
-        />
-      )}
     </div>
   );
 }

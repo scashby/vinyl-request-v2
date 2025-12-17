@@ -29,7 +29,7 @@ interface ClassicalTabProps {
 
 type ClassicalField = 'composer' | 'conductor' | 'chorus' | 'composition' | 'orchestra';
 
-export default function ClassicalTab({ album, onChange }: ClassicalTabProps) {
+export function ClassicalTab({ album, onChange }: ClassicalTabProps) {
   const [showPicker, setShowPicker] = useState(false);
   const [currentField, setCurrentField] = useState<ClassicalField | null>(null);
 
