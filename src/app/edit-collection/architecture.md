@@ -237,7 +237,7 @@ src/app/edit-collection/
 ├── pickers/                    # 4 universal picker modals
 ├── settings/                   # Settings system
 ├── enrichment/                 # API integrations (planned)
-└── components/                 # Shared components
+└── src/components/             # Shared components
 ```
 
 ### Component Hierarchy
