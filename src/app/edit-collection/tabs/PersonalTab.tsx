@@ -203,7 +203,7 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
       <div style={{ maxWidth: '100%' }}>
         {/* ROW 1: [25%] [25%] [50%] - Purchase Date | Purchase Store | Owner */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr', gap: '12px', marginBottom: '10px' }}>
-          {/* Purchase Date */}
+          {/* Purchase Date - MATCHES MainTab Original Release Date */}
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
               <label style={{ ...labelStyle, marginBottom: '0' }}>Purchase Date</label>
@@ -504,7 +504,7 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
 
         {/* ROW 4: [50%] [50%] - Last Cleaned Date | Signed by */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '10px' }}>
-          {/* Last Cleaned Date - Full left column */}
+          {/* Last Cleaned Date - MATCHES MainTab Original Release Date, Full left column */}
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
               <label style={{ ...labelStyle, marginBottom: '0' }}>Last Cleaned Date</label>
@@ -547,39 +547,34 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
             </div>
           </div>
 
-          {/* Signed by */}
+          {/* Signed by - MATCHES MainTab Artist pattern */}
           <div>
             <label style={labelStyle}>Signed by</label>
-            <div style={{ 
-              border: '1px solid #d1d5db',
-              borderRadius: '4px',
-              padding: '6px',
-              minHeight: '60px',
-              backgroundColor: 'white'
-            }}>
+            <div>
               {Array.isArray(album.signed_by) && album.signed_by.length > 0 && (
-                <div style={{ marginBottom: '6px' }}>
+                <div style={{ marginBottom: '8px' }}>
                   {album.signed_by.map((signee, idx) => (
                     <div
                       key={idx}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '8px',
-                        marginBottom: '4px',
+                        justifyContent: 'space-between',
+                        marginBottom: '6px',
                       }}
                     >
-                      <span style={{ flex: 1, fontSize: '13px', color: '#374151' }}>{signee}</span>
+                      <span style={{ fontSize: '13px', color: '#374151' }}>{signee}</span>
                       <button
                         onClick={() => handleRemoveSignee(signee)}
                         style={{
                           background: 'none',
                           border: 'none',
                           cursor: 'pointer',
-                          fontSize: '18px',
+                          fontSize: '20px',
                           color: '#ef4444',
                           padding: 0,
                           lineHeight: '1',
+                          marginLeft: '8px',
                         }}
                       >
                         ×
@@ -596,7 +591,7 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
                   border: '1px solid #d1d5db',
                   borderRadius: '4px',
                   cursor: 'pointer',
-                  fontSize: '16px',
+                  fontSize: '18px',
                   color: '#6b7280',
                   fontWeight: '300',
                 }}
@@ -609,29 +604,23 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
 
         {/* ROW 5: [50%] [50%] - Played History | empty */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-          {/* Played History */}
+          {/* Played History - MATCHES MainTab Artist pattern */}
           <div>
             <label style={labelStyle}>Played History (total plays: {totalPlays})</label>
-            <div style={{ 
-              border: '1px solid #d1d5db',
-              borderRadius: '4px',
-              padding: '6px',
-              minHeight: '60px',
-              backgroundColor: 'white'
-            }}>
+            <div>
               {playedHistory.length > 0 && (
-                <div style={{ marginBottom: '6px' }}>
+                <div style={{ marginBottom: '8px' }}>
                   {playedHistory.map((entry, idx) => (
                     <div
                       key={idx}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '8px',
-                        marginBottom: '4px',
+                        justifyContent: 'space-between',
+                        marginBottom: '6px',
                       }}
                     >
-                      <span style={{ flex: 1, fontSize: '13px', color: '#374151' }}>
+                      <span style={{ fontSize: '13px', color: '#374151' }}>
                         {entry.month}/{entry.day}/{entry.year} - Count: {entry.count}
                       </span>
                       <button
@@ -640,10 +629,11 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
                           background: 'none',
                           border: 'none',
                           cursor: 'pointer',
-                          fontSize: '18px',
+                          fontSize: '20px',
                           color: '#ef4444',
                           padding: 0,
                           lineHeight: '1',
+                          marginLeft: '8px',
                         }}
                       >
                         ×
@@ -660,7 +650,7 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
                   border: '1px solid #d1d5db',
                   borderRadius: '4px',
                   cursor: 'pointer',
-                  fontSize: '16px',
+                  fontSize: '18px',
                   color: '#6b7280',
                   fontWeight: '300',
                 }}
