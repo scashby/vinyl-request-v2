@@ -507,8 +507,8 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
           </div>
         </div>
 
-        {/* ROW 4: [50%] [50%] - Last Cleaned Date | Signed by */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '10px' }}>
+        {/* ROW 4: [25%] [25%] [50%] - Last Cleaned Date | Played History | Signed by */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr', gap: '12px' }}>
           {/* Last Cleaned Date - COPIED FROM MAINTAB ORIGINAL RELEASE DATE */}
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
@@ -551,6 +551,59 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
                 onClick={handleOpenCleanedDatePicker}
                 style={{ ...dateInputStyle, width: '56px', borderRadius: '4px', cursor: 'pointer' }}
               />
+            </div>
+          </div>
+
+          {/* Played History - COPIED FROM MAINTAB ARTIST PATTERN */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <label style={{ ...labelStyle, marginBottom: '0' }}>Played History (total plays: {totalPlays})</label>
+              <span 
+                onClick={() => setShowPlayedForm(true)}
+                style={{ color: '#9ca3af', fontSize: '20px', fontWeight: '300', cursor: 'pointer' }}
+              >
+                +
+              </span>
+            </div>
+            <div style={{ 
+              flex: 1,
+              padding: '8px 10px',
+              border: '1px solid #d1d5db',
+              borderRadius: '4px',
+              fontSize: '14px',
+              backgroundColor: 'white',
+              minHeight: '36px',
+              color: '#111827',
+            }}>
+              {playedHistory.length > 0 ? (
+                playedHistory.map((entry, idx) => (
+                  <div key={idx} style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'space-between',
+                    marginBottom: idx < playedHistory.length - 1 ? '4px' : '0'
+                  }}>
+                    <span>{entry.month}/{entry.day}/{entry.year} - Count: {entry.count}</span>
+                    <button
+                      onClick={() => handleDeletePlayedHistory(idx)}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#9ca3af',
+                        cursor: 'pointer',
+                        padding: 0,
+                        fontSize: '18px',
+                        lineHeight: '1',
+                        fontWeight: '300',
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <span style={{ color: '#9ca3af' }}></span>
+              )}
             </div>
           </div>
 
@@ -606,65 +659,6 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
               )}
             </div>
           </div>
-        </div>
-
-        {/* ROW 5: [50%] [50%] - Played History | empty */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-          {/* Played History - COPIED FROM MAINTAB ARTIST PATTERN */}
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-              <label style={{ ...labelStyle, marginBottom: '0' }}>Played History (total plays: {totalPlays})</label>
-              <span 
-                onClick={() => setShowPlayedForm(true)}
-                style={{ color: '#9ca3af', fontSize: '20px', fontWeight: '300', cursor: 'pointer' }}
-              >
-                +
-              </span>
-            </div>
-            <div style={{ 
-              flex: 1,
-              padding: '8px 10px',
-              border: '1px solid #d1d5db',
-              borderRadius: '4px',
-              fontSize: '14px',
-              backgroundColor: 'white',
-              minHeight: '36px',
-              color: '#111827',
-            }}>
-              {playedHistory.length > 0 ? (
-                playedHistory.map((entry, idx) => (
-                  <div key={idx} style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'space-between',
-                    marginBottom: idx < playedHistory.length - 1 ? '4px' : '0'
-                  }}>
-                    <span>{entry.month}/{entry.day}/{entry.year} - Count: {entry.count}</span>
-                    <button
-                      onClick={() => handleDeletePlayedHistory(idx)}
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: '#9ca3af',
-                        cursor: 'pointer',
-                        padding: 0,
-                        fontSize: '18px',
-                        lineHeight: '1',
-                        fontWeight: '300',
-                      }}
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))
-              ) : (
-                <span style={{ color: '#9ca3af' }}></span>
-              )}
-            </div>
-          </div>
-
-          {/* Empty column */}
-          <div></div>
         </div>
       </div>
 
