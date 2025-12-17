@@ -155,7 +155,7 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
     onChange('signed_by', updated.length > 0 ? updated : null);
   };
 
-  // Styles
+  // Styles - COPIED FROM MAINTAB
   const labelStyle: React.CSSProperties = {
     display: 'block',
     fontSize: '13px',
@@ -167,10 +167,10 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
 
   const inputStyle: React.CSSProperties = {
     width: '100%',
-    padding: '6px 8px',
+    padding: '8px 10px',
     border: '1px solid #d1d5db',
     borderRadius: '4px',
-    fontSize: '13px',
+    fontSize: '14px',
     fontFamily: 'system-ui, -apple-system, sans-serif',
     backgroundColor: 'white',
     color: '#111827',
@@ -178,20 +178,20 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
 
   const selectStyle: React.CSSProperties = {
     width: '100%',
-    padding: '6px 8px',
+    padding: '8px 10px',
     border: '1px solid #d1d5db',
     borderRadius: '4px',
-    fontSize: '13px',
+    fontSize: '14px',
     fontFamily: 'system-ui, -apple-system, sans-serif',
     backgroundColor: 'white',
     color: '#111827',
   };
 
   const dateInputStyle: React.CSSProperties = {
-    padding: '6px 8px',
+    padding: '8px 8px',
     border: '1px solid #d1d5db',
     borderRadius: '4px',
-    fontSize: '13px',
+    fontSize: '14px',
     textAlign: 'center',
     fontFamily: 'system-ui, -apple-system, sans-serif',
     backgroundColor: 'white',
@@ -203,7 +203,7 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
       <div style={{ maxWidth: '100%' }}>
         {/* ROW 1: [25%] [25%] [50%] - Purchase Date | Purchase Store | Owner */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr', gap: '12px', marginBottom: '10px' }}>
-          {/* Purchase Date - MATCHES MainTab Original Release Date */}
+          {/* Purchase Date - COPIED FROM MAINTAB ORIGINAL RELEASE DATE */}
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
               <label style={{ ...labelStyle, marginBottom: '0' }}>Purchase Date</label>
@@ -218,30 +218,32 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
                 </svg>
               </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'space-between' }}>
               <input
                 type="text"
                 value={purchaseDate.year || ''}
                 placeholder="YYYY"
                 readOnly
                 onClick={handleOpenPurchaseDatePicker}
-                style={{ ...dateInputStyle, width: '70px', cursor: 'pointer' }}
+                style={{ ...dateInputStyle, width: '92px', borderRadius: '4px', cursor: 'pointer' }}
               />
+              <div style={{ width: '10px', height: '1px', backgroundColor: '#d1d5db' }} />
               <input
                 type="text"
                 value={purchaseDate.month || ''}
                 placeholder="MM"
                 readOnly
                 onClick={handleOpenPurchaseDatePicker}
-                style={{ ...dateInputStyle, width: '50px', cursor: 'pointer' }}
+                style={{ ...dateInputStyle, width: '56px', borderRadius: '4px', cursor: 'pointer' }}
               />
+              <div style={{ width: '10px', height: '1px', backgroundColor: '#d1d5db' }} />
               <input
                 type="text"
                 value={purchaseDate.day || ''}
                 placeholder="DD"
                 readOnly
                 onClick={handleOpenPurchaseDatePicker}
-                style={{ ...dateInputStyle, width: '50px', cursor: 'pointer' }}
+                style={{ ...dateInputStyle, width: '56px', borderRadius: '4px', cursor: 'pointer' }}
               />
             </div>
           </div>
@@ -256,14 +258,14 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
                 style={{ 
                   ...selectStyle, 
                   flex: 1, 
-                  height: '34px',
+                  height: '36px',
                   borderRadius: '4px 0 0 4px',
                   borderRight: 'none',
                   appearance: 'none',
                   backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'10\' height=\'6\' viewBox=\'0 0 10 6\'%3E%3Cpath fill=\'%23666\' d=\'M0 0l5 6 5-6z\'/%3E%3C/svg%3E")',
                   backgroundRepeat: 'no-repeat',
-                  backgroundPosition: 'right 8px center',
-                  paddingRight: '26px',
+                  backgroundPosition: 'right 12px center',
+                  paddingRight: '32px',
                 }}
               >
                 <option value="">Select</option>
@@ -271,8 +273,8 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
               <button 
                 onClick={() => setShowPurchaseStorePicker(true)}
                 style={{
-                  width: '34px',
-                  height: '34px',
+                  width: '36px',
+                  height: '36px',
                   padding: 0,
                   border: '1px solid #d1d5db',
                   borderRadius: '0 4px 4px 0',
@@ -307,14 +309,14 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
                 style={{ 
                   ...selectStyle, 
                   flex: 1, 
-                  height: '34px',
+                  height: '36px',
                   borderRadius: '4px 0 0 4px',
                   borderRight: 'none',
                   appearance: 'none',
                   backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'10\' height=\'6\' viewBox=\'0 0 10 6\'%3E%3Cpath fill=\'%23666\' d=\'M0 0l5 6 5-6z\'/%3E%3C/svg%3E")',
                   backgroundRepeat: 'no-repeat',
-                  backgroundPosition: 'right 8px center',
-                  paddingRight: '26px',
+                  backgroundPosition: 'right 12px center',
+                  paddingRight: '32px',
                 }}
               >
                 <option value="">Select</option>
@@ -322,8 +324,8 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
               <button 
                 onClick={() => setShowOwnerPicker(true)}
                 style={{
-                  width: '34px',
-                  height: '34px',
+                  width: '36px',
+                  height: '36px',
                   padding: 0,
                   border: '1px solid #d1d5db',
                   borderRadius: '0 4px 4px 0',
@@ -355,13 +357,13 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
           <div>
             <label style={labelStyle}>Purchase Price</label>
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <span style={{ fontSize: '13px', color: '#6b7280' }}>$</span>
+              <span style={{ fontSize: '14px', color: '#6b7280' }}>$</span>
               <input
                 type="number"
                 step="0.01"
                 value={album.purchase_price || ''}
                 onChange={(e) => onChange('purchase_price', e.target.value ? parseFloat(e.target.value) : null)}
-                style={{ ...inputStyle, flex: 1, height: '34px' }}
+                style={{ ...inputStyle, flex: 1, height: '36px' }}
               />
             </div>
           </div>
@@ -370,13 +372,13 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
           <div>
             <label style={labelStyle}>Current Value</label>
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <span style={{ fontSize: '13px', color: '#6b7280' }}>$</span>
+              <span style={{ fontSize: '14px', color: '#6b7280' }}>$</span>
               <input
                 type="number"
                 step="0.01"
                 value={album.current_value || ''}
                 onChange={(e) => onChange('current_value', e.target.value ? parseFloat(e.target.value) : null)}
-                style={{ ...inputStyle, flex: 1, height: '34px' }}
+                style={{ ...inputStyle, flex: 1, height: '36px' }}
               />
             </div>
           </div>
@@ -411,31 +413,32 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
           {/* Tags */}
           <div>
             <label style={labelStyle}>Tags</label>
-            <div style={{ display: 'flex', gap: '0', alignItems: 'stretch' }}>
+            <div style={{ display: 'flex', gap: '0', alignItems: 'flex-start' }}>
               <div style={{
                 flex: 1,
-                padding: '6px 8px',
+                padding: '6px 10px',
                 border: '1px solid #d1d5db',
                 borderRadius: '4px 0 0 4px',
                 borderRight: 'none',
-                minHeight: '34px',
+                minHeight: '36px',
                 display: 'flex',
-                gap: '4px',
+                gap: '6px',
                 flexWrap: 'wrap',
                 alignItems: 'center',
                 backgroundColor: 'white',
+                boxSizing: 'border-box',
               }}>
                 {Array.isArray(album.custom_tags) && album.custom_tags.map((tag) => (
                   <span
                     key={tag}
                     style={{
                       backgroundColor: '#e5e7eb',
-                      padding: '2px 8px',
-                      borderRadius: '3px',
-                      fontSize: '12px',
+                      padding: '4px 10px',
+                      borderRadius: '4px',
+                      fontSize: '13px',
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '4px',
+                      gap: '6px',
                       color: '#374151',
                     }}
                   >
@@ -448,8 +451,9 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
                         color: '#6b7280',
                         cursor: 'pointer',
                         padding: 0,
-                        fontSize: '14px',
+                        fontSize: '16px',
                         lineHeight: '1',
+                        fontWeight: '300',
                       }}
                     >
                       ×
@@ -460,8 +464,8 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
               <button 
                 onClick={() => setShowTagsPicker(true)}
                 style={{
-                  width: '34px',
-                  minHeight: '34px',
+                  width: '36px',
+                  minHeight: '40px',
                   padding: 0,
                   border: '1px solid #d1d5db',
                   borderRadius: '0 4px 4px 0',
@@ -472,6 +476,7 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
                   justifyContent: 'center',
                   color: '#6b7280',
                   flexShrink: 0,
+                  boxSizing: 'border-box',
                 }}
               >
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
@@ -496,7 +501,7 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
               style={{
                 ...inputStyle,
                 resize: 'vertical',
-                minHeight: '34px',
+                minHeight: '40px',
               }}
             />
           </div>
@@ -504,7 +509,7 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
 
         {/* ROW 4: [50%] [50%] - Last Cleaned Date | Signed by */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '10px' }}>
-          {/* Last Cleaned Date - MATCHES MainTab Original Release Date, Full left column */}
+          {/* Last Cleaned Date - COPIED FROM MAINTAB ORIGINAL RELEASE DATE */}
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
               <label style={{ ...labelStyle, marginBottom: '0' }}>Last Cleaned Date</label>
@@ -519,144 +524,142 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
                 </svg>
               </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'space-between' }}>
               <input
                 type="text"
                 value={cleanedDate.year || ''}
                 placeholder="YYYY"
                 readOnly
                 onClick={handleOpenCleanedDatePicker}
-                style={{ ...dateInputStyle, width: '70px', cursor: 'pointer' }}
+                style={{ ...dateInputStyle, width: '92px', borderRadius: '4px', cursor: 'pointer' }}
               />
+              <div style={{ width: '10px', height: '1px', backgroundColor: '#d1d5db' }} />
               <input
                 type="text"
                 value={cleanedDate.month || ''}
                 placeholder="MM"
                 readOnly
                 onClick={handleOpenCleanedDatePicker}
-                style={{ ...dateInputStyle, width: '50px', cursor: 'pointer' }}
+                style={{ ...dateInputStyle, width: '56px', borderRadius: '4px', cursor: 'pointer' }}
               />
+              <div style={{ width: '10px', height: '1px', backgroundColor: '#d1d5db' }} />
               <input
                 type="text"
                 value={cleanedDate.day || ''}
                 placeholder="DD"
                 readOnly
                 onClick={handleOpenCleanedDatePicker}
-                style={{ ...dateInputStyle, width: '50px', cursor: 'pointer' }}
+                style={{ ...dateInputStyle, width: '56px', borderRadius: '4px', cursor: 'pointer' }}
               />
             </div>
           </div>
 
-          {/* Signed by - MATCHES MainTab Artist pattern */}
+          {/* Signed by - COPIED FROM MAINTAB ARTIST PATTERN */}
           <div>
-            <label style={labelStyle}>Signed by</label>
-            <div>
-              {Array.isArray(album.signed_by) && album.signed_by.length > 0 && (
-                <div style={{ marginBottom: '8px' }}>
-                  {album.signed_by.map((signee, idx) => (
-                    <div
-                      key={idx}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        marginBottom: '6px',
-                      }}
-                    >
-                      <span style={{ fontSize: '13px', color: '#374151' }}>{signee}</span>
-                      <button
-                        onClick={() => handleRemoveSignee(signee)}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          cursor: 'pointer',
-                          fontSize: '20px',
-                          color: '#ef4444',
-                          padding: 0,
-                          lineHeight: '1',
-                          marginLeft: '8px',
-                        }}
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <button
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <label style={{ ...labelStyle, marginBottom: '0' }}>Signed by</label>
+              <span 
                 onClick={() => setShowSigneesPicker(true)}
-                style={{
-                  padding: '4px 12px',
-                  background: 'transparent',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '18px',
-                  color: '#6b7280',
-                  fontWeight: '300',
-                }}
+                style={{ color: '#9ca3af', fontSize: '20px', fontWeight: '300', cursor: 'pointer' }}
               >
                 +
-              </button>
+              </span>
+            </div>
+            <div style={{ 
+              flex: 1,
+              padding: '8px 10px',
+              border: '1px solid #d1d5db',
+              borderRadius: '4px',
+              fontSize: '14px',
+              backgroundColor: 'white',
+              minHeight: '36px',
+              color: '#111827',
+            }}>
+              {Array.isArray(album.signed_by) && album.signed_by.length > 0 ? (
+                album.signed_by.map((signee, idx) => (
+                  <div key={idx} style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'space-between',
+                    marginBottom: idx < album.signed_by!.length - 1 ? '4px' : '0'
+                  }}>
+                    <span>{signee}</span>
+                    <button
+                      onClick={() => handleRemoveSignee(signee)}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#9ca3af',
+                        cursor: 'pointer',
+                        padding: 0,
+                        fontSize: '18px',
+                        lineHeight: '1',
+                        fontWeight: '300',
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <span style={{ color: '#9ca3af' }}></span>
+              )}
             </div>
           </div>
         </div>
 
         {/* ROW 5: [50%] [50%] - Played History | empty */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-          {/* Played History - MATCHES MainTab Artist pattern */}
+          {/* Played History - COPIED FROM MAINTAB ARTIST PATTERN */}
           <div>
-            <label style={labelStyle}>Played History (total plays: {totalPlays})</label>
-            <div>
-              {playedHistory.length > 0 && (
-                <div style={{ marginBottom: '8px' }}>
-                  {playedHistory.map((entry, idx) => (
-                    <div
-                      key={idx}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        marginBottom: '6px',
-                      }}
-                    >
-                      <span style={{ fontSize: '13px', color: '#374151' }}>
-                        {entry.month}/{entry.day}/{entry.year} - Count: {entry.count}
-                      </span>
-                      <button
-                        onClick={() => handleDeletePlayedHistory(idx)}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          cursor: 'pointer',
-                          fontSize: '20px',
-                          color: '#ef4444',
-                          padding: 0,
-                          lineHeight: '1',
-                          marginLeft: '8px',
-                        }}
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <button
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <label style={{ ...labelStyle, marginBottom: '0' }}>Played History (total plays: {totalPlays})</label>
+              <span 
                 onClick={() => setShowPlayedForm(true)}
-                style={{
-                  padding: '4px 12px',
-                  background: 'transparent',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '18px',
-                  color: '#6b7280',
-                  fontWeight: '300',
-                }}
+                style={{ color: '#9ca3af', fontSize: '20px', fontWeight: '300', cursor: 'pointer' }}
               >
                 +
-              </button>
+              </span>
+            </div>
+            <div style={{ 
+              flex: 1,
+              padding: '8px 10px',
+              border: '1px solid #d1d5db',
+              borderRadius: '4px',
+              fontSize: '14px',
+              backgroundColor: 'white',
+              minHeight: '36px',
+              color: '#111827',
+            }}>
+              {playedHistory.length > 0 ? (
+                playedHistory.map((entry, idx) => (
+                  <div key={idx} style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'space-between',
+                    marginBottom: idx < playedHistory.length - 1 ? '4px' : '0'
+                  }}>
+                    <span>{entry.month}/{entry.day}/{entry.year} - Count: {entry.count}</span>
+                    <button
+                      onClick={() => handleDeletePlayedHistory(idx)}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#9ca3af',
+                        cursor: 'pointer',
+                        padding: 0,
+                        fontSize: '18px',
+                        lineHeight: '1',
+                        fontWeight: '300',
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <span style={{ color: '#9ca3af' }}></span>
+              )}
             </div>
           </div>
 
