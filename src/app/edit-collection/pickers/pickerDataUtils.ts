@@ -1211,3 +1211,484 @@ export async function fetchTags(): Promise<PickerDataItem[]> {
     return [];
   }
 }
+
+// ============================================================================
+// CLASSICAL MUSIC FIELDS - NEW ADDITIONS
+// ============================================================================
+
+// Composers
+export async function fetchComposers(): Promise<PickerDataItem[]> {
+  try {
+    const { data, error } = await supabase
+      .from('collection')
+      .select('composer')
+      .not('composer', 'is', null)
+      .not('composer', 'eq', '');
+
+    if (error) {
+      console.error('Error fetching composers:', error);
+      return [];
+    }
+
+    const composerCounts = new Map<string, number>();
+    data?.forEach(row => {
+      if (row.composer) {
+        composerCounts.set(
+          row.composer,
+          (composerCounts.get(row.composer) || 0) + 1
+        );
+      }
+    });
+
+    return Array.from(composerCounts.entries())
+      .map(([name, count]) => ({
+        id: name,
+        name,
+        count,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch (error) {
+    console.error('Error in fetchComposers:', error);
+    return [];
+  }
+}
+
+export async function updateComposer(id: string, newName: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('collection')
+      .update({ composer: newName })
+      .eq('composer', id);
+    
+    return !error;
+  } catch (error) {
+    console.error('Error updating composer:', error);
+    return false;
+  }
+}
+
+export async function mergeComposers(targetId: string, sourceIds: string[]): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('collection')
+      .update({ composer: targetId })
+      .in('composer', sourceIds);
+    
+    return !error;
+  } catch (error) {
+    console.error('Error merging composers:', error);
+    return false;
+  }
+}
+
+// Conductors
+export async function fetchConductors(): Promise<PickerDataItem[]> {
+  try {
+    const { data, error } = await supabase
+      .from('collection')
+      .select('conductor')
+      .not('conductor', 'is', null)
+      .not('conductor', 'eq', '');
+
+    if (error) {
+      console.error('Error fetching conductors:', error);
+      return [];
+    }
+
+    const conductorCounts = new Map<string, number>();
+    data?.forEach(row => {
+      if (row.conductor) {
+        conductorCounts.set(
+          row.conductor,
+          (conductorCounts.get(row.conductor) || 0) + 1
+        );
+      }
+    });
+
+    return Array.from(conductorCounts.entries())
+      .map(([name, count]) => ({
+        id: name,
+        name,
+        count,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch (error) {
+    console.error('Error in fetchConductors:', error);
+    return [];
+  }
+}
+
+export async function updateConductor(id: string, newName: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('collection')
+      .update({ conductor: newName })
+      .eq('conductor', id);
+    
+    return !error;
+  } catch (error) {
+    console.error('Error updating conductor:', error);
+    return false;
+  }
+}
+
+export async function mergeConductors(targetId: string, sourceIds: string[]): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('collection')
+      .update({ conductor: targetId })
+      .in('conductor', sourceIds);
+    
+    return !error;
+  } catch (error) {
+    console.error('Error merging conductors:', error);
+    return false;
+  }
+}
+
+// Choruses
+export async function fetchChoruses(): Promise<PickerDataItem[]> {
+  try {
+    const { data, error } = await supabase
+      .from('collection')
+      .select('chorus')
+      .not('chorus', 'is', null)
+      .not('chorus', 'eq', '');
+
+    if (error) {
+      console.error('Error fetching choruses:', error);
+      return [];
+    }
+
+    const chorusCounts = new Map<string, number>();
+    data?.forEach(row => {
+      if (row.chorus) {
+        chorusCounts.set(
+          row.chorus,
+          (chorusCounts.get(row.chorus) || 0) + 1
+        );
+      }
+    });
+
+    return Array.from(chorusCounts.entries())
+      .map(([name, count]) => ({
+        id: name,
+        name,
+        count,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch (error) {
+    console.error('Error in fetchChoruses:', error);
+    return [];
+  }
+}
+
+export async function updateChorus(id: string, newName: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('collection')
+      .update({ chorus: newName })
+      .eq('chorus', id);
+    
+    return !error;
+  } catch (error) {
+    console.error('Error updating chorus:', error);
+    return false;
+  }
+}
+
+export async function mergeChorus(targetId: string, sourceIds: string[]): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('collection')
+      .update({ chorus: targetId })
+      .in('chorus', sourceIds);
+    
+    return !error;
+  } catch (error) {
+    console.error('Error merging choruses:', error);
+    return false;
+  }
+}
+
+// Compositions
+export async function fetchCompositions(): Promise<PickerDataItem[]> {
+  try {
+    const { data, error } = await supabase
+      .from('collection')
+      .select('composition')
+      .not('composition', 'is', null)
+      .not('composition', 'eq', '');
+
+    if (error) {
+      console.error('Error fetching compositions:', error);
+      return [];
+    }
+
+    const compositionCounts = new Map<string, number>();
+    data?.forEach(row => {
+      if (row.composition) {
+        compositionCounts.set(
+          row.composition,
+          (compositionCounts.get(row.composition) || 0) + 1
+        );
+      }
+    });
+
+    return Array.from(compositionCounts.entries())
+      .map(([name, count]) => ({
+        id: name,
+        name,
+        count,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch (error) {
+    console.error('Error in fetchCompositions:', error);
+    return [];
+  }
+}
+
+export async function updateComposition(id: string, newName: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('collection')
+      .update({ composition: newName })
+      .eq('composition', id);
+    
+    return !error;
+  } catch (error) {
+    console.error('Error updating composition:', error);
+    return false;
+  }
+}
+
+export async function mergeCompositions(targetId: string, sourceIds: string[]): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('collection')
+      .update({ composition: targetId })
+      .in('composition', sourceIds);
+    
+    return !error;
+  } catch (error) {
+    console.error('Error merging compositions:', error);
+    return false;
+  }
+}
+
+// Orchestras
+export async function fetchOrchestras(): Promise<PickerDataItem[]> {
+  try {
+    const { data, error } = await supabase
+      .from('collection')
+      .select('orchestra')
+      .not('orchestra', 'is', null)
+      .not('orchestra', 'eq', '');
+
+    if (error) {
+      console.error('Error fetching orchestras:', error);
+      return [];
+    }
+
+    const orchestraCounts = new Map<string, number>();
+    data?.forEach(row => {
+      if (row.orchestra) {
+        orchestraCounts.set(
+          row.orchestra,
+          (orchestraCounts.get(row.orchestra) || 0) + 1
+        );
+      }
+    });
+
+    return Array.from(orchestraCounts.entries())
+      .map(([name, count]) => ({
+        id: name,
+        name,
+        count,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch (error) {
+    console.error('Error in fetchOrchestras:', error);
+    return [];
+  }
+}
+
+export async function updateOrchestra(id: string, newName: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('collection')
+      .update({ orchestra: newName })
+      .eq('orchestra', id);
+    
+    return !error;
+  } catch (error) {
+    console.error('Error updating orchestra:', error);
+    return false;
+  }
+}
+
+export async function mergeOrchestras(targetId: string, sourceIds: string[]): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('collection')
+      .update({ orchestra: targetId })
+      .in('orchestra', sourceIds);
+    
+    return !error;
+  } catch (error) {
+    console.error('Error merging orchestras:', error);
+    return false;
+  }
+}
+
+// ============================================================================
+// PEOPLE / CREDITS FIELDS - NEW ADDITIONS
+// ============================================================================
+
+// Songwriters
+export async function fetchSongwriters(): Promise<PickerDataItem[]> {
+  try {
+    const { data, error } = await supabase
+      .from('collection')
+      .select('songwriters')
+      .not('songwriters', 'is', null);
+
+    if (error) {
+      console.error('Error fetching songwriters:', error);
+      return [];
+    }
+
+    const songwriterCounts = new Map<string, number>();
+    data?.forEach(row => {
+      if (row.songwriters && Array.isArray(row.songwriters)) {
+        row.songwriters.forEach(songwriter => {
+          if (songwriter) {
+            songwriterCounts.set(songwriter, (songwriterCounts.get(songwriter) || 0) + 1);
+          }
+        });
+      }
+    });
+
+    return Array.from(songwriterCounts.entries())
+      .map(([name, count]) => ({
+        id: name,
+        name,
+        count,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch (error) {
+    console.error('Error in fetchSongwriters:', error);
+    return [];
+  }
+}
+
+// Producers
+export async function fetchProducers(): Promise<PickerDataItem[]> {
+  try {
+    const { data, error } = await supabase
+      .from('collection')
+      .select('producers')
+      .not('producers', 'is', null);
+
+    if (error) {
+      console.error('Error fetching producers:', error);
+      return [];
+    }
+
+    const producerCounts = new Map<string, number>();
+    data?.forEach(row => {
+      if (row.producers && Array.isArray(row.producers)) {
+        row.producers.forEach(producer => {
+          if (producer) {
+            producerCounts.set(producer, (producerCounts.get(producer) || 0) + 1);
+          }
+        });
+      }
+    });
+
+    return Array.from(producerCounts.entries())
+      .map(([name, count]) => ({
+        id: name,
+        name,
+        count,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch (error) {
+    console.error('Error in fetchProducers:', error);
+    return [];
+  }
+}
+
+// Engineers
+export async function fetchEngineers(): Promise<PickerDataItem[]> {
+  try {
+    const { data, error } = await supabase
+      .from('collection')
+      .select('engineers')
+      .not('engineers', 'is', null);
+
+    if (error) {
+      console.error('Error fetching engineers:', error);
+      return [];
+    }
+
+    const engineerCounts = new Map<string, number>();
+    data?.forEach(row => {
+      if (row.engineers && Array.isArray(row.engineers)) {
+        row.engineers.forEach(engineer => {
+          if (engineer) {
+            engineerCounts.set(engineer, (engineerCounts.get(engineer) || 0) + 1);
+          }
+        });
+      }
+    });
+
+    return Array.from(engineerCounts.entries())
+      .map(([name, count]) => ({
+        id: name,
+        name,
+        count,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch (error) {
+    console.error('Error in fetchEngineers:', error);
+    return [];
+  }
+}
+
+// Musicians
+export async function fetchMusicians(): Promise<PickerDataItem[]> {
+  try {
+    const { data, error } = await supabase
+      .from('collection')
+      .select('musicians')
+      .not('musicians', 'is', null);
+
+    if (error) {
+      console.error('Error fetching musicians:', error);
+      return [];
+    }
+
+    const musicianCounts = new Map<string, number>();
+    data?.forEach(row => {
+      if (row.musicians && Array.isArray(row.musicians)) {
+        row.musicians.forEach(musician => {
+          if (musician) {
+            musicianCounts.set(musician, (musicianCounts.get(musician) || 0) + 1);
+          }
+        });
+      }
+    });
+
+    return Array.from(musicianCounts.entries())
+      .map(([name, count]) => ({
+        id: name,
+        name,
+        count,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch (error) {
+    console.error('Error in fetchMusicians:', error);
+    return [];
+  }
+}
