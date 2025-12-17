@@ -1,7 +1,7 @@
 # PROJECT_STATUS.md
 # DWD Collection Management System - Collection Browser
 
-**Last Updated:** 2025-12-16 (PersonalTab Complete with UniversalPicker System)
+**Last Updated:** 2025-12-16 (PersonalTab Corrected - Component Reuse Pattern)
 
 ---
 
@@ -31,7 +31,6 @@ Building an exact CLZ Music Web-inspired interface for Dead Wax Dialogues vinyl 
 ---
 
 ## 📊 Overall Progress: ~60% Complete
-
 ```
 Phase 1: Visual Framework         ████████████████████ 100% ✅
 Phase 2.1: Data Connection        ████████████████████ 100% ✅
@@ -42,18 +41,26 @@ Phase 3: Selection & Batch Ops    ░░░░░░░░░░░░░░░�
 Phase 4: Advanced Features        ░░░░░░░░░░░░░░░░░░░░   0%
 ```
 
-**Current Focus:** Building Edit Album Modal and Detail Panel - DetailsTab and enhanced info panel complete
+**Current Focus:** Building Edit Album Modal and Detail Panel - PersonalTab corrected with proper component reuse
 
 ---
 
 ## 🔧 RECENT CHANGES (Last 7 Days)
 
-### 2025-12-16: PersonalTab Complete with UniversalPicker System ✅
-- Created UniversalPicker component integrating PickerModal, ManageModal, EditModal, MergeModal
-- Implemented all PersonalTab features: purchase info, 10-star rating, tags, notes, play history, signed-by
-- Fixed pickerDataUtils.ts to use correct Supabase import path (`../../../lib/supabaseClient`)
-- Added `played_history` field to Album type for tracking play dates and counts
-- **Result:** PersonalTab fully functional with all pickers and data entry fields working
+### 2025-12-16: PersonalTab Corrected - Component Reuse Pattern ✅
+- **CRITICAL LESSON LEARNED**: Always reuse existing components rather than creating new variations
+- **PROTOCOL VIOLATION**: Initial PersonalTab ignored screenshot layout and reinvented components
+- **Corrected Issues**:
+  - ✅ Now uses DatePicker component from MainTab (not custom text inputs)
+  - ✅ Now uses dropdown + picker button pattern from MainTab
+  - ✅ Layout matches CLZ screenshot exactly (vertical, not improvised grid)
+  - ✅ Rating displays dynamically: "My Rating (6 / 10)" not hardcoded
+- **NEW DEVELOPMENT RULE**: Before building ANY new tab/component:
+  1. View screenshot to understand exact requirements
+  2. Identify existing components that match the pattern
+  3. Reuse those components with same styling/behavior
+  4. Screenshot IS the specification - not a suggestion
+- **Result:** PersonalTab now matches CLZ exactly with proper component reuse
 
 ### 2025-12-16: Previous/Next Navigation Complete ✅
 - Wired up Previous/Next buttons in UniversalBottomBar
@@ -96,22 +103,7 @@ Phase 4: Advanced Features        ░░░░░░░░░░░░░░░�
 - Vinyl weight dropdown with standard weights (80g-200g)
 - **Result:** DetailsTab now functional and polished
 
-### 2025-12-15: Album Detail Panel - Track Display Added ✅
-- Added track display to inline AlbumInfoPanel component in page.tsx
-- Tracks grouped by disc with disc titles from disc_metadata
-- Position, title, and duration displayed for each track
-- Header track support with special styling
-- Multi-disc albums fully supported with proper numbering
-- **Result:** Track data now visible in right panel when album selected
-
-### 2025-12-14: TracksTab TypeScript Errors Fixed ✅
-- Fixed duplicate `};` syntax error that terminated function early
-- Removed unused imports: `extractDiscogsReleaseId`, `extractSpotifyAlbumId`
-- Created proper TypeScript interfaces: `Track`, `DiscogsTrack`, `SpotifyTrack`
-- Replaced all `any` types with typed interfaces
-- **Result:** Zero TypeScript/ESLint errors, TracksTab compiles successfully
-
-**See ARCHIVE.md for changes prior to 2025-12-14**
+**See ARCHIVE.md for changes prior to 2025-12-15**
 
 ---
 
@@ -138,12 +130,13 @@ Implemented 24 sort options, column selector with drag-drop, 14 column groups wi
 ✅ **Main Tab** - All pickers wired (Label, Format, Genre, Location, Artist), date pickers, auto-cap
 ✅ **TracksTab** - Built with Discogs/Spotify import, multi-disc support, track management
 ✅ **DetailsTab** - All fields functional with pre-populated lists and multi-select vinyl colors
+✅ **PersonalTab** - COMPLETE with proper component reuse (DatePicker, UniversalPicker patterns)
 
-### Tab Status (Priority Order: Details > Personal > Cover > People > Links > Classical):
+### Tab Status (Priority Order: Cover > People > Links > Classical):
 - ✅ **MainTab** - COMPLETE (all pickers functional)
 - ✅ **TracksTab** - COMPLETE (import from Discogs/Spotify working)
 - ✅ **DetailsTab** - COMPLETE (all pickers, dropdowns, multi-select functional)
-- ✅ **PersonalTab** - COMPLETE (purchase info, ratings, tags, notes, play history)
+- ✅ **PersonalTab** - COMPLETE (purchase info, ratings, tags, notes, play history) - CORRECTED
 - ⏳ **CoverTab** - NEXT PRIORITY (Phase 6)
 - ⏳ **PeopleTab** - Placeholder (Phase 6)
 - ⏳ **LinksTab** - Placeholder (Phase 6)
@@ -284,6 +277,14 @@ Can integrate additional modal features into detail panel after remaining tabs c
 - Some table columns show placeholders
 - Collection tabs not implemented (Phase 5)
 - Some action buttons are placeholders
+
+### Component Reuse Guidelines (NEW)
+**ALWAYS check existing tabs before creating new components:**
+1. DatePicker - Reuse from MainTab for all date inputs
+2. Dropdown + Picker Button - Reuse MainTab's Label/Format pattern
+3. Tag Display - Reuse MainTab's Genre chip pattern
+4. UniversalPicker - Standard for all picker modals
+5. Layout Patterns - Follow CLZ screenshots exactly
 
 **See ARCHITECTURE.md for detailed technical documentation**
 
