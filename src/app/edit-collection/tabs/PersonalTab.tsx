@@ -218,27 +218,30 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
                 </svg>
               </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <input
                 type="text"
                 value={purchaseDate.year || ''}
                 placeholder="YYYY"
                 readOnly
-                style={{ ...dateInputStyle, width: '52px' }}
+                onClick={handleOpenPurchaseDatePicker}
+                style={{ ...dateInputStyle, width: '70px', cursor: 'pointer' }}
               />
               <input
                 type="text"
                 value={purchaseDate.month || ''}
                 placeholder="MM"
                 readOnly
-                style={{ ...dateInputStyle, width: '40px' }}
+                onClick={handleOpenPurchaseDatePicker}
+                style={{ ...dateInputStyle, width: '50px', cursor: 'pointer' }}
               />
               <input
                 type="text"
                 value={purchaseDate.day || ''}
                 placeholder="DD"
                 readOnly
-                style={{ ...dateInputStyle, width: '40px' }}
+                onClick={handleOpenPurchaseDatePicker}
+                style={{ ...dateInputStyle, width: '50px', cursor: 'pointer' }}
               />
             </div>
           </div>
@@ -501,7 +504,7 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
 
         {/* ROW 4: [50%] [50%] - Last Cleaned Date | Signed by */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '10px' }}>
-          {/* Last Cleaned Date */}
+          {/* Last Cleaned Date - Full left column */}
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
               <label style={{ ...labelStyle, marginBottom: '0' }}>Last Cleaned Date</label>
@@ -516,27 +519,30 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
                 </svg>
               </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <input
                 type="text"
                 value={cleanedDate.year || ''}
                 placeholder="YYYY"
                 readOnly
-                style={{ ...dateInputStyle, width: '52px' }}
+                onClick={handleOpenCleanedDatePicker}
+                style={{ ...dateInputStyle, width: '70px', cursor: 'pointer' }}
               />
               <input
                 type="text"
                 value={cleanedDate.month || ''}
                 placeholder="MM"
                 readOnly
-                style={{ ...dateInputStyle, width: '40px' }}
+                onClick={handleOpenCleanedDatePicker}
+                style={{ ...dateInputStyle, width: '50px', cursor: 'pointer' }}
               />
               <input
                 type="text"
                 value={cleanedDate.day || ''}
                 placeholder="DD"
                 readOnly
-                style={{ ...dateInputStyle, width: '40px' }}
+                onClick={handleOpenCleanedDatePicker}
+                style={{ ...dateInputStyle, width: '50px', cursor: 'pointer' }}
               />
             </div>
           </div>
@@ -551,31 +557,29 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
               minHeight: '60px',
               backgroundColor: 'white'
             }}>
-              {Array.isArray(album.signed_by) && album.signed_by.length > 0 ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', marginBottom: '6px' }}>
+              {Array.isArray(album.signed_by) && album.signed_by.length > 0 && (
+                <div style={{ marginBottom: '6px' }}>
                   {album.signed_by.map((signee, idx) => (
                     <div
                       key={idx}
                       style={{
                         display: 'flex',
-                        justifyContent: 'space-between',
                         alignItems: 'center',
-                        padding: '3px 6px',
-                        background: '#f9fafb',
-                        borderRadius: '3px',
-                        fontSize: '12px'
+                        gap: '8px',
+                        marginBottom: '4px',
                       }}
                     >
-                      <span>{signee}</span>
+                      <span style={{ flex: 1, fontSize: '13px', color: '#374151' }}>{signee}</span>
                       <button
                         onClick={() => handleRemoveSignee(signee)}
                         style={{
                           background: 'none',
                           border: 'none',
                           cursor: 'pointer',
-                          fontSize: '14px',
-                          color: '#6b7280',
-                          padding: 0
+                          fontSize: '18px',
+                          color: '#ef4444',
+                          padding: 0,
+                          lineHeight: '1',
                         }}
                       >
                         ×
@@ -583,17 +587,18 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
                     </div>
                   ))}
                 </div>
-              ) : null}
+              )}
               <button
                 onClick={() => setShowSigneesPicker(true)}
                 style={{
-                  padding: '3px 10px',
+                  padding: '4px 12px',
                   background: 'transparent',
                   border: '1px solid #d1d5db',
-                  borderRadius: '3px',
+                  borderRadius: '4px',
                   cursor: 'pointer',
-                  fontSize: '14px',
+                  fontSize: '16px',
                   color: '#6b7280',
+                  fontWeight: '300',
                 }}
               >
                 +
@@ -603,7 +608,7 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
         </div>
 
         {/* ROW 5: [50%] [50%] - Played History | empty */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '10px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           {/* Played History */}
           <div>
             <label style={labelStyle}>Played History (total plays: {totalPlays})</label>
@@ -615,37 +620,34 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
               backgroundColor: 'white'
             }}>
               {playedHistory.length > 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', marginBottom: '6px' }}>
+                <div style={{ marginBottom: '6px' }}>
                   {playedHistory.map((entry, idx) => (
                     <div
                       key={idx}
                       style={{
                         display: 'flex',
-                        justifyContent: 'space-between',
                         alignItems: 'center',
-                        padding: '3px 6px',
-                        background: '#f9fafb',
-                        borderRadius: '3px',
-                        fontSize: '12px'
+                        gap: '8px',
+                        marginBottom: '4px',
                       }}
                     >
-                      <span>{entry.month}/{entry.day}/{entry.year}</span>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <span>Count: {entry.count}</span>
-                        <button
-                          onClick={() => handleDeletePlayedHistory(idx)}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            cursor: 'pointer',
-                            fontSize: '14px',
-                            color: '#6b7280',
-                            padding: 0
-                          }}
-                        >
-                          ×
-                        </button>
-                      </div>
+                      <span style={{ flex: 1, fontSize: '13px', color: '#374151' }}>
+                        {entry.month}/{entry.day}/{entry.year} - Count: {entry.count}
+                      </span>
+                      <button
+                        onClick={() => handleDeletePlayedHistory(idx)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontSize: '18px',
+                          color: '#ef4444',
+                          padding: 0,
+                          lineHeight: '1',
+                        }}
+                      >
+                        ×
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -653,13 +655,14 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
               <button
                 onClick={() => setShowPlayedForm(true)}
                 style={{
-                  padding: '3px 10px',
+                  padding: '4px 12px',
                   background: 'transparent',
                   border: '1px solid #d1d5db',
-                  borderRadius: '3px',
+                  borderRadius: '4px',
                   cursor: 'pointer',
-                  fontSize: '14px',
+                  fontSize: '16px',
                   color: '#6b7280',
+                  fontWeight: '300',
                 }}
               >
                 +
@@ -669,100 +672,6 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
 
           {/* Empty column */}
           <div></div>
-        </div>
-
-        {/* ROW 6: [25%] [25%] [25%] [25%] - Collection Status | Index | Quantity | Location */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '12px' }}>
-          {/* Collection Status */}
-          <div>
-            <label style={labelStyle}>Collection Status</label>
-            <select 
-              value={album.collection_status || 'In Collection'}
-              onChange={(e) => onChange('collection_status', e.target.value)}
-              style={{ 
-                ...selectStyle,
-                height: '34px',
-                appearance: 'none',
-                backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'10\' height=\'6\' viewBox=\'0 0 10 6\'%3E%3Cpath fill=\'%23666\' d=\'M0 0l5 6 5-6z\'/%3E%3C/svg%3E")',
-                backgroundRepeat: 'no-repeat',
-                backgroundPosition: 'right 8px center',
-                paddingRight: '26px',
-              }}
-            >
-              <option value="In Collection">In Collection</option>
-              <option value="Wishlist">Wishlist</option>
-              <option value="For Sale">For Sale</option>
-              <option value="Sold">Sold</option>
-            </select>
-          </div>
-
-          {/* Index */}
-          <div>
-            <label style={labelStyle}>Index</label>
-            <input
-              type="text"
-              value={album.index_number || ''}
-              onChange={(e) => onChange('index_number', e.target.value)}
-              placeholder="Index number"
-              style={{ ...inputStyle, height: '34px' }}
-            />
-          </div>
-
-          {/* Quantity */}
-          <div>
-            <label style={labelStyle}>Quantity</label>
-            <input
-              type="number"
-              value={1}
-              readOnly
-              style={{ ...inputStyle, height: '34px', backgroundColor: '#f9fafb' }}
-            />
-          </div>
-
-          {/* Location */}
-          <div>
-            <label style={labelStyle}>Location</label>
-            <div style={{ display: 'flex', gap: '0', alignItems: 'stretch' }}>
-              <input
-                type="text"
-                value={album.location || ''}
-                onChange={(e) => onChange('location', e.target.value)}
-                placeholder="Storage location"
-                style={{ 
-                  ...inputStyle, 
-                  flex: 1, 
-                  height: '34px',
-                  borderRadius: '4px 0 0 4px',
-                  borderRight: 'none',
-                }}
-              />
-              <button 
-                style={{
-                  width: '34px',
-                  height: '34px',
-                  padding: 0,
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0 4px 4px 0',
-                  backgroundColor: 'white',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#6b7280',
-                  flexShrink: 0,
-                }}
-              >
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
-                  <circle cx="1.5" cy="2.5" r="1"/>
-                  <rect x="4" y="2" width="10" height="1"/>
-                  <circle cx="1.5" cy="7" r="1"/>
-                  <rect x="4" y="6.5" width="10" height="1"/>
-                  <circle cx="1.5" cy="11.5" r="1"/>
-                  <rect x="4" y="11" width="10" height="1"/>
-                </svg>
-              </button>
-            </div>
-          </div>
         </div>
       </div>
 
