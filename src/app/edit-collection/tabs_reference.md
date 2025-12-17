@@ -3,7 +3,7 @@
 
 Reference document for all tabs and fields in the Edit Album Modal. This replicates the CLZ Music Web interface exactly.
 
-**Last Updated:** 2025-12-17 - All 8 tabs complete
+**Last Updated:** 2025-12-17 - 8 tabs functional, 1 external library needed
 
 ---
 
@@ -20,7 +20,7 @@ Reference document for all tabs and fields in the Edit Album Modal. This replica
 
 ## 🎵 Main Tab
 
-**Status:** COMPLETE ✅
+**Status:** ✅ 100% FUNCTIONAL
 
 ### Fields:
 - **Title** (text input) ✅
@@ -46,7 +46,7 @@ Reference document for all tabs and fields in the Edit Album Modal. This replica
 
 ## ℹ️ Details Tab
 
-**Status:** COMPLETE ✅
+**Status:** ✅ 100% FUNCTIONAL
 
 ### Fields:
 - **Packaging** (picker) ✅
@@ -67,42 +67,48 @@ Reference document for all tabs and fields in the Edit Album Modal. This replica
 
 ## 🎻 Classical Tab
 
-**Status:** COMPLETE ✅ (All fields implemented with picker buttons)
+**Status:** ✅ 100% FUNCTIONAL - All pickers wired to PickerModal
 
 ### Fields:
-- **Composer** (add/picker) ✅
-- **Composition** (add/picker) ✅
-- **Conductor** (add/picker) ✅
-- **Orchestra** (add/picker) ✅
-- **Chorus** (add/picker) ✅
+- **Composer** (picker) ✅ **WIRED**
+- **Composition** (picker) ✅ **WIRED**
+- **Conductor** (picker) ✅ **WIRED**
+- **Orchestra** (picker) ✅ **WIRED**
+- **Chorus** (picker) ✅ **WIRED**
 
-**Implementation:** All fields use dropdown + picker button pattern from MainTab
-**Database Support:** album.ts has all required fields (composer, conductor, chorus, composition, orchestra)
-**Picker Functions:** pickerDataUtils.ts has all fetch/update/merge functions added
+**Implementation:** 
+- All fields use PickerModal with `type` prop
+- Opens modal on button click
+- Selects from database using pickerDataUtils
+- Clear buttons functional
+- Database fields: composer, conductor, chorus, composition, orchestra
 
 ---
 
 ## 👥 People Tab
 
-**Status:** COMPLETE ✅ (All fields implemented with multi-value lists)
+**Status:** ✅ 100% FUNCTIONAL - All pickers wired to PickerModal
 
 ### Credits Section:
-- **Songwriter** (add/picker) ✅
-- **Producer** (add/picker) ✅
-- **Engineer** (add/picker) ✅
+- **Songwriter** (multi-value picker) ✅ **WIRED**
+- **Producer** (multi-value picker) ✅ **WIRED**
+- **Engineer** (multi-value picker) ✅ **WIRED**
 
 ### Musicians Section:
-- **Musician** (add/picker) ✅
+- **Musician** (multi-value picker) ✅ **WIRED**
 
-**Implementation:** All fields display as lists with red × remove buttons, + Select button to add
-**Database Support:** album.ts has all array fields (songwriters, producers, engineers, musicians)
-**Picker Functions:** pickerDataUtils.ts has all fetch functions added
+**Implementation:**
+- All fields use PickerModal for adding
+- Display as lists with remove buttons
+- Opens modal on "Select..." button click
+- Prevents duplicates
+- Database fields: songwriters[], producers[], engineers[], musicians[]
 
 ---
 
 ## 🎼 Tracks Tab
 
-**Status:** COMPLETE ✅ (Built with full import functionality)
+**Status:** ✅ 100% FUNCTIONAL
 
 ### Features:
 - **Disc tabs** (Disc #1, Disc #2, etc.) for multi-disc albums ✅
@@ -130,7 +136,7 @@ Reference document for all tabs and fields in the Edit Album Modal. This replica
 
 ## 👤 Personal Tab
 
-**Status:** COMPLETE ✅
+**Status:** ✅ 100% FUNCTIONAL
 
 ### Fields:
 - **Purchase Date** (MM/DD/YYYY with DatePicker) ✅
@@ -149,27 +155,34 @@ Reference document for all tabs and fields in the Edit Album Modal. This replica
 
 ## 📀 Cover Tab
 
-**Status:** COMPLETE ✅ (With enrichment modal)
+**Status:** ✅ 90% FUNCTIONAL - Crop/Rotate needs external library
 
 ### Front Cover:
-- **🔍 Find Online** button ✅ **Opens FindCoverModal**
-- **⬆️ Upload** button ✅ **File picker ready**
-- **🗑️ Remove** button ✅
-- **✂️ Crop / Rotate** button ✅ (placeholder)
+- **🔍 Find Online** button ✅ **Opens Google Images search**
+- **⬆️ Upload** button ✅ **Uploads to Supabase Storage**
+- **🗑️ Remove** button ✅ **Deletes from storage**
+- **✂️ Crop / Rotate** button 🔴 **Needs react-easy-crop library**
 - Image preview ✅
 
 ### Back Cover:
-- **🔍 Find Online** button ✅ **Opens FindCoverModal**
-- **⬆️ Upload** button ✅ **File picker ready**
-- **🗑️ Remove** button ✅
-- **✂️ Crop / Rotate** button ✅ (placeholder)
+- **🔍 Find Online** button ✅ **Opens Google Images search**
+- **⬆️ Upload** button ✅ **Uploads to Supabase Storage**
+- **🗑️ Remove** button ✅ **Deletes from storage**
+- **✂️ Crop / Rotate** button 🔴 **Needs react-easy-crop library**
 - Image preview ✅
 
-### Enrichment:
-- **FindCoverModal** component created ✅
-- Searches Google Images / Discogs / Spotify (placeholder)
-- Grid display of search results
-- Click to select and apply to album
+### What Actually Works:
+- ✅ Upload: Saves image to Supabase Storage bucket `album-images`, updates album.image_url or album.back_image_url
+- ✅ Remove: Deletes file from storage, clears URL from database
+- ✅ Find Online: Opens Google Images search with album info (artist + title + year)
+- 🔴 Crop/Rotate: Shows alert with implementation instructions
+
+### Crop/Rotate Implementation:
+To implement crop/rotate, install library:
+```bash
+npm install react-easy-crop
+```
+Then follow guide in `/CROP_ROTATE_IMPLEMENTATION.md`
 
 **Note:** page.tsx already displays both front (image_url) and back (back_image_url) covers with carousel
 
@@ -177,17 +190,23 @@ Reference document for all tabs and fields in the Edit Album Modal. This replica
 
 ## 🔗 Links Tab
 
-**Status:** COMPLETE ✅
+**Status:** ✅ 100% FUNCTIONAL
 
 ### Features:
-- URL list (add/remove) ✅
+- URL list (add/remove) ✅ **Working**
 - Each link has:
   - URL (text input) ✅
   - Description (text input) ✅
-  - Drag handle (≡) for reordering ✅
-- **➕ New Link** button ✅
-- Drag-drop reordering ✅
-- **Auto-populate** from Spotify/Apple Music/Discogs/Genius (planned for enrichment)
+  - Drag handle (≡) for reordering ✅ **Working**
+- **➕ New Link** button ✅ **Working**
+- Drag-drop reordering ✅ **Working**
+- Stores in album.extra as JSON string ✅ **Working**
+
+**Implementation:**
+- Links stored as JSON array in album.extra field
+- Drag-drop reordering functional
+- Add/remove working
+- No ESLint errors, properly typed
 
 ---
 
@@ -218,22 +237,20 @@ Present on ALL tabs:
 src/app/edit-collection/
 ├── EditAlbumModal.tsx          # Main modal component ✅
 ├── tabs/
-│   ├── MainTab.tsx             # Basic info ✅ COMPLETE
-│   ├── DetailsTab.tsx          # Extended metadata ✅ COMPLETE
-│   ├── ClassicalTab.tsx        # Composer, conductor, etc. ✅ COMPLETE
-│   ├── PeopleTab.tsx           # Credits & musicians ✅ COMPLETE
-│   ├── TracksTab.tsx           # Tracklist management ✅ COMPLETE
-│   ├── PersonalTab.tsx         # Purchase, ratings, tags ✅ COMPLETE
-│   ├── CoverTab.tsx            # Front/back cover ✅ COMPLETE
-│   └── LinksTab.tsx            # URLs ✅ COMPLETE
+│   ├── MainTab.tsx             # Basic info ✅ 100%
+│   ├── DetailsTab.tsx          # Extended metadata ✅ 100%
+│   ├── ClassicalTab.tsx        # Composer, conductor, etc. ✅ 100%
+│   ├── PeopleTab.tsx           # Credits & musicians ✅ 100%
+│   ├── TracksTab.tsx           # Tracklist management ✅ 100%
+│   ├── PersonalTab.tsx         # Purchase, ratings, tags ✅ 100%
+│   ├── CoverTab.tsx            # Front/back cover ✅ 90% (needs crop library)
+│   └── LinksTab.tsx            # URLs ✅ 100%
 ├── pickers/
-│   ├── PickerModal.tsx         # Universal picker base ✅ COMPLETE
-│   ├── ManageModal.tsx         # Manage items ✅ COMPLETE
-│   ├── EditModal.tsx           # Edit single item ✅ COMPLETE
-│   ├── MergeModal.tsx          # Merge multiple items ✅ COMPLETE
-│   └── pickerDataUtils.ts      # Supabase integration ✅ COMPLETE (all functions)
-├── enrichment/
-│   └── FindCoverModal.tsx      # Cover art search ✅ CREATED (placeholder)
+│   ├── PickerModal.tsx         # Universal picker base ✅
+│   ├── ManageModal.tsx         # Manage items ✅
+│   ├── EditModal.tsx           # Edit single item ✅
+│   ├── MergeModal.tsx          # Merge multiple items ✅
+│   └── pickerDataUtils.ts      # Supabase integration ✅
 ├── settings/
 │   ├── SettingsModal.tsx       # Global settings hub ✅
 │   ├── AutoCapSettings.tsx     # Auto cap configuration ✅
@@ -247,15 +264,22 @@ src/app/edit-collection/
 
 ## Summary
 
-**ALL 8 TABS ARE NOW COMPLETE** ✅
+**7 of 8 tabs are 100% functional** ✅
+**1 tab is 90% functional** - needs external library for one feature
 
-Each tab properly imports `Album` type from `types/album` and uses the correct prop names.
+### What Works Right Now:
+- ✅ All pickers in Classical/People tabs wired to PickerModal
+- ✅ Upload/Remove cover images to Supabase Storage
+- ✅ Find cover images online (Google Images)
+- ✅ Add/remove/reorder links with drag-drop
+- ✅ All 8 tabs save data properly
 
-### Next Steps:
-1. **Wire up pickers** in Classical and People tabs (functions already in pickerDataUtils.ts)
-2. **Implement enrichment** - Connect FindCoverModal to real APIs (Google Images, Discogs, Spotify)
-3. **Implement file upload** for covers with proper storage
-4. **Implement crop/rotate** functionality for cover images
+### What Needs Optional Enhancement:
+- 🔴 Crop/Rotate: Install `react-easy-crop` and follow `/CROP_ROTATE_IMPLEMENTATION.md`
+
+### External Dependencies Needed:
+- **Supabase Storage Bucket:** Create bucket named `album-images` (public)
+- **Optional for Crop/Rotate:** `npm install react-easy-crop`
 
 ---
 

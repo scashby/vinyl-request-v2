@@ -1,24 +1,49 @@
 // src/app/edit-collection/tabs/PeopleTab.tsx
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import type { Album } from 'types/album';
+import { PickerModal } from '../pickers/PickerModal';
 
 interface PeopleTabProps {
   album: Album;
-  onChange: (field: keyof Album, value: string[]) => void;
+  onChange: <K extends keyof Album>(field: K, value: Album[K]) => void;
 }
 
+type PeopleField = 'songwriters' | 'producers' | 'engineers' | 'musicians';
+
 export default function PeopleTab({ album, onChange }: PeopleTabProps) {
-  const handleRemoveItem = (field: keyof Album, index: number) => {
+  const [showPicker, setShowPicker] = useState(false);
+  const [currentField, setCurrentField] = useState<PeopleField | null>(null);
+
+  const handleOpenPicker = (field: PeopleField) => {
+    setCurrentField(field);
+    setShowPicker(true);
+  };
+
+  const handlePickerSelect = (selectedItems: { name: string }[]) => {
+    if (currentField) {
+      const currentValues = (album[currentField] as string[]) || [];
+      const newValue = selectedItems[0]?.name;
+      
+      if (newValue && !currentValues.includes(newValue)) {
+        const updatedValues = [...currentValues, newValue];
+        onChange(currentField, updatedValues as Album[PeopleField]);
+      }
+    }
+    setShowPicker(false);
+    setCurrentField(null);
+  };
+
+  const handleRemoveItem = (field: PeopleField, index: number) => {
     const currentArray = (album[field] as string[]) || [];
     const newArray = currentArray.filter((_, i) => i !== index);
-    onChange(field, newArray);
+    onChange(field, newArray as Album[PeopleField]);
   };
 
   const renderMultiValueField = (
     label: string,
-    field: keyof Album,
+    field: PeopleField,
     values: string[] | undefined
   ) => {
     return (
@@ -51,10 +76,7 @@ export default function PeopleTab({ album, onChange }: PeopleTabProps) {
           <button
             type="button"
             className="h-[26px] px-3 bg-[#3a3a3a] hover:bg-[#444444] text-[#e8e6e3] text-[13px] border border-[#555555] rounded flex items-center justify-between min-w-[200px] transition-colors self-start"
-            onClick={() => {
-              // TODO: Open picker modal for this field
-              console.log(`Open ${label} picker`);
-            }}
+            onClick={() => handleOpenPicker(field)}
           >
             <span className="text-[#999999]">Select...</span>
             <svg className="w-3 h-3 ml-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
@@ -91,6 +113,24 @@ export default function PeopleTab({ album, onChange }: PeopleTabProps) {
           </div>
         </div>
       </div>
+
+      {/* Picker Modal */}
+      {showPicker && currentField && (
+        <PickerModal
+          isOpen={showPicker}
+          onClose={() => {
+            setShowPicker(false);
+            setCurrentField(null);
+          }}
+          title={`Select ${currentField.charAt(0).toUpperCase() + currentField.slice(1, -1)}`}
+          type={currentField === 'songwriters' ? 'songwriter' : 
+                currentField === 'producers' ? 'producer' :
+                currentField === 'engineers' ? 'engineer' : 'musician'}
+          onSelect={handlePickerSelect}
+          allowMultiple={false}
+          selectedItems={[]}
+        />
+      )}
     </div>
   );
 }

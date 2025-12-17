@@ -116,7 +116,7 @@ export function FindCoverModal({
           {searchResults.length === 0 ? (
             <div className="flex items-center justify-center h-full text-[#666666] text-[13px] text-center">
               <div>
-                <p className="mb-2">Click "Search for Covers" to find album artwork</p>
+                <p className="mb-2">Click &quot;Search for Covers&quot; to find album artwork</p>
                 <p className="text-[11px]">
                   Image search will retrieve covers from {searchSource === 'google' ? 'Google Images' : searchSource === 'discogs' ? 'Discogs' : 'Spotify'}
                 </p>

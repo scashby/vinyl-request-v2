@@ -1,7 +1,7 @@
 # PROJECT_STATUS.md
 # DWD Collection Management System - Collection Browser
 
-**Last Updated:** 2025-12-17 (All 8 Edit Modal Tabs Complete)
+**Last Updated:** 2025-12-17 (4 Tabs UI Complete, Pickers Wired, Upload Working)
 
 ---
 
@@ -11,25 +11,26 @@
 Phase 1: Visual Framework         ████████████████████ 100% ✅
 Phase 2.1: Data Connection        ████████████████████ 100% ✅
 Phase 2.2: Sorting & Columns      ████████████████████ 100% ✅ [SAFE ROLLBACK POINT]
-Phase 2.3: Edit Album Modal       ████████████████████ 100% ✅ ALL 8 TABS COMPLETE
+Phase 2.3: Edit Album Modal       ███████████████████░  95% 🔄 8 tabs UI done, 1 feature pending
 Phase 2.4: Detail Panel           ██████████░░░░░░░░░░  50% 🔄 IN PROGRESS
 Phase 3: Selection & Batch Ops    ░░░░░░░░░░░░░░░░░░░░   0%
 Phase 4: Advanced Features        ░░░░░░░░░░░░░░░░░░░░   0%
 ```
 
-**Current Focus:** Edit Album Modal complete with all 8 tabs - Ready for enrichment integrations
+**Current Focus:** Edit Album Modal - 8 tabs functional, crop/rotate needs external library
 
 ---
 
 ## 🔧 RECENT CHANGES (Last 7 Days)
 
-### 2025-12-17: All 8 Tabs Complete - Classical, People, Cover, Links ✅
-- **ClassicalTab**: Complete with 5 picker fields (Composer, Conductor, Chorus, Composition, Orchestra)
-- **PeopleTab**: Complete with Credits (Songwriters, Producers, Engineers) and Musicians sections
-- **CoverTab**: Complete with front/back cover display, upload, remove, crop/rotate buttons, and Find Online enrichment modal
-- **LinksTab**: Complete with drag-drop URL management and add/remove functionality
-- **FindCoverModal**: Created enrichment component (placeholder for Google/Discogs/Spotify image search)
-- **Result**: ALL 8 TABS NOW COMPLETE with proper Album type imports
+### 2025-12-17: Last 4 Tabs Complete + Fixes ✅
+- **ClassicalTab**: ✅ Fully wired with PickerModal (Composer, Conductor, Chorus, Composition, Orchestra)
+- **PeopleTab**: ✅ Fully wired with PickerModal (Songwriters, Producers, Engineers, Musicians)  
+- **CoverTab**: ✅ Upload/Remove working, Find Online working, **Crop/Rotate needs react-easy-crop**
+- **LinksTab**: ✅ Fully functional (add/remove/drag-drop, saves to album.extra as JSON)
+- **ESLint Fixes**: All `any` types removed, unused variables removed, quotes escaped
+- **TypeScript Fixes**: PickerModal uses `type` prop, supabase import path corrected
+- **Documentation**: CROP_ROTATE_IMPLEMENTATION.md created with implementation guide
 
 ### 2025-12-17: PersonalTab Complete - Component Reuse & Layout Finalized ✅
 - All 6 fixes applied from user feedback
@@ -46,18 +47,6 @@ Phase 4: Advanced Features        ░░░░░░░░░░░░░░░�
 - Edge cases handled (first/last album - buttons disabled when unavailable)
 - Persists edited changes when navigating between albums
 
-### 2025-12-16: Detail Panel Enhancement ✅
-- Added Details section (Release Date, Original Release Date, Conditions)
-- Added Personal section (Quantity, Index, Added/Modified dates)
-- Added Notes section displaying album.notes
-- All sections styled with blue headings matching CLZ layout
-
-### 2025-12-16: DetailsTab Dropdown Population Fix ✅
-- Fixed all 8 dropdowns to show available options
-- Packaging, Package/Sleeve Condition, Media Condition, Country, Sound, Vinyl Weight, SPARS, Box Set
-- Each dropdown now properly maps through data items
-- Picker buttons still functional for advanced management
-
 **See ARCHIVE.md for changes prior to 2025-12-16**
 
 ---
@@ -73,16 +62,63 @@ Connected to Supabase with batch loading, real album display, format counts, and
 ### Phase 2.2: Sorting & Columns (🎯 SAFE ROLLBACK POINT)
 24 sort options, column selector with drag-drop, 14 column groups with 80+ available columns, localStorage persistence, virtual scrolling.
 
-### Phase 2.3: Edit Album Modal (🎉 COMPLETE)
-**All 8 tabs now complete:**
-- ✅ **MainTab** - All pickers functional (Label, Format, Genre, Location, Artist, Date pickers, Auto-cap)
-- ✅ **DetailsTab** - All fields functional with pre-populated lists and multi-select vinyl colors
-- ✅ **ClassicalTab** - COMPLETE (5 picker fields: Composer, Conductor, Chorus, Composition, Orchestra)
-- ✅ **PeopleTab** - COMPLETE (Credits: Songwriters, Producers, Engineers; Musicians section)
-- ✅ **TracksTab** - Built with Discogs/Spotify import, multi-disc support, track management
-- ✅ **PersonalTab** - COMPLETE (purchase info, ratings, tags, notes, play history)
-- ✅ **CoverTab** - COMPLETE (front/back covers, upload, remove, crop/rotate, Find Online enrichment)
-- ✅ **LinksTab** - COMPLETE (drag-drop URL management, add/remove links)
+---
+
+## 📋 PHASE 2.3: EDIT ALBUM MODAL (95% Complete)
+
+**Status of all 8 tabs:**
+
+| Tab | Status | Notes |
+|-----|--------|-------|
+| Main | ✅ 100% | All pickers wired, date pickers, auto-cap working |
+| Details | ✅ 100% | All dropdowns populated, pickers functional |
+| Classical | ✅ 100% | PickerModal wired for all 5 fields |
+| People | ✅ 100% | PickerModal wired for all 4 field types |
+| Tracks | ✅ 100% | Discogs/Spotify import working |
+| Personal | ✅ 100% | All features functional |
+| Cover | ✅ 90% | Upload/Remove/Find Online working, **Crop/Rotate needs react-easy-crop library** |
+| Links | ✅ 100% | Drag-drop working, saves to album.extra |
+
+### What Actually Works:
+
+**ClassicalTab** (100%):
+- ✅ Opens PickerModal when clicking picker buttons
+- ✅ Selects from database using existing picker infrastructure
+- ✅ Clear buttons work
+- ✅ All 5 fields: Composer, Conductor, Chorus, Composition, Orchestra
+
+**PeopleTab** (100%):
+- ✅ Opens PickerModal for adding people
+- ✅ Multi-value lists with remove buttons
+- ✅ All 4 field types: Songwriters, Producers, Engineers, Musicians
+
+**CoverTab** (90%):
+- ✅ **Upload**: Uploads to Supabase Storage (`album-images` bucket), updates database
+- ✅ **Remove**: Deletes from storage and clears URL from database
+- ✅ **Find Online**: Opens Google Images search in new tab (practical solution, works immediately)
+- 🔴 **Crop/Rotate**: Shows alert with library recommendation - needs `react-easy-crop` to implement
+  - See `/CROP_ROTATE_IMPLEMENTATION.md` for full implementation guide
+
+**LinksTab** (100%):
+- ✅ Add/remove links works
+- ✅ Drag-drop reordering works
+- ✅ Saves to `album.extra` as JSON string
+- ✅ Properly typed, no ESLint errors
+
+### Required Setup:
+
+**Supabase Storage Bucket** (for uploads):
+```sql
+-- Create in Supabase Dashboard or run this SQL:
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('album-images', 'album-images', true);
+```
+
+**Optional Enhancement** (for crop/rotate):
+```bash
+npm install react-easy-crop
+```
+Then follow instructions in `/CROP_ROTATE_IMPLEMENTATION.md`
 
 ---
 
@@ -144,18 +180,16 @@ Connected to Supabase with batch loading, real album display, format counts, and
 ## 📋 PHASE 5: ENRICHMENT FEATURES
 
 ### Edit Album Modal - Enrichment Integration
-**Now that all 8 tabs are complete, enrichment is next priority:**
+**What's Already Working:**
+- ✅ TracksTab - Discogs/Spotify track import
+- ✅ CoverTab - Google Images search (opens in new tab)
+- ✅ CoverTab - File upload to Supabase Storage
 
-1. **MainTab** - Spotify/Apple Music/Discogs metadata fetch
-2. **TracksTab** - Discogs/Spotify track import (✅ Already working!)
-3. **CoverTab** - Image search from Google/Discogs/Spotify (FindCoverModal placeholder ready)
-4. **LinksTab** - Auto-populate from external services
-
-### Enrichment Components Needed:
-- [ ] SpotifyEnrich.tsx - Spotify API integration
-- [ ] AppleEnrich.tsx - Apple Music API integration
-- [ ] DiscogsEnrich.tsx - Discogs API integration
-- [x] FindCoverModal.tsx - ✅ Created (placeholder for image search)
+**What's Pending:**
+- [ ] MainTab - Spotify/Apple Music/Discogs metadata fetch
+- [ ] CoverTab - Automated image search with in-app results (vs. opening Google)
+- [ ] CoverTab - Crop/Rotate modal (needs react-easy-crop library)
+- [ ] LinksTab - Auto-populate from external services
 
 ---
 
@@ -165,47 +199,32 @@ Connected to Supabase with batch loading, real album display, format counts, and
 - **Main:** `src/app/edit-collection/page.tsx` (~1200 lines)
 - **Column Defs:** `columnDefinitions.ts` (80+ columns, 14 groups)
 - **Components:** CollectionTable, ColumnSelector, EditAlbumModal
-- **Tabs:** 8 complete tab components (Main, Details, Classical, People, Tracks, Personal, Cover, Links)
+- **Tabs:** 8 tab components (Main, Details, Classical, People, Tracks, Personal, Cover, Links)
 - **Pickers:** PickerModal, ManageModal, EditModal, MergeModal
-- **Enrichment:** FindCoverModal (placeholder)
 - **Settings:** SettingsModal, AutoCapSettings, AutoCapExceptions
 - **Data Utils:** pickerDataUtils.ts (Supabase integration with all picker functions)
-
-### Tab Status Summary:
-| Tab | Status | Notes |
-|-----|--------|-------|
-| Main | ✅ Complete | All pickers wired, date pickers, auto-cap |
-| Details | ✅ Complete | All dropdowns populated, pickers functional |
-| Classical | ✅ Complete | 5 picker fields (Composer, Conductor, etc.) |
-| People | ✅ Complete | Credits + Musicians sections |
-| Tracks | ✅ Complete | Import from Discogs/Spotify working |
-| Personal | ✅ Complete | Purchase, ratings, tags, play history |
-| Cover | ✅ Complete | Upload, remove, crop/rotate, Find Online modal |
-| Links | ✅ Complete | Drag-drop URL management |
 
 ### Known Limitations
 - Selection checkboxes not functional yet (Phase 3.1)
 - Some table columns show placeholders
 - Collection tabs not implemented (Phase 5)
-- Enrichment features are placeholders (need API integrations)
+- Crop/Rotate needs external library (`react-easy-crop`)
 
 ---
 
 ## 🎯 IMMEDIATE NEXT STEPS
 
-**Priority 1: Enrichment Integration (Phase 5)**
-Now that all tabs are complete, focus on enrichment:
-1. Implement Google Images API for cover search
-2. Wire up Discogs API for metadata/cover search
-3. Wire up Spotify API for metadata/cover fetch
-4. Implement file upload for covers (with storage)
-5. Implement crop/rotate functionality
+**Priority 1: Crop/Rotate Feature (Optional)**
+If you want to implement crop/rotate:
+1. Run: `npm install react-easy-crop`
+2. Follow guide in `/CROP_ROTATE_IMPLEMENTATION.md`
+3. Create CropRotateModal.tsx component
 
-**Priority 2: Picker Wiring (Phase 2.3 Polish)**
-Wire up remaining placeholder pickers in Classical/People tabs:
-1. Wire Composer, Conductor, Chorus, Composition, Orchestra pickers
-2. Wire Songwriter, Producer, Engineer, Musician pickers
-3. Add picker functions to pickerDataUtils.ts (already added to file)
+**Priority 2: Automated Cover Search (Optional Enhancement)**
+Replace "Find Online" with in-app search results:
+1. Implement Google Custom Search API
+2. Add Discogs API integration
+3. Add Spotify API integration
 
 **Priority 3: Selection System (Phase 3)**
 1. Implement checkbox functionality

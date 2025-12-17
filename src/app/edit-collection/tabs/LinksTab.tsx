@@ -12,11 +12,11 @@ interface Link {
 
 interface LinksTabProps {
   album: Album;
-  onChange: (field: keyof Album, value: Link[]) => void;
+  onChange: <K extends keyof Album>(field: K, value: Album[K]) => void;
 }
 
 export default function LinksTab({ album, onChange }: LinksTabProps) {
-  // Parse links from album (might be stored as JSON string or array)
+  // Parse links from album.extra (stored as JSON string)
   const [links, setLinks] = useState<Link[]>(() => {
     if (!album.extra) return [];
     try {
@@ -31,6 +31,13 @@ export default function LinksTab({ album, onChange }: LinksTabProps) {
   const [showAddLinkModal, setShowAddLinkModal] = useState(false);
   const [newLinkUrl, setNewLinkUrl] = useState('');
   const [newLinkDescription, setNewLinkDescription] = useState('');
+
+  const updateLinks = (newLinks: Link[]) => {
+    setLinks(newLinks);
+    // Store as JSON string in extra field - properly typed
+    const jsonString = newLinks.length > 0 ? JSON.stringify(newLinks) : null;
+    onChange('extra', jsonString as Album['extra']);
+  };
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, index: number) => {
     setDraggedIndex(index);
@@ -54,15 +61,13 @@ export default function LinksTab({ album, onChange }: LinksTabProps) {
     const [removed] = newLinks.splice(draggedIndex, 1);
     newLinks.splice(dropIndex, 0, removed);
     
-    setLinks(newLinks);
-    onChange('extra' as keyof Album, newLinks as any);
+    updateLinks(newLinks);
     setDraggedIndex(null);
   };
 
   const handleRemoveLink = (index: number) => {
     const newLinks = links.filter((_, i) => i !== index);
-    setLinks(newLinks);
-    onChange('extra' as keyof Album, newLinks as any);
+    updateLinks(newLinks);
   };
 
   const handleAddLink = () => {
@@ -75,8 +80,7 @@ export default function LinksTab({ album, onChange }: LinksTabProps) {
     };
 
     const newLinks = [...links, newLink];
-    setLinks(newLinks);
-    onChange('extra' as keyof Album, newLinks as any);
+    updateLinks(newLinks);
     
     setNewLinkUrl('');
     setNewLinkDescription('');
