@@ -2,7 +2,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import Image from 'next/image';
 import type { Album } from 'types/album';
 import { supabase } from 'lib/supabaseClient';
 import { CropRotateModal } from '../enrichment/CropRotateModal';
@@ -121,46 +120,97 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
     const isUploading = uploading === coverType;
 
     return (
-      <div className="space-y-3">
-        <h3 className="text-[13px] font-semibold text-[#e8e6e3]">{title}</h3>
+      <div>
+        <h3 style={{
+          fontSize: '14px',
+          fontWeight: '600',
+          color: '#6b7280',
+          marginBottom: '12px',
+          marginTop: '0',
+          fontFamily: 'system-ui, -apple-system, sans-serif',
+        }}>
+          {title}
+        </h3>
         
         {/* Image Display Area */}
-        <div className="w-[300px] h-[300px] bg-[#1a1a1a] border border-[#555555] rounded flex items-center justify-center relative overflow-hidden">
+        <div style={{
+          width: '300px',
+          height: '300px',
+          border: '1px solid #d1d5db',
+          borderRadius: '4px',
+          marginBottom: '12px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: '#f9fafb',
+          overflow: 'hidden',
+          position: 'relative',
+        }}>
           {isUploading ? (
-            <div className="text-[#e8e6e3] text-[13px] text-center">
-              <div className="mb-2">Uploading...</div>
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#e8e6e3] mx-auto"></div>
+            <div style={{ color: '#6b7280', fontSize: '13px', textAlign: 'center' }}>
+              <div style={{ marginBottom: '8px' }}>Uploading...</div>
+              <div style={{
+                width: '32px',
+                height: '32px',
+                border: '2px solid #e5e7eb',
+                borderTopColor: '#6b7280',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite',
+                margin: '0 auto',
+              }}></div>
             </div>
           ) : imageUrl ? (
-            <Image 
+            <img 
               src={imageUrl} 
               alt={`${title} artwork`}
-              fill
-              className="object-contain"
-              unoptimized
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'contain',
+              }}
             />
           ) : (
-            <div className="text-[#666666] text-[13px] text-center">
+            <div style={{ color: '#9ca3af', fontSize: '13px', textAlign: 'center' }}>
               No {coverType} cover
             </div>
           )}
         </div>
 
         {/* Action Buttons */}
-        <div className="flex gap-2">
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           <button
             type="button"
-            className="h-[26px] px-3 bg-[#3a3a3a] hover:bg-[#444444] text-[#e8e6e3] text-[12px] border border-[#555555] rounded transition-colors disabled:opacity-50"
             onClick={handleFindOnline}
             disabled={isUploading}
+            style={{
+              padding: '6px 12px',
+              background: '#f3f4f6',
+              border: '1px solid #d1d5db',
+              borderRadius: '4px',
+              fontSize: '13px',
+              cursor: isUploading ? 'not-allowed' : 'pointer',
+              color: '#374151',
+              fontFamily: 'system-ui, -apple-system, sans-serif',
+              opacity: isUploading ? 0.5 : 1,
+            }}
           >
             Find Online
           </button>
           <button
             type="button"
-            className="h-[26px] px-3 bg-[#3a3a3a] hover:bg-[#444444] text-[#e8e6e3] text-[12px] border border-[#555555] rounded transition-colors disabled:opacity-50"
             onClick={() => handleUpload(coverType)}
             disabled={isUploading}
+            style={{
+              padding: '6px 12px',
+              background: '#f3f4f6',
+              border: '1px solid #d1d5db',
+              borderRadius: '4px',
+              fontSize: '13px',
+              cursor: isUploading ? 'not-allowed' : 'pointer',
+              color: '#374151',
+              fontFamily: 'system-ui, -apple-system, sans-serif',
+              opacity: isUploading ? 0.5 : 1,
+            }}
           >
             Upload
           </button>
@@ -168,17 +218,37 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
             <>
               <button
                 type="button"
-                className="h-[26px] px-3 bg-[#3a3a3a] hover:bg-[#444444] text-[#e8e6e3] text-[12px] border border-[#555555] rounded transition-colors disabled:opacity-50"
                 onClick={() => handleRemove(coverType)}
                 disabled={isUploading}
+                style={{
+                  padding: '6px 12px',
+                  background: '#f3f4f6',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '4px',
+                  fontSize: '13px',
+                  cursor: isUploading ? 'not-allowed' : 'pointer',
+                  color: '#374151',
+                  fontFamily: 'system-ui, -apple-system, sans-serif',
+                  opacity: isUploading ? 0.5 : 1,
+                }}
               >
                 Remove
               </button>
               <button
                 type="button"
-                className="h-[26px] px-3 bg-[#3a3a3a] hover:bg-[#444444] text-[#e8e6e3] text-[12px] border border-[#555555] rounded transition-colors disabled:opacity-50"
                 onClick={() => handleCropRotate(coverType)}
                 disabled={isUploading}
+                style={{
+                  padding: '6px 12px',
+                  background: '#f3f4f6',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '4px',
+                  fontSize: '13px',
+                  cursor: isUploading ? 'not-allowed' : 'pointer',
+                  color: '#374151',
+                  fontFamily: 'system-ui, -apple-system, sans-serif',
+                  opacity: isUploading ? 0.5 : 1,
+                }}
               >
                 Crop/Rotate
               </button>
@@ -190,8 +260,13 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto">
-      <div className="p-6 space-y-8">
+    <div style={{ padding: '20px' }}>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gap: '40px',
+        maxWidth: '900px',
+      }}>
         {/* Front Cover */}
         {renderCoverSection('Front Cover', 'front', album.image_url)}
         

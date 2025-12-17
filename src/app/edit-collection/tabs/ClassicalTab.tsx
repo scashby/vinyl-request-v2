@@ -97,33 +97,57 @@ export function ClassicalTab({ album, onChange }: ClassicalTabProps) {
     const value = album[field];
     
     return (
-      <div className="flex items-center gap-3">
-        <label className="text-[13px] text-[#e8e6e3] w-[120px] text-right flex-shrink-0">
-          {label}:
-        </label>
-        <div className="flex-1 flex items-center gap-2">
-          <button
-            type="button"
-            className="h-[26px] px-3 bg-[#3a3a3a] hover:bg-[#444444] text-[#e8e6e3] text-[13px] border border-[#555555] rounded flex items-center justify-between min-w-[200px] transition-colors"
+      <div style={{ marginBottom: '16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+          <label style={{
+            fontSize: '13px',
+            fontWeight: '600',
+            color: '#6b7280',
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+          }}>
+            {label}
+          </label>
+          <span 
             onClick={() => handleOpenPicker(field)}
+            style={{ 
+              color: '#9ca3af',
+              fontSize: '20px', 
+              fontWeight: '300',
+              cursor: 'pointer',
+              userSelect: 'none',
+            }}
           >
-            <span className={value ? 'text-[#e8e6e3]' : 'text-[#999999]'}>
-              {value || 'Select...'}
-            </span>
-            <svg className="w-3 h-3 ml-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-            </svg>
-          </button>
+            +
+          </span>
+        </div>
+        <div style={{ 
+          flex: 1,
+          padding: '8px 10px',
+          border: '1px solid #d1d5db',
+          borderRadius: '4px',
+          fontSize: '14px',
+          backgroundColor: 'white',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          color: '#111827',
+        }}>
+          <span>{value || 'Select...'}</span>
           {value && (
             <button
-              type="button"
-              className="h-[26px] w-[26px] bg-[#3a3a3a] hover:bg-[#444444] text-[#e8e6e3] border border-[#555555] rounded flex items-center justify-center transition-colors"
               onClick={() => onChange(field, '' as Album[ClassicalField])}
-              title={`Clear ${label.toLowerCase()}`}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#9ca3af',
+                cursor: 'pointer',
+                padding: 0,
+                fontSize: '18px',
+                lineHeight: '1',
+                fontWeight: '300',
+              }}
             >
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              ×
             </button>
           )}
         </div>
@@ -134,13 +158,25 @@ export function ClassicalTab({ album, onChange }: ClassicalTabProps) {
   const fieldConfig = getFieldConfig();
 
   return (
-    <div className="flex-1 overflow-y-auto">
-      <div className="p-6 space-y-6">
-        {renderField('Composer', 'composer')}
-        {renderField('Conductor', 'conductor')}
-        {renderField('Chorus', 'chorus')}
-        {renderField('Composition', 'composition')}
-        {renderField('Orchestra', 'orchestra')}
+    <div style={{ padding: '20px' }}>
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: '1fr 1fr',
+        gap: '40px',
+        maxWidth: '900px'
+      }}>
+        {/* LEFT COLUMN */}
+        <div>
+          {renderField('Composer', 'composer')}
+          {renderField('Conductor', 'conductor')}
+          {renderField('Chorus', 'chorus')}
+        </div>
+
+        {/* RIGHT COLUMN */}
+        <div>
+          {renderField('Composition', 'composition')}
+          {renderField('Orchestra', 'orchestra')}
+        </div>
       </div>
 
       {/* Universal Picker */}
