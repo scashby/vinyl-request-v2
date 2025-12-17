@@ -1,24 +1,24 @@
-// src/app/edit-collection/components/PeopleTab.tsx
+// src/app/edit-collection/tabs/PeopleTab.tsx
 'use client';
 
 import React from 'react';
-import { AlbumData } from '@/types/collection';
+import type { Album } from 'types/album';
 
 interface PeopleTabProps {
-  albumData: AlbumData;
-  onFieldChange: (field: keyof AlbumData, value: string[] | string) => void;
+  album: Album;
+  onChange: (field: keyof Album, value: string[]) => void;
 }
 
-export default function PeopleTab({ albumData, onFieldChange }: PeopleTabProps) {
-  const handleRemoveItem = (field: keyof AlbumData, index: number) => {
-    const currentArray = (albumData[field] as string[]) || [];
+export default function PeopleTab({ album, onChange }: PeopleTabProps) {
+  const handleRemoveItem = (field: keyof Album, index: number) => {
+    const currentArray = (album[field] as string[]) || [];
     const newArray = currentArray.filter((_, i) => i !== index);
-    onFieldChange(field, newArray);
+    onChange(field, newArray);
   };
 
   const renderMultiValueField = (
     label: string,
-    field: keyof AlbumData,
+    field: keyof Album,
     values: string[] | undefined
   ) => {
     return (
@@ -75,9 +75,9 @@ export default function PeopleTab({ albumData, onFieldChange }: PeopleTabProps) 
             Credits
           </h3>
           <div className="space-y-6">
-            {renderMultiValueField('Songwriter', 'songwriters', albumData.songwriters as string[])}
-            {renderMultiValueField('Producer', 'producers', albumData.producers as string[])}
-            {renderMultiValueField('Engineer', 'engineers', albumData.engineers as string[])}
+            {renderMultiValueField('Songwriter', 'songwriters', album.songwriters as string[])}
+            {renderMultiValueField('Producer', 'producers', album.producers as string[])}
+            {renderMultiValueField('Engineer', 'engineers', album.engineers as string[])}
           </div>
         </div>
 
@@ -87,7 +87,7 @@ export default function PeopleTab({ albumData, onFieldChange }: PeopleTabProps) 
             Musicians
           </h3>
           <div className="space-y-6">
-            {renderMultiValueField('Musician', 'musicians', albumData.musicians as string[])}
+            {renderMultiValueField('Musician', 'musicians', album.musicians as string[])}
           </div>
         </div>
       </div>

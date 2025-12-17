@@ -1,8 +1,8 @@
-// src/app/edit-collection/components/LinksTab.tsx
+// src/app/edit-collection/tabs/LinksTab.tsx
 'use client';
 
 import React, { useState } from 'react';
-import { AlbumData } from 'types/';
+import type { Album } from 'types/album';
 
 interface Link {
   id: string;
@@ -11,14 +11,22 @@ interface Link {
 }
 
 interface LinksTabProps {
-  albumData: AlbumData;
-  onFieldChange: (field: keyof AlbumData, value: Link[]) => void;
+  album: Album;
+  onChange: (field: keyof Album, value: Link[]) => void;
 }
 
-export default function LinksTab({ albumData, onFieldChange }: LinksTabProps) {
-  const [links, setLinks] = useState<Link[]>(
-    (albumData.links as Link[]) || []
-  );
+export default function LinksTab({ album, onChange }: LinksTabProps) {
+  // Parse links from album (might be stored as JSON string or array)
+  const [links, setLinks] = useState<Link[]>(() => {
+    if (!album.extra) return [];
+    try {
+      const parsed = JSON.parse(album.extra);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  });
+  
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [showAddLinkModal, setShowAddLinkModal] = useState(false);
   const [newLinkUrl, setNewLinkUrl] = useState('');
@@ -47,14 +55,14 @@ export default function LinksTab({ albumData, onFieldChange }: LinksTabProps) {
     newLinks.splice(dropIndex, 0, removed);
     
     setLinks(newLinks);
-    onFieldChange('links' as keyof AlbumData, newLinks);
+    onChange('extra' as keyof Album, newLinks as any);
     setDraggedIndex(null);
   };
 
   const handleRemoveLink = (index: number) => {
     const newLinks = links.filter((_, i) => i !== index);
     setLinks(newLinks);
-    onFieldChange('links' as keyof AlbumData, newLinks);
+    onChange('extra' as keyof Album, newLinks as any);
   };
 
   const handleAddLink = () => {
@@ -68,7 +76,7 @@ export default function LinksTab({ albumData, onFieldChange }: LinksTabProps) {
 
     const newLinks = [...links, newLink];
     setLinks(newLinks);
-    onFieldChange('links' as keyof AlbumData, newLinks);
+    onChange('extra' as keyof Album, newLinks as any);
     
     setNewLinkUrl('');
     setNewLinkDescription('');

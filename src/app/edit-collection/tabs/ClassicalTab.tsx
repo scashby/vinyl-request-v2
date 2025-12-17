@@ -1,15 +1,15 @@
-// src/app/edit-collection/components/ClassicalTab.tsx
+// src/app/edit-collection/tabs/ClassicalTab.tsx
 'use client';
 
 import React from 'react';
-import { AlbumData } from '@/types/collection';
+import type { Album } from 'types/album';
 
 interface ClassicalTabProps {
-  albumData: AlbumData;
-  onFieldChange: (field: keyof AlbumData, value: string) => void;
+  album: Album;
+  onChange: (field: keyof Album, value: string) => void;
 }
 
-export default function ClassicalTab({ albumData, onFieldChange }: ClassicalTabProps) {
+export default function ClassicalTab({ album, onChange }: ClassicalTabProps) {
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="p-6 space-y-6">
@@ -28,17 +28,17 @@ export default function ClassicalTab({ albumData, onFieldChange }: ClassicalTabP
               }}
             >
               <span className="text-[#999999]">
-                {albumData.composer || 'Select...'}
+                {album.composer || 'Select...'}
               </span>
               <svg className="w-3 h-3 ml-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
               </svg>
             </button>
-            {albumData.composer && (
+            {album.composer && (
               <button
                 type="button"
                 className="h-[26px] w-[26px] bg-[#3a3a3a] hover:bg-[#444444] text-[#e8e6e3] border border-[#555555] rounded flex items-center justify-center transition-colors"
-                onClick={() => onFieldChange('composer', '')}
+                onClick={() => onChange('composer', '')}
                 title="Clear composer"
               >
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -64,17 +64,17 @@ export default function ClassicalTab({ albumData, onFieldChange }: ClassicalTabP
               }}
             >
               <span className="text-[#999999]">
-                {albumData.conductor || 'Select...'}
+                {album.conductor || 'Select...'}
               </span>
               <svg className="w-3 h-3 ml-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
               </svg>
             </button>
-            {albumData.conductor && (
+            {album.conductor && (
               <button
                 type="button"
                 className="h-[26px] w-[26px] bg-[#3a3a3a] hover:bg-[#444444] text-[#e8e6e3] border border-[#555555] rounded flex items-center justify-center transition-colors"
-                onClick={() => onFieldChange('conductor', '')}
+                onClick={() => onChange('conductor', '')}
                 title="Clear conductor"
               >
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -100,17 +100,17 @@ export default function ClassicalTab({ albumData, onFieldChange }: ClassicalTabP
               }}
             >
               <span className="text-[#999999]">
-                {albumData.chorus || 'Select...'}
+                {album.chorus || 'Select...'}
               </span>
               <svg className="w-3 h-3 ml-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
               </svg>
             </button>
-            {albumData.chorus && (
+            {album.chorus && (
               <button
                 type="button"
                 className="h-[26px] w-[26px] bg-[#3a3a3a] hover:bg-[#444444] text-[#e8e6e3] border border-[#555555] rounded flex items-center justify-center transition-colors"
-                onClick={() => onFieldChange('chorus', '')}
+                onClick={() => onChange('chorus', '')}
                 title="Clear chorus"
               >
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -136,17 +136,17 @@ export default function ClassicalTab({ albumData, onFieldChange }: ClassicalTabP
               }}
             >
               <span className="text-[#999999]">
-                {albumData.composition || 'Select...'}
+                {album.composition || 'Select...'}
               </span>
               <svg className="w-3 h-3 ml-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
               </svg>
             </button>
-            {albumData.composition && (
+            {album.composition && (
               <button
                 type="button"
                 className="h-[26px] w-[26px] bg-[#3a3a3a] hover:bg-[#444444] text-[#e8e6e3] border border-[#555555] rounded flex items-center justify-center transition-colors"
-                onClick={() => onFieldChange('composition', '')}
+                onClick={() => onChange('composition', '')}
                 title="Clear composition"
               >
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -172,17 +172,17 @@ export default function ClassicalTab({ albumData, onFieldChange }: ClassicalTabP
               }}
             >
               <span className="text-[#999999]">
-                {albumData.orchestra || 'Select...'}
+                {album.orchestra || 'Select...'}
               </span>
               <svg className="w-3 h-3 ml-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
               </svg>
             </button>
-            {albumData.orchestra && (
+            {album.orchestra && (
               <button
                 type="button"
                 className="h-[26px] w-[26px] bg-[#3a3a3a] hover:bg-[#444444] text-[#e8e6e3] border border-[#555555] rounded flex items-center justify-center transition-colors"
-                onClick={() => onFieldChange('orchestra', '')}
+                onClick={() => onChange('orchestra', '')}
                 title="Clear orchestra"
               >
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
