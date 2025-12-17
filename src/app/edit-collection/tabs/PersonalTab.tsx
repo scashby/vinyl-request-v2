@@ -200,7 +200,7 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
 
   return (
     <>
-      <div style={{ maxWidth: '800px' }}>
+      <div style={{ maxWidth: '900px' }}>
         {/* Purchase Date */}
         <div style={{ marginBottom: '16px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
