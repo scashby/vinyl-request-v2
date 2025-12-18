@@ -28,6 +28,7 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
   const [showFindCover, setShowFindCover] = useState(false);
   const [findCoverType, setFindCoverType] = useState<'front' | 'back'>('front');
   const [cropState, setCropState] = useState<CropState>({ x: 0, y: 0, width: 100, height: 100 });
+  const [imageBounds, setImageBounds] = useState<{ x: number; y: number; width: number; height: number }>({ x: 0, y: 0, width: 100, height: 100 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragHandle, setDragHandle] = useState<DragHandle | null>(null);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
@@ -113,12 +114,35 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
   const handleCropRotate = (coverType: 'front' | 'back') => {
     setCropMode(coverType);
     setRotation(0);
-    setCropState({ x: 0, y: 0, width: 100, height: 100 });
+    
+    // Calculate actual image bounds within container
+    if (imageRef.current) {
+      const container = imageRef.current;
+      const img = container.querySelector('img');
+      
+      if (img) {
+        const containerRect = container.getBoundingClientRect();
+        const imgRect = img.getBoundingClientRect();
+        
+        // Calculate image position and size as percentage of container
+        const x = ((imgRect.left - containerRect.left) / containerRect.width) * 100;
+        const y = ((imgRect.top - containerRect.top) / containerRect.height) * 100;
+        const width = (imgRect.width / containerRect.width) * 100;
+        const height = (imgRect.height / containerRect.height) * 100;
+        
+        setImageBounds({ x, y, width, height });
+        setCropState({ x, y, width, height });
+      } else {
+        // Fallback if no image
+        setImageBounds({ x: 0, y: 0, width: 100, height: 100 });
+        setCropState({ x: 0, y: 0, width: 100, height: 100 });
+      }
+    }
   };
 
   const handleCropReset = () => {
     setRotation(0);
-    setCropState({ x: 0, y: 0, width: 100, height: 100 });
+    setCropState({ ...imageBounds });
   };
 
   const handleCropRotateImage = () => {
@@ -161,47 +185,47 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
     
     switch (dragHandle) {
       case 'nw':
-        newCrop.x = Math.max(0, Math.min(cropStart.x + dx, cropStart.x + cropStart.width - 10));
-        newCrop.y = Math.max(0, Math.min(cropStart.y + dy, cropStart.y + cropStart.height - 10));
+        newCrop.x = Math.max(imageBounds.x, Math.min(cropStart.x + dx, cropStart.x + cropStart.width - 10));
+        newCrop.y = Math.max(imageBounds.y, Math.min(cropStart.y + dy, cropStart.y + cropStart.height - 10));
         newCrop.width = cropStart.width - (newCrop.x - cropStart.x);
         newCrop.height = cropStart.height - (newCrop.y - cropStart.y);
         break;
       case 'ne':
-        newCrop.y = Math.max(0, Math.min(cropStart.y + dy, cropStart.y + cropStart.height - 10));
-        newCrop.width = Math.max(10, Math.min(cropStart.width + dx, 100 - cropStart.x));
+        newCrop.y = Math.max(imageBounds.y, Math.min(cropStart.y + dy, cropStart.y + cropStart.height - 10));
+        newCrop.width = Math.max(10, Math.min(cropStart.width + dx, imageBounds.x + imageBounds.width - cropStart.x));
         newCrop.height = cropStart.height - (newCrop.y - cropStart.y);
         break;
       case 'sw':
-        newCrop.x = Math.max(0, Math.min(cropStart.x + dx, cropStart.x + cropStart.width - 10));
+        newCrop.x = Math.max(imageBounds.x, Math.min(cropStart.x + dx, cropStart.x + cropStart.width - 10));
         newCrop.width = cropStart.width - (newCrop.x - cropStart.x);
-        newCrop.height = Math.max(10, Math.min(cropStart.height + dy, 100 - cropStart.y));
+        newCrop.height = Math.max(10, Math.min(cropStart.height + dy, imageBounds.y + imageBounds.height - cropStart.y));
         break;
       case 'se':
-        newCrop.width = Math.max(10, Math.min(cropStart.width + dx, 100 - cropStart.x));
-        newCrop.height = Math.max(10, Math.min(cropStart.height + dy, 100 - cropStart.y));
+        newCrop.width = Math.max(10, Math.min(cropStart.width + dx, imageBounds.x + imageBounds.width - cropStart.x));
+        newCrop.height = Math.max(10, Math.min(cropStart.height + dy, imageBounds.y + imageBounds.height - cropStart.y));
         break;
       case 'n':
-        newCrop.y = Math.max(0, Math.min(cropStart.y + dy, cropStart.y + cropStart.height - 10));
+        newCrop.y = Math.max(imageBounds.y, Math.min(cropStart.y + dy, cropStart.y + cropStart.height - 10));
         newCrop.height = cropStart.height - (newCrop.y - cropStart.y);
         break;
       case 's':
-        newCrop.height = Math.max(10, Math.min(cropStart.height + dy, 100 - cropStart.y));
+        newCrop.height = Math.max(10, Math.min(cropStart.height + dy, imageBounds.y + imageBounds.height - cropStart.y));
         break;
       case 'e':
-        newCrop.width = Math.max(10, Math.min(cropStart.width + dx, 100 - cropStart.x));
+        newCrop.width = Math.max(10, Math.min(cropStart.width + dx, imageBounds.x + imageBounds.width - cropStart.x));
         break;
       case 'w':
-        newCrop.x = Math.max(0, Math.min(cropStart.x + dx, cropStart.x + cropStart.width - 10));
+        newCrop.x = Math.max(imageBounds.x, Math.min(cropStart.x + dx, cropStart.x + cropStart.width - 10));
         newCrop.width = cropStart.width - (newCrop.x - cropStart.x);
         break;
       case 'move':
-        newCrop.x = Math.max(0, Math.min(cropStart.x + dx, 100 - cropStart.width));
-        newCrop.y = Math.max(0, Math.min(cropStart.y + dy, 100 - cropStart.height));
+        newCrop.x = Math.max(imageBounds.x, Math.min(cropStart.x + dx, imageBounds.x + imageBounds.width - cropStart.width));
+        newCrop.y = Math.max(imageBounds.y, Math.min(cropStart.y + dy, imageBounds.y + imageBounds.height - cropStart.height));
         break;
     }
     
     setCropState(newCrop);
-  }, [isDragging, dragHandle, dragStart, cropStart]);
+  }, [isDragging, dragHandle, dragStart, cropStart, imageBounds]);
 
   const handleMouseUp = useCallback(() => {
     setIsDragging(false);
