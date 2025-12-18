@@ -9,38 +9,47 @@ interface FindCoverModalProps {
   onClose: () => void;
   onSelectImage: (imageUrl: string) => void;
   defaultQuery: string;
+  artist?: string;
+  title?: string;
+  barcode?: string;
+  coverType?: 'front' | 'back';
 }
 
 interface ImageResult {
   url: string;
   width: number;
   height: number;
-  source: 'spotify' | 'lastfm' | 'musicbrainz';
+  source: 'discogs' | 'google' | 'lastfm';
+  type?: 'front' | 'back';
 }
 
-export function FindCoverModal({ isOpen, onClose, onSelectImage, defaultQuery }: FindCoverModalProps) {
+export function FindCoverModal({ 
+  isOpen, 
+  onClose, 
+  onSelectImage, 
+  defaultQuery,
+  artist,
+  title,
+  barcode,
+  coverType = 'front'
+}: FindCoverModalProps) {
   const [searchQuery, setSearchQuery] = useState(defaultQuery);
-  const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
   const [searchResults, setSearchResults] = useState<ImageResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  
-  // Extract filter options from query
-  const availableFilters = defaultQuery.split(' ').filter(term => term.length > 3).slice(0, 3);
 
-  const performSearch = useCallback(async (query: string, filters: string[]) => {
+  const performSearch = useCallback(async () => {
     setIsSearching(true);
     
     try {
-      // Build search query with filters
-      let finalQuery = query;
-      if (filters.length > 0) {
-        finalQuery = `${query} ${filters.join(' ')}`;
-      }
+      // Build URL with specific parameters
+      const params = new URLSearchParams();
+      if (barcode) params.append('barcode', barcode);
+      if (artist) params.append('artist', artist);
+      if (title) params.append('title', title);
+      params.append('type', coverType);
+      params.append('q', searchQuery);
 
-      // Call our API route that uses Spotify, Last.fm, and MusicBrainz
-      const response = await fetch(
-        `/api/search-covers?q=${encodeURIComponent(finalQuery)}`
-      );
+      const response = await fetch(`/api/search-covers?${params.toString()}`);
 
       if (!response.ok) {
         throw new Error('Search failed');
@@ -54,26 +63,17 @@ export function FindCoverModal({ isOpen, onClose, onSelectImage, defaultQuery }:
     } finally {
       setIsSearching(false);
     }
-  }, []);
+  }, [searchQuery, barcode, artist, title, coverType]);
 
   // Pre-search on mount
   useEffect(() => {
     if (isOpen) {
-      performSearch(defaultQuery, selectedFilters);
+      performSearch();
     }
-  }, [isOpen, defaultQuery, selectedFilters, performSearch]);
+  }, [isOpen, performSearch]);
 
   const handleSearch = () => {
-    performSearch(searchQuery, selectedFilters);
-  };
-
-  const toggleFilter = (filter: string) => {
-    setSelectedFilters(prev => {
-      const newFilters = prev.includes(filter) 
-        ? prev.filter(f => f !== filter)
-        : [...prev, filter];
-      return newFilters;
-    });
+    performSearch();
   };
 
   if (!isOpen) return null;
@@ -90,14 +90,14 @@ export function FindCoverModal({ isOpen, onClose, onSelectImage, defaultQuery }:
       alignItems: 'flex-start',
       justifyContent: 'center',
       zIndex: 30000,
-      paddingTop: '40px',
+      padding: '20px',
     }}>
       <div style={{
         backgroundColor: 'white',
         borderRadius: '8px',
-        maxWidth: '1400px',
-        width: '95%',
-        maxHeight: '85vh',
+        width: '100%',
+        maxWidth: '1600px',
+        height: 'calc(100vh - 40px)',
         display: 'flex',
         flexDirection: 'column',
       }}>
@@ -105,13 +105,14 @@ export function FindCoverModal({ isOpen, onClose, onSelectImage, defaultQuery }:
         <div style={{
           backgroundColor: '#f97316',
           color: 'white',
-          padding: '12px 20px',
+          padding: '10px 16px',
           borderRadius: '8px 8px 0 0',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
+          flexShrink: 0,
         }}>
-          <h2 style={{ margin: 0, fontSize: '16px', fontWeight: '600' }}>Find Cover</h2>
+          <h2 style={{ margin: 0, fontSize: '15px', fontWeight: '600' }}>Find Cover</h2>
           <button
             onClick={onClose}
             style={{
@@ -128,15 +129,19 @@ export function FindCoverModal({ isOpen, onClose, onSelectImage, defaultQuery }:
           </button>
         </div>
 
-        {/* Search Bar */}
-        <div style={{ padding: '12px 20px', borderBottom: '1px solid #e5e7eb' }}>
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+        {/* Search Bar - Single line, no wrapping */}
+        <div style={{ 
+          padding: '10px 16px', 
+          borderBottom: '1px solid #e5e7eb',
+          flexShrink: 0,
+        }}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              placeholder="Search for album cover..."
+              placeholder={`Search for ${coverType} cover...`}
               style={{
                 flex: 1,
                 padding: '6px 10px',
@@ -164,34 +169,19 @@ export function FindCoverModal({ isOpen, onClose, onSelectImage, defaultQuery }:
             >
               {isSearching ? 'Searching...' : 'Search'}
             </button>
-            
-            {/* Filter Checkboxes */}
-            {availableFilters.map(filter => (
-              <label
-                key={filter}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                  color: '#374151',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedFilters.includes(filter)}
-                  onChange={() => toggleFilter(filter)}
-                  style={{ cursor: 'pointer' }}
-                />
-                {filter}
-              </label>
-            ))}
+            {barcode && (
+              <span style={{ 
+                fontSize: '11px', 
+                color: '#6b7280',
+                whiteSpace: 'nowrap',
+              }}>
+                Barcode: {barcode}
+              </span>
+            )}
           </div>
         </div>
 
-        {/* Results Grid */}
+        {/* Results Grid - Fills remaining space */}
         <div style={{
           flex: 1,
           overflow: 'auto',
@@ -199,7 +189,7 @@ export function FindCoverModal({ isOpen, onClose, onSelectImage, defaultQuery }:
         }}>
           {isSearching ? (
             <div style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>
-              Searching Spotify, Last.fm, and MusicBrainz...
+              Searching Discogs and Google Images...
             </div>
           ) : searchResults.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>
@@ -208,7 +198,7 @@ export function FindCoverModal({ isOpen, onClose, onSelectImage, defaultQuery }:
           ) : (
             <div style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
               gap: '12px',
             }}>
               {searchResults.map((result, index) => (
@@ -245,7 +235,7 @@ export function FindCoverModal({ isOpen, onClose, onSelectImage, defaultQuery }:
                   }}>
                     <Image
                       src={result.url}
-                      alt={`Search result ${index + 1}`}
+                      alt={`${result.type || coverType} cover ${index + 1}`}
                       fill
                       style={{ objectFit: 'cover' }}
                       unoptimized
@@ -259,7 +249,7 @@ export function FindCoverModal({ isOpen, onClose, onSelectImage, defaultQuery }:
                   }}>
                     {result.width} × {result.height}
                     <div style={{ fontSize: '9px', opacity: 0.7 }}>
-                      {result.source}
+                      {result.source} {result.type && `(${result.type})`}
                     </div>
                   </div>
                 </div>

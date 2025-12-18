@@ -26,6 +26,7 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
   const [cropMode, setCropMode] = useState<'front' | 'back' | null>(null);
   const [rotation, setRotation] = useState(0);
   const [showFindCover, setShowFindCover] = useState(false);
+  const [findCoverType, setFindCoverType] = useState<'front' | 'back'>('front');
   const [cropState, setCropState] = useState<CropState>({ x: 5, y: 5, width: 90, height: 90 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragHandle, setDragHandle] = useState<DragHandle | null>(null);
@@ -99,17 +100,14 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
     onChange(field, null as Album[typeof field]);
   };
 
-  const handleFindOnline = () => {
+  const handleFindOnline = (coverType: 'front' | 'back') => {
+    setFindCoverType(coverType);
     setShowFindCover(true);
   };
 
   const handleSelectImage = (imageUrl: string) => {
-    // Update the appropriate cover with selected image
-    if (cropMode === 'front') {
-      onChange('image_url', imageUrl as Album['image_url']);
-    } else if (cropMode === 'back') {
-      onChange('back_image_url', imageUrl as Album['back_image_url']);
-    }
+    const field = findCoverType === 'front' ? 'image_url' : 'back_image_url';
+    onChange(field, imageUrl as Album[typeof field]);
   };
 
   const handleCropRotate = (coverType: 'front' | 'back') => {
@@ -128,14 +126,7 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
   };
 
   const handleCropApply = () => {
-    // In real implementation, apply crop and rotation to the image
     console.log('Applying crop:', cropState, 'rotation:', rotation);
-    // Here you would:
-    // 1. Create a canvas
-    // 2. Draw the image with rotation and crop applied
-    // 3. Convert to blob
-    // 4. Upload cropped image
-    // 5. Update the album image URL
     setCropMode(null);
     setRotation(0);
   };
@@ -217,7 +208,6 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
     setDragHandle(null);
   }, []);
 
-  // Add/remove mouse event listeners
   React.useEffect(() => {
     if (isDragging) {
       window.addEventListener('mousemove', handleMouseMove);
@@ -255,7 +245,6 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
           {title}
         </h3>
         
-        {/* Action Buttons */}
         {isInCropMode ? (
           <div style={{
             display: 'flex',
@@ -264,166 +253,62 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
             borderRadius: '4px',
             overflow: 'hidden',
           }}>
-            <button
-              type="button"
-              onClick={handleCropReset}
-              style={{
-                flex: 1,
-                padding: '6px 10px',
-                background: 'transparent',
-                border: 'none',
-                borderRight: '1px solid rgba(255,255,255,0.3)',
-                fontSize: '12px',
-                cursor: 'pointer',
-                color: 'white',
-                fontFamily: 'system-ui, -apple-system, sans-serif',
-                fontWeight: '500',
-              }}
-            >
-              × Reset
-            </button>
-            <button
-              type="button"
-              onClick={handleCropRotateImage}
-              style={{
-                flex: 1,
-                padding: '6px 10px',
-                background: 'transparent',
-                border: 'none',
-                borderRight: '1px solid rgba(255,255,255,0.3)',
-                fontSize: '12px',
-                cursor: 'pointer',
-                color: 'white',
-                fontFamily: 'system-ui, -apple-system, sans-serif',
-                fontWeight: '500',
-              }}
-            >
-              🔄 Rotate
-            </button>
-            <button
-              type="button"
-              onClick={handleCropApply}
-              style={{
-                flex: 1,
-                padding: '6px 10px',
-                background: 'transparent',
-                border: 'none',
-                fontSize: '12px',
-                cursor: 'pointer',
-                color: 'white',
-                fontFamily: 'system-ui, -apple-system, sans-serif',
-                fontWeight: '500',
-              }}
-            >
-              ✓ Apply
-            </button>
+            <button type="button" onClick={handleCropReset} style={{
+                flex: 1, padding: '6px 10px', background: 'transparent', border: 'none',
+                borderRight: '1px solid rgba(255,255,255,0.3)', fontSize: '12px', cursor: 'pointer',
+                color: 'white', fontFamily: 'system-ui, -apple-system, sans-serif', fontWeight: '500',
+              }}>× Reset</button>
+            <button type="button" onClick={handleCropRotateImage} style={{
+                flex: 1, padding: '6px 10px', background: 'transparent', border: 'none',
+                borderRight: '1px solid rgba(255,255,255,0.3)', fontSize: '12px', cursor: 'pointer',
+                color: 'white', fontFamily: 'system-ui, -apple-system, sans-serif', fontWeight: '500',
+              }}>🔄 Rotate</button>
+            <button type="button" onClick={handleCropApply} style={{
+                flex: 1, padding: '6px 10px', background: 'transparent', border: 'none',
+                fontSize: '12px', cursor: 'pointer', color: 'white',
+                fontFamily: 'system-ui, -apple-system, sans-serif', fontWeight: '500',
+              }}>✓ Apply</button>
           </div>
         ) : (
           <div style={{
-            display: 'flex',
-            marginBottom: '8px',
-            backgroundColor: '#1a1a1a',
-            borderRadius: '4px',
-            overflow: 'hidden',
+            display: 'flex', marginBottom: '8px', backgroundColor: '#1a1a1a',
+            borderRadius: '4px', overflow: 'hidden',
           }}>
-            <button
-              type="button"
-              onClick={handleFindOnline}
-              disabled={isUploading}
-              style={{
-                flex: 1,
-                padding: '6px 10px',
-                background: 'transparent',
-                border: 'none',
-                borderRight: '1px solid #333',
-                fontSize: '12px',
-                cursor: isUploading ? 'not-allowed' : 'pointer',
-                color: 'white',
-                fontFamily: 'system-ui, -apple-system, sans-serif',
-                fontWeight: '500',
+            <button type="button" onClick={() => handleFindOnline(coverType)} disabled={isUploading} style={{
+                flex: 1, padding: '6px 10px', background: 'transparent', border: 'none',
+                borderRight: '1px solid #333', fontSize: '12px',
+                cursor: isUploading ? 'not-allowed' : 'pointer', color: 'white',
+                fontFamily: 'system-ui, -apple-system, sans-serif', fontWeight: '500',
                 opacity: isUploading ? 0.5 : 1,
-              }}
-            >
-              🔍 Find Online
-            </button>
-            <button
-              type="button"
-              onClick={() => handleUpload(coverType)}
-              disabled={isUploading}
-              style={{
-                flex: 1,
-                padding: '6px 10px',
-                background: 'transparent',
-                border: 'none',
-                borderRight: '1px solid #333',
-                fontSize: '12px',
-                cursor: isUploading ? 'not-allowed' : 'pointer',
-                color: 'white',
-                fontFamily: 'system-ui, -apple-system, sans-serif',
-                fontWeight: '500',
+              }}>🔍 Find Online</button>
+            <button type="button" onClick={() => handleUpload(coverType)} disabled={isUploading} style={{
+                flex: 1, padding: '6px 10px', background: 'transparent', border: 'none',
+                borderRight: '1px solid #333', fontSize: '12px',
+                cursor: isUploading ? 'not-allowed' : 'pointer', color: 'white',
+                fontFamily: 'system-ui, -apple-system, sans-serif', fontWeight: '500',
                 opacity: isUploading ? 0.5 : 1,
-              }}
-            >
-              ⬆ Upload
-            </button>
-            <button
-              type="button"
-              onClick={() => handleRemove(coverType)}
-              disabled={isUploading}
-              style={{
-                flex: 1,
-                padding: '6px 10px',
-                background: 'transparent',
-                border: 'none',
-                borderRight: '1px solid #333',
-                fontSize: '12px',
-                cursor: isUploading ? 'not-allowed' : 'pointer',
-                color: 'white',
-                fontFamily: 'system-ui, -apple-system, sans-serif',
-                fontWeight: '500',
+              }}>⬆ Upload</button>
+            <button type="button" onClick={() => handleRemove(coverType)} disabled={isUploading} style={{
+                flex: 1, padding: '6px 10px', background: 'transparent', border: 'none',
+                borderRight: '1px solid #333', fontSize: '12px',
+                cursor: isUploading ? 'not-allowed' : 'pointer', color: 'white',
+                fontFamily: 'system-ui, -apple-system, sans-serif', fontWeight: '500',
                 opacity: isUploading ? 0.5 : 1,
-              }}
-            >
-              🗑 Remove
-            </button>
-            <button
-              type="button"
-              onClick={() => handleCropRotate(coverType)}
-              disabled={isUploading}
-              style={{
-                flex: 1,
-                padding: '6px 10px',
-                background: 'transparent',
-                border: 'none',
-                fontSize: '12px',
-                cursor: isUploading ? 'not-allowed' : 'pointer',
-                color: 'white',
-                fontFamily: 'system-ui, -apple-system, sans-serif',
-                fontWeight: '500',
+              }}>🗑 Remove</button>
+            <button type="button" onClick={() => handleCropRotate(coverType)} disabled={isUploading} style={{
+                flex: 1, padding: '6px 10px', background: 'transparent', border: 'none',
+                fontSize: '12px', cursor: isUploading ? 'not-allowed' : 'pointer', color: 'white',
+                fontFamily: 'system-ui, -apple-system, sans-serif', fontWeight: '500',
                 opacity: isUploading ? 0.5 : 1,
-              }}
-            >
-              ✂ Crop / Rotate
-            </button>
+              }}>✂ Crop / Rotate</button>
           </div>
         )}
 
-        {/* Image Display Area */}
-        <div 
-          ref={imageRef}
-          style={{
-            width: '100%',
-            aspectRatio: '1',
-            border: '1px solid #d1d5db',
-            borderRadius: '4px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: 'white',
-            overflow: 'hidden',
-            position: 'relative',
-          }}
-        >
+        <div ref={imageRef} style={{
+            width: '100%', aspectRatio: '1', border: '1px solid #d1d5db', borderRadius: '4px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            backgroundColor: 'white', overflow: 'hidden', position: 'relative',
+          }}>
           {isUploading ? (
             <div style={{ color: '#6b7280', fontSize: '13px', textAlign: 'center' }}>
               <div style={{ marginBottom: '8px' }}>Uploading...</div>
@@ -431,88 +316,52 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
           ) : imageUrl ? (
             <>
               <div style={{
-                width: '100%',
-                height: '100%',
-                position: 'relative',
-                transform: `rotate(${rotation}deg)`,
-                transition: 'transform 0.3s ease',
+                width: '100%', height: '100%', position: 'relative',
+                transform: `rotate(${rotation}deg)`, transition: 'transform 0.3s ease',
               }}>
-                <Image 
-                  src={imageUrl} 
-                  alt={`${title} artwork`}
-                  fill
-                  style={{
-                    objectFit: 'contain',
-                  }}
-                  unoptimized
-                />
+                <Image src={imageUrl} alt={`${title} artwork`} fill
+                  style={{ objectFit: 'contain' }} unoptimized />
               </div>
               
-              {/* Crop overlay */}
               {isInCropMode && (
                 <>
                   <div style={{
-                    position: 'absolute',
-                    inset: 0,
-                    backgroundColor: 'rgba(0,0,0,0.5)',
+                    position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)',
                     pointerEvents: 'none',
                   }} />
                   
-                  <div 
-                    onMouseDown={(e) => handleMouseDown(e, 'move')}
-                    style={{
+                  <div onMouseDown={(e) => handleMouseDown(e, 'move')} style={{
                       position: 'absolute',
-                      left: `${cropState.x}%`,
-                      top: `${cropState.y}%`,
-                      width: `${cropState.width}%`,
-                      height: `${cropState.height}%`,
-                      border: '2px solid #3b82f6',
-                      backgroundColor: 'transparent',
+                      left: `${cropState.x}%`, top: `${cropState.y}%`,
+                      width: `${cropState.width}%`, height: `${cropState.height}%`,
+                      border: '2px solid #3b82f6', backgroundColor: 'transparent',
                       cursor: 'move',
-                    }}
-                  >
-                    {/* Corner handles */}
+                    }}>
+                    {/* Corner handles - positioned exactly on corners */}
                     {[
-                      { pos: 'nw' as DragHandle, style: { top: '-6px', left: '-6px' }, cursor: 'nwse-resize' },
-                      { pos: 'ne' as DragHandle, style: { top: '-6px', right: '-6px' }, cursor: 'nesw-resize' },
-                      { pos: 'sw' as DragHandle, style: { bottom: '-6px', left: '-6px' }, cursor: 'nesw-resize' },
-                      { pos: 'se' as DragHandle, style: { bottom: '-6px', right: '-6px' }, cursor: 'nwse-resize' },
+                      { pos: 'nw' as DragHandle, style: { top: '-8px', left: '-8px' }, cursor: 'nwse-resize' },
+                      { pos: 'ne' as DragHandle, style: { top: '-8px', right: '-8px' }, cursor: 'nesw-resize' },
+                      { pos: 'sw' as DragHandle, style: { bottom: '-8px', left: '-8px' }, cursor: 'nesw-resize' },
+                      { pos: 'se' as DragHandle, style: { bottom: '-8px', right: '-8px' }, cursor: 'nwse-resize' },
                     ].map(({ pos, style, cursor }) => (
-                      <div
-                        key={pos}
-                        onMouseDown={(e) => handleMouseDown(e, pos)}
-                        style={{
-                          position: 'absolute',
-                          width: '12px',
-                          height: '12px',
-                          backgroundColor: '#3b82f6',
-                          border: '2px solid white',
-                          borderRadius: '50%',
-                          cursor,
-                          ...style,
-                        }}
-                      />
+                      <div key={pos} onMouseDown={(e) => handleMouseDown(e, pos)} style={{
+                          position: 'absolute', width: '14px', height: '14px',
+                          backgroundColor: '#3b82f6', border: '2px solid white',
+                          borderRadius: '50%', cursor, ...style,
+                        }} />
                     ))}
                     
-                    {/* Edge handles */}
+                    {/* Edge handles - positioned exactly on edges */}
                     {[
-                      { pos: 'n' as DragHandle, style: { top: '-6px', left: '50%', transform: 'translateX(-50%)', width: '40px', height: '12px' }, cursor: 'ns-resize' },
-                      { pos: 's' as DragHandle, style: { bottom: '-6px', left: '50%', transform: 'translateX(-50%)', width: '40px', height: '12px' }, cursor: 'ns-resize' },
-                      { pos: 'e' as DragHandle, style: { right: '-6px', top: '50%', transform: 'translateY(-50%)', width: '12px', height: '40px' }, cursor: 'ew-resize' },
-                      { pos: 'w' as DragHandle, style: { left: '-6px', top: '50%', transform: 'translateY(-50%)', width: '12px', height: '40px' }, cursor: 'ew-resize' },
+                      { pos: 'n' as DragHandle, style: { top: '-8px', left: '50%', transform: 'translateX(-50%)', width: '40px', height: '14px' }, cursor: 'ns-resize' },
+                      { pos: 's' as DragHandle, style: { bottom: '-8px', left: '50%', transform: 'translateX(-50%)', width: '40px', height: '14px' }, cursor: 'ns-resize' },
+                      { pos: 'e' as DragHandle, style: { right: '-8px', top: '50%', transform: 'translateY(-50%)', width: '14px', height: '40px' }, cursor: 'ew-resize' },
+                      { pos: 'w' as DragHandle, style: { left: '-8px', top: '50%', transform: 'translateY(-50%)', width: '14px', height: '40px' }, cursor: 'ew-resize' },
                     ].map(({ pos, style, cursor }) => (
-                      <div
-                        key={pos}
-                        onMouseDown={(e) => handleMouseDown(e, pos)}
-                        style={{
-                          position: 'absolute',
-                          backgroundColor: '#3b82f6',
-                          border: '2px solid white',
-                          borderRadius: '2px',
-                          cursor,
-                          ...style,
-                        }}
-                      />
+                      <div key={pos} onMouseDown={(e) => handleMouseDown(e, pos)} style={{
+                          position: 'absolute', backgroundColor: '#3b82f6',
+                          border: '2px solid white', borderRadius: '2px', cursor, ...style,
+                        }} />
                     ))}
                   </div>
                 </>
@@ -531,10 +380,7 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
   return (
     <div style={{ padding: '16px' }}>
       <div style={{
-        display: 'grid',
-        gridTemplateColumns: '1fr 1fr',
-        gap: '24px',
-        maxWidth: '900px',
+        display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', maxWidth: '900px',
       }}>
         {renderCoverSection('Front Cover', 'front', album.image_url)}
         {renderCoverSection('Back Cover', 'back', album.back_image_url)}
@@ -545,6 +391,10 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
         onClose={() => setShowFindCover(false)}
         onSelectImage={handleSelectImage}
         defaultQuery={`${album.artist} ${album.title} ${album.year || ''} album cover`}
+        artist={album.artist}
+        title={album.title}
+        barcode={album.barcode || undefined}
+        coverType={findCoverType}
       />
     </div>
   );
