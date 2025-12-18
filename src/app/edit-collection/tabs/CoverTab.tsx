@@ -17,6 +17,14 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
   const [rotation, setRotation] = useState(0);
   const [showFindCover, setShowFindCover] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults] = useState<string[]>([
+    'https://via.placeholder.com/300x300/ff6b6b/ffffff?text=Result+1',
+    'https://via.placeholder.com/300x300/4ecdc4/ffffff?text=Result+2',
+    'https://via.placeholder.com/300x300/45b7d1/ffffff?text=Result+3',
+    'https://via.placeholder.com/300x300/96ceb4/ffffff?text=Result+4',
+    'https://via.placeholder.com/300x300/ffeaa7/000000?text=Result+5',
+    'https://via.placeholder.com/300x300/dfe6e9/000000?text=Result+6',
+  ]);
 
   const handleUpload = async (coverType: 'front' | 'back') => {
     const input = document.createElement('input');
@@ -87,8 +95,6 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
   const handleFindOnline = () => {
     setSearchQuery(`${album.artist} ${album.title} ${album.year || ''} album cover`);
     setShowFindCover(true);
-    // In real implementation, this would call an API to search for images
-    // For now, just show the modal structure
   };
 
   const handleCropRotate = (coverType: 'front' | 'back') => {
@@ -105,13 +111,7 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
   };
 
   const handleCropApply = () => {
-    // In real implementation, this would apply the crop/rotation
-    // and upload the modified image
-    setCropMode(null);
-    setRotation(0);
-  };
-
-  const handleCropCancel = () => {
+    // In real implementation, this would apply the crop/rotation and upload the modified image
     setCropMode(null);
     setRotation(0);
   };
@@ -142,17 +142,25 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
           {title}
         </h3>
         
-        {/* Action Buttons - ABOVE IMAGE */}
+        {/* Action Buttons - Connected horizontal bar */}
         {isInCropMode ? (
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
+          <div style={{
+            display: 'flex',
+            marginBottom: '12px',
+            border: '1px solid #d1d5db',
+            borderRadius: '4px',
+            overflow: 'hidden',
+            backgroundColor: 'white',
+          }}>
             <button
               type="button"
               onClick={handleCropReset}
               style={{
+                flex: 1,
                 padding: '6px 12px',
                 background: '#60a5fa',
                 border: 'none',
-                borderRadius: '4px',
+                borderRight: '1px solid rgba(255,255,255,0.3)',
                 fontSize: '13px',
                 cursor: 'pointer',
                 color: 'white',
@@ -165,10 +173,11 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
               type="button"
               onClick={handleCropRotateImage}
               style={{
+                flex: 1,
                 padding: '6px 12px',
                 background: '#60a5fa',
                 border: 'none',
-                borderRadius: '4px',
+                borderRight: '1px solid rgba(255,255,255,0.3)',
                 fontSize: '13px',
                 cursor: 'pointer',
                 color: 'white',
@@ -181,10 +190,10 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
               type="button"
               onClick={handleCropApply}
               style={{
+                flex: 1,
                 padding: '6px 12px',
                 background: '#22c55e',
                 border: 'none',
-                borderRadius: '4px',
                 fontSize: '13px',
                 cursor: 'pointer',
                 color: 'white',
@@ -193,35 +202,26 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
             >
               ✓ Apply
             </button>
-            <button
-              type="button"
-              onClick={handleCropCancel}
-              style={{
-                padding: '6px 12px',
-                background: '#f3f4f6',
-                border: '1px solid #d1d5db',
-                borderRadius: '4px',
-                fontSize: '13px',
-                cursor: 'pointer',
-                color: '#374151',
-                fontFamily: 'system-ui, -apple-system, sans-serif',
-                marginLeft: 'auto',
-              }}
-            >
-              Cancel
-            </button>
           </div>
         ) : (
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
+          <div style={{
+            display: 'flex',
+            marginBottom: '12px',
+            border: '1px solid #d1d5db',
+            borderRadius: '4px',
+            overflow: 'hidden',
+            backgroundColor: 'white',
+          }}>
             <button
               type="button"
-              onClick={() => handleFindOnline()}
+              onClick={handleFindOnline}
               disabled={isUploading}
               style={{
+                flex: 1,
                 padding: '6px 12px',
                 background: '#f3f4f6',
-                border: '1px solid #d1d5db',
-                borderRadius: '4px',
+                border: 'none',
+                borderRight: '1px solid #d1d5db',
                 fontSize: '13px',
                 cursor: isUploading ? 'not-allowed' : 'pointer',
                 color: '#374151',
@@ -236,10 +236,11 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
               onClick={() => handleUpload(coverType)}
               disabled={isUploading}
               style={{
+                flex: 1,
                 padding: '6px 12px',
                 background: '#f3f4f6',
-                border: '1px solid #d1d5db',
-                borderRadius: '4px',
+                border: 'none',
+                borderRight: '1px solid #d1d5db',
                 fontSize: '13px',
                 cursor: isUploading ? 'not-allowed' : 'pointer',
                 color: '#374151',
@@ -254,10 +255,11 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
               onClick={() => handleRemove(coverType)}
               disabled={isUploading}
               style={{
+                flex: 1,
                 padding: '6px 12px',
                 background: '#f3f4f6',
-                border: '1px solid #d1d5db',
-                borderRadius: '4px',
+                border: 'none',
+                borderRight: '1px solid #d1d5db',
                 fontSize: '13px',
                 cursor: isUploading ? 'not-allowed' : 'pointer',
                 color: '#374151',
@@ -272,10 +274,10 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
               onClick={() => handleCropRotate(coverType)}
               disabled={isUploading}
               style={{
+                flex: 1,
                 padding: '6px 12px',
                 background: '#f3f4f6',
-                border: '1px solid #d1d5db',
-                borderRadius: '4px',
+                border: 'none',
                 fontSize: '13px',
                 cursor: isUploading ? 'not-allowed' : 'pointer',
                 color: '#374151',
@@ -306,16 +308,23 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
               <div style={{ marginBottom: '8px' }}>Uploading...</div>
             </div>
           ) : imageUrl ? (
-            <Image 
-              src={imageUrl} 
-              alt={`${title} artwork`}
-              fill
-              style={{
-                objectFit: 'contain',
-                transform: `rotate(${rotation}deg)`,
-                transition: 'transform 0.3s ease',
-              }}
-            />
+            <div style={{
+              width: '100%',
+              height: '100%',
+              position: 'relative',
+              transform: `rotate(${rotation}deg)`,
+              transition: 'transform 0.3s ease',
+            }}>
+              <Image 
+                src={imageUrl} 
+                alt={`${title} artwork`}
+                fill
+                style={{
+                  objectFit: 'contain',
+                }}
+                unoptimized
+              />
+            </div>
           ) : (
             <div style={{ color: '#9ca3af', fontSize: '13px', textAlign: 'center' }}>
               No {coverType} cover
@@ -411,7 +420,6 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
                 />
                 <button
                   onClick={() => {
-                    // In real implementation, trigger search
                     console.log('Searching for:', searchQuery);
                   }}
                   style={{
@@ -441,16 +449,57 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
                 gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
                 gap: '16px',
               }}>
-                {/* Placeholder for search results */}
-                <div style={{
-                  padding: '60px',
-                  textAlign: 'center',
-                  color: '#9ca3af',
-                  fontSize: '14px',
-                  gridColumn: '1 / -1',
-                }}>
-                  Enter search query and click Search to find album covers
-                </div>
+                {searchResults.map((result, index) => (
+                  <div
+                    key={index}
+                    onClick={() => {
+                      // In real implementation, set the selected image
+                      console.log('Selected image:', result);
+                      setShowFindCover(false);
+                    }}
+                    style={{
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '4px',
+                      padding: '8px',
+                      cursor: 'pointer',
+                      backgroundColor: 'white',
+                      transition: 'all 0.2s',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = '#3b82f6';
+                      e.currentTarget.style.boxShadow = '0 2px 8px rgba(59, 130, 246, 0.2)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = '#e5e7eb';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}
+                  >
+                    <div style={{
+                      width: '100%',
+                      paddingBottom: '100%',
+                      position: 'relative',
+                      backgroundColor: '#f3f4f6',
+                      borderRadius: '4px',
+                      overflow: 'hidden',
+                    }}>
+                      <Image
+                        src={result}
+                        alt={`Search result ${index + 1}`}
+                        fill
+                        style={{ objectFit: 'cover' }}
+                        unoptimized
+                      />
+                    </div>
+                    <div style={{
+                      marginTop: '8px',
+                      fontSize: '11px',
+                      color: '#6b7280',
+                      textAlign: 'center',
+                    }}>
+                      300 × 300
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>

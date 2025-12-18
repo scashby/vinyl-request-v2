@@ -17,12 +17,13 @@ interface LinksTabProps {
 
 export function LinksTab({ album, onChange }: LinksTabProps) {
   const [links, setLinks] = useState<Link[]>(() => {
-    if (!album.extra) return [];
+    if (!album.extra) return [{ id: '1', url: '', description: '' }];
     try {
       const parsed = JSON.parse(album.extra);
-      return Array.isArray(parsed) ? parsed : [];
+      const parsedLinks = Array.isArray(parsed) ? parsed : [];
+      return parsedLinks.length > 0 ? parsedLinks : [{ id: '1', url: '', description: '' }];
     } catch {
-      return [];
+      return [{ id: '1', url: '', description: '' }];
     }
   });
   
@@ -30,7 +31,9 @@ export function LinksTab({ album, onChange }: LinksTabProps) {
 
   const updateLinks = (newLinks: Link[]) => {
     setLinks(newLinks);
-    const jsonString = newLinks.length > 0 ? JSON.stringify(newLinks) : null;
+    // Filter out completely empty links before saving
+    const nonEmptyLinks = newLinks.filter(link => link.url || link.description);
+    const jsonString = nonEmptyLinks.length > 0 ? JSON.stringify(nonEmptyLinks) : null;
     onChange('extra', jsonString as Album['extra']);
   };
 
@@ -93,19 +96,7 @@ export function LinksTab({ album, onChange }: LinksTabProps) {
         <div>Description</div>
       </div>
 
-      {/* Links Table */}
-      {links.length === 0 && (
-        <div style={{
-          padding: '40px',
-          textAlign: 'center',
-          color: '#9ca3af',
-          fontSize: '14px',
-          fontFamily: 'system-ui, -apple-system, sans-serif',
-        }}>
-          No links added yet
-        </div>
-      )}
-
+      {/* Links Table - Always show at least one row */}
       {links.map((link, index) => (
         <div
           key={link.id}
