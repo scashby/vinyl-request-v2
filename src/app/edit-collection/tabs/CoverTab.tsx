@@ -1,7 +1,7 @@
 // src/app/edit-collection/tabs/CoverTab.tsx
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import Image from 'next/image';
 import type { Album } from 'types/album';
 import { supabase } from 'lib/supabaseClient';
@@ -19,12 +19,18 @@ interface CropState {
   height: number;
 }
 
+type DragHandle = 'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'e' | 'w' | 'move';
+
 export function CoverTab({ album, onChange }: CoverTabProps) {
   const [uploading, setUploading] = useState<'front' | 'back' | null>(null);
   const [cropMode, setCropMode] = useState<'front' | 'back' | null>(null);
   const [rotation, setRotation] = useState(0);
   const [showFindCover, setShowFindCover] = useState(false);
-  const [cropState, setCropState] = useState<CropState>({ x: 10, y: 10, width: 80, height: 80 });
+  const [cropState, setCropState] = useState<CropState>({ x: 5, y: 5, width: 90, height: 90 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragHandle, setDragHandle] = useState<DragHandle | null>(null);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [cropStart, setCropStart] = useState<CropState>({ x: 0, y: 0, width: 0, height: 0 });
   const imageRef = useRef<HTMLDivElement>(null);
 
   const handleUpload = async (coverType: 'front' | 'back') => {
@@ -98,19 +104,23 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
   };
 
   const handleSelectImage = (imageUrl: string) => {
-    // In real implementation, this would save the selected image
-    console.log('Selected image:', imageUrl);
+    // Update the appropriate cover with selected image
+    if (cropMode === 'front') {
+      onChange('image_url', imageUrl as Album['image_url']);
+    } else if (cropMode === 'back') {
+      onChange('back_image_url', imageUrl as Album['back_image_url']);
+    }
   };
 
   const handleCropRotate = (coverType: 'front' | 'back') => {
     setCropMode(coverType);
     setRotation(0);
-    setCropState({ x: 10, y: 10, width: 80, height: 80 });
+    setCropState({ x: 5, y: 5, width: 90, height: 90 });
   };
 
   const handleCropReset = () => {
     setRotation(0);
-    setCropState({ x: 10, y: 10, width: 80, height: 80 });
+    setCropState({ x: 5, y: 5, width: 90, height: 90 });
   };
 
   const handleCropRotateImage = () => {
@@ -118,16 +128,106 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
   };
 
   const handleCropApply = () => {
-    // In real implementation, apply crop and rotation
+    // In real implementation, apply crop and rotation to the image
     console.log('Applying crop:', cropState, 'rotation:', rotation);
+    // Here you would:
+    // 1. Create a canvas
+    // 2. Draw the image with rotation and crop applied
+    // 3. Convert to blob
+    // 4. Upload cropped image
+    // 5. Update the album image URL
     setCropMode(null);
     setRotation(0);
   };
 
-  const handleMouseDown = (e: React.MouseEvent) => {
+  const handleMouseDown = useCallback((e: React.MouseEvent, handle: DragHandle) => {
     e.preventDefault();
-    // In real implementation, handle crop resizing based on which handle was clicked
-  };
+    e.stopPropagation();
+    
+    if (!imageRef.current) return;
+    
+    const rect = imageRef.current.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    
+    setIsDragging(true);
+    setDragHandle(handle);
+    setDragStart({ x, y });
+    setCropStart({ ...cropState });
+  }, [cropState]);
+
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (!isDragging || !dragHandle || !imageRef.current) return;
+    
+    const rect = imageRef.current.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    
+    const dx = x - dragStart.x;
+    const dy = y - dragStart.y;
+    
+    const newCrop = { ...cropStart };
+    
+    switch (dragHandle) {
+      case 'nw':
+        newCrop.x = Math.max(0, Math.min(cropStart.x + dx, cropStart.x + cropStart.width - 10));
+        newCrop.y = Math.max(0, Math.min(cropStart.y + dy, cropStart.y + cropStart.height - 10));
+        newCrop.width = cropStart.width - (newCrop.x - cropStart.x);
+        newCrop.height = cropStart.height - (newCrop.y - cropStart.y);
+        break;
+      case 'ne':
+        newCrop.y = Math.max(0, Math.min(cropStart.y + dy, cropStart.y + cropStart.height - 10));
+        newCrop.width = Math.max(10, Math.min(cropStart.width + dx, 100 - cropStart.x));
+        newCrop.height = cropStart.height - (newCrop.y - cropStart.y);
+        break;
+      case 'sw':
+        newCrop.x = Math.max(0, Math.min(cropStart.x + dx, cropStart.x + cropStart.width - 10));
+        newCrop.width = cropStart.width - (newCrop.x - cropStart.x);
+        newCrop.height = Math.max(10, Math.min(cropStart.height + dy, 100 - cropStart.y));
+        break;
+      case 'se':
+        newCrop.width = Math.max(10, Math.min(cropStart.width + dx, 100 - cropStart.x));
+        newCrop.height = Math.max(10, Math.min(cropStart.height + dy, 100 - cropStart.y));
+        break;
+      case 'n':
+        newCrop.y = Math.max(0, Math.min(cropStart.y + dy, cropStart.y + cropStart.height - 10));
+        newCrop.height = cropStart.height - (newCrop.y - cropStart.y);
+        break;
+      case 's':
+        newCrop.height = Math.max(10, Math.min(cropStart.height + dy, 100 - cropStart.y));
+        break;
+      case 'e':
+        newCrop.width = Math.max(10, Math.min(cropStart.width + dx, 100 - cropStart.x));
+        break;
+      case 'w':
+        newCrop.x = Math.max(0, Math.min(cropStart.x + dx, cropStart.x + cropStart.width - 10));
+        newCrop.width = cropStart.width - (newCrop.x - cropStart.x);
+        break;
+      case 'move':
+        newCrop.x = Math.max(0, Math.min(cropStart.x + dx, 100 - cropStart.width));
+        newCrop.y = Math.max(0, Math.min(cropStart.y + dy, 100 - cropStart.height));
+        break;
+    }
+    
+    setCropState(newCrop);
+  }, [isDragging, dragHandle, dragStart, cropStart]);
+
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false);
+    setDragHandle(null);
+  }, []);
+
+  // Add/remove mouse event listeners
+  React.useEffect(() => {
+    if (isDragging) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isDragging, handleMouseMove, handleMouseUp]);
 
   const renderCoverSection = (
     title: string,
@@ -141,25 +241,25 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
       <div style={{
         border: '1px solid #e5e7eb',
         borderRadius: '6px',
-        padding: '16px',
+        padding: '12px',
         backgroundColor: '#fafafa',
       }}>
         <h3 style={{
-          fontSize: '14px',
+          fontSize: '13px',
           fontWeight: '600',
           color: '#6b7280',
-          marginBottom: '12px',
+          marginBottom: '8px',
           marginTop: '0',
           fontFamily: 'system-ui, -apple-system, sans-serif',
         }}>
           {title}
         </h3>
         
-        {/* Action Buttons - Black or Blue header bar */}
+        {/* Action Buttons */}
         {isInCropMode ? (
           <div style={{
             display: 'flex',
-            marginBottom: '12px',
+            marginBottom: '8px',
             backgroundColor: '#60a5fa',
             borderRadius: '4px',
             overflow: 'hidden',
@@ -169,11 +269,11 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
               onClick={handleCropReset}
               style={{
                 flex: 1,
-                padding: '8px 12px',
+                padding: '6px 10px',
                 background: 'transparent',
                 border: 'none',
                 borderRight: '1px solid rgba(255,255,255,0.3)',
-                fontSize: '13px',
+                fontSize: '12px',
                 cursor: 'pointer',
                 color: 'white',
                 fontFamily: 'system-ui, -apple-system, sans-serif',
@@ -187,11 +287,11 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
               onClick={handleCropRotateImage}
               style={{
                 flex: 1,
-                padding: '8px 12px',
+                padding: '6px 10px',
                 background: 'transparent',
                 border: 'none',
                 borderRight: '1px solid rgba(255,255,255,0.3)',
-                fontSize: '13px',
+                fontSize: '12px',
                 cursor: 'pointer',
                 color: 'white',
                 fontFamily: 'system-ui, -apple-system, sans-serif',
@@ -205,10 +305,10 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
               onClick={handleCropApply}
               style={{
                 flex: 1,
-                padding: '8px 12px',
+                padding: '6px 10px',
                 background: 'transparent',
                 border: 'none',
-                fontSize: '13px',
+                fontSize: '12px',
                 cursor: 'pointer',
                 color: 'white',
                 fontFamily: 'system-ui, -apple-system, sans-serif',
@@ -221,7 +321,7 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
         ) : (
           <div style={{
             display: 'flex',
-            marginBottom: '12px',
+            marginBottom: '8px',
             backgroundColor: '#1a1a1a',
             borderRadius: '4px',
             overflow: 'hidden',
@@ -232,11 +332,11 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
               disabled={isUploading}
               style={{
                 flex: 1,
-                padding: '8px 12px',
+                padding: '6px 10px',
                 background: 'transparent',
                 border: 'none',
                 borderRight: '1px solid #333',
-                fontSize: '13px',
+                fontSize: '12px',
                 cursor: isUploading ? 'not-allowed' : 'pointer',
                 color: 'white',
                 fontFamily: 'system-ui, -apple-system, sans-serif',
@@ -252,11 +352,11 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
               disabled={isUploading}
               style={{
                 flex: 1,
-                padding: '8px 12px',
+                padding: '6px 10px',
                 background: 'transparent',
                 border: 'none',
                 borderRight: '1px solid #333',
-                fontSize: '13px',
+                fontSize: '12px',
                 cursor: isUploading ? 'not-allowed' : 'pointer',
                 color: 'white',
                 fontFamily: 'system-ui, -apple-system, sans-serif',
@@ -272,11 +372,11 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
               disabled={isUploading}
               style={{
                 flex: 1,
-                padding: '8px 12px',
+                padding: '6px 10px',
                 background: 'transparent',
                 border: 'none',
                 borderRight: '1px solid #333',
-                fontSize: '13px',
+                fontSize: '12px',
                 cursor: isUploading ? 'not-allowed' : 'pointer',
                 color: 'white',
                 fontFamily: 'system-ui, -apple-system, sans-serif',
@@ -292,10 +392,10 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
               disabled={isUploading}
               style={{
                 flex: 1,
-                padding: '8px 12px',
+                padding: '6px 10px',
                 background: 'transparent',
                 border: 'none',
-                fontSize: '13px',
+                fontSize: '12px',
                 cursor: isUploading ? 'not-allowed' : 'pointer',
                 color: 'white',
                 fontFamily: 'system-ui, -apple-system, sans-serif',
@@ -308,7 +408,7 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
           </div>
         )}
 
-        {/* Image Display Area - FULL WIDTH */}
+        {/* Image Display Area */}
         <div 
           ref={imageRef}
           style={{
@@ -348,59 +448,74 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
                 />
               </div>
               
-              {/* Crop handles - only show in crop mode */}
+              {/* Crop overlay */}
               {isInCropMode && (
-                <div style={{
-                  position: 'absolute',
-                  left: `${cropState.x}%`,
-                  top: `${cropState.y}%`,
-                  width: `${cropState.width}%`,
-                  height: `${cropState.height}%`,
-                  border: '2px solid #3b82f6',
-                  boxShadow: '0 0 0 9999px rgba(0,0,0,0.5)',
-                  pointerEvents: 'none',
-                }}>
-                  {/* Corner handles */}
-                  {['nw', 'ne', 'sw', 'se'].map(pos => (
-                    <div
-                      key={pos}
-                      onMouseDown={handleMouseDown}
-                      style={{
-                        position: 'absolute',
-                        width: '10px',
-                        height: '10px',
-                        backgroundColor: '#3b82f6',
-                        border: '2px solid white',
-                        borderRadius: '50%',
-                        pointerEvents: 'all',
-                        cursor: pos.includes('n') ? (pos.includes('w') ? 'nwse-resize' : 'nesw-resize') : (pos.includes('w') ? 'nesw-resize' : 'nwse-resize'),
-                        ...(pos === 'nw' && { top: '-5px', left: '-5px' }),
-                        ...(pos === 'ne' && { top: '-5px', right: '-5px' }),
-                        ...(pos === 'sw' && { bottom: '-5px', left: '-5px' }),
-                        ...(pos === 'se' && { bottom: '-5px', right: '-5px' }),
-                      }}
-                    />
-                  ))}
+                <>
+                  <div style={{
+                    position: 'absolute',
+                    inset: 0,
+                    backgroundColor: 'rgba(0,0,0,0.5)',
+                    pointerEvents: 'none',
+                  }} />
                   
-                  {/* Edge handles */}
-                  {['n', 's', 'e', 'w'].map(pos => (
-                    <div
-                      key={pos}
-                      onMouseDown={handleMouseDown}
-                      style={{
-                        position: 'absolute',
-                        backgroundColor: '#3b82f6',
-                        border: '2px solid white',
-                        borderRadius: '3px',
-                        pointerEvents: 'all',
-                        ...(pos === 'n' && { top: '-5px', left: '50%', transform: 'translateX(-50%)', width: '30px', height: '10px', cursor: 'ns-resize' }),
-                        ...(pos === 's' && { bottom: '-5px', left: '50%', transform: 'translateX(-50%)', width: '30px', height: '10px', cursor: 'ns-resize' }),
-                        ...(pos === 'e' && { right: '-5px', top: '50%', transform: 'translateY(-50%)', width: '10px', height: '30px', cursor: 'ew-resize' }),
-                        ...(pos === 'w' && { left: '-5px', top: '50%', transform: 'translateY(-50%)', width: '10px', height: '30px', cursor: 'ew-resize' }),
-                      }}
-                    />
-                  ))}
-                </div>
+                  <div 
+                    onMouseDown={(e) => handleMouseDown(e, 'move')}
+                    style={{
+                      position: 'absolute',
+                      left: `${cropState.x}%`,
+                      top: `${cropState.y}%`,
+                      width: `${cropState.width}%`,
+                      height: `${cropState.height}%`,
+                      border: '2px solid #3b82f6',
+                      backgroundColor: 'transparent',
+                      cursor: 'move',
+                    }}
+                  >
+                    {/* Corner handles */}
+                    {[
+                      { pos: 'nw' as DragHandle, style: { top: '-6px', left: '-6px' }, cursor: 'nwse-resize' },
+                      { pos: 'ne' as DragHandle, style: { top: '-6px', right: '-6px' }, cursor: 'nesw-resize' },
+                      { pos: 'sw' as DragHandle, style: { bottom: '-6px', left: '-6px' }, cursor: 'nesw-resize' },
+                      { pos: 'se' as DragHandle, style: { bottom: '-6px', right: '-6px' }, cursor: 'nwse-resize' },
+                    ].map(({ pos, style, cursor }) => (
+                      <div
+                        key={pos}
+                        onMouseDown={(e) => handleMouseDown(e, pos)}
+                        style={{
+                          position: 'absolute',
+                          width: '12px',
+                          height: '12px',
+                          backgroundColor: '#3b82f6',
+                          border: '2px solid white',
+                          borderRadius: '50%',
+                          cursor,
+                          ...style,
+                        }}
+                      />
+                    ))}
+                    
+                    {/* Edge handles */}
+                    {[
+                      { pos: 'n' as DragHandle, style: { top: '-6px', left: '50%', transform: 'translateX(-50%)', width: '40px', height: '12px' }, cursor: 'ns-resize' },
+                      { pos: 's' as DragHandle, style: { bottom: '-6px', left: '50%', transform: 'translateX(-50%)', width: '40px', height: '12px' }, cursor: 'ns-resize' },
+                      { pos: 'e' as DragHandle, style: { right: '-6px', top: '50%', transform: 'translateY(-50%)', width: '12px', height: '40px' }, cursor: 'ew-resize' },
+                      { pos: 'w' as DragHandle, style: { left: '-6px', top: '50%', transform: 'translateY(-50%)', width: '12px', height: '40px' }, cursor: 'ew-resize' },
+                    ].map(({ pos, style, cursor }) => (
+                      <div
+                        key={pos}
+                        onMouseDown={(e) => handleMouseDown(e, pos)}
+                        style={{
+                          position: 'absolute',
+                          backgroundColor: '#3b82f6',
+                          border: '2px solid white',
+                          borderRadius: '2px',
+                          cursor,
+                          ...style,
+                        }}
+                      />
+                    ))}
+                  </div>
+                </>
               )}
             </>
           ) : (
@@ -414,21 +529,17 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
   };
 
   return (
-    <div style={{ padding: '20px' }}>
+    <div style={{ padding: '16px' }}>
       <div style={{
         display: 'grid',
         gridTemplateColumns: '1fr 1fr',
-        gap: '40px',
+        gap: '24px',
         maxWidth: '900px',
       }}>
-        {/* Front Cover */}
         {renderCoverSection('Front Cover', 'front', album.image_url)}
-        
-        {/* Back Cover */}
         {renderCoverSection('Back Cover', 'back', album.back_image_url)}
       </div>
 
-      {/* Find Cover Modal */}
       <FindCoverModal
         isOpen={showFindCover}
         onClose={() => setShowFindCover(false)}
