@@ -1,4 +1,4 @@
-// src/app/edit-collection/page.tsx - COMPLETE FILE WITH SETTINGS INTEGRATION
+// src/app/edit-collection/page.tsx - COMPLETE FILE WITH LABEL FIX
 'use client';
 
 import { useCallback, useEffect, useState, useMemo, Suspense, memo } from 'react';
@@ -239,14 +239,14 @@ const AlbumInfoPanel = memo(function AlbumInfoPanel({ album }: { album: Album | 
         )}
       </div>
 
-      {/* Label (Year) */}
+      {/* Label (Year) - UPDATED TO USE CLZ LABELS FIRST */}
       <div style={{
         fontSize: '14px',
         fontWeight: 400,
         color: '#333',
         marginBottom: '8px'
       }}>
-        {album.spotify_label || album.apple_music_label || 'Unknown Label'} 
+        {(album.labels && album.labels.length > 0 ? album.labels.join(', ') : (album.spotify_label || album.apple_music_label)) || 'Unknown Label'} 
         {album.year && ` (${album.year})`}
       </div>
 

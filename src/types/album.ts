@@ -168,6 +168,7 @@ export type Album = {
   // ============================================================================
   // LABELS
   // ============================================================================
+  labels: string[] | null;  // CLZ primary label data
   spotify_label: string | null;
   apple_music_label: string | null;
   

@@ -1,4 +1,4 @@
-// src/app/edit-collection/tabs/MainTab.tsx - FIXED: Aa applies capitalization immediately based on settings
+// src/app/edit-collection/tabs/MainTab.tsx - COMPLETE FILE WITH LABEL FIX
 'use client';
 
 import { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
@@ -34,7 +34,12 @@ interface MainTabProps {
 }
 
 type ModalType = 'picker' | 'manage' | 'edit' | 'merge' | null;
-type FieldType = 'spotify_label' | 'format' | 'genre' | 'location' | 'artist';
+type FieldType = 
+  | 'spotify_label' 
+  | 'format' 
+  | 'genre' 
+  | 'location' 
+  | 'artist';
 
 export interface MainTabRef {
   openLocationPicker: () => void;
@@ -140,7 +145,10 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
   // Get current selection based on active field
   const getCurrentSelection = () => {
     switch (activeField) {
-      case 'spotify_label': return album.spotify_label || album.apple_music_label || '';
+      case 'spotify_label': 
+        return album.labels && album.labels.length > 0 
+          ? album.labels[0]
+          : (album.spotify_label || album.apple_music_label || '');
       case 'format': return album.format || '';
       case 'genre': return album.discogs_genres || [];
       case 'location': return album.location || '';
@@ -182,8 +190,10 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
       const selectedName = items.find(item => item.id === selectedIds)?.name || '';
       
       if (activeField === 'spotify_label') {
+        // Update all label fields
         onChange('spotify_label', selectedName);
         onChange('apple_music_label', selectedName);
+        onChange('labels', selectedName ? [selectedName] : null);
       } else if (activeField === 'format') {
         onChange('format', selectedName);
       } else if (activeField === 'location') {
@@ -586,16 +596,22 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
             </div>
           </div>
 
-          {/* Row 2: Label | Recording Date */}
+          {/* Row 2: Label | Recording Date - UPDATED TO USE CLZ LABELS */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <div>
               <label style={labelStyle}>Label</label>
               <div style={{ display: 'flex', gap: '0', alignItems: 'stretch' }}>
                 <select 
-                  value={album.spotify_label || album.apple_music_label || ''}
+                  value={
+                    album.labels && album.labels.length > 0 
+                      ? album.labels[0] 
+                      : (album.spotify_label || album.apple_music_label || '')
+                  }
                   onChange={(e) => {
+                    // Update all label fields to maintain consistency
                     onChange('spotify_label', e.target.value);
                     onChange('apple_music_label', e.target.value);
+                    onChange('labels', e.target.value ? [e.target.value] : null);
                   }}
                   style={{ 
                     ...selectStyle, 
@@ -605,7 +621,11 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
                     borderRight: 'none'
                   }}
                 >
-                  <option>{album.spotify_label || album.apple_music_label || 'Select label'}</option>
+                  <option>
+                    {album.labels && album.labels.length > 0 
+                      ? album.labels.join(', ') 
+                      : (album.spotify_label || album.apple_music_label || 'Select label')}
+                  </option>
                 </select>
                 <button 
                   onClick={() => handleOpenPicker('spotify_label')}
