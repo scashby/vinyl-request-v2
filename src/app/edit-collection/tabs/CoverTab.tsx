@@ -24,7 +24,8 @@ type DragHandle = 'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'e' | 'w' | 'move';
 export function CoverTab({ album, onChange }: CoverTabProps) {
   const [uploading, setUploading] = useState<'front' | 'back' | null>(null);
   const [cropMode, setCropMode] = useState<'front' | 'back' | null>(null);
-  const [rotation, setRotation] = useState(0);
+  const [frontRotation, setFrontRotation] = useState(0);
+  const [backRotation, setBackRotation] = useState(0);
   const [showFindCover, setShowFindCover] = useState(false);
   const [findCoverType, setFindCoverType] = useState<'front' | 'back'>('front');
   const [cropState, setCropState] = useState<CropState>({ x: 0, y: 0, width: 100, height: 100 });
@@ -113,7 +114,13 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
 
   const handleCropRotate = (coverType: 'front' | 'back') => {
     setCropMode(coverType);
-    setRotation(0);
+    
+    // Reset rotation for this cover
+    if (coverType === 'front') {
+      setFrontRotation(0);
+    } else {
+      setBackRotation(0);
+    }
     
     // Calculate actual image bounds within container
     if (imageRef.current) {
@@ -141,18 +148,29 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
   };
 
   const handleCropReset = () => {
-    setRotation(0);
-    setCropState({ ...imageBounds });
+    // Reset rotation for active cover
+    if (cropMode === 'front') {
+      setFrontRotation(0);
+    } else if (cropMode === 'back') {
+      setBackRotation(0);
+    }
+    
+    // Exit crop mode
+    setCropMode(null);
   };
 
   const handleCropRotateImage = () => {
-    setRotation((rotation + 90) % 360);
+    if (cropMode === 'front') {
+      setFrontRotation((frontRotation + 90) % 360);
+    } else if (cropMode === 'back') {
+      setBackRotation((backRotation + 90) % 360);
+    }
   };
 
   const handleCropApply = () => {
+    const rotation = cropMode === 'front' ? frontRotation : backRotation;
     console.log('Applying crop:', cropState, 'rotation:', rotation);
     setCropMode(null);
-    setRotation(0);
   };
 
   const handleMouseDown = useCallback((e: React.MouseEvent, handle: DragHandle) => {
@@ -354,7 +372,8 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
               <>
                 <div style={{
                   width: '100%', height: '100%', position: 'relative',
-                  transform: `rotate(${rotation}deg)`, transition: 'transform 0.3s ease',
+                  transform: `rotate(${coverType === 'front' ? frontRotation : backRotation}deg)`, 
+                  transition: 'transform 0.3s ease',
                 }}>
                   <Image src={imageUrl} alt={`${title} artwork`} fill
                     style={{ objectFit: 'contain' }} unoptimized />
@@ -363,8 +382,22 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
                 {isInCropMode && (
                   <>
                     <div style={{
-                      position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)',
+                      position: 'absolute', 
+                      inset: 0, 
+                      backgroundColor: 'rgba(0,0,0,0.5)',
                       pointerEvents: 'none',
+                      clipPath: `polygon(
+                        0% 0%, 
+                        0% 100%, 
+                        ${cropState.x}% 100%, 
+                        ${cropState.x}% ${cropState.y}%, 
+                        ${cropState.x + cropState.width}% ${cropState.y}%, 
+                        ${cropState.x + cropState.width}% ${cropState.y + cropState.height}%, 
+                        ${cropState.x}% ${cropState.y + cropState.height}%, 
+                        ${cropState.x}% 100%, 
+                        100% 100%, 
+                        100% 0%
+                      )`
                     }} />
                     
                     <div onMouseDown={(e) => handleMouseDown(e, 'move')} style={{
