@@ -13,6 +13,8 @@ interface FindCoverModalProps {
   title?: string;
   barcode?: string;
   coverType?: 'front' | 'back';
+  year?: string;
+  discogsId?: string;
 }
 
 interface ImageResult {
@@ -23,6 +25,8 @@ interface ImageResult {
   type?: 'front' | 'back';
 }
 
+type SearchSource = 'both' | 'discogs' | 'google';
+
 export function FindCoverModal({ 
   isOpen, 
   onClose, 
@@ -31,14 +35,26 @@ export function FindCoverModal({
   artist,
   title,
   barcode,
-  coverType = 'front'
+  coverType = 'front',
+  year,
+  discogsId
 }: FindCoverModalProps) {
   const [searchQuery, setSearchQuery] = useState(defaultQuery);
   const [searchResults, setSearchResults] = useState<ImageResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [searchSource, setSearchSource] = useState<SearchSource>('both');
+  
+  // Search term toggles
+  const [includeArtist, setIncludeArtist] = useState(true);
+  const [includeTitle, setIncludeTitle] = useState(true);
+  const [includeYear, setIncludeYear] = useState(true);
+  const [includeCoverType, setIncludeCoverType] = useState(true);
+  const [includeBarcode, setIncludeBarcode] = useState(false);
+  const [includeDiscogsId, setIncludeDiscogsId] = useState(false);
 
-  const performSearch = useCallback(async () => {
+  const performSearch = useCallback(async (source?: SearchSource) => {
     setIsSearching(true);
+    const sourceToUse = source || searchSource;
     
     try {
       const params = new URLSearchParams();
@@ -47,6 +63,7 @@ export function FindCoverModal({
       if (title) params.append('title', title);
       params.append('type', coverType);
       params.append('q', searchQuery);
+      params.append('source', sourceToUse);
 
       const response = await fetch(`/api/search-covers?${params.toString()}`);
 
@@ -62,15 +79,33 @@ export function FindCoverModal({
     } finally {
       setIsSearching(false);
     }
-  }, [searchQuery, barcode, artist, title, coverType]);
+  }, [searchQuery, barcode, artist, title, coverType, searchSource]);
 
   useEffect(() => {
     if (isOpen) {
-      performSearch();
+      // Initial auto-search with 'both' source
+      performSearch('both');
     }
   }, [isOpen, performSearch]);
 
-  const handleSearch = () => {
+  const buildSearchQuery = () => {
+    const parts: string[] = [];
+    if (includeArtist && artist) parts.push(artist);
+    if (includeTitle && title) parts.push(title);
+    if (includeYear && year) parts.push(year);
+    if (includeCoverType) parts.push(coverType === 'front' ? 'front cover' : 'back cover');
+    if (includeBarcode && barcode) parts.push(barcode);
+    if (includeDiscogsId && discogsId) parts.push(discogsId);
+    
+    return parts.join(' ');
+  };
+
+  const handleBuildSearch = () => {
+    const query = buildSearchQuery();
+    setSearchQuery(query);
+  };
+
+  const handleManualSearch = () => {
     performSearch();
   };
 
@@ -127,18 +162,175 @@ export function FindCoverModal({
           </button>
         </div>
 
-        {/* Search Bar */}
+        {/* Search Controls */}
         <div style={{ 
           padding: '8px 12px', 
           borderBottom: '1px solid #e5e7eb',
           flexShrink: 0,
         }}>
+          {/* Search term toggles */}
+          <div style={{ 
+            display: 'flex', 
+            gap: '6px', 
+            marginBottom: '6px',
+            flexWrap: 'wrap',
+          }}>
+            <span style={{ fontSize: '11px', color: '#6b7280', alignSelf: 'center', marginRight: '4px' }}>Include:</span>
+            
+            {artist && (
+              <button
+                onClick={() => setIncludeArtist(!includeArtist)}
+                style={{
+                  padding: '3px 8px',
+                  fontSize: '10px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '3px',
+                  backgroundColor: includeArtist ? '#3b82f6' : 'white',
+                  color: includeArtist ? 'white' : '#374151',
+                  cursor: 'pointer',
+                  fontWeight: includeArtist ? '600' : '400',
+                }}
+              >
+                Artist
+              </button>
+            )}
+            
+            {title && (
+              <button
+                onClick={() => setIncludeTitle(!includeTitle)}
+                style={{
+                  padding: '3px 8px',
+                  fontSize: '10px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '3px',
+                  backgroundColor: includeTitle ? '#3b82f6' : 'white',
+                  color: includeTitle ? 'white' : '#374151',
+                  cursor: 'pointer',
+                  fontWeight: includeTitle ? '600' : '400',
+                }}
+              >
+                Title
+              </button>
+            )}
+            
+            {year && (
+              <button
+                onClick={() => setIncludeYear(!includeYear)}
+                style={{
+                  padding: '3px 8px',
+                  fontSize: '10px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '3px',
+                  backgroundColor: includeYear ? '#3b82f6' : 'white',
+                  color: includeYear ? 'white' : '#374151',
+                  cursor: 'pointer',
+                  fontWeight: includeYear ? '600' : '400',
+                }}
+              >
+                Year
+              </button>
+            )}
+            
+            <button
+              onClick={() => setIncludeCoverType(!includeCoverType)}
+              style={{
+                padding: '3px 8px',
+                fontSize: '10px',
+                border: '1px solid #d1d5db',
+                borderRadius: '3px',
+                backgroundColor: includeCoverType ? '#3b82f6' : 'white',
+                color: includeCoverType ? 'white' : '#374151',
+                cursor: 'pointer',
+                fontWeight: includeCoverType ? '600' : '400',
+              }}
+            >
+              {coverType === 'front' ? 'Front' : 'Back'} Cover
+            </button>
+            
+            {barcode && (
+              <button
+                onClick={() => setIncludeBarcode(!includeBarcode)}
+                style={{
+                  padding: '3px 8px',
+                  fontSize: '10px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '3px',
+                  backgroundColor: includeBarcode ? '#3b82f6' : 'white',
+                  color: includeBarcode ? 'white' : '#374151',
+                  cursor: 'pointer',
+                  fontWeight: includeBarcode ? '600' : '400',
+                }}
+              >
+                Barcode
+              </button>
+            )}
+            
+            {discogsId && (
+              <button
+                onClick={() => setIncludeDiscogsId(!includeDiscogsId)}
+                style={{
+                  padding: '3px 8px',
+                  fontSize: '10px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '3px',
+                  backgroundColor: includeDiscogsId ? '#3b82f6' : 'white',
+                  color: includeDiscogsId ? 'white' : '#374151',
+                  cursor: 'pointer',
+                  fontWeight: includeDiscogsId ? '600' : '400',
+                }}
+              >
+                Discogs ID
+              </button>
+            )}
+            
+            <button
+              onClick={handleBuildSearch}
+              style={{
+                padding: '3px 8px',
+                fontSize: '10px',
+                border: '1px solid #10b981',
+                borderRadius: '3px',
+                backgroundColor: '#10b981',
+                color: 'white',
+                cursor: 'pointer',
+                fontWeight: '600',
+                marginLeft: '8px',
+              }}
+            >
+              Build Query
+            </button>
+          </div>
+
+          {/* Search bar with source selector */}
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'nowrap' }}>
+            {/* Source selector */}
+            <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
+              {['both', 'discogs', 'google'].map((source) => (
+                <button
+                  key={source}
+                  onClick={() => setSearchSource(source as SearchSource)}
+                  style={{
+                    padding: '4px 8px',
+                    fontSize: '10px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '3px',
+                    backgroundColor: searchSource === source ? '#1f2937' : 'white',
+                    color: searchSource === source ? 'white' : '#374151',
+                    cursor: 'pointer',
+                    fontWeight: searchSource === source ? '600' : '400',
+                    textTransform: 'capitalize',
+                  }}
+                >
+                  {source}
+                </button>
+              ))}
+            </div>
+            
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              onKeyDown={(e) => e.key === 'Enter' && handleManualSearch()}
               placeholder={`Search for ${coverType} cover...`}
               style={{
                 flex: '1 1 auto',
@@ -151,7 +343,7 @@ export function FindCoverModal({
               }}
             />
             <button
-              onClick={handleSearch}
+              onClick={handleManualSearch}
               disabled={isSearching}
               style={{
                 padding: '5px 16px',
@@ -169,16 +361,6 @@ export function FindCoverModal({
             >
               {isSearching ? 'Searching...' : 'Search'}
             </button>
-            {barcode && (
-              <span style={{ 
-                fontSize: '11px', 
-                color: '#6b7280',
-                whiteSpace: 'nowrap',
-                flexShrink: 0,
-              }}>
-                Barcode: {barcode}
-              </span>
-            )}
           </div>
         </div>
 
@@ -190,7 +372,7 @@ export function FindCoverModal({
         }}>
           {isSearching ? (
             <div style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>
-              Searching Discogs and Last.fm...
+              Searching {searchSource === 'both' ? 'Discogs, Google, and Last.fm' : searchSource === 'discogs' ? 'Discogs and Last.fm' : 'Google Images'}...
             </div>
           ) : searchResults.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>

@@ -36,6 +36,7 @@ export async function GET(request: NextRequest) {
   const artist = searchParams.get('artist');
   const title = searchParams.get('title');
   const coverType = searchParams.get('type') || 'front';
+  const source = searchParams.get('source') || 'both'; // 'both', 'discogs', or 'google'
   
   if (!query && !barcode) {
     return NextResponse.json({ error: 'Query or barcode required' }, { status: 400 });
@@ -44,13 +45,20 @@ export async function GET(request: NextRequest) {
   const results: ImageResult[] = [];
 
   try {
-    const discogsResults = await searchDiscogs(barcode || '', artist || '', title || '', coverType as 'front' | 'back');
-    results.push(...discogsResults);
+    // Search Discogs if source is 'both' or 'discogs'
+    if (source === 'both' || source === 'discogs') {
+      const discogsResults = await searchDiscogs(barcode || '', artist || '', title || '', coverType as 'front' | 'back');
+      results.push(...discogsResults);
+    }
 
-    const googleResults = await searchGoogleImages(artist || '', title || '', barcode || '', coverType as 'front' | 'back');
-    results.push(...googleResults);
+    // Search Google if source is 'both' or 'google'
+    if (source === 'both' || source === 'google') {
+      const googleResults = await searchGoogleImages(artist || '', title || '', barcode || '', coverType as 'front' | 'back');
+      results.push(...googleResults);
+    }
 
-    if (results.length < 5) {
+    // Search Last.fm only if source is 'both' or 'discogs' (it's a fallback for Discogs)
+    if ((source === 'both' || source === 'discogs') && results.length < 5) {
       const lastfmResults = await searchLastFm(artist || '', title || '');
       results.push(...lastfmResults);
     }
