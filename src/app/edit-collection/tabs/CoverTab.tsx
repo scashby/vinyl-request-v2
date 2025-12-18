@@ -2,9 +2,9 @@
 'use client';
 
 import React, { useState } from 'react';
+import Image from 'next/image';
 import type { Album } from 'types/album';
 import { supabase } from 'lib/supabaseClient';
-import { CropRotateModal } from '../enrichment/CropRotateModal';
 
 interface CoverTabProps {
   album: Album;
@@ -13,9 +13,10 @@ interface CoverTabProps {
 
 export function CoverTab({ album, onChange }: CoverTabProps) {
   const [uploading, setUploading] = useState<'front' | 'back' | null>(null);
-  const [showCropModal, setShowCropModal] = useState(false);
-  const [cropImageUrl, setCropImageUrl] = useState<string | null>(null);
-  const [cropCoverType, setCropCoverType] = useState<'front' | 'back'>('front');
+  const [cropMode, setCropMode] = useState<'front' | 'back' | null>(null);
+  const [rotation, setRotation] = useState(0);
+  const [showFindCover, setShowFindCover] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const handleUpload = async (coverType: 'front' | 'back') => {
     const input = document.createElement('input');
@@ -29,12 +30,10 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
       try {
         setUploading(coverType);
 
-        // Generate unique filename
         const fileExt = file.name.split('.').pop();
         const fileName = `${album.id || Date.now()}-${coverType}-${Date.now()}.${fileExt}`;
         const filePath = `album-covers/${fileName}`;
 
-        // Upload to Supabase Storage
         const { error: uploadError } = await supabase.storage
           .from('album-images')
           .upload(filePath, file, {
@@ -44,16 +43,12 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
 
         if (uploadError) throw uploadError;
 
-        // Get public URL
         const { data: { publicUrl } } = supabase.storage
           .from('album-images')
           .getPublicUrl(filePath);
 
-        // Update album with new image URL
         const field = coverType === 'front' ? 'image_url' : 'back_image_url';
         onChange(field, publicUrl as Album[typeof field]);
-
-        console.log(`✅ ${coverType} cover uploaded:`, publicUrl);
       } catch (error) {
         console.error(`Error uploading ${coverType} cover:`, error);
         alert(`Failed to upload ${coverType} cover. Please try again.`);
@@ -71,12 +66,10 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
 
     if (currentUrl && currentUrl.includes('album-images/')) {
       try {
-        // Extract file path from URL
         const urlParts = currentUrl.split('/album-images/');
         if (urlParts.length > 1) {
           const filePath = `album-images/${urlParts[1].split('?')[0]}`;
           
-          // Delete from storage
           const { error } = await supabase.storage
             .from('album-images')
             .remove([filePath]);
@@ -92,24 +85,35 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
   };
 
   const handleFindOnline = () => {
-    // Open search URL based on album info
-    const searchQuery = encodeURIComponent(`${album.artist} ${album.title} ${album.year || ''} album cover`);
-    const googleImagesUrl = `https://www.google.com/search?tbm=isch&q=${searchQuery}`;
-    window.open(googleImagesUrl, '_blank');
+    setSearchQuery(`${album.artist} ${album.title} ${album.year || ''} album cover`);
+    setShowFindCover(true);
+    // In real implementation, this would call an API to search for images
+    // For now, just show the modal structure
   };
 
   const handleCropRotate = (coverType: 'front' | 'back') => {
-    const imageUrl = coverType === 'front' ? album.image_url : album.back_image_url;
-    if (imageUrl) {
-      setCropImageUrl(imageUrl);
-      setCropCoverType(coverType);
-      setShowCropModal(true);
-    }
+    setCropMode(coverType);
+    setRotation(0);
   };
 
-  const handleCropSave = (newImageUrl: string) => {
-    const field = cropCoverType === 'front' ? 'image_url' : 'back_image_url';
-    onChange(field, newImageUrl as Album[typeof field]);
+  const handleCropReset = () => {
+    setRotation(0);
+  };
+
+  const handleCropRotateImage = () => {
+    setRotation((rotation + 90) % 360);
+  };
+
+  const handleCropApply = () => {
+    // In real implementation, this would apply the crop/rotation
+    // and upload the modified image
+    setCropMode(null);
+    setRotation(0);
+  };
+
+  const handleCropCancel = () => {
+    setCropMode(null);
+    setRotation(0);
   };
 
   const renderCoverSection = (
@@ -118,9 +122,15 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
     imageUrl: string | null | undefined
   ) => {
     const isUploading = uploading === coverType;
+    const isInCropMode = cropMode === coverType;
 
     return (
-      <div>
+      <div style={{
+        border: '1px solid #e5e7eb',
+        borderRadius: '6px',
+        padding: '16px',
+        backgroundColor: '#fafafa',
+      }}>
         <h3 style={{
           fontSize: '14px',
           fontWeight: '600',
@@ -132,127 +142,184 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
           {title}
         </h3>
         
+        {/* Action Buttons - ABOVE IMAGE */}
+        {isInCropMode ? (
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={handleCropReset}
+              style={{
+                padding: '6px 12px',
+                background: '#60a5fa',
+                border: 'none',
+                borderRadius: '4px',
+                fontSize: '13px',
+                cursor: 'pointer',
+                color: 'white',
+                fontFamily: 'system-ui, -apple-system, sans-serif',
+              }}
+            >
+              × Reset
+            </button>
+            <button
+              type="button"
+              onClick={handleCropRotateImage}
+              style={{
+                padding: '6px 12px',
+                background: '#60a5fa',
+                border: 'none',
+                borderRadius: '4px',
+                fontSize: '13px',
+                cursor: 'pointer',
+                color: 'white',
+                fontFamily: 'system-ui, -apple-system, sans-serif',
+              }}
+            >
+              🔄 Rotate
+            </button>
+            <button
+              type="button"
+              onClick={handleCropApply}
+              style={{
+                padding: '6px 12px',
+                background: '#22c55e',
+                border: 'none',
+                borderRadius: '4px',
+                fontSize: '13px',
+                cursor: 'pointer',
+                color: 'white',
+                fontFamily: 'system-ui, -apple-system, sans-serif',
+              }}
+            >
+              ✓ Apply
+            </button>
+            <button
+              type="button"
+              onClick={handleCropCancel}
+              style={{
+                padding: '6px 12px',
+                background: '#f3f4f6',
+                border: '1px solid #d1d5db',
+                borderRadius: '4px',
+                fontSize: '13px',
+                cursor: 'pointer',
+                color: '#374151',
+                fontFamily: 'system-ui, -apple-system, sans-serif',
+                marginLeft: 'auto',
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => handleFindOnline()}
+              disabled={isUploading}
+              style={{
+                padding: '6px 12px',
+                background: '#f3f4f6',
+                border: '1px solid #d1d5db',
+                borderRadius: '4px',
+                fontSize: '13px',
+                cursor: isUploading ? 'not-allowed' : 'pointer',
+                color: '#374151',
+                fontFamily: 'system-ui, -apple-system, sans-serif',
+                opacity: isUploading ? 0.5 : 1,
+              }}
+            >
+              🔍 Find Online
+            </button>
+            <button
+              type="button"
+              onClick={() => handleUpload(coverType)}
+              disabled={isUploading}
+              style={{
+                padding: '6px 12px',
+                background: '#f3f4f6',
+                border: '1px solid #d1d5db',
+                borderRadius: '4px',
+                fontSize: '13px',
+                cursor: isUploading ? 'not-allowed' : 'pointer',
+                color: '#374151',
+                fontFamily: 'system-ui, -apple-system, sans-serif',
+                opacity: isUploading ? 0.5 : 1,
+              }}
+            >
+              ⬆ Upload
+            </button>
+            <button
+              type="button"
+              onClick={() => handleRemove(coverType)}
+              disabled={isUploading}
+              style={{
+                padding: '6px 12px',
+                background: '#f3f4f6',
+                border: '1px solid #d1d5db',
+                borderRadius: '4px',
+                fontSize: '13px',
+                cursor: isUploading ? 'not-allowed' : 'pointer',
+                color: '#374151',
+                fontFamily: 'system-ui, -apple-system, sans-serif',
+                opacity: isUploading ? 0.5 : 1,
+              }}
+            >
+              🗑 Remove
+            </button>
+            <button
+              type="button"
+              onClick={() => handleCropRotate(coverType)}
+              disabled={isUploading}
+              style={{
+                padding: '6px 12px',
+                background: '#f3f4f6',
+                border: '1px solid #d1d5db',
+                borderRadius: '4px',
+                fontSize: '13px',
+                cursor: isUploading ? 'not-allowed' : 'pointer',
+                color: '#374151',
+                fontFamily: 'system-ui, -apple-system, sans-serif',
+                opacity: isUploading ? 0.5 : 1,
+              }}
+            >
+              ✂ Crop / Rotate
+            </button>
+          </div>
+        )}
+
         {/* Image Display Area */}
         <div style={{
           width: '300px',
           height: '300px',
           border: '1px solid #d1d5db',
           borderRadius: '4px',
-          marginBottom: '12px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: '#f9fafb',
+          backgroundColor: 'white',
           overflow: 'hidden',
           position: 'relative',
         }}>
           {isUploading ? (
             <div style={{ color: '#6b7280', fontSize: '13px', textAlign: 'center' }}>
               <div style={{ marginBottom: '8px' }}>Uploading...</div>
-              <div style={{
-                width: '32px',
-                height: '32px',
-                border: '2px solid #e5e7eb',
-                borderTopColor: '#6b7280',
-                borderRadius: '50%',
-                animation: 'spin 1s linear infinite',
-                margin: '0 auto',
-              }}></div>
             </div>
           ) : imageUrl ? (
-            <img 
+            <Image 
               src={imageUrl} 
               alt={`${title} artwork`}
+              fill
               style={{
-                width: '100%',
-                height: '100%',
                 objectFit: 'contain',
+                transform: `rotate(${rotation}deg)`,
+                transition: 'transform 0.3s ease',
               }}
             />
           ) : (
             <div style={{ color: '#9ca3af', fontSize: '13px', textAlign: 'center' }}>
               No {coverType} cover
             </div>
-          )}
-        </div>
-
-        {/* Action Buttons */}
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            onClick={handleFindOnline}
-            disabled={isUploading}
-            style={{
-              padding: '6px 12px',
-              background: '#f3f4f6',
-              border: '1px solid #d1d5db',
-              borderRadius: '4px',
-              fontSize: '13px',
-              cursor: isUploading ? 'not-allowed' : 'pointer',
-              color: '#374151',
-              fontFamily: 'system-ui, -apple-system, sans-serif',
-              opacity: isUploading ? 0.5 : 1,
-            }}
-          >
-            Find Online
-          </button>
-          <button
-            type="button"
-            onClick={() => handleUpload(coverType)}
-            disabled={isUploading}
-            style={{
-              padding: '6px 12px',
-              background: '#f3f4f6',
-              border: '1px solid #d1d5db',
-              borderRadius: '4px',
-              fontSize: '13px',
-              cursor: isUploading ? 'not-allowed' : 'pointer',
-              color: '#374151',
-              fontFamily: 'system-ui, -apple-system, sans-serif',
-              opacity: isUploading ? 0.5 : 1,
-            }}
-          >
-            Upload
-          </button>
-          {imageUrl && (
-            <>
-              <button
-                type="button"
-                onClick={() => handleRemove(coverType)}
-                disabled={isUploading}
-                style={{
-                  padding: '6px 12px',
-                  background: '#f3f4f6',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '4px',
-                  fontSize: '13px',
-                  cursor: isUploading ? 'not-allowed' : 'pointer',
-                  color: '#374151',
-                  fontFamily: 'system-ui, -apple-system, sans-serif',
-                  opacity: isUploading ? 0.5 : 1,
-                }}
-              >
-                Remove
-              </button>
-              <button
-                type="button"
-                onClick={() => handleCropRotate(coverType)}
-                disabled={isUploading}
-                style={{
-                  padding: '6px 12px',
-                  background: '#f3f4f6',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '4px',
-                  fontSize: '13px',
-                  cursor: isUploading ? 'not-allowed' : 'pointer',
-                  color: '#374151',
-                  fontFamily: 'system-ui, -apple-system, sans-serif',
-                  opacity: isUploading ? 0.5 : 1,
-                }}
-              >
-                Crop/Rotate
-              </button>
-            </>
           )}
         </div>
       </div>
@@ -274,18 +341,120 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
         {renderCoverSection('Back Cover', 'back', album.back_image_url)}
       </div>
 
-      {/* Crop/Rotate Modal */}
-      {showCropModal && cropImageUrl && (
-        <CropRotateModal
-          imageUrl={cropImageUrl}
-          albumId={String(album.id || Date.now())}
-          coverType={cropCoverType}
-          onSave={handleCropSave}
-          onClose={() => {
-            setShowCropModal(false);
-            setCropImageUrl(null);
-          }}
-        />
+      {/* Find Cover Modal */}
+      {showFindCover && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'flex-start',
+          justifyContent: 'center',
+          zIndex: 30000,
+          paddingTop: '40px',
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '8px',
+            maxWidth: '1000px',
+            width: '90%',
+            maxHeight: '90vh',
+            display: 'flex',
+            flexDirection: 'column',
+          }}>
+            {/* Header */}
+            <div style={{
+              backgroundColor: '#f97316',
+              color: 'white',
+              padding: '16px 24px',
+              borderRadius: '8px 8px 0 0',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}>
+              <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '600' }}>Find Cover</h2>
+              <button
+                onClick={() => setShowFindCover(false)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'white',
+                  fontSize: '24px',
+                  cursor: 'pointer',
+                  padding: 0,
+                  lineHeight: '1',
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Search Bar */}
+            <div style={{ padding: '16px 24px', borderBottom: '1px solid #e5e7eb' }}>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search for album cover..."
+                  style={{
+                    flex: 1,
+                    padding: '8px 12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '4px',
+                    fontSize: '14px',
+                    color: '#111827',
+                  }}
+                />
+                <button
+                  onClick={() => {
+                    // In real implementation, trigger search
+                    console.log('Searching for:', searchQuery);
+                  }}
+                  style={{
+                    padding: '8px 24px',
+                    background: '#3b82f6',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                    fontWeight: '500',
+                  }}
+                >
+                  Search
+                </button>
+              </div>
+            </div>
+
+            {/* Results Grid */}
+            <div style={{
+              flex: 1,
+              overflow: 'auto',
+              padding: '24px',
+            }}>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+                gap: '16px',
+              }}>
+                {/* Placeholder for search results */}
+                <div style={{
+                  padding: '60px',
+                  textAlign: 'center',
+                  color: '#9ca3af',
+                  fontSize: '14px',
+                  gridColumn: '1 / -1',
+                }}>
+                  Enter search query and click Search to find album covers
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

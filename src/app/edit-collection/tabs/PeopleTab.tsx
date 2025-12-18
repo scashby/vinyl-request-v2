@@ -68,6 +68,7 @@ export function PeopleTab({ album, onChange }: PeopleTabProps) {
 
   const renderField = (label: string, field: PeopleField) => {
     const values = (album[field] as string[]) || [];
+    const displayText = values.length > 0 ? values.join(', ') : '';
     
     return (
       <div style={{ marginBottom: '16px' }}>
@@ -94,7 +95,6 @@ export function PeopleTab({ album, onChange }: PeopleTabProps) {
           </span>
         </div>
         <div style={{ 
-          flex: 1,
           padding: '8px 10px',
           border: '1px solid #d1d5db',
           borderRadius: '4px',
@@ -102,8 +102,11 @@ export function PeopleTab({ album, onChange }: PeopleTabProps) {
           backgroundColor: 'white',
           color: '#111827',
           minHeight: '36px',
-        }}>
-          {values.length > 0 ? values.join(', ') : 'Select...'}
+          cursor: values.length === 0 ? 'pointer' : 'default',
+        }}
+        onClick={() => values.length === 0 && handleOpenPicker(field)}
+        >
+          {displayText}
         </div>
       </div>
     );
@@ -120,7 +123,12 @@ export function PeopleTab({ album, onChange }: PeopleTabProps) {
         maxWidth: '900px'
       }}>
         {/* LEFT COLUMN - Credits */}
-        <div>
+        <div style={{
+          border: '1px solid #e5e7eb',
+          borderRadius: '6px',
+          padding: '16px',
+          backgroundColor: '#fafafa',
+        }}>
           <h3 style={{
             fontSize: '14px',
             fontWeight: '600',
@@ -137,7 +145,12 @@ export function PeopleTab({ album, onChange }: PeopleTabProps) {
         </div>
 
         {/* RIGHT COLUMN - Musicians */}
-        <div>
+        <div style={{
+          border: '1px solid #e5e7eb',
+          borderRadius: '6px',
+          padding: '16px',
+          backgroundColor: '#fafafa',
+        }}>
           <h3 style={{
             fontSize: '14px',
             fontWeight: '600',

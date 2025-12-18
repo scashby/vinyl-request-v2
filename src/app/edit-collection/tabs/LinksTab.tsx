@@ -16,7 +16,6 @@ interface LinksTabProps {
 }
 
 export function LinksTab({ album, onChange }: LinksTabProps) {
-  // Parse links from album.extra (stored as JSON string)
   const [links, setLinks] = useState<Link[]>(() => {
     if (!album.extra) return [];
     try {
@@ -31,7 +30,6 @@ export function LinksTab({ album, onChange }: LinksTabProps) {
 
   const updateLinks = (newLinks: Link[]) => {
     setLinks(newLinks);
-    // Store as JSON string in extra field - properly typed
     const jsonString = newLinks.length > 0 ? JSON.stringify(newLinks) : null;
     onChange('extra', jsonString as Album['extra']);
   };
@@ -58,11 +56,6 @@ export function LinksTab({ album, onChange }: LinksTabProps) {
     setDraggedIndex(null);
   };
 
-  const handleRemoveLink = (index: number) => {
-    const newLinks = links.filter((_, i) => i !== index);
-    updateLinks(newLinks);
-  };
-
   const handleUpdateLink = (index: number, field: 'url' | 'description', value: string) => {
     const newLinks = links.map((link, i) => 
       i === index ? { ...link, [field]: value } : link
@@ -76,9 +69,7 @@ export function LinksTab({ album, onChange }: LinksTabProps) {
       url: '',
       description: '',
     };
-
-    const newLinks = [...links, newLink];
-    updateLinks(newLinks);
+    updateLinks([...links, newLink]);
   };
 
   return (
@@ -102,8 +93,8 @@ export function LinksTab({ album, onChange }: LinksTabProps) {
         <div>Description</div>
       </div>
 
-      {/* Links List */}
-      {links.length === 0 ? (
+      {/* Links Table */}
+      {links.length === 0 && (
         <div style={{
           padding: '40px',
           textAlign: 'center',
@@ -113,122 +104,102 @@ export function LinksTab({ album, onChange }: LinksTabProps) {
         }}>
           No links added yet
         </div>
-      ) : (
-        links.map((link, index) => (
-          <div
-            key={link.id}
-            draggable
-            onDragStart={() => handleDragStart(index)}
-            onDragOver={handleDragOver}
-            onDrop={() => handleDrop(index)}
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '40px 40px 1fr 1fr',
-              gap: '8px',
-              padding: '8px',
-              borderBottom: '1px solid #e5e7eb',
-              alignItems: 'center',
-              backgroundColor: draggedIndex === index ? '#f3f4f6' : 'white',
-              cursor: 'move',
-            }}
-          >
-            {/* Drag Handle */}
-            <div style={{
-              display: 'flex',
-              justifyContent: 'center',
-              color: '#9ca3af',
-              fontSize: '18px',
-              cursor: 'grab',
-            }}>
-              ≡
-            </div>
-
-            {/* Checkbox */}
-            <div style={{
-              display: 'flex',
-              justifyContent: 'center',
-            }}>
-              <input
-                type="checkbox"
-                style={{ cursor: 'pointer' }}
-              />
-            </div>
-
-            {/* URL Input */}
-            <div>
-              <input
-                type="text"
-                value={link.url}
-                onChange={(e) => handleUpdateLink(index, 'url', e.target.value)}
-                placeholder="https://"
-                style={{
-                  width: '100%',
-                  padding: '6px 8px',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '4px',
-                  fontSize: '13px',
-                  color: '#111827',
-                  backgroundColor: 'white',
-                  fontFamily: 'system-ui, -apple-system, sans-serif',
-                }}
-              />
-            </div>
-
-            {/* Description Input */}
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <input
-                type="text"
-                value={link.description || ''}
-                onChange={(e) => handleUpdateLink(index, 'description', e.target.value)}
-                placeholder="Description"
-                style={{
-                  flex: 1,
-                  padding: '6px 8px',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '4px',
-                  fontSize: '13px',
-                  color: '#111827',
-                  backgroundColor: 'white',
-                  fontFamily: 'system-ui, -apple-system, sans-serif',
-                }}
-              />
-              <button
-                onClick={() => handleRemoveLink(index)}
-                style={{
-                  padding: '6px 10px',
-                  background: '#ef4444',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  fontSize: '13px',
-                  cursor: 'pointer',
-                  fontWeight: '500',
-                  fontFamily: 'system-ui, -apple-system, sans-serif',
-                }}
-              >
-                ×
-              </button>
-            </div>
-          </div>
-        ))
       )}
 
-      {/* Add Button */}
+      {links.map((link, index) => (
+        <div
+          key={link.id}
+          draggable
+          onDragStart={() => handleDragStart(index)}
+          onDragOver={handleDragOver}
+          onDrop={() => handleDrop(index)}
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '40px 40px 1fr 1fr',
+            gap: '8px',
+            padding: '8px',
+            borderBottom: '1px solid #e5e7eb',
+            alignItems: 'center',
+            backgroundColor: draggedIndex === index ? '#f3f4f6' : 'white',
+          }}
+        >
+          {/* Drag Handle */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'center',
+            color: '#9ca3af',
+            fontSize: '18px',
+            cursor: 'grab',
+          }}>
+            ≡
+          </div>
+
+          {/* Checkbox */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'center',
+          }}>
+            <input
+              type="checkbox"
+              style={{ cursor: 'pointer' }}
+            />
+          </div>
+
+          {/* URL Input */}
+          <div>
+            <input
+              type="text"
+              value={link.url}
+              onChange={(e) => handleUpdateLink(index, 'url', e.target.value)}
+              placeholder="https://"
+              style={{
+                width: '100%',
+                padding: '6px 8px',
+                border: '1px solid #d1d5db',
+                borderRadius: '4px',
+                fontSize: '13px',
+                color: '#111827',
+                backgroundColor: 'white',
+                fontFamily: 'system-ui, -apple-system, sans-serif',
+              }}
+            />
+          </div>
+
+          {/* Description Input */}
+          <div>
+            <input
+              type="text"
+              value={link.description || ''}
+              onChange={(e) => handleUpdateLink(index, 'description', e.target.value)}
+              placeholder="Description"
+              style={{
+                width: '100%',
+                padding: '6px 8px',
+                border: '1px solid #d1d5db',
+                borderRadius: '4px',
+                fontSize: '13px',
+                color: '#111827',
+                backgroundColor: 'white',
+                fontFamily: 'system-ui, -apple-system, sans-serif',
+              }}
+            />
+          </div>
+        </div>
+      ))}
+
+      {/* New Link Button */}
       <div style={{ marginTop: '16px' }}>
         <button
           onClick={handleAddLink}
           style={{
             padding: '8px 16px',
-            background: '#3b82f6',
-            color: 'white',
-            border: 'none',
+            background: '#f3f4f6',
+            color: '#374151',
+            border: '1px solid #d1d5db',
             borderRadius: '4px',
             fontSize: '13px',
             cursor: 'pointer',
             fontWeight: '500',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
             fontFamily: 'system-ui, -apple-system, sans-serif',
           }}
         >

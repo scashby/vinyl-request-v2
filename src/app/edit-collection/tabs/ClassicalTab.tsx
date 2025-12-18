@@ -94,7 +94,7 @@ export function ClassicalTab({ album, onChange }: ClassicalTabProps) {
   };
 
   const renderField = (label: string, field: ClassicalField) => {
-    const value = album[field];
+    const value = album[field] || '';
     
     return (
       <div style={{ marginBottom: '16px' }}>
@@ -121,35 +121,18 @@ export function ClassicalTab({ album, onChange }: ClassicalTabProps) {
           </span>
         </div>
         <div style={{ 
-          flex: 1,
           padding: '8px 10px',
           border: '1px solid #d1d5db',
           borderRadius: '4px',
           fontSize: '14px',
           backgroundColor: 'white',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
           color: '#111827',
-        }}>
-          <span>{value || 'Select...'}</span>
-          {value && (
-            <button
-              onClick={() => onChange(field, '' as Album[ClassicalField])}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: '#9ca3af',
-                cursor: 'pointer',
-                padding: 0,
-                fontSize: '18px',
-                lineHeight: '1',
-                fontWeight: '300',
-              }}
-            >
-              ×
-            </button>
-          )}
+          minHeight: '36px',
+          cursor: !value ? 'pointer' : 'default',
+        }}
+        onClick={() => !value && handleOpenPicker(field)}
+        >
+          {value}
         </div>
       </div>
     );
