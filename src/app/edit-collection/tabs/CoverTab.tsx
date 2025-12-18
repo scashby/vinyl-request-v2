@@ -27,7 +27,7 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
   const [rotation, setRotation] = useState(0);
   const [showFindCover, setShowFindCover] = useState(false);
   const [findCoverType, setFindCoverType] = useState<'front' | 'back'>('front');
-  const [cropState, setCropState] = useState<CropState>({ x: 5, y: 5, width: 90, height: 90 });
+  const [cropState, setCropState] = useState<CropState>({ x: 0, y: 0, width: 100, height: 100 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragHandle, setDragHandle] = useState<DragHandle | null>(null);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
@@ -113,12 +113,12 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
   const handleCropRotate = (coverType: 'front' | 'back') => {
     setCropMode(coverType);
     setRotation(0);
-    setCropState({ x: 5, y: 5, width: 90, height: 90 });
+    setCropState({ x: 0, y: 0, width: 100, height: 100 });
   };
 
   const handleCropReset = () => {
     setRotation(0);
-    setCropState({ x: 5, y: 5, width: 90, height: 90 });
+    setCropState({ x: 0, y: 0, width: 100, height: 100 });
   };
 
   const handleCropRotateImage = () => {
@@ -352,10 +352,10 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
                       }}>
                       {/* Corner handles - exactly on corners */}
                       {[
-                        { pos: 'nw' as DragHandle, style: { top: '-6px', left: '-6px' }, cursor: 'nwse-resize' },
-                        { pos: 'ne' as DragHandle, style: { top: '-6px', right: '-6px' }, cursor: 'nesw-resize' },
-                        { pos: 'sw' as DragHandle, style: { bottom: '-6px', left: '-6px' }, cursor: 'nesw-resize' },
-                        { pos: 'se' as DragHandle, style: { bottom: '-6px', right: '-6px' }, cursor: 'nwse-resize' },
+                        { pos: 'nw' as DragHandle, style: { top: '-7px', left: '-7px' }, cursor: 'nwse-resize' },
+                        { pos: 'ne' as DragHandle, style: { top: '-7px', right: '-7px' }, cursor: 'nesw-resize' },
+                        { pos: 'sw' as DragHandle, style: { bottom: '-7px', left: '-7px' }, cursor: 'nesw-resize' },
+                        { pos: 'se' as DragHandle, style: { bottom: '-7px', right: '-7px' }, cursor: 'nwse-resize' },
                       ].map(({ pos, style, cursor }) => (
                         <div key={pos} onMouseDown={(e) => handleMouseDown(e, pos)} style={{
                             position: 'absolute', width: '12px', height: '12px',
@@ -366,10 +366,10 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
                       
                       {/* Edge handles - exactly on edges */}
                       {[
-                        { pos: 'n' as DragHandle, style: { top: '-6px', left: '50%', transform: 'translateX(-50%)', width: '40px', height: '12px' }, cursor: 'ns-resize' },
-                        { pos: 's' as DragHandle, style: { bottom: '-6px', left: '50%', transform: 'translateX(-50%)', width: '40px', height: '12px' }, cursor: 'ns-resize' },
-                        { pos: 'e' as DragHandle, style: { right: '-6px', top: '50%', transform: 'translateY(-50%)', width: '12px', height: '40px' }, cursor: 'ew-resize' },
-                        { pos: 'w' as DragHandle, style: { left: '-6px', top: '50%', transform: 'translateY(-50%)', width: '12px', height: '40px' }, cursor: 'ew-resize' },
+                        { pos: 'n' as DragHandle, style: { top: '-7px', left: '50%', transform: 'translateX(-50%)', width: '40px', height: '12px' }, cursor: 'ns-resize' },
+                        { pos: 's' as DragHandle, style: { bottom: '-7px', left: '50%', transform: 'translateX(-50%)', width: '40px', height: '12px' }, cursor: 'ns-resize' },
+                        { pos: 'e' as DragHandle, style: { right: '-7px', top: '50%', transform: 'translateY(-50%)', width: '12px', height: '40px' }, cursor: 'ew-resize' },
+                        { pos: 'w' as DragHandle, style: { left: '-7px', top: '50%', transform: 'translateY(-50%)', width: '12px', height: '40px' }, cursor: 'ew-resize' },
                       ].map(({ pos, style, cursor }) => (
                         <div key={pos} onMouseDown={(e) => handleMouseDown(e, pos)} style={{
                             position: 'absolute', backgroundColor: '#3b82f6',
