@@ -228,12 +228,21 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
     const imageUrl = coverType === 'front' ? album.image_url : album.back_image_url;
 
     return (
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ 
+        flex: 1, 
+        minWidth: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: 0,
+      }}>
         <div style={{
           border: '1px solid #e5e7eb',
           borderRadius: '6px',
           padding: '10px',
           backgroundColor: '#fafafa',
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100%',
         }}>
           <h3 style={{
             fontSize: '12px',
@@ -254,18 +263,18 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
               overflow: 'hidden',
             }}>
               <button type="button" onClick={handleCropReset} style={{
-                  flex: 1, padding: '4px 6px', background: 'transparent', border: 'none',
-                  borderRight: '1px solid rgba(255,255,255,0.3)', fontSize: '11px', cursor: 'pointer',
-                  color: 'white', fontWeight: '500',
+                  flex: 1, padding: '3px 4px', background: 'transparent', border: 'none',
+                  borderRight: '1px solid rgba(255,255,255,0.3)', fontSize: '10px', cursor: 'pointer',
+                  color: 'white', fontWeight: '500', whiteSpace: 'nowrap',
                 }}>× Reset</button>
               <button type="button" onClick={handleCropRotateImage} style={{
-                  flex: 1, padding: '4px 6px', background: 'transparent', border: 'none',
-                  borderRight: '1px solid rgba(255,255,255,0.3)', fontSize: '11px', cursor: 'pointer',
-                  color: 'white', fontWeight: '500',
+                  flex: 1, padding: '3px 4px', background: 'transparent', border: 'none',
+                  borderRight: '1px solid rgba(255,255,255,0.3)', fontSize: '10px', cursor: 'pointer',
+                  color: 'white', fontWeight: '500', whiteSpace: 'nowrap',
                 }}>🔄 Rotate</button>
               <button type="button" onClick={handleCropApply} style={{
-                  flex: 1, padding: '4px 6px', background: 'transparent', border: 'none',
-                  fontSize: '11px', cursor: 'pointer', color: 'white', fontWeight: '500',
+                  flex: 1, padding: '3px 4px', background: 'transparent', border: 'none',
+                  fontSize: '10px', cursor: 'pointer', color: 'white', fontWeight: '500', whiteSpace: 'nowrap',
                 }}>✓ Apply</button>
             </div>
           ) : (
@@ -274,35 +283,46 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
               borderRadius: '4px', overflow: 'hidden',
             }}>
               <button type="button" onClick={() => handleFindOnline(coverType)} disabled={isUploading} style={{
-                  flex: '1 1 0', padding: '4px 6px', background: 'transparent', border: 'none',
-                  borderRight: '1px solid #333', fontSize: '11px',
+                  flex: '1 1 0', padding: '3px 4px', background: 'transparent', border: 'none',
+                  borderRight: '1px solid #333', fontSize: '10px',
                   cursor: isUploading ? 'not-allowed' : 'pointer', color: 'white',
                   fontWeight: '500', opacity: isUploading ? 0.5 : 1, minWidth: 0,
-                }}>🔍 Find</button>
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                }}>🔍 Find Online</button>
               <button type="button" onClick={() => handleUpload(coverType)} disabled={isUploading} style={{
-                  flex: '1 1 0', padding: '4px 6px', background: 'transparent', border: 'none',
-                  borderRight: '1px solid #333', fontSize: '11px',
+                  flex: '1 1 0', padding: '3px 4px', background: 'transparent', border: 'none',
+                  borderRight: '1px solid #333', fontSize: '10px',
                   cursor: isUploading ? 'not-allowed' : 'pointer', color: 'white',
                   fontWeight: '500', opacity: isUploading ? 0.5 : 1, minWidth: 0,
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                 }}>⬆ Upload</button>
               <button type="button" onClick={() => handleRemove(coverType)} disabled={isUploading} style={{
-                  flex: '1 1 0', padding: '4px 6px', background: 'transparent', border: 'none',
-                  borderRight: '1px solid #333', fontSize: '11px',
+                  flex: '1 1 0', padding: '3px 4px', background: 'transparent', border: 'none',
+                  borderRight: '1px solid #333', fontSize: '10px',
                   cursor: isUploading ? 'not-allowed' : 'pointer', color: 'white',
                   fontWeight: '500', opacity: isUploading ? 0.5 : 1, minWidth: 0,
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                 }}>🗑 Remove</button>
               <button type="button" onClick={() => handleCropRotate(coverType)} disabled={isUploading} style={{
-                  flex: '1 1 0', padding: '4px 6px', background: 'transparent', border: 'none',
-                  fontSize: '11px', cursor: isUploading ? 'not-allowed' : 'pointer', color: 'white',
+                  flex: '1 1 0', padding: '3px 4px', background: 'transparent', border: 'none',
+                  fontSize: '10px', cursor: isUploading ? 'not-allowed' : 'pointer', color: 'white',
                   fontWeight: '500', opacity: isUploading ? 0.5 : 1, minWidth: 0,
-                }}>✂ Crop</button>
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                }}>✂ Crop / Rotate</button>
             </div>
           )}
 
           <div ref={imageRef} style={{
-              width: '100%', aspectRatio: '1', border: '1px solid #d1d5db', borderRadius: '4px',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              backgroundColor: 'white', overflow: 'hidden', position: 'relative',
+              flex: 1,
+              minHeight: 0,
+              border: '1px solid #d1d5db', 
+              borderRadius: '4px',
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              backgroundColor: 'white', 
+              overflow: 'hidden', 
+              position: 'relative',
             }}>
             {isUploading ? (
               <div style={{ color: '#6b7280', fontSize: '12px', textAlign: 'center' }}>Uploading...</div>
@@ -372,9 +392,18 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
   };
 
   return (
-    <div style={{ padding: '14px' }}>
+    <div style={{ 
+      height: '100%',
+      display: 'flex',
+      flexDirection: 'column',
+      overflow: 'hidden',
+      padding: '12px',
+    }}>
       <div style={{
-        display: 'flex', gap: '16px', maxWidth: '100%',
+        display: 'flex', 
+        gap: '16px', 
+        flex: 1,
+        minHeight: 0,
       }}>
         {renderCoverSection('Front Cover', 'front')}
         {renderCoverSection('Back Cover', 'back')}
