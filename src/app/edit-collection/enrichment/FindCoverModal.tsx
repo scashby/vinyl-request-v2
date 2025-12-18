@@ -41,7 +41,6 @@ export function FindCoverModal({
     setIsSearching(true);
     
     try {
-      // Build URL with specific parameters
       const params = new URLSearchParams();
       if (barcode) params.append('barcode', barcode);
       if (artist) params.append('artist', artist);
@@ -65,7 +64,6 @@ export function FindCoverModal({
     }
   }, [searchQuery, barcode, artist, title, coverType]);
 
-  // Pre-search on mount
   useEffect(() => {
     if (isOpen) {
       performSearch();
@@ -87,7 +85,7 @@ export function FindCoverModal({
       bottom: 0,
       backgroundColor: 'rgba(0, 0, 0, 0.5)',
       display: 'flex',
-      alignItems: 'flex-start',
+      alignItems: 'center',
       justifyContent: 'center',
       zIndex: 30000,
       padding: '20px',
@@ -95,9 +93,9 @@ export function FindCoverModal({
       <div style={{
         backgroundColor: 'white',
         borderRadius: '8px',
-        width: '100%',
-        maxWidth: '1600px',
-        height: 'calc(100vh - 40px)',
+        width: '95vw',
+        maxWidth: '1800px',
+        height: '90vh',
         display: 'flex',
         flexDirection: 'column',
       }}>
@@ -105,14 +103,14 @@ export function FindCoverModal({
         <div style={{
           backgroundColor: '#f97316',
           color: 'white',
-          padding: '10px 16px',
+          padding: '8px 12px',
           borderRadius: '8px 8px 0 0',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
           flexShrink: 0,
         }}>
-          <h2 style={{ margin: 0, fontSize: '15px', fontWeight: '600' }}>Find Cover</h2>
+          <h2 style={{ margin: 0, fontSize: '14px', fontWeight: '600' }}>Find Cover</h2>
           <button
             onClick={onClose}
             style={{
@@ -129,13 +127,13 @@ export function FindCoverModal({
           </button>
         </div>
 
-        {/* Search Bar - Single line, no wrapping */}
+        {/* Search Bar */}
         <div style={{ 
-          padding: '10px 16px', 
+          padding: '8px 12px', 
           borderBottom: '1px solid #e5e7eb',
           flexShrink: 0,
         }}>
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'nowrap' }}>
             <input
               type="text"
               value={searchQuery}
@@ -143,11 +141,12 @@ export function FindCoverModal({
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               placeholder={`Search for ${coverType} cover...`}
               style={{
-                flex: 1,
-                padding: '6px 10px',
+                flex: '1 1 auto',
+                minWidth: 0,
+                padding: '5px 8px',
                 border: '1px solid #d1d5db',
                 borderRadius: '4px',
-                fontSize: '13px',
+                fontSize: '12px',
                 color: '#111827',
               }}
             />
@@ -155,15 +154,16 @@ export function FindCoverModal({
               onClick={handleSearch}
               disabled={isSearching}
               style={{
-                padding: '6px 20px',
+                padding: '5px 16px',
                 background: '#3b82f6',
                 color: 'white',
                 border: 'none',
                 borderRadius: '4px',
-                fontSize: '13px',
+                fontSize: '12px',
                 cursor: isSearching ? 'not-allowed' : 'pointer',
                 fontWeight: '500',
                 whiteSpace: 'nowrap',
+                flexShrink: 0,
                 opacity: isSearching ? 0.7 : 1,
               }}
             >
@@ -174,6 +174,7 @@ export function FindCoverModal({
                 fontSize: '11px', 
                 color: '#6b7280',
                 whiteSpace: 'nowrap',
+                flexShrink: 0,
               }}>
                 Barcode: {barcode}
               </span>
@@ -181,15 +182,15 @@ export function FindCoverModal({
           </div>
         </div>
 
-        {/* Results Grid - Fills remaining space */}
+        {/* Results Grid */}
         <div style={{
           flex: 1,
           overflow: 'auto',
-          padding: '16px',
+          padding: '12px',
         }}>
           {isSearching ? (
             <div style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>
-              Searching Discogs and Google Images...
+              Searching Discogs and Last.fm...
             </div>
           ) : searchResults.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>
@@ -199,7 +200,7 @@ export function FindCoverModal({
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
-              gap: '12px',
+              gap: '10px',
             }}>
               {searchResults.map((result, index) => (
                 <div
@@ -242,14 +243,14 @@ export function FindCoverModal({
                     />
                   </div>
                   <div style={{
-                    marginTop: '6px',
-                    fontSize: '10px',
+                    marginTop: '4px',
+                    fontSize: '9px',
                     color: '#6b7280',
                     textAlign: 'center',
                   }}>
                     {result.width} × {result.height}
-                    <div style={{ fontSize: '9px', opacity: 0.7 }}>
-                      {result.source} {result.type && `(${result.type})`}
+                    <div style={{ fontSize: '8px', opacity: 0.7 }}>
+                      {result.source}
                     </div>
                   </div>
                 </div>

@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
   const barcode = searchParams.get('barcode');
   const artist = searchParams.get('artist');
   const title = searchParams.get('title');
-  const coverType = searchParams.get('type') || 'front'; // 'front' or 'back'
+  const coverType = searchParams.get('type') || 'front';
   
   if (!query && !barcode) {
     return NextResponse.json({ error: 'Query or barcode required' }, { status: 400 });
@@ -44,21 +44,17 @@ export async function GET(request: NextRequest) {
   const results: ImageResult[] = [];
 
   try {
-    // 1. Search Discogs first (most accurate with barcode)
     const discogsResults = await searchDiscogs(barcode || '', artist || '', title || '', coverType as 'front' | 'back');
     results.push(...discogsResults);
 
-    // 2. Search Google Images with specific search terms
     const googleResults = await searchGoogleImages(artist || '', title || '', barcode || '', coverType as 'front' | 'back');
     results.push(...googleResults);
 
-    // 3. Fallback to Last.fm if needed
     if (results.length < 5) {
       const lastfmResults = await searchLastFm(artist || '', title || '');
       results.push(...lastfmResults);
     }
 
-    // Deduplicate by URL
     const uniqueResults = Array.from(
       new Map(results.map(item => [item.url, item])).values()
     );
@@ -71,7 +67,6 @@ export async function GET(request: NextRequest) {
 }
 
 async function searchDiscogs(barcode: string, artist: string, title: string, coverType: 'front' | 'back'): Promise<ImageResult[]> {
-  // Use the actual environment variable name from Vercel
   const token = process.env.NEXT_PUBLIC_DISCOGS_TOKEN;
   
   if (!token) {
@@ -82,11 +77,9 @@ async function searchDiscogs(barcode: string, artist: string, title: string, cov
   try {
     let searchUrl = '';
     
-    // If we have barcode, use it for exact match
     if (barcode) {
       searchUrl = `https://api.discogs.com/database/search?barcode=${encodeURIComponent(barcode)}&token=${token}`;
     } else if (artist && title) {
-      // Otherwise search by artist and title
       searchUrl = `https://api.discogs.com/database/search?artist=${encodeURIComponent(artist)}&release_title=${encodeURIComponent(title)}&type=release&token=${token}`;
     } else {
       return [];
@@ -106,7 +99,6 @@ async function searchDiscogs(barcode: string, artist: string, title: string, cov
 
     const results: ImageResult[] = [];
 
-    // Get detailed release info for first few matches
     for (const release of data.results.slice(0, 3)) {
       try {
         const detailResponse = await fetch(
@@ -122,7 +114,6 @@ async function searchDiscogs(barcode: string, artist: string, title: string, cov
           const detailData = await detailResponse.json() as DiscogsRelease;
           
           if (detailData.images) {
-            // Filter images by type if specified
             const filteredImages = detailData.images.filter(img => {
               if (coverType === 'front') {
                 return img.type === 'primary' || img.type === 'front';
@@ -154,9 +145,6 @@ async function searchDiscogs(barcode: string, artist: string, title: string, cov
 }
 
 async function searchGoogleImages(artist: string, title: string, barcode: string, coverType: 'front' | 'back'): Promise<ImageResult[]> {
-  // Note: GOOGLE_CLIENT_ID/SECRET are for OAuth, not Custom Search API
-  // Custom Search API requires GOOGLE_CX (Custom Search Engine ID)
-  // Currently not configured - this function will be skipped
   const apiKey = process.env.GOOGLE_CLIENT_ID;
   const cx = process.env.GOOGLE_CX;
   
@@ -166,7 +154,6 @@ async function searchGoogleImages(artist: string, title: string, barcode: string
   }
 
   try {
-    // Build specific search query
     let searchQuery = '';
     if (artist && title) {
       searchQuery = `${artist} ${title} vinyl ${coverType} cover`;
