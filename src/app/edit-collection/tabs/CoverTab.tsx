@@ -1,14 +1,22 @@
 // src/app/edit-collection/tabs/CoverTab.tsx
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import Image from 'next/image';
 import type { Album } from 'types/album';
 import { supabase } from 'lib/supabaseClient';
+import { FindCoverModal } from '../enrichment/FindCoverModal';
 
 interface CoverTabProps {
   album: Album;
   onChange: <K extends keyof Album>(field: K, value: Album[K]) => void;
+}
+
+interface CropState {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 }
 
 export function CoverTab({ album, onChange }: CoverTabProps) {
@@ -16,15 +24,8 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
   const [cropMode, setCropMode] = useState<'front' | 'back' | null>(null);
   const [rotation, setRotation] = useState(0);
   const [showFindCover, setShowFindCover] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults] = useState<string[]>([
-    'https://via.placeholder.com/300x300/ff6b6b/ffffff?text=Result+1',
-    'https://via.placeholder.com/300x300/4ecdc4/ffffff?text=Result+2',
-    'https://via.placeholder.com/300x300/45b7d1/ffffff?text=Result+3',
-    'https://via.placeholder.com/300x300/96ceb4/ffffff?text=Result+4',
-    'https://via.placeholder.com/300x300/ffeaa7/000000?text=Result+5',
-    'https://via.placeholder.com/300x300/dfe6e9/000000?text=Result+6',
-  ]);
+  const [cropState, setCropState] = useState<CropState>({ x: 10, y: 10, width: 80, height: 80 });
+  const imageRef = useRef<HTMLDivElement>(null);
 
   const handleUpload = async (coverType: 'front' | 'back') => {
     const input = document.createElement('input');
@@ -93,17 +94,23 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
   };
 
   const handleFindOnline = () => {
-    setSearchQuery(`${album.artist} ${album.title} ${album.year || ''} album cover`);
     setShowFindCover(true);
+  };
+
+  const handleSelectImage = (imageUrl: string) => {
+    // In real implementation, this would save the selected image
+    console.log('Selected image:', imageUrl);
   };
 
   const handleCropRotate = (coverType: 'front' | 'back') => {
     setCropMode(coverType);
     setRotation(0);
+    setCropState({ x: 10, y: 10, width: 80, height: 80 });
   };
 
   const handleCropReset = () => {
     setRotation(0);
+    setCropState({ x: 10, y: 10, width: 80, height: 80 });
   };
 
   const handleCropRotateImage = () => {
@@ -111,9 +118,15 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
   };
 
   const handleCropApply = () => {
-    // In real implementation, this would apply the crop/rotation and upload the modified image
+    // In real implementation, apply crop and rotation
+    console.log('Applying crop:', cropState, 'rotation:', rotation);
     setCropMode(null);
     setRotation(0);
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    // In real implementation, handle crop resizing based on which handle was clicked
   };
 
   const renderCoverSection = (
@@ -142,29 +155,29 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
           {title}
         </h3>
         
-        {/* Action Buttons - Connected horizontal bar */}
+        {/* Action Buttons - Black or Blue header bar */}
         {isInCropMode ? (
           <div style={{
             display: 'flex',
             marginBottom: '12px',
-            border: '1px solid #d1d5db',
+            backgroundColor: '#60a5fa',
             borderRadius: '4px',
             overflow: 'hidden',
-            backgroundColor: 'white',
           }}>
             <button
               type="button"
               onClick={handleCropReset}
               style={{
                 flex: 1,
-                padding: '6px 12px',
-                background: '#60a5fa',
+                padding: '8px 12px',
+                background: 'transparent',
                 border: 'none',
                 borderRight: '1px solid rgba(255,255,255,0.3)',
                 fontSize: '13px',
                 cursor: 'pointer',
                 color: 'white',
                 fontFamily: 'system-ui, -apple-system, sans-serif',
+                fontWeight: '500',
               }}
             >
               × Reset
@@ -174,14 +187,15 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
               onClick={handleCropRotateImage}
               style={{
                 flex: 1,
-                padding: '6px 12px',
-                background: '#60a5fa',
+                padding: '8px 12px',
+                background: 'transparent',
                 border: 'none',
                 borderRight: '1px solid rgba(255,255,255,0.3)',
                 fontSize: '13px',
                 cursor: 'pointer',
                 color: 'white',
                 fontFamily: 'system-ui, -apple-system, sans-serif',
+                fontWeight: '500',
               }}
             >
               🔄 Rotate
@@ -191,13 +205,14 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
               onClick={handleCropApply}
               style={{
                 flex: 1,
-                padding: '6px 12px',
-                background: '#22c55e',
+                padding: '8px 12px',
+                background: 'transparent',
                 border: 'none',
                 fontSize: '13px',
                 cursor: 'pointer',
                 color: 'white',
                 fontFamily: 'system-ui, -apple-system, sans-serif',
+                fontWeight: '500',
               }}
             >
               ✓ Apply
@@ -207,10 +222,9 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
           <div style={{
             display: 'flex',
             marginBottom: '12px',
-            border: '1px solid #d1d5db',
+            backgroundColor: '#1a1a1a',
             borderRadius: '4px',
             overflow: 'hidden',
-            backgroundColor: 'white',
           }}>
             <button
               type="button"
@@ -218,14 +232,15 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
               disabled={isUploading}
               style={{
                 flex: 1,
-                padding: '6px 12px',
-                background: '#f3f4f6',
+                padding: '8px 12px',
+                background: 'transparent',
                 border: 'none',
-                borderRight: '1px solid #d1d5db',
+                borderRight: '1px solid #333',
                 fontSize: '13px',
                 cursor: isUploading ? 'not-allowed' : 'pointer',
-                color: '#374151',
+                color: 'white',
                 fontFamily: 'system-ui, -apple-system, sans-serif',
+                fontWeight: '500',
                 opacity: isUploading ? 0.5 : 1,
               }}
             >
@@ -237,14 +252,15 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
               disabled={isUploading}
               style={{
                 flex: 1,
-                padding: '6px 12px',
-                background: '#f3f4f6',
+                padding: '8px 12px',
+                background: 'transparent',
                 border: 'none',
-                borderRight: '1px solid #d1d5db',
+                borderRight: '1px solid #333',
                 fontSize: '13px',
                 cursor: isUploading ? 'not-allowed' : 'pointer',
-                color: '#374151',
+                color: 'white',
                 fontFamily: 'system-ui, -apple-system, sans-serif',
+                fontWeight: '500',
                 opacity: isUploading ? 0.5 : 1,
               }}
             >
@@ -256,14 +272,15 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
               disabled={isUploading}
               style={{
                 flex: 1,
-                padding: '6px 12px',
-                background: '#f3f4f6',
+                padding: '8px 12px',
+                background: 'transparent',
                 border: 'none',
-                borderRight: '1px solid #d1d5db',
+                borderRight: '1px solid #333',
                 fontSize: '13px',
                 cursor: isUploading ? 'not-allowed' : 'pointer',
-                color: '#374151',
+                color: 'white',
                 fontFamily: 'system-ui, -apple-system, sans-serif',
+                fontWeight: '500',
                 opacity: isUploading ? 0.5 : 1,
               }}
             >
@@ -275,13 +292,14 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
               disabled={isUploading}
               style={{
                 flex: 1,
-                padding: '6px 12px',
-                background: '#f3f4f6',
+                padding: '8px 12px',
+                background: 'transparent',
                 border: 'none',
                 fontSize: '13px',
                 cursor: isUploading ? 'not-allowed' : 'pointer',
-                color: '#374151',
+                color: 'white',
                 fontFamily: 'system-ui, -apple-system, sans-serif',
+                fontWeight: '500',
                 opacity: isUploading ? 0.5 : 1,
               }}
             >
@@ -290,41 +308,101 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
           </div>
         )}
 
-        {/* Image Display Area */}
-        <div style={{
-          width: '300px',
-          height: '300px',
-          border: '1px solid #d1d5db',
-          borderRadius: '4px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: 'white',
-          overflow: 'hidden',
-          position: 'relative',
-        }}>
+        {/* Image Display Area - FULL WIDTH */}
+        <div 
+          ref={imageRef}
+          style={{
+            width: '100%',
+            aspectRatio: '1',
+            border: '1px solid #d1d5db',
+            borderRadius: '4px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'white',
+            overflow: 'hidden',
+            position: 'relative',
+          }}
+        >
           {isUploading ? (
             <div style={{ color: '#6b7280', fontSize: '13px', textAlign: 'center' }}>
               <div style={{ marginBottom: '8px' }}>Uploading...</div>
             </div>
           ) : imageUrl ? (
-            <div style={{
-              width: '100%',
-              height: '100%',
-              position: 'relative',
-              transform: `rotate(${rotation}deg)`,
-              transition: 'transform 0.3s ease',
-            }}>
-              <Image 
-                src={imageUrl} 
-                alt={`${title} artwork`}
-                fill
-                style={{
-                  objectFit: 'contain',
-                }}
-                unoptimized
-              />
-            </div>
+            <>
+              <div style={{
+                width: '100%',
+                height: '100%',
+                position: 'relative',
+                transform: `rotate(${rotation}deg)`,
+                transition: 'transform 0.3s ease',
+              }}>
+                <Image 
+                  src={imageUrl} 
+                  alt={`${title} artwork`}
+                  fill
+                  style={{
+                    objectFit: 'contain',
+                  }}
+                  unoptimized
+                />
+              </div>
+              
+              {/* Crop handles - only show in crop mode */}
+              {isInCropMode && (
+                <div style={{
+                  position: 'absolute',
+                  left: `${cropState.x}%`,
+                  top: `${cropState.y}%`,
+                  width: `${cropState.width}%`,
+                  height: `${cropState.height}%`,
+                  border: '2px solid #3b82f6',
+                  boxShadow: '0 0 0 9999px rgba(0,0,0,0.5)',
+                  pointerEvents: 'none',
+                }}>
+                  {/* Corner handles */}
+                  {['nw', 'ne', 'sw', 'se'].map(pos => (
+                    <div
+                      key={pos}
+                      onMouseDown={handleMouseDown}
+                      style={{
+                        position: 'absolute',
+                        width: '10px',
+                        height: '10px',
+                        backgroundColor: '#3b82f6',
+                        border: '2px solid white',
+                        borderRadius: '50%',
+                        pointerEvents: 'all',
+                        cursor: pos.includes('n') ? (pos.includes('w') ? 'nwse-resize' : 'nesw-resize') : (pos.includes('w') ? 'nesw-resize' : 'nwse-resize'),
+                        ...(pos === 'nw' && { top: '-5px', left: '-5px' }),
+                        ...(pos === 'ne' && { top: '-5px', right: '-5px' }),
+                        ...(pos === 'sw' && { bottom: '-5px', left: '-5px' }),
+                        ...(pos === 'se' && { bottom: '-5px', right: '-5px' }),
+                      }}
+                    />
+                  ))}
+                  
+                  {/* Edge handles */}
+                  {['n', 's', 'e', 'w'].map(pos => (
+                    <div
+                      key={pos}
+                      onMouseDown={handleMouseDown}
+                      style={{
+                        position: 'absolute',
+                        backgroundColor: '#3b82f6',
+                        border: '2px solid white',
+                        borderRadius: '3px',
+                        pointerEvents: 'all',
+                        ...(pos === 'n' && { top: '-5px', left: '50%', transform: 'translateX(-50%)', width: '30px', height: '10px', cursor: 'ns-resize' }),
+                        ...(pos === 's' && { bottom: '-5px', left: '50%', transform: 'translateX(-50%)', width: '30px', height: '10px', cursor: 'ns-resize' }),
+                        ...(pos === 'e' && { right: '-5px', top: '50%', transform: 'translateY(-50%)', width: '10px', height: '30px', cursor: 'ew-resize' }),
+                        ...(pos === 'w' && { left: '-5px', top: '50%', transform: 'translateY(-50%)', width: '10px', height: '30px', cursor: 'ew-resize' }),
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+            </>
           ) : (
             <div style={{ color: '#9ca3af', fontSize: '13px', textAlign: 'center' }}>
               No {coverType} cover
@@ -351,160 +429,12 @@ export function CoverTab({ album, onChange }: CoverTabProps) {
       </div>
 
       {/* Find Cover Modal */}
-      {showFindCover && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'center',
-          zIndex: 30000,
-          paddingTop: '40px',
-        }}>
-          <div style={{
-            backgroundColor: 'white',
-            borderRadius: '8px',
-            maxWidth: '1000px',
-            width: '90%',
-            maxHeight: '90vh',
-            display: 'flex',
-            flexDirection: 'column',
-          }}>
-            {/* Header */}
-            <div style={{
-              backgroundColor: '#f97316',
-              color: 'white',
-              padding: '16px 24px',
-              borderRadius: '8px 8px 0 0',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-            }}>
-              <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '600' }}>Find Cover</h2>
-              <button
-                onClick={() => setShowFindCover(false)}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: 'white',
-                  fontSize: '24px',
-                  cursor: 'pointer',
-                  padding: 0,
-                  lineHeight: '1',
-                }}
-              >
-                ×
-              </button>
-            </div>
-
-            {/* Search Bar */}
-            <div style={{ padding: '16px 24px', borderBottom: '1px solid #e5e7eb' }}>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search for album cover..."
-                  style={{
-                    flex: 1,
-                    padding: '8px 12px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '4px',
-                    fontSize: '14px',
-                    color: '#111827',
-                  }}
-                />
-                <button
-                  onClick={() => {
-                    console.log('Searching for:', searchQuery);
-                  }}
-                  style={{
-                    padding: '8px 24px',
-                    background: '#3b82f6',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    fontSize: '14px',
-                    cursor: 'pointer',
-                    fontWeight: '500',
-                  }}
-                >
-                  Search
-                </button>
-              </div>
-            </div>
-
-            {/* Results Grid */}
-            <div style={{
-              flex: 1,
-              overflow: 'auto',
-              padding: '24px',
-            }}>
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
-                gap: '16px',
-              }}>
-                {searchResults.map((result, index) => (
-                  <div
-                    key={index}
-                    onClick={() => {
-                      // In real implementation, set the selected image
-                      console.log('Selected image:', result);
-                      setShowFindCover(false);
-                    }}
-                    style={{
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '4px',
-                      padding: '8px',
-                      cursor: 'pointer',
-                      backgroundColor: 'white',
-                      transition: 'all 0.2s',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = '#3b82f6';
-                      e.currentTarget.style.boxShadow = '0 2px 8px rgba(59, 130, 246, 0.2)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = '#e5e7eb';
-                      e.currentTarget.style.boxShadow = 'none';
-                    }}
-                  >
-                    <div style={{
-                      width: '100%',
-                      paddingBottom: '100%',
-                      position: 'relative',
-                      backgroundColor: '#f3f4f6',
-                      borderRadius: '4px',
-                      overflow: 'hidden',
-                    }}>
-                      <Image
-                        src={result}
-                        alt={`Search result ${index + 1}`}
-                        fill
-                        style={{ objectFit: 'cover' }}
-                        unoptimized
-                      />
-                    </div>
-                    <div style={{
-                      marginTop: '8px',
-                      fontSize: '11px',
-                      color: '#6b7280',
-                      textAlign: 'center',
-                    }}>
-                      300 × 300
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <FindCoverModal
+        isOpen={showFindCover}
+        onClose={() => setShowFindCover(false)}
+        onSelectImage={handleSelectImage}
+        defaultQuery={`${album.artist} ${album.title} ${album.year || ''} album cover`}
+      />
     </div>
   );
 }
