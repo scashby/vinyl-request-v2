@@ -1,13 +1,34 @@
 # DWD Collection Management System - Project Status
 
-**Last Updated:** December 18, 2024
-**Current Phase:** Phase 2.3 - Edit Album Modal Tabs Implementation (COMPLETE)
+**Last Updated:** December 19, 2024
+**Current Phase:** Phase 2.4 - Menu Features & Collection Management
 
-🎯 **ROLLBACK POINT ESTABLISHED** - All 8 Edit Album Modal tabs functional, Cover search working, ready to proceed to next phase.
+---
+
+## 📝 HOW TO UPDATE THIS FILE
+
+**CRITICAL INSTRUCTIONS FOR CLAUDE:**
+
+1. **NEVER rewrite this file from scratch** - Always use surgical updates (`str_replace`)
+2. **RECENT CHANGES section:** Add new entries at the top, keep only last 7 days
+3. **Move old changes:** Entries older than 7 days go to `ARCHIVE.md`
+4. **Keep summaries brief:** 3-5 bullets max per change entry
+5. **Reference docs:** Point to `TABS_REFERENCE.md` and `ARCHITECTURE.md` for details
+6. **When user uploads this file:** READ it first, then make targeted changes only
+
+**What goes where:**
+- `project_status.md` - Current status, recent changes (last 7 days), active work
+- `ARCHIVE.md` - Historical changes (older than 7 days)
+- `TABS_REFERENCE.md` - Complete tab inventory and field lists
+- `ARCHITECTURE.md` - System architecture, patterns, technical details
+
+---
+
+🎯 **ROLLBACK POINT ESTABLISHED** - All 8 Edit Album Modal tabs functional, Cover search working, CLZ XML import complete with full track data and listen history.
 
 ## Executive Summary
 
-The DWD Collection Management System has successfully completed all 8 Edit Album Modal tabs (Main, Details, Classical, People, Tracks, Personal, Cover, Links) with full CLZ Music Web design replication. Cover tab includes working upload, search (Discogs/Last.fm), and crop/rotate UI. The system maintains pixel-perfect replication standards while building towards comprehensive DJ functionality and community features.
+The DWD Collection Management System has successfully completed all 8 Edit Album Modal tabs (Main, Details, Classical, People, Tracks, Personal, Cover, Links) with full CLZ Music Web design replication. Cover tab includes working upload, search (Discogs/Last.fm), and crop/rotate UI. **CLZ XML import has been completed offline**, capturing comprehensive track-level data, listen history with timestamps, and detailed disc metadata. The system now transitions to implementing menu features and collection management functionality while maintaining pixel-perfect replication standards and building towards comprehensive DJ functionality and community features.
 
 ---
 
@@ -127,114 +148,73 @@ The DWD Collection Management System has successfully completed all 8 Edit Album
 - Clear button functionality
 - Pixel-perfect match to CLZ Music Web
 
+### Phase 2.3.5: CLZ XML Import ✅
+**Completed December 19, 2024 (Offline)**
+- ✅ Track-level data parsing from XML export
+- ✅ Listen history with timestamps captured
+- ✅ Detailed disc metadata imported
+- ✅ Track position, title, and duration data
+- ✅ Disc titles and runtime information
+- ✅ Comprehensive metadata enrichment beyond CSV capabilities
+
 ---
 
 ## Current Status
 
 ### Active Development
-- **Phase 2.3 Continuation:** Integrating picker modals with Classical and People tab fields
-- **Details Tab:** Planning implementation with Genre, Style, Format fields
-- **Personal Tab:** Planning implementation with Rating, Tags, Purchase info
+- **Phase 2.4:** Menu Features & Collection Management implementation
+  - Manage Pick Lists modal - central hub for all picker list types (30+ types)
+  - Manage Collections modal - create/edit/delete collection groupings
+  - Standardizing dropdown fields to pull from Supabase with aggregated counts
+  - Wiring sidebar menu buttons to modals
+  - Dynamic bottom collection tabs from database
 
 ### Recently Completed
-✅ ClassicalTab.tsx component created
-✅ PeopleTab.tsx component created
-✅ CoverTab.tsx component created
-✅ LinksTab.tsx component created
+✅ CLZ XML import completed with full track and listen history data
+✅ All 8 Edit Album Modal tabs functional
+✅ Cover tab with Discogs + Last.fm search integration
 ✅ Comprehensive AlbumData type definitions
 ✅ tabs_reference.md documentation
-✅ Picker data utilities for all new entity types
-
----
-
-## Technical Architecture
-
-### Components Hierarchy
-```
-EditAlbumModal
-├── TabNavigation
-├── MainTab ✅
-├── DetailsTab 🔄
-├── ClassicalTab ✅
-├── PeopleTab ✅
-├── TracksTab ✅
-├── PersonalTab 🔄
-├── CoverTab ✅
-├── LinksTab ✅
-└── NotesTab 🔄
-```
-
-### Type System
-```typescript
-// Core types defined in src/types/collection.ts
-interface AlbumData {
-  // Main fields
-  artist: string;
-  album_title: string;
-  label?: string;
-  // ... 30+ total fields
-  
-  // Classical fields
-  composer?: string;
-  conductor?: string;
-  chorus?: string;
-  composition?: string;
-  orchestra?: string;
-  
-  // People fields
-  songwriters?: string[];
-  producers?: string[];
-  engineers?: string[];
-  musicians?: string[];
-  
-  // Cover fields
-  cover_image_url?: string;
-  back_cover_image_url?: string;
-  
-  // Links fields
-  links?: Link[];
-}
-```
-
-### Picker Data Utilities
-```
-pickerDataUtils.ts (or additions file)
-├── Artist functions ✅
-├── Label functions ✅
-├── Country functions ✅
-├── Composer functions ✅
-├── Conductor functions ✅
-├── Chorus functions ✅
-├── Composition functions ✅
-├── Orchestra functions ✅
-├── Songwriter functions ✅
-├── Producer functions ✅
-├── Engineer functions ✅
-└── Musician functions ✅
-```
+✅ Picker data utilities for all entity types
 
 ---
 
 ## Remaining Work
 
-### Immediate Next Steps (Phase 2.3 Continuation)
-1. **Integrate Picker Modals**
-   - Connect all Classical tab selectors to picker system
-   - Connect all People tab selectors to picker system
-   - Test edit, merge, and manage functionality
+### Immediate Next Steps (Phase 2.4 - Menu Features) 🔄
+**Priority 1: Manage Pick Lists Modal**
+- [ ] Create dropdown showing all 30+ picker list types
+  - Artist, Box Set, Chorus, Composer, Conductor, Country, Engineer
+  - Format, Genre, Label, Location, Media Condition, Musician, Orchestra
+  - Owner, Package/Sleeve Condition, Packaging, Producer, Purchase Store
+  - RPM, SPARS, Signee, Songwriter, Sound, Storage Device, Studio
+  - Tag, Vinyl Color, Vinyl Weight
+- [ ] Wire to existing ManageModal component
+- [ ] Search box to filter list types
+- [ ] "Merge Mode" toggle for batch operations
+- [ ] Display aggregated counts from Supabase (e.g., "263 Near Mint, 8 Poor")
 
-2. **Cover Tab Enhancements**
-   - Implement Find Online modal with search results grid
-   - Implement file upload handler
-   - Implement crop/rotate functionality
-   - Add image optimization and caching
+**Priority 2: Manage Collections Modal**
+- [ ] Create/Edit/Delete collection groupings
+- [ ] Show album counts per collection
+- [ ] Privacy settings (Private/Public)
+- [ ] Storage approach decision:
+  - **Option A**: Simple folder field (albums in one collection)
+  - **Option B**: Junction table (albums in multiple collections)
 
-3. **Links Tab Enhancements**
-   - Add URL validation
-   - Add link preview fetching
-   - Add edit link functionality
+**Priority 3: Standardize Dropdown Fields**
+- [ ] Convert hardcoded dropdowns (Vinyl Color, Country) to Supabase queries
+- [ ] Show aggregated counts like other pickers
+- [ ] Ensure all fields use database management pattern
+- [ ] Pause and standardize when encountering mixed approaches
 
-### Phase 2.4: Details Tab (Planned)
+**Priority 4: Wire Sidebar Menu**
+- [ ] Connect "Manage Pick Lists" button to modal
+- [ ] Connect "Manage Collections" button to modal
+- [ ] Update bottom collection tabs to read from database
+- [ ] Add activeCollection filter to album queries
+
+### Phase 2.5: Details Tab (Planned)
 - Genre selector with picker
 - Style selector with picker
 - Format selector with picker
@@ -243,7 +223,7 @@ pickerDataUtils.ts (or additions file)
 - Notes text area
 - Same styling patterns as Main/Classical tabs
 
-### Phase 2.5: Personal Tab (Planned)
+### Phase 2.6: Personal Tab (Planned)
 - Star rating component
 - Tags multi-value field
 - Collection Number input
@@ -251,7 +231,7 @@ pickerDataUtils.ts (or additions file)
 - Purchase Price input with currency
 - Purchase Location input
 
-### Phase 2.6: Notes Tab (Planned)
+### Phase 2.7: Notes Tab (Planned)
 - Rich text editor or large text area
 - Note timestamps
 - Note history/versioning
@@ -321,9 +301,9 @@ pickerDataUtils.ts (or additions file)
 
 ---
 
-## Files Modified/Created Today
+## Files Modified/Created Recently
 
-### New Components
+### New Components (Phase 2.3)
 - ✅ `/home/claude/src/app/edit-collection/components/ClassicalTab.tsx`
 - ✅ `/home/claude/src/app/edit-collection/components/PeopleTab.tsx`
 - ✅ `/home/claude/src/app/edit-collection/components/CoverTab.tsx`
@@ -346,17 +326,22 @@ pickerDataUtils.ts (or additions file)
 
 ### Documentation
 - ✅ `/home/claude/tabs_reference.md` (comprehensive tab documentation)
-- ✅ `/home/claude/project_status` (this file)
+- ✅ `/home/claude/project_status.md` (this file)
+
+### Data Import (Phase 2.3.5)
+- ✅ CLZ XML import completed offline
+- ✅ Track data populated in database
+- ✅ Listen history captured
+- ✅ Disc metadata imported
 
 ---
 
 ## Known Issues & Technical Debt
 
 ### Minor Issues
-- [ ] Picker modals not yet connected to Classical/People tab selectors
-- [ ] Cover tab Find Online modal needs full implementation
+- [ ] Cover tab Apply Crop needs backend canvas processing (deferred)
 - [ ] Links tab URL validation needs implementation
-- [ ] No edit functionality for existing links
+- [ ] No edit functionality for existing links yet
 
 ### Future Enhancements
 - [ ] Keyboard shortcuts for modal navigation
@@ -376,12 +361,13 @@ pickerDataUtils.ts (or additions file)
 - ✅ Column management persistence
 - ✅ Table virtualization performance
 - ✅ White text visibility across all inputs
+- ✅ Cover search (Discogs + Last.fm)
+- ✅ CLZ XML data import
 
 ### Pending Tests
-- [ ] Classical tab picker integration
-- [ ] People tab multi-value fields
-- [ ] Cover tab image upload
-- [ ] Links tab drag-and-drop
+- [ ] Manage Pick Lists modal functionality
+- [ ] Manage Collections modal functionality
+- [ ] Collection tab switching
 - [ ] Form validation error states
 - [ ] Accessibility compliance
 - [ ] Cross-browser compatibility
@@ -437,14 +423,17 @@ pickerDataUtils.ts (or additions file)
 ✅ Collection virtualization (1,700+ albums)
 ✅ Main tab pixel-perfect replication
 ✅ Tracks tab with drag-and-drop
-✅ Six tabs implemented (Main, Classical, People, Tracks, Cover, Links)
+✅ Eight tabs implemented (Main, Details, Classical, People, Tracks, Personal, Cover, Links)
 ✅ Universal picker system architecture
 ✅ Type system fully defined
 ✅ Comprehensive documentation
+✅ CLZ XML import with full track data
 
 ### Upcoming Milestones
-🎯 All 9 tabs implemented
-🎯 Full picker modal integration
+🎯 Menu features implemented (Pick Lists, Collections)
+🎯 All collection management functionality working
+🎯 All dropdown fields standardized to Supabase
+🎯 Full picker modal integration complete
 🎯 Form validation complete
 🎯 Data persistence working
 🎯 Spotify integration
@@ -476,8 +465,10 @@ These items are functional but need final implementation for complete feature pa
 **Phase 1 (Foundation):** ✅ Completed
 **Phase 2.1 (Picker System):** ✅ Completed
 **Phase 2.2 (Main Tab):** ✅ Completed
-**Phase 2.3 (All Modal Tabs):** ✅ Completed December 18, 2024 🎯 ROLLBACK POINT
-**Phase 2.4 (Detail Panel):** Planned
+**Phase 2.3 (All Modal Tabs):** ✅ Completed December 18, 2024
+**Phase 2.3.5 (CLZ XML Import):** ✅ Completed December 19, 2024
+**Phase 2.4 (Menu Features):** 🔄 In Progress December 19, 2024
+**Phase 2.5-2.7 (Remaining Tabs):** Planned
 **Phase 3 (Validation & Persistence):** Planned Q1 2025
 **Phase 4 (Advanced Features):** Planned Q2 2025
 
