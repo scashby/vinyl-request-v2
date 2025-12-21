@@ -15,44 +15,78 @@ const PRESET_ICONS = ['⚡', '🎵', '🔥', '⭐', '💎', '🎧', '🎸', '�
 
 // Field definitions with their types
 const FIELD_OPTIONS: { value: CrateFieldType; label: string; type: 'text' | 'number' | 'date' | 'boolean' | 'array' }[] = [
-  // Text fields
+  // Basic Info
   { value: 'artist', label: 'Artist', type: 'text' },
   { value: 'title', label: 'Album Title', type: 'text' },
   { value: 'format', label: 'Format', type: 'text' },
-  { value: 'country', label: 'Country', type: 'text' },
-  { value: 'location', label: 'Location', type: 'text' },
-  { value: 'owner', label: 'Owner', type: 'text' },
-  { value: 'notes', label: 'Notes', type: 'text' },
   { value: 'barcode', label: 'Barcode', type: 'text' },
   { value: 'cat_no', label: 'Catalog Number', type: 'text' },
   
+  // Packaging & Condition
+  { value: 'packaging', label: 'Packaging', type: 'text' },
+  { value: 'package_sleeve_condition', label: 'Package/Sleeve Condition', type: 'text' },
+  { value: 'media_condition', label: 'Media Condition', type: 'text' },
+  
+  // Vinyl Details
+  { value: 'vinyl_weight', label: 'Vinyl Weight', type: 'text' },
+  { value: 'rpm', label: 'RPM', type: 'text' },
+  { value: 'sound', label: 'Sound', type: 'text' },
+  { value: 'spars_code', label: 'SPARS Code', type: 'text' },
+  
+  // Location & Studio
+  { value: 'country', label: 'Country', type: 'text' },
+  { value: 'location', label: 'Location', type: 'text' },
+  { value: 'studio', label: 'Studio', type: 'text' },
+  
+  // Personal
+  { value: 'owner', label: 'Owner', type: 'text' },
+  { value: 'purchase_store', label: 'Purchase Store', type: 'text' },
+  { value: 'notes', label: 'Notes', type: 'text' },
+  { value: 'box_set', label: 'Box Set', type: 'text' },
+  
+  // Classical
+  { value: 'composer', label: 'Composer', type: 'text' },
+  { value: 'conductor', label: 'Conductor', type: 'text' },
+  { value: 'chorus', label: 'Chorus', type: 'text' },
+  { value: 'composition', label: 'Composition', type: 'text' },
+  { value: 'orchestra', label: 'Orchestra', type: 'text' },
+  
   // Number fields
   { value: 'year_int', label: 'Year', type: 'number' },
+  { value: 'decade', label: 'Decade', type: 'number' },
   { value: 'my_rating', label: 'My Rating', type: 'number' },
   { value: 'play_count', label: 'Play Count', type: 'number' },
   { value: 'discs', label: 'Disc Count', type: 'number' },
   { value: 'sides', label: 'Sides', type: 'number' },
   { value: 'index_number', label: 'Index Number', type: 'number' },
-  { value: 'decade', label: 'Decade', type: 'number' },
+  { value: 'purchase_price', label: 'Purchase Price', type: 'number' },
+  { value: 'current_value', label: 'Current Value', type: 'number' },
   
   // Date fields
   { value: 'date_added', label: 'Date Added', type: 'date' },
   { value: 'purchase_date', label: 'Purchase Date', type: 'date' },
   { value: 'last_played_date', label: 'Last Played Date', type: 'date' },
+  { value: 'last_cleaned_date', label: 'Last Cleaned Date', type: 'date' },
   { value: 'original_release_date', label: 'Original Release Date', type: 'date' },
   { value: 'recording_date', label: 'Recording Date', type: 'date' },
-  { value: 'last_cleaned_date', label: 'Last Cleaned Date', type: 'date' },
   
   // Boolean fields
   { value: 'for_sale', label: 'For Sale', type: 'boolean' },
   { value: 'is_live', label: 'Is Live', type: 'boolean' },
   { value: 'is_1001', label: '1001 Albums', type: 'boolean' },
   
-  // Array fields
+  // Array fields - Collections
   { value: 'custom_tags', label: 'Tags', type: 'array' },
-  { value: 'discogs_genres', label: 'Discogs Genres', type: 'array' },
-  { value: 'spotify_genres', label: 'Spotify Genres', type: 'array' },
+  { value: 'discogs_genres', label: 'Genres (Discogs)', type: 'array' },
+  { value: 'spotify_genres', label: 'Genres (Spotify)', type: 'array' },
   { value: 'labels', label: 'Labels', type: 'array' },
+  { value: 'signed_by', label: 'Signed By', type: 'array' },
+  
+  // Array fields - Credits
+  { value: 'songwriters', label: 'Songwriters', type: 'array' },
+  { value: 'producers', label: 'Producers', type: 'array' },
+  { value: 'engineers', label: 'Engineers', type: 'array' },
+  { value: 'musicians', label: 'Musicians', type: 'array' },
 ];
 
 // Get operators for a field type
