@@ -660,3 +660,5 @@ export function NewSmartCrateModal({ isOpen, onClose, onCrateCreated }: NewSmart
     </div>
   );
 }
+
+export default NewSmartCrateModal;

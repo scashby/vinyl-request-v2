@@ -422,3 +422,5 @@ export function ManageCratesModal({ isOpen, onClose, onCratesChanged, onOpenNewC
     </div>
   );
 }
+
+export default ManageCratesModal;

@@ -3,18 +3,18 @@
 
 import { useCallback, useEffect, useState, useMemo, Suspense, memo } from 'react';
 import Image from 'next/image';
-import { supabase } from 'lib/supabaseClient';
-import CollectionTable from 'components/CollectionTable';
-import ColumnSelector from 'components/ColumnSelector';
+import { supabase } from '../../lib/supabaseClient';
+import CollectionTable from '../../components/CollectionTable';
+import ColumnSelector from '../../components/ColumnSelector';
 import { ColumnId, DEFAULT_VISIBLE_COLUMNS, DEFAULT_LOCKED_COLUMNS, SortState } from './columnDefinitions';
-import { Album, toSafeStringArray, toSafeSearchString } from 'types/album';
+import { Album, toSafeStringArray, toSafeSearchString } from '../../types/album';
 import EditAlbumModal from './EditAlbumModal';
 import { SettingsModal } from './settings/SettingsModal';
-import type { Crate } from 'types/crate';
-import { albumMatchesSmartCrate } from 'lib/crateUtils';
-import { NewCrateModal } from './crates/NewCrateModal';
-import { NewSmartCrateModal } from './crates/NewSmartCrateModal';
-import { ManageCratesModal } from './crates/ManageCratesModal';
+import NewCrateModal from './crates/NewCrateModal';
+import NewSmartCrateModal from './crates/NewSmartCrateModal';
+import ManageCratesModal from './crates/ManageCratesModal';
+import type { Crate } from '../../types/crate';
+import { albumMatchesSmartCrate } from '../../lib/crateUtils';
 
 type SortOption = 
   | 'artist-asc' | 'artist-desc' 
@@ -633,9 +633,9 @@ function CollectionBrowserPage() {
   const [editingAlbumId, setEditingAlbumId] = useState<number | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showFolderModeDropdown, setShowFolderModeDropdown] = useState(false); // Dropdown for view mode selection
+  const [showManageCratesModal, setShowManageCratesModal] = useState(false);
   const [showNewCrateModal, setShowNewCrateModal] = useState(false);
   const [showNewSmartCrateModal, setShowNewSmartCrateModal] = useState(false);
-  const [showManageCratesModal, setShowManageCratesModal] = useState(false);
   
   const [sortBy, setSortBy] = useState<SortOption>('artist-asc');
   const [showSortDropdown, setShowSortDropdown] = useState(false);

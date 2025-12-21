@@ -340,3 +340,5 @@ export function NewCrateModal({ isOpen, onClose, onCrateCreated }: NewCrateModal
     </div>
   );
 }
+
+export default NewCrateModal;
