@@ -8,7 +8,7 @@ import type { Crate } from 'types/crate';
 interface NewCrateModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onCrateCreated: () => void;
+  onCrateCreated: (crateId: number) => void;
   editingCrate?: Crate | null; // Optional crate to edit
 }
 
@@ -69,6 +69,10 @@ export function NewCrateModal({ isOpen, onClose, onCrateCreated, editingCrate }:
           setSaving(false);
           return;
         }
+
+        // Success - pass existing crate ID
+        onCrateCreated(editingCrate.id);
+        handleClose();
       } else {
         // INSERT new crate
         // Get the highest sort_order and add 1
@@ -82,7 +86,7 @@ export function NewCrateModal({ isOpen, onClose, onCrateCreated, editingCrate }:
           ? (existingCrates[0].sort_order || 0) + 1 
           : 0;
 
-        const { error: insertError } = await supabase
+        const { data: newCrate, error: insertError } = await supabase
           .from('crates')
           .insert({
             name: name.trim(),
@@ -93,18 +97,20 @@ export function NewCrateModal({ isOpen, onClose, onCrateCreated, editingCrate }:
             match_rules: 'all',
             live_update: true,
             sort_order: nextSortOrder,
-          });
+          })
+          .select('id')
+          .single();
 
-        if (insertError) {
-          setError(insertError.message);
+        if (insertError || !newCrate) {
+          setError(insertError?.message || 'Failed to create crate');
           setSaving(false);
           return;
         }
-      }
 
-      // Success
-      onCrateCreated();
-      handleClose();
+        // Success - pass new crate ID
+        onCrateCreated(newCrate.id);
+        handleClose();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : `Failed to ${isEditing ? 'update' : 'create'} crate`);
       setSaving(false);

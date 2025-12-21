@@ -639,6 +639,8 @@ function CollectionBrowserPage() {
   const [showNewSmartCrateModal, setShowNewSmartCrateModal] = useState(false);
   const [showAddToCrateModal, setShowAddToCrateModal] = useState(false);
   const [editingCrate, setEditingCrate] = useState<Crate | null>(null);
+  const [returnToAddToCrate, setReturnToAddToCrate] = useState(false);
+  const [newlyCreatedCrateId, setNewlyCreatedCrateId] = useState<number | null>(null);
   
   const [sortBy, setSortBy] = useState<SortOption>('artist-asc');
   const [showSortDropdown, setShowSortDropdown] = useState(false);
@@ -2137,12 +2139,25 @@ function CollectionBrowserPage() {
           onClose={() => {
             setShowNewCrateModal(false);
             setEditingCrate(null);
+            if (returnToAddToCrate) {
+              setReturnToAddToCrate(false);
+              setNewlyCreatedCrateId(null);
+            }
           }}
-          onCrateCreated={() => {
-            loadCrates();
-            setShowNewCrateModal(false);
-            setShowManageCratesModal(true);
+          onCrateCreated={async (newCrateId) => {
+            await loadCrates();
             setEditingCrate(null);
+            
+            if (returnToAddToCrate) {
+              // User created crate from AddToCrateModal - return there with new crate selected
+              setNewlyCreatedCrateId(newCrateId);
+              setShowNewCrateModal(false);
+              setShowAddToCrateModal(true);
+            } else {
+              // Normal flow from ManageCratesModal - return there
+              setShowNewCrateModal(false);
+              setShowManageCratesModal(true);
+            }
           }}
           editingCrate={editingCrate}
         />
@@ -2198,10 +2213,21 @@ function CollectionBrowserPage() {
       {showAddToCrateModal && (
         <AddToCrateModal
           isOpen={showAddToCrateModal}
-          onClose={() => setShowAddToCrateModal(false)}
+          onClose={() => {
+            setShowAddToCrateModal(false);
+            setReturnToAddToCrate(false);
+            setNewlyCreatedCrateId(null);
+          }}
           crates={cratesWithCounts}
           onAddToCrates={handleAddToCrates}
           selectedCount={selectedAlbumIds.size}
+          onOpenNewCrate={() => {
+            setReturnToAddToCrate(true);
+            setShowAddToCrateModal(false);
+            setEditingCrate(null);
+            setShowNewCrateModal(true);
+          }}
+          autoSelectCrateId={newlyCreatedCrateId}
         />
       )}
     </>

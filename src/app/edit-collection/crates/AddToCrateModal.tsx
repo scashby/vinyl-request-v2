@@ -10,6 +10,8 @@ interface AddToCrateModalProps {
   crates: Crate[];
   onAddToCrates: (crateIds: number[]) => Promise<void>;
   selectedCount: number;
+  onOpenNewCrate: () => void;
+  autoSelectCrateId?: number | null;
 }
 
 export function AddToCrateModal({
@@ -18,6 +20,8 @@ export function AddToCrateModal({
   crates,
   onAddToCrates,
   selectedCount,
+  onOpenNewCrate,
+  autoSelectCrateId,
 }: AddToCrateModalProps) {
   const [selectedCrateIds, setSelectedCrateIds] = useState<number[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -30,6 +34,18 @@ export function AddToCrateModal({
       setSearchQuery('');
     }
   }, [isOpen]);
+
+  // Auto-select newly created crate
+  useEffect(() => {
+    if (isOpen && autoSelectCrateId) {
+      setSelectedCrateIds(prev => {
+        if (!prev.includes(autoSelectCrateId)) {
+          return [...prev, autoSelectCrateId];
+        }
+        return prev;
+      });
+    }
+  }, [isOpen, autoSelectCrateId]);
 
   if (!isOpen) return null;
 
@@ -127,11 +143,14 @@ export function AddToCrateModal({
           </button>
         </div>
 
-        {/* Search */}
+        {/* Search + New Crate Button */}
         <div
           style={{
             padding: '12px 16px',
             borderBottom: '1px solid #e5e7eb',
+            display: 'flex',
+            gap: '8px',
+            alignItems: 'center',
           }}
         >
           <input
@@ -140,7 +159,7 @@ export function AddToCrateModal({
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{
-              width: '100%',
+              flex: 1,
               padding: '6px 10px',
               border: '1px solid #d1d5db',
               borderRadius: '4px',
@@ -148,6 +167,22 @@ export function AddToCrateModal({
               outline: 'none',
             }}
           />
+          <button
+            onClick={onOpenNewCrate}
+            style={{
+              padding: '6px 12px',
+              background: '#3b82f6',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              fontSize: '13px',
+              fontWeight: '500',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            New Crate
+          </button>
         </div>
 
         {/* Crates List */}
