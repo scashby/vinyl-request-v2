@@ -12,6 +12,9 @@ import EditAlbumModal from './EditAlbumModal';
 import { SettingsModal } from './settings/SettingsModal';
 import type { Crate } from '../../types/crate';
 import { albumMatchesSmartCrate } from '../../lib/crateUtils';
+import { NewCrateModal } from './crates/NewCrateModal';
+import { NewSmartCrateModal } from './crates/NewSmartCrateModal';
+import { ManageCratesModal } from './crates/ManageCratesModal';
 
 type SortOption = 
   | 'artist-asc' | 'artist-desc' 
@@ -630,6 +633,9 @@ function CollectionBrowserPage() {
   const [editingAlbumId, setEditingAlbumId] = useState<number | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showFolderModeDropdown, setShowFolderModeDropdown] = useState(false); // Dropdown for view mode selection
+  const [showNewCrateModal, setShowNewCrateModal] = useState(false);
+  const [showNewSmartCrateModal, setShowNewSmartCrateModal] = useState(false);
+  const [showManageCratesModal, setShowManageCratesModal] = useState(false);
   
   const [sortBy, setSortBy] = useState<SortOption>('artist-asc');
   const [showSortDropdown, setShowSortDropdown] = useState(false);
@@ -1029,6 +1035,10 @@ function CollectionBrowserPage() {
                   <span style={{ marginRight: '10px' }}>📋</span> Manage Pick Lists
                 </button>
                 <button 
+                  onClick={() => {
+                    setSidebarOpen(false);
+                    setShowManageCratesModal(true);
+                  }}
                   title="Manage crates (DJ workflow organization)"
                   style={{ width: '100%', padding: '10px', background: 'transparent', border: 'none', color: 'white', textAlign: 'left', cursor: 'pointer', marginBottom: '5px', fontSize: '14px' }}>
                   <span style={{ marginRight: '10px' }}>📦</span> Manage Crates
@@ -1570,6 +1580,40 @@ function CollectionBrowserPage() {
                 }}>
                   {folderSortByCount ? '🔢' : '🔤'}
                 </button>
+                {folderMode === 'crates' && (
+                  <>
+                    <button 
+                      onClick={() => setShowNewCrateModal(true)}
+                      title="Create new crate"
+                      style={{
+                        background: '#368CF8',
+                        color: 'white',
+                        border: 'none',
+                        padding: '4px 8px',
+                        borderRadius: '3px',
+                        cursor: 'pointer',
+                        fontSize: '12px',
+                        flex: 1
+                      }}>
+                      + Crate
+                    </button>
+                    <button 
+                      onClick={() => setShowNewSmartCrateModal(true)}
+                      title="Create new smart crate"
+                      style={{
+                        background: '#8809AC',
+                        color: 'white',
+                        border: 'none',
+                        padding: '4px 8px',
+                        borderRadius: '3px',
+                        cursor: 'pointer',
+                        fontSize: '12px',
+                        flex: 1
+                      }}>
+                      + Smart
+                    </button>
+                  </>
+                )}
               </div>
             </div>
 
@@ -2058,6 +2102,38 @@ function CollectionBrowserPage() {
         <SettingsModal
           isOpen={showSettings}
           onClose={() => setShowSettings(false)}
+        />
+      )}
+
+      {showNewCrateModal && (
+        <NewCrateModal
+          isOpen={showNewCrateModal}
+          onClose={() => setShowNewCrateModal(false)}
+          onCrateCreated={() => {
+            loadCrates();
+            setShowNewCrateModal(false);
+          }}
+        />
+      )}
+
+      {showNewSmartCrateModal && (
+        <NewSmartCrateModal
+          isOpen={showNewSmartCrateModal}
+          onClose={() => setShowNewSmartCrateModal(false)}
+          onCrateCreated={() => {
+            loadCrates();
+            setShowNewSmartCrateModal(false);
+          }}
+        />
+      )}
+
+      {showManageCratesModal && (
+        <ManageCratesModal
+          isOpen={showManageCratesModal}
+          onClose={() => setShowManageCratesModal(false)}
+          onCratesChanged={() => {
+            loadCrates();
+          }}
         />
       )}
     </>
