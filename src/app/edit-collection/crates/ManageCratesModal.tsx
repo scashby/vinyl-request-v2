@@ -11,9 +11,11 @@ interface ManageCratesModalProps {
   onCratesChanged: () => void;
   onOpenNewCrate: () => void;
   onOpenNewSmartCrate: () => void;
+  onOpenEditCrate: (crate: Crate) => void;
+  onOpenEditSmartCrate: (crate: Crate) => void;
 }
 
-export function ManageCratesModal({ isOpen, onClose, onCratesChanged, onOpenNewCrate, onOpenNewSmartCrate }: ManageCratesModalProps) {
+export function ManageCratesModal({ isOpen, onClose, onCratesChanged, onOpenNewCrate, onOpenNewSmartCrate, onOpenEditCrate, onOpenEditSmartCrate }: ManageCratesModalProps) {
   const [crates, setCrates] = useState<Crate[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -352,19 +354,25 @@ export function ManageCratesModal({ isOpen, onClose, onCratesChanged, onOpenNewC
 
                   {/* Action Buttons */}
                   <div style={{ display: 'flex', gap: '8px' }}>
-                    {/* Edit button - placeholder for future */}
+                    {/* Edit button */}
                     <button
-                      disabled
+                      onClick={() => {
+                        if (crate.is_smart) {
+                          onOpenEditSmartCrate(crate);
+                        } else {
+                          onOpenEditCrate(crate);
+                        }
+                      }}
                       style={{
                         padding: '6px 12px',
-                        background: '#f3f4f6',
-                        color: '#9ca3af',
-                        border: '1px solid #e5e7eb',
+                        background: 'white',
+                        color: '#374151',
+                        border: '1px solid #d1d5db',
                         borderRadius: '4px',
                         fontSize: '13px',
-                        cursor: 'not-allowed',
+                        cursor: 'pointer',
+                        fontWeight: '500',
                       }}
-                      title="Edit feature coming soon"
                     >
                       Edit
                     </button>

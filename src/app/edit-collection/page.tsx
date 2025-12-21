@@ -636,6 +636,7 @@ function CollectionBrowserPage() {
   const [showManageCratesModal, setShowManageCratesModal] = useState(false);
   const [showNewCrateModal, setShowNewCrateModal] = useState(false);
   const [showNewSmartCrateModal, setShowNewSmartCrateModal] = useState(false);
+  const [editingCrate, setEditingCrate] = useState<Crate | null>(null);
   
   const [sortBy, setSortBy] = useState<SortOption>('artist-asc');
   const [showSortDropdown, setShowSortDropdown] = useState(false);
@@ -1024,11 +1025,6 @@ function CollectionBrowserPage() {
 
               <div style={{ marginBottom: '20px' }}>
                 <div style={{ fontSize: '11px', fontWeight: 600, color: '#999', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Collection</div>
-                <button 
-                  title="Add albums from main system"
-                  style={{ width: '100%', padding: '10px', background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', textAlign: 'left', cursor: 'pointer', marginBottom: '5px', borderRadius: '4px', fontSize: '14px' }}>
-                  <span style={{ marginRight: '10px' }}>➕</span> Add Albums from Core
-                </button>
                 <button 
                   title="Create and manage pick lists"
                   style={{ width: '100%', padding: '10px', background: 'transparent', border: 'none', color: 'white', textAlign: 'left', cursor: 'pointer', marginBottom: '5px', fontSize: '14px' }}>
@@ -2074,24 +2070,34 @@ function CollectionBrowserPage() {
       {showNewCrateModal && (
         <NewCrateModal
           isOpen={showNewCrateModal}
-          onClose={() => setShowNewCrateModal(false)}
+          onClose={() => {
+            setShowNewCrateModal(false);
+            setEditingCrate(null);
+          }}
           onCrateCreated={() => {
             loadCrates();
             setShowNewCrateModal(false);
             setShowManageCratesModal(true);
+            setEditingCrate(null);
           }}
+          editingCrate={editingCrate}
         />
       )}
 
       {showNewSmartCrateModal && (
         <NewSmartCrateModal
           isOpen={showNewSmartCrateModal}
-          onClose={() => setShowNewSmartCrateModal(false)}
+          onClose={() => {
+            setShowNewSmartCrateModal(false);
+            setEditingCrate(null);
+          }}
           onCrateCreated={() => {
             loadCrates();
             setShowNewSmartCrateModal(false);
             setShowManageCratesModal(true);
+            setEditingCrate(null);
           }}
+          editingCrate={editingCrate}
         />
       )}
 
@@ -2104,10 +2110,22 @@ function CollectionBrowserPage() {
           }}
           onOpenNewCrate={() => {
             setShowManageCratesModal(false);
+            setEditingCrate(null);
             setShowNewCrateModal(true);
           }}
           onOpenNewSmartCrate={() => {
             setShowManageCratesModal(false);
+            setEditingCrate(null);
+            setShowNewSmartCrateModal(true);
+          }}
+          onOpenEditCrate={(crate) => {
+            setShowManageCratesModal(false);
+            setEditingCrate(crate);
+            setShowNewCrateModal(true);
+          }}
+          onOpenEditSmartCrate={(crate) => {
+            setShowManageCratesModal(false);
+            setEditingCrate(crate);
             setShowNewSmartCrateModal(true);
           }}
         />

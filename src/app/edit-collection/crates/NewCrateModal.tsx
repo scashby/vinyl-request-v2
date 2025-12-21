@@ -1,13 +1,15 @@
 // src/app/edit-collection/crates/NewCrateModal.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from 'lib/supabaseClient';
+import type { Crate } from 'types/crate';
 
 interface NewCrateModalProps {
   isOpen: boolean;
   onClose: () => void;
   onCrateCreated: () => void;
+  editingCrate?: Crate | null; // Optional crate to edit
 }
 
 const PRESET_ICONS = ['📦', '🎵', '🔥', '⭐', '💎', '🎧', '🎸', '🎹', '🎤', '🎺', '🎷', '🥁'];
@@ -21,12 +23,23 @@ const PRESET_COLORS = [
   '#06b6d4', // Cyan
 ];
 
-export function NewCrateModal({ isOpen, onClose, onCrateCreated }: NewCrateModalProps) {
+export function NewCrateModal({ isOpen, onClose, onCrateCreated, editingCrate }: NewCrateModalProps) {
   const [name, setName] = useState('');
   const [icon, setIcon] = useState('📦');
   const [color, setColor] = useState('#3578b3');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const isEditing = !!editingCrate;
+
+  // Populate form when editing
+  useEffect(() => {
+    if (editingCrate) {
+      setName(editingCrate.name);
+      setIcon(editingCrate.icon);
+      setColor(editingCrate.color);
+    }
+  }, [editingCrate]);
 
   if (!isOpen) return null;
 
@@ -40,49 +53,70 @@ export function NewCrateModal({ isOpen, onClose, onCrateCreated }: NewCrateModal
     setError(null);
 
     try {
-      // Get the highest sort_order and add 1
-      const { data: existingCrates } = await supabase
-        .from('crates')
-        .select('sort_order')
-        .order('sort_order', { ascending: false })
-        .limit(1);
+      if (isEditing) {
+        // UPDATE existing crate
+        const { error: updateError } = await supabase
+          .from('crates')
+          .update({
+            name: name.trim(),
+            icon,
+            color,
+          })
+          .eq('id', editingCrate.id);
 
-      const nextSortOrder = existingCrates && existingCrates.length > 0 
-        ? (existingCrates[0].sort_order || 0) + 1 
-        : 0;
+        if (updateError) {
+          setError(updateError.message);
+          setSaving(false);
+          return;
+        }
+      } else {
+        // INSERT new crate
+        // Get the highest sort_order and add 1
+        const { data: existingCrates } = await supabase
+          .from('crates')
+          .select('sort_order')
+          .order('sort_order', { ascending: false })
+          .limit(1);
 
-      const { error: insertError } = await supabase
-        .from('crates')
-        .insert({
-          name: name.trim(),
-          icon,
-          color,
-          is_smart: false,
-          smart_rules: null,
-          match_rules: 'all',
-          live_update: true,
-          sort_order: nextSortOrder,
-        });
+        const nextSortOrder = existingCrates && existingCrates.length > 0 
+          ? (existingCrates[0].sort_order || 0) + 1 
+          : 0;
 
-      if (insertError) {
-        setError(insertError.message);
-        setSaving(false);
-        return;
+        const { error: insertError } = await supabase
+          .from('crates')
+          .insert({
+            name: name.trim(),
+            icon,
+            color,
+            is_smart: false,
+            smart_rules: null,
+            match_rules: 'all',
+            live_update: true,
+            sort_order: nextSortOrder,
+          });
+
+        if (insertError) {
+          setError(insertError.message);
+          setSaving(false);
+          return;
+        }
       }
 
       // Success
       onCrateCreated();
       handleClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create crate');
+      setError(err instanceof Error ? err.message : `Failed to ${isEditing ? 'update' : 'create'} crate`);
       setSaving(false);
     }
   };
 
   const handleClose = () => {
-    setName('');
-    setIcon('📦');
-    setColor('#3578b3');
+    if (!isEditing) {
+      setName('');
+      setIcon('📦');
+      setColor('#3578b3');
+    }
     setError(null);
     setSaving(false);
     onClose();
@@ -100,7 +134,7 @@ export function NewCrateModal({ isOpen, onClose, onCrateCreated }: NewCrateModal
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 30001,
+        zIndex: 30002,
       }}
       onClick={handleClose}
     >
@@ -124,7 +158,7 @@ export function NewCrateModal({ isOpen, onClose, onCrateCreated }: NewCrateModal
           }}
         >
           <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '600', color: '#111827' }}>
-            New Crate
+            {isEditing ? 'Edit Crate' : 'New Crate'}
           </h2>
           <button
             onClick={handleClose}
@@ -333,7 +367,7 @@ export function NewCrateModal({ isOpen, onClose, onCrateCreated }: NewCrateModal
               opacity: saving || !name.trim() ? 0.5 : 1,
             }}
           >
-            {saving ? 'Creating...' : 'Create Crate'}
+            {saving ? (isEditing ? 'Saving...' : 'Creating...') : (isEditing ? 'Save Changes' : 'Create Crate')}
           </button>
         </div>
       </div>

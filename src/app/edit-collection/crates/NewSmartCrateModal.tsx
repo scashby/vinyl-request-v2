@@ -1,14 +1,15 @@
 // src/app/edit-collection/crates/NewSmartCrateModal.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from 'lib/supabaseClient';
-import type { SmartRule, CrateFieldType, CrateOperatorType } from 'types/crate';
+import type { SmartRule, CrateFieldType, CrateOperatorType, Crate } from 'types/crate';
 
 interface NewSmartCrateModalProps {
   isOpen: boolean;
   onClose: () => void;
   onCrateCreated: () => void;
+  editingCrate?: Crate | null; // Optional crate to edit
 }
 
 const PRESET_ICONS = ['⚡', '🎵', '🔥', '⭐', '💎', '🎧', '🎸', '🎹', '🎤', '🎺', '🎷', '🥁'];
@@ -128,7 +129,7 @@ function getOperatorsForFieldType(fieldType: string): { value: CrateOperatorType
   }
 }
 
-export function NewSmartCrateModal({ isOpen, onClose, onCrateCreated }: NewSmartCrateModalProps) {
+export function NewSmartCrateModal({ isOpen, onClose, onCrateCreated, editingCrate }: NewSmartCrateModalProps) {
   const [name, setName] = useState('');
   const [icon, setIcon] = useState('⚡');
   const [matchRules, setMatchRules] = useState<'all' | 'any'>('all');
@@ -136,6 +137,19 @@ export function NewSmartCrateModal({ isOpen, onClose, onCrateCreated }: NewSmart
   const [rules, setRules] = useState<SmartRule[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const isEditing = !!editingCrate;
+
+  // Populate form when editing
+  useEffect(() => {
+    if (editingCrate && editingCrate.is_smart) {
+      setName(editingCrate.name);
+      setIcon(editingCrate.icon);
+      setMatchRules(editingCrate.match_rules);
+      setLiveUpdate(editingCrate.live_update);
+      setRules(editingCrate.smart_rules?.rules || []);
+    }
+  }, [editingCrate]);
 
   if (!isOpen) return null;
 
@@ -198,51 +212,74 @@ export function NewSmartCrateModal({ isOpen, onClose, onCrateCreated }: NewSmart
     setError(null);
 
     try {
-      // Get the highest sort_order and add 1
-      const { data: existingCrates } = await supabase
-        .from('crates')
-        .select('sort_order')
-        .order('sort_order', { ascending: false })
-        .limit(1);
+      if (isEditing) {
+        // UPDATE existing smart crate
+        const { error: updateError } = await supabase
+          .from('crates')
+          .update({
+            name: name.trim(),
+            icon,
+            smart_rules: { rules },
+            match_rules: matchRules,
+            live_update: liveUpdate,
+          })
+          .eq('id', editingCrate.id);
 
-      const nextSortOrder = existingCrates && existingCrates.length > 0 
-        ? (existingCrates[0].sort_order || 0) + 1 
-        : 0;
+        if (updateError) {
+          setError(updateError.message);
+          setSaving(false);
+          return;
+        }
+      } else {
+        // INSERT new smart crate
+        // Get the highest sort_order and add 1
+        const { data: existingCrates } = await supabase
+          .from('crates')
+          .select('sort_order')
+          .order('sort_order', { ascending: false })
+          .limit(1);
 
-      const { error: insertError } = await supabase
-        .from('crates')
-        .insert({
-          name: name.trim(),
-          icon,
-          color: '#3578b3',
-          is_smart: true,
-          smart_rules: { rules },
-          match_rules: matchRules,
-          live_update: liveUpdate,
-          sort_order: nextSortOrder,
-        });
+        const nextSortOrder = existingCrates && existingCrates.length > 0 
+          ? (existingCrates[0].sort_order || 0) + 1 
+          : 0;
 
-      if (insertError) {
-        setError(insertError.message);
-        setSaving(false);
-        return;
+        const { error: insertError } = await supabase
+          .from('crates')
+          .insert({
+            name: name.trim(),
+            icon,
+            color: '#3578b3',
+            is_smart: true,
+            smart_rules: { rules },
+            match_rules: matchRules,
+            live_update: liveUpdate,
+            sort_order: nextSortOrder,
+          });
+
+        if (insertError) {
+          setError(insertError.message);
+          setSaving(false);
+          return;
+        }
       }
 
       // Success
       onCrateCreated();
       handleClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create smart crate');
+      setError(err instanceof Error ? err.message : `Failed to ${isEditing ? 'update' : 'create'} smart crate`);
       setSaving(false);
     }
   };
 
   const handleClose = () => {
-    setName('');
-    setIcon('⚡');
-    setMatchRules('all');
-    setLiveUpdate(true);
-    setRules([]);
+    if (!isEditing) {
+      setName('');
+      setIcon('⚡');
+      setMatchRules('all');
+      setLiveUpdate(true);
+      setRules([]);
+    }
     setError(null);
     setSaving(false);
     onClose();
@@ -260,7 +297,7 @@ export function NewSmartCrateModal({ isOpen, onClose, onCrateCreated }: NewSmart
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 30001,
+        zIndex: 30002,
       }}
       onClick={handleClose}
     >
@@ -287,7 +324,7 @@ export function NewSmartCrateModal({ isOpen, onClose, onCrateCreated }: NewSmart
           }}
         >
           <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '600', color: '#111827' }}>
-            New Smart Crate
+            {isEditing ? 'Edit Smart Crate' : 'New Smart Crate'}
           </h2>
           <button
             onClick={handleClose}
@@ -687,7 +724,7 @@ export function NewSmartCrateModal({ isOpen, onClose, onCrateCreated }: NewSmart
               opacity: saving || !name.trim() || rules.length === 0 ? 0.5 : 1,
             }}
           >
-            {saving ? 'Creating...' : 'Create Smart Crate'}
+            {saving ? (isEditing ? 'Saving...' : 'Creating...') : (isEditing ? 'Save Changes' : 'Create Smart Crate')}
           </button>
         </div>
       </div>
