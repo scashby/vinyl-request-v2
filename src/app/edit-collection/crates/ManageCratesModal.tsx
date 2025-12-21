@@ -9,9 +9,11 @@ interface ManageCratesModalProps {
   isOpen: boolean;
   onClose: () => void;
   onCratesChanged: () => void;
+  onOpenNewCrate: () => void;
+  onOpenNewSmartCrate: () => void;
 }
 
-export function ManageCratesModal({ isOpen, onClose, onCratesChanged }: ManageCratesModalProps) {
+export function ManageCratesModal({ isOpen, onClose, onCratesChanged, onOpenNewCrate, onOpenNewSmartCrate }: ManageCratesModalProps) {
   const [crates, setCrates] = useState<Crate[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -158,20 +160,62 @@ export function ManageCratesModal({ isOpen, onClose, onCratesChanged }: ManageCr
           <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '600', color: '#111827' }}>
             Manage Crates
           </h2>
-          <button
-            onClick={handleClose}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              fontSize: '24px',
-              cursor: 'pointer',
-              color: '#6b7280',
-              padding: '0',
-              lineHeight: '1',
-            }}
-          >
-            ×
-          </button>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button
+              onClick={onOpenNewCrate}
+              style={{
+                padding: '6px 12px',
+                background: '#3b82f6',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                fontSize: '13px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+              }}
+              title="Create new crate"
+            >
+              <span>📦</span>
+              <span>New Crate</span>
+            </button>
+            <button
+              onClick={onOpenNewSmartCrate}
+              style={{
+                padding: '6px 12px',
+                background: '#8b5cf6',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                fontSize: '13px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+              }}
+              title="Create new smart crate"
+            >
+              <span>⚡</span>
+              <span>New Smart</span>
+            </button>
+            <button
+              onClick={handleClose}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                fontSize: '24px',
+                cursor: 'pointer',
+                color: '#6b7280',
+                padding: '0',
+                lineHeight: '1',
+              }}
+            >
+              ×
+            </button>
+          </div>
         </div>
 
         {/* Content */}

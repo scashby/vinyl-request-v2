@@ -3,15 +3,15 @@
 
 import { useCallback, useEffect, useState, useMemo, Suspense, memo } from 'react';
 import Image from 'next/image';
-import { supabase } from '../../lib/supabaseClient';
-import CollectionTable from '../../components/CollectionTable';
-import ColumnSelector from '../../components/ColumnSelector';
+import { supabase } from 'lib/supabaseClient';
+import CollectionTable from 'components/CollectionTable';
+import ColumnSelector from 'components/ColumnSelector';
 import { ColumnId, DEFAULT_VISIBLE_COLUMNS, DEFAULT_LOCKED_COLUMNS, SortState } from './columnDefinitions';
-import { Album, toSafeStringArray, toSafeSearchString } from '../../types/album';
+import { Album, toSafeStringArray, toSafeSearchString } from 'types/album';
 import EditAlbumModal from './EditAlbumModal';
 import { SettingsModal } from './settings/SettingsModal';
-import type { Crate } from '../../types/crate';
-import { albumMatchesSmartCrate } from '../../lib/crateUtils';
+import type { Crate } from 'types/crate';
+import { albumMatchesSmartCrate } from 'lib/crateUtils';
 import { NewCrateModal } from './crates/NewCrateModal';
 import { NewSmartCrateModal } from './crates/NewSmartCrateModal';
 import { ManageCratesModal } from './crates/ManageCratesModal';
@@ -1580,40 +1580,6 @@ function CollectionBrowserPage() {
                 }}>
                   {folderSortByCount ? '🔢' : '🔤'}
                 </button>
-                {folderMode === 'crates' && (
-                  <>
-                    <button 
-                      onClick={() => setShowNewCrateModal(true)}
-                      title="Create new crate"
-                      style={{
-                        background: '#368CF8',
-                        color: 'white',
-                        border: 'none',
-                        padding: '4px 8px',
-                        borderRadius: '3px',
-                        cursor: 'pointer',
-                        fontSize: '12px',
-                        flex: 1
-                      }}>
-                      + Crate
-                    </button>
-                    <button 
-                      onClick={() => setShowNewSmartCrateModal(true)}
-                      title="Create new smart crate"
-                      style={{
-                        background: '#8809AC',
-                        color: 'white',
-                        border: 'none',
-                        padding: '4px 8px',
-                        borderRadius: '3px',
-                        cursor: 'pointer',
-                        fontSize: '12px',
-                        flex: 1
-                      }}>
-                      + Smart
-                    </button>
-                  </>
-                )}
               </div>
             </div>
 
@@ -2112,6 +2078,7 @@ function CollectionBrowserPage() {
           onCrateCreated={() => {
             loadCrates();
             setShowNewCrateModal(false);
+            setShowManageCratesModal(true);
           }}
         />
       )}
@@ -2123,6 +2090,7 @@ function CollectionBrowserPage() {
           onCrateCreated={() => {
             loadCrates();
             setShowNewSmartCrateModal(false);
+            setShowManageCratesModal(true);
           }}
         />
       )}
@@ -2133,6 +2101,14 @@ function CollectionBrowserPage() {
           onClose={() => setShowManageCratesModal(false)}
           onCratesChanged={() => {
             loadCrates();
+          }}
+          onOpenNewCrate={() => {
+            setShowManageCratesModal(false);
+            setShowNewCrateModal(true);
+          }}
+          onOpenNewSmartCrate={() => {
+            setShowManageCratesModal(false);
+            setShowNewSmartCrateModal(true);
           }}
         />
       )}
