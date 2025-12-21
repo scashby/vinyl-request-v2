@@ -13,6 +13,7 @@ import { SettingsModal } from './settings/SettingsModal';
 import NewCrateModal from './crates/NewCrateModal';
 import NewSmartCrateModal from './crates/NewSmartCrateModal';
 import ManageCratesModal from './crates/ManageCratesModal';
+import { AddToCrateModal } from './crates/AddToCrateModal';
 import type { Crate } from '../../types/crate';
 import { albumMatchesSmartCrate } from '../../lib/crateUtils';
 
@@ -636,6 +637,7 @@ function CollectionBrowserPage() {
   const [showManageCratesModal, setShowManageCratesModal] = useState(false);
   const [showNewCrateModal, setShowNewCrateModal] = useState(false);
   const [showNewSmartCrateModal, setShowNewSmartCrateModal] = useState(false);
+  const [showAddToCrateModal, setShowAddToCrateModal] = useState(false);
   const [editingCrate, setEditingCrate] = useState<Crate | null>(null);
   
   const [sortBy, setSortBy] = useState<SortOption>('artist-asc');
@@ -945,6 +947,56 @@ function CollectionBrowserPage() {
     setSelectedFolderValue(null);
     setSelectedCrateId(null);
   }, []);
+
+  // Handle adding albums to crates
+  const handleAddToCrates = useCallback(async (crateIds: number[]) => {
+    if (selectedAlbumIds.size === 0 || crateIds.length === 0) return;
+
+    try {
+      const albumIds = Array.from(selectedAlbumIds);
+      
+      // Create insert records for all combinations of albums and crates
+      const records = [];
+      for (const crateId of crateIds) {
+        for (const albumId of albumIds) {
+          records.push({
+            crate_id: crateId,
+            album_id: albumId,
+          });
+        }
+      }
+
+      // Insert into crate_albums table
+      // Note: The unique constraint (crate_id, album_id) will prevent duplicates
+      const { error } = await supabase
+        .from('crate_albums')
+        .insert(records);
+
+      if (error) {
+        // If it's a unique constraint violation, that's okay - albums already in crate
+        if (!error.message.includes('duplicate') && !error.message.includes('unique')) {
+          throw error;
+        }
+      }
+
+      // Refresh crates to update counts
+      await loadCrates();
+      
+      // Clear selection
+      setSelectedAlbumIds(new Set());
+      
+      // Show success message
+      const crateNames = crates
+        .filter(c => crateIds.includes(c.id))
+        .map(c => c.name)
+        .join(', ');
+      
+      console.log(`✅ Added ${albumIds.length} album(s) to: ${crateNames}`);
+    } catch (err) {
+      console.error('Failed to add albums to crates:', err);
+      throw err;
+    }
+  }, [selectedAlbumIds, crates, loadCrates]);
 
   return (
     <>
@@ -1344,6 +1396,18 @@ function CollectionBrowserPage() {
               cursor: 'pointer',
               fontSize: '12px'
             }}>🗑 Remove</button>
+            <button 
+              onClick={() => setShowAddToCrateModal(true)}
+              title="Add selected albums to a crate"
+              style={{
+              background: 'rgba(255,255,255,0.2)',
+              border: 'none',
+              color: 'white',
+              padding: '4px 10px',
+              borderRadius: '3px',
+              cursor: 'pointer',
+              fontSize: '12px'
+            }}>📦 Add to Crate</button>
             <button 
               title="Export selected to PDF"
               style={{
@@ -2128,6 +2192,16 @@ function CollectionBrowserPage() {
             setEditingCrate(crate);
             setShowNewSmartCrateModal(true);
           }}
+        />
+      )}
+
+      {showAddToCrateModal && (
+        <AddToCrateModal
+          isOpen={showAddToCrateModal}
+          onClose={() => setShowAddToCrateModal(false)}
+          crates={cratesWithCounts}
+          onAddToCrates={handleAddToCrates}
+          selectedCount={selectedAlbumIds.size}
         />
       )}
     </>
