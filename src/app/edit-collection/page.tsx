@@ -1,4 +1,4 @@
-// src/app/edit-collection/page.tsx - COMPLETE FILE WITH LABEL FIX
+// src/app/edit-collection/page.tsx - WITH CRATES FUNCTIONALITY
 'use client';
 
 import { useCallback, useEffect, useState, useMemo, Suspense, memo } from 'react';
@@ -10,6 +10,8 @@ import { ColumnId, DEFAULT_VISIBLE_COLUMNS, DEFAULT_LOCKED_COLUMNS, SortState } 
 import { Album, toSafeStringArray, toSafeSearchString } from '../../types/album';
 import EditAlbumModal from './EditAlbumModal';
 import { SettingsModal } from './settings/SettingsModal';
+import type { Crate } from '../../types/crate';
+import { albumMatchesSmartCrate } from '../../lib/crateUtils';
 
 type SortOption = 
   | 'artist-asc' | 'artist-desc' 
@@ -614,8 +616,10 @@ function CollectionBrowserPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchTypeDropdown, setShowSearchTypeDropdown] = useState(false);
   const [selectedLetter, setSelectedLetter] = useState<string>('All');
-  const [folderMode] = useState<string>('format');
+  const [folderMode, setFolderMode] = useState<string>('format'); // Can be 'format', 'crates', 'artist', etc.
   const [selectedFolderValue, setSelectedFolderValue] = useState<string | null>(null);
+  const [selectedCrateId, setSelectedCrateId] = useState<number | null>(null); // NEW: Selected crate
+  const [crates, setCrates] = useState<Crate[]>([]); // NEW: Crates from database
   const [collectionFilter] = useState<string>('All');
   const [showCollectionDropdown, setShowCollectionDropdown] = useState(false);
   const [folderSearch, setFolderSearch] = useState('');
@@ -625,6 +629,7 @@ function CollectionBrowserPage() {
   const [activeCollection, setActiveCollection] = useState('music');
   const [editingAlbumId, setEditingAlbumId] = useState<number | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [showFolderModeDropdown, setShowFolderModeDropdown] = useState(false); // Dropdown for view mode selection
   
   const [sortBy, setSortBy] = useState<SortOption>('artist-asc');
   const [showSortDropdown, setShowSortDropdown] = useState(false);
@@ -725,9 +730,27 @@ function CollectionBrowserPage() {
     setLoading(false);
   }, []);
 
+  // NEW: Load crates from database
+  const loadCrates = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('crates')
+      .select('*')
+      .order('sort_order', { ascending: true });
+
+    if (error) {
+      console.error('Error loading crates:', error);
+      return;
+    }
+
+    if (data) {
+      setCrates(data as Crate[]);
+    }
+  }, []);
+
   useEffect(() => {
     loadAlbums();
-  }, [loadAlbums]);
+    loadCrates(); // NEW: Load crates on mount
+  }, [loadAlbums, loadCrates]);
 
   const filteredAndSortedAlbums = useMemo(() => {
     let filtered = albums.filter(album => {
@@ -742,8 +765,25 @@ function CollectionBrowserPage() {
         }
       }
 
-      if (selectedFolderValue) {
-        if (folderMode === 'format' && album.format !== selectedFolderValue) return false;
+      // Filter by crate when in crates mode
+      if (folderMode === 'crates' && selectedCrateId !== null) {
+        const selectedCrate = crates.find(c => c.id === selectedCrateId);
+        if (selectedCrate) {
+          if (selectedCrate.is_smart) {
+            // Smart crate - evaluate rules
+            if (!albumMatchesSmartCrate(album, selectedCrate)) {
+              return false;
+            }
+          } else {
+            // Manual crate - will be implemented in Phase 2
+            // For now, show all albums if it's a manual crate
+          }
+        }
+      }
+
+      // Filter by format when in format mode
+      if (folderMode === 'format' && selectedFolderValue) {
+        if (album.format !== selectedFolderValue) return false;
       }
 
       if (searchQuery) {
@@ -816,7 +856,7 @@ function CollectionBrowserPage() {
     }
 
     return filtered;
-  }, [albums, collectionFilter, selectedLetter, selectedFolderValue, folderMode, searchQuery, sortBy, tableSortState]);
+  }, [albums, collectionFilter, selectedLetter, selectedFolderValue, selectedCrateId, folderMode, crates, searchQuery, sortBy, tableSortState]);
 
   // Auto-select first album when filtered list changes
   useEffect(() => {
@@ -832,6 +872,21 @@ function CollectionBrowserPage() {
       return acc;
     }, {} as Record<string, number>);
   }, [albums]);
+
+  // NEW: Calculate crate counts
+  const cratesWithCounts = useMemo(() => {
+    return crates.map(crate => {
+      let count = 0;
+      if (crate.is_smart) {
+        // Count albums that match smart crate rules
+        count = albums.filter(album => albumMatchesSmartCrate(album, crate)).length;
+      } else {
+        // Manual crate - will be implemented in Phase 2
+        count = 0;
+      }
+      return { ...crate, album_count: count };
+    });
+  }, [crates, albums]);
 
   const sortedFolderItems = useMemo(() => {
     return Object.entries(folderCounts)
@@ -874,6 +929,15 @@ function CollectionBrowserPage() {
   const selectedAlbumsAsStrings = useMemo(() => {
     return new Set(Array.from(selectedAlbumIds).map(id => String(id)));
   }, [selectedAlbumIds]);
+
+  // Handle folder mode change (Format, Crates, Artist, etc.)
+  const handleFolderModeChange = useCallback((mode: string) => {
+    setFolderMode(mode);
+    setShowFolderModeDropdown(false);
+    // Clear selections when switching modes
+    setSelectedFolderValue(null);
+    setSelectedCrateId(null);
+  }, []);
 
   return (
     <>
@@ -965,9 +1029,9 @@ function CollectionBrowserPage() {
                   <span style={{ marginRight: '10px' }}>📋</span> Manage Pick Lists
                 </button>
                 <button 
-                  title="Manage collections"
+                  title="Manage crates (DJ workflow organization)"
                   style={{ width: '100%', padding: '10px', background: 'transparent', border: 'none', color: 'white', textAlign: 'left', cursor: 'pointer', marginBottom: '5px', fontSize: '14px' }}>
-                  <span style={{ marginRight: '10px' }}>⚙️</span> Manage Collections
+                  <span style={{ marginRight: '10px' }}>📦</span> Manage Crates
                 </button>
               </div>
 
@@ -1327,24 +1391,140 @@ function CollectionBrowserPage() {
               alignItems: 'center',
               flexShrink: 0
             }}>
-              <button 
-                title="Change view mode (Format, Artist, Genre, etc.)"
-                style={{
-                background: '#3a3a3a',
-                color: 'white',
-                border: '1px solid #555',
-                padding: '5px 10px',
-                borderRadius: '3px',
-                cursor: 'pointer',
-                fontSize: '12px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}>
-                <span>📁</span>
-                <span>Format</span>
-                <span style={{ fontSize: '10px' }}>▼</span>
-              </button>
+              <div style={{ position: 'relative' }}>
+                <button 
+                  onClick={() => setShowFolderModeDropdown(!showFolderModeDropdown)}
+                  title="Change view mode"
+                  style={{
+                  background: '#3a3a3a',
+                  color: 'white',
+                  border: '1px solid #555',
+                  padding: '5px 10px',
+                  borderRadius: '3px',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}>
+                  <span>{folderMode === 'crates' ? '📦' : '📁'}</span>
+                  <span>{folderMode === 'crates' ? 'Crates' : 'Format'}</span>
+                  <span style={{ fontSize: '10px' }}>▼</span>
+                </button>
+
+                {/* View Mode Dropdown Menu */}
+                {showFolderModeDropdown && (
+                  <>
+                    <div
+                      onClick={() => setShowFolderModeDropdown(false)}
+                      style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        zIndex: 99
+                      }}
+                    />
+                    <div style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      marginTop: '4px',
+                      background: '#2a2a2a',
+                      border: '1px solid #555',
+                      borderRadius: '4px',
+                      zIndex: 100,
+                      minWidth: '180px',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+                    }}>
+                      {/* Favorites Section */}
+                      <div style={{
+                        padding: '8px 12px 4px 12px',
+                        fontSize: '10px',
+                        fontWeight: 600,
+                        color: '#999',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px'
+                      }}>
+                        Favorites
+                      </div>
+                      <button
+                        onClick={() => handleFolderModeChange('format')}
+                        style={{
+                          width: '100%',
+                          padding: '8px 16px',
+                          background: folderMode === 'format' ? '#5A9BD5' : 'transparent',
+                          border: 'none',
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          fontSize: '13px',
+                          color: 'white',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px'
+                        }}
+                        onMouseEnter={(e) => {
+                          if (folderMode !== 'format') {
+                            e.currentTarget.style.background = '#3a3a3a';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (folderMode !== 'format') {
+                            e.currentTarget.style.background = 'transparent';
+                          }
+                        }}
+                      >
+                        <span>📁</span>
+                        <span>Format</span>
+                      </button>
+
+                      {/* Crates Section */}
+                      <div style={{
+                        padding: '8px 12px 4px 12px',
+                        fontSize: '10px',
+                        fontWeight: 600,
+                        color: '#999',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                        marginTop: '4px',
+                        borderTop: '1px solid #444'
+                      }}>
+                        Crates
+                      </div>
+                      <button
+                        onClick={() => handleFolderModeChange('crates')}
+                        style={{
+                          width: '100%',
+                          padding: '8px 16px',
+                          background: folderMode === 'crates' ? '#5A9BD5' : 'transparent',
+                          border: 'none',
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          fontSize: '13px',
+                          color: 'white',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px'
+                        }}
+                        onMouseEnter={(e) => {
+                          if (folderMode !== 'crates') {
+                            e.currentTarget.style.background = '#3a3a3a';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (folderMode !== 'crates') {
+                            e.currentTarget.style.background = 'transparent';
+                          }
+                        }}
+                      >
+                        <span>📦</span>
+                        <span>Crates</span>
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
               <button 
                 title="View options"
                 style={{
@@ -1360,10 +1540,10 @@ function CollectionBrowserPage() {
             <div style={{ padding: '10px', borderBottom: '1px solid #1a1a1a', flexShrink: 0 }}>
               <input
                 type="text"
-                placeholder="Search format..."
+                placeholder={folderMode === 'crates' ? 'Search crates...' : 'Search format...'}
                 value={folderSearch}
                 onChange={(e) => setFolderSearch(e.target.value)}
-                title="Filter formats"
+                title={folderMode === 'crates' ? 'Filter crates' : 'Filter formats'}
                 style={{
                   width: '100%',
                   padding: '6px 8px',
@@ -1394,49 +1574,19 @@ function CollectionBrowserPage() {
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', padding: '6px', minHeight: 0 }}>
-              <button 
-                onClick={() => setSelectedFolderValue(null)}
-                title="Show all albums"
-                style={{
-                width: '100%',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '6px 8px',
-                background: !selectedFolderValue ? '#5A9BD5' : 'transparent',
-                border: 'none',
-                borderRadius: '3px',
-                cursor: 'pointer',
-                marginBottom: '3px',
-                fontSize: '12px',
-                color: 'white',
-                textAlign: 'left'
-              }}>
-                <span>[All Albums]</span>
-                <span style={{
-                  background: !selectedFolderValue ? '#3578b3' : '#555',
-                  color: 'white',
-                  padding: '2px 7px',
-                  borderRadius: '10px',
-                  fontSize: '11px',
-                  fontWeight: 600
-                }}>
-                  {albums.length}
-                </span>
-              </button>
-
-              {sortedFolderItems.map(([format, count]) => (
-                <button
-                  key={format}
-                  onClick={() => setSelectedFolderValue(format)}
-                  title={`Filter by ${format}`}
-                  style={{
+              {folderMode === 'format' ? (
+                <>
+                  {/* FORMAT MODE - Show formats */}
+                  <button 
+                    onClick={() => setSelectedFolderValue(null)}
+                    title="Show all albums"
+                    style={{
                     width: '100%',
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
                     padding: '6px 8px',
-                    background: selectedFolderValue === format ? '#5A9BD5' : 'transparent',
+                    background: !selectedFolderValue ? '#5A9BD5' : 'transparent',
                     border: 'none',
                     borderRadius: '3px',
                     cursor: 'pointer',
@@ -1444,21 +1594,127 @@ function CollectionBrowserPage() {
                     fontSize: '12px',
                     color: 'white',
                     textAlign: 'left'
-                  }}
-                >
-                  <span>{format}</span>
-                  <span style={{
-                    background: selectedFolderValue === format ? '#3578b3' : '#555',
-                    color: 'white',
-                    padding: '2px 7px',
-                    borderRadius: '10px',
-                    fontSize: '11px',
-                    fontWeight: 600
                   }}>
-                    {count}
-                  </span>
-                </button>
-              ))}
+                    <span>[All Albums]</span>
+                    <span style={{
+                      background: !selectedFolderValue ? '#3578b3' : '#555',
+                      color: 'white',
+                      padding: '2px 7px',
+                      borderRadius: '10px',
+                      fontSize: '11px',
+                      fontWeight: 600
+                    }}>
+                      {albums.length}
+                    </span>
+                  </button>
+
+                  {sortedFolderItems.map(([format, count]) => (
+                    <button
+                      key={format}
+                      onClick={() => setSelectedFolderValue(format)}
+                      title={`Filter by ${format}`}
+                      style={{
+                        width: '100%',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '6px 8px',
+                        background: selectedFolderValue === format ? '#5A9BD5' : 'transparent',
+                        border: 'none',
+                        borderRadius: '3px',
+                        cursor: 'pointer',
+                        marginBottom: '3px',
+                        fontSize: '12px',
+                        color: 'white',
+                        textAlign: 'left'
+                      }}
+                    >
+                      <span>{format}</span>
+                      <span style={{
+                        background: selectedFolderValue === format ? '#3578b3' : '#555',
+                        color: 'white',
+                        padding: '2px 7px',
+                        borderRadius: '10px',
+                        fontSize: '11px',
+                        fontWeight: 600
+                      }}>
+                        {count}
+                      </span>
+                    </button>
+                  ))}
+                </>
+              ) : (
+                <>
+                  {/* CRATES MODE - Show crates */}
+                  <button 
+                    onClick={() => setSelectedCrateId(null)}
+                    title="Show all albums"
+                    style={{
+                    width: '100%',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '6px 8px',
+                    background: selectedCrateId === null ? '#5A9BD5' : 'transparent',
+                    border: 'none',
+                    borderRadius: '3px',
+                    cursor: 'pointer',
+                    marginBottom: '3px',
+                    fontSize: '12px',
+                    color: 'white',
+                    textAlign: 'left'
+                  }}>
+                    <span>📚 [All Albums]</span>
+                    <span style={{
+                      background: selectedCrateId === null ? '#3578b3' : '#555',
+                      color: 'white',
+                      padding: '2px 7px',
+                      borderRadius: '10px',
+                      fontSize: '11px',
+                      fontWeight: 600
+                    }}>
+                      {albums.length}
+                    </span>
+                  </button>
+
+                  {cratesWithCounts
+                    .filter(crate => !folderSearch || crate.name.toLowerCase().includes(folderSearch.toLowerCase()))
+                    .map(crate => (
+                    <button
+                      key={crate.id}
+                      onClick={() => setSelectedCrateId(crate.id)}
+                      title={`Filter by ${crate.name}`}
+                      style={{
+                        width: '100%',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '6px 8px',
+                        background: selectedCrateId === crate.id ? '#5A9BD5' : 'transparent',
+                        border: 'none',
+                        borderRadius: '3px',
+                        cursor: 'pointer',
+                        marginBottom: '3px',
+                        fontSize: '12px',
+                        color: 'white',
+                        textAlign: 'left'
+                      }}
+                    >
+                      <span>{crate.icon} {crate.name}</span>
+                      <span style={{
+                        background: selectedCrateId === crate.id ? '#3578b3' : '#555',
+                        color: 'white',
+                        padding: '2px 7px',
+                        borderRadius: '10px',
+                        fontSize: '11px',
+                        fontWeight: 600
+                      }}>
+                        {crate.album_count || 0}
+                      </span>
+                    </button>
+                  ))}
+                </>
+              )}
             </div>
           </div>
 
