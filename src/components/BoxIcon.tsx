@@ -11,40 +11,82 @@ export function BoxIcon({ color, size = 32 }: BoxIconProps) {
     <svg
       width={size}
       height={size}
-      viewBox="0 0 32 32"
+      viewBox="0 0 48 48"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
-      {/* Main crate body - filled */}
-      <rect
-        x="4"
-        y="6"
-        width="24"
-        height="22"
-        rx="1"
+      {/* Records sticking out of the top */}
+      <path
+        d="M12 8 L14 6 L18 6 L20 8 Z"
+        fill={color}
+        opacity="0.6"
+      />
+      <path
+        d="M16 6 L18 4 L22 4 L24 6 Z"
+        fill={color}
+        opacity="0.7"
+      />
+      <path
+        d="M20 4 L22 2 L26 2 L28 4 Z"
+        fill={color}
+        opacity="0.8"
+      />
+      <path
+        d="M24 2 L26 1 L30 1 L32 2 Z"
         fill={color}
         opacity="0.9"
       />
       
-      {/* Horizontal slats - darker lines */}
-      <line x1="4" y1="11" x2="28" y2="11" stroke="rgba(0,0,0,0.25)" strokeWidth="2" />
-      <line x1="4" y1="16" x2="28" y2="16" stroke="rgba(0,0,0,0.25)" strokeWidth="2" />
-      <line x1="4" y1="21" x2="28" y2="21" stroke="rgba(0,0,0,0.25)" strokeWidth="2" />
+      {/* Crate front face - 3D perspective */}
+      <path
+        d="M8 12 L8 38 L32 38 L32 12 Z"
+        fill={color}
+        opacity="0.9"
+      />
       
-      {/* Vertical corner posts */}
-      <rect x="6" y="6" width="2.5" height="22" fill="rgba(0,0,0,0.15)" />
-      <rect x="23.5" y="6" width="2.5" height="22" fill="rgba(0,0,0,0.15)" />
+      {/* Right side face for depth */}
+      <path
+        d="M32 12 L40 16 L40 42 L32 38 Z"
+        fill={color}
+        opacity="0.7"
+      />
       
-      {/* Top and bottom rim highlights */}
-      <line x1="4" y1="6" x2="28" y2="6" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" />
-      <line x1="4" y1="28" x2="28" y2="28" stroke="rgba(0,0,0,0.3)" strokeWidth="1.5" />
+      {/* Top face */}
+      <path
+        d="M8 12 L32 12 L40 16 L16 16 Z"
+        fill={color}
+        opacity="1"
+      />
       
-      {/* Side edges for depth */}
-      <line x1="4" y1="6" x2="4" y2="28" stroke="rgba(0,0,0,0.2)" strokeWidth="1.5" />
-      <line x1="28" y1="6" x2="28" y2="28" stroke="rgba(0,0,0,0.2)" strokeWidth="1.5" />
+      {/* Frame - vertical corner posts */}
+      <rect x="8" y="12" width="3" height="26" fill="rgba(0,0,0,0.3)" />
+      <rect x="29" y="12" width="3" height="26" fill="rgba(0,0,0,0.3)" />
+      
+      {/* Frame - horizontal bottom */}
+      <rect x="8" y="35" width="24" height="3" fill="rgba(0,0,0,0.25)" />
+      
+      {/* Handle cutout in center */}
+      <ellipse
+        cx="20"
+        cy="20"
+        rx="4"
+        ry="5"
+        fill="rgba(0,0,0,0.4)"
+      />
+      
+      {/* Diagonal slats - left side */}
+      <line x1="11" y1="16" x2="16" y2="32" stroke="rgba(0,0,0,0.3)" strokeWidth="2" strokeLinecap="round" />
+      <line x1="16" y1="16" x2="11" y2="32" stroke="rgba(0,0,0,0.3)" strokeWidth="2" strokeLinecap="round" />
+      
+      {/* Diagonal slats - right side */}
+      <line x1="24" y1="16" x2="29" y2="32" stroke="rgba(0,0,0,0.3)" strokeWidth="2" strokeLinecap="round" />
+      <line x1="29" y1="16" x2="24" y2="32" stroke="rgba(0,0,0,0.3)" strokeWidth="2" strokeLinecap="round" />
       
       {/* Center vertical support */}
-      <rect x="15" y="6" width="2" height="22" fill="rgba(0,0,0,0.1)" />
+      <rect x="19" y="24" width="2" height="14" fill="rgba(0,0,0,0.25)" />
+      
+      {/* Bottom horizontal slat */}
+      <rect x="11" y="32" width="18" height="2" fill="rgba(0,0,0,0.2)" />
     </svg>
   );
 }
