@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from 'lib/supabaseClient';
 import type { Crate } from 'types/crate';
+import { BoxIcon } from '../../../components/BoxIcon';
 
 interface ManageCratesModalProps {
   isOpen: boolean;
@@ -323,9 +324,16 @@ export function ManageCratesModal({ isOpen, onClose, onCratesChanged, onOpenNewC
                       style={{
                         fontSize: '28px',
                         lineHeight: '1',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
                       }}
                     >
-                      {crate.icon}
+                      {crate.is_smart ? (
+                        <BoxIcon color={crate.icon} size={28} />
+                      ) : (
+                        crate.icon
+                      )}
                     </div>
                     <div style={{ flex: 1 }}>
                       <div

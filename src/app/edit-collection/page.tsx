@@ -16,6 +16,7 @@ import ManageCratesModal from './crates/ManageCratesModal';
 import { AddToCrateModal } from './crates/AddToCrateModal';
 import type { Crate } from '../../types/crate';
 import { albumMatchesSmartCrate } from '../../lib/crateUtils';
+import { BoxIcon } from '../../components/BoxIcon';
 
 type SortOption = 
   | 'artist-asc' | 'artist-desc' 
@@ -1771,7 +1772,14 @@ function CollectionBrowserPage() {
                         textAlign: 'left'
                       }}
                     >
-                      <span>{crate.icon} {crate.name}</span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        {crate.is_smart ? (
+                          <BoxIcon color={crate.icon} size={16} />
+                        ) : (
+                          <span>{crate.icon}</span>
+                        )}
+                        <span>{crate.name}</span>
+                      </span>
                       <span style={{
                         background: selectedCrateId === crate.id ? '#3578b3' : '#555',
                         color: 'white',

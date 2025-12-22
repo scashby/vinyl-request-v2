@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import type { Crate } from '../../../types/crate';
+import { BoxIcon } from '../../../components/BoxIcon';
 
 interface AddToCrateModalProps {
   isOpen: boolean;
@@ -244,8 +245,13 @@ export function AddToCrateModal({
                         margin: 0,
                       }}
                     />
-                    <span style={{ fontSize: '13px', color: '#111827' }}>
-                      {crate.icon} {crate.name}
+                    <span style={{ fontSize: '13px', color: '#111827', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      {crate.is_smart ? (
+                        <BoxIcon color={crate.icon} size={16} />
+                      ) : (
+                        <span>{crate.icon}</span>
+                      )}
+                      <span>{crate.name}</span>
                     </span>
                   </div>
                   {crate.album_count !== undefined && (
