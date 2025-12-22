@@ -172,51 +172,49 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
   return (
     <>
       <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 30001 }} onClick={onClose}>
-        <div style={{ backgroundColor: 'white', borderRadius: '8px', width: '980px', maxHeight: '600px', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ backgroundColor: 'white', borderRadius: '8px', width: '580px', maxHeight: '500px', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }} onClick={(e) => e.stopPropagation()}>
           
           {/* Header */}
           <div style={{ padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f97316', borderTopLeftRadius: '8px', borderTopRightRadius: '8px' }}>
-            <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '600', color: 'white' }}>Manage Pick Lists</h3>
+            <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: 'white' }}>Manage Pick Lists</h3>
             <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '24px', cursor: 'pointer', padding: 0, width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: '1' }}>×</button>
           </div>
 
           {/* Toolbar */}
-          <div style={{ padding: '14px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', gap: '10px', alignItems: 'center', backgroundColor: 'white' }}>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', gap: '12px', alignItems: 'center', backgroundColor: 'white' }}>
             <input
               type="text"
               placeholder="Search..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              style={{ flex: '0 0 180px', padding: '7px 12px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '14px', outline: 'none', backgroundColor: 'white', color: '#111827' }}
+              style={{ flex: '0 0 140px', padding: '7px 12px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px', outline: 'none', backgroundColor: 'white', color: '#111827' }}
             />
             <select
               value={selectedList}
               onChange={(e) => setSelectedList(e.target.value)}
-              style={{ flex: 1, padding: '7px 12px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '14px', outline: 'none', backgroundColor: 'white', cursor: 'pointer', color: '#111827' }}
+              style={{ flex: 1, padding: '7px 12px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px', outline: 'none', backgroundColor: 'white', cursor: 'pointer', color: '#111827' }}
             >
-              <option value="">Artist list</option>
+              <option value="">Select a list...</option>
               {Object.entries(PICK_LIST_CONFIGS).sort((a, b) => a[1].label.localeCompare(b[1].label)).map(([key, cfg]) => (
                 <option key={key} value={key}>{cfg.label} list</option>
               ))}
             </select>
-            {selectedList && (
-              <button
-                onClick={() => { setMergeMode(!mergeMode); setSelectedItems(new Set()); }}
-                style={{ padding: '7px 18px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', fontSize: '14px', fontWeight: '500', cursor: 'pointer', whiteSpace: 'nowrap' }}
-              >
-                Merge Mode
-              </button>
-            )}
+            <button
+              onClick={() => { setMergeMode(!mergeMode); setSelectedItems(new Set()); }}
+              style={{ padding: '7px 18px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', fontSize: '13px', fontWeight: '500', cursor: 'pointer', whiteSpace: 'nowrap' }}
+            >
+              Merge Mode
+            </button>
           </div>
 
           {/* Content */}
-          <div style={{ flex: 1, overflowY: 'auto', backgroundColor: 'white' }}>
+          <div style={{ flex: 1, overflowY: 'auto', backgroundColor: 'white', minHeight: '250px' }}>
             {!selectedList ? (
-              <div style={{ padding: '60px 20px', textAlign: 'center', color: '#9ca3af', fontSize: '14px' }}>
-                Select a pick list from the dropdown above
+              <div style={{ padding: '80px 40px', textAlign: 'center', color: '#9ca3af', fontSize: '13px' }}>
+                Select a pick list to manage in the top right dropdown menu...
               </div>
             ) : filteredItems.length === 0 ? (
-              <div style={{ padding: '60px 20px', textAlign: 'center', color: '#9ca3af', fontSize: '14px' }}>
+              <div style={{ padding: '80px 40px', textAlign: 'center', color: '#9ca3af', fontSize: '13px' }}>
                 {searchQuery ? 'No items match your search' : 'No items available'}
               </div>
             ) : (
@@ -224,7 +222,7 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
                 <tbody>
                   {filteredItems.map((item, index) => (
                     <tr key={item.id} style={{ borderBottom: index < filteredItems.length - 1 ? '1px solid #f3f4f6' : 'none' }}>
-                      <td style={{ padding: '10px 20px', fontSize: '14px', color: '#111827', width: '60%' }}>
+                      <td style={{ padding: '10px 20px', fontSize: '13px', color: '#111827', width: '60%' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           {mergeMode && (
                             <input
@@ -241,15 +239,15 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
                           <span>{item.name}</span>
                         </div>
                       </td>
-                      <td style={{ padding: '10px 20px', fontSize: '14px', color: '#111827', textAlign: 'center', width: '20%' }}>
+                      <td style={{ padding: '10px 20px', fontSize: '13px', color: '#111827', textAlign: 'center', width: '20%' }}>
                         {item.count !== undefined ? item.count : ''}
                       </td>
                       <td style={{ padding: '10px 20px', textAlign: 'right', width: '20%' }}>
                         {!mergeMode && (
-                          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                            <button onClick={() => handleEdit(item)} style={{ padding: '5px 16px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>Edit</button>
+                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                            <button onClick={() => handleEdit(item)} style={{ padding: '5px 14px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', fontSize: '12px', fontWeight: '500', cursor: 'pointer' }}>Edit</button>
                             {config?.deleteFn && config.allowDelete && (
-                              <button onClick={() => handleDelete(item.id)} style={{ padding: '5px 16px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>×</button>
+                              <button onClick={() => handleDelete(item.id)} style={{ padding: '5px 10px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', fontSize: '14px', fontWeight: '500', cursor: 'pointer', lineHeight: '1' }}>×</button>
                             )}
                           </div>
                         )}
@@ -264,9 +262,9 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
           {/* Footer */}
           <div style={{ padding: '14px 20px', borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: mergeMode && selectedItems.size >= 2 ? 'space-between' : 'center', alignItems: 'center', backgroundColor: 'white', borderBottomLeftRadius: '8px', borderBottomRightRadius: '8px' }}>
             {mergeMode && selectedItems.size >= 2 && (
-              <button onClick={handleMerge} style={{ padding: '7px 24px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>Merge Mode</button>
+              <button onClick={handleMerge} style={{ padding: '7px 22px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>Merge Mode</button>
             )}
-            <button onClick={onClose} style={{ padding: '7px 24px', background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: '4px', fontSize: '14px', fontWeight: '500', cursor: 'pointer' }}>Close</button>
+            <button onClick={onClose} style={{ padding: '7px 22px', background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: '4px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>Close</button>
           </div>
         </div>
       </div>
@@ -276,15 +274,15 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 30002 }} onClick={() => setEditingItem(null)}>
           <div style={{ backgroundColor: 'white', borderRadius: '8px', width: '400px', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }} onClick={(e) => e.stopPropagation()}>
             <div style={{ padding: '14px 20px', backgroundColor: '#3b82f6', borderTopLeftRadius: '8px', borderTopRightRadius: '8px' }}>
-              <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '600', color: 'white' }}>Edit {config.label}</h3>
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: 'white' }}>Edit {config.label}</h3>
             </div>
             <div style={{ padding: '20px' }}>
-              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500', color: '#374151' }}>Name</label>
-              <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '14px', outline: 'none', boxSizing: 'border-box', color: '#111827' }} autoFocus />
+              <label style={{ display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: '500', color: '#374151' }}>Name</label>
+              <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} style={{ width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px', outline: 'none', boxSizing: 'border-box', color: '#111827' }} autoFocus />
             </div>
             <div style={{ padding: '14px 20px', borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'flex-end', gap: '10px', backgroundColor: 'white', borderBottomLeftRadius: '8px', borderBottomRightRadius: '8px' }}>
-              <button onClick={() => setEditingItem(null)} style={{ padding: '7px 20px', background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: '4px', fontSize: '14px', fontWeight: '500', cursor: 'pointer' }}>Cancel</button>
-              <button onClick={handleSaveEdit} style={{ padding: '7px 20px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>Save</button>
+              <button onClick={() => setEditingItem(null)} style={{ padding: '7px 20px', background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: '4px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>Cancel</button>
+              <button onClick={handleSaveEdit} style={{ padding: '7px 20px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>Save</button>
             </div>
           </div>
         </div>
