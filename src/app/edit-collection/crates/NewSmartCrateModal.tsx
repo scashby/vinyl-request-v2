@@ -23,6 +23,12 @@ const SMART_CRATE_COLORS = [
   '#f59e0b', // Amber/Orange
   '#ef4444', // Red
   '#a855f7', // Bright Purple
+  'ffff00', // Yellow
+  '#00ff00', // Bright Green
+  '#008080', // Teal
+  '#808080', // Gray
+  '#000000', // Black
+  '#8b4513', // Brown
 ];
 
 // Field definitions with their types
