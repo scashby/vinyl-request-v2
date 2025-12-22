@@ -23,7 +23,7 @@ const SMART_CRATE_COLORS = [
   '#f59e0b', // Amber/Orange
   '#ef4444', // Red
   '#a855f7', // Bright Purple
-  'ffff00', // Yellow
+  '#ffff00', // Yellow (FIXED: added #)
   '#00ff00', // Bright Green
   '#008080', // Teal
   '#808080', // Gray
@@ -421,7 +421,7 @@ export function NewSmartCrateModal({ isOpen, onClose, onCrateCreated, editingCra
               >
                 Box Color
               </label>
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', maxWidth: '400px' }}>
                 {SMART_CRATE_COLORS.map((color) => (
                   <button
                     key={color}
