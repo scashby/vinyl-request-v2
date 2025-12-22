@@ -13,15 +13,15 @@ interface NewSmartCrateModalProps {
   editingCrate?: Crate | null; // Optional crate to edit
 }
 
-// Smart crate colors - cool tones to distinguish from manual crates
+// Smart crate colors - diverse palette to distinguish from manual crates
 const SMART_CRATE_COLORS = [
   '#3b82f6', // Blue (default)
   '#8b5cf6', // Purple
   '#06b6d4', // Cyan
   '#10b981', // Green
-  '#6366f1', // Indigo
-  '#0ea5e9', // Light Blue
-  '#14b8a6', // Teal
+  '#ec4899', // Pink
+  '#f59e0b', // Amber/Orange
+  '#ef4444', // Red
   '#a855f7', // Bright Purple
 ];
 
