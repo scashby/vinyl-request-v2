@@ -630,7 +630,6 @@ function CollectionBrowserPage() {
   const [folderSortByCount, setFolderSortByCount] = useState(false);
   const [selectedAlbumIds, setSelectedAlbumIds] = useState<Set<number>>(new Set());
   const [selectedAlbumId, setSelectedAlbumId] = useState<number | null>(null);
-  const [activeCollection, setActiveCollection] = useState('music');
   const [editingAlbumId, setEditingAlbumId] = useState<number | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showFolderModeDropdown, setShowFolderModeDropdown] = useState(false); // Dropdown for view mode selection
@@ -2064,47 +2063,6 @@ function CollectionBrowserPage() {
 
             <AlbumInfoPanel album={selectedAlbum} />
           </div>
-        </div>
-
-        <div style={{
-          background: '#1a1a1a',
-          borderTop: '1px solid #000',
-          padding: 0,
-          display: 'flex',
-          alignItems: 'stretch',
-          height: '40px',
-          flexShrink: 0
-        }}>
-          <button 
-            title="Collection menu"
-            style={{
-            background: 'transparent',
-            color: 'white',
-            border: 'none',
-            padding: '0 14px',
-            cursor: 'pointer',
-            fontSize: '14px',
-            borderRight: '1px solid #333'
-          }}>☰</button>
-          {['music', 'Vinyl', 'Singles (45s and 12")', 'Sale'].map(collection => (
-            <button
-              key={collection}
-              onClick={() => setActiveCollection(collection)}
-              title={`Switch to ${collection} collection`}
-              style={{
-                background: activeCollection === collection ? '#8809AC' : 'transparent',
-                color: 'white',
-                border: 'none',
-                borderBottom: activeCollection === collection ? '3px solid #8809AC' : 'none',
-                padding: '0 18px',
-                cursor: 'pointer',
-                fontSize: '13px',
-                fontWeight: activeCollection === collection ? 600 : 400
-              }}
-            >
-              {collection}
-            </button>
-          ))}
         </div>
       </div>
 
