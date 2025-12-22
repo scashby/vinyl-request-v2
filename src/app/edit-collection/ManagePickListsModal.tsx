@@ -172,7 +172,7 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
   return (
     <>
       <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 30001 }} onClick={onClose}>
-        <div style={{ backgroundColor: 'white', borderRadius: '8px', width: '580px', maxHeight: '500px', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ backgroundColor: 'white', borderRadius: '8px', width: '720px', maxHeight: '380px', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }} onClick={(e) => e.stopPropagation()}>
           
           {/* Header */}
           <div style={{ padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f97316', borderTopLeftRadius: '8px', borderTopRightRadius: '8px' }}>
@@ -201,20 +201,20 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
             </select>
             <button
               onClick={() => { setMergeMode(!mergeMode); setSelectedItems(new Set()); }}
-              style={{ padding: '7px 18px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', fontSize: '13px', fontWeight: '500', cursor: 'pointer', whiteSpace: 'nowrap' }}
+              style={{ padding: '7px 18px', background: '#93c5fd', color: '#1e40af', border: 'none', borderRadius: '4px', fontSize: '13px', fontWeight: '500', cursor: 'pointer', whiteSpace: 'nowrap' }}
             >
               Merge Mode
             </button>
           </div>
 
           {/* Content */}
-          <div style={{ flex: 1, overflowY: 'auto', backgroundColor: 'white', minHeight: '250px' }}>
+          <div style={{ flex: 1, overflowY: 'auto', backgroundColor: 'white' }}>
             {!selectedList ? (
-              <div style={{ padding: '80px 40px', textAlign: 'center', color: '#9ca3af', fontSize: '13px' }}>
+              <div style={{ padding: '60px 40px', textAlign: 'center', color: '#9ca3af', fontSize: '13px' }}>
                 Select a pick list to manage in the top right dropdown menu...
               </div>
             ) : filteredItems.length === 0 ? (
-              <div style={{ padding: '80px 40px', textAlign: 'center', color: '#9ca3af', fontSize: '13px' }}>
+              <div style={{ padding: '60px 40px', textAlign: 'center', color: '#9ca3af', fontSize: '13px' }}>
                 {searchQuery ? 'No items match your search' : 'No items available'}
               </div>
             ) : (
