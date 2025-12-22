@@ -14,6 +14,7 @@ import NewCrateModal from './crates/NewCrateModal';
 import NewSmartCrateModal from './crates/NewSmartCrateModal';
 import ManageCratesModal from './crates/ManageCratesModal';
 import { AddToCrateModal } from './crates/AddToCrateModal';
+import ManagePickListsModal from './ManagePickListsModal';
 import type { Crate } from '../../types/crate';
 import { albumMatchesSmartCrate } from '../../lib/crateUtils';
 import { BoxIcon } from '../../components/BoxIcon';
@@ -635,6 +636,7 @@ function CollectionBrowserPage() {
   const [showSettings, setShowSettings] = useState(false);
   const [showFolderModeDropdown, setShowFolderModeDropdown] = useState(false); // Dropdown for view mode selection
   const [showManageCratesModal, setShowManageCratesModal] = useState(false);
+  const [showManagePickListsModal, setShowManagePickListsModal] = useState(false);
   const [showNewCrateModal, setShowNewCrateModal] = useState(false);
   const [showNewSmartCrateModal, setShowNewSmartCrateModal] = useState(false);
   const [showAddToCrateModal, setShowAddToCrateModal] = useState(false);
@@ -1080,6 +1082,10 @@ function CollectionBrowserPage() {
               <div style={{ marginBottom: '20px' }}>
                 <div style={{ fontSize: '11px', fontWeight: 600, color: '#999', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Collection</div>
                 <button 
+                  onClick={() => {
+                    setSidebarOpen(false);
+                    setShowManagePickListsModal(true);
+                  }}
                   title="Create and manage pick lists"
                   style={{ width: '100%', padding: '10px', background: 'transparent', border: 'none', color: 'white', textAlign: 'left', cursor: 'pointer', marginBottom: '5px', fontSize: '14px' }}>
                   <span style={{ marginRight: '10px' }}>📋</span> Manage Pick Lists
@@ -2096,6 +2102,13 @@ function CollectionBrowserPage() {
         <SettingsModal
           isOpen={showSettings}
           onClose={() => setShowSettings(false)}
+        />
+      )}
+
+      {showManagePickListsModal && (
+        <ManagePickListsModal
+          isOpen={showManagePickListsModal}
+          onClose={() => setShowManagePickListsModal(false)}
         />
       )}
 
