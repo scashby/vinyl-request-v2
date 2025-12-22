@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from 'lib/supabaseClient';
 import type { SmartRule, CrateFieldType, CrateOperatorType, Crate } from 'types/crate';
+import { BoxIcon } from '../../../components/BoxIcon';
 
 interface NewSmartCrateModalProps {
   isOpen: boolean;
@@ -12,7 +13,17 @@ interface NewSmartCrateModalProps {
   editingCrate?: Crate | null; // Optional crate to edit
 }
 
-const PRESET_ICONS = ['⚡', '🎵', '🔥', '⭐', '💎', '🎧', '🎸', '🎹', '🎤', '🎺', '🎷', '🥁'];
+// Smart crate colors - cool tones to distinguish from manual crates
+const SMART_CRATE_COLORS = [
+  '#3b82f6', // Blue (default)
+  '#8b5cf6', // Purple
+  '#06b6d4', // Cyan
+  '#10b981', // Green
+  '#6366f1', // Indigo
+  '#0ea5e9', // Light Blue
+  '#14b8a6', // Teal
+  '#a855f7', // Bright Purple
+];
 
 // Field definitions with their types
 const FIELD_OPTIONS: { value: CrateFieldType; label: string; type: 'text' | 'number' | 'date' | 'boolean' | 'array' }[] = [
@@ -131,7 +142,7 @@ function getOperatorsForFieldType(fieldType: string): { value: CrateOperatorType
 
 export function NewSmartCrateModal({ isOpen, onClose, onCrateCreated, editingCrate }: NewSmartCrateModalProps) {
   const [name, setName] = useState('');
-  const [icon, setIcon] = useState('⚡');
+  const [icon, setIcon] = useState('#3b82f6'); // Color for smart crate box
   const [matchRules, setMatchRules] = useState<'all' | 'any'>('all');
   const [liveUpdate, setLiveUpdate] = useState(true);
   const [rules, setRules] = useState<SmartRule[]>([]);
@@ -247,8 +258,8 @@ export function NewSmartCrateModal({ isOpen, onClose, onCrateCreated, editingCra
           .from('crates')
           .insert({
             name: name.trim(),
-            icon,
-            color: '#3578b3',
+            icon, // Color value (e.g., "#3b82f6")
+            color: icon, // Same color value for consistency
             is_smart: true,
             smart_rules: { rules },
             match_rules: matchRules,
@@ -275,7 +286,7 @@ export function NewSmartCrateModal({ isOpen, onClose, onCrateCreated, editingCra
   const handleClose = () => {
     if (!isEditing) {
       setName('');
-      setIcon('⚡');
+      setIcon('#3b82f6'); // Reset to default blue
       setMatchRules('all');
       setLiveUpdate(true);
       setRules([]);
@@ -402,27 +413,27 @@ export function NewSmartCrateModal({ isOpen, onClose, onCrateCreated, editingCra
                   marginBottom: '8px',
                 }}
               >
-                Icon
+                Box Color
               </label>
-              <div style={{ display: 'flex', gap: '4px' }}>
-                {PRESET_ICONS.slice(0, 6).map((presetIcon) => (
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {SMART_CRATE_COLORS.map((color) => (
                   <button
-                    key={presetIcon}
-                    onClick={() => setIcon(presetIcon)}
+                    key={color}
+                    onClick={() => setIcon(color)}
                     style={{
-                      width: '40px',
-                      height: '40px',
-                      border: icon === presetIcon ? '2px solid #3b82f6' : '1px solid #d1d5db',
+                      width: '48px',
+                      height: '48px',
+                      border: icon === color ? '3px solid #111827' : '1px solid #d1d5db',
                       borderRadius: '6px',
-                      background: icon === presetIcon ? '#eff6ff' : 'white',
+                      background: 'white',
                       cursor: 'pointer',
-                      fontSize: '20px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
+                      padding: '4px',
                     }}
                   >
-                    {presetIcon}
+                    <BoxIcon color={color} size={32} />
                   </button>
                 ))}
               </div>
