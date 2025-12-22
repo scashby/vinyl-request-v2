@@ -15,65 +15,36 @@ export function BoxIcon({ color, size = 32 }: BoxIconProps) {
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
-      {/* Box body */}
+      {/* Main crate body - filled */}
       <rect
         x="4"
-        y="10"
+        y="6"
         width="24"
-        height="18"
+        height="22"
         rx="1"
         fill={color}
-        stroke={color}
-        strokeWidth="1.5"
         opacity="0.9"
       />
       
-      {/* Box lid/top */}
-      <path
-        d="M4 10 L16 4 L28 10 Z"
-        fill={color}
-        stroke={color}
-        strokeWidth="1.5"
-        opacity="1"
-      />
+      {/* Horizontal slats - darker lines */}
+      <line x1="4" y1="11" x2="28" y2="11" stroke="rgba(0,0,0,0.25)" strokeWidth="2" />
+      <line x1="4" y1="16" x2="28" y2="16" stroke="rgba(0,0,0,0.25)" strokeWidth="2" />
+      <line x1="4" y1="21" x2="28" y2="21" stroke="rgba(0,0,0,0.25)" strokeWidth="2" />
       
-      {/* Center line on lid */}
-      <line
-        x1="16"
-        y1="4"
-        x2="16"
-        y2="10"
-        stroke="rgba(0,0,0,0.2)"
-        strokeWidth="1.5"
-      />
+      {/* Vertical corner posts */}
+      <rect x="6" y="6" width="2.5" height="22" fill="rgba(0,0,0,0.15)" />
+      <rect x="23.5" y="6" width="2.5" height="22" fill="rgba(0,0,0,0.15)" />
       
-      {/* Front edge highlight */}
-      <line
-        x1="4"
-        y1="10"
-        x2="28"
-        y2="10"
-        stroke="rgba(255,255,255,0.3)"
-        strokeWidth="1"
-      />
+      {/* Top and bottom rim highlights */}
+      <line x1="4" y1="6" x2="28" y2="6" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" />
+      <line x1="4" y1="28" x2="28" y2="28" stroke="rgba(0,0,0,0.3)" strokeWidth="1.5" />
       
-      {/* Vertical edges for depth */}
-      <line
-        x1="4"
-        y1="10"
-        x2="4"
-        y2="28"
-        stroke="rgba(0,0,0,0.15)"
-        strokeWidth="1.5"
-      />
-      <line
-        x1="28"
-        y1="10"
-        x2="28"
-        y2="28"
-        stroke="rgba(0,0,0,0.15)"
-        strokeWidth="1.5"
-      />
+      {/* Side edges for depth */}
+      <line x1="4" y1="6" x2="4" y2="28" stroke="rgba(0,0,0,0.2)" strokeWidth="1.5" />
+      <line x1="28" y1="6" x2="28" y2="28" stroke="rgba(0,0,0,0.2)" strokeWidth="1.5" />
+      
+      {/* Center vertical support */}
+      <rect x="15" y="6" width="2" height="22" fill="rgba(0,0,0,0.1)" />
     </svg>
   );
 }
