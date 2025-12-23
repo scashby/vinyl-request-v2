@@ -38,6 +38,7 @@ import {
 interface ManagePickListsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  initialList?: string;
 }
 
 interface PickListConfig {
@@ -82,7 +83,7 @@ const PICK_LIST_CONFIGS: Record<string, PickListConfig> = {
   'vinyl-weight': { label: 'Vinyl Weight', fetchFn: fetchVinylWeights, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: false },
 };
 
-export default function ManagePickListsModal({ isOpen, onClose }: ManagePickListsModalProps) {
+export default function ManagePickListsModal({ isOpen, onClose, initialList }: ManagePickListsModalProps) {
   const [selectedList, setSelectedList] = useState<string>('');
   const [items, setItems] = useState<{ id: string; name: string; count?: number; sortName?: string }[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -96,11 +97,10 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
   const [mergeMode, setMergeMode] = useState(false);
   const [showMergeModal, setShowMergeModal] = useState(false);
   
-  // Sort toggle state - Default to sorting by Sort Name
+  // Sort toggle state
   const [sortBy, setSortBy] = useState<'name' | 'sortName'>('sortName');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
-  // Helper to generate a display sortname (fallback if not in DB)
   const getSortName = useCallback((name: string) => {
     if (name.startsWith('The ')) return name.substring(4) + ', The';
     if (name.startsWith('A ')) return name.substring(2) + ', A';
@@ -119,6 +119,19 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
     }
   }, [selectedList]);
 
+  // Handle initialization and list changes
+  useEffect(() => {
+    if (isOpen) {
+      if (initialList && PICK_LIST_CONFIGS[initialList]) {
+        setSelectedList(initialList);
+      }
+      setSearchQuery('');
+      setMergeMode(false);
+      setSelectedItems(new Set());
+      setShowMergeModal(false);
+    }
+  }, [isOpen, initialList]);
+
   useEffect(() => {
     if (selectedList) {
       loadItems();
@@ -131,19 +144,9 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
     }
   }, [selectedList, loadItems]);
 
-  useEffect(() => {
-    if (!isOpen) {
-      setSearchQuery('');
-      setMergeMode(false);
-      setSelectedItems(new Set());
-      setShowMergeModal(false);
-    }
-  }, [isOpen]);
-
   const handleEdit = (item: { id: string; name: string; sortName?: string }) => {
     setEditingItem(item);
     setEditName(item.name);
-    // Use the actual sortName from DB if available, otherwise generate heuristic
     setEditSortName(item.sortName || getSortName(item.name));
   };
 
@@ -151,7 +154,6 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
     if (!selectedList || !editingItem) return;
     const config = PICK_LIST_CONFIGS[selectedList];
     
-    // Pass sortName as 3rd arg. It will be used by updateArtist, ignored by others.
     const success = await config.updateFn(editingItem.id, editName, editSortName);
     
     if (success) {
@@ -163,7 +165,6 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
   };
 
   const handleDelete = async (itemId: string, e?: React.MouseEvent) => {
-    // STOP PROPAGATION to prevent bubbling to row selection
     if (e) {
       e.stopPropagation();
       e.preventDefault();
@@ -177,7 +178,6 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
         ? 'This will remove the artist permanently from all albums in your collection. Are you sure?'
         : 'Are you sure you want to delete this item?';
 
-      // Ensure confirm dialog fires after current event loop
       setTimeout(async () => {
         if (window.confirm(confirmMessage)) {
           const success = await config.deleteFn!(itemId);
@@ -231,7 +231,6 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
     const result = items.filter(item => item.name.toLowerCase().includes(searchQuery.toLowerCase()));
     
     return result.sort((a, b) => {
-      // Use DB sortName if available, else heuristic
       const nameA = sortBy === 'sortName' ? (a.sortName || getSortName(a.name)) : a.name;
       const nameB = sortBy === 'sortName' ? (b.sortName || getSortName(b.name)) : b.name;
       
@@ -272,7 +271,6 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
           }} 
           onClick={(e) => e.stopPropagation()}
         >
-          
           {/* Header */}
           <div 
             style={{ 
@@ -315,7 +313,6 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
               gap: '12px'
             }}
           >
-            {/* Search Field (Left) */}
             <div style={{ flex: '0 0 35%', position: 'relative' }}>
               <input
                 type="text"
@@ -336,7 +333,6 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
               />
             </div>
 
-            {/* Spacer & Count (Middle) */}
             <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                {selectedList && (
                 <div style={{ 
@@ -365,7 +361,6 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
                )}
             </div>
 
-            {/* Dropdown (Right) */}
             <div style={{ flex: '0 0 35%' }}>
               <select
                 value={selectedList}
@@ -405,10 +400,7 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
               <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid #e5e7eb', backgroundColor: 'white' }}>
-                    {/* Edit/Checkbox Column */}
                     <th style={{ width: '40px', padding: '8px' }}></th>
-                    
-                    {/* Name / Sort Name Header */}
                     <th 
                       style={{ 
                         padding: '8px 12px', 
@@ -422,7 +414,6 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
                         <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: '600' }}>Name</span>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '1px' }}>
                           <span style={{ fontSize: '11px', color: '#9ca3af', fontWeight: '400' }}>Sort Name</span>
-                          {/* Sort Arrow next to "Sort Name" */}
                           {sortBy === 'sortName' && (
                             <span style={{ fontSize: '10px', color: '#9ca3af' }}>
                               {sortDirection === 'asc' ? '▼' : '▲'}
@@ -431,20 +422,15 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
                         </div>
                       </div>
                     </th>
-
-                    {/* Count Header */}
                     <th style={{ width: '60px', padding: '8px 12px', textAlign: 'center', verticalAlign: 'middle', fontSize: '12px', color: '#6b7280', fontWeight: '600' }}>
                       Count
                     </th>
-
-                    {/* Delete Column Header */}
                     <th style={{ width: '40px', padding: '8px' }}></th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredItems.map((item, index) => {
                     const isSelected = selectedItems.has(item.id);
-                    // Use DB sortName if available, else heuristic fallback
                     const sortName = item.sortName || getSortName(item.name);
 
                     return (
@@ -455,7 +441,6 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
                           borderBottom: '1px solid #f3f4f6' 
                         }}
                       >
-                        {/* Column 1: Edit or Checkbox */}
                         <td style={{ padding: '8px', textAlign: 'center', verticalAlign: 'middle' }}>
                           {mergeMode ? (
                             <input
@@ -486,8 +471,6 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
                             </button>
                           )}
                         </td>
-
-                        {/* Column 2: Name & Sort Name Rows */}
                         <td style={{ padding: '8px 12px', verticalAlign: 'middle' }}>
                           <div style={{ display: 'flex', flexDirection: 'column' }}>
                             <span style={{ fontSize: '13px', color: '#111827', fontWeight: '500' }}>
@@ -498,13 +481,9 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
                             </span>
                           </div>
                         </td>
-
-                        {/* Column 3: Count */}
                         <td style={{ padding: '8px 12px', textAlign: 'center', verticalAlign: 'middle', fontSize: '13px', color: '#4b5563' }}>
                           {item.count}
                         </td>
-
-                        {/* Column 4: Delete */}
                         <td style={{ padding: '8px', textAlign: 'center', verticalAlign: 'middle' }}>
                           {!mergeMode && config?.allowDelete && (
                             <button 
@@ -610,7 +589,6 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
               <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '600', color: 'white' }}>Edit {config.label}</h3>
             </div>
             <div style={{ padding: '18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {/* Name Input */}
               <div>
                 <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: '500', color: '#374151' }}>Name</label>
                 <input 
@@ -621,8 +599,6 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
                   autoFocus 
                 />
               </div>
-
-              {/* Sort Name Input */}
               <div>
                 <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: '500', color: '#374151' }}>Sort Name</label>
                 <input 

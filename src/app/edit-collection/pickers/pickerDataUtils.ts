@@ -7,7 +7,7 @@ export interface PickerDataItem {
   id: string;
   name: string;
   count?: number;
-  sortName?: string; // Added for Artist sorting
+  sortName?: string;
 }
 
 // ============================================================================
@@ -170,7 +170,6 @@ export async function fetchLocations(): Promise<PickerDataItem[]> {
 // Artists
 export async function fetchArtists(): Promise<PickerDataItem[]> {
   try {
-    // Select both artist and sort_artist
     const { data, error } = await supabase
       .from('collection')
       .select('artist, sort_artist')
@@ -182,19 +181,15 @@ export async function fetchArtists(): Promise<PickerDataItem[]> {
       return [];
     }
 
-    // Map to store count and the sort name found
     const artistMap = new Map<string, { count: number; sortName: string }>();
 
     data?.forEach(row => {
       if (row.artist) {
         const current = artistMap.get(row.artist);
-        // Use row.sort_artist if present, otherwise fallback to artist name
         const sortVal = row.sort_artist || row.artist;
 
         if (current) {
           current.count++;
-          // If we haven't captured a sortName yet (or current is same as name), 
-          // and we found a distinct one, update it.
           if (current.sortName === row.artist && sortVal !== row.artist) {
              current.sortName = sortVal;
           }
@@ -235,7 +230,11 @@ export async function updateLabel(id: string, newName: string): Promise<boolean>
       .from('collection')
       .update({ spotify_label: newName })
       .eq('spotify_label', id);
-    if (error) { console.error(error); return false; }
+    
+    if (error) {
+      console.error('Error updating label:', error);
+      return false;
+    }
     return true;
   } catch (error) {
     console.error('Error updating label:', error);
@@ -249,7 +248,11 @@ export async function updateFormat(id: string, newName: string): Promise<boolean
       .from('collection')
       .update({ format: newName })
       .eq('format', id);
-    if (error) { console.error(error); return false; }
+    
+    if (error) {
+      console.error('Error updating format:', error);
+      return false;
+    }
     return true;
   } catch (error) {
     console.error('Error updating format:', error);
@@ -263,7 +266,11 @@ export async function updateLocation(id: string, newName: string): Promise<boole
       .from('collection')
       .update({ folder: newName })
       .eq('folder', id);
-    if (error) { console.error(error); return false; }
+    
+    if (error) {
+      console.error('Error updating location:', error);
+      return false;
+    }
     return true;
   } catch (error) {
     console.error('Error updating location:', error);
@@ -297,7 +304,7 @@ export async function updateArtist(id: string, newName: string, newSortName?: st
 
 export async function deleteArtist(id: string): Promise<boolean> {
   try {
-    // Delete all albums by this artist from the collection table
+    // Hard delete all albums by this artist
     const { error } = await supabase
       .from('collection')
       .delete()
@@ -338,7 +345,11 @@ export async function deleteLabel(id: string): Promise<boolean> {
       .from('collection')
       .update({ spotify_label: null })
       .eq('spotify_label', id);
-    if (error) { console.error(error); return false; }
+    
+    if (error) {
+      console.error('Error deleting label:', error);
+      return false;
+    }
     return true;
   } catch (error) {
     console.error('Error deleting label:', error);
@@ -352,7 +363,11 @@ export async function mergeLabels(targetId: string, sourceIds: string[]): Promis
       .from('collection')
       .update({ spotify_label: targetId })
       .in('spotify_label', sourceIds);
-    if (error) { console.error(error); return false; }
+    
+    if (error) {
+      console.error('Error merging labels:', error);
+      return false;
+    }
     return true;
   } catch (error) {
     console.error('Error merging labels:', error);
@@ -366,7 +381,11 @@ export async function mergeFormats(targetId: string, sourceIds: string[]): Promi
       .from('collection')
       .update({ format: targetId })
       .in('format', sourceIds);
-    if (error) { console.error(error); return false; }
+    
+    if (error) {
+      console.error('Error merging formats:', error);
+      return false;
+    }
     return true;
   } catch (error) {
     console.error('Error merging formats:', error);
@@ -380,7 +399,11 @@ export async function mergeLocations(targetId: string, sourceIds: string[]): Pro
       .from('collection')
       .update({ folder: targetId })
       .in('folder', sourceIds);
-    if (error) { console.error(error); return false; }
+    
+    if (error) {
+      console.error('Error merging locations:', error);
+      return false;
+    }
     return true;
   } catch (error) {
     console.error('Error merging locations:', error);

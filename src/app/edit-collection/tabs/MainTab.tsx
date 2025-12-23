@@ -1,12 +1,11 @@
-// src/app/edit-collection/tabs/MainTab.tsx - COMPLETE FILE WITH LABEL FIX
+// src/app/edit-collection/tabs/MainTab.tsx
 'use client';
 
 import { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import type { Album } from 'types/album';
 import { PickerModal } from '../pickers/PickerModal';
-import { ManageModal } from '../pickers/ManageModal';
+import ManagePickListsModal from '../ManagePickListsModal';
 import { EditModal } from '../pickers/EditModal';
-import { MergeModal } from '../pickers/MergeModal';
 import { DatePicker } from 'components/DatePicker';
 import { AutoCapSettings, type AutoCapMode } from '../settings/AutoCapSettings';
 import { AutoCapExceptions, applyAutoCap, DEFAULT_EXCEPTIONS } from '../settings/AutoCapExceptions';
@@ -16,15 +15,6 @@ import {
   fetchGenres,
   fetchLocations,
   fetchArtists,
-  updateLabel,
-  updateFormat,
-  updateLocation,
-  updateArtist,
-  deleteLabel,
-  mergeLabels,
-  mergeFormats,
-  mergeLocations,
-  mergeArtists,
   type PickerDataItem,
 } from '../pickers/pickerDataUtils';
 
@@ -33,7 +23,7 @@ interface MainTabProps {
   onChange: (field: keyof Album, value: string | number | string[] | null | boolean) => void;
 }
 
-type ModalType = 'picker' | 'manage' | 'edit' | 'merge' | null;
+type ModalType = 'picker' | 'manage' | 'edit' | null;
 type FieldType = 
   | 'spotify_label' 
   | 'format' 
@@ -49,8 +39,6 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
   // Modal state
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [activeField, setActiveField] = useState<FieldType | null>(null);
-  const [editingItemId, setEditingItemId] = useState<string | null>(null);
-  const [mergingItemIds, setMergingItemIds] = useState<string[]>([]);
 
   // Data state - real data from Supabase
   const [labels, setLabels] = useState<PickerDataItem[]>([]);
@@ -209,110 +197,51 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
   };
 
   const handleOpenNew = () => {
-    setEditingItemId(null);
     setActiveModal('edit');
   };
 
   // ManageModal handlers
-  const handleEdit = (itemId: string) => {
-    setEditingItemId(itemId);
-    setActiveModal('edit');
-  };
-
-  const handleDelete = async (itemId: string) => {
-    if (!activeField) return;
-
-    // Delete from database
-    let success = false;
-    if (activeField === 'spotify_label') {
-      success = await deleteLabel(itemId);
-    }
-    
-    if (success && activeField) {
+  const handleManageClose = async () => {
+    handleCloseModal();
+    // Refresh data after manage modal closes in case changes were made
+    if (activeField) {
       await reloadData(activeField);
     }
-  };
-
-  const handleOpenMerge = (itemIds: string[]) => {
-    setMergingItemIds(itemIds);
-    setActiveModal('merge');
   };
 
   // EditModal handlers
   const handleEditSave = async (newName: string) => {
     if (!activeField) return;
     
-    if (editingItemId) {
-      // Edit existing
-      let success = false;
-      
-      if (activeField === 'spotify_label') {
-        success = await updateLabel(editingItemId, newName);
-      } else if (activeField === 'format') {
-        success = await updateFormat(editingItemId, newName);
-      } else if (activeField === 'location') {
-        success = await updateLocation(editingItemId, newName);
-      } else if (activeField === 'artist') {
-        success = await updateArtist(editingItemId, newName);
-      }
-      
-      if (success) {
-        await reloadData(activeField);
-      }
-    } else {
-      // Create new
-      const newItem: PickerDataItem = {
-        id: newName,
-        name: newName,
-        count: 0,
-      };
-      
-      switch (activeField) {
-        case 'spotify_label':
-          setLabels([...labels, newItem].sort((a, b) => a.name.localeCompare(b.name)));
-          break;
-        case 'format':
-          setFormats([...formats, newItem].sort((a, b) => a.name.localeCompare(b.name)));
-          break;
-        case 'genre':
-          setGenres([...genres, newItem].sort((a, b) => a.name.localeCompare(b.name)));
-          break;
-        case 'location':
-          setLocations([...locations, newItem].sort((a, b) => a.name.localeCompare(b.name)));
-          break;
-        case 'artist':
-          setArtists([...artists, newItem].sort((a, b) => a.name.localeCompare(b.name)));
-          break;
-      }
-    }
-  };
-
-  // MergeModal handlers
-  const handleMerge = async (primaryId: string, mergeIntoIds: string[]) => {
-    if (!activeField) return;
-
-    let success = false;
+    // Create new (Local only - db sync handled by reload or future implementation)
+    const newItem: PickerDataItem = {
+      id: newName,
+      name: newName,
+      count: 0,
+    };
     
-    if (activeField === 'spotify_label') {
-      success = await mergeLabels(primaryId, mergeIntoIds);
-    } else if (activeField === 'format') {
-      success = await mergeFormats(primaryId, mergeIntoIds);
-    } else if (activeField === 'location') {
-      success = await mergeLocations(primaryId, mergeIntoIds);
-    } else if (activeField === 'artist') {
-      success = await mergeArtists(primaryId, mergeIntoIds);
-    }
-    
-    if (success) {
-      await reloadData(activeField);
+    switch (activeField) {
+      case 'spotify_label':
+        setLabels([...labels, newItem].sort((a, b) => a.name.localeCompare(b.name)));
+        break;
+      case 'format':
+        setFormats([...formats, newItem].sort((a, b) => a.name.localeCompare(b.name)));
+        break;
+      case 'genre':
+        setGenres([...genres, newItem].sort((a, b) => a.name.localeCompare(b.name)));
+        break;
+      case 'location':
+        setLocations([...locations, newItem].sort((a, b) => a.name.localeCompare(b.name)));
+        break;
+      case 'artist':
+        setArtists([...artists, newItem].sort((a, b) => a.name.localeCompare(b.name)));
+        break;
     }
   };
 
   // Close all modals
   const handleCloseModal = () => {
     setActiveModal(null);
-    setEditingItemId(null);
-    setMergingItemIds([]);
   };
 
   // Date picker handlers
@@ -333,17 +262,13 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
     setShowDatePicker(false);
   };
 
-  // Auto Cap handler - Apply capitalization immediately when clicked
+  // Auto Cap handler
   const handleApplyAutoCap = () => {
-    // Read current settings
     const mode = (localStorage.getItem('autoCapMode') as AutoCapMode) || autoCapMode;
     const exceptionsStr = localStorage.getItem('autoCapExceptions');
     const exceptions = exceptionsStr ? JSON.parse(exceptionsStr) : autoCapExceptions;
     
-    // Apply capitalization to current title
     const capitalized = applyAutoCap(album.title || '', mode, exceptions);
-    
-    // Update the title
     onChange('title', capitalized);
   };
 
@@ -406,8 +331,18 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
 
   const fieldConfig = getFieldConfig();
   const currentItems = getCurrentItems();
-  const editingItem = editingItemId ? currentItems.find(item => item.id === editingItemId) : null;
-  const mergingItems = currentItems.filter(item => mergingItemIds.includes(item.id));
+
+  // Map activeField to ManagePickListsModal config keys
+  const getManageListKey = (field: FieldType | null): string => {
+    switch (field) {
+      case 'artist': return 'artist';
+      case 'spotify_label': return 'label';
+      case 'format': return 'format';
+      case 'genre': return 'genre';
+      case 'location': return 'location';
+      default: return '';
+    }
+  };
 
   return (
     <>
@@ -596,7 +531,7 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
             </div>
           </div>
 
-          {/* Row 2: Label | Recording Date - UPDATED TO USE CLZ LABELS */}
+          {/* Row 2: Label | Recording Date */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <div>
               <label style={labelStyle}>Label</label>
@@ -608,7 +543,6 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
                       : (album.spotify_label || album.apple_music_label || '')
                   }
                   onChange={(e) => {
-                    // Update all label fields to maintain consistency
                     onChange('spotify_label', e.target.value);
                     onChange('apple_music_label', e.target.value);
                     onChange('labels', e.target.value ? [e.target.value] : null);
@@ -750,7 +684,7 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
             </div>
           </div>
 
-          {/* Row 4: Cat No - FULL WIDTH */}
+          {/* Row 4: Cat No */}
           <div>
             <label style={labelStyle}>Cat No</label>
             <input
@@ -761,7 +695,7 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
             />
           </div>
 
-          {/* Row 5: Genre - FULL WIDTH */}
+          {/* Row 5: Genre */}
           <div>
             <label style={labelStyle}>Genre</label>
             <div style={{ display: 'flex', gap: '0', alignItems: 'flex-start' }}>
@@ -866,16 +800,10 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
       )}
 
       {activeModal === 'manage' && (
-        <ManageModal
+        <ManagePickListsModal
           isOpen={true}
-          onClose={handleCloseModal}
-          title={`Manage ${fieldConfig.itemLabel}s`}
-          items={currentItems}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-          onMerge={handleOpenMerge}
-          itemLabel={fieldConfig.itemLabel}
-          allowMerge={true}
+          onClose={handleManageClose}
+          initialList={getManageListKey(activeField)}
         />
       )}
 
@@ -883,20 +811,9 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
         <EditModal
           isOpen={true}
           onClose={handleCloseModal}
-          title={editingItemId ? `Edit ${fieldConfig.itemLabel}` : `New ${fieldConfig.itemLabel}`}
-          itemName={editingItem?.name || ''}
+          title={`New ${fieldConfig.itemLabel}`}
+          itemName={''}
           onSave={handleEditSave}
-          itemLabel={fieldConfig.itemLabel}
-        />
-      )}
-
-      {activeModal === 'merge' && (
-        <MergeModal
-          isOpen={true}
-          onClose={handleCloseModal}
-          title={`Merge ${fieldConfig.itemLabel}s`}
-          items={mergingItems}
-          onMerge={handleMerge}
           itemLabel={fieldConfig.itemLabel}
         />
       )}
