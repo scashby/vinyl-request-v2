@@ -97,8 +97,9 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
   const [mergeMode, setMergeMode] = useState(false);
   const [showMergeModal, setShowMergeModal] = useState(false);
   
-  // Sort toggle state
-  const [sortBy, setSortBy] = useState<'name' | 'sortName'>('name');
+  // Sort toggle state - Default to sorting by Sort Name
+  const [sortBy, setSortBy] = useState<'name' | 'sortName'>('sortName');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   // Helper to generate a display sortname
   const getSortName = useCallback((name: string) => {
@@ -124,7 +125,8 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
       loadItems();
       setSelectedItems(new Set());
       setMergeMode(false);
-      setSortBy('name');
+      setSortBy('sortName');
+      setSortDirection('asc');
     } else {
       setItems([]);
     }
@@ -162,7 +164,12 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
     }
   };
 
-  const handleDelete = async (itemId: string) => {
+  const handleDelete = async (itemId: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    
     if (!selectedList) return;
     const config = PICK_LIST_CONFIGS[selectedList];
     
@@ -172,10 +179,13 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
         ? 'Are you sure you want to remove this artist permanently?'
         : 'Are you sure you want to delete this item?';
 
-      if (confirm(confirmMessage)) {
-        const success = await config.deleteFn(itemId);
-        if (success) await loadItems();
-      }
+      // We use a small timeout to ensure the UI updates/doesn't block immediately if there's a race condition
+      setTimeout(async () => {
+        if (window.confirm(confirmMessage)) {
+          const success = await config.deleteFn!(itemId);
+          if (success) await loadItems();
+        }
+      }, 0);
     }
   };
 
@@ -210,6 +220,17 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
     setSelectedItems(newSelection);
   };
 
+  const handleSortToggle = () => {
+    if (sortBy === 'sortName') {
+      // Toggle direction if already sorting by sortName
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      // Switch to sortName if not already
+      setSortBy('sortName');
+      setSortDirection('asc');
+    }
+  };
+
   const config = selectedList ? PICK_LIST_CONFIGS[selectedList] : null;
 
   const filteredItems = useMemo(() => {
@@ -218,9 +239,11 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
     return result.sort((a, b) => {
       const nameA = sortBy === 'sortName' ? getSortName(a.name) : a.name;
       const nameB = sortBy === 'sortName' ? getSortName(b.name) : b.name;
-      return nameA.localeCompare(nameB, undefined, { sensitivity: 'base' });
+      
+      const comparison = nameA.localeCompare(nameB, undefined, { sensitivity: 'base' });
+      return sortDirection === 'asc' ? comparison : -comparison;
     });
-  }, [items, searchQuery, sortBy, getSortName]);
+  }, [items, searchQuery, sortBy, sortDirection, getSortName]);
 
   if (!isOpen) return null;
 
@@ -398,17 +421,18 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
                         cursor: 'pointer',
                         verticalAlign: 'top'
                       }}
-                      onClick={() => setSortBy(prev => prev === 'name' ? 'sortName' : 'name')}
+                      onClick={handleSortToggle}
                     >
-                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                          <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: '600' }}>Name</span>
-                          <span style={{ fontSize: '11px', color: '#9ca3af', fontWeight: '400', marginTop: '1px' }}>Sort Name</span>
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: '600' }}>Name</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '1px' }}>
+                          <span style={{ fontSize: '11px', color: '#9ca3af', fontWeight: '400' }}>Sort Name</span>
+                          {sortBy === 'sortName' && (
+                            <span style={{ fontSize: '10px', color: '#9ca3af' }}>
+                              {sortDirection === 'asc' ? '▲' : '▼'}
+                            </span>
+                          )}
                         </div>
-                        {/* Sort Indicator */}
-                        <span style={{ fontSize: '10px', color: '#9ca3af', marginLeft: '4px' }}>
-                          {sortBy === 'sortName' ? '▼ Sort' : '▼ Name'}
-                        </span>
                       </div>
                     </th>
 
@@ -487,7 +511,7 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
                         <td style={{ padding: '8px', textAlign: 'center', verticalAlign: 'middle' }}>
                           {!mergeMode && config?.allowDelete && (
                             <button 
-                              onClick={() => handleDelete(item.id)}
+                              onClick={(e) => handleDelete(item.id, e)}
                               style={{ 
                                 background: 'transparent', 
                                 border: 'none', 
