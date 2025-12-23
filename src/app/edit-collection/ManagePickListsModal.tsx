@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { MergeModal } from './pickers/MergeModal';
+import { EditModal } from './pickers/EditModal';
 import {
   fetchArtists, updateArtist, mergeArtists, deleteArtist,
   fetchLabels, updateLabel, deleteLabel, mergeLabels,
@@ -39,7 +40,7 @@ interface ManagePickListsModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialList?: string;
-  hideListSelector?: boolean; // ADDED
+  hideListSelector?: boolean;
 }
 
 interface PickListConfig {
@@ -151,11 +152,11 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
     setEditSortName(item.sortName || getSortName(item.name));
   };
 
-  const handleSaveEdit = async () => {
+  const handleSaveEdit = async (newName: string, newSortName?: string) => {
     if (!selectedList || !editingItem) return;
     const config = PICK_LIST_CONFIGS[selectedList];
     
-    const success = await config.updateFn(editingItem.id, editName, editSortName);
+    const success = await config.updateFn(editingItem.id, newName, newSortName);
     
     if (success) {
       await loadItems();
@@ -285,8 +286,8 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
             }}
           >
             <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '600', color: 'white' }}>
-              {/* Show label in title if selector is hidden, else generic title */}
-              {hideListSelector && config ? `Manage ${config.label}s` : 'Manage Pick Lists'}
+              {/* Show the selected list name (e.g. "Manage Artists") if selected, otherwise generic */}
+              {config ? `Manage ${config.label}s` : 'Manage Pick Lists'}
             </h3>
             <button 
               onClick={onClose} 
@@ -391,12 +392,6 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
                 </select>
               </div>
             )}
-            {/* If hidden, we essentially just have an empty space or nothing on the right. 
-                Flex layout above handles search (35%) and center count (1). 
-                If right side is gone, the center might be off-center unless we balance it.
-                Let's add a dummy spacer if hidden to keep search/count alignment consistent if desired,
-                or let flex handle it.
-            */}
             {hideListSelector && <div style={{ flex: '0 0 35%' }} />}
           </div>
 
@@ -404,7 +399,7 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
           <div style={{ flex: 1, overflowY: 'auto', backgroundColor: 'white' }}>
             {!selectedList ? (
               <div style={{ padding: '50px 30px', textAlign: 'center', color: '#9ca3af', fontSize: '13px', fontStyle: 'italic' }}>
-                Select a pick list to manage...
+                Select a pick list to manage in the top right dropdown menu...
               </div>
             ) : filteredItems.length === 0 ? (
               <div style={{ padding: '50px 30px', textAlign: 'center', color: '#9ca3af', fontSize: '13px' }}>
@@ -419,7 +414,7 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
                       style={{ 
                         padding: '8px 12px', 
                         textAlign: 'left', 
-                        cursor: 'pointer',
+                        cursor: 'pointer', 
                         verticalAlign: 'top'
                       }}
                       onClick={handleSortToggle}
@@ -428,6 +423,7 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
                         <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: '600' }}>Name</span>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '1px' }}>
                           <span style={{ fontSize: '11px', color: '#9ca3af', fontWeight: '400' }}>Sort Name</span>
+                          {/* Sort Arrow next to "Sort Name" */}
                           {sortBy === 'sortName' && (
                             <span style={{ fontSize: '10px', color: '#9ca3af' }}>
                               {sortDirection === 'asc' ? '▼' : '▲'}
@@ -597,38 +593,16 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
 
       {/* Internal Edit Modal */}
       {editingItem && config && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 30005 }} onClick={() => setEditingItem(null)}>
-          <div style={{ backgroundColor: 'white', borderRadius: '8px', width: '400px', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ padding: '12px 18px', backgroundColor: '#f97316', borderTopLeftRadius: '8px', borderTopRightRadius: '8px' }}>
-              <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '600', color: 'white' }}>Edit {config.label}</h3>
-            </div>
-            <div style={{ padding: '18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div>
-                <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: '500', color: '#374151' }}>Name</label>
-                <input 
-                  type="text" 
-                  value={editName} 
-                  onChange={(e) => setEditName(e.target.value)} 
-                  style={{ width: '100%', padding: '7px 10px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px', outline: 'none', boxSizing: 'border-box', color: '#111827' }} 
-                  autoFocus 
-                />
-              </div>
-              <div>
-                <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: '500', color: '#374151' }}>Sort Name</label>
-                <input 
-                  type="text" 
-                  value={editSortName} 
-                  onChange={(e) => setEditSortName(e.target.value)} 
-                  style={{ width: '100%', padding: '7px 10px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px', outline: 'none', boxSizing: 'border-box', color: '#111827' }} 
-                />
-              </div>
-            </div>
-            <div style={{ padding: '12px 18px', borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'flex-end', gap: '8px', backgroundColor: 'white', borderBottomLeftRadius: '8px', borderBottomRightRadius: '8px' }}>
-              <button onClick={() => setEditingItem(null)} style={{ padding: '6px 18px', background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: '4px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>Cancel</button>
-              <button onClick={handleSaveEdit} style={{ padding: '6px 18px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>Save</button>
-            </div>
-          </div>
-        </div>
+        <EditModal 
+          isOpen={true}
+          onClose={() => setEditingItem(null)}
+          title={`Edit ${config.label}`}
+          itemName={editName}
+          itemSortName={editSortName}
+          itemLabel={config.label}
+          onSave={handleSaveEdit}
+          showSortName={selectedList === 'artist'}
+        />
       )}
 
       {/* External Merge Modal */}
