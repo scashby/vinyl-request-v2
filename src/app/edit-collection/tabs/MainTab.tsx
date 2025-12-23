@@ -210,7 +210,7 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
   };
 
   // EditModal handlers
-  const handleEditSave = async (newName: string) => {
+  const handleEditSave = async (newName: string, newSortName?: string) => {
     if (!activeField) return;
     
     // Create new (Local only - db sync handled by reload or future implementation)
@@ -218,6 +218,7 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
       id: newName,
       name: newName,
       count: 0,
+      sortName: newSortName, // Pass through the sort name
     };
     
     switch (activeField) {
@@ -804,6 +805,7 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
           isOpen={true}
           onClose={handleManageClose}
           initialList={getManageListKey(activeField)}
+          hideListSelector={true} // Hide selector when opened from here
         />
       )}
 
@@ -815,6 +817,7 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
           itemName={''}
           onSave={handleEditSave}
           itemLabel={fieldConfig.itemLabel}
+          showSortName={activeField === 'artist'} // Show Sort Name for Artists
         />
       )}
 

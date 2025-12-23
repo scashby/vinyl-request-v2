@@ -8,8 +8,10 @@ interface EditModalProps {
   onClose: () => void;
   title: string;
   itemName: string;
-  onSave: (newName: string) => void;
+  itemSortName?: string; // ADDED
+  onSave: (newName: string, newSortName?: string) => void; // UPDATED signature
   itemLabel?: string;
+  showSortName?: boolean; // ADDED
 }
 
 export function EditModal({
@@ -17,17 +19,21 @@ export function EditModal({
   onClose,
   title,
   itemName,
+  itemSortName = '',
   onSave,
   itemLabel = 'Item',
+  showSortName = false,
 }: EditModalProps) {
   const [localName, setLocalName] = useState(itemName);
+  const [localSortName, setLocalSortName] = useState(itemSortName);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setLocalName(itemName);
+    setLocalSortName(itemSortName || '');
     setError(null);
-  }, [itemName, isOpen]);
+  }, [itemName, itemSortName, isOpen]);
 
   useEffect(() => {
     if (isOpen && inputRef.current) {
@@ -36,27 +42,49 @@ export function EditModal({
     }
   }, [isOpen]);
 
+  // Auto-generate sort name if empty when name changes
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newName = e.target.value;
+    setLocalName(newName);
+    setError(null);
+    
+    // Only auto-update sort name if it hasn't been manually edited or was matching logic
+    if (showSortName) {
+      let autoSort = newName;
+      if (newName.startsWith('The ')) autoSort = newName.substring(4) + ', The';
+      else if (newName.startsWith('A ')) autoSort = newName.substring(2) + ', A';
+      
+      // Simple heuristic: if sort name was empty or matched previous auto-logic, update it
+      // For now, we'll just auto-fill if the user hasn't explicitly cleared it or typed something distinct
+      if (!localSortName || localSortName === itemName || localSortName.endsWith(', The') || localSortName.endsWith(', A')) {
+         setLocalSortName(autoSort);
+      }
+    }
+  };
+
   if (!isOpen) return null;
 
   const handleSave = () => {
     const trimmedName = localName.trim();
+    const trimmedSortName = localSortName.trim();
     
     if (!trimmedName) {
       setError(`${itemLabel} name cannot be empty`);
       return;
     }
 
-    if (trimmedName === itemName) {
+    if (trimmedName === itemName && trimmedSortName === itemSortName) {
       onClose();
       return;
     }
 
-    onSave(trimmedName);
+    onSave(trimmedName, showSortName ? trimmedSortName : undefined);
     onClose();
   };
 
   const handleCancel = () => {
     setLocalName(itemName);
+    setLocalSortName(itemSortName || '');
     setError(null);
     onClose();
   };
@@ -107,9 +135,10 @@ export function EditModal({
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
+            backgroundColor: '#f97316', // Matched orange style
           }}
         >
-          <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: '#111827' }}>
+          <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: 'white' }}>
             {title}
           </h3>
           <button
@@ -117,7 +146,7 @@ export function EditModal({
             style={{
               background: 'transparent',
               border: 'none',
-              color: '#6b7280',
+              color: 'white',
               fontSize: '20px',
               cursor: 'pointer',
               padding: '0 4px',
@@ -129,38 +158,72 @@ export function EditModal({
         </div>
 
         {/* Content */}
-        <div style={{ padding: '16px' }}>
-          <label
-            style={{
-              display: 'block',
-              marginBottom: '6px',
-              fontSize: '13px',
-              fontWeight: '500',
-              color: '#374151',
-            }}
-          >
-            {itemLabel} Name
-          </label>
-          <input
-            ref={inputRef}
-            type="text"
-            value={localName}
-            onChange={(e) => {
-              setLocalName(e.target.value);
-              setError(null);
-            }}
-            onKeyDown={handleKeyDown}
-            style={{
-              width: '100%',
-              padding: '8px 10px',
-              border: error ? '1px solid #ef4444' : '1px solid #d1d5db',
-              borderRadius: '4px',
-              fontSize: '13px',
-              outline: 'none',
-              boxSizing: 'border-box',
-            }}
-            placeholder={`Enter ${itemLabel.toLowerCase()} name`}
-          />
+        <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div>
+            <label
+              style={{
+                display: 'block',
+                marginBottom: '6px',
+                fontSize: '13px',
+                fontWeight: '500',
+                color: '#374151',
+              }}
+            >
+              {itemLabel} Name
+            </label>
+            <input
+              ref={inputRef}
+              type="text"
+              value={localName}
+              onChange={handleNameChange}
+              onKeyDown={handleKeyDown}
+              style={{
+                width: '100%',
+                padding: '8px 10px',
+                border: error ? '1px solid #ef4444' : '1px solid #d1d5db',
+                borderRadius: '4px',
+                fontSize: '13px',
+                outline: 'none',
+                boxSizing: 'border-box',
+                color: '#111827'
+              }}
+              placeholder={`Enter ${itemLabel.toLowerCase()} name`}
+            />
+          </div>
+
+          {showSortName && (
+            <div>
+              <label
+                style={{
+                  display: 'block',
+                  marginBottom: '6px',
+                  fontSize: '13px',
+                  fontWeight: '500',
+                  color: '#374151',
+                }}
+              >
+                Sort Name
+              </label>
+              <input
+                type="text"
+                value={localSortName}
+                onChange={(e) => setLocalSortName(e.target.value)}
+                onKeyDown={handleKeyDown}
+                style={{
+                  width: '100%',
+                  padding: '8px 10px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '4px',
+                  fontSize: '13px',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                  color: '#111827'
+                }}
+                placeholder="Sort name (optional)"
+              />
+            </div>
+          )}
+
           {error && (
             <div
               style={{
@@ -182,6 +245,7 @@ export function EditModal({
             display: 'flex',
             justifyContent: 'flex-end',
             gap: '8px',
+            backgroundColor: 'white',
           }}
         >
           <button

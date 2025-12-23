@@ -39,6 +39,7 @@ interface ManagePickListsModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialList?: string;
+  hideListSelector?: boolean; // ADDED
 }
 
 interface PickListConfig {
@@ -83,7 +84,7 @@ const PICK_LIST_CONFIGS: Record<string, PickListConfig> = {
   'vinyl-weight': { label: 'Vinyl Weight', fetchFn: fetchVinylWeights, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: false },
 };
 
-export default function ManagePickListsModal({ isOpen, onClose, initialList }: ManagePickListsModalProps) {
+export default function ManagePickListsModal({ isOpen, onClose, initialList, hideListSelector = false }: ManagePickListsModalProps) {
   const [selectedList, setSelectedList] = useState<string>('');
   const [items, setItems] = useState<{ id: string; name: string; count?: number; sortName?: string }[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -283,7 +284,10 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList }: M
               borderTopRightRadius: '8px',
             }}
           >
-            <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '600', color: 'white' }}>Manage Pick Lists</h3>
+            <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '600', color: 'white' }}>
+              {/* Show label in title if selector is hidden, else generic title */}
+              {hideListSelector && config ? `Manage ${config.label}s` : 'Manage Pick Lists'}
+            </h3>
             <button 
               onClick={onClose} 
               style={{ 
@@ -361,36 +365,46 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList }: M
                )}
             </div>
 
-            <div style={{ flex: '0 0 35%' }}>
-              <select
-                value={selectedList}
-                onChange={(e) => setSelectedList(e.target.value)}
-                style={{ 
-                  width: '100%', 
-                  padding: '6px 10px', 
-                  border: '1px solid #d1d5db', 
-                  borderRadius: '4px', 
-                  fontSize: '13px', 
-                  outline: 'none', 
-                  backgroundColor: 'white', 
-                  cursor: 'pointer', 
-                  color: '#111827',
-                  boxSizing: 'border-box'
-                }}
-              >
-                <option value="">Select a list...</option>
-                {Object.entries(PICK_LIST_CONFIGS).sort((a, b) => a[1].label.localeCompare(b[1].label)).map(([key, cfg]) => (
-                  <option key={key} value={key}>{cfg.label} list</option>
-                ))}
-              </select>
-            </div>
+            {/* Conditionally render dropdown */}
+            {!hideListSelector && (
+              <div style={{ flex: '0 0 35%' }}>
+                <select
+                  value={selectedList}
+                  onChange={(e) => setSelectedList(e.target.value)}
+                  style={{ 
+                    width: '100%', 
+                    padding: '6px 10px', 
+                    border: '1px solid #d1d5db', 
+                    borderRadius: '4px', 
+                    fontSize: '13px', 
+                    outline: 'none', 
+                    backgroundColor: 'white', 
+                    cursor: 'pointer', 
+                    color: '#111827',
+                    boxSizing: 'border-box'
+                  }}
+                >
+                  <option value="">Select a list...</option>
+                  {Object.entries(PICK_LIST_CONFIGS).sort((a, b) => a[1].label.localeCompare(b[1].label)).map(([key, cfg]) => (
+                    <option key={key} value={key}>{cfg.label} list</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {/* If hidden, we essentially just have an empty space or nothing on the right. 
+                Flex layout above handles search (35%) and center count (1). 
+                If right side is gone, the center might be off-center unless we balance it.
+                Let's add a dummy spacer if hidden to keep search/count alignment consistent if desired,
+                or let flex handle it.
+            */}
+            {hideListSelector && <div style={{ flex: '0 0 35%' }} />}
           </div>
 
           {/* Table Content */}
           <div style={{ flex: 1, overflowY: 'auto', backgroundColor: 'white' }}>
             {!selectedList ? (
               <div style={{ padding: '50px 30px', textAlign: 'center', color: '#9ca3af', fontSize: '13px', fontStyle: 'italic' }}>
-                Select a pick list to manage in the top right dropdown menu...
+                Select a pick list to manage...
               </div>
             ) : filteredItems.length === 0 ? (
               <div style={{ padding: '50px 30px', textAlign: 'center', color: '#9ca3af', fontSize: '13px' }}>
