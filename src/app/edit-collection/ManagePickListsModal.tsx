@@ -50,8 +50,9 @@ interface PickListConfig {
   allowMerge: boolean;
 }
 
+// Updated allowDelete for Artist based on requirements
 const PICK_LIST_CONFIGS: Record<string, PickListConfig> = {
-  artist: { label: 'Artist', fetchFn: fetchArtists, updateFn: updateArtist, mergeFn: mergeArtists, allowDelete: false, allowMerge: true },
+  artist: { label: 'Artist', fetchFn: fetchArtists, updateFn: updateArtist, mergeFn: mergeArtists, allowDelete: true, allowMerge: true },
   'box-set': { label: 'Box Set', fetchFn: fetchBoxSets, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: false },
   chorus: { label: 'Chorus', fetchFn: fetchChoruses, updateFn: updateChorus, mergeFn: mergeChorus, allowDelete: false, allowMerge: true },
   composer: { label: 'Composer', fetchFn: fetchComposers, updateFn: updateComposer, mergeFn: mergeComposers, allowDelete: false, allowMerge: true },
@@ -87,13 +88,24 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
   const [items, setItems] = useState<{ id: string; name: string; count?: number }[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  
+  // Edit State
   const [editingItem, setEditingItem] = useState<{ id: string; name: string } | null>(null);
   const [editName, setEditName] = useState('');
+  const [editSortName, setEditSortName] = useState('');
+
   const [mergeMode, setMergeMode] = useState(false);
   const [showMergeModal, setShowMergeModal] = useState(false);
   
   // Sort toggle state
   const [sortBy, setSortBy] = useState<'name' | 'sortName'>('name');
+
+  // Helper to generate a display sortname
+  const getSortName = useCallback((name: string) => {
+    if (name.startsWith('The ')) return name.substring(4) + ', The';
+    if (name.startsWith('A ')) return name.substring(2) + ', A';
+    return name;
+  }, []);
 
   const loadItems = useCallback(async () => {
     if (!selectedList) {
@@ -120,7 +132,6 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
 
   useEffect(() => {
     if (!isOpen) {
-      // Don't clear selected list on close, remembers last selection
       setSearchQuery('');
       setMergeMode(false);
       setSelectedItems(new Set());
@@ -131,35 +142,41 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
   const handleEdit = (item: { id: string; name: string }) => {
     setEditingItem(item);
     setEditName(item.name);
+    // Initialize sort name with the auto-generated one for now
+    setEditSortName(getSortName(item.name));
   };
 
   const handleSaveEdit = async () => {
     if (!selectedList || !editingItem) return;
     const config = PICK_LIST_CONFIGS[selectedList];
+    
+    // Note: Currently updateFn only takes ID and Name. 
+    // If Sort Name support is added to backend, it would be passed here.
     const success = await config.updateFn(editingItem.id, editName);
+    
     if (success) {
       await loadItems();
       setEditingItem(null);
       setEditName('');
+      setEditSortName('');
     }
   };
 
   const handleDelete = async (itemId: string) => {
     if (!selectedList) return;
     const config = PICK_LIST_CONFIGS[selectedList];
+    
     if (config.deleteFn) {
-      if (confirm('Are you sure you want to delete this item?')) {
+      // Use specific confirmation for Artist or generic for others
+      const confirmMessage = selectedList === 'artist' 
+        ? 'Are you sure you want to remove this artist permanently?'
+        : 'Are you sure you want to delete this item?';
+
+      if (confirm(confirmMessage)) {
         const success = await config.deleteFn(itemId);
         if (success) await loadItems();
       }
     }
-  };
-
-  // Helper to generate a display sortname since DB doesn't have it yet
-  const getSortName = (name: string) => {
-    if (name.startsWith('The ')) return name.substring(4) + ', The';
-    if (name.startsWith('A ')) return name.substring(2) + ', A';
-    return name;
   };
 
   // Open the MergeModal
@@ -203,7 +220,7 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
       const nameB = sortBy === 'sortName' ? getSortName(b.name) : b.name;
       return nameA.localeCompare(nameB, undefined, { sensitivity: 'base' });
     });
-  }, [items, searchQuery, sortBy]);
+  }, [items, searchQuery, sortBy, getSortName]);
 
   if (!isOpen) return null;
 
@@ -370,16 +387,37 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
               <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid #e5e7eb', backgroundColor: 'white' }}>
+                    {/* Edit/Checkbox Column */}
                     <th style={{ width: '40px', padding: '8px' }}></th>
+                    
+                    {/* Name / Sort Name Header */}
                     <th 
-                      style={{ padding: '8px 12px', textAlign: 'left', fontSize: '12px', color: '#6b7280', fontWeight: '600', cursor: 'pointer' }}
+                      style={{ 
+                        padding: '8px 12px', 
+                        textAlign: 'left', 
+                        cursor: 'pointer',
+                        verticalAlign: 'top'
+                      }}
                       onClick={() => setSortBy(prev => prev === 'name' ? 'sortName' : 'name')}
                     >
-                      Name {sortBy === 'sortName' && '▼'}
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: '600' }}>Name</span>
+                          <span style={{ fontSize: '11px', color: '#9ca3af', fontWeight: '400', marginTop: '1px' }}>Sort Name</span>
+                        </div>
+                        {/* Sort Indicator */}
+                        <span style={{ fontSize: '10px', color: '#9ca3af', marginLeft: '4px' }}>
+                          {sortBy === 'sortName' ? '▼ Sort' : '▼ Name'}
+                        </span>
+                      </div>
                     </th>
-                    <th style={{ width: '60px', padding: '8px 12px', textAlign: 'center', fontSize: '12px', color: '#6b7280', fontWeight: '600' }}>
+
+                    {/* Count Header */}
+                    <th style={{ width: '60px', padding: '8px 12px', textAlign: 'center', verticalAlign: 'middle', fontSize: '12px', color: '#6b7280', fontWeight: '600' }}>
                       Count
                     </th>
+
+                    {/* Delete Column Header */}
                     <th style={{ width: '40px', padding: '8px' }}></th>
                   </tr>
                 </thead>
@@ -387,7 +425,6 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
                   {filteredItems.map((item, index) => {
                     const isSelected = selectedItems.has(item.id);
                     const sortName = getSortName(item.name);
-                    const showSortName = sortName !== item.name;
 
                     return (
                       <tr 
@@ -398,7 +435,7 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
                         }}
                       >
                         {/* Column 1: Edit or Checkbox */}
-                        <td style={{ padding: '8px', textAlign: 'center' }}>
+                        <td style={{ padding: '8px', textAlign: 'center', verticalAlign: 'middle' }}>
                           {mergeMode ? (
                             <input
                               type="checkbox"
@@ -414,7 +451,10 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
                                 border: 'none', 
                                 cursor: 'pointer', 
                                 color: '#3b82f6',
-                                padding: '4px'
+                                padding: '4px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
                               }}
                               title="Edit"
                             >
@@ -426,27 +466,25 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
                           )}
                         </td>
 
-                        {/* Column 2: Name & Sort Name */}
-                        <td style={{ padding: '8px 12px' }}>
+                        {/* Column 2: Name & Sort Name Rows */}
+                        <td style={{ padding: '8px 12px', verticalAlign: 'middle' }}>
                           <div style={{ display: 'flex', flexDirection: 'column' }}>
                             <span style={{ fontSize: '13px', color: '#111827', fontWeight: '500' }}>
                               {item.name}
                             </span>
-                            {showSortName && (
-                              <span style={{ fontSize: '11px', color: '#9ca3af', marginTop: '1px' }}>
-                                {sortName}
-                              </span>
-                            )}
+                            <span style={{ fontSize: '11px', color: '#9ca3af', marginTop: '1px' }}>
+                              {sortName}
+                            </span>
                           </div>
                         </td>
 
                         {/* Column 3: Count */}
-                        <td style={{ padding: '8px 12px', textAlign: 'center', fontSize: '13px', color: '#4b5563' }}>
+                        <td style={{ padding: '8px 12px', textAlign: 'center', verticalAlign: 'middle', fontSize: '13px', color: '#4b5563' }}>
                           {item.count}
                         </td>
 
                         {/* Column 4: Delete */}
-                        <td style={{ padding: '8px', textAlign: 'center' }}>
+                        <td style={{ padding: '8px', textAlign: 'center', verticalAlign: 'middle' }}>
                           {!mergeMode && config?.allowDelete && (
                             <button 
                               onClick={() => handleDelete(item.id)}
@@ -457,7 +495,10 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
                                 color: '#ef4444',
                                 fontSize: '18px',
                                 padding: '0 4px',
-                                lineHeight: '1'
+                                lineHeight: '1',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
                               }}
                               title="Delete"
                             >
@@ -547,9 +588,29 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
             <div style={{ padding: '12px 18px', backgroundColor: '#f97316', borderTopLeftRadius: '8px', borderTopRightRadius: '8px' }}>
               <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '600', color: 'white' }}>Edit {config.label}</h3>
             </div>
-            <div style={{ padding: '18px' }}>
-              <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: '500', color: '#374151' }}>Name</label>
-              <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} style={{ width: '100%', padding: '7px 10px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px', outline: 'none', boxSizing: 'border-box', color: '#111827' }} autoFocus />
+            <div style={{ padding: '18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {/* Name Input */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: '500', color: '#374151' }}>Name</label>
+                <input 
+                  type="text" 
+                  value={editName} 
+                  onChange={(e) => setEditName(e.target.value)} 
+                  style={{ width: '100%', padding: '7px 10px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px', outline: 'none', boxSizing: 'border-box', color: '#111827' }} 
+                  autoFocus 
+                />
+              </div>
+
+              {/* Sort Name Input */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: '500', color: '#374151' }}>Sort Name</label>
+                <input 
+                  type="text" 
+                  value={editSortName} 
+                  onChange={(e) => setEditSortName(e.target.value)} 
+                  style={{ width: '100%', padding: '7px 10px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px', outline: 'none', boxSizing: 'border-box', color: '#111827' }} 
+                />
+              </div>
             </div>
             <div style={{ padding: '12px 18px', borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'flex-end', gap: '8px', backgroundColor: 'white', borderBottomLeftRadius: '8px', borderBottomRightRadius: '8px' }}>
               <button onClick={() => setEditingItem(null)} style={{ padding: '6px 18px', background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: '4px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>Cancel</button>
