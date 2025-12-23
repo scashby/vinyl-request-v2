@@ -410,7 +410,7 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
                       style={{ 
                         padding: '8px 12px', 
                         textAlign: 'left', 
-                        cursor: 'pointer', 
+                        cursor: 'pointer',
                         verticalAlign: 'top'
                       }}
                       onClick={handleSortToggle}
