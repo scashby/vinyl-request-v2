@@ -1,7 +1,8 @@
 // src/app/edit-collection/ManagePickListsModal.tsx
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { MergeModal } from './pickers/MergeModal';
 import {
   fetchArtists, updateArtist, mergeArtists,
   fetchLabels, updateLabel, deleteLabel, mergeLabels,
@@ -89,7 +90,10 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
   const [editingItem, setEditingItem] = useState<{ id: string; name: string } | null>(null);
   const [editName, setEditName] = useState('');
   const [mergeMode, setMergeMode] = useState(false);
-  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [showMergeModal, setShowMergeModal] = useState(false);
+  
+  // Sort toggle state
+  const [sortBy, setSortBy] = useState<'name' | 'sortName'>('name');
 
   const loadItems = useCallback(async () => {
     if (!selectedList) {
@@ -108,7 +112,7 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
       loadItems();
       setSelectedItems(new Set());
       setMergeMode(false);
-      setDeleteConfirmId(null);
+      setSortBy('name');
     } else {
       setItems([]);
     }
@@ -116,9 +120,11 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
 
   useEffect(() => {
     if (!isOpen) {
+      // Don't clear selected list on close, remembers last selection
       setSearchQuery('');
       setMergeMode(false);
-      setDeleteConfirmId(null);
+      setSelectedItems(new Set());
+      setShowMergeModal(false);
     }
   }, [isOpen]);
 
@@ -142,30 +148,38 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
     if (!selectedList) return;
     const config = PICK_LIST_CONFIGS[selectedList];
     if (config.deleteFn) {
-      const success = await config.deleteFn(itemId);
-      if (success) {
-        await loadItems();
-        setDeleteConfirmId(null);
+      if (confirm('Are you sure you want to delete this item?')) {
+        const success = await config.deleteFn(itemId);
+        if (success) await loadItems();
       }
     }
   };
 
-  const handleMerge = async () => {
-    if (!selectedList || selectedItems.size < 2) return;
+  // Helper to generate a display sortname since DB doesn't have it yet
+  const getSortName = (name: string) => {
+    if (name.startsWith('The ')) return name.substring(4) + ', The';
+    if (name.startsWith('A ')) return name.substring(2) + ', A';
+    return name;
+  };
+
+  // Open the MergeModal
+  const handleOpenMergeModal = () => {
+    if (selectedItems.size >= 2) {
+      setShowMergeModal(true);
+    }
+  };
+
+  // Execute the actual merge
+  const handleExecuteMerge = async (primaryId: string, mergeIntoIds: string[]) => {
+    if (!selectedList) return;
     const config = PICK_LIST_CONFIGS[selectedList];
-    const itemIds = Array.from(selectedItems);
-    const targetId = itemIds[0];
-    const sourceIds = itemIds.slice(1);
     
-    const targetName = items.find(i => i.id === targetId)?.name;
-    
-    if (confirm(`Merge ${selectedItems.size} items into "${targetName}"?`)) {
-      const success = await config.mergeFn(targetId, sourceIds);
-      if (success) {
-        await loadItems();
-        setSelectedItems(new Set());
-        setMergeMode(false);
-      }
+    const success = await config.mergeFn(primaryId, mergeIntoIds);
+    if (success) {
+      await loadItems();
+      setSelectedItems(new Set());
+      setMergeMode(false);
+      setShowMergeModal(false);
     }
   };
 
@@ -179,11 +193,19 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
     setSelectedItems(newSelection);
   };
 
-  if (!isOpen) return null;
-
   const config = selectedList ? PICK_LIST_CONFIGS[selectedList] : null;
-  const filteredItems = items.filter(item => item.name.toLowerCase().includes(searchQuery.toLowerCase()));
-  const sortedItems = [...filteredItems].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+
+  const filteredItems = useMemo(() => {
+    const result = items.filter(item => item.name.toLowerCase().includes(searchQuery.toLowerCase()));
+    
+    return result.sort((a, b) => {
+      const nameA = sortBy === 'sortName' ? getSortName(a.name) : a.name;
+      const nameB = sortBy === 'sortName' ? getSortName(b.name) : b.name;
+      return nameA.localeCompare(nameB, undefined, { sensitivity: 'base' });
+    });
+  }, [items, searchQuery, sortBy]);
+
+  if (!isOpen) return null;
 
   return (
     <>
@@ -198,53 +220,49 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
           display: 'flex', 
           alignItems: 'center', 
           justifyContent: 'center', 
-          zIndex: 30001 
+          zIndex: 30000 
         }} 
         onClick={onClose}
       >
         <div 
           style={{ 
             backgroundColor: 'white', 
-            borderRadius: '6px', 
-            width: mergeMode ? '900px' : '650px', 
-            maxHeight: '600px', 
+            borderRadius: '8px', 
+            width: '800px', 
+            height: '600px', 
             display: 'flex', 
             flexDirection: 'column', 
             overflow: 'hidden', 
-            boxShadow: '0 4px 20px rgba(0,0,0,0.15)' 
+            boxShadow: '0 4px 20px rgba(0,0,0,0.2)' 
           }} 
           onClick={(e) => e.stopPropagation()}
         >
           
-          {/* Header - ORANGE by default (CLZ Style) */}
+          {/* Header */}
           <div 
             style={{ 
               padding: '12px 16px', 
-              borderBottom: '1px solid #e5e7eb', 
+              backgroundColor: '#f97316', 
               display: 'flex', 
               justifyContent: 'space-between', 
-              alignItems: 'center', 
-              backgroundColor: '#f97316',
+              alignItems: 'center',
+              borderTopLeftRadius: '8px',
+              borderTopRightRadius: '8px',
             }}
           >
-            <h3 style={{ 
-              margin: 0, 
-              fontSize: '16px', 
-              fontWeight: '600', 
-              color: 'white'
-            }}>
-              {config ? `Manage ${config.label}s` : 'Manage Pick Lists'}
-            </h3>
+            <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '600', color: 'white' }}>Manage Pick Lists</h3>
             <button 
               onClick={onClose} 
               style={{ 
                 background: 'transparent', 
                 border: 'none', 
                 color: 'white', 
-                fontSize: '20px', 
+                fontSize: '22px', 
                 cursor: 'pointer', 
-                padding: '0 4px', 
-                lineHeight: '1' 
+                padding: 0, 
+                lineHeight: '1',
+                display: 'flex',
+                alignItems: 'center',
               }}
             >
               ×
@@ -257,326 +275,276 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
               padding: '12px 16px', 
               borderBottom: '1px solid #e5e7eb', 
               display: 'flex', 
-              gap: '8px', 
               alignItems: 'center', 
-              backgroundColor: 'white' 
+              backgroundColor: 'white',
+              gap: '12px'
             }}
           >
-            {/* List Selector on LEFT */}
-            <select
-              value={selectedList}
-              onChange={(e) => setSelectedList(e.target.value)}
-              style={{ 
-                flex: '0 0 200px', 
-                padding: '6px 10px', 
-                border: '1px solid #d1d5db', 
-                borderRadius: '4px', 
-                fontSize: '13px', 
-                outline: 'none', 
-                backgroundColor: 'white', 
-                cursor: 'pointer', 
-                color: '#111827' 
-              }}
-            >
-              <option value="">Select a list...</option>
-              {Object.entries(PICK_LIST_CONFIGS).sort((a, b) => a[1].label.localeCompare(b[1].label)).map(([key, cfg]) => (
-                <option key={key} value={key}>{cfg.label}</option>
-              ))}
-            </select>
-
-            <input
-              type="text"
-              placeholder="Search..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{ 
-                flex: 1, 
-                padding: '6px 10px', 
-                border: '1px solid #d1d5db', 
-                borderRadius: '4px', 
-                fontSize: '13px', 
-                outline: 'none', 
-                backgroundColor: 'white', 
-                color: '#111827' 
-              }}
-            />
-
-            {/* Merge Mode Toggle */}
-            {config?.allowMerge && (
-              <button
-                onClick={() => {
-                  setMergeMode(!mergeMode);
-                  setSelectedItems(new Set());
+            {/* Search Field (Left) */}
+            <div style={{ flex: '0 0 35%', position: 'relative' }}>
+              <input
+                type="text"
+                placeholder="Search..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{ 
+                  width: '100%', 
+                  padding: '6px 10px', 
+                  border: '1px solid #d1d5db', 
+                  borderRadius: '4px', 
+                  fontSize: '13px', 
+                  outline: 'none', 
+                  backgroundColor: 'white', 
+                  color: '#111827',
+                  boxSizing: 'border-box'
                 }}
-                style={{
-                  padding: '6px 12px',
-                  background: mergeMode ? '#ef4444' : '#6b7280',
-                  color: 'white',
-                  border: 'none',
+              />
+            </div>
+
+            {/* Spacer & Count (Middle) */}
+            <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+               {selectedList && (
+                <div style={{ 
+                  backgroundColor: '#f3f4f6', 
+                  padding: '4px 12px', 
                   borderRadius: '4px',
-                  fontSize: '13px',
-                  fontWeight: '500',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: '12px',
+                  color: '#4b5563',
+                  border: '1px solid #e5e7eb'
+                }}>
+                  <span style={{ 
+                    backgroundColor: 'black', 
+                    color: 'white', 
+                    padding: '1px 6px', 
+                    borderRadius: '10px', 
+                    fontWeight: '600',
+                    fontSize: '11px'
+                  }}>
+                    {filteredItems.length}
+                  </span>
+                  <span>{config?.label}s</span>
+                </div>
+               )}
+            </div>
+
+            {/* Dropdown (Right) */}
+            <div style={{ flex: '0 0 35%' }}>
+              <select
+                value={selectedList}
+                onChange={(e) => setSelectedList(e.target.value)}
+                style={{ 
+                  width: '100%', 
+                  padding: '6px 10px', 
+                  border: '1px solid #d1d5db', 
+                  borderRadius: '4px', 
+                  fontSize: '13px', 
+                  outline: 'none', 
+                  backgroundColor: 'white', 
+                  cursor: 'pointer', 
+                  color: '#111827',
+                  boxSizing: 'border-box'
                 }}
               >
-                {mergeMode ? 'Cancel Merge' : 'Merge Mode'}
-              </button>
-            )}
+                <option value="">Select a list...</option>
+                {Object.entries(PICK_LIST_CONFIGS).sort((a, b) => a[1].label.localeCompare(b[1].label)).map(([key, cfg]) => (
+                  <option key={key} value={key}>{cfg.label} list</option>
+                ))}
+              </select>
+            </div>
           </div>
 
-          {/* Yellow Banner in Merge Mode */}
-          {mergeMode && (
-            <div
-              style={{
-                padding: '10px 16px',
-                backgroundColor: '#fef3c7',
-                borderBottom: '1px solid #fbbf24',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}
-            >
-              <span style={{ fontSize: '13px', color: '#92400e', fontWeight: '500' }}>
-                {selectedItems.size === 0
-                  ? `Select 2 or more items to merge`
-                  : `${selectedItems.size} items selected`}
-              </span>
-              {selectedItems.size >= 2 && (
-                <button
-                  onClick={handleMerge}
-                  style={{
-                    padding: '5px 14px',
-                    background: '#3b82f6',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    fontSize: '13px',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Merge Selected
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* Content Area */}
-          <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-            {/* List */}
-            <div 
-              style={{ 
-                flex: mergeMode ? '0 0 60%' : '1', 
-                overflowY: 'auto', 
-                padding: '8px 16px', 
-                borderRight: mergeMode ? '1px solid #e5e7eb' : 'none' 
-              }}
-            >
-              {!selectedList ? (
-                <div style={{ padding: '50px 30px', textAlign: 'center', color: '#9ca3af', fontSize: '13px', fontStyle: 'italic' }}>
-                  Select a pick list to manage using the dropdown menu...
-                </div>
-              ) : sortedItems.length === 0 ? (
-                <div style={{ padding: '50px 30px', textAlign: 'center', color: '#9ca3af', fontSize: '13px' }}>
-                  {searchQuery ? 'No items match your search' : 'No items available'}
-                </div>
-              ) : (
-                sortedItems.map((item) => {
-                  const isDeleteConfirming = deleteConfirmId === item.id;
-                  const isSelectedForMerge = selectedItems.has(item.id);
-
-                  return (
-                    <div 
-                      key={item.id} 
-                      style={{ 
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '6px 8px',
-                        borderRadius: '3px',
-                        backgroundColor: isSelectedForMerge ? '#eff6ff' : 'transparent',
-                        marginBottom: '1px',
-                        borderBottom: '1px solid #f3f4f6'
-                      }}
-                    >
-                      {/* Name & Checkbox */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
-                        {mergeMode && (
-                          <input
-                            type="checkbox"
-                            checked={isSelectedForMerge}
-                            onChange={() => toggleSelection(item.id)}
-                            style={{ width: '16px', height: '16px', cursor: 'pointer', margin: 0 }}
-                          />
-                        )}
-                        <span style={{ fontSize: '13px', color: '#111827', flex: 1 }}>{item.name}</span>
-                        {item.count !== undefined && (
-                          <span style={{ fontSize: '13px', color: '#6b7280', fontWeight: '400', marginRight: '8px' }}>
-                            {item.count}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Actions */}
-                      {!mergeMode && (
-                        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                          {isDeleteConfirming ? (
-                            <>
-                              <button
-                                onClick={() => handleDelete(item.id)}
-                                style={{
-                                  padding: '4px 10px',
-                                  background: '#ef4444',
-                                  color: 'white',
-                                  border: 'none',
-                                  borderRadius: '3px',
-                                  fontSize: '12px',
-                                  fontWeight: '500',
-                                  cursor: 'pointer',
-                                }}
-                              >
-                                Confirm
-                              </button>
-                              <button
-                                onClick={() => setDeleteConfirmId(null)}
-                                style={{
-                                  padding: '4px 10px',
-                                  background: '#e5e7eb',
-                                  color: '#374151',
-                                  border: 'none',
-                                  borderRadius: '3px',
-                                  fontSize: '12px',
-                                  fontWeight: '500',
-                                  cursor: 'pointer',
-                                }}
-                              >
-                                Cancel
-                              </button>
-                            </>
-                          ) : (
-                            <>
-                              {/* Edit Button */}
-                              <button 
-                                onClick={() => handleEdit(item)} 
-                                style={{ 
-                                  background: 'transparent',
-                                  border: 'none',
-                                  cursor: 'pointer',
-                                  padding: '4px',
-                                  color: '#6b7280',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                }}
-                                title="Edit"
-                              >
-                                <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
-                                  <path d="M11.5 1.5l1 1-8 8-1.5.5.5-1.5 8-8zm1.5-.5c-.3-.3-.7-.3-1 0l-1 1 1 1 1-1c.3-.3.3-.7 0-1l-.5-.5-.5.5zm-10 11l1-3 2 2-3 1z"/>
-                                </svg>
-                              </button>
-                              
-                              {/* Delete Button */}
-                              {config?.allowDelete && config.deleteFn && (
-                                <button 
-                                  onClick={() => setDeleteConfirmId(item.id)} 
-                                  style={{ 
-                                    background: 'transparent',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    padding: '4px',
-                                    color: '#6b7280',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    fontSize: '16px',
-                                    lineHeight: '1',
-                                  }}
-                                  title="Delete"
-                                >
-                                  ×
-                                </button>
-                              )}
-                            </>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })
-              )}
-            </div>
-
-            {/* Right Panel in Merge Mode */}
-            {mergeMode && selectedItems.size > 0 && (
-              <div style={{ flex: '0 0 40%', padding: '16px', backgroundColor: '#f9fafb', overflowY: 'auto' }}>
-                <div style={{ fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '12px' }}>
-                  Merge {selectedItems.size} items into:
-                </div>
-                {Array.from(selectedItems).map(id => {
-                  const item = items.find(i => i.id === id);
-                  if (!item) return null;
-                  return (
-                    <div key={id} style={{
-                      padding: '6px 8px',
-                      backgroundColor: 'white',
-                      borderRadius: '3px',
-                      marginBottom: '4px',
-                      fontSize: '13px',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                    }}>
-                      <span>{item.name}</span>
-                      <span style={{ color: '#6b7280' }}>{item.count}</span>
-                    </div>
-                  );
-                })}
+          {/* Table Content */}
+          <div style={{ flex: 1, overflowY: 'auto', backgroundColor: 'white' }}>
+            {!selectedList ? (
+              <div style={{ padding: '50px 30px', textAlign: 'center', color: '#9ca3af', fontSize: '13px', fontStyle: 'italic' }}>
+                Select a pick list to manage in the top right dropdown menu...
               </div>
+            ) : filteredItems.length === 0 ? (
+              <div style={{ padding: '50px 30px', textAlign: 'center', color: '#9ca3af', fontSize: '13px' }}>
+                {searchQuery ? 'No items match your search' : 'No items available'}
+              </div>
+            ) : (
+              <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid #e5e7eb', backgroundColor: 'white' }}>
+                    <th style={{ width: '40px', padding: '8px' }}></th>
+                    <th 
+                      style={{ padding: '8px 12px', textAlign: 'left', fontSize: '12px', color: '#6b7280', fontWeight: '600', cursor: 'pointer' }}
+                      onClick={() => setSortBy(prev => prev === 'name' ? 'sortName' : 'name')}
+                    >
+                      Name {sortBy === 'sortName' && '▼'}
+                    </th>
+                    <th style={{ width: '60px', padding: '8px 12px', textAlign: 'center', fontSize: '12px', color: '#6b7280', fontWeight: '600' }}>
+                      Count
+                    </th>
+                    <th style={{ width: '40px', padding: '8px' }}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredItems.map((item, index) => {
+                    const isSelected = selectedItems.has(item.id);
+                    const sortName = getSortName(item.name);
+                    const showSortName = sortName !== item.name;
+
+                    return (
+                      <tr 
+                        key={item.id} 
+                        style={{ 
+                          backgroundColor: index % 2 === 0 ? 'white' : '#f9fafb',
+                          borderBottom: '1px solid #f3f4f6' 
+                        }}
+                      >
+                        {/* Column 1: Edit or Checkbox */}
+                        <td style={{ padding: '8px', textAlign: 'center' }}>
+                          {mergeMode ? (
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleSelection(item.id)}
+                              style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                            />
+                          ) : (
+                            <button 
+                              onClick={() => handleEdit(item)}
+                              style={{ 
+                                background: 'transparent', 
+                                border: 'none', 
+                                cursor: 'pointer', 
+                                color: '#3b82f6',
+                                padding: '4px'
+                              }}
+                              title="Edit"
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                              </svg>
+                            </button>
+                          )}
+                        </td>
+
+                        {/* Column 2: Name & Sort Name */}
+                        <td style={{ padding: '8px 12px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            <span style={{ fontSize: '13px', color: '#111827', fontWeight: '500' }}>
+                              {item.name}
+                            </span>
+                            {showSortName && (
+                              <span style={{ fontSize: '11px', color: '#9ca3af', marginTop: '1px' }}>
+                                {sortName}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Column 3: Count */}
+                        <td style={{ padding: '8px 12px', textAlign: 'center', fontSize: '13px', color: '#4b5563' }}>
+                          {item.count}
+                        </td>
+
+                        {/* Column 4: Delete */}
+                        <td style={{ padding: '8px', textAlign: 'center' }}>
+                          {!mergeMode && config?.allowDelete && (
+                            <button 
+                              onClick={() => handleDelete(item.id)}
+                              style={{ 
+                                background: 'transparent', 
+                                border: 'none', 
+                                cursor: 'pointer', 
+                                color: '#ef4444',
+                                fontSize: '18px',
+                                padding: '0 4px',
+                                lineHeight: '1'
+                              }}
+                              title="Delete"
+                            >
+                              ×
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             )}
           </div>
 
           {/* Footer */}
-          <div 
-            style={{ 
-              padding: '12px 16px', 
-              borderTop: '1px solid #e5e7eb', 
-              display: 'flex', 
-              justifyContent: mergeMode ? 'space-between' : 'flex-end', // Right align close button
-              gap: '8px',
-              backgroundColor: 'white'
-            }}
-          >
-            {mergeMode ? (
-              <>
-                <button
-                  onClick={() => { setMergeMode(false); setSelectedItems(new Set()); }}
-                  style={{ padding: '6px 16px', background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: '4px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleMerge}
-                  disabled={selectedItems.size < 2}
-                  style={{ padding: '6px 16px', background: selectedItems.size >= 2 ? '#3b82f6' : '#d1d5db', color: 'white', border: 'none', borderRadius: '4px', fontSize: '13px', fontWeight: '600', cursor: selectedItems.size >= 2 ? 'pointer' : 'not-allowed' }}
-                >
-                  Merge to
-                </button>
-              </>
+          <div style={{ 
+            padding: '12px 16px', 
+            borderTop: '1px solid #e5e7eb', 
+            backgroundColor: 'white', 
+            borderBottomLeftRadius: '8px', 
+            borderBottomRightRadius: '8px',
+            height: '50px',
+            display: 'flex',
+            alignItems: 'center'
+          }}>
+            {!mergeMode ? (
+              <div style={{ width: '100%', display: 'flex', justifyContent: 'flex-end' }}>
+                {config?.allowMerge && (
+                  <button
+                    onClick={() => { setMergeMode(true); setSelectedItems(new Set()); }}
+                    disabled={!selectedList}
+                    style={{ 
+                      padding: '6px 16px', 
+                      background: !selectedList ? '#f3f4f6' : '#e5e7eb', 
+                      color: !selectedList ? '#9ca3af' : '#374151', 
+                      border: 'none', 
+                      borderRadius: '4px', 
+                      fontSize: '13px', 
+                      fontWeight: '500', 
+                      cursor: !selectedList ? 'not-allowed' : 'pointer' 
+                    }}
+                  >
+                    Merge Mode
+                  </button>
+                )}
+              </div>
             ) : (
-              <button
-                onClick={onClose}
-                style={{ padding: '6px 20px', background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: '4px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}
-              >
-                Close
-              </button>
+              <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '13px', color: '#6b7280', fontWeight: '500' }}>
+                  {selectedItems.size > 0 ? `${selectedItems.size} selected...` : 'Select items to merge...'}
+                </span>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    onClick={() => { setMergeMode(false); setSelectedItems(new Set()); }}
+                    style={{ padding: '6px 16px', background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: '4px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleOpenMergeModal}
+                    disabled={selectedItems.size < 2}
+                    style={{ 
+                      padding: '6px 16px', 
+                      background: selectedItems.size >= 2 ? '#3b82f6' : '#d1d5db', 
+                      color: 'white', 
+                      border: 'none', 
+                      borderRadius: '4px', 
+                      fontSize: '13px', 
+                      fontWeight: '600', 
+                      cursor: selectedItems.size >= 2 ? 'pointer' : 'not-allowed' 
+                    }}
+                  >
+                    Merge to
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* Edit modal */}
+      {/* Internal Edit Modal */}
       {editingItem && config && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 30002 }} onClick={() => setEditingItem(null)}>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 30005 }} onClick={() => setEditingItem(null)}>
           <div style={{ backgroundColor: 'white', borderRadius: '8px', width: '400px', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ padding: '12px 18px', backgroundColor: '#f97316', borderBottom: '1px solid #e5e7eb', borderTopLeftRadius: '8px', borderTopRightRadius: '8px' }}>
+            <div style={{ padding: '12px 18px', backgroundColor: '#f97316', borderTopLeftRadius: '8px', borderTopRightRadius: '8px' }}>
               <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '600', color: 'white' }}>Edit {config.label}</h3>
             </div>
             <div style={{ padding: '18px' }}>
@@ -589,6 +557,18 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
             </div>
           </div>
         </div>
+      )}
+
+      {/* External Merge Modal */}
+      {showMergeModal && config && (
+        <MergeModal
+          isOpen={showMergeModal}
+          onClose={() => setShowMergeModal(false)}
+          title={`Merge ${config.label}s`}
+          items={items.filter(i => selectedItems.has(i.id))}
+          onMerge={handleExecuteMerge}
+          itemLabel={config.label}
+        />
       )}
     </>
   );
