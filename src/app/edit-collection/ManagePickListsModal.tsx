@@ -46,38 +46,39 @@ interface PickListConfig {
   deleteFn?: (id: string) => Promise<boolean>;
   mergeFn: (targetId: string, sourceIds: string[]) => Promise<boolean>;
   allowDelete: boolean;
+  allowMerge: boolean;
 }
 
 const PICK_LIST_CONFIGS: Record<string, PickListConfig> = {
-  artist: { label: 'Artist', fetchFn: fetchArtists, updateFn: updateArtist, mergeFn: mergeArtists, allowDelete: false },
-  'box-set': { label: 'Box Set', fetchFn: fetchBoxSets, updateFn: async () => false, mergeFn: async () => false, allowDelete: false },
-  chorus: { label: 'Chorus', fetchFn: fetchChoruses, updateFn: updateChorus, mergeFn: mergeChorus, allowDelete: false },
-  composer: { label: 'Composer', fetchFn: fetchComposers, updateFn: updateComposer, mergeFn: mergeComposers, allowDelete: false },
-  composition: { label: 'Composition', fetchFn: fetchCompositions, updateFn: updateComposition, mergeFn: mergeCompositions, allowDelete: false },
-  conductor: { label: 'Conductor', fetchFn: fetchConductors, updateFn: updateConductor, mergeFn: mergeConductors, allowDelete: false },
-  country: { label: 'Country', fetchFn: fetchCountries, updateFn: async () => false, deleteFn: async () => false, mergeFn: async () => false, allowDelete: true },
-  engineer: { label: 'Engineer', fetchFn: fetchEngineers, updateFn: async () => false, mergeFn: async () => false, allowDelete: false },
-  format: { label: 'Format', fetchFn: fetchFormats, updateFn: updateFormat, deleteFn: async () => false, mergeFn: mergeFormats, allowDelete: true },
-  genre: { label: 'Genre', fetchFn: fetchGenres, updateFn: async () => false, deleteFn: async () => false, mergeFn: async () => false, allowDelete: true },
-  label: { label: 'Label', fetchFn: fetchLabels, updateFn: updateLabel, deleteFn: deleteLabel, mergeFn: mergeLabels, allowDelete: true },
-  location: { label: 'Location', fetchFn: fetchLocations, updateFn: updateLocation, deleteFn: async () => false, mergeFn: mergeLocations, allowDelete: true },
-  'media-condition': { label: 'Media Condition', fetchFn: fetchMediaConditions, updateFn: async () => false, deleteFn: async () => false, mergeFn: async () => false, allowDelete: true },
-  musician: { label: 'Musician', fetchFn: fetchMusicians, updateFn: async () => false, mergeFn: async () => false, allowDelete: false },
-  orchestra: { label: 'Orchestra', fetchFn: fetchOrchestras, updateFn: updateOrchestra, mergeFn: mergeOrchestras, allowDelete: false },
-  owner: { label: 'Owner', fetchFn: fetchOwners, updateFn: updateOwner, deleteFn: deleteOwner, mergeFn: mergeOwners, allowDelete: true },
-  'package-sleeve-condition': { label: 'Package/Sleeve Condition', fetchFn: fetchPackageConditions, updateFn: async () => false, deleteFn: async () => false, mergeFn: async () => false, allowDelete: true },
-  packaging: { label: 'Packaging', fetchFn: fetchPackaging, updateFn: updatePackaging, deleteFn: deletePackaging, mergeFn: mergePackaging, allowDelete: true },
-  producer: { label: 'Producer', fetchFn: fetchProducers, updateFn: async () => false, mergeFn: async () => false, allowDelete: false },
-  'purchase-store': { label: 'Purchase Store', fetchFn: fetchPurchaseStores, updateFn: updatePurchaseStore, deleteFn: deletePurchaseStore, mergeFn: mergePurchaseStores, allowDelete: true },
-  signee: { label: 'Signee', fetchFn: fetchSignees, updateFn: async () => false, mergeFn: async () => false, allowDelete: false },
-  songwriter: { label: 'Songwriter', fetchFn: fetchSongwriters, updateFn: async () => false, mergeFn: async () => false, allowDelete: false },
-  sound: { label: 'Sound', fetchFn: fetchSounds, updateFn: updateSound, mergeFn: mergeSounds, allowDelete: false },
-  spars: { label: 'SPARS', fetchFn: fetchSPARS, updateFn: updateSPARS, deleteFn: async () => false, mergeFn: mergeSPARS, allowDelete: true },
-  'storage-device': { label: 'Storage Device', fetchFn: fetchStorageDevices, updateFn: async () => false, mergeFn: async () => false, allowDelete: false },
-  studio: { label: 'Studio', fetchFn: fetchStudios, updateFn: updateStudio, mergeFn: mergeStudios, allowDelete: false },
-  tag: { label: 'Tag', fetchFn: fetchTags, updateFn: async () => false, deleteFn: async () => false, mergeFn: async () => false, allowDelete: true },
-  'vinyl-color': { label: 'Vinyl Color', fetchFn: fetchVinylColors, updateFn: updateVinylColor, deleteFn: async () => false, mergeFn: mergeVinylColors, allowDelete: true },
-  'vinyl-weight': { label: 'Vinyl Weight', fetchFn: fetchVinylWeights, updateFn: async () => false, mergeFn: async () => false, allowDelete: false },
+  artist: { label: 'Artist', fetchFn: fetchArtists, updateFn: updateArtist, mergeFn: mergeArtists, allowDelete: false, allowMerge: true },
+  'box-set': { label: 'Box Set', fetchFn: fetchBoxSets, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: false },
+  chorus: { label: 'Chorus', fetchFn: fetchChoruses, updateFn: updateChorus, mergeFn: mergeChorus, allowDelete: false, allowMerge: true },
+  composer: { label: 'Composer', fetchFn: fetchComposers, updateFn: updateComposer, mergeFn: mergeComposers, allowDelete: false, allowMerge: true },
+  composition: { label: 'Composition', fetchFn: fetchCompositions, updateFn: updateComposition, mergeFn: mergeCompositions, allowDelete: false, allowMerge: true },
+  conductor: { label: 'Conductor', fetchFn: fetchConductors, updateFn: updateConductor, mergeFn: mergeConductors, allowDelete: false, allowMerge: true },
+  country: { label: 'Country', fetchFn: fetchCountries, updateFn: async () => false, deleteFn: async () => false, mergeFn: async () => false, allowDelete: true, allowMerge: false },
+  engineer: { label: 'Engineer', fetchFn: fetchEngineers, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: false },
+  format: { label: 'Format', fetchFn: fetchFormats, updateFn: updateFormat, deleteFn: async () => false, mergeFn: mergeFormats, allowDelete: true, allowMerge: true },
+  genre: { label: 'Genre', fetchFn: fetchGenres, updateFn: async () => false, deleteFn: async () => false, mergeFn: async () => false, allowDelete: true, allowMerge: false },
+  label: { label: 'Label', fetchFn: fetchLabels, updateFn: updateLabel, deleteFn: deleteLabel, mergeFn: mergeLabels, allowDelete: true, allowMerge: true },
+  location: { label: 'Location', fetchFn: fetchLocations, updateFn: updateLocation, deleteFn: async () => false, mergeFn: mergeLocations, allowDelete: true, allowMerge: true },
+  'media-condition': { label: 'Media Condition', fetchFn: fetchMediaConditions, updateFn: async () => false, deleteFn: async () => false, mergeFn: async () => false, allowDelete: true, allowMerge: false },
+  musician: { label: 'Musician', fetchFn: fetchMusicians, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: false },
+  orchestra: { label: 'Orchestra', fetchFn: fetchOrchestras, updateFn: updateOrchestra, mergeFn: mergeOrchestras, allowDelete: false, allowMerge: true },
+  owner: { label: 'Owner', fetchFn: fetchOwners, updateFn: updateOwner, deleteFn: deleteOwner, mergeFn: mergeOwners, allowDelete: true, allowMerge: true },
+  'package-sleeve-condition': { label: 'Package/Sleeve Condition', fetchFn: fetchPackageConditions, updateFn: async () => false, deleteFn: async () => false, mergeFn: async () => false, allowDelete: true, allowMerge: false },
+  packaging: { label: 'Packaging', fetchFn: fetchPackaging, updateFn: updatePackaging, deleteFn: deletePackaging, mergeFn: mergePackaging, allowDelete: true, allowMerge: true },
+  producer: { label: 'Producer', fetchFn: fetchProducers, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: false },
+  'purchase-store': { label: 'Purchase Store', fetchFn: fetchPurchaseStores, updateFn: updatePurchaseStore, deleteFn: deletePurchaseStore, mergeFn: mergePurchaseStores, allowDelete: true, allowMerge: true },
+  signee: { label: 'Signee', fetchFn: fetchSignees, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: false },
+  songwriter: { label: 'Songwriter', fetchFn: fetchSongwriters, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: false },
+  sound: { label: 'Sound', fetchFn: fetchSounds, updateFn: updateSound, mergeFn: mergeSounds, allowDelete: false, allowMerge: true },
+  spars: { label: 'SPARS', fetchFn: fetchSPARS, updateFn: updateSPARS, deleteFn: async () => false, mergeFn: mergeSPARS, allowDelete: true, allowMerge: true },
+  'storage-device': { label: 'Storage Device', fetchFn: fetchStorageDevices, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: false },
+  studio: { label: 'Studio', fetchFn: fetchStudios, updateFn: updateStudio, mergeFn: mergeStudios, allowDelete: false, allowMerge: true },
+  tag: { label: 'Tag', fetchFn: fetchTags, updateFn: async () => false, deleteFn: async () => false, mergeFn: async () => false, allowDelete: true, allowMerge: false },
+  'vinyl-color': { label: 'Vinyl Color', fetchFn: fetchVinylColors, updateFn: updateVinylColor, deleteFn: async () => false, mergeFn: mergeVinylColors, allowDelete: true, allowMerge: true },
+  'vinyl-weight': { label: 'Vinyl Weight', fetchFn: fetchVinylWeights, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: false },
 };
 
 export default function ManagePickListsModal({ isOpen, onClose }: ManagePickListsModalProps) {
@@ -88,6 +89,7 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
   const [editingItem, setEditingItem] = useState<{ id: string; name: string } | null>(null);
   const [editName, setEditName] = useState('');
   const [mergeMode, setMergeMode] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const loadItems = useCallback(async () => {
     if (!selectedList) {
@@ -106,10 +108,19 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
       loadItems();
       setSelectedItems(new Set());
       setMergeMode(false);
+      setDeleteConfirmId(null);
     } else {
       setItems([]);
     }
   }, [selectedList, loadItems]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setSearchQuery('');
+      setMergeMode(false);
+      setDeleteConfirmId(null);
+    }
+  }, [isOpen]);
 
   const handleEdit = (item: { id: string; name: string }) => {
     setEditingItem(item);
@@ -131,9 +142,10 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
     if (!selectedList) return;
     const config = PICK_LIST_CONFIGS[selectedList];
     if (config.deleteFn) {
-      if (confirm('Are you sure you want to delete this item?')) {
-        const success = await config.deleteFn(itemId);
-        if (success) await loadItems();
+      const success = await config.deleteFn(itemId);
+      if (success) {
+        await loadItems();
+        setDeleteConfirmId(null);
       }
     }
   };
@@ -144,7 +156,10 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
     const itemIds = Array.from(selectedItems);
     const targetId = itemIds[0];
     const sourceIds = itemIds.slice(1);
-    if (confirm(`Merge ${selectedItems.size} items into "${items.find(i => i.id === targetId)?.name}"?`)) {
+    
+    const targetName = items.find(i => i.id === targetId)?.name;
+    
+    if (confirm(`Merge ${selectedItems.size} items into "${targetName}"?`)) {
       const success = await config.mergeFn(targetId, sourceIds);
       if (success) {
         await loadItems();
@@ -168,131 +183,390 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
 
   const config = selectedList ? PICK_LIST_CONFIGS[selectedList] : null;
   const filteredItems = items.filter(item => item.name.toLowerCase().includes(searchQuery.toLowerCase()));
+  const sortedItems = [...filteredItems].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
 
   return (
     <>
-      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 30001 }} onClick={onClose}>
-        <div style={{ backgroundColor: 'white', borderRadius: '8px', width: '650px', maxHeight: '480px', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }} onClick={(e) => e.stopPropagation()}>
+      <div 
+        style={{ 
+          position: 'fixed', 
+          top: 0, 
+          left: 0, 
+          right: 0, 
+          bottom: 0, 
+          backgroundColor: 'rgba(0, 0, 0, 0.5)', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center', 
+          zIndex: 30001 
+        }} 
+        onClick={onClose}
+      >
+        <div 
+          style={{ 
+            backgroundColor: 'white', 
+            borderRadius: '6px', 
+            width: mergeMode ? '900px' : '650px', 
+            maxHeight: '600px', 
+            display: 'flex', 
+            flexDirection: 'column', 
+            overflow: 'hidden', 
+            boxShadow: '0 4px 20px rgba(0,0,0,0.15)' 
+          }} 
+          onClick={(e) => e.stopPropagation()}
+        >
           
-          {/* Header */}
-          <div style={{ padding: '12px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f97316', borderTopLeftRadius: '8px', borderTopRightRadius: '8px' }}>
-            <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '600', color: 'white' }}>Manage Pick Lists</h3>
-            <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '22px', cursor: 'pointer', padding: 0, width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: '1' }}>×</button>
+          {/* Header - ORANGE by default (CLZ Style) */}
+          <div 
+            style={{ 
+              padding: '12px 16px', 
+              borderBottom: '1px solid #e5e7eb', 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              backgroundColor: '#f97316',
+            }}
+          >
+            <h3 style={{ 
+              margin: 0, 
+              fontSize: '16px', 
+              fontWeight: '600', 
+              color: 'white'
+            }}>
+              {config ? `Manage ${config.label}s` : 'Manage Pick Lists'}
+            </h3>
+            <button 
+              onClick={onClose} 
+              style={{ 
+                background: 'transparent', 
+                border: 'none', 
+                color: 'white', 
+                fontSize: '20px', 
+                cursor: 'pointer', 
+                padding: '0 4px', 
+                lineHeight: '1' 
+              }}
+            >
+              ×
+            </button>
           </div>
 
           {/* Toolbar */}
-          <div style={{ padding: '14px 18px', borderBottom: '1px solid #e5e7eb', display: 'flex', gap: '8px', alignItems: 'center', backgroundColor: 'white' }}>
+          <div 
+            style={{ 
+              padding: '12px 16px', 
+              borderBottom: '1px solid #e5e7eb', 
+              display: 'flex', 
+              gap: '8px', 
+              alignItems: 'center', 
+              backgroundColor: 'white' 
+            }}
+          >
+            {/* List Selector on LEFT */}
+            <select
+              value={selectedList}
+              onChange={(e) => setSelectedList(e.target.value)}
+              style={{ 
+                flex: '0 0 200px', 
+                padding: '6px 10px', 
+                border: '1px solid #d1d5db', 
+                borderRadius: '4px', 
+                fontSize: '13px', 
+                outline: 'none', 
+                backgroundColor: 'white', 
+                cursor: 'pointer', 
+                color: '#111827' 
+              }}
+            >
+              <option value="">Select a list...</option>
+              {Object.entries(PICK_LIST_CONFIGS).sort((a, b) => a[1].label.localeCompare(b[1].label)).map(([key, cfg]) => (
+                <option key={key} value={key}>{cfg.label}</option>
+              ))}
+            </select>
+
             <input
               type="text"
               placeholder="Search..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              style={{ flex: '0 0 160px', padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px', outline: 'none', backgroundColor: 'white', color: '#111827' }}
+              style={{ 
+                flex: 1, 
+                padding: '6px 10px', 
+                border: '1px solid #d1d5db', 
+                borderRadius: '4px', 
+                fontSize: '13px', 
+                outline: 'none', 
+                backgroundColor: 'white', 
+                color: '#111827' 
+              }}
             />
-            <div style={{ flex: '0 0 130px', padding: '6px 10px', fontSize: '13px', color: '#6b7280', textAlign: 'center', display: 'flex', gap: '6px', justifyContent: 'center', alignItems: 'center' }}>
-              {selectedList && filteredItems.length > 0 && (
-                <>
-                  <span style={{ fontWeight: '600', color: '#111827' }}>{filteredItems.length}</span>
-                  <span>{config?.label.toLowerCase()}s</span>
-                </>
-              )}
-            </div>
-            <select
-              value={selectedList}
-              onChange={(e) => setSelectedList(e.target.value)}
-              style={{ flex: '0 0 220px', padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px', outline: 'none', backgroundColor: 'white', cursor: 'pointer', color: '#111827' }}
-            >
-              <option value="">Select a list...</option>
-              {Object.entries(PICK_LIST_CONFIGS).sort((a, b) => a[1].label.localeCompare(b[1].label)).map(([key, cfg]) => (
-                <option key={key} value={key}>{cfg.label} list</option>
-              ))}
-            </select>
+
+            {/* Merge Mode Toggle */}
+            {config?.allowMerge && (
+              <button
+                onClick={() => {
+                  setMergeMode(!mergeMode);
+                  setSelectedItems(new Set());
+                }}
+                style={{
+                  padding: '6px 12px',
+                  background: mergeMode ? '#ef4444' : '#6b7280',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  fontSize: '13px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {mergeMode ? 'Cancel Merge' : 'Merge Mode'}
+              </button>
+            )}
           </div>
 
-          {/* Content */}
-          <div style={{ flex: 1, overflowY: 'auto', backgroundColor: 'white' }}>
-            {!selectedList ? (
-              <div style={{ padding: '50px 30px', textAlign: 'center', color: '#9ca3af', fontSize: '13px', fontStyle: 'italic' }}>
-                Select a pick list to manage in the top right dropdown menu...
-              </div>
-            ) : filteredItems.length === 0 ? (
-              <div style={{ padding: '50px 30px', textAlign: 'center', color: '#9ca3af', fontSize: '13px' }}>
-                {searchQuery ? 'No items match your search' : 'No items available'}
-              </div>
-            ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <tbody>
-                  {filteredItems.map((item, index) => (
-                    <tr key={item.id} style={{ borderBottom: index < filteredItems.length - 1 ? '1px solid #f3f4f6' : 'none' }}>
-                      <td style={{ padding: '8px 18px', fontSize: '13px', color: '#111827', width: '60%' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          {mergeMode && (
-                            <input
-                              type="checkbox"
-                              checked={selectedItems.has(item.id)}
-                              onChange={() => toggleSelection(item.id)}
-                              style={{ width: '16px', height: '16px', cursor: 'pointer', margin: 0 }}
-                            />
-                          )}
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2">
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                          </svg>
-                          <span>{item.name}</span>
-                        </div>
-                      </td>
-                      <td style={{ padding: '8px 18px', fontSize: '13px', color: '#111827', textAlign: 'center', width: '20%' }}>
-                        {item.count !== undefined ? item.count : ''}
-                      </td>
-                      <td style={{ padding: '8px 18px', textAlign: 'right', width: '20%' }}>
-                        {!mergeMode && (
-                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
-                            <button onClick={() => handleEdit(item)} style={{ padding: '4px 12px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', fontSize: '12px', fontWeight: '500', cursor: 'pointer' }}>Edit</button>
-                            {config?.deleteFn && config.allowDelete && (
-                              <button onClick={() => handleDelete(item.id)} style={{ padding: '4px 8px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', fontSize: '13px', fontWeight: '500', cursor: 'pointer', lineHeight: '1' }}>×</button>
-                            )}
-                          </div>
+          {/* Yellow Banner in Merge Mode */}
+          {mergeMode && (
+            <div
+              style={{
+                padding: '10px 16px',
+                backgroundColor: '#fef3c7',
+                borderBottom: '1px solid #fbbf24',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <span style={{ fontSize: '13px', color: '#92400e', fontWeight: '500' }}>
+                {selectedItems.size === 0
+                  ? `Select 2 or more items to merge`
+                  : `${selectedItems.size} items selected`}
+              </span>
+              {selectedItems.size >= 2 && (
+                <button
+                  onClick={handleMerge}
+                  style={{
+                    padding: '5px 14px',
+                    background: '#3b82f6',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Merge Selected
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Content Area */}
+          <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+            {/* List */}
+            <div 
+              style={{ 
+                flex: mergeMode ? '0 0 60%' : '1', 
+                overflowY: 'auto', 
+                padding: '8px 16px', 
+                borderRight: mergeMode ? '1px solid #e5e7eb' : 'none' 
+              }}
+            >
+              {!selectedList ? (
+                <div style={{ padding: '50px 30px', textAlign: 'center', color: '#9ca3af', fontSize: '13px', fontStyle: 'italic' }}>
+                  Select a pick list to manage using the dropdown menu...
+                </div>
+              ) : sortedItems.length === 0 ? (
+                <div style={{ padding: '50px 30px', textAlign: 'center', color: '#9ca3af', fontSize: '13px' }}>
+                  {searchQuery ? 'No items match your search' : 'No items available'}
+                </div>
+              ) : (
+                sortedItems.map((item) => {
+                  const isDeleteConfirming = deleteConfirmId === item.id;
+                  const isSelectedForMerge = selectedItems.has(item.id);
+
+                  return (
+                    <div 
+                      key={item.id} 
+                      style={{ 
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '6px 8px',
+                        borderRadius: '3px',
+                        backgroundColor: isSelectedForMerge ? '#eff6ff' : 'transparent',
+                        marginBottom: '1px',
+                        borderBottom: '1px solid #f3f4f6'
+                      }}
+                    >
+                      {/* Name & Checkbox */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
+                        {mergeMode && (
+                          <input
+                            type="checkbox"
+                            checked={isSelectedForMerge}
+                            onChange={() => toggleSelection(item.id)}
+                            style={{ width: '16px', height: '16px', cursor: 'pointer', margin: 0 }}
+                          />
                         )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                        <span style={{ fontSize: '13px', color: '#111827', flex: 1 }}>{item.name}</span>
+                        {item.count !== undefined && (
+                          <span style={{ fontSize: '13px', color: '#6b7280', fontWeight: '400', marginRight: '8px' }}>
+                            {item.count}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Actions */}
+                      {!mergeMode && (
+                        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                          {isDeleteConfirming ? (
+                            <>
+                              <button
+                                onClick={() => handleDelete(item.id)}
+                                style={{
+                                  padding: '4px 10px',
+                                  background: '#ef4444',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '3px',
+                                  fontSize: '12px',
+                                  fontWeight: '500',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                Confirm
+                              </button>
+                              <button
+                                onClick={() => setDeleteConfirmId(null)}
+                                style={{
+                                  padding: '4px 10px',
+                                  background: '#e5e7eb',
+                                  color: '#374151',
+                                  border: 'none',
+                                  borderRadius: '3px',
+                                  fontSize: '12px',
+                                  fontWeight: '500',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                Cancel
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              {/* Edit Button */}
+                              <button 
+                                onClick={() => handleEdit(item)} 
+                                style={{ 
+                                  background: 'transparent',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  padding: '4px',
+                                  color: '#6b7280',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                }}
+                                title="Edit"
+                              >
+                                <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+                                  <path d="M11.5 1.5l1 1-8 8-1.5.5.5-1.5 8-8zm1.5-.5c-.3-.3-.7-.3-1 0l-1 1 1 1 1-1c.3-.3.3-.7 0-1l-.5-.5-.5.5zm-10 11l1-3 2 2-3 1z"/>
+                                </svg>
+                              </button>
+                              
+                              {/* Delete Button */}
+                              {config?.allowDelete && config.deleteFn && (
+                                <button 
+                                  onClick={() => setDeleteConfirmId(item.id)} 
+                                  style={{ 
+                                    background: 'transparent',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    padding: '4px',
+                                    color: '#6b7280',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    fontSize: '16px',
+                                    lineHeight: '1',
+                                  }}
+                                  title="Delete"
+                                >
+                                  ×
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Right Panel in Merge Mode */}
+            {mergeMode && selectedItems.size > 0 && (
+              <div style={{ flex: '0 0 40%', padding: '16px', backgroundColor: '#f9fafb', overflowY: 'auto' }}>
+                <div style={{ fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '12px' }}>
+                  Merge {selectedItems.size} items into:
+                </div>
+                {Array.from(selectedItems).map(id => {
+                  const item = items.find(i => i.id === id);
+                  if (!item) return null;
+                  return (
+                    <div key={id} style={{
+                      padding: '6px 8px',
+                      backgroundColor: 'white',
+                      borderRadius: '3px',
+                      marginBottom: '4px',
+                      fontSize: '13px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                    }}>
+                      <span>{item.name}</span>
+                      <span style={{ color: '#6b7280' }}>{item.count}</span>
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
 
           {/* Footer */}
-          <div style={{ padding: '12px 18px', borderTop: '1px solid #e5e7eb', backgroundColor: 'white', borderBottomLeftRadius: '8px', borderBottomRightRadius: '8px' }}>
-            {!mergeMode ? (
-              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <div 
+            style={{ 
+              padding: '12px 16px', 
+              borderTop: '1px solid #e5e7eb', 
+              display: 'flex', 
+              justifyContent: mergeMode ? 'space-between' : 'flex-end', // Right align close button
+              gap: '8px',
+              backgroundColor: 'white'
+            }}
+          >
+            {mergeMode ? (
+              <>
                 <button
-                  onClick={() => { setMergeMode(true); setSelectedItems(new Set()); }}
-                  style={{ padding: '6px 16px', background: '#93c5fd', color: '#1e40af', border: 'none', borderRadius: '4px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}
+                  onClick={() => { setMergeMode(false); setSelectedItems(new Set()); }}
+                  style={{ padding: '6px 16px', background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: '4px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}
                 >
-                  Merge Mode
+                  Cancel
                 </button>
-              </div>
+                <button
+                  onClick={handleMerge}
+                  disabled={selectedItems.size < 2}
+                  style={{ padding: '6px 16px', background: selectedItems.size >= 2 ? '#3b82f6' : '#d1d5db', color: 'white', border: 'none', borderRadius: '4px', fontSize: '13px', fontWeight: '600', cursor: selectedItems.size >= 2 ? 'pointer' : 'not-allowed' }}
+                >
+                  Merge to
+                </button>
+              </>
             ) : (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '12px', color: '#6b7280' }}>
-                  {selectedItems.size === 0 ? 'Select 2 or more items to merge' : `${selectedItems.size} items selected`}
-                </span>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button
-                    onClick={() => { setMergeMode(false); setSelectedItems(new Set()); }}
-                    style={{ padding: '6px 16px', background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: '4px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleMerge}
-                    disabled={selectedItems.size < 2}
-                    style={{ padding: '6px 16px', background: selectedItems.size >= 2 ? '#3b82f6' : '#d1d5db', color: 'white', border: 'none', borderRadius: '4px', fontSize: '13px', fontWeight: '600', cursor: selectedItems.size >= 2 ? 'pointer' : 'not-allowed' }}
-                  >
-                    Merge to
-                  </button>
-                </div>
-              </div>
+              <button
+                onClick={onClose}
+                style={{ padding: '6px 20px', background: '#e5e7eb', color: '#374151', border: 'none', borderRadius: '4px', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}
+              >
+                Close
+              </button>
             )}
           </div>
         </div>
@@ -302,7 +576,7 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
       {editingItem && config && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 30002 }} onClick={() => setEditingItem(null)}>
           <div style={{ backgroundColor: 'white', borderRadius: '8px', width: '400px', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ padding: '12px 18px', backgroundColor: '#3b82f6', borderTopLeftRadius: '8px', borderTopRightRadius: '8px' }}>
+            <div style={{ padding: '12px 18px', backgroundColor: '#f97316', borderBottom: '1px solid #e5e7eb', borderTopLeftRadius: '8px', borderTopRightRadius: '8px' }}>
               <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '600', color: 'white' }}>Edit {config.label}</h3>
             </div>
             <div style={{ padding: '18px' }}>
