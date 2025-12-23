@@ -172,7 +172,7 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
   return (
     <>
       <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 30001 }} onClick={onClose}>
-        <div style={{ backgroundColor: 'white', borderRadius: '8px', width: '520px', maxHeight: '420px', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ backgroundColor: 'white', borderRadius: '8px', width: '650px', maxHeight: '480px', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }} onClick={(e) => e.stopPropagation()}>
           
           {/* Header */}
           <div style={{ padding: '12px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f97316', borderTopLeftRadius: '8px', borderTopRightRadius: '8px' }}>
@@ -189,11 +189,18 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{ flex: '0 0 160px', padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px', outline: 'none', backgroundColor: 'white', color: '#111827' }}
             />
-            <div style={{ flex: 1 }}></div>
+            <div style={{ flex: '0 0 130px', padding: '6px 10px', fontSize: '13px', color: '#6b7280', textAlign: 'center', display: 'flex', gap: '6px', justifyContent: 'center', alignItems: 'center' }}>
+              {selectedList && filteredItems.length > 0 && (
+                <>
+                  <span style={{ fontWeight: '600', color: '#111827' }}>{filteredItems.length}</span>
+                  <span>{config?.label.toLowerCase()}s</span>
+                </>
+              )}
+            </div>
             <select
               value={selectedList}
               onChange={(e) => setSelectedList(e.target.value)}
-              style={{ flex: '0 0 240px', padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px', outline: 'none', backgroundColor: 'white', cursor: 'pointer', color: '#111827' }}
+              style={{ flex: '0 0 220px', padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px', outline: 'none', backgroundColor: 'white', cursor: 'pointer', color: '#111827' }}
             >
               <option value="">Select a list...</option>
               {Object.entries(PICK_LIST_CONFIGS).sort((a, b) => a[1].label.localeCompare(b[1].label)).map(([key, cfg]) => (
