@@ -42,8 +42,8 @@ interface ManagePickListsModalProps {
 
 interface PickListConfig {
   label: string;
-  fetchFn: () => Promise<{ id: string; name: string; count?: number }[]>;
-  updateFn: (id: string, name: string) => Promise<boolean>;
+  fetchFn: () => Promise<{ id: string; name: string; count?: number; sortName?: string }[]>;
+  updateFn: (id: string, name: string, sortName?: string) => Promise<boolean>;
   deleteFn?: (id: string) => Promise<boolean>;
   mergeFn: (targetId: string, sourceIds: string[]) => Promise<boolean>;
   allowDelete: boolean;
@@ -84,12 +84,12 @@ const PICK_LIST_CONFIGS: Record<string, PickListConfig> = {
 
 export default function ManagePickListsModal({ isOpen, onClose }: ManagePickListsModalProps) {
   const [selectedList, setSelectedList] = useState<string>('');
-  const [items, setItems] = useState<{ id: string; name: string; count?: number }[]>([]);
+  const [items, setItems] = useState<{ id: string; name: string; count?: number; sortName?: string }[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   
   // Edit State
-  const [editingItem, setEditingItem] = useState<{ id: string; name: string } | null>(null);
+  const [editingItem, setEditingItem] = useState<{ id: string; name: string; sortName?: string } | null>(null);
   const [editName, setEditName] = useState('');
   const [editSortName, setEditSortName] = useState('');
 
@@ -100,7 +100,7 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
   const [sortBy, setSortBy] = useState<'name' | 'sortName'>('sortName');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
-  // Helper to generate a display sortname
+  // Helper to generate a display sortname (fallback if not in DB)
   const getSortName = useCallback((name: string) => {
     if (name.startsWith('The ')) return name.substring(4) + ', The';
     if (name.startsWith('A ')) return name.substring(2) + ', A';
@@ -140,17 +140,19 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
     }
   }, [isOpen]);
 
-  const handleEdit = (item: { id: string; name: string }) => {
+  const handleEdit = (item: { id: string; name: string; sortName?: string }) => {
     setEditingItem(item);
     setEditName(item.name);
-    setEditSortName(getSortName(item.name));
+    // Use the actual sortName from DB if available, otherwise generate heuristic
+    setEditSortName(item.sortName || getSortName(item.name));
   };
 
   const handleSaveEdit = async () => {
     if (!selectedList || !editingItem) return;
     const config = PICK_LIST_CONFIGS[selectedList];
     
-    const success = await config.updateFn(editingItem.id, editName);
+    // Pass sortName as 3rd arg. It will be used by updateArtist, ignored by others.
+    const success = await config.updateFn(editingItem.id, editName, editSortName);
     
     if (success) {
       await loadItems();
@@ -229,8 +231,9 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
     const result = items.filter(item => item.name.toLowerCase().includes(searchQuery.toLowerCase()));
     
     return result.sort((a, b) => {
-      const nameA = sortBy === 'sortName' ? getSortName(a.name) : a.name;
-      const nameB = sortBy === 'sortName' ? getSortName(b.name) : b.name;
+      // Use DB sortName if available, else heuristic
+      const nameA = sortBy === 'sortName' ? (a.sortName || getSortName(a.name)) : a.name;
+      const nameB = sortBy === 'sortName' ? (b.sortName || getSortName(b.name)) : b.name;
       
       const comparison = nameA.localeCompare(nameB, undefined, { sensitivity: 'base' });
       return sortDirection === 'asc' ? comparison : -comparison;
@@ -441,7 +444,8 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
                 <tbody>
                   {filteredItems.map((item, index) => {
                     const isSelected = selectedItems.has(item.id);
-                    const sortName = getSortName(item.name);
+                    // Use DB sortName if available, else heuristic fallback
+                    const sortName = item.sortName || getSortName(item.name);
 
                     return (
                       <tr 

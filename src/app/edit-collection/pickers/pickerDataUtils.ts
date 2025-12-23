@@ -7,6 +7,7 @@ export interface PickerDataItem {
   id: string;
   name: string;
   count?: number;
+  sortName?: string; // Added for Artist sorting
 }
 
 // ============================================================================
@@ -169,9 +170,10 @@ export async function fetchLocations(): Promise<PickerDataItem[]> {
 // Artists
 export async function fetchArtists(): Promise<PickerDataItem[]> {
   try {
+    // Select both artist and sort_artist
     const { data, error } = await supabase
       .from('collection')
-      .select('artist')
+      .select('artist, sort_artist')
       .not('artist', 'is', null)
       .not('artist', 'eq', '');
 
@@ -180,16 +182,43 @@ export async function fetchArtists(): Promise<PickerDataItem[]> {
       return [];
     }
 
-    const artistCounts = new Map<string, number>();
+    // Map to store count and the sort name found
+    const artistMap = new Map<string, { count: number; sortName: string }>();
+
     data?.forEach(row => {
       if (row.artist) {
-        artistCounts.set(row.artist, (artistCounts.get(row.artist) || 0) + 1);
+        const current = artistMap.get(row.artist);
+        // Use row.sort_artist if present, otherwise fallback to artist name
+        const sortVal = row.sort_artist || row.artist;
+
+        if (current) {
+          current.count++;
+          // If we haven't captured a sortName yet (or current is same as name), 
+          // and we found a distinct one, update it.
+          if (current.sortName === row.artist && sortVal !== row.artist) {
+             current.sortName = sortVal;
+          }
+        } else {
+          artistMap.set(row.artist, { 
+            count: 1, 
+            sortName: sortVal
+          });
+        }
       }
     });
 
-    return Array.from(artistCounts.entries())
-      .map(([name, count]) => ({ id: name, name, count }))
-      .sort((a, b) => a.name.localeCompare(b.name));
+    return Array.from(artistMap.entries())
+      .map(([name, info]) => ({
+        id: name,
+        name,
+        count: info.count,
+        sortName: info.sortName
+      }))
+      .sort((a, b) => {
+        const sa = a.sortName || a.name;
+        const sb = b.sortName || b.name;
+        return sa.localeCompare(sb);
+      });
   } catch (error) {
     console.error('Error in fetchArtists:', error);
     return [];
@@ -206,11 +235,7 @@ export async function updateLabel(id: string, newName: string): Promise<boolean>
       .from('collection')
       .update({ spotify_label: newName })
       .eq('spotify_label', id);
-    
-    if (error) {
-      console.error('Error updating label:', error);
-      return false;
-    }
+    if (error) { console.error(error); return false; }
     return true;
   } catch (error) {
     console.error('Error updating label:', error);
@@ -224,11 +249,7 @@ export async function updateFormat(id: string, newName: string): Promise<boolean
       .from('collection')
       .update({ format: newName })
       .eq('format', id);
-    
-    if (error) {
-      console.error('Error updating format:', error);
-      return false;
-    }
+    if (error) { console.error(error); return false; }
     return true;
   } catch (error) {
     console.error('Error updating format:', error);
@@ -242,11 +263,7 @@ export async function updateLocation(id: string, newName: string): Promise<boole
       .from('collection')
       .update({ folder: newName })
       .eq('folder', id);
-    
-    if (error) {
-      console.error('Error updating location:', error);
-      return false;
-    }
+    if (error) { console.error(error); return false; }
     return true;
   } catch (error) {
     console.error('Error updating location:', error);
@@ -255,11 +272,16 @@ export async function updateLocation(id: string, newName: string): Promise<boole
 }
 
 // --- ARTIST UPDATES ---
-export async function updateArtist(id: string, newName: string): Promise<boolean> {
+export async function updateArtist(id: string, newName: string, newSortName?: string): Promise<boolean> {
   try {
+    const updates: { artist: string; sort_artist?: string } = { artist: newName };
+    if (newSortName !== undefined) {
+      updates.sort_artist = newSortName;
+    }
+
     const { error } = await supabase
       .from('collection')
-      .update({ artist: newName })
+      .update(updates)
       .eq('artist', id);
     
     if (error) {
@@ -316,11 +338,7 @@ export async function deleteLabel(id: string): Promise<boolean> {
       .from('collection')
       .update({ spotify_label: null })
       .eq('spotify_label', id);
-    
-    if (error) {
-      console.error('Error deleting label:', error);
-      return false;
-    }
+    if (error) { console.error(error); return false; }
     return true;
   } catch (error) {
     console.error('Error deleting label:', error);
@@ -334,11 +352,7 @@ export async function mergeLabels(targetId: string, sourceIds: string[]): Promis
       .from('collection')
       .update({ spotify_label: targetId })
       .in('spotify_label', sourceIds);
-    
-    if (error) {
-      console.error('Error merging labels:', error);
-      return false;
-    }
+    if (error) { console.error(error); return false; }
     return true;
   } catch (error) {
     console.error('Error merging labels:', error);
@@ -352,11 +366,7 @@ export async function mergeFormats(targetId: string, sourceIds: string[]): Promi
       .from('collection')
       .update({ format: targetId })
       .in('format', sourceIds);
-    
-    if (error) {
-      console.error('Error merging formats:', error);
-      return false;
-    }
+    if (error) { console.error(error); return false; }
     return true;
   } catch (error) {
     console.error('Error merging formats:', error);
@@ -370,11 +380,7 @@ export async function mergeLocations(targetId: string, sourceIds: string[]): Pro
       .from('collection')
       .update({ folder: targetId })
       .in('folder', sourceIds);
-    
-    if (error) {
-      console.error('Error merging locations:', error);
-      return false;
-    }
+    if (error) { console.error(error); return false; }
     return true;
   } catch (error) {
     console.error('Error merging locations:', error);
