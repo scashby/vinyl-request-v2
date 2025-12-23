@@ -230,11 +230,7 @@ export async function updateLabel(id: string, newName: string): Promise<boolean>
       .from('collection')
       .update({ spotify_label: newName })
       .eq('spotify_label', id);
-    
-    if (error) {
-      console.error('Error updating label:', error);
-      return false;
-    }
+    if (error) { console.error(error); return false; }
     return true;
   } catch (error) {
     console.error('Error updating label:', error);
@@ -248,11 +244,7 @@ export async function updateFormat(id: string, newName: string): Promise<boolean
       .from('collection')
       .update({ format: newName })
       .eq('format', id);
-    
-    if (error) {
-      console.error('Error updating format:', error);
-      return false;
-    }
+    if (error) { console.error(error); return false; }
     return true;
   } catch (error) {
     console.error('Error updating format:', error);
@@ -266,11 +258,7 @@ export async function updateLocation(id: string, newName: string): Promise<boole
       .from('collection')
       .update({ folder: newName })
       .eq('folder', id);
-    
-    if (error) {
-      console.error('Error updating location:', error);
-      return false;
-    }
+    if (error) { console.error(error); return false; }
     return true;
   } catch (error) {
     console.error('Error updating location:', error);
@@ -304,7 +292,6 @@ export async function updateArtist(id: string, newName: string, newSortName?: st
 
 export async function deleteArtist(id: string): Promise<boolean> {
   try {
-    // Hard delete all albums by this artist
     const { error } = await supabase
       .from('collection')
       .delete()
@@ -345,11 +332,7 @@ export async function deleteLabel(id: string): Promise<boolean> {
       .from('collection')
       .update({ spotify_label: null })
       .eq('spotify_label', id);
-    
-    if (error) {
-      console.error('Error deleting label:', error);
-      return false;
-    }
+    if (error) { console.error(error); return false; }
     return true;
   } catch (error) {
     console.error('Error deleting label:', error);
@@ -363,11 +346,7 @@ export async function mergeLabels(targetId: string, sourceIds: string[]): Promis
       .from('collection')
       .update({ spotify_label: targetId })
       .in('spotify_label', sourceIds);
-    
-    if (error) {
-      console.error('Error merging labels:', error);
-      return false;
-    }
+    if (error) { console.error(error); return false; }
     return true;
   } catch (error) {
     console.error('Error merging labels:', error);
@@ -381,11 +360,7 @@ export async function mergeFormats(targetId: string, sourceIds: string[]): Promi
       .from('collection')
       .update({ format: targetId })
       .in('format', sourceIds);
-    
-    if (error) {
-      console.error('Error merging formats:', error);
-      return false;
-    }
+    if (error) { console.error(error); return false; }
     return true;
   } catch (error) {
     console.error('Error merging formats:', error);
@@ -399,11 +374,7 @@ export async function mergeLocations(targetId: string, sourceIds: string[]): Pro
       .from('collection')
       .update({ folder: targetId })
       .in('folder', sourceIds);
-    
-    if (error) {
-      console.error('Error merging locations:', error);
-      return false;
-    }
+    if (error) { console.error(error); return false; }
     return true;
   } catch (error) {
     console.error('Error merging locations:', error);
@@ -607,33 +578,33 @@ export async function mergeSPARS(targetId: string, sourceIds: string[]): Promise
 // Box Sets
 export async function fetchBoxSets(): Promise<PickerDataItem[]> {
   try {
-    
-    // UPDATED: fetch items where is_box_set is true, and map 'title' to 'name'
+    // UPDATED: fetch from 'box_set' column
     const { data, error } = await supabase
       .from('collection')
-      .select('title')
-      .eq('is_box_set', true);
+      .select('box_set')
+      .not('box_set', 'is', null)
+      .not('box_set', 'eq', '');
 
     if (error) {
       console.error('Error fetching box sets:', error);
       return [];
     }
 
-    // Since we are listing Box Sets themselves (which are albums), we just map the titles.
-    // NOTE: This assumes titles are unique enough or we just list them.
-    // If the goal is a unique list of box set names available to be "parent" sets:
-    const boxSetTitles = new Set<string>();
+    const boxSetCounts = new Map<string, number>();
     data?.forEach(row => {
-      if (row.title) {
-        boxSetTitles.add(row.title);
+      if (row.box_set) {
+        boxSetCounts.set(
+          row.box_set,
+          (boxSetCounts.get(row.box_set) || 0) + 1
+        );
       }
     });
 
-    return Array.from(boxSetTitles)
-      .map((title) => ({
-        id: title, // Using title as ID for now as per other text-based pickers
-        name: title,
-        count: 1, // Can't easily count "children" without a complex join, defaulting to 1 (itself)
+    return Array.from(boxSetCounts.entries())
+      .map(([name, count]) => ({
+        id: name,
+        name,
+        count,
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
   } catch (error) {

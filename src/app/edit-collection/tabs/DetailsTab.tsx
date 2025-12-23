@@ -4,9 +4,8 @@
 import { useState, useEffect } from 'react';
 import type { Album } from 'types/album';
 import { PickerModal } from '../pickers/PickerModal';
-import { ManageModal } from '../pickers/ManageModal';
+import ManagePickListsModal from '../ManagePickListsModal';
 import { EditModal } from '../pickers/EditModal';
-import { MergeModal } from '../pickers/MergeModal';
 import {
   fetchPackaging,
   fetchMediaConditions,
@@ -23,12 +22,6 @@ import {
   updateSound,
   updateVinylColor,
   updateSPARS,
-  deletePackaging,
-  mergePackaging,
-  mergeStudios,
-  mergeSounds,
-  mergeVinylColors,
-  mergeSPARS,
   type PickerDataItem,
 } from '../pickers/pickerDataUtils';
 
@@ -37,7 +30,7 @@ interface DetailsTabProps {
   onChange: (field: keyof Album, value: string | number | string[] | null | boolean) => void;
 }
 
-type ModalType = 'picker' | 'manage' | 'edit' | 'merge' | 'boxset' | null;
+type ModalType = 'picker' | 'manage' | 'edit' | 'boxset' | null;
 type FieldType = 
   | 'packaging' 
   | 'package_sleeve_condition' 
@@ -55,7 +48,6 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [activeField, setActiveField] = useState<FieldType | null>(null);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
-  const [mergingItemIds, setMergingItemIds] = useState<string[]>([]);
 
   // Data state
   const [packaging, setPackaging] = useState<PickerDataItem[]>([]);
@@ -205,6 +197,23 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
     }
   };
 
+  // Map activeField to ManagePickListsModal config keys
+  const getManageListKey = (field: FieldType | null): string => {
+    switch (field) {
+      case 'box_set': return 'box-set';
+      case 'packaging': return 'packaging';
+      case 'media_condition': return 'media-condition';
+      case 'package_sleeve_condition': return 'package-sleeve-condition';
+      case 'studio': return 'studio';
+      case 'country': return 'country';
+      case 'sound': return 'sound';
+      case 'vinyl_color': return 'vinyl-color';
+      case 'vinyl_weight': return 'vinyl-weight';
+      case 'spars_code': return 'spars';
+      default: return '';
+    }
+  };
+
   // Open picker modal
   const handleOpenPicker = (field: FieldType) => {
     if (field === 'box_set') {
@@ -254,6 +263,9 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
         case 'spars_code':
           onChange('spars_code', selectedName);
           break;
+        case 'box_set':
+          onChange('box_set', selectedName);
+          break;
       }
     }
   };
@@ -263,32 +275,20 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
   };
 
   const handleOpenNew = () => {
-    setEditingItemId(null);
-    setActiveModal('edit');
+    if (activeField === 'box_set') {
+      setActiveModal('boxset');
+    } else {
+      setEditingItemId(null);
+      setActiveModal('edit');
+    }
   };
 
   // ManageModal handlers
-  const handleEdit = (itemId: string) => {
-    setEditingItemId(itemId);
-    setActiveModal('edit');
-  };
-
-  const handleDelete = async (itemId: string) => {
-    if (!activeField) return;
-
-    let success = false;
-    if (activeField === 'packaging') {
-      success = await deletePackaging(itemId);
-    }
-    
-    if (success && activeField) {
+  const handleManageClose = async () => {
+    handleCloseModal();
+    if (activeField) {
       await reloadData(activeField);
     }
-  };
-
-  const handleOpenMerge = (itemIds: string[]) => {
-    setMergingItemIds(itemIds);
-    setActiveModal('merge');
   };
 
   // EditModal handlers
@@ -331,67 +331,52 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
       switch (activeField) {
         case 'packaging':
           setPackaging([...packaging, newItem].sort((a, b) => a.name.localeCompare(b.name)));
+          onChange('packaging', newName);
           break;
         case 'studio':
           setStudios([...studios, newItem].sort((a, b) => a.name.localeCompare(b.name)));
+          onChange('studio', newName);
           break;
         case 'sound':
           setSounds([...sounds, newItem].sort((a, b) => a.name.localeCompare(b.name)));
+          onChange('sound', newName);
           break;
         case 'vinyl_color':
           setVinylColors([...vinylColors, newItem].sort((a, b) => a.name.localeCompare(b.name)));
+          const currentColors = album.vinyl_color || [];
+          onChange('vinyl_color', [...currentColors, newName]);
           break;
         case 'vinyl_weight':
           setVinylWeights([...vinylWeights, newItem].sort((a, b) => a.name.localeCompare(b.name)));
+          onChange('vinyl_weight', newName);
           break;
         case 'spars_code':
           setSPARS([...spars, newItem].sort((a, b) => a.name.localeCompare(b.name)));
+          onChange('spars_code', newName);
           break;
       }
     }
-  };
-
-  // MergeModal handlers
-  const handleMerge = async (primaryId: string, mergeIntoIds: string[]) => {
-    if (!activeField) return;
-
-    let success = false;
-    
-    switch (activeField) {
-      case 'packaging':
-        success = await mergePackaging(primaryId, mergeIntoIds);
-        break;
-      case 'studio':
-        success = await mergeStudios(primaryId, mergeIntoIds);
-        break;
-      case 'sound':
-        success = await mergeSounds(primaryId, mergeIntoIds);
-        break;
-      case 'vinyl_color':
-        success = await mergeVinylColors(primaryId, mergeIntoIds);
-        break;
-      case 'spars_code':
-        success = await mergeSPARS(primaryId, mergeIntoIds);
-        break;
-    }
-    
-    if (success) {
-      await reloadData(activeField);
-    }
+    handleCloseModal();
   };
 
   // Box Set modal handlers
   const handleBoxSetSave = () => {
-    // TODO: Implement box set creation/linking
     onChange('box_set', boxSetName);
+    
+    // Update local list
+    const newItem = { id: boxSetName, name: boxSetName, count: 0 };
+    setBoxSets([...boxSets, newItem].sort((a, b) => a.name.localeCompare(b.name)));
+    
     setActiveModal(null);
+    setBoxSetName('');
+    setBoxSetBarcode('');
+    setBoxSetReleaseDate({ year: '', month: '', day: '' });
   };
 
   // Close all modals
   const handleCloseModal = () => {
     setActiveModal(null);
     setEditingItemId(null);
-    setMergingItemIds([]);
   };
 
   const labelStyle: React.CSSProperties = {
@@ -433,7 +418,6 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
   const fieldConfig = getFieldConfig();
   const currentItems = getCurrentItems();
   const editingItem = editingItemId ? currentItems.find(item => item.id === editingItemId) : null;
-  const mergingItems = currentItems.filter(item => mergingItemIds.includes(item.id));
 
   return (
     <>
@@ -449,9 +433,9 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
             fontSize: '15px', 
             fontWeight: '700', 
             color: '#374151', 
-            marginBottom: '4px',
-            paddingBottom: '8px',
-            borderBottom: '2px solid #e5e7eb'
+            marginBottom: '4px', 
+            paddingBottom: '8px', 
+            borderBottom: '2px solid #e5e7eb' 
           }}>
             Packaging
           </div>
@@ -744,7 +728,7 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
             color: '#374151', 
             marginBottom: '4px',
             paddingBottom: '8px',
-            borderBottom: '2px solid #e5e7eb'
+            borderBottom: '2px solid #e5e7eb' 
           }}>
             Vinyl
           </div>
@@ -1068,7 +1052,7 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
       </div>
 
       {/* MODAL COMPONENTS */}
-      {activeModal === 'picker' && activeField !== 'box_set' && (
+      {activeModal === 'picker' && activeField !== 'box_set' && activeField && (
         <PickerModal
           isOpen={true}
           onClose={handleCloseModal}
@@ -1084,17 +1068,13 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
         />
       )}
 
+      {/* Use ManagePickListsModal for management */}
       {activeModal === 'manage' && (
-        <ManageModal
+        <ManagePickListsModal
           isOpen={true}
-          onClose={handleCloseModal}
-          title={`Manage ${fieldConfig.itemLabel}s`}
-          items={currentItems}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-          onMerge={handleOpenMerge}
-          itemLabel={fieldConfig.itemLabel}
-          allowMerge={true}
+          onClose={handleManageClose}
+          initialList={getManageListKey(activeField)}
+          hideListSelector={true} // Hide selector when coming from picker
         />
       )}
 
@@ -1109,18 +1089,7 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
         />
       )}
 
-      {activeModal === 'merge' && (
-        <MergeModal
-          isOpen={true}
-          onClose={handleCloseModal}
-          title={`Merge ${fieldConfig.itemLabel}s`}
-          items={mergingItems}
-          onMerge={handleMerge}
-          itemLabel={fieldConfig.itemLabel}
-        />
-      )}
-
-      {/* Box Set Modal */}
+      {/* Box Set Modal (Custom New Box Set) */}
       {activeModal === 'boxset' && (
         <div
           style={{
