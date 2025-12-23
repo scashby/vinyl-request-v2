@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { MergeModal } from './pickers/MergeModal';
 import {
-  fetchArtists, updateArtist, mergeArtists,
+  fetchArtists, updateArtist, mergeArtists, deleteArtist,
   fetchLabels, updateLabel, deleteLabel, mergeLabels,
   fetchFormats, updateFormat, mergeFormats,
   fetchGenres,
@@ -50,9 +50,8 @@ interface PickListConfig {
   allowMerge: boolean;
 }
 
-// Updated allowDelete for Artist based on requirements
 const PICK_LIST_CONFIGS: Record<string, PickListConfig> = {
-  artist: { label: 'Artist', fetchFn: fetchArtists, updateFn: updateArtist, mergeFn: mergeArtists, allowDelete: true, allowMerge: true },
+  artist: { label: 'Artist', fetchFn: fetchArtists, updateFn: updateArtist, deleteFn: deleteArtist, mergeFn: mergeArtists, allowDelete: true, allowMerge: true },
   'box-set': { label: 'Box Set', fetchFn: fetchBoxSets, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: false },
   chorus: { label: 'Chorus', fetchFn: fetchChoruses, updateFn: updateChorus, mergeFn: mergeChorus, allowDelete: false, allowMerge: true },
   composer: { label: 'Composer', fetchFn: fetchComposers, updateFn: updateComposer, mergeFn: mergeComposers, allowDelete: false, allowMerge: true },
@@ -144,7 +143,6 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
   const handleEdit = (item: { id: string; name: string }) => {
     setEditingItem(item);
     setEditName(item.name);
-    // Initialize sort name with the auto-generated one for now
     setEditSortName(getSortName(item.name));
   };
 
@@ -152,8 +150,6 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
     if (!selectedList || !editingItem) return;
     const config = PICK_LIST_CONFIGS[selectedList];
     
-    // Note: Currently updateFn only takes ID and Name. 
-    // If Sort Name support is added to backend, it would be passed here.
     const success = await config.updateFn(editingItem.id, editName);
     
     if (success) {
@@ -165,6 +161,7 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
   };
 
   const handleDelete = async (itemId: string, e?: React.MouseEvent) => {
+    // STOP PROPAGATION to prevent bubbling to row selection
     if (e) {
       e.stopPropagation();
       e.preventDefault();
@@ -174,12 +171,11 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
     const config = PICK_LIST_CONFIGS[selectedList];
     
     if (config.deleteFn) {
-      // Use specific confirmation for Artist or generic for others
       const confirmMessage = selectedList === 'artist' 
-        ? 'Are you sure you want to remove this artist permanently?'
+        ? 'This will remove the artist permanently from all albums in your collection. Are you sure?'
         : 'Are you sure you want to delete this item?';
 
-      // We use a small timeout to ensure the UI updates/doesn't block immediately if there's a race condition
+      // Ensure confirm dialog fires after current event loop
       setTimeout(async () => {
         if (window.confirm(confirmMessage)) {
           const success = await config.deleteFn!(itemId);
@@ -189,14 +185,12 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
     }
   };
 
-  // Open the MergeModal
   const handleOpenMergeModal = () => {
     if (selectedItems.size >= 2) {
       setShowMergeModal(true);
     }
   };
 
-  // Execute the actual merge
   const handleExecuteMerge = async (primaryId: string, mergeIntoIds: string[]) => {
     if (!selectedList) return;
     const config = PICK_LIST_CONFIGS[selectedList];
@@ -222,10 +216,8 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
 
   const handleSortToggle = () => {
     if (sortBy === 'sortName') {
-      // Toggle direction if already sorting by sortName
       setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
     } else {
-      // Switch to sortName if not already
       setSortBy('sortName');
       setSortDirection('asc');
     }
@@ -418,7 +410,7 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
                       style={{ 
                         padding: '8px 12px', 
                         textAlign: 'left', 
-                        cursor: 'pointer',
+                        cursor: 'pointer', 
                         verticalAlign: 'top'
                       }}
                       onClick={handleSortToggle}
@@ -427,9 +419,10 @@ export default function ManagePickListsModal({ isOpen, onClose }: ManagePickList
                         <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: '600' }}>Name</span>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '1px' }}>
                           <span style={{ fontSize: '11px', color: '#9ca3af', fontWeight: '400' }}>Sort Name</span>
+                          {/* Sort Arrow next to "Sort Name" */}
                           {sortBy === 'sortName' && (
                             <span style={{ fontSize: '10px', color: '#9ca3af' }}>
-                              {sortDirection === 'asc' ? '▲' : '▼'}
+                              {sortDirection === 'asc' ? '▼' : '▲'}
                             </span>
                           )}
                         </div>
