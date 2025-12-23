@@ -607,12 +607,39 @@ export async function mergeSPARS(targetId: string, sourceIds: string[]): Promise
 // Box Sets
 export async function fetchBoxSets(): Promise<PickerDataItem[]> {
   try {
-    const { data, error } = await supabase.from('collection').select('box_set').not('box_set', 'is', null).not('box_set', 'eq', '');
-    if (error) { console.error(error); return []; }
-    const counts = new Map<string, number>();
-    data?.forEach(row => { if (row.box_set) counts.set(row.box_set, (counts.get(row.box_set) || 0) + 1); });
-    return Array.from(counts.entries()).map(([name, count]) => ({ id: name, name, count })).sort((a, b) => a.name.localeCompare(b.name));
-  } catch (error) { console.error(error); return []; }
+    
+    // UPDATED: fetch items where is_box_set is true, and map 'title' to 'name'
+    const { data, error } = await supabase
+      .from('collection')
+      .select('title')
+      .eq('is_box_set', true);
+
+    if (error) {
+      console.error('Error fetching box sets:', error);
+      return [];
+    }
+
+    // Since we are listing Box Sets themselves (which are albums), we just map the titles.
+    // NOTE: This assumes titles are unique enough or we just list them.
+    // If the goal is a unique list of box set names available to be "parent" sets:
+    const boxSetTitles = new Set<string>();
+    data?.forEach(row => {
+      if (row.title) {
+        boxSetTitles.add(row.title);
+      }
+    });
+
+    return Array.from(boxSetTitles)
+      .map((title) => ({
+        id: title, // Using title as ID for now as per other text-based pickers
+        name: title,
+        count: 1, // Can't easily count "children" without a complex join, defaulting to 1 (itself)
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch (error) {
+    console.error('Error in fetchBoxSets:', error);
+    return [];
+  }
 }
 
 // Purchase Stores
