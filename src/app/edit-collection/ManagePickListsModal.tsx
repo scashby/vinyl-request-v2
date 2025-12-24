@@ -51,38 +51,44 @@ interface PickListConfig {
   mergeFn: (targetId: string, sourceIds: string[]) => Promise<boolean>;
   allowDelete: boolean;
   allowMerge: boolean;
+  hasSortName?: boolean;
 }
 
 const PICK_LIST_CONFIGS: Record<string, PickListConfig> = {
-  artist: { label: 'Artist', fetchFn: fetchArtists, updateFn: updateArtist, deleteFn: deleteArtist, mergeFn: mergeArtists, allowDelete: true, allowMerge: true },
-  'box-set': { label: 'Box Set', fetchFn: fetchBoxSets, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: false },
-  chorus: { label: 'Chorus', fetchFn: fetchChoruses, updateFn: updateChorus, mergeFn: mergeChorus, allowDelete: false, allowMerge: true },
-  composer: { label: 'Composer', fetchFn: fetchComposers, updateFn: updateComposer, mergeFn: mergeComposers, allowDelete: false, allowMerge: true },
-  composition: { label: 'Composition', fetchFn: fetchCompositions, updateFn: updateComposition, mergeFn: mergeCompositions, allowDelete: false, allowMerge: true },
-  conductor: { label: 'Conductor', fetchFn: fetchConductors, updateFn: updateConductor, mergeFn: mergeConductors, allowDelete: false, allowMerge: true },
-  country: { label: 'Country', fetchFn: fetchCountries, updateFn: async () => false, deleteFn: async () => false, mergeFn: async () => false, allowDelete: true, allowMerge: false },
-  engineer: { label: 'Engineer', fetchFn: fetchEngineers, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: false },
-  format: { label: 'Format', fetchFn: fetchFormats, updateFn: updateFormat, deleteFn: async () => false, mergeFn: mergeFormats, allowDelete: true, allowMerge: true },
-  genre: { label: 'Genre', fetchFn: fetchGenres, updateFn: async () => false, deleteFn: async () => false, mergeFn: async () => false, allowDelete: true, allowMerge: false },
-  label: { label: 'Label', fetchFn: fetchLabels, updateFn: updateLabel, deleteFn: deleteLabel, mergeFn: mergeLabels, allowDelete: true, allowMerge: true },
-  location: { label: 'Location', fetchFn: fetchLocations, updateFn: updateLocation, deleteFn: async () => false, mergeFn: mergeLocations, allowDelete: true, allowMerge: true },
-  'media-condition': { label: 'Media Condition', fetchFn: fetchMediaConditions, updateFn: async () => false, deleteFn: async () => false, mergeFn: async () => false, allowDelete: true, allowMerge: false },
-  musician: { label: 'Musician', fetchFn: fetchMusicians, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: false },
-  orchestra: { label: 'Orchestra', fetchFn: fetchOrchestras, updateFn: updateOrchestra, mergeFn: mergeOrchestras, allowDelete: false, allowMerge: true },
-  owner: { label: 'Owner', fetchFn: fetchOwners, updateFn: updateOwner, deleteFn: deleteOwner, mergeFn: mergeOwners, allowDelete: true, allowMerge: true },
-  'package-sleeve-condition': { label: 'Package/Sleeve Condition', fetchFn: fetchPackageConditions, updateFn: async () => false, deleteFn: async () => false, mergeFn: async () => false, allowDelete: true, allowMerge: false },
-  packaging: { label: 'Packaging', fetchFn: fetchPackaging, updateFn: updatePackaging, deleteFn: deletePackaging, mergeFn: mergePackaging, allowDelete: true, allowMerge: true },
-  producer: { label: 'Producer', fetchFn: fetchProducers, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: false },
-  'purchase-store': { label: 'Purchase Store', fetchFn: fetchPurchaseStores, updateFn: updatePurchaseStore, deleteFn: deletePurchaseStore, mergeFn: mergePurchaseStores, allowDelete: true, allowMerge: true },
-  signee: { label: 'Signee', fetchFn: fetchSignees, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: false },
-  songwriter: { label: 'Songwriter', fetchFn: fetchSongwriters, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: false },
-  sound: { label: 'Sound', fetchFn: fetchSounds, updateFn: updateSound, mergeFn: mergeSounds, allowDelete: false, allowMerge: true },
-  spars: { label: 'SPARS', fetchFn: fetchSPARS, updateFn: updateSPARS, deleteFn: async () => false, mergeFn: mergeSPARS, allowDelete: true, allowMerge: true },
-  'storage-device': { label: 'Storage Device', fetchFn: fetchStorageDevices, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: false },
-  studio: { label: 'Studio', fetchFn: fetchStudios, updateFn: updateStudio, mergeFn: mergeStudios, allowDelete: false, allowMerge: true },
-  tag: { label: 'Tag', fetchFn: fetchTags, updateFn: async () => false, deleteFn: async () => false, mergeFn: async () => false, allowDelete: true, allowMerge: false },
-  'vinyl-color': { label: 'Vinyl Color', fetchFn: fetchVinylColors, updateFn: updateVinylColor, deleteFn: async () => false, mergeFn: mergeVinylColors, allowDelete: true, allowMerge: true },
-  'vinyl-weight': { label: 'Vinyl Weight', fetchFn: fetchVinylWeights, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: false },
+  // Sort Name Required
+  artist: { label: 'Artist', fetchFn: fetchArtists, updateFn: updateArtist, deleteFn: deleteArtist, mergeFn: mergeArtists, allowDelete: true, allowMerge: true, hasSortName: true },
+  composer: { label: 'Composer', fetchFn: fetchComposers, updateFn: updateComposer, mergeFn: mergeComposers, allowDelete: false, allowMerge: true, hasSortName: true },
+  conductor: { label: 'Conductor', fetchFn: fetchConductors, updateFn: updateConductor, mergeFn: mergeConductors, allowDelete: false, allowMerge: true, hasSortName: true },
+  musician: { label: 'Musician', fetchFn: fetchMusicians, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: true, hasSortName: true },
+  songwriter: { label: 'Songwriter', fetchFn: fetchSongwriters, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: true, hasSortName: true },
+  producer: { label: 'Producer', fetchFn: fetchProducers, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: true, hasSortName: true },
+  engineer: { label: 'Engineer', fetchFn: fetchEngineers, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: true, hasSortName: true },
+
+  // No Sort Name
+  chorus: { label: 'Chorus', fetchFn: fetchChoruses, updateFn: updateChorus, mergeFn: mergeChorus, allowDelete: false, allowMerge: true, hasSortName: false },
+  label: { label: 'Label', fetchFn: fetchLabels, updateFn: updateLabel, deleteFn: deleteLabel, mergeFn: mergeLabels, allowDelete: true, allowMerge: true, hasSortName: false },
+  genre: { label: 'Genre', fetchFn: fetchGenres, updateFn: async () => false, deleteFn: async () => false, mergeFn: async () => false, allowDelete: true, allowMerge: true, hasSortName: false },
+  'media-condition': { label: 'Media Condition', fetchFn: fetchMediaConditions, updateFn: async () => false, deleteFn: async () => false, mergeFn: async () => false, allowDelete: true, allowMerge: true, hasSortName: false },
+  'package-sleeve-condition': { label: 'Package/Sleeve Condition', fetchFn: fetchPackageConditions, updateFn: async () => false, deleteFn: async () => false, mergeFn: async () => false, allowDelete: true, allowMerge: true, hasSortName: false },
+  tag: { label: 'Tag', fetchFn: fetchTags, updateFn: async () => false, deleteFn: async () => false, mergeFn: async () => false, allowDelete: true, allowMerge: true, hasSortName: false },
+  'vinyl-color': { label: 'Vinyl Color', fetchFn: fetchVinylColors, updateFn: updateVinylColor, deleteFn: async () => false, mergeFn: mergeVinylColors, allowDelete: true, allowMerge: true, hasSortName: false },
+  'vinyl-weight': { label: 'Vinyl Weight', fetchFn: fetchVinylWeights, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: true, hasSortName: false },
+  
+  // Others (Merge enabled for consistency)
+  'box-set': { label: 'Box Set', fetchFn: fetchBoxSets, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: true, hasSortName: false },
+  composition: { label: 'Composition', fetchFn: fetchCompositions, updateFn: updateComposition, mergeFn: mergeCompositions, allowDelete: false, allowMerge: true, hasSortName: false },
+  country: { label: 'Country', fetchFn: fetchCountries, updateFn: async () => false, deleteFn: async () => false, mergeFn: async () => false, allowDelete: true, allowMerge: true, hasSortName: false },
+  format: { label: 'Format', fetchFn: fetchFormats, updateFn: updateFormat, deleteFn: async () => false, mergeFn: mergeFormats, allowDelete: true, allowMerge: true, hasSortName: false },
+  location: { label: 'Location', fetchFn: fetchLocations, updateFn: updateLocation, deleteFn: async () => false, mergeFn: mergeLocations, allowDelete: true, allowMerge: true, hasSortName: false },
+  orchestra: { label: 'Orchestra', fetchFn: fetchOrchestras, updateFn: updateOrchestra, mergeFn: mergeOrchestras, allowDelete: false, allowMerge: true, hasSortName: false },
+  owner: { label: 'Owner', fetchFn: fetchOwners, updateFn: updateOwner, deleteFn: deleteOwner, mergeFn: mergeOwners, allowDelete: true, allowMerge: true, hasSortName: false },
+  packaging: { label: 'Packaging', fetchFn: fetchPackaging, updateFn: updatePackaging, deleteFn: deletePackaging, mergeFn: mergePackaging, allowDelete: true, allowMerge: true, hasSortName: false },
+  'purchase-store': { label: 'Purchase Store', fetchFn: fetchPurchaseStores, updateFn: updatePurchaseStore, deleteFn: deletePurchaseStore, mergeFn: mergePurchaseStores, allowDelete: true, allowMerge: true, hasSortName: false },
+  signee: { label: 'Signee', fetchFn: fetchSignees, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: true, hasSortName: false },
+  sound: { label: 'Sound', fetchFn: fetchSounds, updateFn: updateSound, mergeFn: mergeSounds, allowDelete: false, allowMerge: true, hasSortName: false },
+  spars: { label: 'SPARS', fetchFn: fetchSPARS, updateFn: updateSPARS, deleteFn: async () => false, mergeFn: mergeSPARS, allowDelete: true, allowMerge: true, hasSortName: false },
+  'storage-device': { label: 'Storage Device', fetchFn: fetchStorageDevices, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: true, hasSortName: false },
+  studio: { label: 'Studio', fetchFn: fetchStudios, updateFn: updateStudio, mergeFn: mergeStudios, allowDelete: false, allowMerge: true, hasSortName: false },
 };
 
 export default function ManagePickListsModal({ isOpen, onClose, initialList, hideListSelector = false }: ManagePickListsModalProps) {
@@ -139,7 +145,14 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
       loadItems();
       setSelectedItems(new Set());
       setMergeMode(false);
-      setSortBy('sortName');
+      
+      // Default sort logic
+      const config = PICK_LIST_CONFIGS[selectedList];
+      if (config && config.hasSortName) {
+        setSortBy('sortName');
+      } else {
+        setSortBy('name');
+      }
       setSortDirection('asc');
     } else {
       setItems([]);
@@ -228,18 +241,27 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
   };
 
   const config = selectedList ? PICK_LIST_CONFIGS[selectedList] : null;
+  const showSortNameUI = config?.hasSortName || false;
 
   const filteredItems = useMemo(() => {
     const result = items.filter(item => item.name.toLowerCase().includes(searchQuery.toLowerCase()));
     
     return result.sort((a, b) => {
+      // If Sort Name is not applicable, always sort by Name
+      if (!showSortNameUI) {
+         return sortDirection === 'asc' 
+            ? a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+            : b.name.localeCompare(a.name, undefined, { sensitivity: 'base' });
+      }
+
+      // Otherwise follow standard logic
       const nameA = sortBy === 'sortName' ? (a.sortName || getSortName(a.name)) : a.name;
       const nameB = sortBy === 'sortName' ? (b.sortName || getSortName(b.name)) : b.name;
       
       const comparison = nameA.localeCompare(nameB, undefined, { sensitivity: 'base' });
       return sortDirection === 'asc' ? comparison : -comparison;
     });
-  }, [items, searchQuery, sortBy, sortDirection, getSortName]);
+  }, [items, searchQuery, sortBy, sortDirection, getSortName, showSortNameUI]);
 
   if (!isOpen) return null;
 
@@ -286,7 +308,7 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
             }}
           >
             <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '600', color: 'white' }}>
-              {/* Show the selected list name (e.g. "Manage Artists") if selected, otherwise generic */}
+              {/* Show the selected list name if configured, otherwise generic title */}
               {config ? `Manage ${config.label}s` : 'Manage Pick Lists'}
             </h3>
             <button 
@@ -399,7 +421,7 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
           <div style={{ flex: 1, overflowY: 'auto', backgroundColor: 'white' }}>
             {!selectedList ? (
               <div style={{ padding: '50px 30px', textAlign: 'center', color: '#9ca3af', fontSize: '13px', fontStyle: 'italic' }}>
-                Select a pick list to manage in the top right dropdown menu...
+                Select a pick list to manage...
               </div>
             ) : filteredItems.length === 0 ? (
               <div style={{ padding: '50px 30px', textAlign: 'center', color: '#9ca3af', fontSize: '13px' }}>
@@ -421,15 +443,23 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
                     >
                       <div style={{ display: 'flex', flexDirection: 'column' }}>
                         <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: '600' }}>Name</span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '1px' }}>
-                          <span style={{ fontSize: '11px', color: '#9ca3af', fontWeight: '400' }}>Sort Name</span>
-                          {/* Sort Arrow next to "Sort Name" */}
-                          {sortBy === 'sortName' && (
-                            <span style={{ fontSize: '10px', color: '#9ca3af' }}>
+                        {/* Only show Sort Name header if applicable */}
+                        {showSortNameUI && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '1px' }}>
+                            <span style={{ fontSize: '11px', color: '#9ca3af', fontWeight: '400' }}>Sort Name</span>
+                            {sortBy === 'sortName' && (
+                              <span style={{ fontSize: '10px', color: '#9ca3af' }}>
+                                {sortDirection === 'asc' ? '▼' : '▲'}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        {/* Show simple arrow for Name sort if Sort Name hidden */}
+                        {!showSortNameUI && sortBy === 'name' && (
+                           <span style={{ fontSize: '10px', color: '#9ca3af', marginLeft: '4px' }}>
                               {sortDirection === 'asc' ? '▼' : '▲'}
-                            </span>
-                          )}
-                        </div>
+                           </span>
+                        )}
                       </div>
                     </th>
                     <th style={{ width: '60px', padding: '8px 12px', textAlign: 'center', verticalAlign: 'middle', fontSize: '12px', color: '#6b7280', fontWeight: '600' }}>
@@ -486,9 +516,11 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
                             <span style={{ fontSize: '13px', color: '#111827', fontWeight: '500' }}>
                               {item.name}
                             </span>
-                            <span style={{ fontSize: '11px', color: '#9ca3af', marginTop: '1px' }}>
-                              {sortName}
-                            </span>
+                            {showSortNameUI && (
+                              <span style={{ fontSize: '11px', color: '#9ca3af', marginTop: '1px' }}>
+                                {sortName}
+                              </span>
+                            )}
                           </div>
                         </td>
                         <td style={{ padding: '8px 12px', textAlign: 'center', verticalAlign: 'middle', fontSize: '13px', color: '#4b5563' }}>
@@ -601,7 +633,7 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
           itemSortName={editSortName}
           itemLabel={config.label}
           onSave={handleSaveEdit}
-          showSortName={selectedList === 'artist'}
+          showSortName={showSortNameUI}
         />
       )}
 
