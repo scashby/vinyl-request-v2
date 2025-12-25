@@ -45,26 +45,48 @@ interface ManagePickListsModalProps {
 
 interface PickListConfig {
   label: string;
+  // Fetch returns items that MIGHT have a sortName
   fetchFn: () => Promise<{ id: string; name: string; count?: number; sortName?: string }[]>;
+  // Update accepts an optional sortName
   updateFn: (id: string, name: string, sortName?: string) => Promise<boolean>;
   deleteFn?: (id: string) => Promise<boolean>;
   mergeFn: (targetId: string, sourceIds: string[]) => Promise<boolean>;
   allowDelete: boolean;
   allowMerge: boolean;
-  hasSortName?: boolean;
+  // This flag controls the UI: does this specific list show the Sort Name column/input?
+  hasSortName: boolean;
 }
 
 const PICK_LIST_CONFIGS: Record<string, PickListConfig> = {
-  // Sort Name Required
-  artist: { label: 'Artist', fetchFn: fetchArtists, updateFn: updateArtist, deleteFn: deleteArtist, mergeFn: mergeArtists, allowDelete: true, allowMerge: true, hasSortName: true },
-  composer: { label: 'Composer', fetchFn: fetchComposers, updateFn: updateComposer, mergeFn: mergeComposers, allowDelete: false, allowMerge: true, hasSortName: true },
-  conductor: { label: 'Conductor', fetchFn: fetchConductors, updateFn: updateConductor, mergeFn: mergeConductors, allowDelete: false, allowMerge: true, hasSortName: true },
-  musician: { label: 'Musician', fetchFn: fetchMusicians, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: true, hasSortName: true },
-  songwriter: { label: 'Songwriter', fetchFn: fetchSongwriters, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: true, hasSortName: true },
-  producer: { label: 'Producer', fetchFn: fetchProducers, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: true, hasSortName: true },
-  engineer: { label: 'Engineer', fetchFn: fetchEngineers, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: true, hasSortName: true },
+  // --------------------------------------------------------------------------
+  // COMPLEX LISTS (Name + Sort Name)
+  // Only 'artist' is enabled currently because the DB has a 'sort_artist' column.
+  // --------------------------------------------------------------------------
+  artist: { 
+    label: 'Artist', 
+    fetchFn: fetchArtists, 
+    updateFn: updateArtist, 
+    deleteFn: deleteArtist, 
+    mergeFn: mergeArtists, 
+    allowDelete: true, 
+    allowMerge: true, 
+    hasSortName: true 
+  },
 
-  // No Sort Name
+  // --------------------------------------------------------------------------
+  // POTENTIAL COMPLEX LISTS (Currently treated as Simple due to DB Schema)
+  // * To enable Sort Name for these, we must first add `sort_composer`, etc. to the DB.
+  // --------------------------------------------------------------------------
+  composer: { label: 'Composer', fetchFn: fetchComposers, updateFn: updateComposer, mergeFn: mergeComposers, allowDelete: false, allowMerge: true, hasSortName: false },
+  conductor: { label: 'Conductor', fetchFn: fetchConductors, updateFn: updateConductor, mergeFn: mergeConductors, allowDelete: false, allowMerge: true, hasSortName: false },
+  musician: { label: 'Musician', fetchFn: fetchMusicians, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: true, hasSortName: false },
+  songwriter: { label: 'Songwriter', fetchFn: fetchSongwriters, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: true, hasSortName: false },
+  producer: { label: 'Producer', fetchFn: fetchProducers, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: true, hasSortName: false },
+  engineer: { label: 'Engineer', fetchFn: fetchEngineers, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: true, hasSortName: false },
+
+  // --------------------------------------------------------------------------
+  // SIMPLE LISTS (Name Only)
+  // --------------------------------------------------------------------------
   chorus: { label: 'Chorus', fetchFn: fetchChoruses, updateFn: updateChorus, mergeFn: mergeChorus, allowDelete: false, allowMerge: true, hasSortName: false },
   label: { label: 'Label', fetchFn: fetchLabels, updateFn: updateLabel, deleteFn: deleteLabel, mergeFn: mergeLabels, allowDelete: true, allowMerge: true, hasSortName: false },
   genre: { label: 'Genre', fetchFn: fetchGenres, updateFn: async () => false, deleteFn: async () => false, mergeFn: async () => false, allowDelete: true, allowMerge: true, hasSortName: false },
@@ -74,7 +96,7 @@ const PICK_LIST_CONFIGS: Record<string, PickListConfig> = {
   'vinyl-color': { label: 'Vinyl Color', fetchFn: fetchVinylColors, updateFn: updateVinylColor, deleteFn: async () => false, mergeFn: mergeVinylColors, allowDelete: true, allowMerge: true, hasSortName: false },
   'vinyl-weight': { label: 'Vinyl Weight', fetchFn: fetchVinylWeights, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: true, hasSortName: false },
   
-  // Others (Merge enabled for consistency)
+  // Others
   'box-set': { label: 'Box Set', fetchFn: fetchBoxSets, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: true, hasSortName: false },
   composition: { label: 'Composition', fetchFn: fetchCompositions, updateFn: updateComposition, mergeFn: mergeCompositions, allowDelete: false, allowMerge: true, hasSortName: false },
   country: { label: 'Country', fetchFn: fetchCountries, updateFn: async () => false, deleteFn: async () => false, mergeFn: async () => false, allowDelete: true, allowMerge: true, hasSortName: false },
@@ -148,6 +170,7 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
       
       // Default sort logic
       const config = PICK_LIST_CONFIGS[selectedList];
+      // If the list supports Sort Name, default to sorting by that.
       if (config && config.hasSortName) {
         setSortBy('sortName');
       } else {
@@ -162,6 +185,7 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
   const handleEdit = (item: { id: string; name: string; sortName?: string }) => {
     setEditingItem(item);
     setEditName(item.name);
+    // Only auto-generate a sort name if one doesn't exist AND we are in a supported list
     setEditSortName(item.sortName || getSortName(item.name));
   };
 
@@ -169,7 +193,10 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
     if (!selectedList || !editingItem) return;
     const config = PICK_LIST_CONFIGS[selectedList];
     
-    const success = await config.updateFn(editingItem.id, newName, newSortName);
+    // Pass sortName only if the list is configured to support it
+    const sortNameToSave = config.hasSortName ? newSortName : undefined;
+    
+    const success = await config.updateFn(editingItem.id, newName, sortNameToSave);
     
     if (success) {
       await loadItems();
@@ -232,6 +259,13 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
   };
 
   const handleSortToggle = () => {
+    // If the list is simple (No Sort Name), we only toggle name direction
+    if (!showSortNameUI) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+      return;
+    }
+
+    // Complex list toggle logic
     if (sortBy === 'sortName') {
       setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
     } else {
@@ -247,14 +281,14 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
     const result = items.filter(item => item.name.toLowerCase().includes(searchQuery.toLowerCase()));
     
     return result.sort((a, b) => {
-      // If Sort Name is not applicable, always sort by Name
+      // If Sort Name is not applicable (Simple List), always sort by Name
       if (!showSortNameUI) {
          return sortDirection === 'asc' 
             ? a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
             : b.name.localeCompare(a.name, undefined, { sensitivity: 'base' });
       }
 
-      // Otherwise follow standard logic
+      // Complex List Logic
       const nameA = sortBy === 'sortName' ? (a.sortName || getSortName(a.name)) : a.name;
       const nameB = sortBy === 'sortName' ? (b.sortName || getSortName(b.name)) : b.name;
       
@@ -308,7 +342,6 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
             }}
           >
             <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '600', color: 'white' }}>
-              {/* Show the selected list name if configured, otherwise generic title */}
               {config ? `Manage ${config.label}s` : 'Manage Pick Lists'}
             </h3>
             <button 
@@ -388,7 +421,7 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
                )}
             </div>
 
-            {/* Conditionally render dropdown */}
+            {/* List Selector (Hidden if hideListSelector=true) */}
             {!hideListSelector && (
               <div style={{ flex: '0 0 35%' }}>
                 <select
@@ -443,7 +476,10 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
                     >
                       <div style={{ display: 'flex', flexDirection: 'column' }}>
                         <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: '600' }}>Name</span>
-                        {/* Only show Sort Name header if applicable */}
+                        
+                        {/* CONDITIONALLY RENDER SORT NAME HEADER 
+                           Only if the current list configuration supports it 
+                        */}
                         {showSortNameUI && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '1px' }}>
                             <span style={{ fontSize: '11px', color: '#9ca3af', fontWeight: '400' }}>Sort Name</span>
@@ -454,8 +490,9 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
                             )}
                           </div>
                         )}
-                        {/* Show simple arrow for Name sort if Sort Name hidden */}
-                        {!showSortNameUI && sortBy === 'name' && (
+                        
+                        {/* Name Sort Arrow (Visible if Simple List OR if sorted by Name) */}
+                        {(!showSortNameUI || sortBy === 'name') && (
                            <span style={{ fontSize: '10px', color: '#9ca3af', marginLeft: '4px' }}>
                               {sortDirection === 'asc' ? '▼' : '▲'}
                            </span>
@@ -633,6 +670,7 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
           itemSortName={editSortName}
           itemLabel={config.label}
           onSave={handleSaveEdit}
+          // The Sort Name Input is only shown if this list is configured for it
           showSortName={showSortNameUI}
         />
       )}
