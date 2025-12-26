@@ -52,7 +52,7 @@ interface PickListConfig {
   allowDelete: boolean;
   allowMerge: boolean;
   hasSortName: boolean;
-  keepOriginalOrder?: boolean; // New flag to prevent auto-alphabetical sorting
+  keepOriginalOrder?: boolean;
 }
 
 const PICK_LIST_CONFIGS: Record<string, PickListConfig> = {
@@ -115,7 +115,7 @@ const PICK_LIST_CONFIGS: Record<string, PickListConfig> = {
     hasSortName: true 
   },
   
-  // NOW ENABLED AS SMART LISTS (JSONB)
+  // PEOPLE (Smart Lists)
   musician: { 
     label: 'Musician', 
     fetchFn: fetchMusicians, 
@@ -158,12 +158,12 @@ const PICK_LIST_CONFIGS: Record<string, PickListConfig> = {
   },
 
   // --------------------------------------------------------------------------
-  // SIMPLE LISTS (Name Only)
+  // SIMPLE LISTS (Name Only - Sort Name Field Hidden)
   // --------------------------------------------------------------------------
   label: { label: 'Label', fetchFn: fetchLabels, updateFn: updateLabel, deleteFn: deleteLabel, mergeFn: mergeLabels, allowDelete: true, allowMerge: true, hasSortName: false },
   genre: { label: 'Genre', fetchFn: fetchGenres, updateFn: async () => false, deleteFn: async () => false, mergeFn: async () => false, allowDelete: true, allowMerge: true, hasSortName: false },
   
-  // GRADE ORDER PRESERVED
+  // GRADE ORDER PRESERVED (keepOriginalOrder: true)
   'media-condition': { label: 'Media Condition', fetchFn: fetchMediaConditions, updateFn: async () => false, deleteFn: async () => false, mergeFn: async () => false, allowDelete: true, allowMerge: true, hasSortName: false, keepOriginalOrder: true },
   'package-sleeve-condition': { label: 'Package/Sleeve Condition', fetchFn: fetchPackageConditions, updateFn: async () => false, deleteFn: async () => false, mergeFn: async () => false, allowDelete: true, allowMerge: true, hasSortName: false, keepOriginalOrder: true },
   'vinyl-weight': { label: 'Vinyl Weight', fetchFn: fetchVinylWeights, updateFn: async () => false, mergeFn: async () => false, allowDelete: false, allowMerge: true, hasSortName: false, keepOriginalOrder: true },
@@ -222,7 +222,6 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
     }
   }, [selectedList]);
 
-  // Handle initialization and list changes
   useEffect(() => {
     if (isOpen) {
       if (initialList && PICK_LIST_CONFIGS[initialList]) {
@@ -243,9 +242,8 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
       
       const config = PICK_LIST_CONFIGS[selectedList];
       
-      // Determine default sort strategy
       if (config?.keepOriginalOrder) {
-        setSortBy('none'); // Special flag to disable auto-sort
+        setSortBy('none'); 
       } else if (config?.hasSortName) {
         setSortBy('sortName');
         setSortDirection('asc');
@@ -268,7 +266,9 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
     if (!selectedList || !editingItem) return;
     const config = PICK_LIST_CONFIGS[selectedList];
     
+    // Only pass sortName if the list supports it
     const sortNameToSave = config.hasSortName ? newSortName : undefined;
+    
     const success = await config.updateFn(editingItem.id, newName, sortNameToSave);
     
     if (success) {
@@ -334,7 +334,6 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
   const handleSortToggle = () => {
     const config = selectedList ? PICK_LIST_CONFIGS[selectedList] : null;
 
-    // If we are currently not sorting (Original Order), force Name Ascending on click
     if (sortBy === 'none') {
         setSortBy('name');
         setSortDirection('asc');
@@ -342,10 +341,8 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
     }
 
     if (!config?.hasSortName) {
-      // Simple List: Toggle Name direction
       setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
     } else {
-      // Complex List: Toggle between SortName and Name
       if (sortBy === 'sortName') {
         setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
       } else {
@@ -361,18 +358,15 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
   const filteredItems = useMemo(() => {
     const result = items.filter(item => item.name.toLowerCase().includes(searchQuery.toLowerCase()));
     
-    // If "none", return result as-is (Original Order from fetch)
     if (sortBy === 'none') return result;
 
     return result.sort((a, b) => {
-      // If Sort Name is not applicable (Simple List), always sort by Name
       if (!showSortNameUI) {
          return sortDirection === 'asc' 
             ? a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
             : b.name.localeCompare(a.name, undefined, { sensitivity: 'base' });
       }
 
-      // Complex List Logic
       const nameA = sortBy === 'sortName' ? (a.sortName || getSortName(a.name)) : a.name;
       const nameB = sortBy === 'sortName' ? (b.sortName || getSortName(b.name)) : b.name;
       
@@ -505,7 +499,6 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
                )}
             </div>
 
-            {/* List Selector (Hidden if hideListSelector=true) */}
             {!hideListSelector && (
               <div style={{ flex: '0 0 35%' }}>
                 <select
@@ -561,7 +554,6 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
                       <div style={{ display: 'flex', flexDirection: 'column' }}>
                         <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: '600' }}>Name</span>
                         
-                        {/* CONDITIONALLY RENDER SORT NAME HEADER */}
                         {showSortNameUI && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '1px' }}>
                             <span style={{ fontSize: '11px', color: '#9ca3af', fontWeight: '400' }}>Sort Name</span>
@@ -573,7 +565,6 @@ export default function ManagePickListsModal({ isOpen, onClose, initialList, hid
                           </div>
                         )}
                         
-                        {/* Name Sort Arrow */}
                         {(!showSortNameUI || sortBy === 'name') && (
                            <span style={{ fontSize: '10px', color: '#9ca3af', marginLeft: '4px' }}>
                               {sortBy === 'none' ? '' : (sortDirection === 'asc' ? '▼' : '▲')}
