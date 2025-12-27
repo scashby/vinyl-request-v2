@@ -10,12 +10,6 @@ import {
   fetchOwners, 
   fetchSignees, 
   fetchTags,
-  updatePurchaseStore,
-  deletePurchaseStore,
-  mergePurchaseStores,
-  updateOwner,
-  deleteOwner,
-  mergeOwners
 } from '../pickers/pickerDataUtils';
 
 interface PersonalTabProps {
@@ -695,9 +689,6 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
           }}
           multiSelect={false}
           canManage={true}
-          onUpdate={updatePurchaseStore}
-          onDelete={deletePurchaseStore}
-          onMerge={mergePurchaseStores}
           newItemLabel="Purchase Store"
           manageItemsLabel="Manage Purchase Stores"
         />
@@ -716,9 +707,6 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
           }}
           multiSelect={false}
           canManage={true}
-          onUpdate={updateOwner}
-          onDelete={deleteOwner}
-          onMerge={mergeOwners}
           newItemLabel="Owner"
           manageItemsLabel="Manage Owners"
         />
