@@ -13,6 +13,8 @@ import { PersonalTab } from './tabs/PersonalTab';
 import { CoverTab } from './tabs/CoverTab';
 import { LinksTab } from './tabs/LinksTab';
 import { UniversalBottomBar } from 'components/UniversalBottomBar';
+import { PickerModal } from './pickers/PickerModal';
+import { fetchLocations, type PickerDataItem } from './pickers/pickerDataUtils';
 
 type TabId = 'main' | 'details' | 'classical' | 'people' | 'tracks' | 'personal' | 'cover' | 'links';
 
@@ -88,10 +90,25 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
   const mainTabRef = useRef<MainTabRef>(null);
   const tracksTabRef = useRef<TracksTabRef>(null);
 
+  // Location picker state (shared across all tabs)
+  const [showLocationPicker, setShowLocationPicker] = useState(false);
+  const [locations, setLocations] = useState<PickerDataItem[]>([]);
+
   // Calculate current position and navigation availability
   const currentIndex = allAlbumIds.indexOf(albumId);
   const hasPrevious = currentIndex > 0;
   const hasNext = currentIndex < allAlbumIds.length - 1;
+
+  // Load locations on mount
+  useEffect(() => {
+    const loadLocations = async () => {
+      const locationsData = await fetchLocations();
+      setLocations(locationsData);
+    };
+    if (album) {
+      loadLocations();
+    }
+  }, [album]);
 
   // Navigation handlers
   const handlePrevious = async () => {
@@ -539,7 +556,7 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
           )}
         </div>
 
-        {/* Bottom Bar - ADDED */}
+        {/* Bottom Bar */}
         <div style={{
           borderTop: '1px solid #e5e7eb',
           padding: '12px 16px',
@@ -555,10 +572,39 @@ export default function EditAlbumModal({ albumId, onClose, onRefresh, onNavigate
             onCancel={onClose}
             onSave={handleSave}
             onOpenLocationPicker={() => {
-              mainTabRef.current?.openLocationPicker();
+              setShowLocationPicker(true);
             }}
           />
         </div>
+
+        {/* Location Picker Modal - Shared across all tabs */}
+        {showLocationPicker && (
+          <PickerModal
+            isOpen={true}
+            onClose={() => setShowLocationPicker(false)}
+            title="Select Location"
+            mode="single"
+            items={locations}
+            selectedIds={editedAlbum.location ? [editedAlbum.location] : []}
+            onSave={(selectedIds) => {
+              if (selectedIds.length > 0) {
+                handleFieldChange('location', selectedIds[0]);
+              }
+              setShowLocationPicker(false);
+            }}
+            onManage={() => {
+              // TODO: Open manage locations modal
+              alert('Manage locations will be implemented');
+            }}
+            onNew={() => {
+              // TODO: Open new location modal
+              alert('New location will be implemented');
+            }}
+            searchPlaceholder="Search locations..."
+            itemLabel="Location"
+            showSortName={false}
+          />
+        )}
       </div>
     </div>
   );

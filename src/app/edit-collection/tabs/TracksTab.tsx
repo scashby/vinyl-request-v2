@@ -23,6 +23,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { PickerModal } from '../pickers/PickerModal';
 import { ManageModal } from '../pickers/ManageModal';
+import { EditModal } from '../pickers/EditModal';
 import {
   fetchStorageDevices,
   type PickerDataItem,
@@ -227,6 +228,7 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
   // Storage device picker state
   const [showStoragePicker, setShowStoragePicker] = useState(false);
   const [showManageStorage, setShowManageStorage] = useState(false);
+  const [showNewStorageModal, setShowNewStorageModal] = useState(false);
   const [storageDevices, setStorageDevices] = useState<PickerDataItem[]>([]);
 
   // Track import state
@@ -802,11 +804,7 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
             setShowManageStorage(true);
           }}
           onNew={() => {
-            const deviceName = prompt('Enter new storage device name:');
-            if (deviceName) {
-              // TODO: Add new storage device to database
-              alert('Storage device creation will be implemented with database integration');
-            }
+            setShowNewStorageModal(true);
           }}
           searchPlaceholder="Search storage devices..."
           itemLabel="Storage Device"
@@ -835,6 +833,31 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
           }}
           itemLabel="Storage Device"
           allowMerge={true}
+        />
+      )}
+
+      {/* New Storage Device Modal */}
+      {showNewStorageModal && (
+        <EditModal
+          isOpen={true}
+          onClose={() => setShowNewStorageModal(false)}
+          title="New Storage Device"
+          itemName=""
+          onSave={async (deviceName) => {
+            // Add to local state immediately
+            const newDevice: PickerDataItem = {
+              id: deviceName,
+              name: deviceName,
+              count: 0,
+            };
+            setStorageDevices([...storageDevices, newDevice].sort((a, b) => a.name.localeCompare(b.name)));
+            
+            // Set it as the current storage device
+            handleUpdateDisc(activeDisc, 'storage_device', deviceName);
+            
+            setShowNewStorageModal(false);
+          }}
+          itemLabel="Storage Device"
         />
       )}
 
