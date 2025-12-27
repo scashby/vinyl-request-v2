@@ -50,7 +50,7 @@ const DEFAULT_COLUMN_FAVORITES: ColumnFavorite[] = [
   {
     id: 'print-export',
     name: 'My Print / Export columns',
-    columns: ['artist', 'title', 'master_release_date', 'discs', 'tracks', 'length', 'barcode', 'cat_no', 'format', 'genres', 'label', 'original_release_date', 'original_release_year', 'recording_date', 'recording_year', 'master_release_date', 'box_set', 'country', 'extra', 'is_live', 'media_condition', 'package_sleeve_condition', 'packaging', 'rpm', 'sound', 'spars_code', 'storage_device_slot', 'studio', 'vinyl_color', 'vinyl_weight', 'chorus', 'composer', 'composition', 'conductor', 'orchestra', 'engineers', 'musicians', 'producers', 'songwriters', 'added_date', 'collection_status', 'current_value', 'folder', 'location', 'modified_date', 'my_rating', 'notes', 'owner', 'play_count', 'last_played_date', 'last_cleaned_date', 'signed_by', 'custom_tags', 'due_date', 'loan_date', 'loaned_to', 'artist', 'sort_title', 'storage_device']
+    columns: ['artist', 'title', 'master_release_date', 'discs', 'tracks', 'length', 'barcode', 'cat_no', 'format', 'genres', 'label', 'original_release_date', 'original_release_year', 'recording_date', 'recording_year', 'box_set', 'country', 'extra', 'is_live', 'media_condition', 'package_sleeve_condition', 'packaging', 'rpm', 'sound', 'spars_code', 'storage_device_slot', 'studio', 'vinyl_color', 'vinyl_weight', 'chorus', 'composer', 'composition', 'conductor', 'orchestra', 'engineers', 'musicians', 'producers', 'songwriters', 'added_date', 'collection_status', 'current_value', 'folder', 'location', 'modified_date', 'my_rating', 'notes', 'owner', 'play_count', 'last_played_date', 'last_cleaned_date', 'signed_by', 'custom_tags', 'due_date', 'loan_date', 'loaned_to', 'sort_title']
   }
 ];
 

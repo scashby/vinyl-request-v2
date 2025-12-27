@@ -76,11 +76,9 @@ function formatValue(value: unknown, columnId: ColumnId): string {
     }
   }
   
-  // Handle lengths
-  if (columnId === 'length_seconds' && typeof value === 'number') {
-    const mins = Math.floor(value / 60);
-    const secs = value % 60;
-    return `${mins}:${String(secs).padStart(2, '0')}`;
+  // Handle lengths (length is stored as formatted string like "42:15")
+  if (columnId === 'length' && typeof value === 'string') {
+    return value;
   }
   
   // Handle currency
@@ -144,14 +142,15 @@ export async function generatePDF(options: PDFOptions): Promise<void> {
     fontSize,
     fontColor,
     titleOnEveryPage,
-    maxAlbumsPerPage,
     pageNumbers,
     printDateTime,
-    coverThumbnails,
     columnFieldNames,
     rowShading,
     borderStyle
   } = options;
+
+  // Note: maxAlbumsPerPage and coverThumbnails are in PDFOptions but not yet implemented
+  // They can be added to the destructuring when implemented
 
   // Sort albums
   const sortedAlbums = sortAlbums(albums, sortFields);
@@ -223,7 +222,7 @@ export async function generatePDF(options: PDFOptions): Promise<void> {
 
   // Configure borders
   let lineWidth = 0.1;
-  let lineColor: [number, number, number] = [200, 200, 200];
+  const lineColor: [number, number, number] = [200, 200, 200];
   
   if (borderStyle === 'none') {
     lineWidth = 0;
