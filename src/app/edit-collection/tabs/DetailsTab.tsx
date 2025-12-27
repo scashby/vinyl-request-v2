@@ -1065,6 +1065,7 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
           onNew={handleOpenNew}
           searchPlaceholder={`Search ${fieldConfig.itemLabel}s...`}
           itemLabel={fieldConfig.itemLabel}
+          showSortName={false}
         />
       )}
 

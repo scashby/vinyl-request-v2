@@ -22,6 +22,7 @@ interface PickerModalProps {
   onNew: () => void;
   searchPlaceholder?: string;
   itemLabel?: string;
+  showSortName?: boolean; // NEW: Control whether to show sort names
 }
 
 export function PickerModal({
@@ -36,6 +37,7 @@ export function PickerModal({
   onNew,
   searchPlaceholder = 'Search...',
   itemLabel = 'Item',
+  showSortName = false, // NEW: Default to false (simple picklists)
 }: PickerModalProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [localSelectedIds, setLocalSelectedIds] = useState<string | string[]>(selectedIds);
@@ -234,22 +236,26 @@ export function PickerModal({
                   style={{ 
                     padding: '8px 12px', 
                     textAlign: 'left', 
-                    cursor: 'pointer',
+                    cursor: showSortName ? 'pointer' : 'default',
                     verticalAlign: 'top'
                   }}
-                  onClick={handleSortToggle}
+                  onClick={showSortName ? handleSortToggle : undefined}
                 >
-                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: '600' }}>Name</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '1px' }}>
-                      <span style={{ fontSize: '11px', color: '#9ca3af', fontWeight: '400' }}>Sort Name</span>
-                      {sortBy === 'sortName' && (
-                        <span style={{ fontSize: '10px', color: '#9ca3af' }}>
-                          {sortDirection === 'asc' ? '▼' : '▲'}
-                        </span>
-                      )}
+                  {showSortName ? (
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: '600' }}>Name</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '1px' }}>
+                        <span style={{ fontSize: '11px', color: '#9ca3af', fontWeight: '400' }}>Sort Name</span>
+                        {sortBy === 'sortName' && (
+                          <span style={{ fontSize: '10px', color: '#9ca3af' }}>
+                            {sortDirection === 'asc' ? '▼' : '▲'}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: '600' }}>Name</span>
+                  )}
                 </th>
                 <th style={{ width: '60px', padding: '8px 12px', textAlign: 'center', verticalAlign: 'middle', fontSize: '12px', color: '#6b7280', fontWeight: '600' }}>
                   Count
@@ -297,14 +303,20 @@ export function PickerModal({
                         />
                       </td>
                       <td style={{ padding: '8px 12px', verticalAlign: 'middle' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        {showSortName ? (
+                          <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            <span style={{ fontSize: '13px', color: '#111827', fontWeight: '500' }}>
+                              {item.name}
+                            </span>
+                            <span style={{ fontSize: '11px', color: '#9ca3af', marginTop: '1px' }}>
+                              {sortName}
+                            </span>
+                          </div>
+                        ) : (
                           <span style={{ fontSize: '13px', color: '#111827', fontWeight: '500' }}>
                             {item.name}
                           </span>
-                          <span style={{ fontSize: '11px', color: '#9ca3af', marginTop: '1px' }}>
-                            {sortName}
-                          </span>
-                        </div>
+                        )}
                       </td>
                       <td style={{ padding: '8px 12px', textAlign: 'center', verticalAlign: 'middle', fontSize: '13px', color: '#4b5563' }}>
                         {item.count}

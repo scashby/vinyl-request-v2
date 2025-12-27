@@ -797,6 +797,7 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
           onNew={handleOpenNew}
           searchPlaceholder={`Search ${fieldConfig.itemLabel}s...`}
           itemLabel={fieldConfig.itemLabel}
+          showSortName={activeField === 'artist'}
         />
       )}
 

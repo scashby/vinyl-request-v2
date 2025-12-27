@@ -810,6 +810,7 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
           }}
           searchPlaceholder="Search storage devices..."
           itemLabel="Storage Device"
+          showSortName={false}
         />
       )}
 
