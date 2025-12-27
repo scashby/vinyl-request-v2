@@ -28,6 +28,7 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
   // Date picker state
   const [showPurchaseDatePicker, setShowPurchaseDatePicker] = useState(false);
   const [showCleanedDatePicker, setShowCleanedDatePicker] = useState(false);
+  const [showPlayedDatePicker, setShowPlayedDatePicker] = useState(false);
   const [datePickerPosition, setDatePickerPosition] = useState({ top: 0, left: 0 });
 
   // Picker state
@@ -38,7 +39,6 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
 
   // Played History
   const [playedHistory, setPlayedHistory] = useState<PlayedHistoryEntry[]>([]);
-  const [showPlayedForm, setShowPlayedForm] = useState(false);
 
   // Parse played history
   useEffect(() => {
@@ -71,6 +71,21 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
     setShowCleanedDatePicker(false);
   };
 
+  const handlePlayedDateChange = (date: { year: number | null; month: number | null; day: number | null }) => {
+    if (date.year && date.month && date.day) {
+      const newEntry: PlayedHistoryEntry = {
+        year: date.year,
+        month: date.month,
+        day: date.day,
+        count: 1 // Always add with count of 1
+      };
+      const updated = [...playedHistory, newEntry];
+      setPlayedHistory(updated);
+      onChange('played_history', JSON.stringify(updated));
+    }
+    setShowPlayedDatePicker(false);
+  };
+
   const handleOpenPurchaseDatePicker = (event: React.MouseEvent) => {
     const rect = event.currentTarget.getBoundingClientRect();
     setDatePickerPosition({ top: rect.bottom + 4, left: rect.left });
@@ -81,6 +96,12 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
     const rect = event.currentTarget.getBoundingClientRect();
     setDatePickerPosition({ top: rect.bottom + 4, left: rect.left });
     setShowCleanedDatePicker(true);
+  };
+
+  const handleOpenPlayedDatePicker = (event: React.MouseEvent) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    setDatePickerPosition({ top: rect.bottom + 4, left: rect.left });
+    setShowPlayedDatePicker(true);
   };
 
   // Parse dates for display
@@ -116,21 +137,6 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
   // Played history handlers
   const totalPlays = playedHistory.reduce((sum, entry) => sum + entry.count, 0);
 
-  const handleAddPlayedHistory = (year: string, month: string, day: string, count: string) => {
-    if (year && month && day && count) {
-      const newEntry: PlayedHistoryEntry = {
-        year: parseInt(year),
-        month: parseInt(month),
-        day: parseInt(day),
-        count: parseInt(count)
-      };
-      const updated = [...playedHistory, newEntry];
-      setPlayedHistory(updated);
-      onChange('played_history', JSON.stringify(updated));
-      setShowPlayedForm(false);
-    }
-  };
-
   const handleDeletePlayedHistory = (index: number) => {
     const updated = playedHistory.filter((_, i) => i !== index);
     setPlayedHistory(updated);
@@ -149,7 +155,7 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
     onChange('signed_by', updated.length > 0 ? updated : null);
   };
 
-  // Styles - COPIED FROM MAINTAB
+  // Styles
   const labelStyle: React.CSSProperties = {
     display: 'block',
     fontSize: '13px',
@@ -197,7 +203,7 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
       <div style={{ maxWidth: '100%' }}>
         {/* ROW 1: [25%] [25%] [50%] - Purchase Date | Purchase Store | Owner */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr', gap: '12px', marginBottom: '10px' }}>
-          {/* Purchase Date - COPIED FROM MAINTAB ORIGINAL RELEASE DATE */}
+          {/* Purchase Date */}
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
               <label style={{ ...labelStyle, marginBottom: '0' }}>Purchase Date</label>
@@ -503,7 +509,7 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
 
         {/* ROW 4: [25%] [25%] [50%] - Last Cleaned Date | Played History | Signed by */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr', gap: '12px' }}>
-          {/* Last Cleaned Date - COPIED FROM MAINTAB ORIGINAL RELEASE DATE */}
+          {/* Last Cleaned Date */}
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
               <label style={{ ...labelStyle, marginBottom: '0' }}>Last Cleaned Date</label>
@@ -548,16 +554,20 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
             </div>
           </div>
 
-          {/* Played History - COPIED FROM MAINTAB ARTIST PATTERN */}
+          {/* Played History - DATE PICKER ONLY */}
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
               <label style={{ ...labelStyle, marginBottom: '0' }}>Played History (total plays: {totalPlays})</label>
-              <span 
-                onClick={() => setShowPlayedForm(true)}
-                style={{ color: '#9ca3af', fontSize: '20px', fontWeight: '300', cursor: 'pointer' }}
+              <div 
+                onClick={handleOpenPlayedDatePicker}
+                style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#6b7280' }}
               >
-                +
-              </span>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <rect x="2" y="3" width="12" height="11" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+                  <path d="M2 6h12" stroke="currentColor" strokeWidth="1.5"/>
+                  <path d="M5 2v2M11 2v2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
+              </div>
             </div>
             <div style={{ 
               flex: 1,
@@ -577,7 +587,7 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
                     justifyContent: 'space-between',
                     marginBottom: idx < playedHistory.length - 1 ? '4px' : '0'
                   }}>
-                    <span>{entry.month}/{entry.day}/{entry.year} - Count: {entry.count}</span>
+                    <span>{entry.year}  {String(entry.month).padStart(2, '0')}  {String(entry.day).padStart(2, '0')}</span>
                     <button
                       onClick={() => handleDeletePlayedHistory(idx)}
                       style={{
@@ -601,7 +611,7 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
             </div>
           </div>
 
-          {/* Signed by - COPIED FROM MAINTAB ARTIST PATTERN */}
+          {/* Signed by */}
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
               <label style={{ ...labelStyle, marginBottom: '0' }}>Signed by</label>
@@ -671,6 +681,15 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
           value={cleanedDate}
           onChange={handleCleanedDateChange}
           onClose={() => setShowCleanedDatePicker(false)}
+          position={datePickerPosition}
+        />
+      )}
+
+      {showPlayedDatePicker && (
+        <DatePicker
+          value={{ year: null, month: null, day: null }}
+          onChange={handlePlayedDateChange}
+          onClose={() => setShowPlayedDatePicker(false)}
           position={datePickerPosition}
         />
       )}
@@ -747,132 +766,6 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
           manageItemsLabel="Manage Signees"
         />
       )}
-
-      {/* Played History Form Modal */}
-      {showPlayedForm && (
-        <PlayedHistoryFormModal
-          onClose={() => setShowPlayedForm(false)}
-          onSave={handleAddPlayedHistory}
-        />
-      )}
-    </>
-  );
-}
-
-// Played History Form Modal Component
-interface PlayedHistoryFormModalProps {
-  onClose: () => void;
-  onSave: (year: string, month: string, day: string, count: string) => void;
-}
-
-function PlayedHistoryFormModal({ onClose, onSave }: PlayedHistoryFormModalProps) {
-  const [year, setYear] = useState('');
-  const [month, setMonth] = useState('');
-  const [day, setDay] = useState('');
-  const [count, setCount] = useState('1');
-
-  const handleSave = () => {
-    if (year && month && day && count) {
-      onSave(year, month, day, count);
-    }
-  };
-
-  return (
-    <>
-      <div
-        onClick={onClose}
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0, 0, 0, 0.5)',
-          zIndex: 30000,
-        }}
-      />
-      <div style={{
-        position: 'fixed',
-        top: '50%',
-        left: '50%',
-        transform: 'translate(-50%, -50%)',
-        background: 'white',
-        borderRadius: '8px',
-        width: '400px',
-        zIndex: 30001,
-        boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
-        padding: '20px'
-      }}>
-        <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: 600 }}>Add Played History</h3>
-        
-        <div style={{ marginBottom: '12px' }}>
-          <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '4px' }}>Date</label>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <input
-              type="text"
-              placeholder="YYYY"
-              value={year}
-              onChange={(e) => setYear(e.target.value)}
-              style={{ width: '80px', padding: '8px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px' }}
-            />
-            <input
-              type="text"
-              placeholder="MM"
-              value={month}
-              onChange={(e) => setMonth(e.target.value)}
-              style={{ width: '60px', padding: '8px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px' }}
-            />
-            <input
-              type="text"
-              placeholder="DD"
-              value={day}
-              onChange={(e) => setDay(e.target.value)}
-              style={{ width: '60px', padding: '8px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px' }}
-            />
-          </div>
-        </div>
-
-        <div style={{ marginBottom: '16px' }}>
-          <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '4px' }}>Count</label>
-          <input
-            type="number"
-            value={count}
-            onChange={(e) => setCount(e.target.value)}
-            style={{ width: '100%', padding: '8px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px' }}
-          />
-        </div>
-
-        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-          <button
-            onClick={onClose}
-            style={{
-              padding: '8px 16px',
-              background: 'white',
-              border: '1px solid #d1d5db',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '13px'
-            }}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            style={{
-              padding: '8px 16px',
-              background: '#3b82f6',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '13px',
-              fontWeight: 500
-            }}
-          >
-            Save
-          </button>
-        </div>
-      </div>
     </>
   );
 }
