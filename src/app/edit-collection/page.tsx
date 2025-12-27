@@ -1,4 +1,4 @@
-// src/app/edit-collection/page.tsx - WITH CRATES FUNCTIONALITY
+// src/app/edit-collection/page.tsx - WITH CRATES FUNCTIONALITY AND PRINT TO PDF
 'use client';
 
 import { useCallback, useEffect, useState, useMemo, Suspense, memo } from 'react';
@@ -15,6 +15,7 @@ import NewSmartCrateModal from './crates/NewSmartCrateModal';
 import ManageCratesModal from './crates/ManageCratesModal';
 import { AddToCrateModal } from './crates/AddToCrateModal';
 import ManagePickListsModal from './ManagePickListsModal';
+import { PrintToPDFModal } from './PrintToPDFModal';
 import type { Crate } from '../../types/crate';
 import { albumMatchesSmartCrate } from '../../lib/crateUtils';
 import { BoxIcon } from '../../components/BoxIcon';
@@ -640,6 +641,7 @@ function CollectionBrowserPage() {
   const [showNewCrateModal, setShowNewCrateModal] = useState(false);
   const [showNewSmartCrateModal, setShowNewSmartCrateModal] = useState(false);
   const [showAddToCrateModal, setShowAddToCrateModal] = useState(false);
+  const [showPrintToPDF, setShowPrintToPDF] = useState(false);
   const [editingCrate, setEditingCrate] = useState<Crate | null>(null);
   const [returnToAddToCrate, setReturnToAddToCrate] = useState(false);
   const [newlyCreatedCrateId, setNewlyCreatedCrateId] = useState<number | null>(null);
@@ -1106,6 +1108,10 @@ function CollectionBrowserPage() {
               <div style={{ marginBottom: '20px' }}>
                 <div style={{ fontSize: '11px', fontWeight: 600, color: '#999', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Tools</div>
                 <button 
+                  onClick={() => {
+                    setSidebarOpen(false);
+                    setShowPrintToPDF(true);
+                  }}
                   title="Export collection to PDF"
                   style={{ width: '100%', padding: '10px', background: 'transparent', border: 'none', color: 'white', textAlign: 'left', cursor: 'pointer', marginBottom: '5px', fontSize: '14px' }}>
                   <span style={{ marginRight: '10px' }}>🖨️</span> Print to PDF
@@ -2207,6 +2213,16 @@ function CollectionBrowserPage() {
             setShowNewCrateModal(true);
           }}
           autoSelectCrateId={newlyCreatedCrateId}
+        />
+      )}
+
+      {showPrintToPDF && (
+        <PrintToPDFModal
+          isOpen={showPrintToPDF}
+          onClose={() => setShowPrintToPDF(false)}
+          allAlbums={albums}
+          currentListAlbums={filteredAndSortedAlbums}
+          checkedAlbumIds={selectedAlbumIds}
         />
       )}
     </>
