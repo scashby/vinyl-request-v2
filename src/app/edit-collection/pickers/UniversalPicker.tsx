@@ -514,9 +514,11 @@ export function UniversalPicker({
                   >
                     Default Instrument
                   </label>
-                  <select
+                  <input
+                    type="text"
                     value={newItemDefaultInstrument}
                     onChange={(e) => setNewItemDefaultInstrument(e.target.value)}
+                    placeholder="Enter instrument"
                     style={{
                       width: '100%',
                       padding: '8px 10px',
@@ -524,21 +526,8 @@ export function UniversalPicker({
                       borderRadius: '4px',
                       fontSize: '14px',
                       color: '#111827',
-                      backgroundColor: 'white',
                     }}
-                  >
-                    <option value="">Select instrument...</option>
-                    <option value="Guitar">Guitar</option>
-                    <option value="Bass">Bass</option>
-                    <option value="Drums">Drums</option>
-                    <option value="Keyboards">Keyboards</option>
-                    <option value="Piano">Piano</option>
-                    <option value="Vocals">Vocals</option>
-                    <option value="Saxophone">Saxophone</option>
-                    <option value="Trumpet">Trumpet</option>
-                    <option value="Violin">Violin</option>
-                    <option value="Other">Other</option>
-                  </select>
+                  />
                 </div>
               )}
             </div>
