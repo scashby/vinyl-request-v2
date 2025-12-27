@@ -10,16 +10,6 @@ import {
   fetchChoruses,
   fetchCompositions,
   fetchOrchestras,
-  updateComposer,
-  updateConductor,
-  updateChorus,
-  updateComposition,
-  updateOrchestra,
-  mergeComposers,
-  mergeConductors,
-  mergeChorus,
-  mergeCompositions,
-  mergeOrchestras,
 } from '../pickers/pickerDataUtils';
 
 interface ClassicalTabProps {
@@ -52,41 +42,36 @@ export function ClassicalTab({ album, onChange }: ClassicalTabProps) {
         return {
           title: 'Select Composer',
           fetchItems: fetchComposers,
-          onUpdate: updateComposer,
-          onMerge: mergeComposers,
           label: 'Composer',
+          showSortName: true, // Proper name
         };
       case 'conductor':
         return {
           title: 'Select Conductor',
           fetchItems: fetchConductors,
-          onUpdate: updateConductor,
-          onMerge: mergeConductors,
           label: 'Conductor',
+          showSortName: true, // Proper name
         };
       case 'chorus':
         return {
           title: 'Select Chorus',
           fetchItems: fetchChoruses,
-          onUpdate: updateChorus,
-          onMerge: mergeChorus,
           label: 'Chorus',
+          showSortName: true, // Band/ensemble name
         };
       case 'composition':
         return {
           title: 'Select Composition',
           fetchItems: fetchCompositions,
-          onUpdate: updateComposition,
-          onMerge: mergeCompositions,
           label: 'Composition',
+          showSortName: false, // Work title, not a name
         };
       case 'orchestra':
         return {
           title: 'Select Orchestra',
           fetchItems: fetchOrchestras,
-          onUpdate: updateOrchestra,
-          onMerge: mergeOrchestras,
           label: 'Orchestra',
+          showSortName: true, // Band/ensemble name
         };
       default:
         return null;
@@ -176,10 +161,9 @@ export function ClassicalTab({ album, onChange }: ClassicalTabProps) {
           onSelect={handlePickerSelect}
           multiSelect={false}
           canManage={true}
-          onUpdate={fieldConfig.onUpdate}
-          onMerge={fieldConfig.onMerge}
           newItemLabel={fieldConfig.label}
           manageItemsLabel={`Manage ${fieldConfig.label}s`}
+          showSortName={fieldConfig.showSortName}
         />
       )}
     </div>

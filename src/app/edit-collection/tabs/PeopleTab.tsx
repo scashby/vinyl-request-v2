@@ -42,24 +42,32 @@ export function PeopleTab({ album, onChange }: PeopleTabProps) {
           title: 'Select Songwriters',
           fetchItems: fetchSongwriters,
           label: 'Songwriter',
+          showSortName: true, // Proper names
+          showDefaultInstrument: false,
         };
       case 'producers':
         return {
           title: 'Select Producers',
           fetchItems: fetchProducers,
           label: 'Producer',
+          showSortName: true, // Proper names
+          showDefaultInstrument: false,
         };
       case 'engineers':
         return {
           title: 'Select Engineers',
           fetchItems: fetchEngineers,
           label: 'Engineer',
+          showSortName: true, // Proper names
+          showDefaultInstrument: false,
         };
       case 'musicians':
         return {
           title: 'Select Musicians',
           fetchItems: fetchMusicians,
           label: 'Musician',
+          showSortName: true, // Proper names
+          showDefaultInstrument: true, // Musicians need default instrument
         };
       default:
         return null;
@@ -181,6 +189,8 @@ export function PeopleTab({ album, onChange }: PeopleTabProps) {
           canManage={true}
           newItemLabel={fieldConfig.label}
           manageItemsLabel={`Manage ${fieldConfig.label}s`}
+          showSortName={fieldConfig.showSortName}
+          showDefaultInstrument={fieldConfig.showDefaultInstrument}
         />
       )}
     </div>
