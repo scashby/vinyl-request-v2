@@ -2,12 +2,11 @@
 'use client';
 
 import { useState } from 'react';
-import { ColumnId, COLUMN_DEFINITIONS, COLUMN_GROUPS } from './columnDefinitions';
 
-interface ColumnFavorite {
+export interface ColumnFavorite {
   id: string;
   name: string;
-  columns: ColumnId[];
+  columns: string[];
 }
 
 interface ManageColumnFavoritesModalProps {
@@ -18,6 +17,16 @@ interface ManageColumnFavoritesModalProps {
   selectedId: string;
   onSelect: (id: string) => void;
 }
+
+const COLUMN_FIELDS = {
+  Main: ['Artist', 'Artist Sort', 'Barcode', 'Cat No', 'Format', 'Genre', 'Label', 'Original Release Date', 'Original Release Year', 'Recording Date', 'Recording Year', 'Release Date', 'Release Year', 'Sort Title', 'Subtitle', 'Title'],
+  Details: ['Box Set', 'Country', 'Extra', 'Is Live', 'Media Condition', 'Package/Sleeve Condition', 'Packaging', 'RPM', 'Sound', 'SPARS', 'Storage Device', 'Storage Device Slot', 'Studio', 'Vinyl Color', 'Vinyl Weight'],
+  Edition: ['Discs', 'Length', 'Tracks'],
+  Classical: ['Chorus', 'Composer', 'Composition', 'Conductor', 'Orchestra'],
+  People: ['Engineer', 'Musician', 'Producer', 'Songwriter'],
+  Personal: ['Added Date', 'Added Year', 'Collection Status', 'Current Value', 'Index', 'Last Cleaned Date', 'Last Cleaned Year', 'Last Played Date', 'Location', 'Modified Date', 'My Rating', 'Notes', 'Owner', 'Play Count', 'Played Year', 'Purchase Date', 'Purchase Price', 'Purchase Store', 'Purchase Year', 'Quantity', 'Signed by', 'Tags'],
+  Loan: ['Due Date', 'Loan Date', 'Loaned To'],
+};
 
 export function ManageColumnFavoritesModal({
   isOpen,
@@ -32,7 +41,7 @@ export function ManageColumnFavoritesModal({
   const [editingName, setEditingName] = useState('');
   const [showColumnSelector, setShowColumnSelector] = useState(false);
   const [selectedFavoriteForEdit, setSelectedFavoriteForEdit] = useState<ColumnFavorite | null>(null);
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['main']));
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['Main']));
 
   if (!isOpen) return null;
 
@@ -70,14 +79,14 @@ export function ManageColumnFavoritesModal({
     const newFavorite: ColumnFavorite = {
       id: newId,
       name: 'New Favorite',
-      columns: ['artist', 'title']
+      columns: ['Artist', 'Title']
     };
     setLocalFavorites([...localFavorites, newFavorite]);
     setSelectedFavoriteForEdit(newFavorite);
     setShowColumnSelector(true);
   };
 
-  const handleSaveColumns = (columns: ColumnId[]) => {
+  const handleSaveColumns = (columns: string[]) => {
     if (selectedFavoriteForEdit) {
       setLocalFavorites(localFavorites.map(f =>
         f.id === selectedFavoriteForEdit.id ? { ...f, columns } : f
@@ -233,10 +242,11 @@ export function ManageColumnFavoritesModal({
                           border: '1px solid #5BA3D0',
                           borderRadius: '2px',
                           fontSize: '13px',
+                          color: '#1a1a1a',
                         }}
                       />
                     ) : (
-                      <span style={{ flex: 1, fontSize: '13px', fontWeight: 500 }}>
+                      <span style={{ flex: 1, fontSize: '13px', fontWeight: 500, color: '#1a1a1a' }}>
                         {favorite.name}
                       </span>
                     )}
@@ -305,12 +315,12 @@ export function ManageColumnFavoritesModal({
               </div>
 
               <div style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
-                {COLUMN_GROUPS.map(group => {
-                  const isExpanded = expandedGroups.has(group.id);
+                {Object.entries(COLUMN_FIELDS).map(([groupName, fields]) => {
+                  const isExpanded = expandedGroups.has(groupName);
                   return (
-                    <div key={group.id} style={{ marginBottom: '4px' }}>
+                    <div key={groupName} style={{ marginBottom: '4px' }}>
                       <button
-                        onClick={() => toggleGroup(group.id)}
+                        onClick={() => toggleGroup(groupName)}
                         style={{
                           width: '100%',
                           display: 'flex',
@@ -334,20 +344,17 @@ export function ManageColumnFavoritesModal({
                         }}>
                           ▶
                         </span>
-                        <span>{group.icon}</span>
-                        <span>{group.label}</span>
+                        <span>{groupName}</span>
                       </button>
 
                       {isExpanded && (
                         <div style={{ paddingLeft: '28px', paddingTop: '4px' }}>
-                          {group.columns.map(colId => {
-                            const col = COLUMN_DEFINITIONS[colId];
-                            if (!col) return null;
-                            const isSelected = selectedFavoriteForEdit.columns.includes(colId);
+                          {fields.map(field => {
+                            const isSelected = selectedFavoriteForEdit.columns.includes(field);
 
                             return (
                               <label
-                                key={colId}
+                                key={field}
                                 style={{
                                   display: 'flex',
                                   alignItems: 'center',
@@ -357,12 +364,14 @@ export function ManageColumnFavoritesModal({
                                   fontSize: '13px',
                                   borderRadius: '3px',
                                   marginBottom: '2px',
+                                  color: '#1a1a1a',
+                                  backgroundColor: isSelected ? '#f0f0f0' : 'transparent',
                                 }}
                                 onMouseEnter={(e) => {
-                                  e.currentTarget.style.background = '#f5f5f5';
+                                  if (!isSelected) e.currentTarget.style.background = '#f5f5f5';
                                 }}
                                 onMouseLeave={(e) => {
-                                  e.currentTarget.style.background = 'transparent';
+                                  if (!isSelected) e.currentTarget.style.background = 'transparent';
                                 }}
                               >
                                 <input
@@ -370,8 +379,8 @@ export function ManageColumnFavoritesModal({
                                   checked={isSelected}
                                   onChange={(e) => {
                                     const newColumns = e.target.checked
-                                      ? [...selectedFavoriteForEdit.columns, colId]
-                                      : selectedFavoriteForEdit.columns.filter(id => id !== colId);
+                                      ? [...selectedFavoriteForEdit.columns, field]
+                                      : selectedFavoriteForEdit.columns.filter(c => c !== field);
                                     setSelectedFavoriteForEdit({
                                       ...selectedFavoriteForEdit,
                                       columns: newColumns
@@ -379,7 +388,7 @@ export function ManageColumnFavoritesModal({
                                   }}
                                   style={{ cursor: 'pointer' }}
                                 />
-                                <span>{col.label}</span>
+                                <span>{field}</span>
                               </label>
                             );
                           })}
@@ -429,6 +438,7 @@ export function ManageColumnFavoritesModal({
               borderRadius: '3px',
               fontSize: '13px',
               cursor: 'pointer',
+              color: '#1a1a1a',
             }}
           >
             Cancel

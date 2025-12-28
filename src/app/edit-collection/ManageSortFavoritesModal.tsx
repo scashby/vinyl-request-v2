@@ -2,14 +2,13 @@
 'use client';
 
 import { useState } from 'react';
-import { ColumnId, COLUMN_DEFINITIONS, COLUMN_GROUPS } from './columnDefinitions';
 
-interface SortField {
-  column: ColumnId;
+export interface SortField {
+  field: string;
   direction: 'asc' | 'desc';
 }
 
-interface SortFavorite {
+export interface SortFavorite {
   id: string;
   name: string;
   fields: SortField[];
@@ -24,6 +23,16 @@ interface ManageSortFavoritesModalProps {
   onSelect: (id: string) => void;
 }
 
+const SORT_FIELDS = {
+  Main: ['Artist', 'Barcode', 'Cat No', 'Core AlbumID', 'Format', 'Genre', 'Label', 'Original Release Date', 'Original Release Month', 'Original Release Year', 'Recording Date', 'Recording Month', 'Recording Year', 'Release Date', 'Release Month', 'Release Year', 'Sort Title', 'Subtitle', 'Title'],
+  Details: ['Box Set', 'Country', 'Extra', 'Is Live', 'Media Condition', 'Package/Sleeve Condition', 'Packaging', 'RPM', 'Sound', 'SPARS', 'Storage Device', 'Storage Device Slot', 'Studio', 'Vinyl Color', 'Vinyl Weight'],
+  Edition: ['Discs', 'Length', 'Tracks'],
+  Classical: ['Chorus', 'Composer', 'Composition', 'Conductor', 'Orchestra'],
+  People: ['Engineer', 'Musician', 'Producer', 'Songwriter'],
+  Personal: ['Added Date', 'Added Year', 'Collection Status', 'Current Value', 'Index', 'Last Cleaned Date', 'Last Cleaned Year', 'Last Played Date', 'Location', 'Modified Date', 'My Rating', 'Notes', 'Owner', 'Play Count', 'Played Year', 'Purchase Date', 'Purchase Price', 'Purchase Store', 'Purchase Year', 'Quantity', 'Signed by', 'Tags'],
+  Loan: ['Due Date', 'Loan Date', 'Loaned To'],
+};
+
 export function ManageSortFavoritesModal({
   isOpen,
   onClose,
@@ -35,15 +44,16 @@ export function ManageSortFavoritesModal({
   const [localFavorites, setLocalFavorites] = useState<SortFavorite[]>(favorites);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
-  const [showFieldSelector, setShowFieldSelector] = useState(false);
+  const [showSortSelector, setShowSortSelector] = useState(false);
   const [selectedFavoriteForEdit, setSelectedFavoriteForEdit] = useState<SortFavorite | null>(null);
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['main']));
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['Main']));
+  const [searchQuery, setSearchQuery] = useState('');
 
   if (!isOpen) return null;
 
   const handleEdit = (favorite: SortFavorite) => {
     setSelectedFavoriteForEdit(favorite);
-    setShowFieldSelector(true);
+    setShowSortSelector(true);
   };
 
   const handleDelete = (id: string) => {
@@ -71,23 +81,23 @@ export function ManageSortFavoritesModal({
   };
 
   const handleAddNew = () => {
-    const newId = `sort-${Date.now()}`;
+    const newId = `favorite-${Date.now()}`;
     const newFavorite: SortFavorite = {
       id: newId,
-      name: 'New Sort',
-      fields: [{ column: 'artist', direction: 'asc' }]
+      name: 'New Sort Favorite',
+      fields: [{ field: 'Artist', direction: 'asc' }]
     };
     setLocalFavorites([...localFavorites, newFavorite]);
     setSelectedFavoriteForEdit(newFavorite);
-    setShowFieldSelector(true);
+    setShowSortSelector(true);
   };
 
-  const handleSaveFields = (fields: SortField[]) => {
+  const handleSaveSortFields = (fields: SortField[]) => {
     if (selectedFavoriteForEdit) {
       setLocalFavorites(localFavorites.map(f =>
         f.id === selectedFavoriteForEdit.id ? { ...f, fields } : f
       ));
-      setShowFieldSelector(false);
+      setShowSortSelector(false);
       setSelectedFavoriteForEdit(null);
     }
   };
@@ -104,10 +114,41 @@ export function ManageSortFavoritesModal({
     });
   };
 
-  const formatFieldName = (field: SortField): string => {
-    const col = COLUMN_DEFINITIONS[field.column];
-    const direction = field.direction === 'asc' ? '↑' : '↓';
-    return `${col?.label || field.column} ${direction}`;
+  const toggleField = (field: string) => {
+    if (!selectedFavoriteForEdit) return;
+    
+    const exists = selectedFavoriteForEdit.fields.find(f => f.field === field);
+    if (exists) {
+      setSelectedFavoriteForEdit({
+        ...selectedFavoriteForEdit,
+        fields: selectedFavoriteForEdit.fields.filter(f => f.field !== field)
+      });
+    } else {
+      setSelectedFavoriteForEdit({
+        ...selectedFavoriteForEdit,
+        fields: [...selectedFavoriteForEdit.fields, { field, direction: 'asc' }]
+      });
+    }
+  };
+
+  const toggleDirection = (field: string) => {
+    if (!selectedFavoriteForEdit) return;
+    
+    setSelectedFavoriteForEdit({
+      ...selectedFavoriteForEdit,
+      fields: selectedFavoriteForEdit.fields.map(f =>
+        f.field === field ? { ...f, direction: f.direction === 'asc' ? 'desc' : 'asc' } : f
+      )
+    });
+  };
+
+  const removeField = (field: string) => {
+    if (!selectedFavoriteForEdit) return;
+    
+    setSelectedFavoriteForEdit({
+      ...selectedFavoriteForEdit,
+      fields: selectedFavoriteForEdit.fields.filter(f => f.field !== field)
+    });
   };
 
   return (
@@ -134,7 +175,7 @@ export function ManageSortFavoritesModal({
           transform: 'translate(-50%, -50%)',
           backgroundColor: 'white',
           borderRadius: '4px',
-          width: showFieldSelector ? '900px' : '600px',
+          width: showSortSelector ? '900px' : '600px',
           maxHeight: '80vh',
           display: 'flex',
           flexDirection: 'column',
@@ -175,8 +216,8 @@ export function ManageSortFavoritesModal({
         <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
           {/* Favorites List */}
           <div style={{
-            width: showFieldSelector ? '280px' : '100%',
-            borderRight: showFieldSelector ? '1px solid #e0e0e0' : 'none',
+            width: showSortSelector ? '280px' : '100%',
+            borderRight: showSortSelector ? '1px solid #e0e0e0' : 'none',
             display: 'flex',
             flexDirection: 'column',
           }}>
@@ -244,17 +285,18 @@ export function ManageSortFavoritesModal({
                           border: '1px solid #5BA3D0',
                           borderRadius: '2px',
                           fontSize: '13px',
+                          color: '#1a1a1a',
                         }}
                       />
                     ) : (
-                      <span style={{ flex: 1, fontSize: '13px', fontWeight: 500 }}>
+                      <span style={{ flex: 1, fontSize: '13px', fontWeight: 500, color: '#1a1a1a' }}>
                         {favorite.name}
                       </span>
                     )}
                     <div style={{ display: 'flex', gap: '4px' }}>
                       <button
                         onClick={() => handleEdit(favorite)}
-                        title="Edit fields"
+                        title="Edit sort fields"
                         style={{
                           padding: '4px 8px',
                           backgroundColor: 'transparent',
@@ -299,85 +341,168 @@ export function ManageSortFavoritesModal({
                     fontSize: '11px',
                     color: '#999',
                   }}>
-                    {favorite.fields.map(f => formatFieldName(f)).join(' / ')}
+                    {favorite.fields.map(f => `${f.field} ${f.direction.toUpperCase()}`).join(' | ')}
                   </div>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Field Selector */}
-          {showFieldSelector && selectedFavoriteForEdit && (
+          {/* Sort Field Selector */}
+          {showSortSelector && selectedFavoriteForEdit && (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
               <div style={{ padding: '16px', borderBottom: '1px solid #e0e0e0' }}>
-                <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#333' }}>
+                <h3 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: 600, color: '#333' }}>
                   Select Sort Fields for: {selectedFavoriteForEdit.name}
                 </h3>
+                <input
+                  type="text"
+                  placeholder="🔍 Search fields..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '6px 10px',
+                    border: '1px solid #D8D8D8',
+                    borderRadius: '4px',
+                    fontSize: '13px',
+                    color: '#1a1a1a',
+                  }}
+                />
               </div>
 
-              {/* Selected Fields */}
-              <div style={{ padding: '16px', borderBottom: '1px solid #e0e0e0' }}>
-                <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>
-                  Selected Fields (click to toggle direction):
+              <div style={{ flex: 1, display: 'flex', gap: '12px', padding: '12px', overflow: 'hidden' }}>
+                {/* Available Fields */}
+                <div style={{ flex: 1, overflowY: 'auto', borderRight: '1px solid #e0e0e0', paddingRight: '12px' }}>
+                  {Object.entries(SORT_FIELDS).map(([groupName, fields]) => {
+                    const isExpanded = expandedGroups.has(groupName);
+                    const filteredFields = searchQuery
+                      ? fields.filter(f => f.toLowerCase().includes(searchQuery.toLowerCase()))
+                      : fields;
+                    
+                    if (filteredFields.length === 0) return null;
+
+                    return (
+                      <div key={groupName} style={{ marginBottom: '4px' }}>
+                        <button
+                          onClick={() => toggleGroup(groupName)}
+                          style={{
+                            width: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: '8px 12px',
+                            background: '#2C2C2C',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '13px',
+                            fontWeight: 600,
+                            textAlign: 'left',
+                          }}
+                        >
+                          <span style={{
+                            fontSize: '10px',
+                            transition: 'transform 0.2s',
+                            transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)'
+                          }}>
+                            ▶
+                          </span>
+                          <span>{groupName}</span>
+                        </button>
+
+                        {isExpanded && (
+                          <div style={{ paddingLeft: '12px', paddingTop: '4px' }}>
+                            {filteredFields.map(field => {
+                              const isSelected = selectedFavoriteForEdit.fields.some(f => f.field === field);
+
+                              return (
+                                <label
+                                  key={field}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    padding: '6px 8px',
+                                    cursor: 'pointer',
+                                    fontSize: '13px',
+                                    borderRadius: '3px',
+                                    marginBottom: '2px',
+                                    color: '#1a1a1a',
+                                    backgroundColor: isSelected ? '#f0f0f0' : 'transparent',
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    if (!isSelected) e.currentTarget.style.background = '#f5f5f5';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    if (!isSelected) e.currentTarget.style.background = 'transparent';
+                                  }}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={() => toggleField(field)}
+                                    style={{ cursor: 'pointer' }}
+                                  />
+                                  <span>{field}</span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-                {selectedFavoriteForEdit.fields.length === 0 ? (
-                  <div style={{ fontSize: '13px', color: '#999', fontStyle: 'italic' }}>
-                    No fields selected
+
+                {/* Selected Fields */}
+                <div style={{ width: '280px', display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', color: '#333' }}>
+                    Selected Fields ({selectedFavoriteForEdit.fields.length})
                   </div>
-                ) : (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                    {selectedFavoriteForEdit.fields.map((field, index) => (
+                  <div style={{ flex: 1, overflowY: 'auto', background: '#f8f8f8', borderRadius: '4px', padding: '8px' }}>
+                    {selectedFavoriteForEdit.fields.map((sortField, idx) => (
                       <div
-                        key={index}
+                        key={idx}
                         style={{
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '6px',
-                          padding: '6px 10px',
-                          backgroundColor: '#f0f8ff',
-                          border: '1px solid #5BA3D0',
+                          gap: '8px',
+                          marginBottom: '6px',
+                          padding: '8px',
+                          background: 'white',
                           borderRadius: '4px',
-                          fontSize: '13px',
+                          border: '1px solid #D8D8D8',
                         }}
                       >
+                        <span style={{ fontSize: '16px', color: '#888', cursor: 'grab' }}>☰</span>
+                        <span style={{ flex: 1, fontSize: '13px', color: '#1a1a1a' }}>{sortField.field}</span>
                         <button
-                          onClick={() => {
-                            const newFields = [...selectedFavoriteForEdit.fields];
-                            newFields[index] = {
-                              ...field,
-                              direction: field.direction === 'asc' ? 'desc' : 'asc'
-                            };
-                            setSelectedFavoriteForEdit({
-                              ...selectedFavoriteForEdit,
-                              fields: newFields
-                            });
-                          }}
+                          onClick={() => toggleDirection(sortField.field)}
                           style={{
-                            background: 'transparent',
+                            padding: '4px 10px',
+                            background: '#0066cc',
+                            color: 'white',
                             border: 'none',
+                            borderRadius: '4px',
+                            fontSize: '11px',
+                            fontWeight: 600,
                             cursor: 'pointer',
-                            fontSize: '14px',
-                            padding: '0',
                           }}
                         >
-                          {field.direction === 'asc' ? '↑' : '↓'}
+                          {sortField.direction.toUpperCase()}
                         </button>
-                        <span>{COLUMN_DEFINITIONS[field.column]?.label}</span>
                         <button
-                          onClick={() => {
-                            const newFields = selectedFavoriteForEdit.fields.filter((_, i) => i !== index);
-                            setSelectedFavoriteForEdit({
-                              ...selectedFavoriteForEdit,
-                              fields: newFields
-                            });
-                          }}
+                          onClick={() => removeField(sortField.field)}
                           style={{
                             background: 'transparent',
                             border: 'none',
+                            color: '#666',
+                            fontSize: '18px',
                             cursor: 'pointer',
-                            color: '#ef4444',
-                            fontSize: '14px',
-                            padding: '0',
+                            lineHeight: '1',
+                            padding: 0,
                           }}
                         >
                           ×
@@ -385,105 +510,12 @@ export function ManageSortFavoritesModal({
                       </div>
                     ))}
                   </div>
-                )}
-              </div>
-
-              {/* Available Fields */}
-              <div style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
-                {COLUMN_GROUPS.map(group => {
-                  const isExpanded = expandedGroups.has(group.id);
-                  const sortableColumns = group.columns.filter(colId => 
-                    COLUMN_DEFINITIONS[colId]?.sortable
-                  );
-
-                  if (sortableColumns.length === 0) return null;
-
-                  return (
-                    <div key={group.id} style={{ marginBottom: '4px' }}>
-                      <button
-                        onClick={() => toggleGroup(group.id)}
-                        style={{
-                          width: '100%',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          padding: '8px 12px',
-                          background: '#2C2C2C',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          fontSize: '13px',
-                          fontWeight: 600,
-                          textAlign: 'left',
-                        }}
-                      >
-                        <span style={{
-                          fontSize: '10px',
-                          transition: 'transform 0.2s',
-                          transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)'
-                        }}>
-                          ▶
-                        </span>
-                        <span>{group.icon}</span>
-                        <span>{group.label}</span>
-                      </button>
-
-                      {isExpanded && (
-                        <div style={{ paddingLeft: '28px', paddingTop: '4px' }}>
-                          {sortableColumns.map(colId => {
-                            const col = COLUMN_DEFINITIONS[colId];
-                            if (!col) return null;
-
-                            return (
-                              <button
-                                key={colId}
-                                onClick={() => {
-                                  const newField: SortField = {
-                                    column: colId,
-                                    direction: 'asc'
-                                  };
-                                  setSelectedFavoriteForEdit({
-                                    ...selectedFavoriteForEdit,
-                                    fields: [...selectedFavoriteForEdit.fields, newField]
-                                  });
-                                }}
-                                style={{
-                                  width: '100%',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '8px',
-                                  padding: '6px 8px',
-                                  background: 'transparent',
-                                  border: 'none',
-                                  cursor: 'pointer',
-                                  fontSize: '13px',
-                                  borderRadius: '3px',
-                                  marginBottom: '2px',
-                                  textAlign: 'left',
-                                }}
-                                onMouseEnter={(e) => {
-                                  e.currentTarget.style.background = '#f5f5f5';
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.currentTarget.style.background = 'transparent';
-                                }}
-                              >
-                                <span style={{ fontSize: '16px' }}>+</span>
-                                <span>{col.label}</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                </div>
               </div>
 
               <div style={{ padding: '16px', borderTop: '1px solid #e0e0e0' }}>
                 <button
-                  onClick={() => handleSaveFields(selectedFavoriteForEdit.fields)}
+                  onClick={() => handleSaveSortFields(selectedFavoriteForEdit.fields)}
                   style={{
                     width: '100%',
                     padding: '8px 12px',
@@ -520,6 +552,7 @@ export function ManageSortFavoritesModal({
               borderRadius: '3px',
               fontSize: '13px',
               cursor: 'pointer',
+              color: '#1a1a1a',
             }}
           >
             Cancel
