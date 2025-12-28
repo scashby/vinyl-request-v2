@@ -77,20 +77,37 @@ export function StatisticsModal({ isOpen, onClose, albums }: StatisticsModalProp
         minutes: Math.floor((totalSeconds % 3600) / 60)
       };
 
-      // Format data
+      // Format data - TOP 9 FORMATS + OTHER
       const formatCounts: Record<string, number> = {};
       albums.forEach(album => {
-        const format = album.format || 'Other';
+        const format = album.format || 'Unknown';
         formatCounts[format] = (formatCounts[format] || 0) + 1;
       });
 
-      const formatData = Object.entries(formatCounts)
-        .map(([name, value]) => ({
-          name,
-          value,
-          color: FORMAT_COLORS[name] || '#8C8C8C'
-        }))
-        .sort((a, b) => b.value - a.value);
+      // Sort formats by count and take top 9
+      const sortedFormats = Object.entries(formatCounts)
+        .sort((a, b) => b[1] - a[1]);
+      
+      const top9Formats = sortedFormats.slice(0, 9);
+      const otherFormats = sortedFormats.slice(9);
+      
+      // Calculate "Other" count
+      const otherCount = otherFormats.reduce((sum, [, count]) => sum + count, 0);
+      
+      // Build format data with top 9 + Other
+      const formatData = top9Formats.map(([name, value]) => ({
+        name,
+        value,
+        color: FORMAT_COLORS[name] || '#8C8C8C'
+      }));
+      
+      if (otherCount > 0) {
+        formatData.push({
+          name: 'Other',
+          value: otherCount,
+          color: FORMAT_COLORS['Other']
+        });
+      }
 
       // Genre data
       const genreCounts: Record<string, number> = {};
@@ -264,38 +281,45 @@ export function StatisticsModal({ isOpen, onClose, albums }: StatisticsModalProp
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '24px' }}>
                 {/* Albums by Format */}
                 <div style={{ background: 'white', borderRadius: '8px', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-                  <h2 style={{ margin: '0 0 24px 0', fontSize: '18px', fontWeight: 600, color: '#1a1a1a' }}>Albums by Format</h2>
-                  <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
-                    <div style={{ width: '60%', height: '300px' }}>
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={stats.formatData}
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={0}
-                            outerRadius={120}
-                            paddingAngle={2}
-                            dataKey="value"
-                          >
-                            {stats.formatData.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.color} />
-                            ))}
-                          </Pie>
-                          <Tooltip />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12px' }}>
-                        {stats.formatData.map((item, idx) => (
-                          <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <div style={{ width: '12px', height: '12px', background: item.color, borderRadius: '2px', flexShrink: 0 }} />
-                            <span style={{ color: '#1a1a1a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.name}</span>
-                          </div>
-                        ))}
+                  <h2 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: 600, color: '#1a1a1a' }}>Albums by Format</h2>
+                  
+                  {/* Legend - Horizontal above chart */}
+                  <div style={{ 
+                    display: 'flex', 
+                    flexWrap: 'wrap', 
+                    gap: '12px 16px',
+                    marginBottom: '20px',
+                    fontSize: '12px',
+                    justifyContent: 'center'
+                  }}>
+                    {stats.formatData.map((item, idx) => (
+                      <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <div style={{ width: '12px', height: '12px', background: item.color, borderRadius: '2px', flexShrink: 0 }} />
+                        <span style={{ color: '#1a1a1a', whiteSpace: 'nowrap' }}>{item.name}</span>
                       </div>
-                    </div>
+                    ))}
+                  </div>
+
+                  {/* Pie Chart - Centered */}
+                  <div style={{ display: 'flex', justifyContent: 'center', width: '100%', height: '300px' }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={stats.formatData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={0}
+                          outerRadius={120}
+                          paddingAngle={2}
+                          dataKey="value"
+                        >
+                          {stats.formatData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
                   </div>
                 </div>
 
