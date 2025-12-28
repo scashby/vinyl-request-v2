@@ -109,8 +109,10 @@ export function PrintToPDFModal({
     Promise.all([
       import('jspdf'),
       import('jspdf-autotable')
-    ]).then(([jsPDFModule]) => {
+    ]).then(([jsPDFModule, autoTableModule]) => {
       const { default: jsPDF } = jsPDFModule;
+      const autoTable = autoTableModule.default;
+      
       const doc = new jsPDF({
           orientation: layout === 'portrait' ? 'portrait' : 'landscape',
           unit: 'mm',
@@ -179,23 +181,8 @@ export function PrintToPDFModal({
         while (startIndex < tableData.length) {
           const pageData = tableData.slice(startIndex, startIndex + albumsPerPage);
           
-          // Use autoTable for table generation (jspdf-autotable extends jsPDF at runtime)
-          type AutoTableDoc = typeof doc & {
-            autoTable: (options: {
-              head?: string[][];
-              body: string[][];
-              startY: number;
-              margin?: { left: number; right: number; bottom: number };
-              styles?: Record<string, unknown>;
-              headStyles?: Record<string, unknown>;
-              alternateRowStyles?: Record<string, unknown>;
-              tableLineColor?: number[];
-              tableLineWidth?: number;
-              didDrawCell?: (data: { row: { index: number }; column: { index: number }; section: string; cell: { x: number; y: number; width: number; height: number } }) => void;
-            }) => void;
-          };
-          
-          (doc as unknown as AutoTableDoc).autoTable({
+          // Use autoTable for table generation
+          autoTable(doc, {
             head: columnFieldNames ? [columns] : [],
             body: pageData,
             startY: currentY,
