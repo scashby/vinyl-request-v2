@@ -489,7 +489,7 @@ export function PrintToPDFModal({
                       </tr>
                     </thead>
                     <tbody>
-                      {currentListAlbums.slice(0, 5).map((album, idx) => (
+                      {currentListAlbums.slice(0, maxAlbumsEnabled ? parseInt(maxAlbumsPerPage) || 10 : 10).map((album, idx) => (
                         <tr key={album.id} style={{ borderBottom: '1px solid #ddd', background: rowShading && idx % 2 === 1 ? '#f5f5f5' : 'white' }}>
                           <td style={{ padding: '6px 4px', color: '#1a1a1a' }}>{album.artist}</td>
                           <td style={{ padding: '6px 4px', color: '#1a1a1a' }}>{album.title}</td>
