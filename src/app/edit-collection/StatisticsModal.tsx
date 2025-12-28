@@ -266,24 +266,26 @@ export function StatisticsModal({ isOpen, onClose, albums }: StatisticsModalProp
                 <div style={{ background: 'white', borderRadius: '8px', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
                   <h2 style={{ margin: '0 0 24px 0', fontSize: '18px', fontWeight: 600, color: '#1a1a1a' }}>Albums by Format</h2>
                   <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
-                    <ResponsiveContainer width="60%" height={300}>
-                      <PieChart>
-                        <Pie
-                          data={stats.formatData}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={0}
-                          outerRadius={120}
-                          paddingAngle={2}
-                          dataKey="value"
-                        >
-                          {stats.formatData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip />
-                      </PieChart>
-                    </ResponsiveContainer>
+                    <div style={{ width: '60%', height: '300px' }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={stats.formatData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={0}
+                            outerRadius={120}
+                            paddingAngle={2}
+                            dataKey="value"
+                          >
+                            {stats.formatData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12px' }}>
                         {stats.formatData.map((item, idx) => (
@@ -303,7 +305,16 @@ export function StatisticsModal({ isOpen, onClose, albums }: StatisticsModalProp
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     {stats.recentAdditions.slice(0, 5).map((album) => (
                       <div key={album.id} style={{ display: 'flex', gap: '12px', alignItems: 'center', padding: '8px', borderRadius: '4px', border: '1px solid #E8E8E8' }}>
-                        <div style={{ width: '60px', height: '60px', background: album.image_url ? `url(${album.image_url})` : '#DDD', backgroundSize: 'cover', borderRadius: '4px', flexShrink: 0 }} />
+                        <div style={{ 
+                          width: '60px', 
+                          height: '60px', 
+                          backgroundImage: album.image_url ? `url(${album.image_url})` : 'none',
+                          backgroundColor: album.image_url ? 'transparent' : '#DDD',
+                          backgroundSize: 'cover', 
+                          backgroundPosition: 'center',
+                          borderRadius: '4px', 
+                          flexShrink: 0 
+                        }} />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: '14px', fontWeight: 600, color: '#0066cc', marginBottom: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {album.title}
@@ -377,24 +388,26 @@ export function StatisticsModal({ isOpen, onClose, albums }: StatisticsModalProp
                 {/* Played */}
                 <div style={{ background: 'white', borderRadius: '8px', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
                   <h2 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: 600, color: '#1a1a1a' }}>Played</h2>
-                  <ResponsiveContainer width="100%" height={250}>
-                    <PieChart>
-                      <Pie
-                        data={stats.playedData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={0}
-                        outerRadius={90}
-                        paddingAngle={2}
-                        dataKey="value"
-                      >
-                        {stats.playedData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
+                  <div style={{ width: '100%', height: '250px' }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={stats.playedData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={0}
+                          outerRadius={90}
+                          paddingAngle={2}
+                          dataKey="value"
+                        >
+                          {stats.playedData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
                   <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginTop: '12px', fontSize: '13px' }}>
                     {stats.playedData.map((item, idx) => (
                       <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
