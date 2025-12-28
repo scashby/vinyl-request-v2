@@ -16,6 +16,7 @@ import ManageCratesModal from './crates/ManageCratesModal';
 import { AddToCrateModal } from './crates/AddToCrateModal';
 import ManagePickListsModal from './ManagePickListsModal';
 import { PrintToPDFModal } from './PrintToPDFModal';
+import { StatisticsModal } from './StatisticsModal';
 import type { Crate } from '../../types/crate';
 import { albumMatchesSmartCrate } from '../../lib/crateUtils';
 import { BoxIcon } from '../../components/BoxIcon';
@@ -642,6 +643,7 @@ function CollectionBrowserPage() {
   const [showNewSmartCrateModal, setShowNewSmartCrateModal] = useState(false);
   const [showAddToCrateModal, setShowAddToCrateModal] = useState(false);
   const [showPrintToPDF, setShowPrintToPDF] = useState(false);
+  const [showStatistics, setShowStatistics] = useState(false);
   const [editingCrate, setEditingCrate] = useState<Crate | null>(null);
   const [returnToAddToCrate, setReturnToAddToCrate] = useState(false);
   const [newlyCreatedCrateId, setNewlyCreatedCrateId] = useState<number | null>(null);
@@ -1117,6 +1119,10 @@ function CollectionBrowserPage() {
                   <span style={{ marginRight: '10px' }}>🖨️</span> Print to PDF
                 </button>
                 <button 
+                  onClick={() => {
+                    setSidebarOpen(false);
+                    setShowStatistics(true);
+                  }}
                   title="View collection statistics"
                   style={{ width: '100%', padding: '10px', background: 'transparent', border: 'none', color: 'white', textAlign: 'left', cursor: 'pointer', marginBottom: '5px', fontSize: '14px' }}>
                   <span style={{ marginRight: '10px' }}>📊</span> Statistics
@@ -2223,6 +2229,14 @@ function CollectionBrowserPage() {
           allAlbums={albums}
           currentListAlbums={filteredAndSortedAlbums}
           checkedAlbumIds={selectedAlbumIds}
+        />
+      )}
+
+      {showStatistics && (
+        <StatisticsModal
+          isOpen={showStatistics}
+          onClose={() => setShowStatistics(false)}
+          albums={albums}
         />
       )}
     </>
