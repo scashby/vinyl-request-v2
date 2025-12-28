@@ -105,10 +105,13 @@ export function PrintToPDFModal({
       return 0;
     });
 
-    // Dynamic import jsPDF
-    import('jspdf').then(({ default: jsPDF }) => {
-      import('jspdf-autotable').then(() => {
-        const doc = new jsPDF({
+    // Dynamic import jsPDF and autoTable
+    Promise.all([
+      import('jspdf'),
+      import('jspdf-autotable')
+    ]).then(([jsPDFModule]) => {
+      const { default: jsPDF } = jsPDFModule;
+      const doc = new jsPDF({
           orientation: layout === 'portrait' ? 'portrait' : 'landscape',
           unit: 'mm',
           format: 'a4'
@@ -123,7 +126,8 @@ export function PrintToPDFModal({
         if (margins === 'Large') marginSize = 15;
 
         // Set font
-        const fontFamily = fontType.toLowerCase();
+        let fontFamily = fontType.toLowerCase();
+        if (fontFamily === 'arial') fontFamily = 'helvetica'; // jsPDF uses helvetica for Arial
         doc.setFont(fontFamily);
         
         let currentY = marginSize;
@@ -257,7 +261,6 @@ export function PrintToPDFModal({
         const filename = `${title.replace(/[^a-z0-9]/gi, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
         doc.save(filename);
       });
-    });
   };
 
   if (!isOpen) return null;
