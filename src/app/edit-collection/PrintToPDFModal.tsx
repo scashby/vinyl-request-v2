@@ -77,6 +77,189 @@ export function PrintToPDFModal({
   const [selectedSortFavoriteId, setSelectedSortFavoriteId] = useState('1');
   const [showManageSortFavorites, setShowManageSortFavorites] = useState(false);
 
+  const generatePDF = () => {
+    // Determine which albums to include
+    let albumsToInclude: Album[];
+    if (whichAlbums === 'all') {
+      albumsToInclude = allAlbums;
+    } else if (whichAlbums === 'current') {
+      albumsToInclude = currentListAlbums;
+    } else {
+      albumsToInclude = allAlbums.filter(album => checkedAlbumIds.has(album.id));
+    }
+
+    // Apply sort order
+    const sortedAlbums = [...albumsToInclude].sort((a, b) => {
+      if (!selectedSortFavorite) return 0;
+      
+      for (const sortField of selectedSortFavorite.fields) {
+        const fieldKey = sortField.field.toLowerCase().replace(/ /g, '_') as keyof Album;
+        const aVal = a[fieldKey] || '';
+        const bVal = b[fieldKey] || '';
+        
+        const comparison = String(aVal).localeCompare(String(bVal));
+        if (comparison !== 0) {
+          return sortField.direction === 'asc' ? comparison : -comparison;
+        }
+      }
+      return 0;
+    });
+
+    // Dynamic import jsPDF
+    import('jspdf').then(({ default: jsPDF }) => {
+      import('jspdf-autotable').then(() => {
+        const doc = new jsPDF({
+          orientation: layout === 'portrait' ? 'portrait' : 'landscape',
+          unit: 'mm',
+          format: 'a4'
+        });
+
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        
+        // Set margins
+        let marginSize = 10;
+        if (margins === 'Small') marginSize = 5;
+        if (margins === 'Large') marginSize = 15;
+
+        // Set font
+        const fontFamily = fontType.toLowerCase();
+        doc.setFont(fontFamily);
+        
+        let currentY = marginSize;
+        let pageNumber = 1;
+
+        // Add title on first page (and every page if enabled)
+        const addTitle = () => {
+          doc.setFontSize(16);
+          doc.setTextColor(fontColor);
+          doc.text(title, pageWidth / 2, currentY, { align: 'center' });
+          currentY += 10;
+        };
+
+        // Add date/time
+        const addDateTime = () => {
+          const now = new Date().toLocaleString();
+          doc.setFontSize(8);
+          doc.text(now, pageWidth - marginSize, currentY, { align: 'right' });
+        };
+
+        // Add page number
+        const addPageNumber = () => {
+          doc.setFontSize(8);
+          doc.text(`Page ${pageNumber}`, pageWidth / 2, pageHeight - 5, { align: 'center' });
+        };
+
+        addTitle();
+        if (printDateTime) {
+          addDateTime();
+          currentY += 5;
+        }
+
+        // Prepare table data
+        const columns = selectedColumnFavorite?.columns || [];
+        const tableData = sortedAlbums.map(album => {
+          return columns.map(col => {
+            const key = col.toLowerCase().replace(/ /g, '_') as keyof Album;
+            if (col === 'Tracks') {
+              return String(album.tracks?.filter(t => t.type === 'track').length || '—');
+            }
+            return String(album[key] || '—');
+          });
+        });
+
+        // Split data into pages if max albums per page is set
+        const albumsPerPage = maxAlbumsEnabled ? parseInt(maxAlbumsPerPage) || 20 : tableData.length;
+        let startIndex = 0;
+
+        while (startIndex < tableData.length) {
+          const pageData = tableData.slice(startIndex, startIndex + albumsPerPage);
+          
+          // Use autoTable for table generation (jspdf-autotable extends jsPDF at runtime)
+          type AutoTableDoc = typeof doc & {
+            autoTable: (options: {
+              head?: string[][];
+              body: string[][];
+              startY: number;
+              margin?: { left: number; right: number; bottom: number };
+              styles?: Record<string, unknown>;
+              headStyles?: Record<string, unknown>;
+              alternateRowStyles?: Record<string, unknown>;
+              tableLineColor?: number[];
+              tableLineWidth?: number;
+              didDrawCell?: (data: { row: { index: number }; column: { index: number }; section: string; cell: { x: number; y: number; width: number; height: number } }) => void;
+            }) => void;
+          };
+          
+          (doc as unknown as AutoTableDoc).autoTable({
+            head: columnFieldNames ? [columns] : [],
+            body: pageData,
+            startY: currentY,
+            margin: { left: marginSize, right: marginSize, bottom: marginSize + 10 },
+            styles: {
+              fontSize: parseInt(fontSize),
+              font: fontFamily,
+              textColor: fontColor,
+              cellPadding: 2,
+              overflow: wrapInsideColumn ? 'linebreak' : 'hidden',
+            },
+            headStyles: {
+              fillColor: [240, 240, 240],
+              textColor: [0, 0, 0],
+              fontStyle: 'bold',
+            },
+            alternateRowStyles: rowShading ? {
+              fillColor: [245, 245, 245]
+            } : undefined,
+            tableLineColor: [200, 200, 200],
+            tableLineWidth: borders === 'none' ? 0 : 0.1,
+            didDrawCell: (data: { row: { index: number }; column: { index: number }; section: string; cell: { x: number; y: number; width: number; height: number } }) => {
+              if (borders === 'outside' && data.row.index > 0 && data.row.index < pageData.length - 1) {
+                // Only draw outside borders
+                if (data.column.index !== 0 && data.column.index !== columns.length - 1) {
+                  return;
+                }
+              } else if (borders === 'middle') {
+                // Only draw middle borders (between rows)
+                if (data.section === 'body') {
+                  const { x, y, width, height } = data.cell;
+                  doc.setDrawColor(200, 200, 200);
+                  doc.line(x, y + height, x + width, y + height);
+                }
+              }
+            }
+          });
+
+          startIndex += albumsPerPage;
+
+          // Add page number if enabled
+          if (pageNumbers) {
+            addPageNumber();
+          }
+
+          // Add new page if there's more data
+          if (startIndex < tableData.length) {
+            doc.addPage();
+            pageNumber++;
+            currentY = marginSize;
+            
+            if (titleOnEveryPage) {
+              addTitle();
+            }
+            if (printDateTime && printDateTimeEveryPage) {
+              addDateTime();
+              currentY += 5;
+            }
+          }
+        }
+
+        // Save the PDF
+        const filename = `${title.replace(/[^a-z0-9]/gi, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+        doc.save(filename);
+      });
+    });
+  };
+
   if (!isOpen) return null;
 
   const selectedColumnFavorite = columnFavorites.find(f => f.id === selectedColumnFavoriteId);
@@ -507,7 +690,10 @@ export function PrintToPDFModal({
 
             {/* Generate Button */}
             <div style={{ textAlign: 'center', paddingBottom: '40px' }}>
-              <button style={{ background: '#4FC3F7', color: 'white', border: 'none', padding: '12px 40px', borderRadius: '4px', fontSize: '15px', fontWeight: 500, cursor: 'pointer', boxShadow: '0 2px 6px rgba(0,0,0,0.15)' }}>
+              <button 
+                onClick={generatePDF}
+                style={{ background: '#4FC3F7', color: 'white', border: 'none', padding: '12px 40px', borderRadius: '4px', fontSize: '15px', fontWeight: 500, cursor: 'pointer', boxShadow: '0 2px 6px rgba(0,0,0,0.15)' }}
+              >
                 Generate PDF file
               </button>
             </div>
