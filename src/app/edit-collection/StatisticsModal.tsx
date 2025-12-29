@@ -332,7 +332,7 @@ export function StatisticsModal({ isOpen, onClose, albums }: StatisticsModalProp
                       <div key={album.id} style={{ display: 'flex', gap: '12px', alignItems: 'center', padding: '8px', borderRadius: '4px', border: '1px solid #E8E8E8' }}>
                         {album.image_url ? (
                           <Image 
-                            src={album.image_url} 
+                            src={album.image_url || ''} 
                             alt={album.title}
                             width={60}
                             height={60}
