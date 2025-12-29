@@ -17,6 +17,7 @@ import { AddToCrateModal } from './crates/AddToCrateModal';
 import ManagePickListsModal from './ManagePickListsModal';
 import { PrintToPDFModal } from './PrintToPDFModal';
 import { StatisticsModal } from './StatisticsModal';
+import ImportSelectionModal from './components/ImportSelectionModal';
 import type { Crate } from '../../types/crate';
 import { albumMatchesSmartCrate } from '../../lib/crateUtils';
 import { BoxIcon } from '../../components/BoxIcon';
@@ -644,6 +645,7 @@ function CollectionBrowserPage() {
   const [showAddToCrateModal, setShowAddToCrateModal] = useState(false);
   const [showPrintToPDF, setShowPrintToPDF] = useState(false);
   const [showStatistics, setShowStatistics] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [editingCrate, setEditingCrate] = useState<Crate | null>(null);
   const [returnToAddToCrate, setReturnToAddToCrate] = useState(false);
   const [newlyCreatedCrateId, setNewlyCreatedCrateId] = useState<number | null>(null);
@@ -1126,6 +1128,15 @@ function CollectionBrowserPage() {
                   title="View collection statistics"
                   style={{ width: '100%', padding: '10px', background: 'transparent', border: 'none', color: 'white', textAlign: 'left', cursor: 'pointer', marginBottom: '5px', fontSize: '14px' }}>
                   <span style={{ marginRight: '10px' }}>📊</span> Statistics
+                </button>
+                <button 
+                  onClick={() => {
+                    setSidebarOpen(false);
+                    setShowImportModal(true);
+                  }}
+                  title="Import album data from various sources"
+                  style={{ width: '100%', padding: '10px', background: 'transparent', border: 'none', color: 'white', textAlign: 'left', cursor: 'pointer', marginBottom: '5px', fontSize: '14px' }}>
+                  <span style={{ marginRight: '10px' }}>📥</span> Import Data
                 </button>
                 <button 
                   title="Find duplicate albums"
@@ -2237,6 +2248,25 @@ function CollectionBrowserPage() {
           isOpen={showStatistics}
           onClose={() => setShowStatistics(false)}
           albums={albums}
+        />
+      )}
+
+      {showImportModal && (
+        <ImportSelectionModal
+          onSelectImportType={(type) => {
+            setShowImportModal(false);
+            // Navigate to appropriate import page
+            if (type === 'csv') {
+              window.location.href = '/admin/import-csv';
+            } else if (type === 'discogs') {
+              window.location.href = '/admin/import-discogs';
+            } else if (type === 'clz') {
+              window.location.href = '/admin/import-clz';
+            } else if (type === 'enrich') {
+              window.location.href = '/admin/enrich-sources';
+            }
+          }}
+          onCancel={() => setShowImportModal(false)}
         />
       )}
     </>
