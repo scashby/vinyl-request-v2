@@ -330,30 +330,20 @@ export function StatisticsModal({ isOpen, onClose, albums }: StatisticsModalProp
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     {stats.recentAdditions.slice(0, 5).map((album) => (
                       <div key={album.id} style={{ display: 'flex', gap: '12px', alignItems: 'center', padding: '8px', borderRadius: '4px', border: '1px solid #E8E8E8' }}>
-                        {album.image_url ? (
-                          <Image 
-                            src={album.image_url || ''} 
-                            alt={album.title}
-                            width={60}
-                            height={60}
-                            style={{
-                              width: '60px',
-                              height: '60px',
-                              objectFit: 'cover',
-                              borderRadius: '4px',
-                              flexShrink: 0
-                            }}
-                            unoptimized
-                          />
-                        ) : (
-                          <div style={{ 
-                            width: '60px', 
-                            height: '60px', 
-                            backgroundColor: '#DDD',
-                            borderRadius: '4px', 
-                            flexShrink: 0 
-                          }} />
-                        )}
+                        <Image 
+                          src={album.image_url || ''} 
+                          alt={album.title}
+                          width={60}
+                          height={60}
+                          style={{
+                            width: '60px',
+                            height: '60px',
+                            objectFit: 'cover',
+                            borderRadius: '4px',
+                            flexShrink: 0
+                          }}
+                          unoptimized
+                        />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: '14px', fontWeight: 600, color: '#0066cc', marginBottom: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {album.title}
