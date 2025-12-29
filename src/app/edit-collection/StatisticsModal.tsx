@@ -331,7 +331,7 @@ export function StatisticsModal({ isOpen, onClose, albums }: StatisticsModalProp
                     {stats.recentAdditions.slice(0, 5).map((album) => (
                       <div key={album.id} style={{ display: 'flex', gap: '12px', alignItems: 'center', padding: '8px', borderRadius: '4px', border: '1px solid #E8E8E8' }}>
                         <Image 
-                          src={album.image_url || '/images/placeholder.png'} 
+                          src={album.image_url || ''} 
                           alt={album.title}
                           width={60}
                           height={60}
