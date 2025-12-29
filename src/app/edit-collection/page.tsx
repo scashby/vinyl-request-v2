@@ -1,7 +1,7 @@
 // src/app/edit-collection/page.tsx - REFACTORED WITH CSS MODULE
 'use client';
 
-import { useCallback, useEffect, useState, useMemo, Suspense, memo } from 'react';
+import { useCallback, useEffect, useState, useMemo, memo } from 'react';
 import Image from 'next/image';
 import { supabase } from '../../lib/supabaseClient';
 import CollectionTable from '../../components/CollectionTable';
@@ -764,10 +764,4 @@ function CollectionBrowserPage() {
   );
 }
 
-export default function Page() {
-  return (
-    <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', fontSize: '16px', color: '#666' }}>Loading...</div>}>
-      <CollectionBrowserPage />
-    </Suspense>
-  );
-}
+export default CollectionBrowserPage;
