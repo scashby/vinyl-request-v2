@@ -333,13 +333,15 @@ export function StatisticsModal({ isOpen, onClose, albums }: StatisticsModalProp
                         {album.image_url ? (
                           <Image 
                             src={album.image_url} 
-                            alt={`${album.artist} - ${album.title}`}
+                            alt={album.title}
                             width={60}
                             height={60}
-                            style={{ 
-                              objectFit: 'cover', 
-                              borderRadius: '4px', 
-                              flexShrink: 0 
+                            style={{
+                              width: '60px',
+                              height: '60px',
+                              objectFit: 'cover',
+                              borderRadius: '4px',
+                              flexShrink: 0
                             }}
                             unoptimized
                           />
