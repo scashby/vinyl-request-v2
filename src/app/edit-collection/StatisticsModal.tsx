@@ -148,10 +148,9 @@ export function StatisticsModal({ isOpen, onClose, albums }: StatisticsModalProp
         .map(([name, count]) => ({ name, count }))
         .sort((a, b) => b.count - a.count);
 
-      // Recent additions
+      // Recent additions - DON'T SLICE HERE
       const recentAdditions = [...albums]
-        .sort((a, b) => (b.date_added || '').localeCompare(a.date_added || ''))
-        .slice(0, 10);
+        .sort((a, b) => (b.date_added || '').localeCompare(a.date_added || ''));
 
       // Played data
       const playedCount = albums.filter(a => (a.play_count || 0) > 0).length;
