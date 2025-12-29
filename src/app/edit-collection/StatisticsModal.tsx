@@ -327,15 +327,19 @@ export function StatisticsModal({ isOpen, onClose, albums }: StatisticsModalProp
                 <div style={{ background: 'white', borderRadius: '8px', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
                   <h2 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: 600, color: '#1a1a1a' }}>Most recent additions</h2>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {stats.recentAdditions.slice(0, 5).map((album) => (
-                      <div key={album.id} style={{ display: 'flex', gap: '12px', alignItems: 'center', padding: '8px', borderRadius: '4px', border: '1px solid #E8E8E8' }}>
-                        <Image
-                          src={album.image_url || "/images/placeholder.png"}
-                          alt={album.title}
-                          width={60}
-                          height={60}
-                          unoptimized
-                        />
+                    {stats.recentAdditions.slice(0, 5).map((album) => {
+                      const imageUrl = album.image_url && album.image_url.trim().toLowerCase() !== 'no'
+                        ? album.image_url.trim()
+                        : '/images/placeholder.png';
+                      return (
+                        <div key={album.id} style={{ display: 'flex', gap: '12px', alignItems: 'center', padding: '8px', borderRadius: '4px', border: '1px solid #E8E8E8' }}>
+                          <Image
+                            src={imageUrl}
+                            alt={album.title}
+                            width={60}
+                            height={60}
+                            unoptimized
+                          />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: '14px', fontWeight: 600, color: '#0066cc', marginBottom: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {album.title}
@@ -348,7 +352,8 @@ export function StatisticsModal({ isOpen, onClose, albums }: StatisticsModalProp
                           {album.date_added ? new Date(album.date_added).toLocaleDateString() : ''}
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               </div>
