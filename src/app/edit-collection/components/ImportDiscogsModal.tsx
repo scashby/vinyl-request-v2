@@ -50,7 +50,7 @@ interface ComparedAlbum extends ParsedAlbum {
 interface ImportDiscogsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onComplete?: () => void;
+  onImportComplete?: () => void;
 }
 
 // Normalization functions
@@ -146,19 +146,37 @@ function compareAlbums(
   parsed: ParsedAlbum[],
   existing: ExistingAlbum[]
 ): ComparedAlbum[] {
-  // Build map with normalized fields (handle missing normalized fields)
-  const existingMap = new Map<string, ExistingAlbum>();
+  // Build two maps: by release_id (primary) and by artist_album_norm (fallback)
+  const releaseIdMap = new Map<string, ExistingAlbum>();
+  const artistAlbumMap = new Map<string, ExistingAlbum>();
+  
   existing.forEach(album => {
+    // Add to release_id map if release_id exists
+    if (album.discogs_release_id) {
+      releaseIdMap.set(album.discogs_release_id, album);
+    }
+    
+    // Add to artist_album_norm map
     const normalizedKey = album.artist_album_norm || 
       normalizeArtistAlbum(album.artist, album.title);
-    existingMap.set(normalizedKey, album);
+    artistAlbumMap.set(normalizedKey, album);
   });
 
   const compared: ComparedAlbum[] = [];
 
   // Check parsed albums
   for (const parsedAlbum of parsed) {
-    const existingAlbum = existingMap.get(parsedAlbum.artist_album_norm);
+    let existingAlbum: ExistingAlbum | undefined;
+    
+    // First, try to match by discogs_release_id (most precise)
+    if (parsedAlbum.discogs_release_id) {
+      existingAlbum = releaseIdMap.get(parsedAlbum.discogs_release_id);
+    }
+    
+    // If no match by release_id, try by artist_album_norm (fallback)
+    if (!existingAlbum) {
+      existingAlbum = artistAlbumMap.get(parsedAlbum.artist_album_norm);
+    }
 
     if (!existingAlbum) {
       // NEW album
@@ -187,12 +205,19 @@ function compareAlbums(
         missingFields,
       });
 
-      existingMap.delete(parsedAlbum.artist_album_norm);
+      // Remove from both maps
+      if (existingAlbum.discogs_release_id) {
+        releaseIdMap.delete(existingAlbum.discogs_release_id);
+      }
+      const existingNormalizedKey = existingAlbum.artist_album_norm || 
+        normalizeArtistAlbum(existingAlbum.artist, existingAlbum.title);
+      artistAlbumMap.delete(existingNormalizedKey);
     }
   }
 
   // Remaining in database but not in CSV = REMOVED
-  for (const [, existingAlbum] of existingMap) {
+  // Use artistAlbumMap since it has all albums (releaseIdMap might not have albums without release_id)
+  for (const [, existingAlbum] of artistAlbumMap) {
     const normalizedKey = existingAlbum.artist_album_norm || 
       normalizeArtistAlbum(existingAlbum.artist, existingAlbum.title);
       
@@ -394,7 +419,7 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
   return enriched;
 }
 
-export function ImportDiscogsModal({ isOpen, onClose, onComplete }: ImportDiscogsModalProps) {
+export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }: ImportDiscogsModalProps) {
   const [stage, setStage] = useState<ImportStage>('upload');
   const [syncMode, setSyncMode] = useState<SyncMode>('partial_sync');
   const [file, setFile] = useState<File | null>(null);
@@ -581,8 +606,8 @@ export function ImportDiscogsModal({ isOpen, onClose, onComplete }: ImportDiscog
       setResults(resultCounts);
       setStage('complete');
       
-      if (onComplete) {
-        onComplete();
+      if (onImportComplete) {
+        onImportComplete();
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Import failed');
