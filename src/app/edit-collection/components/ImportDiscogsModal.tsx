@@ -50,7 +50,7 @@ interface ComparedAlbum extends ParsedAlbum {
 interface ImportDiscogsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onImportComplete?: () => void;
+  onComplete?: () => void;
 }
 
 // Normalization functions
@@ -221,7 +221,7 @@ function compareAlbums(
   return compared;
 }
 
-// Discogs API enrichment - USE SERVER PROXY
+// Discogs API enrichment
 async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unknown>> {
   await new Promise(resolve => setTimeout(resolve, 1000)); // Rate limiting
 
@@ -244,10 +244,53 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
     ) || null,
   };
 
-  // Extract tracks
+  // Extract sound (Stereo, Mono, etc.)
+  if (data.formats && Array.isArray(data.formats)) {
+    const soundDescriptions = data.formats[0]?.descriptions || [];
+    const soundTypes = ['Stereo', 'Mono', 'Quadraphonic', 'Surround'];
+    const sound = soundDescriptions.find((d: string) => 
+      soundTypes.some(type => d.includes(type))
+    );
+    if (sound) enriched.sound = sound;
+  }
+
+  // Extract identifiers (matrix numbers, SPARS code, barcode)
+  if (data.identifiers && Array.isArray(data.identifiers)) {
+    const matrixEntries: Record<string, string> = {};
+    
+    data.identifiers.forEach((identifier: { type: string; value: string; description?: string }) => {
+      if (identifier.type === 'Matrix / Runout') {
+        const desc = identifier.description || '';
+        if (desc.toLowerCase().includes('side a') || desc.toLowerCase().includes('a-side')) {
+          matrixEntries.side_a = identifier.value;
+        } else if (desc.toLowerCase().includes('side b') || desc.toLowerCase().includes('b-side')) {
+          matrixEntries.side_b = identifier.value;
+        } else if (desc.toLowerCase().includes('side c')) {
+          matrixEntries.side_c = identifier.value;
+        } else if (desc.toLowerCase().includes('side d')) {
+          matrixEntries.side_d = identifier.value;
+        } else if (!matrixEntries.side_a) {
+          matrixEntries.side_a = identifier.value;
+        } else if (!matrixEntries.side_b) {
+          matrixEntries.side_b = identifier.value;
+        }
+      } else if (identifier.type === 'SPARS Code') {
+        enriched.spars_code = identifier.value;
+      }
+    });
+
+    if (Object.keys(matrixEntries).length > 0) {
+      enriched.matrix_numbers = matrixEntries;
+    }
+  }
+
+  // Extract tracks and disc metadata
   if (data.tracklist && Array.isArray(data.tracklist)) {
     const tracks: unknown[] = [];
+    const discMetadata: { disc_number: number; title: string | null }[] = [];
     let position = 1;
+    let currentDiscNumber = 1;
+    let currentDiscTitle: string | null = null;
 
     data.tracklist.forEach((track: {
       position?: string;
@@ -277,6 +320,21 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
 
       const isHeader = track.type_ === 'heading';
 
+      // Check if this is a disc header/title
+      if (isHeader && discNumber !== currentDiscNumber) {
+        currentDiscNumber = discNumber;
+        currentDiscTitle = track.title || null;
+        
+        // Add to disc metadata
+        const existingDisc = discMetadata.find(d => d.disc_number === discNumber);
+        if (!existingDisc) {
+          discMetadata.push({
+            disc_number: discNumber,
+            title: currentDiscTitle,
+          });
+        }
+      }
+
       tracks.push({
         position: trackPosition.toString(),
         title: track.title || '',
@@ -291,30 +349,52 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
     });
 
     enriched.tracks = tracks;
+    
+    if (discMetadata.length > 0) {
+      enriched.disc_metadata = discMetadata;
+    }
   }
 
   // Extract credits
   const engineers: string[] = [];
   const producers: string[] = [];
+  const musicians: string[] = [];
   const songwriters: string[] = [];
+  let studio: string | null = null;
 
   if (data.extraartists && Array.isArray(data.extraartists)) {
     data.extraartists.forEach((artist: { name: string; role: string }) => {
       const role = artist.role.toLowerCase();
-      if (role.includes('engineer')) engineers.push(artist.name);
-      if (role.includes('producer')) producers.push(artist.name);
-      if (role.includes('written-by') || role.includes('songwriter')) songwriters.push(artist.name);
+      if (role.includes('engineer')) {
+        engineers.push(artist.name);
+      }
+      if (role.includes('producer')) {
+        producers.push(artist.name);
+      }
+      if (role.includes('musician') || role.includes('performer')) {
+        musicians.push(artist.name);
+      }
+      if (role.includes('written-by') || role.includes('songwriter')) {
+        songwriters.push(artist.name);
+      }
+      if (role.includes('recorded at') || role.includes('studio')) {
+        if (!studio) {
+          studio = artist.name;
+        }
+      }
     });
   }
 
   if (engineers.length > 0) enriched.engineers = engineers;
   if (producers.length > 0) enriched.producers = producers;
+  if (musicians.length > 0) enriched.musicians = musicians;
   if (songwriters.length > 0) enriched.songwriters = songwriters;
+  if (studio) enriched.studio = studio;
 
   return enriched;
 }
 
-export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }: ImportDiscogsModalProps) {
+export function ImportDiscogsModal({ isOpen, onClose, onComplete }: ImportDiscogsModalProps) {
   const [stage, setStage] = useState<ImportStage>('upload');
   const [syncMode, setSyncMode] = useState<SyncMode>('partial_sync');
   const [file, setFile] = useState<File | null>(null);
@@ -384,7 +464,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
       // Determine what to process based on sync mode
       if (syncMode === 'full_replacement') {
         // Delete everything, process all
-        await supabase.from('collection').delete().neq('id', 0);
+        await supabase.from('collection').delete().gt('id', 0);
         albumsToProcess = comparedAlbums.filter(a => a.status !== 'REMOVED');
       } else if (syncMode === 'full_sync') {
         // Process all CSV albums (scrape missing/changed data), delete REMOVED
@@ -501,8 +581,8 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
       setResults(resultCounts);
       setStage('complete');
       
-      if (onImportComplete) {
-        onImportComplete();
+      if (onComplete) {
+        onComplete();
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Import failed');
