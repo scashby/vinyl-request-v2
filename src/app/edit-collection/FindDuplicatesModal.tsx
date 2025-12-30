@@ -19,6 +19,7 @@ interface DuplicateGroup {
   displayName: string;
   albums: Album[];
   keepCount: number;
+  expanded: boolean;
 }
 
 export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemoved }: FindDuplicatesModalProps) {
@@ -26,7 +27,7 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
   const [showMethodDropdown, setShowMethodDropdown] = useState(false);
   const [loading, setLoading] = useState(false);
   const [duplicateGroups, setDuplicateGroups] = useState<DuplicateGroup[]>([]);
-  const [stage, setStage] = useState<'select' | 'results'>('select');
+  const [searched, setSearched] = useState(false);
 
   const detectionMethods = [
     { value: 'title' as DetectionMethod, label: 'Title' },
@@ -102,14 +103,15 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
           duplicates.push({
             key,
             displayName: detectionMethod === 'title_artist' 
-              ? `${albums[0].artist} - ${albums[0].title}`
+              ? albums[0].title
               : detectionMethod === 'title'
               ? albums[0].title
               : detectionMethod === 'barcode'
               ? `Barcode: ${albums[0].barcode}`
               : `Index: ${albums[0].index_number}`,
             albums,
-            keepCount: 1,
+            keepCount: albums.length,
+            expanded: false,
           });
         }
       });
@@ -117,13 +119,24 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
       duplicates.sort((a, b) => b.albums.length - a.albums.length);
 
       setDuplicateGroups(duplicates);
-      setStage('results');
+      setSearched(true);
     } catch (err) {
       console.error('Error finding duplicates:', err);
       alert('Failed to find duplicates');
     } finally {
       setLoading(false);
     }
+  };
+
+  const toggleGroup = (groupIndex: number) => {
+    setDuplicateGroups(prev => {
+      const updated = [...prev];
+      updated[groupIndex] = {
+        ...updated[groupIndex],
+        expanded: !updated[groupIndex].expanded
+      };
+      return updated;
+    });
   };
 
   const handleKeepCountChange = (groupIndex: number, newKeepCount: number) => {
@@ -159,7 +172,7 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
         updated[groupIndex] = {
           ...group,
           albums: newAlbums,
-          keepCount: Math.min(group.keepCount, newAlbums.length - 1)
+          keepCount: Math.min(group.keepCount, newAlbums.length)
         };
         return updated;
       });
@@ -202,7 +215,7 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
 
       alert(`Successfully removed ${albumsToRemove.length} duplicate albums`);
       setDuplicateGroups([]);
-      setStage('select');
+      setSearched(false);
       onDuplicatesRemoved();
     } catch (err) {
       console.error('Error removing duplicates:', err);
@@ -221,158 +234,164 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
   if (!isOpen) return null;
 
   return (
-    <div className={styles.importModalContainer}>
-      <div className={styles.importModalHeader}>
-        <button onClick={onClose} className={styles.importModalBackButton}>
+    <div className={styles.clzDuplicatesOverlay}>
+      <div className={styles.clzDuplicatesHeader}>
+        <button onClick={onClose} className={styles.clzDuplicatesBackButton}>
           ← Back
         </button>
-        <div className={styles.importModalTitle}>
+        <div className={styles.clzDuplicatesTitle}>
           🔍 Find Duplicates
         </div>
-        <button onClick={onClose} className={styles.importModalCloseButton}>×</button>
+        <button onClick={onClose} className={styles.clzDuplicatesCloseButton}>×</button>
       </div>
 
-      <div className={styles.importModalContent}>
-        {stage === 'select' && (
-          <div className={styles.importModalInner}>
-            <div className={styles.duplicatesSelectBar}>
-              <span className={styles.duplicatesSelectLabel}>Find duplicates based on</span>
-              <div className={styles.dropdownWrapper}>
-                <button onClick={() => setShowMethodDropdown(!showMethodDropdown)} className={styles.dropdownButton}>
-                  <span>{selectedMethodLabel}</span>
-                  <span className={styles.dropdownArrow}>▼</span>
-                </button>
+      <div className={styles.clzDuplicatesToolbar}>
+        <span className={styles.clzDuplicatesToolbarLabel}>Find duplicates based on</span>
+        <div className={styles.clzDuplicatesDropdownWrapper}>
+          <button onClick={() => setShowMethodDropdown(!showMethodDropdown)} className={styles.clzDuplicatesDropdownButton}>
+            <span>{selectedMethodLabel}</span>
+            <span className={styles.clzDuplicatesDropdownArrow}>▼</span>
+          </button>
 
-                {showMethodDropdown && (
-                  <>
-                    <div onClick={() => setShowMethodDropdown(false)} className={styles.dropdownOverlay} />
-                    <div className={styles.dropdownMenu}>
-                      {detectionMethods.map(method => (
-                        <button key={method.value} onClick={() => {
-                          setDetectionMethod(method.value);
-                          setShowMethodDropdown(false);
-                        }} className={detectionMethod === method.value ? styles.dropdownItemActive : styles.dropdownItem}>
-                          <span>{method.label}</span>
-                          {detectionMethod === method.value && (
-                            <span className={styles.dropdownCheckmark}>✓</span>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  </>
-                )}
+          {showMethodDropdown && (
+            <>
+              <div onClick={() => setShowMethodDropdown(false)} className={styles.dropdownOverlay} />
+              <div className={styles.clzDuplicatesDropdownMenu}>
+                {detectionMethods.map(method => (
+                  <button key={method.value} onClick={() => {
+                    setDetectionMethod(method.value);
+                    setShowMethodDropdown(false);
+                  }} className={detectionMethod === method.value ? styles.clzDuplicatesDropdownItemActive : styles.clzDuplicatesDropdownItem}>
+                    {method.label}
+                  </button>
+                ))}
               </div>
-              <button onClick={handleFindDuplicates} disabled={loading} className={styles.importConfirmButton}>
-                {loading ? 'Searching...' : 'Find Duplicates'}
+            </>
+          )}
+        </div>
+        <button onClick={handleFindDuplicates} disabled={loading} className={styles.clzDuplicatesFindButton}>
+          {loading ? 'Searching...' : 'Find Duplicates'}
+        </button>
+        {searched && duplicateGroups.length > 0 && (
+          <div className={styles.clzDuplicatesCount}>
+            {duplicateGroups.length} duplicates found:
+          </div>
+        )}
+        <div className={styles.clzDuplicatesToolbarSpacer} />
+        <button className={styles.clzDuplicatesColumnButton} title="Manage Column Favorites">
+          ⊞
+        </button>
+      </div>
+
+      <div className={styles.clzDuplicatesContent}>
+        {loading && !searched && (
+          <div className={styles.clzDuplicatesLoading}>
+            <div className={styles.clzDuplicatesLoadingSpinner} />
+            <div>Loading...</div>
+            <div>Please wait</div>
+          </div>
+        )}
+
+        {!loading && searched && duplicateGroups.length === 0 && (
+          <div className={styles.clzDuplicatesEmpty}>
+            <div className={styles.clzDuplicatesEmptyIcon}>✓</div>
+            <div className={styles.clzDuplicatesEmptyTitle}>No duplicates found</div>
+            <div className={styles.clzDuplicatesEmptyText}>Your collection has no duplicate albums based on {selectedMethodLabel}.</div>
+          </div>
+        )}
+
+        {searched && duplicateGroups.length > 0 && (
+          <>
+            <div className={styles.clzDuplicatesTableWrapper}>
+              <table className={styles.clzDuplicatesTable}>
+                <thead>
+                  <tr className={styles.clzDuplicatesTableHeaderRow}>
+                    <th className={styles.clzDuplicatesTableHeaderCell}>Artist</th>
+                    <th className={styles.clzDuplicatesTableHeaderCell}>Title</th>
+                    <th className={styles.clzDuplicatesTableHeaderCell}>Release Date</th>
+                    <th className={styles.clzDuplicatesTableHeaderCell}>Format</th>
+                    <th className={styles.clzDuplicatesTableHeaderCell}>Discs</th>
+                    <th className={styles.clzDuplicatesTableHeaderCell}>Tracks</th>
+                    <th className={styles.clzDuplicatesTableHeaderCell}>Length</th>
+                    <th className={styles.clzDuplicatesTableHeaderCell}>Genre</th>
+                    <th className={styles.clzDuplicatesTableHeaderCell}>Label</th>
+                    <th className={styles.clzDuplicatesTableHeaderCell}>Added Date</th>
+                    <th className={styles.clzDuplicatesTableHeaderCell}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {duplicateGroups.map((group, groupIdx) => (
+                    <>
+                      <tr key={`group-${groupIdx}`} className={styles.clzDuplicatesGroupRow}>
+                        <td colSpan={11} className={styles.clzDuplicatesGroupCell}>
+                          <div className={styles.clzDuplicatesGroupHeader}>
+                            <button onClick={() => toggleGroup(groupIdx)} className={styles.clzDuplicatesGroupToggle}>
+                              {group.expanded ? '▼' : '▶'}
+                            </button>
+                            <span className={styles.clzDuplicatesGroupName}>{group.displayName}</span>
+                            <div className={styles.clzDuplicatesGroupActions}>
+                              <button className={styles.clzDuplicatesKeepButton}>
+                                Keep {group.keepCount}
+                              </button>
+                              <select value={group.keepCount} onChange={(e) => handleKeepCountChange(groupIdx, parseInt(e.target.value))} className={styles.clzDuplicatesKeepSelect}>
+                                {Array.from({ length: group.albums.length }, (_, i) => i + 1).map(num => (
+                                  <option key={num} value={num}>Keep {num}</option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                      {group.expanded && group.albums.map((album) => (
+                        <tr key={`album-${album.id}`} className={styles.clzDuplicatesAlbumRow}>
+                          <td className={styles.clzDuplicatesTableCell}>{album.artist}</td>
+                          <td className={styles.clzDuplicatesTableCell}>{album.title}</td>
+                          <td className={styles.clzDuplicatesTableCell}>{album.year || '—'}</td>
+                          <td className={styles.clzDuplicatesTableCell}>{album.format || '—'}</td>
+                          <td className={styles.clzDuplicatesTableCell}>{album.discs || 1}</td>
+                          <td className={styles.clzDuplicatesTableCell}>{album.spotify_total_tracks || album.apple_music_track_count || '—'}</td>
+                          <td className={styles.clzDuplicatesTableCell}>
+                            {album.length_seconds ? `${Math.floor(album.length_seconds / 60)}:${(album.length_seconds % 60).toString().padStart(2, '0')}` : '—'}
+                          </td>
+                          <td className={styles.clzDuplicatesTableCell}>
+                            {album.discogs_genres ? (Array.isArray(album.discogs_genres) ? album.discogs_genres[0] : album.discogs_genres) : '—'}
+                          </td>
+                          <td className={styles.clzDuplicatesTableCell}>
+                            {album.labels ? (Array.isArray(album.labels) ? album.labels[0] : album.labels) : album.spotify_label || album.apple_music_label || '—'}
+                          </td>
+                          <td className={styles.clzDuplicatesTableCell}>
+                            {album.date_added ? new Date(album.date_added).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                          </td>
+                          <td className={styles.clzDuplicatesTableCell}>
+                            <button onClick={() => handleRemoveAlbum(groupIdx, album.id)} className={styles.clzDuplicatesRemoveButton}>
+                              Remove
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      {groupIdx < duplicateGroups.length - 1 && (
+                        <tr key={`separator-${groupIdx}`} className={styles.clzDuplicatesSeparator}>
+                          <td colSpan={11}></td>
+                        </tr>
+                      )}
+                    </>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className={styles.clzDuplicatesFooterActions}>
+              <button onClick={handleRemoveAllAutomatically} disabled={loading || totalToRemove === 0} className={styles.clzDuplicatesRemoveAllButton}>
+                Remove all duplicates automatically ({totalToRemove})
               </button>
             </div>
-          </div>
-        )}
-
-        {stage === 'results' && (
-          <div className={styles.importModalInner}>
-            {duplicateGroups.length === 0 ? (
-              <div className={styles.duplicatesEmpty}>
-                <div className={styles.duplicatesEmptyIcon}>✓</div>
-                <div className={styles.duplicatesEmptyTitle}>No duplicates found</div>
-                <div className={styles.duplicatesEmptyText}>Your collection has no duplicate albums based on {selectedMethodLabel}.</div>
-              </div>
-            ) : (
-              <>
-                <div className={styles.duplicatesAlert}>
-                  <strong>{duplicateGroups.length} duplicate groups found</strong> with a total of <strong>{totalToRemove} albums</strong> to remove.
-                </div>
-
-                <div className={styles.duplicatesTableCard}>
-                  <div className={styles.duplicatesTableHeader}>
-                    <div>Artist</div>
-                    <div>Title</div>
-                    <div>Release Date</div>
-                    <div>Format</div>
-                    <div className={styles.duplicatesTableHeaderCenter}>Discs</div>
-                    <div className={styles.duplicatesTableHeaderCenter}>Tracks</div>
-                    <div className={styles.duplicatesTableHeaderCenter}>Length</div>
-                    <div className={styles.duplicatesTableHeaderCenter}>Genre</div>
-                    <div className={styles.duplicatesTableHeaderCenter}>Label</div>
-                    <div className={styles.duplicatesTableHeaderCenter}>Added Date</div>
-                    <div className={styles.duplicatesTableHeaderCenter}>Action</div>
-                  </div>
-
-                  <div className={styles.duplicatesTableBody}>
-                    {duplicateGroups.map((group, groupIdx) => (
-                      <div key={groupIdx} className={styles.duplicatesGroup}>
-                        <div className={styles.duplicatesGroupHeader}>
-                          <div>{group.displayName}</div>
-                          <div className={styles.duplicatesGroupActions}>
-                            <span className={styles.duplicatesKeepBadge}>
-                              Keep {group.keepCount}
-                            </span>
-                            <select value={group.keepCount} onChange={(e) => handleKeepCountChange(groupIdx, parseInt(e.target.value))} className={styles.duplicatesKeepSelect}>
-                              {Array.from({ length: group.albums.length }, (_, i) => i + 1).map(num => (
-                                <option key={num} value={num}>Keep {num}</option>
-                              ))}
-                            </select>
-                          </div>
-                        </div>
-
-                        {group.albums.map((album, albumIdx) => (
-                          <div key={album.id} className={albumIdx % 2 === 0 ? styles.duplicatesAlbumRow : styles.duplicatesAlbumRowAlt}>
-                            <div className={styles.duplicatesAlbumCell}>{album.artist}</div>
-                            <div className={styles.duplicatesAlbumCell}>{album.title}</div>
-                            <div className={styles.duplicatesAlbumCellSecondary}>{album.year || '—'}</div>
-                            <div className={styles.duplicatesAlbumCellSecondary}>{album.format || '—'}</div>
-                            <div className={styles.duplicatesAlbumCellCenter}>{album.discs || 1}</div>
-                            <div className={styles.duplicatesAlbumCellCenter}>{album.spotify_total_tracks || album.apple_music_track_count || '—'}</div>
-                            <div className={styles.duplicatesAlbumCellCenter}>
-                              {album.length_seconds ? `${Math.floor(album.length_seconds / 60)}:${(album.length_seconds % 60).toString().padStart(2, '0')}` : '—'}
-                            </div>
-                            <div className={styles.duplicatesAlbumCellSecondary}>
-                              {album.discogs_genres ? (Array.isArray(album.discogs_genres) ? album.discogs_genres[0] : album.discogs_genres) : '—'}
-                            </div>
-                            <div className={styles.duplicatesAlbumCellSecondary}>
-                              {album.labels ? (Array.isArray(album.labels) ? album.labels[0] : album.labels) : album.spotify_label || album.apple_music_label || '—'}
-                            </div>
-                            <div className={styles.duplicatesAlbumCellSecondary}>
-                              {album.date_added ? new Date(album.date_added).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
-                            </div>
-                            <div className={styles.duplicatesAlbumCellCenter}>
-                              <button onClick={() => handleRemoveAlbum(groupIdx, album.id)} className={styles.duplicatesRemoveButton}>
-                                Remove
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className={styles.importButtonContainer}>
-                  <button onClick={() => {
-                    setStage('select');
-                    setDuplicateGroups([]);
-                  }} className={styles.importCancelButton}>
-                    Back
-                  </button>
-                  <button onClick={handleRemoveAllAutomatically} disabled={loading || totalToRemove === 0} className={styles.importConfirmButton}>
-                    {loading ? 'Removing...' : `Remove all duplicates automatically (${totalToRemove})`}
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
+          </>
         )}
       </div>
 
-      {loading && stage === 'results' && (
-        <div className={styles.duplicatesLoadingOverlay}>
-          <div className={styles.duplicatesLoadingContent}>
-            <div className={styles.duplicatesLoadingSpinner} />
-            <div className={styles.duplicatesLoadingTitle}>Processing...</div>
-            <div className={styles.duplicatesLoadingText}>Please wait</div>
-          </div>
-        </div>
-      )}
+      <div className={styles.clzDuplicatesFooter}>
+        CLZoom Web © Copyright 2000-2025 · Terms of Use · Privacy Policy
+      </div>
     </div>
   );
 }
