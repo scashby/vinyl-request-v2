@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { supabase } from '../../../lib/supabaseClient';
 import { parseDiscogsFormat } from '../../../lib/formatParser';
+import { normalizeArtist, normalizeTitle, normalizeArtistAlbum } from '../../../lib/importUtils';
 
 type SyncMode = 'full_replacement' | 'full_sync' | 'partial_sync' | 'new_only';
 type ImportStage = 'upload' | 'preview' | 'importing' | 'complete';
@@ -51,28 +52,6 @@ interface ImportDiscogsModalProps {
   isOpen: boolean;
   onClose: () => void;
   onImportComplete?: () => void;
-}
-
-// Normalization functions
-function normalizeText(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/^the\s+/i, '')
-    .replace(/^a\s+/i, '')
-    .replace(/[^a-z0-9]/g, '')
-    .trim();
-}
-
-function normalizeArtist(artist: string): string {
-  return normalizeText(artist);
-}
-
-function normalizeTitle(title: string): string {
-  return normalizeText(title);
-}
-
-function normalizeArtistAlbum(artist: string, title: string): string {
-  return normalizeArtist(artist) + normalizeTitle(title);
 }
 
 // CSV parsing
@@ -625,9 +604,17 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
     onClose();
   };
 
-  const newCount = comparedAlbums.filter(a => a.status === 'NEW').length;
-  const unchangedCount = comparedAlbums.filter(a => a.status === 'UNCHANGED').length;
-  const removedCount = comparedAlbums.filter(a => a.status === 'REMOVED').length;
+  const newCount = syncMode === 'full_replacement' 
+    ? comparedAlbums.filter(a => a.status !== 'REMOVED').length 
+    : comparedAlbums.filter(a => a.status === 'NEW').length;
+  const unchangedCount = syncMode === 'full_replacement'
+    ? 0
+    : comparedAlbums.filter(a => a.status === 'UNCHANGED').length;
+  const removedCount = syncMode === 'full_replacement'
+    ? comparedAlbums.filter(a => a.status === 'REMOVED').length
+    : syncMode === 'full_sync'
+      ? comparedAlbums.filter(a => a.status === 'REMOVED').length
+      : 0;
 
   return (
     <div style={{
@@ -795,20 +782,26 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '14px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#059669', fontWeight: '600' }}>New albums to add:</span>
+                    <span style={{ color: '#059669', fontWeight: '600' }}>
+                      {syncMode === 'full_replacement' ? 'Albums to import:' : 'New albums to add:'}
+                    </span>
                     <span style={{ color: '#111827', fontWeight: '600' }}>{newCount}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#d97706', fontWeight: '600' }}>Existing albums missing data:</span>
-                    <span style={{ color: '#111827', fontWeight: '600' }}>
-                      {comparedAlbums.filter(a => a.status === 'CHANGED' && a.needsEnrichment).length}
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#6b7280', fontWeight: '600' }}>Unchanged albums:</span>
-                    <span style={{ color: '#111827', fontWeight: '600' }}>{unchangedCount}</span>
-                  </div>
-                  {syncMode === 'full_sync' && removedCount > 0 && (
+                  {syncMode !== 'full_replacement' && (
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: '#d97706', fontWeight: '600' }}>Existing albums missing data:</span>
+                        <span style={{ color: '#111827', fontWeight: '600' }}>
+                          {comparedAlbums.filter(a => a.status === 'CHANGED' && a.needsEnrichment).length}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: '#6b7280', fontWeight: '600' }}>Unchanged albums:</span>
+                        <span style={{ color: '#111827', fontWeight: '600' }}>{unchangedCount}</span>
+                      </div>
+                    </>
+                  )}
+                  {(syncMode === 'full_sync' || syncMode === 'full_replacement') && removedCount > 0 && (
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ color: '#dc2626', fontWeight: '600' }}>Albums to remove:</span>
                       <span style={{ color: '#111827', fontWeight: '600' }}>{removedCount}</span>
@@ -829,7 +822,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
               }}>
                 <strong>Mode: {syncMode.replace(/_/g, ' ').toUpperCase()}</strong>
                 <br />
-                {syncMode === 'full_replacement' && 'Will delete entire database and import all albums from CSV.'}
+                {syncMode === 'full_replacement' && `Will delete all ${removedCount} albums from database and import all ${newCount} albums from CSV.`}
                 {syncMode === 'full_sync' && 'Will scrape missing/changed data for all CSV albums and remove albums not in CSV.'}
                 {syncMode === 'partial_sync' && 'Will only process new and changed albums.'}
                 {syncMode === 'new_only' && 'Will only add albums not currently in database.'}
@@ -867,7 +860,18 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                         let statusDisplay: string = album.status;
                         let actionText = 'No action';
 
-                        if (album.status === 'NEW') {
+                        if (syncMode === 'full_replacement') {
+                          // In full replacement, show all non-removed as import, all removed as delete
+                          if (album.status === 'REMOVED') {
+                            statusColor = '#dc2626';
+                            statusDisplay = 'WILL DELETE';
+                            actionText = 'Delete from database';
+                          } else {
+                            statusColor = '#059669';
+                            statusDisplay = 'WILL IMPORT';
+                            actionText = 'Import + enrich';
+                          }
+                        } else if (album.status === 'NEW') {
                           statusColor = '#059669';
                           statusDisplay = 'NEW';
                           actionText = 'Add + enrich';
