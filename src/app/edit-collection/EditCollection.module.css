@@ -944,7 +944,7 @@
   text-align: right;
 }
 
-/* Import Discogs Modal Styles */
+/* Import Modal Styles - Matching ImportSelectionModal Design */
 .importModalContainer {
   position: fixed;
   top: 0;
@@ -959,120 +959,187 @@
 }
 
 .importModalHeader {
-  background: linear-gradient(to right, #8809AC, #A855F7);
+  background: #2A2A2A;
   color: white;
-  padding: 12px 24px;
+  padding: 14px 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-shrink: 0;
 }
 
-.importModalHeaderLeft {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
 .importModalBackButton {
-  background: none;
+  background: transparent;
   border: none;
   color: white;
   cursor: pointer;
   font-size: 15px;
-  padding: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
 }
 
 .importModalTitle {
   font-size: 16px;
   font-weight: 500;
+  color: white;
 }
 
 .importModalCloseButton {
-  background: none;
+  background: transparent;
   border: none;
   color: white;
-  font-size: 24px;
+  font-size: 28px;
   cursor: pointer;
-  padding: 4px;
+  line-height: 1;
+  padding: 0;
 }
 
 .importModalContent {
   flex: 1;
   overflow-y: auto;
-  padding: 40px;
-  background: #F5F5F5;
+  background: white;
+  padding: 24px;
 }
 
 .importModalInner {
-  max-width: 900px;
+  max-width: 1000px;
   margin: 0 auto;
 }
 
-.importModalH2 {
-  font-size: 24px;
-  font-weight: 600;
-  color: #1a1a1a;
-  margin-bottom: 32px;
+.importSelectionDescription {
+  font-size: 15px;
+  color: #666;
+  margin-bottom: 24px;
 }
 
-.importSyncModeSection {
-  margin-bottom: 32px;
-}
-
-.importSyncModeLabel {
-  font-size: 16px;
-  font-weight: 600;
-  color: #1a1a1a;
-  margin-bottom: 16px;
-  display: block;
-}
-
-.importSyncModeOptions {
+.importSelectionCards {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
-.importSyncModeOption {
-  display: flex;
-  flex-direction: column;
-  padding: 16px;
+.importSelectionCard {
+  width: 100%;
+  text-align: left;
   background: white;
   border: 2px solid #D8D8D8;
   border-radius: 6px;
+  padding: 20px;
   cursor: pointer;
+  transition: all 0.2s;
 }
 
-.importSyncModeOptionSelected {
+.importSelectionCard:hover {
+  border-color: #4FC3F7;
+  background: #F0F9FF;
+}
+
+.importSelectionCardInner {
+  display: flex;
+  align-items: start;
+}
+
+.importSelectionCardIcon {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 16px;
+  font-size: 24px;
+}
+
+.importSelectionCardIconGreen {
+  background: #E8F5E9;
+}
+
+.importSelectionCardIconBlue {
+  background: #E3F2FD;
+}
+
+.importSelectionCardIconPurple {
+  background: #F3E5F5;
+}
+
+.importSelectionCardIconOrange {
+  background: #FFF3E0;
+}
+
+.importSelectionCardContent {
+  flex: 1;
+}
+
+.importSelectionCardTitle {
+  margin: 0 0 6px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.importSelectionCardDescription {
+  margin: 0;
+  font-size: 14px;
+  color: #666;
+}
+
+/* Discogs Import Sync Mode Cards */
+.importSyncCards {
   display: flex;
   flex-direction: column;
-  padding: 16px;
+  gap: 12px;
+  margin-bottom: 32px;
+}
+
+.importSyncCard {
+  width: 100%;
+  text-align: left;
+  background: white;
+  border: 2px solid #D8D8D8;
+  border-radius: 6px;
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.importSyncCard:hover {
+  border-color: #4FC3F7;
+  background: #F0F9FF;
+}
+
+.importSyncCardSelected {
+  width: 100%;
+  text-align: left;
   background: #F0F9FF;
   border: 2px solid #4FC3F7;
   border-radius: 6px;
+  padding: 20px;
   cursor: pointer;
+  transition: all 0.2s;
 }
 
-.importSyncModeOptionTop {
+.importSyncCardTop {
   display: flex;
   align-items: center;
   gap: 12px;
   margin-bottom: 8px;
 }
 
-.importSyncModeRadio {
+.importSyncCardRadio {
   margin: 0;
 }
 
-.importSyncModeOptionName {
-  font-size: 15px;
+.importSyncCardName {
+  font-size: 16px;
   font-weight: 600;
   color: #1a1a1a;
   flex: 1;
 }
 
-.importSyncModeImpact {
+.importSyncCardImpact {
   font-size: 11px;
   font-weight: 700;
   padding: 4px 8px;
@@ -1101,51 +1168,55 @@
   color: #1565C0;
 }
 
-.importSyncModeDescription {
-  font-size: 13px;
+.importSyncCardDescription {
+  font-size: 14px;
   color: #666;
   line-height: 1.5;
+  margin: 0;
 }
 
-.importDropzone {
-  margin-top: 32px;
-  padding: 60px 40px;
-  border: 3px dashed #D8D8D8;
-  border-radius: 8px;
+/* File Upload Card */
+.importUploadCard {
+  background: white;
+  border: 2px solid #D8D8D8;
+  border-radius: 6px;
+  padding: 40px;
   text-align: center;
   cursor: pointer;
-  background: white;
+  transition: all 0.2s;
+  margin-bottom: 24px;
 }
 
-.importDropzone:hover {
+.importUploadCard:hover {
   border-color: #4FC3F7;
   background: #F0F9FF;
 }
 
-.importDropzoneIcon {
-  font-size: 64px;
+.importUploadIcon {
+  font-size: 48px;
   margin-bottom: 16px;
 }
 
-.importDropzoneText {
+.importUploadText {
   font-size: 15px;
   color: #666;
-  margin-bottom: 12px;
+  margin: 0;
 }
 
 .importFileInput {
   display: none;
 }
 
-.importEnrichSection {
-  margin-top: 32px;
+/* Enrichment Info Card */
+.importEnrichCard {
+  background: white;
+  border: 2px solid #D8D8D8;
+  border-radius: 6px;
   padding: 20px;
-  background: #E8F5E9;
-  border-radius: 8px;
-  border: 1px solid #A5D6A7;
+  margin-bottom: 24px;
 }
 
-.importEnrichTitle {
+.importEnrichHeader {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1156,9 +1227,9 @@
 }
 
 .importEnrichDescription {
-  font-size: 13px;
-  color: #1B5E20;
-  margin-bottom: 12px;
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 16px;
   line-height: 1.5;
 }
 
@@ -1179,33 +1250,24 @@
   font-size: 13px;
   color: #666;
   margin-left: 28px;
-  line-height: 1.5;
   margin-top: 4px;
+  line-height: 1.5;
 }
 
-.importError {
-  margin-top: 20px;
-  padding: 16px;
-  background: #FFEBEE;
-  border: 1px solid #EF5350;
-  border-radius: 6px;
-  color: #C62828;
-  font-size: 14px;
-}
-
+/* Preview Stats Grid */
 .importPreviewStats {
-  display: flex;
-  gap: 16px;
-  margin-bottom: 32px;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
 }
 
 .importPreviewStat {
-  flex: 1;
-  padding: 20px;
   background: white;
-  border-radius: 8px;
+  border: 2px solid #D8D8D8;
+  border-radius: 6px;
+  padding: 20px;
   text-align: center;
-  border: 2px solid #E8E8E8;
 }
 
 .importPreviewStatValue {
@@ -1223,14 +1285,13 @@
   letter-spacing: 0.5px;
 }
 
-.importPreviewTableContainer {
+/* Preview Table */
+.importPreviewTableCard {
   background: white;
-  border-radius: 8px;
-  border: 1px solid #D8D8D8;
+  border: 2px solid #D8D8D8;
+  border-radius: 6px;
   overflow: hidden;
-  max-height: 500px;
-  overflow-y: auto;
-  margin-bottom: 32px;
+  margin-bottom: 24px;
 }
 
 .importPreviewTable {
@@ -1240,8 +1301,6 @@
 
 .importPreviewTable thead {
   background: #F5F5F5;
-  position: sticky;
-  top: 0;
 }
 
 .importPreviewTable th {
@@ -1292,6 +1351,7 @@
   color: #C62828;
 }
 
+/* Action Buttons */
 .importButtonContainer {
   display: flex;
   gap: 12px;
@@ -1299,14 +1359,20 @@
 }
 
 .importCancelButton {
-  background: #F5F5F5;
+  background: white;
   color: #1a1a1a;
-  border: 1px solid #D8D8D8;
+  border: 2px solid #D8D8D8;
   padding: 12px 32px;
   border-radius: 6px;
   font-size: 15px;
   font-weight: 500;
   cursor: pointer;
+  transition: all 0.2s;
+}
+
+.importCancelButton:hover {
+  border-color: #4FC3F7;
+  background: #F0F9FF;
 }
 
 .importConfirmButton {
@@ -1318,11 +1384,24 @@
   font-size: 15px;
   font-weight: 500;
   cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  transition: all 0.2s;
 }
 
-.importProgressContainer {
-  text-align: center;
+.importConfirmButton:hover {
+  background: #29B6F6;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* Progress Screen */
+.importProgressCard {
+  background: white;
+  border: 2px solid #D8D8D8;
+  border-radius: 6px;
   padding: 60px 40px;
+  text-align: center;
+  max-width: 500px;
+  margin: 60px auto;
 }
 
 .importProgressIcon {
@@ -1330,20 +1409,26 @@
   margin-bottom: 20px;
 }
 
+.importProgressTitle {
+  font-size: 24px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin-bottom: 12px;
+}
+
 .importProgressStage {
-  font-size: 16px;
+  font-size: 15px;
   color: #666;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
 .importProgressBar {
   width: 100%;
-  max-width: 400px;
   height: 8px;
   background: #E8E8E8;
   border-radius: 4px;
   overflow: hidden;
-  margin: 0 auto 12px;
+  margin-bottom: 12px;
 }
 
 .importProgressBarFill {
@@ -1357,9 +1442,15 @@
   color: #999;
 }
 
-.importCompleteContainer {
-  text-align: center;
+/* Complete Screen */
+.importCompleteCard {
+  background: white;
+  border: 2px solid #D8D8D8;
+  border-radius: 6px;
   padding: 60px 40px;
+  text-align: center;
+  max-width: 500px;
+  margin: 60px auto;
 }
 
 .importCompleteIcon {
@@ -1367,8 +1458,15 @@
   margin-bottom: 20px;
 }
 
+.importCompleteTitle {
+  font-size: 24px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin-bottom: 12px;
+}
+
 .importCompleteText {
-  font-size: 16px;
+  font-size: 15px;
   color: #666;
   margin-bottom: 32px;
 }
@@ -1382,4 +1480,22 @@
   font-size: 15px;
   font-weight: 500;
   cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  transition: all 0.2s;
+}
+
+.importDoneButton:hover {
+  background: #29B6F6;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* Error Display */
+.importError {
+  background: #FFEBEE;
+  border: 2px solid #EF5350;
+  border-radius: 6px;
+  padding: 16px;
+  color: #C62828;
+  font-size: 14px;
+  margin-top: 24px;
 }

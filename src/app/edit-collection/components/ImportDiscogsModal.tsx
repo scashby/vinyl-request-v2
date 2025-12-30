@@ -365,53 +365,52 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
   return (
     <div className={styles.importModalContainer}>
       <div className={styles.importModalHeader}>
-        <div className={styles.importModalHeaderLeft}>
-          <button onClick={onClose} className={styles.importModalBackButton}>◀ Back</button>
-          <div className={styles.importModalTitle}>Import from Discogs CSV</div>
-        </div>
+        <button onClick={onClose} className={styles.importModalBackButton}>
+          ◀ Back
+        </button>
+        <div className={styles.importModalTitle}>Import from Discogs CSV</div>
         <button onClick={onClose} className={styles.importModalCloseButton}>×</button>
       </div>
 
       <div className={styles.importModalContent}>
         {step === 'upload' && (
           <div className={styles.importModalInner}>
-            <h2 className={styles.importModalH2}>Select Discogs CSV Export</h2>
+            <p className={styles.importSelectionDescription}>
+              Select your sync mode and upload your Discogs CSV export file.
+            </p>
             
-            <div className={styles.importSyncModeSection}>
-              <label className={styles.importSyncModeLabel}>Sync Mode</label>
-              <div className={styles.importSyncModeOptions}>
-                {SYNC_MODE_INFO.map(mode => (
-                  <div 
-                    key={mode.value} 
-                    className={syncMode === mode.value ? styles.importSyncModeOptionSelected : styles.importSyncModeOption}
-                    onClick={() => setSyncMode(mode.value)}
-                  >
-                    <div className={styles.importSyncModeOptionTop}>
-                      <input
-                        type="radio"
-                        checked={syncMode === mode.value}
-                        onChange={() => setSyncMode(mode.value)}
-                        className={styles.importSyncModeRadio}
-                      />
-                      <span className={styles.importSyncModeOptionName}>{mode.label}</span>
-                      <span className={`${styles.importSyncModeImpact} ${getImpactClass(mode.apiImpact)}`}>
-                        {mode.apiImpact} API Impact
-                      </span>
-                    </div>
-                    <p className={styles.importSyncModeDescription}>{mode.description}</p>
+            <div className={styles.importSyncCards}>
+              {SYNC_MODE_INFO.map(mode => (
+                <div 
+                  key={mode.value} 
+                  className={syncMode === mode.value ? styles.importSyncCardSelected : styles.importSyncCard}
+                  onClick={() => setSyncMode(mode.value)}
+                >
+                  <div className={styles.importSyncCardTop}>
+                    <input
+                      type="radio"
+                      checked={syncMode === mode.value}
+                      onChange={() => setSyncMode(mode.value)}
+                      className={styles.importSyncCardRadio}
+                    />
+                    <span className={styles.importSyncCardName}>{mode.label}</span>
+                    <span className={`${styles.importSyncCardImpact} ${getImpactClass(mode.apiImpact)}`}>
+                      {mode.apiImpact} API Impact
+                    </span>
                   </div>
-                ))}
-              </div>
+                  <p className={styles.importSyncCardDescription}>{mode.description}</p>
+                </div>
+              ))}
             </div>
 
             <div
-              className={styles.importDropzone}
+              className={styles.importUploadCard}
               onDrop={handleDrop}
               onDragOver={(e) => e.preventDefault()}
               onClick={() => fileInputRef.current?.click()}
             >
-              <div className={styles.importDropzoneIcon}>📄</div>
-              <p className={styles.importDropzoneText}>Drag and drop your Discogs CSV here, or click to browse</p>
+              <div className={styles.importUploadIcon}>📄</div>
+              <p className={styles.importUploadText}>Drag and drop your Discogs CSV here, or click to browse</p>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -421,8 +420,8 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
               />
             </div>
 
-            <div className={styles.importEnrichSection}>
-              <div className={styles.importEnrichTitle}>
+            <div className={styles.importEnrichCard}>
+              <div className={styles.importEnrichHeader}>
                 <span>✅</span>
                 <span>Discogs enrichment enabled</span>
               </div>
@@ -449,7 +448,9 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
 
         {step === 'preview' && (
           <div className={styles.importModalInner}>
-            <h2 className={styles.importModalH2}>Import Preview</h2>
+            <p className={styles.importSelectionDescription}>
+              Review the changes that will be made to your collection.
+            </p>
             
             <div className={styles.importPreviewStats}>
               <div className={styles.importPreviewStat}>
@@ -474,7 +475,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
               </div>
             </div>
 
-            <div className={styles.importPreviewTableContainer}>
+            <div className={styles.importPreviewTableCard}>
               <table className={styles.importPreviewTable}>
                 <thead>
                   <tr>
@@ -511,14 +512,12 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
         )}
 
         {step === 'importing' && (
-          <div className={styles.importProgressContainer}>
+          <div className={styles.importProgressCard}>
             <div className={styles.importProgressIcon}>⏳</div>
-            <h2 className={styles.importModalH2}>Importing...</h2>
+            <h2 className={styles.importProgressTitle}>Importing...</h2>
             <p className={styles.importProgressStage}>{importProgress.stage}</p>
             <div className={styles.importProgressBar}>
-              <div 
-                className={styles.importProgressBarFill}
-              />
+              <div className={styles.importProgressBarFill} />
             </div>
             <p className={styles.importProgressText}>
               {importProgress.current} / {importProgress.total}
@@ -527,9 +526,9 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
         )}
 
         {step === 'complete' && (
-          <div className={styles.importCompleteContainer}>
+          <div className={styles.importCompleteCard}>
             <div className={styles.importCompleteIcon}>✅</div>
-            <h2 className={styles.importModalH2}>Import Complete!</h2>
+            <h2 className={styles.importCompleteTitle}>Import Complete!</h2>
             <p className={styles.importCompleteText}>
               Successfully imported {parsedData.length} albums.
             </p>
