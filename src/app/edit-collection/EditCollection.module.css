@@ -1792,3 +1792,53 @@
   color: #6b7280;
   margin-top: 4px;
 }
+
+/* Additional Find Duplicates Styles */
+.duplicatesSelectBar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: #2A2A2A;
+  color: white;
+  border-radius: 4px;
+  margin-bottom: 24px;
+}
+
+.duplicatesSelectLabel {
+  font-size: 14px;
+  font-weight: 600;
+  color: white;
+}
+
+.duplicatesTableHeader {
+  display: grid;
+  grid-template-columns: 2fr 2fr 1fr 1.5fr 0.7fr 0.7fr 0.8fr 1.5fr 1.5fr 1.2fr 100px;
+  gap: 8px;
+  padding: 10px 12px;
+  background-color: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+  font-weight: 600;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.duplicatesAlbumRow {
+  display: grid;
+  grid-template-columns: 2fr 2fr 1fr 1.5fr 0.7fr 0.7fr 0.8fr 1.5fr 1.5fr 1.2fr 100px;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  background-color: #fff;
+  border-top: 1px solid #f3f4f6;
+}
+
+.duplicatesAlbumRowAlt {
+  display: grid;
+  grid-template-columns: 2fr 2fr 1fr 1.5fr 0.7fr 0.7fr 0.8fr 1.5fr 1.5fr 1.2fr 100px;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  background-color: #f9fafb;
+  border-top: 1px solid #f3f4f6;
+}
