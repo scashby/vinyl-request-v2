@@ -1,6 +1,5 @@
-/* src/app/edit-collection/EditCollection.module.css - Extracted from page.tsx inline styles */
+/* src/app/edit-collection/EditCollection.module.css */
 
-/* Layout */
 .container {
   position: fixed;
   top: 0;
@@ -14,7 +13,16 @@
   z-index: 9999;
 }
 
-/* Sidebar */
+.sidebarOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 19999;
+}
+
 .sidebar {
   position: fixed;
   top: 0;
@@ -28,16 +36,6 @@
   padding: 20px;
 }
 
-.sidebarOverlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 19999;
-}
-
 .sidebarHeader {
   display: flex;
   justify-content: space-between;
@@ -45,12 +43,18 @@
   margin-bottom: 24px;
   font-size: 18px;
   font-weight: 600;
+}
+
+.sidebarCloseButton {
+  background: none;
+  border: none;
   color: white;
+  font-size: 24px;
+  cursor: pointer;
 }
 
 .sidebarSection {
   margin-bottom: 20px;
-  color: white;
 }
 
 .sidebarSectionTitle {
@@ -74,11 +78,11 @@
   font-size: 14px;
 }
 
-.sidebarButton span:first-child {
-  margin-right: 10px;
+.sidebarHr {
+  border-color: #444;
+  margin: 20px 0;
 }
 
-/* Header */
 .header {
   background: linear-gradient(to right, #8809AC, #A855F7);
   color: white;
@@ -94,24 +98,38 @@
   display: flex;
   align-items: center;
   gap: 16px;
+}
+
+.headerMenuButton {
+  background: none;
+  border: none;
   color: white;
+  cursor: pointer;
+  font-size: 20px;
+  padding: 4px;
 }
 
 .headerTitle {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: white;
 }
 
 .headerRight {
   display: flex;
   gap: 12px;
   align-items: center;
-  color: white;
 }
 
-/* Toolbar */
+.headerButton {
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  font-size: 18px;
+  padding: 4px;
+}
+
 .toolbar {
   background: #3A3A3A;
   color: white;
@@ -129,37 +147,9 @@
   gap: 8px;
   align-items: center;
   flex: 0 0 auto;
-  color: white;
 }
 
-.toolbarCenter {
-  display: flex;
-  gap: 2px;
-  align-items: center;
-  flex: 1 1 auto;
-  justify-content: center;
-  color: white;
-}
-
-.toolbarRight {
-  display: flex;
-  gap: 0;
-  align-items: center;
-  flex: 0 0 auto;
-  color: white;
-}
-
-/* Buttons */
-.button {
-  background: transparent;
-  border: none;
-  color: white;
-  cursor: pointer;
-  padding: 4px 8px;
-  font-size: 13px;
-}
-
-.buttonPrimary {
+.addButton {
   background: #368CF8;
   color: white;
   border: none;
@@ -174,7 +164,7 @@
   white-space: nowrap;
 }
 
-.buttonSecondary {
+.collectionButton {
   background: #2a2a2a;
   color: white;
   border: 1px solid #555;
@@ -187,36 +177,79 @@
   gap: 6px;
 }
 
-.buttonIcon {
-  background: #3a3a3a;
-  border: 1px solid #555;
-  padding: 4px 9px;
-  border-radius: 3px;
-  cursor: pointer;
-  font-size: 12px;
-  color: white;
+.toolbarCenter {
   display: flex;
+  gap: 2px;
   align-items: center;
-  gap: 3px;
+  flex: 1 1 auto;
+  justify-content: center;
 }
 
 .letterButton {
   background: transparent;
   color: white;
   border: none;
-  padding: 4px 7px;
+  padding: 4px 8px;
   cursor: pointer;
   font-size: 12px;
   border-radius: 2px;
-  min-width: 20px;
 }
 
 .letterButtonActive {
   background: #5A9BD5;
   color: white;
+  border: none;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 12px;
+  border-radius: 2px;
 }
 
-/* Selection Bar */
+.settingsButton {
+  background: transparent;
+  color: white;
+  border: none;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 14px;
+  margin-left: 4px;
+}
+
+.toolbarRight {
+  display: flex;
+  gap: 0;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.searchButton {
+  background: #2a2a2a;
+  color: white;
+  border: 1px solid #555;
+  border-right: none;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 13px;
+  border-radius: 3px 0 0 3px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+}
+
+.searchInput {
+  background: #2a2a2a;
+  color: white;
+  border: 1px solid #555;
+  border-left: none;
+  padding: 6px 12px;
+  border-radius: 0 3px 3px 0;
+  font-size: 13px;
+  width: 220px;
+  height: 32px;
+  outline: none;
+}
+
 .selectionBar {
   background: #5BA3D0;
   color: white;
@@ -238,7 +271,18 @@
   font-size: 12px;
 }
 
-/* Left Panel */
+.selectionCount {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.mainContent {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+
 .leftPanel {
   width: 220px;
   background: #2C2C2C;
@@ -257,17 +301,107 @@
   justify-content: space-between;
   align-items: center;
   flex-shrink: 0;
+}
+
+.folderButton {
+  background: #3a3a3a;
   color: white;
+  border: 1px solid #555;
+  padding: 5px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.menuButton {
+  background: transparent;
+  color: white;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px;
+}
+
+.dropdownOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 99;
+}
+
+.folderDropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  background: #2a2a2a;
+  border: 1px solid #555;
+  border-radius: 4px;
+  z-index: 100;
+  min-width: 180px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.dropdownCategory {
+  padding: 8px 12px 4px 12px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #999;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.dropdownCategoryBorder {
+  padding: 8px 12px 4px 12px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #999;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 4px;
+  border-top: 1px solid #444;
+}
+
+.dropdownItem {
+  width: 100%;
+  padding: 8px 16px;
+  background: transparent;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  font-size: 13px;
+  color: white;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dropdownItemActive {
+  width: 100%;
+  padding: 8px 16px;
+  background: #5A9BD5;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  font-size: 13px;
+  color: white;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .leftPanelSearch {
   padding: 10px;
   border-bottom: 1px solid #1a1a1a;
   flex-shrink: 0;
-  color: white;
 }
 
-.leftPanelSearchInput {
+.searchInput2 {
   width: 100%;
   padding: 6px 8px;
   background: #3a3a3a;
@@ -278,15 +412,30 @@
   outline: none;
 }
 
+.searchControls {
+  margin-top: 8px;
+  display: flex;
+  gap: 6px;
+}
+
+.sortButton {
+  background: #3a3a3a;
+  color: white;
+  border: 1px solid #555;
+  padding: 4px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
 .leftPanelList {
   flex: 1;
   overflow-y: auto;
   padding: 6px;
   min-height: 0;
-  color: white;
 }
 
-.folderButton {
+.allAlbumsButton {
   width: 100%;
   display: flex;
   justify-content: space-between;
@@ -302,9 +451,20 @@
   text-align: left;
 }
 
-.folderButtonActive {
+.allAlbumsButtonActive {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 8px;
   background: #5A9BD5;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  margin-bottom: 3px;
+  font-size: 12px;
   color: white;
+  text-align: left;
 }
 
 .folderCount {
@@ -319,9 +479,18 @@
 .folderCountActive {
   background: #3578b3;
   color: white;
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
 }
 
-/* Center Panel */
+.crateIcon {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .centerPanel {
   flex: 1;
   display: flex;
@@ -331,33 +500,109 @@
   min-width: 0;
 }
 
-.centerPanelToolbar {
+.centerToolbar {
   padding: 6px 12px;
   border-bottom: 1px solid #555;
   display: flex;
   align-items: center;
   justify-content: space-between;
   background: #4a4a4a;
-  color: white;
   height: 40px;
   flex-shrink: 0;
 }
 
-.centerPanelToolbarLeft {
+.centerToolbarLeft {
   display: flex;
   gap: 6px;
   align-items: center;
-  color: white;
 }
 
-.centerPanelContent {
+.iconButton {
+  background: #3a3a3a;
+  border: 1px solid #555;
+  padding: 4px 9px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  color: white;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.sortDropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+  min-width: 240px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.sortCategory {
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #999;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: #f8f8f8;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.sortItem {
+  width: 100%;
+  padding: 10px 16px;
+  background: transparent;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  font-size: 13px;
+  color: #333;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sortItemActive {
+  width: 100%;
+  padding: 10px 16px;
+  background: #e3f2fd;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  font-size: 13px;
+  color: #333;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.albumCount {
+  font-size: 12px;
+  color: #ddd;
+  font-weight: 600;
+}
+
+.centerContent {
   flex: 1;
   overflow: hidden;
   background: #fff;
   min-height: 0;
 }
 
-/* Right Panel */
+.loading {
+  padding: 40px;
+  text-align: center;
+  color: #666;
+}
+
 .rightPanel {
   width: 380px;
   background: #fff;
@@ -368,26 +613,24 @@
   flex-shrink: 0;
 }
 
-.rightPanelToolbar {
+.rightToolbar {
   padding: 6px 12px;
   border-bottom: 1px solid #555;
   display: flex;
   align-items: center;
   justify-content: space-between;
   background: #4a4a4a;
-  color: white;
   height: 40px;
   flex-shrink: 0;
 }
 
-.rightPanelToolbarLeft {
+.rightToolbarLeft {
   display: flex;
   gap: 6px;
   align-items: center;
-  color: white;
 }
 
-.rightPanelToolbarButton {
+.rightButton {
   background: #3a3a3a;
   border: 1px solid #555;
   padding: 6px 10px;
@@ -397,43 +640,53 @@
   color: white;
 }
 
-/* Album Info Panel */
-.albumInfoPanel {
+.rightButtonText {
+  background: #3a3a3a;
+  border: 1px solid #555;
+  padding: 6px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  color: white;
+  font-weight: 600;
+}
+
+.infoPanel {
   padding: 16px;
   flex: 1;
   overflow-y: auto;
   background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
 }
 
-.albumInfoEmpty {
+.infoEmpty {
   padding: 40px 20px;
   text-align: center;
   color: #999;
   font-size: 14px;
 }
 
-.albumInfoArtist {
+.infoArtist {
   font-size: 14px;
   color: #333;
   margin-bottom: 4px;
   font-weight: 400;
 }
 
-.albumInfoTitle {
+.infoTitleRow {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-bottom: 16px;
 }
 
-.albumInfoTitleText {
+.infoTitle {
   color: #2196F3;
   margin: 0;
   font-size: 18px;
   font-weight: 400;
 }
 
-.albumInfoCheckmark {
+.infoCheck {
   background: #2196F3;
   color: white;
   border-radius: 4px;
@@ -444,12 +697,12 @@
   justify-content: center;
 }
 
-.albumInfoImage {
+.infoImage {
   position: relative;
   margin-bottom: 12px;
 }
 
-.albumInfoImagePlaceholder {
+.infoImagePlaceholder {
   width: 100%;
   aspect-ratio: 1;
   background: #fff;
@@ -461,7 +714,7 @@
   border: 1px solid #ddd;
 }
 
-.albumInfoCarousel {
+.infoDots {
   position: absolute;
   bottom: 8px;
   left: 50%;
@@ -470,7 +723,7 @@
   gap: 6px;
 }
 
-.albumInfoCarouselDot {
+.infoDot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
@@ -478,25 +731,29 @@
   cursor: pointer;
 }
 
-.albumInfoCarouselDotActive {
+.infoDotActive {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
   background: #333;
+  cursor: pointer;
 }
 
-.albumInfoLabel {
+.infoLabel {
   font-size: 14px;
   font-weight: 400;
   color: #333;
   margin-bottom: 8px;
 }
 
-.albumInfoGenres {
+.infoGenres {
   font-size: 13px;
   color: #666;
   margin-bottom: 12px;
   font-weight: 400;
 }
 
-.albumInfoBarcode {
+.infoBarcode {
   font-size: 12px;
   color: #333;
   margin-bottom: 8px;
@@ -504,28 +761,28 @@
   font-weight: 400;
 }
 
-.albumInfoCountry {
+.infoCountry {
   font-size: 13px;
   color: #333;
   margin-bottom: 8px;
   font-weight: 400;
 }
 
-.albumInfoFormat {
+.infoFormat {
   font-size: 13px;
   color: #333;
   margin-bottom: 12px;
   font-weight: 400;
 }
 
-.albumInfoCatNo {
+.infoCatNo {
   font-size: 13px;
   color: #666;
   margin-bottom: 12px;
   font-weight: 400;
 }
 
-.albumInfoLink {
+.infoLink {
   font-size: 13px;
   color: #2196F3;
   margin-bottom: 16px;
@@ -534,24 +791,24 @@
   font-weight: 400;
 }
 
-.albumInfoSection {
+.infoSection {
   margin-bottom: 16px;
 }
 
-.albumInfoSectionTitle {
+.infoSectionTitle {
   font-size: 16px;
   font-weight: 700;
   color: #2196F3;
   margin-bottom: 12px;
 }
 
-.albumInfoSectionContent {
+.infoSectionContent {
   background: white;
   padding: 12px;
   border-radius: 4px;
 }
 
-.albumInfoField {
+.infoField {
   font-size: 13px;
   color: #1f2937;
   margin-bottom: 8px;
@@ -559,17 +816,22 @@
   font-weight: 400;
 }
 
-.albumInfoFieldLabel {
+.infoFieldLabel {
   font-weight: 600;
   min-width: 140px;
 }
 
-.albumInfoFieldLabelWide {
+.infoFieldLabelWide {
   font-weight: 600;
   min-width: 180px;
 }
 
-.albumInfoNotes {
+.infoStars {
+  display: flex;
+  gap: 2px;
+}
+
+.infoNotes {
   font-size: 13px;
   color: #1f2937;
   line-height: 1.6;
@@ -580,13 +842,13 @@
   min-height: 40px;
 }
 
-.albumInfoTags {
+.infoTags {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-.albumInfoTag {
+.infoTag {
   padding: 6px 12px;
   background: #e5e7eb;
   color: #374151;
@@ -595,13 +857,12 @@
   font-weight: 400;
 }
 
-.albumInfoNoTags {
+.infoNoTags {
   font-size: 13px;
   color: #9ca3af;
   font-weight: 400;
 }
 
-/* Track Listings */
 .trackDisc {
   margin-bottom: 16px;
 }
@@ -631,6 +892,16 @@
   color: #6b7280;
   padding: 6px 8px;
   background: #f3f4f6;
+  margin-top: 4px;
+}
+
+.trackHeaderFirst {
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b7280;
+  padding: 6px 8px;
+  background: #f3f4f6;
+  margin-top: 0;
 }
 
 .trackRow {
@@ -638,10 +909,20 @@
   align-items: center;
   padding: 6px 8px;
   font-size: 13px;
+  background: white;
   font-weight: 400;
 }
 
-.trackPosition {
+.trackRowAlt {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px;
+  font-size: 13px;
+  background: #f9fafb;
+  font-weight: 400;
+}
+
+.trackPos {
   min-width: 28px;
   color: #6b7280;
   font-size: 13px;
@@ -661,166 +942,4 @@
   font-size: 13px;
   min-width: 40px;
   text-align: right;
-}
-
-/* Dropdown */
-.dropdown {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  margin-top: 4px;
-  background: white;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  z-index: 100;
-  min-width: 240px;
-  max-height: 400px;
-  overflow-y: auto;
-}
-
-.dropdownDark {
-  background: #2a2a2a;
-  border: 1px solid #555;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  color: white;
-}
-
-.dropdownCategory {
-  padding: 8px 12px;
-  font-size: 11px;
-  font-weight: 600;
-  color: #999;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  background: #f8f8f8;
-  border-bottom: 1px solid #e8e8e8;
-}
-
-.dropdownCategoryDark {
-  padding: 8px 12px 4px 12px;
-  font-size: 10px;
-  font-weight: 600;
-  color: #999;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  border-top: 1px solid #444;
-}
-
-.dropdownItem {
-  width: 100%;
-  padding: 10px 16px;
-  background: transparent;
-  border: none;
-  text-align: left;
-  cursor: pointer;
-  font-size: 13px;
-  color: #333;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.dropdownItemActive {
-  background: #e3f2fd;
-  color: #333;
-}
-
-.dropdownItemDark {
-  color: white;
-}
-
-.dropdownItemDark.dropdownItemActive {
-  background: #5A9BD5;
-  color: white;
-}
-
-.dropdownOverlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 99;
-}
-
-/* Search Input */
-.searchContainer {
-  position: relative;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-}
-
-.searchButton {
-  background: #2a2a2a;
-  color: white;
-  border: 1px solid #555;
-  border-right: none;
-  padding: 6px 10px;
-  cursor: pointer;
-  font-size: 13px;
-  border-radius: 3px 0 0 3px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  height: 32px;
-  flex-shrink: 0;
-}
-
-.searchInput {
-  background: #2a2a2a;
-  color: white;
-  border: 1px solid #555;
-  border-left: none;
-  padding: 6px 12px;
-  border-radius: 0 3px 3px 0;
-  font-size: 13px;
-  width: 220px;
-  height: 32px;
-  outline: none;
-  flex-shrink: 0;
-}
-
-/* Main layout */
-.mainContent {
-  display: flex;
-  flex: 1;
-  overflow: hidden;
-  min-height: 0;
-}
-
-/* Utility */
-.flex {
-  display: flex;
-}
-
-.flexRow {
-  display: flex;
-  flex-direction: row;
-}
-
-.flexColumn {
-  display: flex;
-  flex-direction: column;
-}
-
-.flex1 {
-  flex: 1;
-}
-
-.gap8 {
-  gap: 8px;
-}
-
-.gap6 {
-  gap: 6px;
-}
-
-.alignCenter {
-  align-items: center;
-}
-
-.justifyBetween {
-  justify-content: space-between;
 }
