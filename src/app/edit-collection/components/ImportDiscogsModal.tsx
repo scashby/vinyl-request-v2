@@ -438,8 +438,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
         // Load existing collection
         const { data: existing, error: dbError } = await supabase
           .from('collection')
-          .select('id, artist, title, artist_norm, title_norm, artist_album_norm, discogs_release_id, image_url, tracks, discogs_genres, packaging')
-          .limit(10000);  // Set high limit to get all albums (default is 1000)
+          .select('id, artist, title, artist_norm, title_norm, artist_album_norm, discogs_release_id, image_url, tracks, discogs_genres, packaging');
 
         if (dbError) {
           setError(`Database error: ${dbError.message}`);
@@ -447,8 +446,14 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
           return;
         }
 
+        if (!existing) {
+          setError('No data returned from database');
+          setComparedAlbums([]);
+          return;
+        }
+
         // Store total database count
-        setTotalDatabaseCount(existing?.length || 0);
+        setTotalDatabaseCount(existing.length);
 
         // Compare to show diagnostic counts
         const compared = compareAlbums(parsed, existing as ExistingAlbum[]);
