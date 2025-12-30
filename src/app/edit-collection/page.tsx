@@ -1,7 +1,7 @@
 // src/app/edit-collection/page.tsx - WITH CRATES FUNCTIONALITY AND PRINT TO PDF
 'use client';
 
-import { useCallback, useEffect, useState, useMemo, memo } from 'react';
+import { useCallback, useEffect, useState, useMemo, Suspense, memo } from 'react';
 import Image from 'next/image';
 import { supabase } from '../../lib/supabaseClient';
 import CollectionTable from '../../components/CollectionTable';
@@ -752,8 +752,8 @@ function CollectionBrowserPage() {
         [class*="Navigation"],
         [class*="navbar"],
         [class*="NavBar"],
-        [class*="sidebar"]:not(.clz-sidebar),
-        [class*="Sidebar"]:not(.clz-sidebar) {
+        body > [class*="sidebar"]:not(.clz-sidebar),
+        body > [class*="Sidebar"]:not(.clz-sidebar) {
           display: none !important;
         }
         body {
@@ -1041,4 +1041,21 @@ function CollectionBrowserPage() {
   );
 }
 
-export default CollectionBrowserPage;
+export default function Page() {
+  return (
+    <Suspense fallback={
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh',
+        fontSize: '16px',
+        color: '#666'
+      }}>
+        Loading...
+      </div>
+    }>
+      <CollectionBrowserPage />
+    </Suspense>
+  );
+}
