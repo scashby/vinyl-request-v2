@@ -564,10 +564,8 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
               year_int: album.year ? parseInt(album.year) : null,
               discogs_release_id: album.discogs_release_id,
               discogs_master_id: album.discogs_master_id,
-              artist_norm: album.artist_norm,
-              title_norm: album.title_norm,
-              artist_album_norm: album.artist_album_norm,
-              // album_norm is a generated column - don't include it
+              // All normalized fields are generated columns - don't include them:
+              // artist_norm, title_norm, artist_album_norm, album_norm
             };
 
             // Parse format

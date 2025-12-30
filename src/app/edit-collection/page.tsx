@@ -22,6 +22,7 @@ import ImportDiscogsModal from './components/ImportDiscogsModal';
 import ImportCLZModal from './components/ImportCLZModal';
 import ImportCSVModal from './components/ImportCSVModal';
 import ImportEnrichModal from './components/ImportEnrichModal';
+import FindDuplicatesModal from './FindDuplicatesModal';
 import type { Crate } from '../../types/crate';
 import { albumMatchesSmartCrate } from '../../lib/crateUtils';
 import { BoxIcon } from '../../components/BoxIcon';
@@ -407,6 +408,7 @@ function CollectionBrowserPage() {
   const [showImportCLZModal, setShowImportCLZModal] = useState(false);
   const [showImportCSVModal, setShowImportCSVModal] = useState(false);
   const [showImportEnrichModal, setShowImportEnrichModal] = useState(false);
+  const [showFindDuplicates, setShowFindDuplicates] = useState(false);
   const [editingCrate, setEditingCrate] = useState<Crate | null>(null);
   const [returnToAddToCrate, setReturnToAddToCrate] = useState(false);
   const [newlyCreatedCrateId, setNewlyCreatedCrateId] = useState<number | null>(null);
@@ -804,7 +806,7 @@ function CollectionBrowserPage() {
                 <button onClick={() => { setSidebarOpen(false); setShowImportModal(true); }} title="Import album data from various sources" className={styles.sidebarButton}>
                   <span style={{ marginRight: '10px' }}>📥</span> Import Data
                 </button>
-                <button title="Find duplicate albums" className={styles.sidebarButton}>
+                <button onClick={() => { setSidebarOpen(false); setShowFindDuplicates(true); }} title="Find duplicate albums" className={styles.sidebarButton}>
                   <span style={{ marginRight: '10px' }}>🔍</span> Find Duplicates
                 </button>
                 <button title="Track loaned albums" className={styles.sidebarButton}>
@@ -1075,6 +1077,11 @@ function CollectionBrowserPage() {
         isOpen={showImportEnrichModal} 
         onClose={() => setShowImportEnrichModal(false)} 
         onImportComplete={loadAlbums} 
+      />}
+      {showFindDuplicates && <FindDuplicatesModal 
+        isOpen={showFindDuplicates} 
+        onClose={() => setShowFindDuplicates(false)} 
+        onDuplicatesRemoved={loadAlbums} 
       />}
     </>
   );
