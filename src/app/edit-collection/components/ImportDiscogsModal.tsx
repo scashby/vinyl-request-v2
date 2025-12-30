@@ -340,93 +340,142 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
     }
   }, [handleFileSelect]);
 
+  const getImpactClass = (impact: string) => {
+    switch (impact) {
+      case 'CRITICAL': return styles.impactCritical;
+      case 'HIGH': return styles.impactHigh;
+      case 'MEDIUM': return styles.impactMedium;
+      case 'LOW': return styles.impactLow;
+      default: return '';
+    }
+  };
+
+  const getStatusClass = (status: string) => {
+    switch (status) {
+      case 'NEW': return styles.importStatusNew;
+      case 'CHANGED': return styles.importStatusChanged;
+      case 'UNCHANGED': return styles.importStatusUnchanged;
+      case 'REMOVED': return styles.importStatusRemoved;
+      default: return '';
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
-    <div className={styles.container}>
-      <div className={styles.header}>
-        <div className={styles.headerLeft}>
-          <button onClick={onClose} className={styles.headerMenuButton}>◀ Back</button>
-          <div className={styles.headerTitle}>
-            <span>Import from Discogs CSV</span>
-          </div>
+    <div className={styles.importModalContainer}>
+      <div className={styles.importModalHeader}>
+        <div className={styles.importModalHeaderLeft}>
+          <button onClick={onClose} className={styles.importModalBackButton}>◀ Back</button>
+          <div className={styles.importModalTitle}>Import from Discogs CSV</div>
         </div>
-        <div className={styles.headerRight}>
-          <button onClick={onClose} className={styles.headerButton}>×</button>
-        </div>
+        <button onClick={onClose} className={styles.importModalCloseButton}>×</button>
       </div>
 
-      <div className={styles.mainContent}>
+      <div className={styles.importModalContent}>
         {step === 'upload' && (
-          <div className={styles.centerPanel}>
-            <h2>Select Discogs CSV Export</h2>
+          <div className={styles.importModalInner}>
+            <h2 className={styles.importModalH2}>Select Discogs CSV Export</h2>
             
-            <div>
-              <label>Sync Mode</label>
-              {SYNC_MODE_INFO.map(mode => (
-                <div key={mode.value}>
-                  <label>
-                    <input
-                      type="radio"
-                      checked={syncMode === mode.value}
-                      onChange={() => setSyncMode(mode.value)}
-                    />
-                    <span>{mode.label}</span>
-                    <span>({mode.apiImpact} API Impact)</span>
-                  </label>
-                  <p>{mode.description}</p>
-                </div>
-              ))}
+            <div className={styles.importSyncModeSection}>
+              <label className={styles.importSyncModeLabel}>Sync Mode</label>
+              <div className={styles.importSyncModeOptions}>
+                {SYNC_MODE_INFO.map(mode => (
+                  <div 
+                    key={mode.value} 
+                    className={syncMode === mode.value ? styles.importSyncModeOptionSelected : styles.importSyncModeOption}
+                    onClick={() => setSyncMode(mode.value)}
+                  >
+                    <div className={styles.importSyncModeOptionTop}>
+                      <input
+                        type="radio"
+                        checked={syncMode === mode.value}
+                        onChange={() => setSyncMode(mode.value)}
+                        className={styles.importSyncModeRadio}
+                      />
+                      <span className={styles.importSyncModeOptionName}>{mode.label}</span>
+                      <span className={`${styles.importSyncModeImpact} ${getImpactClass(mode.apiImpact)}`}>
+                        {mode.apiImpact} API Impact
+                      </span>
+                    </div>
+                    <p className={styles.importSyncModeDescription}>{mode.description}</p>
+                  </div>
+                ))}
+              </div>
             </div>
 
             <div
+              className={styles.importDropzone}
               onDrop={handleDrop}
               onDragOver={(e) => e.preventDefault()}
               onClick={() => fileInputRef.current?.click()}
             >
-              <div>📄</div>
-              <p>Drag and drop your Discogs CSV here, or click to browse</p>
+              <div className={styles.importDropzoneIcon}>📄</div>
+              <p className={styles.importDropzoneText}>Drag and drop your Discogs CSV here, or click to browse</p>
               <input
                 ref={fileInputRef}
                 type="file"
                 accept=".csv"
                 onChange={handleFileSelect}
+                className={styles.importFileInput}
               />
             </div>
 
-            <div>
-              <div>✅ Discogs enrichment enabled</div>
-              <p>All albums will be enriched with metadata from Discogs API based on your sync mode selection.</p>
+            <div className={styles.importEnrichSection}>
+              <div className={styles.importEnrichTitle}>
+                <span>✅</span>
+                <span>Discogs enrichment enabled</span>
+              </div>
+              <p className={styles.importEnrichDescription}>
+                All albums will be enriched with metadata from Discogs API based on your sync mode selection.
+              </p>
               
-              <label>
+              <label className={styles.importCheckboxLabel}>
                 <input
                   type="checkbox"
                   checked={enableFormatParser}
                   onChange={(e) => setEnableFormatParser(e.target.checked)}
                 />
-                <span>Enable format parser</span>
+                <span className={styles.importCheckboxText}>Enable format parser</span>
               </label>
-              <p>Parse format strings to extract vinyl details (weight, color, RPM, etc.)</p>
+              <p className={styles.importCheckboxDescription}>
+                Parse format strings to extract vinyl details (weight, color, RPM, etc.)
+              </p>
             </div>
 
-            {error && <div className={styles.loading}>{error}</div>}
+            {error && <div className={styles.importError}>{error}</div>}
           </div>
         )}
 
         {step === 'preview' && (
-          <div className={styles.centerPanel}>
-            <h2>Import Preview</h2>
+          <div className={styles.importModalInner}>
+            <h2 className={styles.importModalH2}>Import Preview</h2>
             
-            <div>
-              <div><div>{stats.newCount}</div><div>NEW</div></div>
-              <div><div>{stats.changedCount}</div><div>CHANGED</div></div>
-              <div><div>{stats.unchangedCount}</div><div>UNCHANGED</div></div>
-              <div><div>{stats.removedCount}</div><div>REMOVED</div></div>
-              <div><div>{stats.toScrapeCount}</div><div>TO SCRAPE</div></div>
+            <div className={styles.importPreviewStats}>
+              <div className={styles.importPreviewStat}>
+                <div className={styles.importPreviewStatValue}>{stats.newCount}</div>
+                <div className={styles.importPreviewStatLabel}>NEW</div>
+              </div>
+              <div className={styles.importPreviewStat}>
+                <div className={styles.importPreviewStatValue}>{stats.changedCount}</div>
+                <div className={styles.importPreviewStatLabel}>CHANGED</div>
+              </div>
+              <div className={styles.importPreviewStat}>
+                <div className={styles.importPreviewStatValue}>{stats.unchangedCount}</div>
+                <div className={styles.importPreviewStatLabel}>UNCHANGED</div>
+              </div>
+              <div className={styles.importPreviewStat}>
+                <div className={styles.importPreviewStatValue}>{stats.removedCount}</div>
+                <div className={styles.importPreviewStatLabel}>REMOVED</div>
+              </div>
+              <div className={styles.importPreviewStat}>
+                <div className={styles.importPreviewStatValue}>{stats.toScrapeCount}</div>
+                <div className={styles.importPreviewStatLabel}>TO SCRAPE</div>
+              </div>
             </div>
 
-            <div>
-              <table>
+            <div className={styles.importPreviewTableContainer}>
+              <table className={styles.importPreviewTable}>
                 <thead>
                   <tr>
                     <th>Status</th>
@@ -438,7 +487,11 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 <tbody>
                   {comparison.slice(0, 100).map((item, idx) => (
                     <tr key={idx}>
-                      <td><span>{item.status}</span></td>
+                      <td>
+                        <span className={`${styles.importStatusBadge} ${getStatusClass(item.status)}`}>
+                          {item.status}
+                        </span>
+                      </td>
                       <td>{item.parsed?.artist || item.existing?.artist}</td>
                       <td>{item.parsed?.title || item.existing?.title}</td>
                       <td>{item.parsed?.format || item.existing?.format}</td>
@@ -448,30 +501,44 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
               </table>
             </div>
 
-            <div>
-              <button onClick={handleReset} className={styles.headerButton}>Cancel</button>
-              <button onClick={handleImport} className={styles.addButton}>Import {parsedData.length} Albums</button>
+            <div className={styles.importButtonContainer}>
+              <button onClick={handleReset} className={styles.importCancelButton}>Cancel</button>
+              <button onClick={handleImport} className={styles.importConfirmButton}>
+                Import {parsedData.length} Albums
+              </button>
             </div>
           </div>
         )}
 
         {step === 'importing' && (
-          <div className={styles.centerPanel}>
-            <h2>Importing...</h2>
-            <p>{importProgress.stage}</p>
-            <div className={styles.loading}>
-              <div />
+          <div className={styles.importProgressContainer}>
+            <div className={styles.importProgressIcon}>⏳</div>
+            <h2 className={styles.importModalH2}>Importing...</h2>
+            <p className={styles.importProgressStage}>{importProgress.stage}</p>
+            <div className={styles.importProgressBar}>
+              <div 
+                className={styles.importProgressBarFill}
+              />
             </div>
-            <p>{importProgress.current} / {importProgress.total}</p>
+            <p className={styles.importProgressText}>
+              {importProgress.current} / {importProgress.total}
+            </p>
           </div>
         )}
 
         {step === 'complete' && (
-          <div className={styles.centerPanel}>
-            <div>✅</div>
-            <h2>Import Complete!</h2>
-            <p>Successfully imported {parsedData.length} albums.</p>
-            <button onClick={() => { onImportComplete(); onClose(); }} className={styles.addButton}>Done</button>
+          <div className={styles.importCompleteContainer}>
+            <div className={styles.importCompleteIcon}>✅</div>
+            <h2 className={styles.importModalH2}>Import Complete!</h2>
+            <p className={styles.importCompleteText}>
+              Successfully imported {parsedData.length} albums.
+            </p>
+            <button 
+              onClick={() => { onImportComplete(); onClose(); }} 
+              className={styles.importDoneButton}
+            >
+              Done
+            </button>
           </div>
         )}
       </div>
