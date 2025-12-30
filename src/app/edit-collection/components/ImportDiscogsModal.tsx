@@ -146,9 +146,12 @@ function compareAlbums(
   parsed: ParsedAlbum[],
   existing: ExistingAlbum[]
 ): ComparedAlbum[] {
+  // Build map with normalized fields (handle missing normalized fields)
   const existingMap = new Map<string, ExistingAlbum>();
   existing.forEach(album => {
-    existingMap.set(album.artist_album_norm, album);
+    const normalizedKey = album.artist_album_norm || 
+      normalizeArtistAlbum(album.artist, album.title);
+    existingMap.set(normalizedKey, album);
   });
 
   const compared: ComparedAlbum[] = [];
@@ -169,7 +172,7 @@ function compareAlbums(
       // Exists - check what's missing
       const missingFields: string[] = [];
       
-      if (!existingAlbum.image_url) missingFields.push('image_url');
+      if (!existingAlbum.image_url) missingFields.push('cover images');
       if (!existingAlbum.tracks || existingAlbum.tracks.length === 0) missingFields.push('tracks');
       if (!existingAlbum.discogs_genres || existingAlbum.discogs_genres.length === 0) missingFields.push('genres');
       if (!existingAlbum.packaging) missingFields.push('packaging');
@@ -190,6 +193,9 @@ function compareAlbums(
 
   // Remaining in database but not in CSV = REMOVED
   for (const [, existingAlbum] of existingMap) {
+    const normalizedKey = existingAlbum.artist_album_norm || 
+      normalizeArtistAlbum(existingAlbum.artist, existingAlbum.title);
+      
     compared.push({
       artist: existingAlbum.artist,
       title: existingAlbum.title,
@@ -201,10 +207,10 @@ function compareAlbums(
       year: null,
       discogs_release_id: existingAlbum.discogs_release_id || '',
       discogs_master_id: null,
-      artist_norm: existingAlbum.artist_norm,
-      title_norm: existingAlbum.title_norm,
-      artist_album_norm: existingAlbum.artist_album_norm,
-      album_norm: existingAlbum.title_norm,
+      artist_norm: existingAlbum.artist_norm || normalizeArtist(existingAlbum.artist),
+      title_norm: existingAlbum.title_norm || normalizeTitle(existingAlbum.title),
+      artist_album_norm: normalizedKey,
+      album_norm: existingAlbum.title_norm || normalizeTitle(existingAlbum.title),
       status: 'REMOVED',
       existingId: existingAlbum.id,
       needsEnrichment: false,
@@ -519,7 +525,6 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
   };
 
   const newCount = comparedAlbums.filter(a => a.status === 'NEW').length;
-  const changedCount = comparedAlbums.filter(a => a.status === 'CHANGED').length;
   const unchangedCount = comparedAlbums.filter(a => a.status === 'UNCHANGED').length;
   const removedCount = comparedAlbums.filter(a => a.status === 'REMOVED').length;
 
@@ -674,37 +679,44 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
           {/* PREVIEW STAGE */}
           {stage === 'preview' && (
             <>
+              {/* Summary Stats */}
               <div style={{
                 padding: '16px',
                 backgroundColor: '#f9fafb',
                 borderRadius: '6px',
-                marginBottom: '20px',
+                marginBottom: '16px',
               }}>
                 <h3 style={{ margin: '0 0 12px 0', fontSize: '15px', fontWeight: '600', color: '#111827' }}>
-                  Import Preview
+                  Import Summary
                 </h3>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '14px' }}>
-                  <div>
-                    <span style={{ color: '#059669', fontWeight: '600' }}>NEW:</span>{' '}
-                    <span style={{ color: '#6b7280' }}>{newCount} albums</span>
+                <div style={{ fontSize: '14px', color: '#6b7280', marginBottom: '12px' }}>
+                  <strong>{comparedAlbums.filter(a => a.status !== 'REMOVED').length}</strong> albums found in CSV
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '14px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#059669', fontWeight: '600' }}>New albums to add:</span>
+                    <span style={{ color: '#111827', fontWeight: '600' }}>{newCount}</span>
                   </div>
-                  <div>
-                    <span style={{ color: '#d97706', fontWeight: '600' }}>CHANGED:</span>{' '}
-                    <span style={{ color: '#6b7280' }}>{changedCount} albums</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#d97706', fontWeight: '600' }}>Existing albums missing data:</span>
+                    <span style={{ color: '#111827', fontWeight: '600' }}>
+                      {comparedAlbums.filter(a => a.status === 'CHANGED' && a.needsEnrichment).length}
+                    </span>
                   </div>
-                  <div>
-                    <span style={{ color: '#6b7280', fontWeight: '600' }}>UNCHANGED:</span>{' '}
-                    <span style={{ color: '#6b7280' }}>{unchangedCount} albums</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#6b7280', fontWeight: '600' }}>Unchanged albums:</span>
+                    <span style={{ color: '#111827', fontWeight: '600' }}>{unchangedCount}</span>
                   </div>
-                  {syncMode === 'full_sync' && (
-                    <div>
-                      <span style={{ color: '#dc2626', fontWeight: '600' }}>REMOVED:</span>{' '}
-                      <span style={{ color: '#6b7280' }}>{removedCount} albums</span>
+                  {syncMode === 'full_sync' && removedCount > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#dc2626', fontWeight: '600' }}>Albums to remove:</span>
+                      <span style={{ color: '#111827', fontWeight: '600' }}>{removedCount}</span>
                     </div>
                   )}
                 </div>
               </div>
 
+              {/* Mode Warning */}
               <div style={{
                 padding: '12px',
                 backgroundColor: '#fef3c7',
@@ -712,6 +724,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 borderRadius: '4px',
                 fontSize: '13px',
                 color: '#92400e',
+                marginBottom: '16px',
               }}>
                 <strong>Mode: {syncMode.replace(/_/g, ' ').toUpperCase()}</strong>
                 <br />
@@ -719,6 +732,74 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                 {syncMode === 'full_sync' && 'Will scrape missing/changed data for all CSV albums and remove albums not in CSV.'}
                 {syncMode === 'partial_sync' && 'Will only process new and changed albums.'}
                 {syncMode === 'new_only' && 'Will only add albums not currently in database.'}
+              </div>
+
+              {/* Preview Table */}
+              <div style={{
+                border: '1px solid #e5e7eb',
+                borderRadius: '6px',
+                overflow: 'hidden',
+              }}>
+                <div style={{
+                  padding: '10px 12px',
+                  backgroundColor: '#f9fafb',
+                  borderBottom: '1px solid #e5e7eb',
+                  fontWeight: '600',
+                  fontSize: '13px',
+                  color: '#6b7280',
+                }}>
+                  Preview (first 10 albums)
+                </div>
+                <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                  <table style={{ width: '100%', fontSize: '13px', borderCollapse: 'collapse' }}>
+                    <thead style={{ position: 'sticky', top: 0, backgroundColor: '#f9fafb', zIndex: 1 }}>
+                      <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
+                        <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: '#6b7280' }}>Artist</th>
+                        <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: '#6b7280' }}>Title</th>
+                        <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: '#6b7280' }}>Status</th>
+                        <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: '#6b7280' }}>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {comparedAlbums.slice(0, 10).map((album, idx) => {
+                        let statusColor = '#6b7280';
+                        let statusDisplay: string = album.status;
+                        let actionText = 'No action';
+
+                        if (album.status === 'NEW') {
+                          statusColor = '#059669';
+                          statusDisplay = 'NEW';
+                          actionText = 'Add + enrich';
+                        } else if (album.status === 'CHANGED' && album.needsEnrichment) {
+                          statusColor = '#d97706';
+                          statusDisplay = 'MISSING DATA';
+                          actionText = album.missingFields.join(', ');
+                        } else if (album.status === 'UNCHANGED') {
+                          statusColor = '#6b7280';
+                          statusDisplay = 'UNCHANGED';
+                          actionText = 'Skip';
+                        } else if (album.status === 'REMOVED') {
+                          statusColor = '#dc2626';
+                          statusDisplay = 'REMOVED';
+                          actionText = syncMode === 'full_sync' ? 'Delete' : 'Keep';
+                        }
+
+                        return (
+                          <tr key={idx} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                            <td style={{ padding: '8px 12px', color: '#111827' }}>{album.artist}</td>
+                            <td style={{ padding: '8px 12px', color: '#111827' }}>{album.title}</td>
+                            <td style={{ padding: '8px 12px', color: statusColor, fontWeight: '600' }}>
+                              {statusDisplay}
+                            </td>
+                            <td style={{ padding: '8px 12px', color: '#6b7280', fontSize: '12px' }}>
+                              {actionText}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </>
           )}
