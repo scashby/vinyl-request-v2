@@ -140,28 +140,7 @@ function compareAlbums(
     artistAlbumMap.set(normalizedKey, album);
   });
 
-  // DEBUG: Log first 5 database normalized keys
-  console.log('=== DATABASE SAMPLE NORMALIZED KEYS ===');
-  let dbCount = 0;
-  for (const [key, album] of artistAlbumMap) {
-    if (dbCount < 5) {
-      console.log(`DB: "${key}" <- "${album.artist}" + "${album.title}"`);
-      dbCount++;
-    }
-  }
-  console.log(`Total database albums in map: ${artistAlbumMap.size}`);
-
   const compared: ComparedAlbum[] = [];
-
-  // DEBUG: Log first 5 CSV normalized keys
-  console.log('=== CSV SAMPLE NORMALIZED KEYS ===');
-  for (let i = 0; i < Math.min(5, parsed.length); i++) {
-    console.log(`CSV: "${parsed[i].artist_album_norm}" <- "${parsed[i].artist}" + "${parsed[i].title}"`);
-  }
-  console.log(`Total CSV albums: ${parsed.length}`);
-
-  let matchedCount = 0;
-  let newCount = 0;
 
   // Check parsed albums
   for (const parsedAlbum of parsed) {
@@ -170,25 +149,15 @@ function compareAlbums(
     // First, try to match by discogs_release_id (most precise)
     if (parsedAlbum.discogs_release_id) {
       existingAlbum = releaseIdMap.get(parsedAlbum.discogs_release_id);
-      if (existingAlbum) {
-        console.log(`MATCHED by release_id: ${parsedAlbum.discogs_release_id}`);
-      }
     }
     
     // If no match by release_id, try by artist_album_norm (fallback)
     if (!existingAlbum) {
       existingAlbum = artistAlbumMap.get(parsedAlbum.artist_album_norm);
-      if (existingAlbum) {
-        console.log(`MATCHED by norm: "${parsedAlbum.artist_album_norm}"`);
-      }
     }
 
     if (!existingAlbum) {
       // NEW album
-      newCount++;
-      if (newCount <= 3) {
-        console.log(`NEW (no match): "${parsedAlbum.artist_album_norm}" <- "${parsedAlbum.artist}" + "${parsedAlbum.title}"`);
-      }
       compared.push({
         ...parsedAlbum,
         status: 'NEW',
@@ -197,7 +166,6 @@ function compareAlbums(
       });
     } else {
       // Exists - check what's missing
-      matchedCount++;
       const missingFields: string[] = [];
       
       if (!existingAlbum.image_url) missingFields.push('cover images');
@@ -215,7 +183,7 @@ function compareAlbums(
         missingFields,
       });
 
-      // Remove from both maps
+      // Remove from both maps to prevent duplicate matches
       if (existingAlbum.discogs_release_id) {
         releaseIdMap.delete(existingAlbum.discogs_release_id);
       }
@@ -252,12 +220,6 @@ function compareAlbums(
       missingFields: [],
     });
   }
-
-  console.log('=== COMPARISON SUMMARY ===');
-  console.log(`Total CSV albums: ${parsed.length}`);
-  console.log(`Matched albums: ${matchedCount}`);
-  console.log(`New albums: ${newCount}`);
-  console.log(`Removed albums: ${artistAlbumMap.size}`);
 
   return compared;
 }
@@ -476,7 +438,8 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
         // Load existing collection
         const { data: existing, error: dbError } = await supabase
           .from('collection')
-          .select('id, artist, title, artist_norm, title_norm, artist_album_norm, discogs_release_id, image_url, tracks, discogs_genres, packaging');
+          .select('id, artist, title, artist_norm, title_norm, artist_album_norm, discogs_release_id, image_url, tracks, discogs_genres, packaging')
+          .limit(10000);  // Set high limit to get all albums (default is 1000)
 
         if (dbError) {
           setError(`Database error: ${dbError.message}`);
