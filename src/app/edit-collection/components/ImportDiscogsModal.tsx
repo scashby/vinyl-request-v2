@@ -927,7 +927,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                   fontSize: '13px',
                   color: '#6b7280',
                 }}>
-                  Preview (first 10 albums)
+                  Preview (first 10 albums that will be processed)
                 </div>
                 <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
                   <table style={{ width: '100%', fontSize: '13px', borderCollapse: 'collapse' }}>
@@ -940,7 +940,23 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                       </tr>
                     </thead>
                     <tbody>
-                      {comparedAlbums.slice(0, 10).map((album, idx) => {
+                      {(() => {
+                        // Filter albums based on sync mode to show only what will be processed
+                        let albumsToShow = comparedAlbums;
+                        
+                        if (syncMode === 'new_only') {
+                          albumsToShow = comparedAlbums.filter(a => a.status === 'NEW');
+                        } else if (syncMode === 'partial_sync') {
+                          albumsToShow = comparedAlbums.filter(a => 
+                            a.status === 'NEW' || (a.status === 'CHANGED' && a.needsEnrichment)
+                          );
+                        } else if (syncMode === 'full_sync') {
+                          // Show everything except unchanged
+                          albumsToShow = comparedAlbums.filter(a => a.status !== 'UNCHANGED');
+                        }
+                        // full_replacement shows everything
+                        
+                        return albumsToShow.slice(0, 10).map((album, idx) => {
                         let statusColor = '#6b7280';
                         let statusDisplay: string = album.status;
                         let actionText = 'No action';
@@ -986,7 +1002,8 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                             </td>
                           </tr>
                         );
-                      })}
+                      });
+                      })()}
                     </tbody>
                   </table>
                 </div>
