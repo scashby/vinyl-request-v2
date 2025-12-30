@@ -497,9 +497,24 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
         albumsToProcess = comparedAlbums.filter(a => a.status !== 'REMOVED');
       } else if (syncMode === 'full_sync') {
         // Process all CSV albums (scrape missing/changed data), delete REMOVED
-        const removed = comparedAlbums.filter(a => a.status === 'REMOVED');
+        const removed = comparedAlbums.filter(a => a.status === 'REMOVED' && a.existingId);
         if (removed.length > 0) {
-          await supabase.from('collection').delete().in('id', removed.map(a => a.existingId!));
+          const idsToDelete = removed.map(a => a.existingId!);
+          
+          // Batch deletes to avoid URL length limits (100 IDs at a time)
+          const batchSize = 100;
+          for (let i = 0; i < idsToDelete.length; i += batchSize) {
+            const batch = idsToDelete.slice(i, i + batchSize);
+            const { error: deleteError } = await supabase
+              .from('collection')
+              .delete()
+              .in('id', batch);
+            
+            if (deleteError) {
+              console.error('Delete error:', deleteError);
+              // Continue even if some deletes fail
+            }
+          }
         }
         albumsToProcess = comparedAlbums.filter(a => a.status !== 'REMOVED');
       } else if (syncMode === 'partial_sync') {
@@ -552,7 +567,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
               artist_norm: album.artist_norm,
               title_norm: album.title_norm,
               artist_album_norm: album.artist_album_norm,
-              album_norm: album.album_norm,
+              // album_norm is a generated column - don't include it
             };
 
             // Parse format
