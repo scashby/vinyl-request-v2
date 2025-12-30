@@ -18,6 +18,7 @@ import ManagePickListsModal from './ManagePickListsModal';
 import { PrintToPDFModal } from './PrintToPDFModal';
 import { StatisticsModal } from './StatisticsModal';
 import ImportSelectionModal from './components/ImportSelectionModal';
+import ImportDiscogsModal from './components/ImportDiscogsModal';
 import type { Crate } from '../../types/crate';
 import { albumMatchesSmartCrate } from '../../lib/crateUtils';
 import { BoxIcon } from '../../components/BoxIcon';
@@ -399,6 +400,7 @@ function CollectionBrowserPage() {
   const [showPrintToPDF, setShowPrintToPDF] = useState(false);
   const [showStatistics, setShowStatistics] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showImportDiscogsModal, setShowImportDiscogsModal] = useState(false);
   const [editingCrate, setEditingCrate] = useState<Crate | null>(null);
   const [returnToAddToCrate, setReturnToAddToCrate] = useState(false);
   const [newlyCreatedCrateId, setNewlyCreatedCrateId] = useState<number | null>(null);
@@ -1036,7 +1038,23 @@ function CollectionBrowserPage() {
       {showAddToCrateModal && <AddToCrateModal isOpen={showAddToCrateModal} onClose={() => { setShowAddToCrateModal(false); setReturnToAddToCrate(false); setNewlyCreatedCrateId(null); }} crates={cratesWithCounts} onAddToCrates={handleAddToCrates} selectedCount={selectedAlbumIds.size} onOpenNewCrate={() => { setReturnToAddToCrate(true); setShowAddToCrateModal(false); setEditingCrate(null); setShowNewCrateModal(true); }} autoSelectCrateId={newlyCreatedCrateId} />}
       {showPrintToPDF && <PrintToPDFModal isOpen={showPrintToPDF} onClose={() => setShowPrintToPDF(false)} allAlbums={albums} currentListAlbums={filteredAndSortedAlbums} checkedAlbumIds={selectedAlbumIds} />}
       {showStatistics && <StatisticsModal isOpen={showStatistics} onClose={() => setShowStatistics(false)} albums={albums} />}
-      {showImportModal && <ImportSelectionModal onSelectImportType={(type) => { setShowImportModal(false); if (type === 'csv') { window.location.href = '/admin/import-csv'; } else if (type === 'discogs') { window.location.href = '/admin/import-discogs'; } else if (type === 'clz') { window.location.href = '/admin/import-clz'; } else if (type === 'enrich') { window.location.href = '/admin/enrich-sources'; }}} onCancel={() => setShowImportModal(false)} />}
+      {showImportModal && <ImportSelectionModal onSelectImportType={(type) => { 
+        setShowImportModal(false); 
+        if (type === 'discogs') {
+          setShowImportDiscogsModal(true);
+        } else if (type === 'csv') { 
+          window.location.href = '/admin/import-csv'; 
+        } else if (type === 'clz') { 
+          window.location.href = '/admin/import-clz'; 
+        } else if (type === 'enrich') { 
+          window.location.href = '/admin/enrich-sources'; 
+        }
+      }} onCancel={() => setShowImportModal(false)} />}
+      {showImportDiscogsModal && <ImportDiscogsModal 
+        isOpen={showImportDiscogsModal} 
+        onClose={() => setShowImportDiscogsModal(false)} 
+        onImportComplete={loadAlbums} 
+      />}
     </>
   );
 }
