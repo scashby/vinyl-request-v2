@@ -19,6 +19,9 @@ import { PrintToPDFModal } from './PrintToPDFModal';
 import { StatisticsModal } from './StatisticsModal';
 import ImportSelectionModal from './components/ImportSelectionModal';
 import ImportDiscogsModal from './components/ImportDiscogsModal';
+import ImportCLZModal from './components/ImportCLZModal';
+import ImportCSVModal from './components/ImportCSVModal';
+import ImportEnrichModal from './components/ImportEnrichModal';
 import type { Crate } from '../../types/crate';
 import { albumMatchesSmartCrate } from '../../lib/crateUtils';
 import { BoxIcon } from '../../components/BoxIcon';
@@ -401,6 +404,9 @@ function CollectionBrowserPage() {
   const [showStatistics, setShowStatistics] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showImportDiscogsModal, setShowImportDiscogsModal] = useState(false);
+  const [showImportCLZModal, setShowImportCLZModal] = useState(false);
+  const [showImportCSVModal, setShowImportCSVModal] = useState(false);
+  const [showImportEnrichModal, setShowImportEnrichModal] = useState(false);
   const [editingCrate, setEditingCrate] = useState<Crate | null>(null);
   const [returnToAddToCrate, setReturnToAddToCrate] = useState(false);
   const [newlyCreatedCrateId, setNewlyCreatedCrateId] = useState<number | null>(null);
@@ -1043,16 +1049,31 @@ function CollectionBrowserPage() {
         if (type === 'discogs') {
           setShowImportDiscogsModal(true);
         } else if (type === 'csv') { 
-          window.location.href = '/admin/import-csv'; 
+          setShowImportCSVModal(true);
         } else if (type === 'clz') { 
-          window.location.href = '/admin/import-clz'; 
+          setShowImportCLZModal(true);
         } else if (type === 'enrich') { 
-          window.location.href = '/admin/enrich-sources'; 
+          setShowImportEnrichModal(true);
         }
       }} onCancel={() => setShowImportModal(false)} />}
       {showImportDiscogsModal && <ImportDiscogsModal 
         isOpen={showImportDiscogsModal} 
         onClose={() => setShowImportDiscogsModal(false)} 
+        onImportComplete={loadAlbums} 
+      />}
+      {showImportCLZModal && <ImportCLZModal 
+        isOpen={showImportCLZModal} 
+        onClose={() => setShowImportCLZModal(false)} 
+        onImportComplete={loadAlbums} 
+      />}
+      {showImportCSVModal && <ImportCSVModal 
+        isOpen={showImportCSVModal} 
+        onClose={() => setShowImportCSVModal(false)} 
+        onImportComplete={loadAlbums} 
+      />}
+      {showImportEnrichModal && <ImportEnrichModal 
+        isOpen={showImportEnrichModal} 
+        onClose={() => setShowImportEnrichModal(false)} 
         onImportComplete={loadAlbums} 
       />}
     </>

@@ -140,7 +140,28 @@ function compareAlbums(
     artistAlbumMap.set(normalizedKey, album);
   });
 
+  // DEBUG: Log first 5 database normalized keys
+  console.log('=== DATABASE SAMPLE NORMALIZED KEYS ===');
+  let dbCount = 0;
+  for (const [key, album] of artistAlbumMap) {
+    if (dbCount < 5) {
+      console.log(`DB: "${key}" <- "${album.artist}" + "${album.title}"`);
+      dbCount++;
+    }
+  }
+  console.log(`Total database albums in map: ${artistAlbumMap.size}`);
+
   const compared: ComparedAlbum[] = [];
+
+  // DEBUG: Log first 5 CSV normalized keys
+  console.log('=== CSV SAMPLE NORMALIZED KEYS ===');
+  for (let i = 0; i < Math.min(5, parsed.length); i++) {
+    console.log(`CSV: "${parsed[i].artist_album_norm}" <- "${parsed[i].artist}" + "${parsed[i].title}"`);
+  }
+  console.log(`Total CSV albums: ${parsed.length}`);
+
+  let matchedCount = 0;
+  let newCount = 0;
 
   // Check parsed albums
   for (const parsedAlbum of parsed) {
@@ -149,15 +170,25 @@ function compareAlbums(
     // First, try to match by discogs_release_id (most precise)
     if (parsedAlbum.discogs_release_id) {
       existingAlbum = releaseIdMap.get(parsedAlbum.discogs_release_id);
+      if (existingAlbum) {
+        console.log(`MATCHED by release_id: ${parsedAlbum.discogs_release_id}`);
+      }
     }
     
     // If no match by release_id, try by artist_album_norm (fallback)
     if (!existingAlbum) {
       existingAlbum = artistAlbumMap.get(parsedAlbum.artist_album_norm);
+      if (existingAlbum) {
+        console.log(`MATCHED by norm: "${parsedAlbum.artist_album_norm}"`);
+      }
     }
 
     if (!existingAlbum) {
       // NEW album
+      newCount++;
+      if (newCount <= 3) {
+        console.log(`NEW (no match): "${parsedAlbum.artist_album_norm}" <- "${parsedAlbum.artist}" + "${parsedAlbum.title}"`);
+      }
       compared.push({
         ...parsedAlbum,
         status: 'NEW',
@@ -166,6 +197,7 @@ function compareAlbums(
       });
     } else {
       // Exists - check what's missing
+      matchedCount++;
       const missingFields: string[] = [];
       
       if (!existingAlbum.image_url) missingFields.push('cover images');
@@ -220,6 +252,12 @@ function compareAlbums(
       missingFields: [],
     });
   }
+
+  console.log('=== COMPARISON SUMMARY ===');
+  console.log(`Total CSV albums: ${parsed.length}`);
+  console.log(`Matched albums: ${matchedCount}`);
+  console.log(`New albums: ${newCount}`);
+  console.log(`Removed albums: ${artistAlbumMap.size}`);
 
   return compared;
 }
@@ -418,47 +456,54 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
 
   if (!isOpen) return null;
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
       setFile(selectedFile);
       setError(null);
+      
+      // Parse immediately to show counts
+      try {
+        const text = await selectedFile.text();
+        const parsed = parseDiscogsCSV(text);
+
+        if (parsed.length === 0) {
+          setError('No albums found in CSV file');
+          setComparedAlbums([]);
+          return;
+        }
+
+        // Load existing collection
+        const { data: existing, error: dbError } = await supabase
+          .from('collection')
+          .select('id, artist, title, artist_norm, title_norm, artist_album_norm, discogs_release_id, image_url, tracks, discogs_genres, packaging');
+
+        if (dbError) {
+          setError(`Database error: ${dbError.message}`);
+          setComparedAlbums([]);
+          return;
+        }
+
+        // Store total database count
+        setTotalDatabaseCount(existing?.length || 0);
+
+        // Compare to show diagnostic counts
+        const compared = compareAlbums(parsed, existing as ExistingAlbum[]);
+        setComparedAlbums(compared);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to parse CSV');
+        setComparedAlbums([]);
+      }
     }
   };
 
   const handleParseCSV = async () => {
-    if (!file) return;
-
-    try {
-      setError(null);
-      const text = await file.text();
-      const parsed = parseDiscogsCSV(text);
-
-      if (parsed.length === 0) {
-        setError('No albums found in CSV file');
-        return;
-      }
-
-      // Load existing collection
-      const { data: existing, error: dbError } = await supabase
-        .from('collection')
-        .select('id, artist, title, artist_norm, title_norm, artist_album_norm, discogs_release_id, image_url, tracks, discogs_genres, packaging');
-
-      if (dbError) {
-        setError(`Database error: ${dbError.message}`);
-        return;
-      }
-
-      // Store total database count for full_replacement mode
-      setTotalDatabaseCount(existing?.length || 0);
-
-      // Compare
-      const compared = compareAlbums(parsed, existing as ExistingAlbum[]);
-      setComparedAlbums(compared);
-      setStage('preview');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to parse CSV');
+    if (!file || comparedAlbums.length === 0) {
+      setError('Please select a valid CSV file');
+      return;
     }
+
+    setStage('preview');
   };
 
   const handleStartImport = async () => {
@@ -765,6 +810,64 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                     Selected: {file.name} ({(file.size / 1024).toFixed(1)} KB)
                   </div>
                 )}
+                
+                {file && comparedAlbums.length > 0 && (
+                  <div style={{
+                    marginTop: '16px',
+                    padding: '16px',
+                    backgroundColor: '#f9fafb',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '6px',
+                  }}>
+                    <div style={{ fontSize: '14px', fontWeight: '600', color: '#111827', marginBottom: '12px' }}>
+                      CSV Analysis
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: '#6b7280' }}>Total albums in CSV:</span>
+                        <span style={{ fontWeight: '600', color: '#111827' }}>
+                          {comparedAlbums.filter(a => a.status !== 'REMOVED').length}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: '#059669' }}>New albums (not in database):</span>
+                        <span style={{ fontWeight: '600', color: '#059669' }}>
+                          {comparedAlbums.filter(a => a.status === 'NEW').length}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: '#d97706' }}>Existing albums missing data:</span>
+                        <span style={{ fontWeight: '600', color: '#d97706' }}>
+                          {comparedAlbums.filter(a => a.status === 'CHANGED' && a.needsEnrichment).length}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: '#6b7280' }}>Unchanged albums:</span>
+                        <span style={{ fontWeight: '600', color: '#6b7280' }}>
+                          {comparedAlbums.filter(a => a.status === 'UNCHANGED').length}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: '#dc2626' }}>Albums in DB but not in CSV:</span>
+                        <span style={{ fontWeight: '600', color: '#dc2626' }}>
+                          {comparedAlbums.filter(a => a.status === 'REMOVED').length}
+                        </span>
+                      </div>
+                      <div style={{ 
+                        marginTop: '8px', 
+                        paddingTop: '8px', 
+                        borderTop: '1px solid #e5e7eb',
+                        display: 'flex',
+                        justifyContent: 'space-between'
+                      }}>
+                        <span style={{ color: '#6b7280' }}>Current database total:</span>
+                        <span style={{ fontWeight: '600', color: '#111827' }}>
+                          {totalDatabaseCount}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </>
           )}
@@ -996,15 +1099,15 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
               </button>
               <button
                 onClick={handleParseCSV}
-                disabled={!file}
+                disabled={!file || comparedAlbums.length === 0}
                 style={{
                   padding: '8px 16px',
-                  backgroundColor: file ? '#f97316' : '#d1d5db',
+                  backgroundColor: (file && comparedAlbums.length > 0) ? '#f97316' : '#d1d5db',
                   border: 'none',
                   borderRadius: '4px',
                   fontSize: '14px',
                   fontWeight: '600',
-                  cursor: file ? 'pointer' : 'not-allowed',
+                  cursor: (file && comparedAlbums.length > 0) ? 'pointer' : 'not-allowed',
                   color: 'white',
                 }}
               >
