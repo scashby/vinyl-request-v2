@@ -135,9 +135,8 @@ function compareAlbums(
       releaseIdMap.set(album.discogs_release_id, album);
     }
     
-    // Add to artist_album_norm map
-    const normalizedKey = album.artist_album_norm || 
-      normalizeArtistAlbum(album.artist, album.title);
+    // Add to artist_album_norm map - ALWAYS recalculate, never trust stored value
+    const normalizedKey = normalizeArtistAlbum(album.artist, album.title);
     artistAlbumMap.set(normalizedKey, album);
   });
 
@@ -197,8 +196,8 @@ function compareAlbums(
   // Remaining in database but not in CSV = REMOVED
   // Use artistAlbumMap since it has all albums (releaseIdMap might not have albums without release_id)
   for (const [, existingAlbum] of artistAlbumMap) {
-    const normalizedKey = existingAlbum.artist_album_norm || 
-      normalizeArtistAlbum(existingAlbum.artist, existingAlbum.title);
+    // Recalculate normalized key, don't trust stored value
+    const normalizedKey = normalizeArtistAlbum(existingAlbum.artist, existingAlbum.title);
       
     compared.push({
       artist: existingAlbum.artist,
@@ -211,10 +210,10 @@ function compareAlbums(
       year: null,
       discogs_release_id: existingAlbum.discogs_release_id || '',
       discogs_master_id: null,
-      artist_norm: existingAlbum.artist_norm || normalizeArtist(existingAlbum.artist),
-      title_norm: existingAlbum.title_norm || normalizeTitle(existingAlbum.title),
+      artist_norm: normalizeArtist(existingAlbum.artist),
+      title_norm: normalizeTitle(existingAlbum.title),
       artist_album_norm: normalizedKey,
-      album_norm: existingAlbum.title_norm || normalizeTitle(existingAlbum.title),
+      album_norm: normalizeTitle(existingAlbum.title),
       status: 'REMOVED',
       existingId: existingAlbum.id,
       needsEnrichment: false,
@@ -404,6 +403,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
   const [file, setFile] = useState<File | null>(null);
   
   const [comparedAlbums, setComparedAlbums] = useState<ComparedAlbum[]>([]);
+  const [totalDatabaseCount, setTotalDatabaseCount] = useState<number>(0);
   
   const [progress, setProgress] = useState({ current: 0, total: 0, status: '' });
   const [error, setError] = useState<string | null>(null);
@@ -449,6 +449,9 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
         return;
       }
 
+      // Store total database count for full_replacement mode
+      setTotalDatabaseCount(existing?.length || 0);
+
       // Compare
       const compared = compareAlbums(parsed, existing as ExistingAlbum[]);
       setComparedAlbums(compared);
@@ -492,7 +495,8 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
       const resultCounts = {
         added: 0,
         updated: 0,
-        removed: syncMode === 'full_sync' ? comparedAlbums.filter(a => a.status === 'REMOVED').length : 0,
+        removed: syncMode === 'full_replacement' ? totalDatabaseCount : 
+                 syncMode === 'full_sync' ? comparedAlbums.filter(a => a.status === 'REMOVED').length : 0,
         unchanged: 0,
         errors: 0,
       };
@@ -598,6 +602,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
     setStage('upload');
     setFile(null);
     setComparedAlbums([]);
+    setTotalDatabaseCount(0);
     setProgress({ current: 0, total: 0, status: '' });
     setError(null);
     setResults({ added: 0, updated: 0, removed: 0, unchanged: 0, errors: 0 });
@@ -611,7 +616,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
     ? 0
     : comparedAlbums.filter(a => a.status === 'UNCHANGED').length;
   const removedCount = syncMode === 'full_replacement'
-    ? comparedAlbums.filter(a => a.status === 'REMOVED').length
+    ? totalDatabaseCount  // Show ALL albums in database will be deleted
     : syncMode === 'full_sync'
       ? comparedAlbums.filter(a => a.status === 'REMOVED').length
       : 0;
