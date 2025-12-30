@@ -221,15 +221,11 @@ function compareAlbums(
   return compared;
 }
 
-// Discogs API enrichment
+// Discogs API enrichment - USE SERVER PROXY
 async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unknown>> {
   await new Promise(resolve => setTimeout(resolve, 1000)); // Rate limiting
 
-  const response = await fetch(`https://api.discogs.com/releases/${releaseId}`, {
-    headers: {
-      'User-Agent': 'DeadWaxDialogues/1.0',
-    },
-  });
+  const response = await fetch(`/api/discogsProxy?releaseId=${releaseId}`);
 
   if (!response.ok) {
     throw new Error(`Discogs API error: ${response.status}`);
