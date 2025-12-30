@@ -128,6 +128,7 @@ function compareAlbums(
   // Build two maps: by release_id (primary) and by artist_album_norm (fallback)
   const releaseIdMap = new Map<string, ExistingAlbum>();
   const artistAlbumMap = new Map<string, ExistingAlbum>();
+  const matchedDbIds = new Set<number>();  // Track which database albums were matched
   
   existing.forEach(album => {
     // Add to release_id map if release_id exists
@@ -183,6 +184,9 @@ function compareAlbums(
         missingFields,
       });
 
+      // Track that this database album was matched
+      matchedDbIds.add(existingAlbum.id);
+
       // Remove from both maps to prevent duplicate matches
       if (existingAlbum.discogs_release_id) {
         releaseIdMap.delete(existingAlbum.discogs_release_id);
@@ -194,9 +198,14 @@ function compareAlbums(
   }
 
   // Remaining in database but not in CSV = REMOVED
-  // Use artistAlbumMap since it has all albums (releaseIdMap might not have albums without release_id)
-  for (const [, existingAlbum] of artistAlbumMap) {
-    // Recalculate normalized key, don't trust stored value
+  // Iterate over full existing array and check against matched IDs
+  for (const existingAlbum of existing) {
+    // Skip if this album was already matched
+    if (matchedDbIds.has(existingAlbum.id)) {
+      continue;
+    }
+
+    // This database album was not matched by any CSV entry
     const normalizedKey = normalizeArtistAlbum(existingAlbum.artist, existingAlbum.title);
       
     compared.push({
