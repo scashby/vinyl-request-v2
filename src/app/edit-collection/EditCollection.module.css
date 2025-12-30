@@ -1500,353 +1500,11 @@
   margin-top: 24px;
 }
 
+
 /* Find Duplicates Modal Styles */
-.duplicatesModalSelect {
-  background-color: #fff;
-  border-radius: 8px;
-  width: 500px;
-  max-width: 500px;
-  max-height: 90vh;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.duplicatesModalResults {
-  background-color: #fff;
-  border-radius: 8px;
-  width: 90%;
-  max-width: 1400px;
-  max-height: 90vh;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.duplicatesModalHeader {
-  padding: 16px 20px;
-  border-bottom: 1px solid #e5e7eb;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background-color: #f97316;
-  border-radius: 8px 8px 0 0;
-}
-
-.headerIcon {
-  font-size: 20px;
-}
-
-.headerText {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-  color: #fff;
-}
-
-.formGroup {
-  margin-bottom: 24px;
-}
-
-.formLabel {
-  display: block;
-  font-size: 14px;
-  font-weight: 600;
-  color: #374151;
-  margin-bottom: 8px;
-}
-
-.dropdownWrapper {
-  position: relative;
-}
-
-.dropdownButton {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
-  font-size: 14px;
-  background-color: #fff;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  text-align: left;
-}
-
-.dropdownArrow {
-  font-size: 10px;
-  color: #6b7280;
-}
-
-.dropdownMenu {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  margin-top: 4px;
-  background-color: #fff;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  z-index: 2;
-}
-
-.dropdownCheckmark {
-  color: #f97316;
-  font-weight: 600;
-}
-
-.duplicatesEmpty {
-  text-align: center;
-  padding: 40px 20px;
-  color: #6b7280;
-}
-
-.duplicatesEmptyIcon {
-  font-size: 48px;
-  margin-bottom: 16px;
-}
-
-.duplicatesEmptyTitle {
-  font-size: 18px;
-  font-weight: 600;
-  margin-bottom: 8px;
-  color: #111827;
-}
-
-.duplicatesEmptyText {
-  font-size: 14px;
-  color: #6b7280;
-}
-
-.duplicatesAlert {
-  padding: 12px 16px;
-  background-color: #fef3c7;
-  border: 1px solid #fbbf24;
-  border-radius: 6px;
-  font-size: 14px;
-  color: #92400e;
-  margin-bottom: 16px;
-}
-
-.duplicatesTableCard {
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.duplicatesTableHeader {
-  display: grid;
-  grid-template-columns: 3fr 2fr 2fr 2fr 1fr 100px;
-  gap: 8px;
-  padding: 10px 12px;
-  background-color: #f9fafb;
-  border-bottom: 1px solid #e5e7eb;
-  font-weight: 600;
-  font-size: 13px;
-  color: #6b7280;
-}
-
-.duplicatesTableHeaderCenter {
-  text-align: center;
-}
-
-.duplicatesTableBody {
-  max-height: 500px;
-  overflow-y: auto;
-}
-
-.duplicatesGroup {
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.duplicatesGroup:last-child {
-  border-bottom: none;
-}
-
-.duplicatesGroupHeader {
-  padding: 10px 12px;
-  background-color: #f3f4f6;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-weight: 600;
-  font-size: 14px;
-  color: #111827;
-}
-
-.duplicatesGroupActions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.duplicatesKeepBadge {
-  padding: 4px 12px;
-  background-color: #3b82f6;
-  color: #fff;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.duplicatesKeepSelect {
-  padding: 4px 8px;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
-  font-size: 13px;
-  background-color: #fff;
-  cursor: pointer;
-}
-
-.duplicatesAlbumRow {
-  display: grid;
-  grid-template-columns: 3fr 2fr 2fr 2fr 1fr 100px;
-  gap: 8px;
-  padding: 8px 12px;
-  font-size: 13px;
-  background-color: #fff;
-  border-top: 1px solid #f3f4f6;
-}
-
-.duplicatesAlbumRow:first-of-type {
-  border-top: none;
-}
-
-.duplicatesAlbumRowAlt {
-  display: grid;
-  grid-template-columns: 3fr 2fr 2fr 2fr 1fr 100px;
-  gap: 8px;
-  padding: 8px 12px;
-  font-size: 13px;
-  background-color: #f9fafb;
-  border-top: 1px solid #f3f4f6;
-}
-
-.duplicatesAlbumCell {
-  color: #111827;
-}
-
-.duplicatesAlbumCellSecondary {
-  color: #6b7280;
-}
-
-.duplicatesAlbumCellCenter {
-  color: #6b7280;
-  text-align: center;
-}
-
-.duplicatesRemoveButton {
-  padding: 4px 12px;
-  background-color: #dc2626;
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  font-size: 12px;
-  cursor: pointer;
-  font-weight: 500;
-}
-
-.duplicatesLoadingOverlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(255, 255, 255, 0.9);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 8px;
-}
-
-.duplicatesLoadingContent {
-  text-align: center;
-  padding: 40px;
-}
-
-.duplicatesLoadingSpinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid #f3f4f6;
-  border-top: 4px solid #f97316;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin: 0 auto 16px;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-.duplicatesLoadingTitle {
-  font-size: 16px;
-  font-weight: 600;
-  color: #111827;
-}
-
-.duplicatesLoadingText {
-  font-size: 14px;
-  color: #6b7280;
-  margin-top: 4px;
-}
-
-/* Additional Find Duplicates Styles */
-.duplicatesSelectBar {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 16px;
-  background: #2A2A2A;
-  color: white;
-  border-radius: 4px;
-  margin-bottom: 24px;
-}
-
-.duplicatesSelectLabel {
-  font-size: 14px;
-  font-weight: 600;
-  color: white;
-}
-
-.duplicatesTableHeader {
-  display: grid;
-  grid-template-columns: 2fr 2fr 1fr 1.5fr 0.7fr 0.7fr 0.8fr 1.5fr 1.5fr 1.2fr 100px;
-  gap: 8px;
-  padding: 10px 12px;
-  background-color: #f9fafb;
-  border-bottom: 1px solid #e5e7eb;
-  font-weight: 600;
-  font-size: 13px;
-  color: #6b7280;
-}
-
-.duplicatesAlbumRow {
-  display: grid;
-  grid-template-columns: 2fr 2fr 1fr 1.5fr 0.7fr 0.7fr 0.8fr 1.5fr 1.5fr 1.2fr 100px;
-  gap: 8px;
-  padding: 8px 12px;
-  font-size: 13px;
-  background-color: #fff;
-  border-top: 1px solid #f3f4f6;
-}
-
-.duplicatesAlbumRowAlt {
-  display: grid;
-  grid-template-columns: 2fr 2fr 1fr 1.5fr 0.7fr 0.7fr 0.8fr 1.5fr 1.5fr 1.2fr 100px;
-  gap: 8px;
-  padding: 8px 12px;
-  font-size: 13px;
-  background-color: #f9fafb;
-  border-top: 1px solid #f3f4f6;
-}
-
-/* CLZ Find Duplicates Styles */
-.clzDuplicatesOverlay {
+.duplicatesWrapper {
   position: fixed;
-  top: 0;
+  top: 60px;
   left: 0;
   right: 0;
   bottom: 0;
@@ -1856,16 +1514,16 @@
   flex-direction: column;
 }
 
-.clzDuplicatesHeader {
+.duplicatesNavBar {
   background: #2A2A2A;
   color: white;
   padding: 12px 20px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 20px;
 }
 
-.clzDuplicatesBackButton {
+.duplicatesBackButton {
   background: none;
   border: none;
   color: white;
@@ -1874,29 +1532,17 @@
   padding: 4px 8px;
 }
 
-.clzDuplicatesBackButton:hover {
+.duplicatesBackButton:hover {
   text-decoration: underline;
 }
 
-.clzDuplicatesTitle {
+.duplicatesTitle {
   font-size: 16px;
   font-weight: 600;
   color: white;
 }
 
-.clzDuplicatesCloseButton {
-  background: none;
-  border: none;
-  color: white;
-  font-size: 24px;
-  cursor: pointer;
-  padding: 0;
-  width: 32px;
-  height: 32px;
-  line-height: 1;
-}
-
-.clzDuplicatesToolbar {
+.duplicatesToolbar {
   background: #2A2A2A;
   color: white;
   padding: 12px 20px;
@@ -1906,17 +1552,17 @@
   border-bottom: 1px solid #444;
 }
 
-.clzDuplicatesToolbarLabel {
+.duplicatesToolbarLabel {
   font-size: 14px;
   color: white;
   white-space: nowrap;
 }
 
-.clzDuplicatesDropdownWrapper {
+.duplicatesDropdownWrapper {
   position: relative;
 }
 
-.clzDuplicatesDropdownButton {
+.duplicatesDropdownButton {
   background: white;
   border: 1px solid #ddd;
   padding: 6px 12px;
@@ -1929,12 +1575,12 @@
   color: #000;
 }
 
-.clzDuplicatesDropdownArrow {
+.duplicatesDropdownArrow {
   font-size: 10px;
   color: #666;
 }
 
-.clzDuplicatesDropdownMenu {
+.duplicatesDropdownMenu {
   position: absolute;
   top: 100%;
   left: 0;
@@ -1947,7 +1593,7 @@
   min-width: 180px;
 }
 
-.clzDuplicatesDropdownItem {
+.duplicatesDropdownItem {
   width: 100%;
   padding: 10px 12px;
   border: none;
@@ -1958,11 +1604,11 @@
   color: #000;
 }
 
-.clzDuplicatesDropdownItem:hover {
+.duplicatesDropdownItem:hover {
   background: #f3f4f6;
 }
 
-.clzDuplicatesDropdownItemActive {
+.duplicatesDropdownItemActive {
   width: 100%;
   padding: 10px 12px;
   border: none;
@@ -1973,7 +1619,7 @@
   color: #000;
 }
 
-.clzDuplicatesFindButton {
+.duplicatesFindButton {
   background: #4FC3F7;
   color: white;
   border: none;
@@ -1984,56 +1630,50 @@
   border-radius: 4px;
 }
 
-.clzDuplicatesFindButton:hover {
+.duplicatesFindButton:hover {
   background: #29B6F6;
 }
 
-.clzDuplicatesFindButton:disabled {
+.duplicatesFindButton:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
 
-.clzDuplicatesCount {
+.duplicatesCount {
   color: white;
   font-size: 14px;
   margin-left: 20px;
 }
 
-.clzDuplicatesToolbarSpacer {
-  flex: 1;
-}
-
-.clzDuplicatesColumnButton {
-  background: none;
-  border: 1px solid #666;
-  color: white;
-  font-size: 16px;
-  cursor: pointer;
-  padding: 4px 12px;
-  border-radius: 4px;
-}
-
-.clzDuplicatesColumnButton:hover {
-  background: #444;
-}
-
-.clzDuplicatesContent {
+.duplicatesContent {
   flex: 1;
   overflow-y: auto;
   background: #fff;
+  position: relative;
 }
 
-.clzDuplicatesLoading {
+.duplicatesLoadingInterstitial {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.duplicatesLoadingContent {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 60px 20px;
   gap: 12px;
   color: #666;
 }
 
-.clzDuplicatesLoadingSpinner {
+.duplicatesLoadingSpinner {
   width: 40px;
   height: 40px;
   border: 4px solid #f3f4f6;
@@ -2042,93 +1682,69 @@
   animation: spin 1s linear infinite;
 }
 
-.clzDuplicatesEmpty {
-  text-align: center;
-  padding: 60px 40px;
-  color: #666;
-}
-
-.clzDuplicatesEmptyIcon {
-  font-size: 64px;
-  margin-bottom: 20px;
-  color: #4FC3F7;
-}
-
-.clzDuplicatesEmptyTitle {
-  font-size: 20px;
-  font-weight: 600;
-  color: #1a1a1a;
-  margin-bottom: 8px;
-}
-
-.clzDuplicatesEmptyText {
-  font-size: 14px;
-  color: #666;
-}
-
-.clzDuplicatesTableWrapper {
+.duplicatesTableWrapper {
   padding: 0;
 }
 
-.clzDuplicatesTable {
+.duplicatesTable {
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
 }
 
-.clzDuplicatesTableHeaderRow {
+.duplicatesTableHeaderRow {
   background: #f3f4f6;
   position: sticky;
   top: 0;
   z-index: 10;
 }
 
-.clzDuplicatesTableHeaderCell {
+.duplicatesTableHeaderCell {
   padding: 10px 12px;
   text-align: left;
   font-weight: 700;
   color: #000;
+  border-right: 1px solid #000;
+  border-left: 1px solid #000;
   border-bottom: 1px solid #e5e7eb;
 }
 
-.clzDuplicatesGroupRow {
+.duplicatesTableHeaderCell:first-child {
+  border-left: none;
+}
+
+.duplicatesTableHeaderCell:last-child {
+  border-right: none;
+}
+
+.duplicatesGroupRow {
   background: #e5e7eb;
 }
 
-.clzDuplicatesGroupCell {
+.duplicatesGroupCell {
   padding: 0;
 }
 
-.clzDuplicatesGroupHeader {
+.duplicatesGroupHeader {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   padding: 10px 12px;
-  gap: 8px;
 }
 
-.clzDuplicatesGroupToggle {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 12px;
-  padding: 0;
-  width: 20px;
-  color: #000;
-}
-
-.clzDuplicatesGroupName {
+.duplicatesGroupName {
   font-weight: 700;
   color: #000;
   flex: 1;
 }
 
-.clzDuplicatesGroupActions {
+.duplicatesGroupActions {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.clzDuplicatesKeepButton {
+.duplicatesKeepButton {
   background: #4FC3F7;
   color: white;
   border: none;
@@ -2139,28 +1755,18 @@
   border-radius: 4px;
 }
 
-.clzDuplicatesKeepSelect {
-  background: white;
-  border: 1px solid #ddd;
-  padding: 4px 8px;
-  font-size: 13px;
-  cursor: pointer;
-  border-radius: 4px;
-  color: #000;
-}
-
-.clzDuplicatesAlbumRow {
+.duplicatesAlbumRow {
   background: white;
 }
 
-.clzDuplicatesTableCell {
+.duplicatesTableCell {
   padding: 8px 12px;
   border: 1px solid #000;
   color: #000;
   background: white;
 }
 
-.clzDuplicatesRemoveButton {
+.duplicatesRemoveButton {
   background: #EF4444;
   color: white;
   border: none;
@@ -2171,28 +1777,29 @@
   border-radius: 4px;
 }
 
-.clzDuplicatesRemoveButton:hover {
+.duplicatesRemoveButton:hover {
   background: #DC2626;
 }
 
-.clzDuplicatesSeparator {
+.duplicatesSeparator {
   height: 8px;
   background: #f3f4f6;
 }
 
-.clzDuplicatesSeparator td {
+.duplicatesSeparator td {
   padding: 0;
   border: none;
 }
 
-.clzDuplicatesFooterActions {
+.duplicatesFooterActions {
   padding: 20px;
   display: flex;
   justify-content: flex-end;
   border-top: 1px solid #e5e7eb;
+  background: white;
 }
 
-.clzDuplicatesRemoveAllButton {
+.duplicatesRemoveAllButton {
   background: #4FC3F7;
   color: white;
   border: none;
@@ -2203,19 +1810,11 @@
   border-radius: 4px;
 }
 
-.clzDuplicatesRemoveAllButton:hover {
+.duplicatesRemoveAllButton:hover {
   background: #29B6F6;
 }
 
-.clzDuplicatesRemoveAllButton:disabled {
+.duplicatesRemoveAllButton:disabled {
   opacity: 0.6;
   cursor: not-allowed;
-}
-
-.clzDuplicatesFooter {
-  background: #F97316;
-  color: white;
-  padding: 12px 20px;
-  text-align: center;
-  font-size: 12px;
 }
