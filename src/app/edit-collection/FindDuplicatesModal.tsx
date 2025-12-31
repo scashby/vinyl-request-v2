@@ -33,7 +33,7 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
     {
       id: 'default',
       name: 'Default',
-      columns: ['Artist', 'Title', 'Release Date', 'Format', 'Discs', 'Tracks', 'Length', 'Genre', 'Label', 'Added Date', 'Action']
+      columns: ['Artist', 'Title', 'Release Date', 'Format', 'Discs', 'Tracks', 'Length', 'Genre', 'Label', 'Added Date']
     }
   ]);
   const [selectedFavoriteId, setSelectedFavoriteId] = useState('default');
@@ -218,6 +218,43 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
 
   if (!isOpen) return null;
 
+  const selectedFavorite = columnFavorites.find(f => f.id === selectedFavoriteId);
+  const displayColumns = selectedFavorite?.columns || ['Artist', 'Title', 'Release Date', 'Format', 'Discs', 'Tracks', 'Length', 'Genre', 'Label', 'Added Date'];
+
+  const getColumnValue = (album: Album, columnName: string): string => {
+    switch (columnName) {
+      case 'Artist': return album.artist || '—';
+      case 'Title': return album.title || '—';
+      case 'Release Date':
+      case 'Release Year': return album.year || '—';
+      case 'Format': return album.format || '—';
+      case 'Discs': return String(album.discs || 1);
+      case 'Tracks': return String(album.spotify_total_tracks || album.apple_music_track_count || '—');
+      case 'Length': 
+        if (!album.length_seconds) return '—';
+        return `${Math.floor(album.length_seconds / 60)}:${(album.length_seconds % 60).toString().padStart(2, '0')}`;
+      case 'Genre': 
+        return album.discogs_genres ? (Array.isArray(album.discogs_genres) ? album.discogs_genres[0] : album.discogs_genres) : '—';
+      case 'Label': 
+        return album.labels ? (Array.isArray(album.labels) ? album.labels[0] : album.labels) : album.spotify_label || album.apple_music_label || '—';
+      case 'Added Date': 
+        return album.date_added ? new Date(album.date_added).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+      case 'Barcode': return album.barcode || '—';
+      case 'Cat No': return album.cat_no || '—';
+      case 'Country': return album.country || '—';
+      case 'Original Release Date': return album.original_release_date || '—';
+      case 'Index': return String(album.index_number || '—');
+      case 'Purchase Date': 
+        return album.purchase_date ? new Date(album.purchase_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+      case 'Purchase Price': return album.purchase_price ? `$${album.purchase_price.toFixed(2)}` : '—';
+      case 'Current Value': return album.current_value ? `$${album.current_value.toFixed(2)}` : '—';
+      case 'My Rating': return album.my_rating ? String(album.my_rating) : '—';
+      case 'Media Condition': return album.media_condition || '—';
+      case 'Package/Sleeve Condition': return album.package_sleeve_condition || '—';
+      default: return '—';
+    }
+  };
+
   return (
     <div className={styles.duplicatesWrapper}>
       <div className={styles.duplicatesNavBar}>
@@ -274,16 +311,9 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
               <table className={styles.duplicatesTable}>
                 <thead>
                   <tr className={styles.duplicatesTableHeaderRow}>
-                    <th className={styles.duplicatesTableHeaderCell}>Artist</th>
-                    <th className={styles.duplicatesTableHeaderCell}>Title</th>
-                    <th className={styles.duplicatesTableHeaderCell}>Release Date</th>
-                    <th className={styles.duplicatesTableHeaderCell}>Format</th>
-                    <th className={styles.duplicatesTableHeaderCell}>Discs</th>
-                    <th className={styles.duplicatesTableHeaderCell}>Tracks</th>
-                    <th className={styles.duplicatesTableHeaderCell}>Length</th>
-                    <th className={styles.duplicatesTableHeaderCell}>Genre</th>
-                    <th className={styles.duplicatesTableHeaderCell}>Label</th>
-                    <th className={styles.duplicatesTableHeaderCell}>Added Date</th>
+                    {displayColumns.map(col => (
+                      <th key={col} className={styles.duplicatesTableHeaderCell}>{col}</th>
+                    ))}
                     <th className={styles.duplicatesTableHeaderCell}>Action</th>
                   </tr>
                 </thead>
@@ -291,7 +321,7 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
                   {duplicateGroups.map((group, groupIdx) => (
                     <>
                       <tr key={`group-${groupIdx}`} className={styles.duplicatesGroupRow}>
-                        <td colSpan={11} className={styles.duplicatesGroupCell}>
+                        <td colSpan={displayColumns.length + 1} className={styles.duplicatesGroupCell}>
                           <div className={styles.duplicatesGroupHeader}>
                             <span className={styles.duplicatesGroupName}>{group.displayName}</span>
                             <div className={styles.duplicatesGroupActions}>
@@ -304,24 +334,9 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
                       </tr>
                       {group.albums.map((album) => (
                         <tr key={`album-${album.id}`} className={styles.duplicatesAlbumRow}>
-                          <td className={styles.duplicatesTableCell}>{album.artist}</td>
-                          <td className={styles.duplicatesTableCell}>{album.title}</td>
-                          <td className={styles.duplicatesTableCell}>{album.year || '—'}</td>
-                          <td className={styles.duplicatesTableCell}>{album.format || '—'}</td>
-                          <td className={styles.duplicatesTableCell}>{album.discs || 1}</td>
-                          <td className={styles.duplicatesTableCell}>{album.spotify_total_tracks || album.apple_music_track_count || '—'}</td>
-                          <td className={styles.duplicatesTableCell}>
-                            {album.length_seconds ? `${Math.floor(album.length_seconds / 60)}:${(album.length_seconds % 60).toString().padStart(2, '0')}` : '—'}
-                          </td>
-                          <td className={styles.duplicatesTableCell}>
-                            {album.discogs_genres ? (Array.isArray(album.discogs_genres) ? album.discogs_genres[0] : album.discogs_genres) : '—'}
-                          </td>
-                          <td className={styles.duplicatesTableCell}>
-                            {album.labels ? (Array.isArray(album.labels) ? album.labels[0] : album.labels) : album.spotify_label || album.apple_music_label || '—'}
-                          </td>
-                          <td className={styles.duplicatesTableCell}>
-                            {album.date_added ? new Date(album.date_added).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
-                          </td>
+                          {displayColumns.map(col => (
+                            <td key={col} className={styles.duplicatesTableCell}>{getColumnValue(album, col)}</td>
+                          ))}
                           <td className={styles.duplicatesTableCell}>
                             <button onClick={() => handleRemoveAlbum(groupIdx, album.id)} className={styles.duplicatesRemoveButton}>
                               Remove
@@ -331,7 +346,7 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
                       ))}
                       {groupIdx < duplicateGroups.length - 1 && (
                         <tr key={`separator-${groupIdx}`} className={styles.duplicatesSeparator}>
-                          <td colSpan={11}></td>
+                          <td colSpan={displayColumns.length + 1}></td>
                         </tr>
                       )}
                     </>

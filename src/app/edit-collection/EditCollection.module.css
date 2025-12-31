@@ -1517,10 +1517,11 @@
 .duplicatesNavBar {
   background: #2A2A2A;
   color: white;
-  padding: 12px 20px;
+  padding: 16px 20px;
   display: flex;
   align-items: center;
   gap: 20px;
+  min-height: 48px;
 }
 
 .duplicatesBackButton {
