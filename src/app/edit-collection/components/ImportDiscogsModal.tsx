@@ -19,8 +19,15 @@ interface ParsedAlbum {
   barcode: string | null;
   country: string | null;
   year: string | null;
+  folder: string;
   discogs_release_id: string;
   discogs_master_id: string | null;
+  date_added: string;
+  media_condition: string;
+  package_sleeve_condition: string | null;
+  notes: string | null;
+  rating: number | null;
+  decade: number | null;
   artist_norm: string;
   title_norm: string;
   artist_album_norm: string;
@@ -52,6 +59,35 @@ interface ImportDiscogsModalProps {
   isOpen: boolean;
   onClose: () => void;
   onImportComplete?: () => void;
+}
+
+// Helper functions
+function sanitizeMediaCondition(condition: string | null | undefined): string {
+  if (!condition || condition.trim() === '') return 'Unknown';
+  return condition.trim();
+}
+
+function sanitizeFolder(folder: string | null | undefined): string {
+  if (!folder || folder.trim() === '') return 'Uncategorized';
+  return folder.trim();
+}
+
+function parseDiscogsDate(dateString: string): string {
+  if (!dateString || dateString.trim() === '') return new Date().toISOString();
+  try {
+    const parsed = new Date(dateString);
+    if (isNaN(parsed.getTime())) return new Date().toISOString();
+    return parsed.toISOString();
+  } catch {
+    return new Date().toISOString();
+  }
+}
+
+function calculateDecade(year: string | null): number | null {
+  if (!year) return null;
+  const yearNum = parseInt(year);
+  if (isNaN(yearNum) || yearNum <= 0) return null;
+  return Math.floor(yearNum / 10) * 10;
 }
 
 // CSV parsing
@@ -97,17 +133,28 @@ function parseDiscogsCSV(csvText: string): ParsedAlbum[] {
     const labelsText = row['Label'] || row['label'] || '';
     const labels = labelsText ? labelsText.split(',').map(l => l.trim()) : [];
 
+    const year = row['Released'] || row['Year'] || row['year'] || null;
+    const ratingText = row['Rating'] || row['rating'] || '';
+    const rating = ratingText ? parseInt(ratingText) : null;
+
     const album: ParsedAlbum = {
       artist,
       title,
       format: row['Format'] || row['format'] || '',
       labels,
-      cat_no: row['Catalog #'] || row['catalog'] || row['cat_no'] || null,
+      cat_no: row['Catalog#'] || row['Catalog #'] || row['catalog'] || row['cat_no'] || null,
       barcode: row['Barcode'] || row['barcode'] || null,
       country: row['Country'] || row['country'] || null,
-      year: row['Released'] || row['Year'] || row['year'] || null,
-      discogs_release_id: row['Release ID'] || row['release_id'] || row['discogs_release_id'] || '',
+      year,
+      folder: sanitizeFolder(row['CollectionFolder'] || row['Folder'] || row['folder']),
+      discogs_release_id: row['release_id'] || row['Release ID'] || row['discogs_release_id'] || '',
       discogs_master_id: row['Master ID'] || row['master_id'] || row['discogs_master_id'] || null,
+      date_added: parseDiscogsDate(row['Date Added'] || row['date_added'] || ''),
+      media_condition: sanitizeMediaCondition(row['Collection Media Condition'] || row['media_condition']),
+      package_sleeve_condition: row['Collection Sleeve Condition'] || row['package_sleeve_condition'] || null,
+      notes: row['Collection Notes'] || row['notes'] || null,
+      rating,
+      decade: calculateDecade(year),
       artist_norm: normalizeArtist(artist),
       title_norm: normalizeTitle(title),
       artist_album_norm: normalizeArtistAlbum(artist, title),
@@ -217,8 +264,15 @@ function compareAlbums(
       barcode: null,
       country: null,
       year: null,
+      folder: 'Unknown',
       discogs_release_id: existingAlbum.discogs_release_id || '',
       discogs_master_id: null,
+      date_added: new Date().toISOString(),
+      media_condition: 'Unknown',
+      package_sleeve_condition: null,
+      notes: null,
+      rating: null,
+      decade: null,
       artist_norm: normalizeArtist(existingAlbum.artist),
       title_norm: normalizeTitle(existingAlbum.title),
       artist_album_norm: normalizedKey,
@@ -561,12 +615,18 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
               barcode: album.barcode,
               country: album.country,
               year: album.year,
+              folder: album.folder,
               discogs_release_id: album.discogs_release_id,
               discogs_master_id: album.discogs_master_id,
+              date_added: album.date_added,
+              media_condition: album.media_condition,
+              package_sleeve_condition: album.package_sleeve_condition,
+              notes: album.notes,
+              rating: album.rating,
+              decade: album.decade,
             };
             // GENERATED COLUMNS - NEVER INCLUDE:
             // year_int (generated from year)
-            // decade (generated from year_int)
             // artist_norm (generated from artist)
             // title_norm (generated from title)
             // album_norm (generated from title)
