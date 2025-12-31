@@ -45,32 +45,16 @@ interface ParsedCLZAlbum {
   labels: string[];
 }
 
-interface ExistingAlbum {
+// Use Record type for existing albums since we need all fields for conflict detection
+type ExistingAlbum = Record<string, unknown> & {
   id: number;
   artist: string;
   title: string;
-  year: string | null;
-  tracks: unknown[] | null;
-  musicians: string[] | null;
-  producers: string[] | null;
-  engineers: string[] | null;
-  songwriters: string[] | null;
-  barcode: string | null;
-  cat_no: string | null;
-  labels: string[] | null;
-  format: string | null;
-  country: string | null;
-  folder: string | null;
-  discogs_release_id: string | null;
-  discogs_master_id: string | null;
-  date_added: string | null;
-}
+};
 
 interface ComparedCLZAlbum extends ParsedCLZAlbum {
   status: AlbumStatus;
   existingId?: number;
-  hasTracks: boolean;
-  hasCredits: boolean;
 }
 
 interface ImportCLZModalProps {
@@ -220,7 +204,7 @@ function compareCLZAlbums(
   const existingMap = new Map<string, ExistingAlbum>();
   
   existing.forEach(album => {
-    const key = normalizeArtist(album.artist) + normalizeTitle(album.title);
+    const key = normalizeArtist(album.artist as string) + normalizeTitle(album.title as string);
     existingMap.set(key, album);
   });
 
@@ -236,21 +220,12 @@ function compareCLZAlbums(
         ...clzAlbum,
         status: 'MATCHED',
         existingId: existingAlbum.id,
-        hasTracks: !!(existingAlbum.tracks && existingAlbum.tracks.length > 0),
-        hasCredits: !!(
-          (existingAlbum.musicians && existingAlbum.musicians.length > 0) ||
-          (existingAlbum.producers && existingAlbum.producers.length > 0) ||
-          (existingAlbum.engineers && existingAlbum.engineers.length > 0) ||
-          (existingAlbum.songwriters && existingAlbum.songwriters.length > 0)
-        ),
       });
     } else {
       // NO MATCH
       compared.push({
         ...clzAlbum,
         status: 'NO_MATCH',
-        hasTracks: false,
-        hasCredits: false,
       });
     }
   }
@@ -301,10 +276,10 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
         return;
       }
 
-      // Load existing collection
+      // Load existing collection (select all fields needed for conflict detection)
       const { data: existing, error: dbError } = await supabase
         .from('collection')
-        .select('id, artist, title, year, tracks, musicians, producers, engineers, songwriters, barcode, cat_no, labels, format, country, folder, discogs_release_id, discogs_master_id, date_added');
+        .select('*');
 
       if (dbError) {
         setError(`Database error: ${dbError.message}`);
@@ -326,17 +301,15 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
     setError(null);
 
     try {
-      // Only process MATCHED albums
+      // Process ALL MATCHED albums
       const matchedAlbums = comparedAlbums.filter(a => a.status === 'MATCHED');
-      
-      // Always use safe mode: Only update albums missing tracks or credits
-      const albumsToProcess = matchedAlbums.filter(a => !a.hasTracks || !a.hasCredits);
+      const albumsToProcess = matchedAlbums; // Process all matched albums
 
       setProgress({ current: 0, total: albumsToProcess.length, status: 'Processing...' });
 
       const resultCounts = {
         updated: 0,
-        skipped: matchedAlbums.length - albumsToProcess.length,
+        skipped: 0,
         noMatch: comparedAlbums.filter(a => a.status === 'NO_MATCH').length,
         errors: 0,
         conflicts: 0,
@@ -385,13 +358,13 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
 
           // Step 1: Handle identifying fields (only fill if NULL)
           const identifyingUpdates = buildIdentifyingFieldUpdates(
-            existingAlbum as unknown as Record<string, unknown>,
+            existingAlbum,
             clzData
           );
 
           // Step 2: Detect conflicts for conflictable fields
           const { safeUpdates, conflicts: albumConflicts } = detectConflicts(
-            existingAlbum as unknown as Record<string, unknown>,
+            existingAlbum,
             clzData,
             'clz',
             (resolutions || []) as PreviousResolution[]
@@ -411,7 +384,13 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
               .eq('id', album.existingId!);
 
             if (updateError) throw updateError;
+          }
+          
+          // Count as updated if we applied changes or found conflicts
+          if (Object.keys(updateData).length > 0 || albumConflicts.length > 0) {
             resultCounts.updated++;
+          } else {
+            resultCounts.skipped++;
           }
 
           // Queue conflicts for later resolution
@@ -464,9 +443,6 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
 
   const matchedCount = comparedAlbums.filter(a => a.status === 'MATCHED').length;
   const noMatchCount = comparedAlbums.filter(a => a.status === 'NO_MATCH').length;
-  const needsUpdateCount = comparedAlbums.filter(a => 
-    a.status === 'MATCHED' && (!a.hasTracks || !a.hasCredits)
-  ).length;
 
   // Show conflict resolution modal
   if (stage === 'conflicts') {
@@ -603,17 +579,12 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
                     <span style={{ color: '#111827', fontWeight: '600' }}>{matchedCount}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#d97706', fontWeight: '600' }}>Missing tracks/credits:</span>
-                    <span style={{ color: '#111827', fontWeight: '600' }}>{needsUpdateCount}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: '#dc2626', fontWeight: '600' }}>No match found:</span>
                     <span style={{ color: '#111827', fontWeight: '600' }}>{noMatchCount}</span>
                   </div>
                 </div>
               </div>
 
-              {/* Mode Warning */}
               <div style={{
                 padding: '12px',
                 backgroundColor: '#fef3c7',
@@ -625,10 +596,7 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
               }}>
                 <strong>Safe Import Mode</strong>
                 <br />
-                Will only update albums missing tracks or credits. Existing data will be preserved unless conflicts are detected.
-                <br />
-                <br />
-                <strong>Note:</strong> Identifying fields (artist, title, format, barcode, etc.) are locked and won&apos;t be changed if they already have values. Other fields may generate conflicts that you&apos;ll resolve after import.
+                Will process all {matchedCount} matched albums. Identifying fields (artist, title, format, barcode, etc.) are locked. Other fields will be updated if empty, or queued for conflict resolution if both sources have data.
               </div>
 
               {/* Preview Table */}
@@ -666,15 +634,7 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
                         if (album.status === 'MATCHED') {
                           statusColor = '#059669';
                           statusDisplay = 'MATCHED';
-                          if (!album.hasTracks && !album.hasCredits) {
-                            actionText = 'Update tracks + credits';
-                          } else if (!album.hasTracks) {
-                            actionText = 'Update tracks';
-                          } else if (!album.hasCredits) {
-                            actionText = 'Update credits';
-                          } else {
-                            actionText = 'Skip (has data)';
-                          }
+                          actionText = 'Process for updates/conflicts';
                         } else {
                           statusColor = '#dc2626';
                           statusDisplay = 'NO_MATCH';
