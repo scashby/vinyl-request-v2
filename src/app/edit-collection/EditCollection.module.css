@@ -1503,9 +1503,15 @@
 
 /* Find Duplicates Modal Styles */
 .duplicatesWrapper {
+  position: fixed;
+  top: 60px;
+  left: 0;
+  right: 0;
+  bottom: 0;
   background: #fff;
   display: flex;
   flex-direction: column;
+  z-index: 30000;
 }
 
 .duplicatesNavBar {
