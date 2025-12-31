@@ -1504,7 +1504,7 @@
 /* Find Duplicates Modal Styles */
 .duplicatesWrapper {
   position: fixed;
-  top: 60px;
+  top: 0;
   left: 0;
   right: 0;
   bottom: 0;
@@ -1515,7 +1515,7 @@
   overflow: hidden;
 }
 
-.duplicatesNavBar {
+.duplicatesNav {
   background: #2C2C2C;
   height: 50px;
   min-height: 50px;
@@ -1525,7 +1525,6 @@
   align-items: center;
   gap: 16px;
   flex-shrink: 0;
-  border: 5px solid red;
 }
 
 .duplicatesBackButton {

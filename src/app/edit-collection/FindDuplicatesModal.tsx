@@ -261,7 +261,7 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
       <div className={styles.duplicatesWrapper}>
         <Header />
         
-        <div className={styles.duplicatesNavBar}>
+        <div className={styles.duplicatesNav}>
           <button onClick={onClose} className={styles.duplicatesBackButton}>
             ← Back
           </button>
