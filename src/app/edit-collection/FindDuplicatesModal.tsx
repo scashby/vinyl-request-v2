@@ -38,6 +38,7 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
     }
   ]);
   const [selectedFavoriteId, setSelectedFavoriteId] = useState('default');
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<number>>(new Set());
 
   const detectionMethods = [
     { value: 'title' as DetectionMethod, label: 'Title' },
@@ -129,12 +130,25 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
 
       setDuplicateGroups(duplicates);
       setSearched(true);
+      setCollapsedGroups(new Set());
     } catch (err) {
       console.error('Error finding duplicates:', err);
       alert('Failed to find duplicates');
     } finally {
       setLoading(false);
     }
+  };
+
+  const toggleGroupCollapse = (groupIndex: number) => {
+    setCollapsedGroups(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(groupIndex)) {
+        newSet.delete(groupIndex);
+      } else {
+        newSet.add(groupIndex);
+      }
+      return newSet;
+    });
   };
 
   const handleRemoveAlbum = async (groupIndex: number, albumId: number) => {
@@ -325,6 +339,9 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
                         <tr key={`group-${groupIdx}`} className={styles.duplicatesGroupRow}>
                           <td colSpan={displayColumns.length + 1} className={styles.duplicatesGroupCell}>
                             <div className={styles.duplicatesGroupHeader}>
+                              <button onClick={() => toggleGroupCollapse(groupIdx)} className={styles.duplicatesCollapseButton}>
+                                {collapsedGroups.has(groupIdx) ? '▶' : '▼'}
+                              </button>
                               <span className={styles.duplicatesGroupName}>{group.displayName}</span>
                               <div className={styles.duplicatesGroupActions}>
                                 <button className={styles.duplicatesKeepButton}>
@@ -334,7 +351,7 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
                             </div>
                           </td>
                         </tr>
-                        {group.albums.map((album) => (
+                        {!collapsedGroups.has(groupIdx) && group.albums.map((album) => (
                           <tr key={`album-${album.id}`} className={styles.duplicatesAlbumRow}>
                             {displayColumns.map(col => (
                               <td key={col} className={styles.duplicatesTableCell}>{getColumnValue(album, col)}</td>

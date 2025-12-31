@@ -1758,10 +1758,30 @@
   padding: 10px 12px;
 }
 
+.duplicatesCollapseButton {
+  background: none;
+  border: none;
+  color: #666;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.duplicatesCollapseButton:hover {
+  color: #000;
+}
+
 .duplicatesGroupName {
   font-weight: 700;
   color: #000;
   flex: 1;
+  margin-left: 4px;
 }
 
 .duplicatesGroupActions {
