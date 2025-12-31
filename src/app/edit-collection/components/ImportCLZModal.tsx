@@ -12,7 +12,6 @@ import {
 } from '../../../lib/conflictDetection';
 import ConflictResolutionModal from './ConflictResolutionModal';
 
-type SyncMode = 'update_all' | 'update_missing_only';
 type ImportStage = 'upload' | 'preview' | 'importing' | 'conflicts' | 'complete';
 type AlbumStatus = 'MATCHED' | 'NO_MATCH';
 
@@ -261,7 +260,6 @@ function compareCLZAlbums(
 
 export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: ImportCLZModalProps) {
   const [stage, setStage] = useState<ImportStage>('upload');
-  const [syncMode, setSyncMode] = useState<SyncMode>('update_missing_only');
   const [file, setFile] = useState<File | null>(null);
   
   const [comparedAlbums, setComparedAlbums] = useState<ComparedCLZAlbum[]>([]);
@@ -331,15 +329,8 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
       // Only process MATCHED albums
       const matchedAlbums = comparedAlbums.filter(a => a.status === 'MATCHED');
       
-      // Filter based on sync mode
-      let albumsToProcess: ComparedCLZAlbum[] = [];
-      
-      if (syncMode === 'update_all') {
-        albumsToProcess = matchedAlbums;
-      } else if (syncMode === 'update_missing_only') {
-        // Only update albums missing tracks or credits
-        albumsToProcess = matchedAlbums.filter(a => !a.hasTracks || !a.hasCredits);
-      }
+      // Always use safe mode: Only update albums missing tracks or credits
+      const albumsToProcess = matchedAlbums.filter(a => !a.hasTracks || !a.hasCredits);
 
       setProgress({ current: 0, total: albumsToProcess.length, status: 'Processing...' });
 
@@ -558,51 +549,6 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
           {/* UPLOAD STAGE */}
           {stage === 'upload' && (
             <>
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{
-                  display: 'block',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  color: '#374151',
-                  marginBottom: '8px',
-                }}>
-                  Update Mode
-                </label>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {[
-                    { value: 'update_missing_only', label: 'Update Missing Only', desc: 'Only update albums missing tracks or credits (recommended)' },
-                    { value: 'update_all', label: 'Update All', desc: 'Update all matched albums with CLZ data' },
-                  ].map(mode => (
-                    <label key={mode.value} style={{
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      padding: '12px',
-                      border: `2px solid ${syncMode === mode.value ? '#f97316' : '#e5e7eb'}`,
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      backgroundColor: syncMode === mode.value ? '#f5f3ff' : 'white',
-                    }}>
-                      <input
-                        type="radio"
-                        name="syncMode"
-                        value={mode.value}
-                        checked={syncMode === mode.value}
-                        onChange={(e) => setSyncMode(e.target.value as SyncMode)}
-                        style={{ marginRight: '12px', marginTop: '2px' }}
-                      />
-                      <div>
-                        <div style={{ fontWeight: '600', color: '#111827', marginBottom: '2px' }}>
-                          {mode.label}
-                        </div>
-                        <div style={{ fontSize: '13px', color: '#6b7280' }}>
-                          {mode.desc}
-                        </div>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
               <div>
                 <label style={{
                   display: 'block',
@@ -677,10 +623,9 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
                 color: '#92400e',
                 marginBottom: '16px',
               }}>
-                <strong>Mode: {syncMode.replace(/_/g, ' ').toUpperCase()}</strong>
+                <strong>Safe Import Mode</strong>
                 <br />
-                {syncMode === 'update_all' && `Will update all ${matchedCount} matched albums with CLZ data.`}
-                {syncMode === 'update_missing_only' && `Will only update ${needsUpdateCount} albums missing tracks or credits.`}
+                Will only update albums missing tracks or credits. Existing data will be preserved unless conflicts are detected.
                 <br />
                 <br />
                 <strong>Note:</strong> Identifying fields (artist, title, format, barcode, etc.) are locked and won&apos;t be changed if they already have values. Other fields may generate conflicts that you&apos;ll resolve after import.
@@ -727,8 +672,6 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
                             actionText = 'Update tracks';
                           } else if (!album.hasCredits) {
                             actionText = 'Update credits';
-                          } else if (syncMode === 'update_all') {
-                            actionText = 'Check for conflicts';
                           } else {
                             actionText = 'Skip (has data)';
                           }
