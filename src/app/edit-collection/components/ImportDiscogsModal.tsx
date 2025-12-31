@@ -551,7 +551,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
           });
 
           try {
-            // Base album data
+            // Base album data - NEVER include generated columns
             const albumData: Record<string, unknown> = {
               artist: album.artist,
               title: album.title,
@@ -561,12 +561,16 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
               barcode: album.barcode,
               country: album.country,
               year: album.year,
-              year_int: album.year ? parseInt(album.year) : null,
               discogs_release_id: album.discogs_release_id,
               discogs_master_id: album.discogs_master_id,
-              // All normalized fields are generated columns - don't include them:
-              // artist_norm, title_norm, artist_album_norm, album_norm
             };
+            // GENERATED COLUMNS - NEVER INCLUDE:
+            // year_int (generated from year)
+            // decade (generated from year_int)
+            // artist_norm (generated from artist)
+            // title_norm (generated from title)
+            // album_norm (generated from title)
+            // artist_album_norm (generated from artist + title)
 
             // Parse format
             const formatData = parseDiscogsFormat(album.format);
