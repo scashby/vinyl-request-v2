@@ -9,20 +9,11 @@ import ColumnSelector from '../../components/ColumnSelector';
 import { ColumnId, DEFAULT_VISIBLE_COLUMNS, DEFAULT_LOCKED_COLUMNS, SortState } from './columnDefinitions';
 import { Album, toSafeStringArray, toSafeSearchString } from '../../types/album';
 import EditAlbumModal from './EditAlbumModal';
-import { SettingsModal } from './settings/SettingsModal';
 import NewCrateModal from './crates/NewCrateModal';
 import NewSmartCrateModal from './crates/NewSmartCrateModal';
-import ManageCratesModal from './crates/ManageCratesModal';
 import { AddToCrateModal } from './crates/AddToCrateModal';
-import ManagePickListsModal from './ManagePickListsModal';
-import { PrintToPDFModal } from './PrintToPDFModal';
-import { StatisticsModal } from './StatisticsModal';
-import ImportSelectionModal from './components/ImportSelectionModal';
-import ImportDiscogsModal from './components/ImportDiscogsModal';
-import ImportCLZModal from './components/ImportCLZModal';
-import ImportCSVModal from './components/ImportCSVModal';
-import ImportEnrichModal from './components/ImportEnrichModal';
 import FindDuplicatesModal from './FindDuplicatesModal';
+import Header from './Header';
 import type { Crate } from '../../types/crate';
 import { albumMatchesSmartCrate } from '../../lib/crateUtils';
 import { BoxIcon } from '../../components/BoxIcon';
@@ -379,7 +370,6 @@ const AlbumInfoPanel = memo(function AlbumInfoPanel({ album }: { album: Album | 
 function CollectionBrowserPage() {
   const [albums, setAlbums] = useState<Album[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchTypeDropdown, setShowSearchTypeDropdown] = useState(false);
   const [selectedLetter, setSelectedLetter] = useState<string>('All');
@@ -394,20 +384,10 @@ function CollectionBrowserPage() {
   const [selectedAlbumIds, setSelectedAlbumIds] = useState<Set<number>>(new Set());
   const [selectedAlbumId, setSelectedAlbumId] = useState<number | null>(null);
   const [editingAlbumId, setEditingAlbumId] = useState<number | null>(null);
-  const [showSettings, setShowSettings] = useState(false);
   const [showFolderModeDropdown, setShowFolderModeDropdown] = useState(false);
-  const [showManageCratesModal, setShowManageCratesModal] = useState(false);
-  const [showManagePickListsModal, setShowManagePickListsModal] = useState(false);
   const [showNewCrateModal, setShowNewCrateModal] = useState(false);
   const [showNewSmartCrateModal, setShowNewSmartCrateModal] = useState(false);
   const [showAddToCrateModal, setShowAddToCrateModal] = useState(false);
-  const [showPrintToPDF, setShowPrintToPDF] = useState(false);
-  const [showStatistics, setShowStatistics] = useState(false);
-  const [showImportModal, setShowImportModal] = useState(false);
-  const [showImportDiscogsModal, setShowImportDiscogsModal] = useState(false);
-  const [showImportCLZModal, setShowImportCLZModal] = useState(false);
-  const [showImportCSVModal, setShowImportCSVModal] = useState(false);
-  const [showImportEnrichModal, setShowImportEnrichModal] = useState(false);
   const [showFindDuplicates, setShowFindDuplicates] = useState(false);
   const [editingCrate, setEditingCrate] = useState<Crate | null>(null);
   const [returnToAddToCrate, setReturnToAddToCrate] = useState(false);
@@ -774,65 +754,13 @@ function CollectionBrowserPage() {
       `}</style>
 
       <div className={styles.container}>
-        {sidebarOpen && (
-          <>
-            <div className={styles.sidebarOverlay} onClick={() => setSidebarOpen(false)} />
-            <div className={`clz-sidebar ${styles.sidebar}`}>
-              <div className={styles.sidebarHeader}>
-                <div>DWD COLLECTION</div>
-                <button onClick={() => setSidebarOpen(false)} title="Close menu" className={styles.sidebarCloseButton}>×</button>
-              </div>
-
-              <div className={styles.sidebarSection}>
-                <div className={styles.sidebarSectionTitle}>Collection</div>
-                <button onClick={() => { setSidebarOpen(false); setShowManagePickListsModal(true); }} title="Create and manage pick lists" className={styles.sidebarButton}>
-                  <span style={{ marginRight: '10px' }}>📋</span> Manage Pick Lists
-                </button>
-                <button onClick={() => { setSidebarOpen(false); setShowManageCratesModal(true); }} title="Manage crates (DJ workflow organization)" className={styles.sidebarButton}>
-                  <span style={{ marginRight: '10px' }}>📦</span> Manage Crates
-                </button>
-              </div>
-
-              <hr className={styles.sidebarHr} />
-
-              <div className={styles.sidebarSection}>
-                <div className={styles.sidebarSectionTitle}>Tools</div>
-                <button onClick={() => { setSidebarOpen(false); setShowPrintToPDF(true); }} title="Export collection to PDF" className={styles.sidebarButton}>
-                  <span style={{ marginRight: '10px' }}>🖨️</span> Print to PDF
-                </button>
-                <button onClick={() => { setSidebarOpen(false); setShowStatistics(true); }} title="View collection statistics" className={styles.sidebarButton}>
-                  <span style={{ marginRight: '10px' }}>📊</span> Statistics
-                </button>
-                <button onClick={() => { setSidebarOpen(false); setShowImportModal(true); }} title="Import album data from various sources" className={styles.sidebarButton}>
-                  <span style={{ marginRight: '10px' }}>📥</span> Import Data
-                </button>
-                <button onClick={() => { setSidebarOpen(false); setShowFindDuplicates(true); }} title="Find duplicate albums" className={styles.sidebarButton}>
-                  <span style={{ marginRight: '10px' }}>🔍</span> Find Duplicates
-                </button>
-                <button title="Track loaned albums" className={styles.sidebarButton}>
-                  <span style={{ marginRight: '10px' }}>📚</span> Loan Manager
-                </button>
-                <button onClick={() => { setSidebarOpen(false); setShowSettings(true); }} title="Application settings" className={styles.sidebarButton}>
-                  <span style={{ marginRight: '10px' }}>⚙️</span> Settings
-                </button>
-              </div>
-            </div>
-          </>
-        )}
-
-        <div className={`clz-header ${styles.header}`}>
-          <div className={styles.headerLeft}>
-            <button onClick={() => setSidebarOpen(true)} title="Open menu" className={styles.headerMenuButton}>☰</button>
-            <div className={styles.headerTitle}>
-              <span style={{ fontSize: '18px' }}>♪</span>
-              <span style={{ fontSize: '15px', fontWeight: 600, letterSpacing: '0.5px' }}>DWD Collection Management System</span>
-            </div>
-          </div>
-          <div className={styles.headerRight}>
-            <button title="Grid view" className={styles.headerButton}>⊞</button>
-            <button title="User account" className={styles.headerButton}>👤</button>
-          </div>
-        </div>
+        <Header 
+          albums={albums} 
+          loadAlbums={loadAlbums} 
+          loadCrates={loadCrates}
+          filteredAndSortedAlbums={filteredAndSortedAlbums}
+          selectedAlbumIds={selectedAlbumIds}
+        />
 
         <div className={styles.toolbar}>
           <div className={styles.toolbarLeft}>
@@ -856,7 +784,6 @@ function CollectionBrowserPage() {
             {alphabet.map(letter => (
               <button key={letter} onClick={() => setSelectedLetter(letter)} title={`Filter by letter ${letter}`} className={selectedLetter === letter ? styles.letterButtonActive : styles.letterButton}>{letter}</button>
             ))}
-            <button onClick={() => setShowSettings(true)} title="Settings" className={styles.settingsButton}>⚙️</button>
           </div>
 
           <div className={styles.toolbarRight}>
@@ -1038,46 +965,9 @@ function CollectionBrowserPage() {
 
       {showColumnSelector && <ColumnSelector visibleColumns={visibleColumns} onColumnsChange={handleColumnsChange} onClose={() => setShowColumnSelector(false)} />}
       {editingAlbumId && <EditAlbumModal albumId={editingAlbumId} onClose={() => setEditingAlbumId(null)} onRefresh={loadAlbums} onNavigate={(newAlbumId) => setEditingAlbumId(newAlbumId)} allAlbumIds={filteredAndSortedAlbums.map(a => a.id)} />}
-      {showSettings && <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />}
-      {showManagePickListsModal && <ManagePickListsModal isOpen={showManagePickListsModal} onClose={() => setShowManagePickListsModal(false)} />}
-      {showNewCrateModal && <NewCrateModal isOpen={showNewCrateModal} onClose={() => { setShowNewCrateModal(false); setEditingCrate(null); if (returnToAddToCrate) { setReturnToAddToCrate(false); setNewlyCreatedCrateId(null); }}} onCrateCreated={async (newCrateId) => { await loadCrates(); setEditingCrate(null); if (returnToAddToCrate) { setNewlyCreatedCrateId(newCrateId); setShowNewCrateModal(false); setShowAddToCrateModal(true); } else { setShowNewCrateModal(false); setShowManageCratesModal(true); }}} editingCrate={editingCrate} />}
-      {showNewSmartCrateModal && <NewSmartCrateModal isOpen={showNewSmartCrateModal} onClose={() => { setShowNewSmartCrateModal(false); setEditingCrate(null); }} onCrateCreated={() => { loadCrates(); setShowNewSmartCrateModal(false); setShowManageCratesModal(true); setEditingCrate(null); }} editingCrate={editingCrate} />}
-      {showManageCratesModal && <ManageCratesModal isOpen={showManageCratesModal} onClose={() => setShowManageCratesModal(false)} onCratesChanged={() => { loadCrates(); }} onOpenNewCrate={() => { setShowManageCratesModal(false); setEditingCrate(null); setShowNewCrateModal(true); }} onOpenNewSmartCrate={() => { setShowManageCratesModal(false); setEditingCrate(null); setShowNewSmartCrateModal(true); }} onOpenEditCrate={(crate) => { setShowManageCratesModal(false); setEditingCrate(crate); setShowNewCrateModal(true); }} onOpenEditSmartCrate={(crate) => { setShowManageCratesModal(false); setEditingCrate(crate); setShowNewSmartCrateModal(true); }} />}
+      {showNewCrateModal && <NewCrateModal isOpen={showNewCrateModal} onClose={() => { setShowNewCrateModal(false); setEditingCrate(null); if (returnToAddToCrate) { setReturnToAddToCrate(false); setNewlyCreatedCrateId(null); }}} onCrateCreated={async (newCrateId) => { await loadCrates(); setEditingCrate(null); if (returnToAddToCrate) { setNewlyCreatedCrateId(newCrateId); setShowNewCrateModal(false); setShowAddToCrateModal(true); } else { setShowNewCrateModal(false); }}} editingCrate={editingCrate} />}
+      {showNewSmartCrateModal && <NewSmartCrateModal isOpen={showNewSmartCrateModal} onClose={() => { setShowNewSmartCrateModal(false); setEditingCrate(null); }} onCrateCreated={() => { loadCrates(); setShowNewSmartCrateModal(false); setEditingCrate(null); }} editingCrate={editingCrate} />}
       {showAddToCrateModal && <AddToCrateModal isOpen={showAddToCrateModal} onClose={() => { setShowAddToCrateModal(false); setReturnToAddToCrate(false); setNewlyCreatedCrateId(null); }} crates={cratesWithCounts} onAddToCrates={handleAddToCrates} selectedCount={selectedAlbumIds.size} onOpenNewCrate={() => { setReturnToAddToCrate(true); setShowAddToCrateModal(false); setEditingCrate(null); setShowNewCrateModal(true); }} autoSelectCrateId={newlyCreatedCrateId} />}
-      {showPrintToPDF && <PrintToPDFModal isOpen={showPrintToPDF} onClose={() => setShowPrintToPDF(false)} allAlbums={albums} currentListAlbums={filteredAndSortedAlbums} checkedAlbumIds={selectedAlbumIds} />}
-      {showStatistics && <StatisticsModal isOpen={showStatistics} onClose={() => setShowStatistics(false)} albums={albums} />}
-      {showImportModal && <ImportSelectionModal onSelectImportType={(type) => { 
-        setShowImportModal(false); 
-        if (type === 'discogs') {
-          setShowImportDiscogsModal(true);
-        } else if (type === 'csv') { 
-          setShowImportCSVModal(true);
-        } else if (type === 'clz') { 
-          setShowImportCLZModal(true);
-        } else if (type === 'enrich') { 
-          setShowImportEnrichModal(true);
-        }
-      }} onCancel={() => setShowImportModal(false)} />}
-      {showImportDiscogsModal && <ImportDiscogsModal 
-        isOpen={showImportDiscogsModal} 
-        onClose={() => setShowImportDiscogsModal(false)} 
-        onImportComplete={loadAlbums} 
-      />}
-      {showImportCLZModal && <ImportCLZModal 
-        isOpen={showImportCLZModal} 
-        onClose={() => setShowImportCLZModal(false)} 
-        onImportComplete={loadAlbums} 
-      />}
-      {showImportCSVModal && <ImportCSVModal 
-        isOpen={showImportCSVModal} 
-        onClose={() => setShowImportCSVModal(false)} 
-        onImportComplete={loadAlbums} 
-      />}
-      {showImportEnrichModal && <ImportEnrichModal 
-        isOpen={showImportEnrichModal} 
-        onClose={() => setShowImportEnrichModal(false)} 
-        onImportComplete={loadAlbums} 
-      />}
       {showFindDuplicates && <FindDuplicatesModal 
         isOpen={showFindDuplicates} 
         onClose={() => setShowFindDuplicates(false)} 

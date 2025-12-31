@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabaseClient';
 import { Album } from '../../types/album';
 import styles from './EditCollection.module.css';
 import { ManageColumnFavoritesModal, ColumnFavorite } from './ManageColumnFavoritesModal';
+import Header from './Header';
 
 interface FindDuplicatesModalProps {
   isOpen: boolean;
@@ -258,6 +259,8 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
   return (
     <>
       <div className={styles.duplicatesWrapper}>
+        <Header />
+        
         <div className={styles.duplicatesNavBar}>
           <button onClick={onClose} className={styles.duplicatesBackButton}>
             ← Back
