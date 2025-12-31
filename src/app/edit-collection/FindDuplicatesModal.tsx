@@ -5,6 +5,7 @@ import { useState, useMemo } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { Album } from '../../types/album';
 import styles from './EditCollection.module.css';
+import { ManageColumnFavoritesModal, ColumnFavorite } from './ManageColumnFavoritesModal';
 
 interface FindDuplicatesModalProps {
   isOpen: boolean;
@@ -27,6 +28,15 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
   const [loading, setLoading] = useState(false);
   const [duplicateGroups, setDuplicateGroups] = useState<DuplicateGroup[]>([]);
   const [searched, setSearched] = useState(false);
+  const [showColumnFavoritesModal, setShowColumnFavoritesModal] = useState(false);
+  const [columnFavorites, setColumnFavorites] = useState<ColumnFavorite[]>([
+    {
+      id: 'default',
+      name: 'Default',
+      columns: ['Artist', 'Title', 'Release Date', 'Format', 'Discs', 'Tracks', 'Length', 'Genre', 'Label', 'Added Date', 'Action']
+    }
+  ]);
+  const [selectedFavoriteId, setSelectedFavoriteId] = useState('default');
 
   const detectionMethods = [
     { value: 'title' as DetectionMethod, label: 'Title' },
@@ -252,7 +262,7 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
           </div>
         )}
         <div className={styles.duplicatesToolbarSpacer} />
-        <button className={styles.duplicatesColumnButton} title="Manage Column Favorites">
+        <button onClick={() => setShowColumnFavoritesModal(true)} className={styles.duplicatesColumnButton} title="Manage Column Favorites">
           ⊞
         </button>
       </div>
@@ -348,6 +358,18 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
           </div>
         )}
       </div>
+
+      <ManageColumnFavoritesModal
+        isOpen={showColumnFavoritesModal}
+        onClose={() => setShowColumnFavoritesModal(false)}
+        favorites={columnFavorites}
+        onSave={(newFavorites) => {
+          setColumnFavorites(newFavorites);
+          setShowColumnFavoritesModal(false);
+        }}
+        selectedId={selectedFavoriteId}
+        onSelect={setSelectedFavoriteId}
+      />
     </div>
   );
 }
