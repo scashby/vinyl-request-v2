@@ -4,9 +4,16 @@
 import { useState } from 'react';
 import { supabase } from '../../../lib/supabaseClient';
 import { normalizeArtist, normalizeTitle } from '../../../lib/importUtils';
+import {
+  buildIdentifyingFieldUpdates,
+  detectConflicts,
+  type FieldConflict,
+  type PreviousResolution,
+} from '../../../lib/conflictDetection';
+import ConflictResolutionModal from './ConflictResolutionModal';
 
 type SyncMode = 'update_all' | 'update_missing_only';
-type ImportStage = 'upload' | 'preview' | 'importing' | 'complete';
+type ImportStage = 'upload' | 'preview' | 'importing' | 'conflicts' | 'complete';
 type AlbumStatus = 'MATCHED' | 'NO_MATCH';
 
 interface ParsedCLZAlbum {
@@ -36,6 +43,7 @@ interface ParsedCLZAlbum {
   cat_no: string;
   artist_norm: string;
   title_norm: string;
+  labels: string[];
 }
 
 interface ExistingAlbum {
@@ -48,6 +56,15 @@ interface ExistingAlbum {
   producers: string[] | null;
   engineers: string[] | null;
   songwriters: string[] | null;
+  barcode: string | null;
+  cat_no: string | null;
+  labels: string[] | null;
+  format: string | null;
+  country: string | null;
+  folder: string | null;
+  discogs_release_id: string | null;
+  discogs_master_id: string | null;
+  date_added: string | null;
 }
 
 interface ComparedCLZAlbum extends ParsedCLZAlbum {
@@ -82,6 +99,12 @@ function parseCLZXML(xmlText: string): ParsedCLZAlbum[] {
     // Get title and year
     const title = music.querySelector('title')?.textContent || 'Unknown Title';
     const year = music.querySelector('releaseyear')?.textContent || '';
+
+    // Get labels
+    const labels: string[] = [];
+    music.querySelectorAll('labels label displayname').forEach(node => {
+      if (node.textContent) labels.push(node.textContent);
+    });
 
     // Parse tracks and discs
     const tracks: ParsedCLZAlbum['tracks'] = [];
@@ -168,6 +191,7 @@ function parseCLZXML(xmlText: string): ParsedCLZAlbum[] {
       songwriters,
       barcode: music.querySelector('barcode')?.textContent || '',
       cat_no: music.querySelector('labelnumber')?.textContent || '',
+      labels,
       artist_norm: normalizeArtist(artist),
       title_norm: normalizeTitle(title),
     });
@@ -241,15 +265,19 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
   const [file, setFile] = useState<File | null>(null);
   
   const [comparedAlbums, setComparedAlbums] = useState<ComparedCLZAlbum[]>([]);
+  const [existingAlbums, setExistingAlbums] = useState<ExistingAlbum[]>([]);
   
   const [progress, setProgress] = useState({ current: 0, total: 0, status: '' });
   const [error, setError] = useState<string | null>(null);
+  
+  const [allConflicts, setAllConflicts] = useState<FieldConflict[]>([]);
   
   const [results, setResults] = useState({
     updated: 0,
     skipped: 0,
     noMatch: 0,
     errors: 0,
+    conflicts: 0,
   });
 
   if (!isOpen) return null;
@@ -278,7 +306,7 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
       // Load existing collection
       const { data: existing, error: dbError } = await supabase
         .from('collection')
-        .select('id, artist, title, year, tracks, musicians, producers, engineers, songwriters');
+        .select('id, artist, title, year, tracks, musicians, producers, engineers, songwriters, barcode, cat_no, labels, format, country, folder, discogs_release_id, discogs_master_id, date_added');
 
       if (dbError) {
         setError(`Database error: ${dbError.message}`);
@@ -288,6 +316,7 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
       // Compare
       const compared = compareCLZAlbums(parsed, existing as ExistingAlbum[]);
       setComparedAlbums(compared);
+      setExistingAlbums(existing as ExistingAlbum[]);
       setStage('preview');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to parse XML');
@@ -319,7 +348,10 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
         skipped: matchedAlbums.length - albumsToProcess.length,
         noMatch: comparedAlbums.filter(a => a.status === 'NO_MATCH').length,
         errors: 0,
+        conflicts: 0,
       };
+
+      const conflicts: FieldConflict[] = [];
 
       // Process albums
       for (let i = 0; i < albumsToProcess.length; i++) {
@@ -328,11 +360,26 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
         setProgress({
           current: i + 1,
           total: albumsToProcess.length,
-          status: `Updating ${album.artist} - ${album.title}`,
+          status: `Processing ${album.artist} - ${album.title}`,
         });
 
         try {
-          const updateData: Record<string, unknown> = {
+          // Find existing album
+          const existingAlbum = existingAlbums.find(e => e.id === album.existingId);
+          if (!existingAlbum) continue;
+
+          // Load previous conflict resolutions
+          const { data: resolutions } = await supabase
+            .from('import_conflict_resolutions')
+            .select('*')
+            .eq('album_id', album.existingId!)
+            .eq('source', 'clz');
+
+          // Build CLZ data object
+          const clzData: Record<string, unknown> = {
+            artist: album.artist,
+            title: album.title,
+            year: album.year,
             tracks: album.tracks,
             disc_metadata: album.disc_metadata,
             discs: album.disc_count,
@@ -340,30 +387,64 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
             producers: album.producers,
             engineers: album.engineers,
             songwriters: album.songwriters,
+            barcode: album.barcode,
+            cat_no: album.cat_no,
+            labels: album.labels,
           };
 
-          // Only update barcode/cat_no if they have values
-          if (album.barcode) updateData.barcode = album.barcode;
-          if (album.cat_no) updateData.cat_no = album.cat_no;
+          // Step 1: Handle identifying fields (only fill if NULL)
+          const identifyingUpdates = buildIdentifyingFieldUpdates(
+            existingAlbum as unknown as Record<string, unknown>,
+            clzData
+          );
 
-          const { error: updateError } = await supabase
-            .from('collection')
-            .update(updateData)
-            .eq('id', album.existingId!);
+          // Step 2: Detect conflicts for conflictable fields
+          const { safeUpdates, conflicts: albumConflicts } = detectConflicts(
+            existingAlbum as unknown as Record<string, unknown>,
+            clzData,
+            'clz',
+            (resolutions || []) as PreviousResolution[]
+          );
 
-          if (updateError) throw updateError;
-          resultCounts.updated++;
+          // Combine identifying updates and safe updates
+          const updateData = {
+            ...identifyingUpdates,
+            ...safeUpdates,
+          };
+
+          // Update album with non-conflicting data
+          if (Object.keys(updateData).length > 0) {
+            const { error: updateError } = await supabase
+              .from('collection')
+              .update(updateData)
+              .eq('id', album.existingId!);
+
+            if (updateError) throw updateError;
+            resultCounts.updated++;
+          }
+
+          // Queue conflicts for later resolution
+          if (albumConflicts.length > 0) {
+            conflicts.push(...albumConflicts);
+            resultCounts.conflicts += albumConflicts.length;
+          }
         } catch (err) {
-          console.error(`Error updating ${album.artist} - ${album.title}:`, err);
+          console.error(`Error processing ${album.artist} - ${album.title}:`, err);
           resultCounts.errors++;
         }
       }
 
       setResults(resultCounts);
-      setStage('complete');
       
-      if (onImportComplete) {
-        onImportComplete();
+      // If there are conflicts, show resolution modal
+      if (conflicts.length > 0) {
+        setAllConflicts(conflicts);
+        setStage('conflicts');
+      } else {
+        setStage('complete');
+        if (onImportComplete) {
+          onImportComplete();
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Import failed');
@@ -371,13 +452,22 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
     }
   };
 
+  const handleConflictsResolved = () => {
+    setStage('complete');
+    if (onImportComplete) {
+      onImportComplete();
+    }
+  };
+
   const handleClose = () => {
     setStage('upload');
     setFile(null);
     setComparedAlbums([]);
+    setExistingAlbums([]);
     setProgress({ current: 0, total: 0, status: '' });
     setError(null);
-    setResults({ updated: 0, skipped: 0, noMatch: 0, errors: 0 });
+    setAllConflicts([]);
+    setResults({ updated: 0, skipped: 0, noMatch: 0, errors: 0, conflicts: 0 });
     onClose();
   };
 
@@ -386,6 +476,18 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
   const needsUpdateCount = comparedAlbums.filter(a => 
     a.status === 'MATCHED' && (!a.hasTracks || !a.hasCredits)
   ).length;
+
+  // Show conflict resolution modal
+  if (stage === 'conflicts') {
+    return (
+      <ConflictResolutionModal
+        conflicts={allConflicts}
+        source="clz"
+        onComplete={handleConflictsResolved}
+        onCancel={() => setStage('complete')}
+      />
+    );
+  }
 
   return (
     <div style={{
@@ -579,6 +681,9 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
                 <br />
                 {syncMode === 'update_all' && `Will update all ${matchedCount} matched albums with CLZ data.`}
                 {syncMode === 'update_missing_only' && `Will only update ${needsUpdateCount} albums missing tracks or credits.`}
+                <br />
+                <br />
+                <strong>Note:</strong> Identifying fields (artist, title, format, barcode, etc.) are locked and won&apos;t be changed if they already have values. Other fields may generate conflicts that you&apos;ll resolve after import.
               </div>
 
               {/* Preview Table */}
@@ -623,7 +728,7 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
                           } else if (!album.hasCredits) {
                             actionText = 'Update credits';
                           } else if (syncMode === 'update_all') {
-                            actionText = 'Update all data';
+                            actionText = 'Check for conflicts';
                           } else {
                             actionText = 'Skip (has data)';
                           }
@@ -697,6 +802,9 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
                 <div><strong>{results.updated}</strong> albums updated</div>
                 <div><strong>{results.skipped}</strong> albums skipped</div>
                 <div><strong>{results.noMatch}</strong> albums not found in database</div>
+                {results.conflicts > 0 && (
+                  <div><strong>{results.conflicts}</strong> conflicts resolved</div>
+                )}
                 {results.errors > 0 && (
                   <div style={{ color: '#dc2626', marginTop: '8px' }}>
                     <strong>{results.errors}</strong> errors occurred
