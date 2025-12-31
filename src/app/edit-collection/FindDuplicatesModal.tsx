@@ -251,6 +251,10 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
             {duplicateGroups.length} duplicates found:
           </div>
         )}
+        <div className={styles.duplicatesToolbarSpacer} />
+        <button className={styles.duplicatesColumnButton} title="Manage Column Favorites">
+          ⊞
+        </button>
       </div>
 
       <div className={styles.duplicatesContent}>
@@ -333,17 +337,17 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
             </div>
           </>
         )}
-      </div>
 
-      {loading && (
-        <div className={styles.duplicatesLoadingInterstitial}>
-          <div className={styles.duplicatesLoadingContent}>
-            <div className={styles.duplicatesLoadingSpinner} />
-            <div>Loading...</div>
-            <div>Please wait</div>
+        {loading && (
+          <div className={styles.duplicatesLoadingInterstitial}>
+            <div className={styles.duplicatesLoadingContent}>
+              <div className={styles.duplicatesLoadingSpinner} />
+              <div>Loading...</div>
+              <div>Please wait</div>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

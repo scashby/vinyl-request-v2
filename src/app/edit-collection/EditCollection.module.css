@@ -1503,13 +1503,7 @@
 
 /* Find Duplicates Modal Styles */
 .duplicatesWrapper {
-  position: fixed;
-  top: 60px;
-  left: 0;
-  right: 0;
-  bottom: 0;
   background: #fff;
-  z-index: 9999;
   display: flex;
   flex-direction: column;
 }
@@ -1645,11 +1639,30 @@
   margin-left: 20px;
 }
 
+.duplicatesToolbarSpacer {
+  flex: 1;
+}
+
+.duplicatesColumnButton {
+  background: none;
+  border: 1px solid #666;
+  color: white;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px 12px;
+  border-radius: 4px;
+}
+
+.duplicatesColumnButton:hover {
+  background: #444;
+}
+
 .duplicatesContent {
   flex: 1;
   overflow-y: auto;
   background: #fff;
   position: relative;
+  min-height: 400px;
 }
 
 .duplicatesLoadingInterstitial {
@@ -1707,14 +1720,6 @@
   border-right: 1px solid #000;
   border-left: 1px solid #000;
   border-bottom: 1px solid #e5e7eb;
-}
-
-.duplicatesTableHeaderCell:first-child {
-  border-left: none;
-}
-
-.duplicatesTableHeaderCell:last-child {
-  border-right: none;
 }
 
 .duplicatesGroupRow {
