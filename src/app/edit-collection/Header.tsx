@@ -14,6 +14,7 @@ import ImportDiscogsModal from './components/ImportDiscogsModal';
 import ImportCLZModal from './components/ImportCLZModal';
 import ImportCSVModal from './components/ImportCSVModal';
 import ImportEnrichModal from './components/ImportEnrichModal';
+import FindDuplicatesModal from './FindDuplicatesModal';
 import type { Album } from '../../types/album';
 import type { Crate } from '../../types/crate';
 import styles from './EditCollection.module.css';
@@ -46,6 +47,7 @@ export default function Header({
   const [showImportCLZModal, setShowImportCLZModal] = useState(false);
   const [showImportCSVModal, setShowImportCSVModal] = useState(false);
   const [showImportEnrichModal, setShowImportEnrichModal] = useState(false);
+  const [showFindDuplicates, setShowFindDuplicates] = useState(false);
   const [editingCrate, setEditingCrate] = useState<Crate | null>(null);
 
   return (
@@ -81,6 +83,9 @@ export default function Header({
               </button>
               <button onClick={() => { setSidebarOpen(false); setShowImportModal(true); }} title="Import album data from various sources" className={styles.sidebarButton}>
                 <span style={{ marginRight: '10px' }}>📥</span> Import Data
+              </button>
+              <button onClick={() => { setSidebarOpen(false); setShowFindDuplicates(true); }} title="Find duplicate albums" className={styles.sidebarButton}>
+                <span style={{ marginRight: '10px' }}>🔍</span> Find Duplicates
               </button>
               <button title="Track loaned albums" className={styles.sidebarButton}>
                 <span style={{ marginRight: '10px' }}>📚</span> Loan Manager
@@ -145,6 +150,11 @@ export default function Header({
         isOpen={showImportEnrichModal} 
         onClose={() => setShowImportEnrichModal(false)} 
         onImportComplete={loadAlbums} 
+      />}
+      {showFindDuplicates && <FindDuplicatesModal 
+        isOpen={showFindDuplicates} 
+        onClose={() => setShowFindDuplicates(false)} 
+        onDuplicatesRemoved={loadAlbums} 
       />}
     </>
   );

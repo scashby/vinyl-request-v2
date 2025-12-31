@@ -12,7 +12,6 @@ import EditAlbumModal from './EditAlbumModal';
 import NewCrateModal from './crates/NewCrateModal';
 import NewSmartCrateModal from './crates/NewSmartCrateModal';
 import { AddToCrateModal } from './crates/AddToCrateModal';
-import FindDuplicatesModal from './FindDuplicatesModal';
 import Header from './Header';
 import type { Crate } from '../../types/crate';
 import { albumMatchesSmartCrate } from '../../lib/crateUtils';
@@ -388,7 +387,6 @@ function CollectionBrowserPage() {
   const [showNewCrateModal, setShowNewCrateModal] = useState(false);
   const [showNewSmartCrateModal, setShowNewSmartCrateModal] = useState(false);
   const [showAddToCrateModal, setShowAddToCrateModal] = useState(false);
-  const [showFindDuplicates, setShowFindDuplicates] = useState(false);
   const [editingCrate, setEditingCrate] = useState<Crate | null>(null);
   const [returnToAddToCrate, setReturnToAddToCrate] = useState(false);
   const [newlyCreatedCrateId, setNewlyCreatedCrateId] = useState<number | null>(null);
@@ -968,11 +966,6 @@ function CollectionBrowserPage() {
       {showNewCrateModal && <NewCrateModal isOpen={showNewCrateModal} onClose={() => { setShowNewCrateModal(false); setEditingCrate(null); if (returnToAddToCrate) { setReturnToAddToCrate(false); setNewlyCreatedCrateId(null); }}} onCrateCreated={async (newCrateId) => { await loadCrates(); setEditingCrate(null); if (returnToAddToCrate) { setNewlyCreatedCrateId(newCrateId); setShowNewCrateModal(false); setShowAddToCrateModal(true); } else { setShowNewCrateModal(false); }}} editingCrate={editingCrate} />}
       {showNewSmartCrateModal && <NewSmartCrateModal isOpen={showNewSmartCrateModal} onClose={() => { setShowNewSmartCrateModal(false); setEditingCrate(null); }} onCrateCreated={() => { loadCrates(); setShowNewSmartCrateModal(false); setEditingCrate(null); }} editingCrate={editingCrate} />}
       {showAddToCrateModal && <AddToCrateModal isOpen={showAddToCrateModal} onClose={() => { setShowAddToCrateModal(false); setReturnToAddToCrate(false); setNewlyCreatedCrateId(null); }} crates={cratesWithCounts} onAddToCrates={handleAddToCrates} selectedCount={selectedAlbumIds.size} onOpenNewCrate={() => { setReturnToAddToCrate(true); setShowAddToCrateModal(false); setEditingCrate(null); setShowNewCrateModal(true); }} autoSelectCrateId={newlyCreatedCrateId} />}
-      {showFindDuplicates && <FindDuplicatesModal 
-        isOpen={showFindDuplicates} 
-        onClose={() => setShowFindDuplicates(false)} 
-        onDuplicatesRemoved={loadAlbums} 
-      />}
     </>
   );
 }
