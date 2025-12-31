@@ -1508,48 +1508,62 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: #fff;
+  background: white;
+  z-index: 30000;
   display: flex;
   flex-direction: column;
-  z-index: 30000;
+  overflow: hidden;
 }
 
 .duplicatesNavBar {
-  background: #2A2A2A;
-  color: white;
-  padding: 16px 20px;
+  background: #2C2C2C;
+  height: 50px;
+  min-height: 50px;
+  max-height: 50px;
+  padding: 0 20px;
   display: flex;
   align-items: center;
-  gap: 20px;
-  min-height: 48px;
+  gap: 16px;
+  flex-shrink: 0;
 }
 
 .duplicatesBackButton {
   background: none;
   border: none;
-  color: white;
+  color: #FFFFFF;
   font-size: 14px;
+  font-weight: 400;
   cursor: pointer;
-  padding: 4px 8px;
+  padding: 8px 12px;
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
 }
 
 .duplicatesBackButton:hover {
-  text-decoration: underline;
+  opacity: 0.8;
 }
 
 .duplicatesTitle {
   font-size: 16px;
   font-weight: 600;
-  color: white;
+  color: #FFFFFF;
+  margin: 0;
+  padding: 0;
+  line-height: 1;
 }
 
 .duplicatesToolbar {
-  background: #2A2A2A;
+  background: #2C2C2C;
   color: white;
-  padding: 12px 20px;
+  height: 56px;
+  min-height: 56px;
+  max-height: 56px;
+  padding: 0 20px;
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-shrink: 0;
   border-bottom: 1px solid #444;
 }
 
