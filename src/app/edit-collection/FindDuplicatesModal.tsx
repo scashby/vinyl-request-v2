@@ -256,122 +256,122 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
   };
 
   return (
-    <div className={styles.duplicatesWrapper}>
-      <div className={styles.duplicatesNavBar}>
-        <button onClick={onClose} className={styles.duplicatesBackButton}>
-          ← Back
-        </button>
-        <div className={styles.duplicatesTitle}>
-          🔍 Find Duplicates
-        </div>
-      </div>
-
-      <div className={styles.duplicatesToolbar}>
-        <span className={styles.duplicatesToolbarLabel}>Find duplicates based on</span>
-        <div className={styles.duplicatesDropdownWrapper}>
-          <button onClick={() => setShowMethodDropdown(!showMethodDropdown)} className={styles.duplicatesDropdownButton}>
-            <span>{selectedMethodLabel}</span>
-            <span className={styles.duplicatesDropdownArrow}>▼</span>
+    <>
+      <div className={styles.duplicatesWrapper}>
+        <div className={styles.duplicatesNavBar}>
+          <button onClick={onClose} className={styles.duplicatesBackButton}>
+            ← Back
           </button>
+          <span className={styles.duplicatesTitle}>🔍 Find Duplicates</span>
+        </div>
 
-          {showMethodDropdown && (
+        <div className={styles.duplicatesToolbar}>
+          <span className={styles.duplicatesToolbarLabel}>Find duplicates based on</span>
+          <div className={styles.duplicatesDropdownWrapper}>
+            <button onClick={() => setShowMethodDropdown(!showMethodDropdown)} className={styles.duplicatesDropdownButton}>
+              <span>{selectedMethodLabel}</span>
+              <span className={styles.duplicatesDropdownArrow}>▼</span>
+            </button>
+
+            {showMethodDropdown && (
+              <>
+                <div onClick={() => setShowMethodDropdown(false)} className={styles.dropdownOverlay} />
+                <div className={styles.duplicatesDropdownMenu}>
+                  {detectionMethods.map(method => (
+                    <button key={method.value} onClick={() => {
+                      setDetectionMethod(method.value);
+                      setShowMethodDropdown(false);
+                    }} className={detectionMethod === method.value ? styles.duplicatesDropdownItemActive : styles.duplicatesDropdownItem}>
+                      {method.label}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+          <button onClick={handleFindDuplicates} disabled={loading} className={styles.duplicatesFindButton}>
+            Find Duplicates
+          </button>
+          {searched && duplicateGroups.length > 0 && (
+            <span className={styles.duplicatesCount}>
+              {duplicateGroups.length} duplicates found:
+            </span>
+          )}
+          <div className={styles.duplicatesToolbarSpacer} />
+          <button onClick={() => setShowColumnFavoritesModal(true)} className={styles.duplicatesColumnButton} title="Manage Column Favorites">
+            ⊞
+          </button>
+        </div>
+
+        <div className={styles.duplicatesContent}>
+          {searched && duplicateGroups.length > 0 && (
             <>
-              <div onClick={() => setShowMethodDropdown(false)} className={styles.dropdownOverlay} />
-              <div className={styles.duplicatesDropdownMenu}>
-                {detectionMethods.map(method => (
-                  <button key={method.value} onClick={() => {
-                    setDetectionMethod(method.value);
-                    setShowMethodDropdown(false);
-                  }} className={detectionMethod === method.value ? styles.duplicatesDropdownItemActive : styles.duplicatesDropdownItem}>
-                    {method.label}
-                  </button>
-                ))}
+              <div className={styles.duplicatesTableWrapper}>
+                <table className={styles.duplicatesTable}>
+                  <thead>
+                    <tr className={styles.duplicatesTableHeaderRow}>
+                      {displayColumns.map(col => (
+                        <th key={col} className={styles.duplicatesTableHeaderCell}>{col}</th>
+                      ))}
+                      <th className={styles.duplicatesTableHeaderCell}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {duplicateGroups.map((group, groupIdx) => (
+                      <>
+                        <tr key={`group-${groupIdx}`} className={styles.duplicatesGroupRow}>
+                          <td colSpan={displayColumns.length + 1} className={styles.duplicatesGroupCell}>
+                            <div className={styles.duplicatesGroupHeader}>
+                              <span className={styles.duplicatesGroupName}>{group.displayName}</span>
+                              <div className={styles.duplicatesGroupActions}>
+                                <button className={styles.duplicatesKeepButton}>
+                                  Keep {group.keepCount}
+                                </button>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                        {group.albums.map((album) => (
+                          <tr key={`album-${album.id}`} className={styles.duplicatesAlbumRow}>
+                            {displayColumns.map(col => (
+                              <td key={col} className={styles.duplicatesTableCell}>{getColumnValue(album, col)}</td>
+                            ))}
+                            <td className={styles.duplicatesTableCell}>
+                              <button onClick={() => handleRemoveAlbum(groupIdx, album.id)} className={styles.duplicatesRemoveButton}>
+                                Remove
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                        {groupIdx < duplicateGroups.length - 1 && (
+                          <tr key={`separator-${groupIdx}`} className={styles.duplicatesSeparator}>
+                            <td colSpan={displayColumns.length + 1}></td>
+                          </tr>
+                        )}
+                      </>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className={styles.duplicatesFooterActions}>
+                <button onClick={handleRemoveAllAutomatically} disabled={loading || totalToRemove === 0} className={styles.duplicatesRemoveAllButton}>
+                  Remove all duplicates automatically
+                </button>
               </div>
             </>
           )}
+
+          {loading && (
+            <div className={styles.duplicatesLoadingInterstitial}>
+              <div className={styles.duplicatesLoadingContent}>
+                <div className={styles.duplicatesLoadingSpinner} />
+                <div>Loading...</div>
+                <div>Please wait</div>
+              </div>
+            </div>
+          )}
         </div>
-        <button onClick={handleFindDuplicates} disabled={loading} className={styles.duplicatesFindButton}>
-          Find Duplicates
-        </button>
-        {searched && duplicateGroups.length > 0 && (
-          <div className={styles.duplicatesCount}>
-            {duplicateGroups.length} duplicates found:
-          </div>
-        )}
-        <div className={styles.duplicatesToolbarSpacer} />
-        <button onClick={() => setShowColumnFavoritesModal(true)} className={styles.duplicatesColumnButton} title="Manage Column Favorites">
-          ⊞
-        </button>
-      </div>
-
-      <div className={styles.duplicatesContent}>
-        {searched && duplicateGroups.length > 0 && (
-          <>
-            <div className={styles.duplicatesTableWrapper}>
-              <table className={styles.duplicatesTable}>
-                <thead>
-                  <tr className={styles.duplicatesTableHeaderRow}>
-                    {displayColumns.map(col => (
-                      <th key={col} className={styles.duplicatesTableHeaderCell}>{col}</th>
-                    ))}
-                    <th className={styles.duplicatesTableHeaderCell}>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {duplicateGroups.map((group, groupIdx) => (
-                    <>
-                      <tr key={`group-${groupIdx}`} className={styles.duplicatesGroupRow}>
-                        <td colSpan={displayColumns.length + 1} className={styles.duplicatesGroupCell}>
-                          <div className={styles.duplicatesGroupHeader}>
-                            <span className={styles.duplicatesGroupName}>{group.displayName}</span>
-                            <div className={styles.duplicatesGroupActions}>
-                              <button className={styles.duplicatesKeepButton}>
-                                Keep {group.keepCount}
-                              </button>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                      {group.albums.map((album) => (
-                        <tr key={`album-${album.id}`} className={styles.duplicatesAlbumRow}>
-                          {displayColumns.map(col => (
-                            <td key={col} className={styles.duplicatesTableCell}>{getColumnValue(album, col)}</td>
-                          ))}
-                          <td className={styles.duplicatesTableCell}>
-                            <button onClick={() => handleRemoveAlbum(groupIdx, album.id)} className={styles.duplicatesRemoveButton}>
-                              Remove
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                      {groupIdx < duplicateGroups.length - 1 && (
-                        <tr key={`separator-${groupIdx}`} className={styles.duplicatesSeparator}>
-                          <td colSpan={displayColumns.length + 1}></td>
-                        </tr>
-                      )}
-                    </>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className={styles.duplicatesFooterActions}>
-              <button onClick={handleRemoveAllAutomatically} disabled={loading || totalToRemove === 0} className={styles.duplicatesRemoveAllButton}>
-                Remove all duplicates automatically
-              </button>
-            </div>
-          </>
-        )}
-
-        {loading && (
-          <div className={styles.duplicatesLoadingInterstitial}>
-            <div className={styles.duplicatesLoadingContent}>
-              <div className={styles.duplicatesLoadingSpinner} />
-              <div>Loading...</div>
-              <div>Please wait</div>
-            </div>
-          </div>
-        )}
       </div>
 
       <ManageColumnFavoritesModal
@@ -385,6 +385,6 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
         selectedId={selectedFavoriteId}
         onSelect={setSelectedFavoriteId}
       />
-    </div>
+    </>
   );
 }
