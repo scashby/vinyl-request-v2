@@ -26,7 +26,7 @@ interface ParsedAlbum {
   media_condition: string;
   package_sleeve_condition: string | null;
   notes: string | null;
-  rating: number | null;
+  my_rating: number | null;
   decade: number | null;
   artist_norm: string;
   title_norm: string;
@@ -135,7 +135,7 @@ function parseDiscogsCSV(csvText: string): ParsedAlbum[] {
 
     const year = row['Released'] || row['Year'] || row['year'] || null;
     const ratingText = row['Rating'] || row['rating'] || '';
-    const rating = ratingText ? parseInt(ratingText) : null;
+    const my_rating = ratingText ? parseInt(ratingText) : null;
 
     const album: ParsedAlbum = {
       artist,
@@ -153,7 +153,7 @@ function parseDiscogsCSV(csvText: string): ParsedAlbum[] {
       media_condition: sanitizeMediaCondition(row['Collection Media Condition'] || row['media_condition']),
       package_sleeve_condition: row['Collection Sleeve Condition'] || row['package_sleeve_condition'] || null,
       notes: row['Collection Notes'] || row['notes'] || null,
-      rating,
+      my_rating,
       decade: calculateDecade(year),
       artist_norm: normalizeArtist(artist),
       title_norm: normalizeTitle(title),
@@ -271,7 +271,7 @@ function compareAlbums(
       media_condition: 'Unknown',
       package_sleeve_condition: null,
       notes: null,
-      rating: null,
+      my_rating: null,
       decade: null,
       artist_norm: normalizeArtist(existingAlbum.artist),
       title_norm: normalizeTitle(existingAlbum.title),
@@ -622,7 +622,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
               media_condition: album.media_condition,
               package_sleeve_condition: album.package_sleeve_condition,
               notes: album.notes,
-              rating: album.rating,
+              my_rating: album.my_rating,
               decade: album.decade,
             };
             // GENERATED COLUMNS - NEVER INCLUDE:
