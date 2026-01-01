@@ -1,84 +1,42 @@
-import React, { useState, useEffect } from 'react';
-import { compareTrackArrays, type Track, type TrackDiff, type FieldConflict, canMergeField } from 'lib/conflictDetection';
+// src/app/edit-collection/components/ConflictResolutionModal.tsx
+import React, { useState } from 'react';
+import { 
+  type FieldConflict, 
+  getFieldDisplayName, 
+  formatValueForDisplay, 
+  canMergeField,
+  applyResolution,
+  getRejectedValue,
+  smartMergeTracks,
+  type Track,
+} from 'lib/conflictDetection';
+import { supabase } from 'lib/supabaseClient';
+import styles from '../EditCollection.module.css';
 
 interface ConflictResolutionModalProps {
   conflicts: FieldConflict[];
-  source: string;
+  source: 'clz' | 'discogs';
   onComplete: () => void;
   onCancel: () => void;
 }
 
 export default function ConflictResolutionModal({
   conflicts,
+  source,
+  onComplete,
   onCancel,
 }: ConflictResolutionModalProps) {
-  const [appliedConflicts, setAppliedConflicts] = useState<Set<string>>(new Set());
-  const [expandedConflicts, setExpandedConflicts] = useState<Set<string>>(new Set());
-  const [expandedFields, setExpandedFields] = useState<Set<string>>(new Set());
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [resolutions, setResolutions] = useState<Map<string, 'current' | 'new' | 'merge'>>(new Map());
+  const [appliedConflicts, setAppliedConflicts] = useState<Set<string>>(new Set());
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  // Helper to generate unique ID for conflict
-  const getConflictId = (conflict: FieldConflict) => `${conflict.album_id}-${conflict.field_name}`;
-  
-  // Helper to get display name for field
-  const getFieldDisplayName = (fieldName: string): string => {
-    const nameMap: Record<string, string> = {
-      tracks: 'Tracks',
-      disc_metadata: 'Disc Metadata',
-      musicians: 'Musicians',
-      producers: 'Producers',
-      engineers: 'Engineers',
-      songwriters: 'Songwriters',
-      packaging: 'Packaging',
-      sound: 'Sound',
-      image_url: 'Cover Image',
-      back_image_url: 'Back Cover Image',
-      discogs_genres: 'Genres',
-      discogs_styles: 'Styles',
-      notes: 'Notes',
-    };
-    return nameMap[fieldName] || fieldName;
+  // Generate unique ID for conflict
+  const getConflictId = (conflict: FieldConflict): string => {
+    return `${conflict.album_id}-${conflict.field_name}`;
   };
 
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onCancel();
-      }
-    };
-    window.addEventListener('keydown', handleEscape);
-    return () => window.removeEventListener('keydown', handleEscape);
-  }, [onCancel]);
-
-  const applyConflict = (conflict: FieldConflict) => {
-    const conflictId = getConflictId(conflict);
-    setAppliedConflicts(prev => new Set([...prev, conflictId]));
-  };
-
-  const toggleConflictExpanded = (conflictId: string) => {
-    setExpandedConflicts(prev => {
-      const next = new Set(prev);
-      if (next.has(conflictId)) {
-        next.delete(conflictId);
-      } else {
-        next.add(conflictId);
-      }
-      return next;
-    });
-  };
-
-  const toggleFieldExpanded = (conflictId: string) => {
-    setExpandedFields(prev => {
-      const next = new Set(prev);
-      if (next.has(conflictId)) {
-        next.delete(conflictId);
-      } else {
-        next.add(conflictId);
-      }
-      return next;
-    });
-  };
-
+  // Group conflicts by album
   const groupedConflicts = conflicts.reduce((acc, conflict) => {
     const key = `${conflict.artist} - ${conflict.title}`;
     if (!acc[key]) {
@@ -88,497 +46,214 @@ export default function ConflictResolutionModal({
     return acc;
   }, {} as Record<string, FieldConflict[]>);
 
-  const renderValue = (value: unknown, isExpanded: boolean = false): React.ReactNode => {
-    if (value === null || value === undefined) {
-      return <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>null</span>;
-    }
-
-    if (typeof value === 'boolean') {
-      return <span style={{ color: '#8b5cf6' }}>{value.toString()}</span>;
-    }
-
-    if (typeof value === 'number') {
-      return <span style={{ color: '#06b6d4' }}>{value}</span>;
-    }
-
-    if (typeof value === 'string') {
-      return <span style={{ color: '#10b981' }}>&quot;{value}&quot;</span>;
-    }
-
-    if (Array.isArray(value)) {
-      if (!isExpanded) {
-        return (
-          <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>
-            [{value.length} items]
-          </span>
-        );
+  // Toggle group expansion
+  const toggleGroupExpanded = (albumKey: string): void => {
+    setExpandedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(albumKey)) {
+        next.delete(albumKey);
+      } else {
+        next.add(albumKey);
       }
-      return (
-        <pre style={{ 
-          margin: 0, 
-          padding: '8px', 
-          background: '#1f2937', 
-          borderRadius: '4px',
-          fontSize: '12px',
-          maxHeight: '200px',
-          overflow: 'auto'
-        }}>
-          {JSON.stringify(value, null, 2)}
-        </pre>
-      );
-    }
-
-    if (typeof value === 'object') {
-      if (!isExpanded) {
-        return (
-          <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>
-            {'{'}...{'}'}
-          </span>
-        );
-      }
-      return (
-        <pre style={{ 
-          margin: 0, 
-          padding: '8px', 
-          background: '#1f2937', 
-          borderRadius: '4px',
-          fontSize: '12px',
-          maxHeight: '200px',
-          overflow: 'auto'
-        }}>
-          {JSON.stringify(value, null, 2)}
-        </pre>
-      );
-    }
-
-    return String(value);
+      return next;
+    });
   };
 
-  const renderTrackComparison = (
-    currentTracks: Track[] | undefined,
-    newTracks: Track[] | undefined
-  ): React.ReactNode => {
-    if (!currentTracks && !newTracks) {
-      return <div style={{ color: '#9ca3af', fontStyle: 'italic' }}>No track data</div>;
+  // Handle resolution selection
+  const handleResolutionChange = (conflictId: string, resolution: 'current' | 'new' | 'merge'): void => {
+    setResolutions(prev => new Map(prev).set(conflictId, resolution));
+  };
+
+  // Map UI resolution to library ResolutionStrategy
+  const mapToResolutionStrategy = (uiResolution: 'current' | 'new' | 'merge'): 'keep_current' | 'use_new' | 'merge' => {
+    if (uiResolution === 'current') return 'keep_current';
+    if (uiResolution === 'new') return 'use_new';
+    return 'merge';
+  };
+
+  // Apply conflict resolution to database
+  const handleApplyConflict = async (conflict: FieldConflict): Promise<void> => {
+    const conflictId = getConflictId(conflict);
+    const resolution = resolutions.get(conflictId) || 'current';
+    const strategyResolution = mapToResolutionStrategy(resolution);
+    
+    setIsProcessing(true);
+    
+    try {
+      // Determine final value
+      let finalValue: unknown;
+      
+      if (strategyResolution === 'merge' && conflict.field_name === 'tracks') {
+        // Special handling for track merging
+        finalValue = smartMergeTracks(
+          conflict.current_value as Track[] | null,
+          conflict.new_value as Track[] | null
+        );
+      } else {
+        finalValue = applyResolution(conflict.current_value, conflict.new_value, strategyResolution);
+      }
+      
+      // Update album in database
+      const { error: updateError } = await supabase
+        .from('collection')
+        .update({ [conflict.field_name]: finalValue })
+        .eq('id', conflict.album_id);
+      
+      if (updateError) throw updateError;
+      
+      // Save resolution to history
+      const rejectedValue = getRejectedValue(conflict.current_value, conflict.new_value, strategyResolution);
+      
+      const { error: resolutionError } = await supabase
+        .from('import_conflict_resolutions')
+        .insert({
+          album_id: conflict.album_id,
+          field_name: conflict.field_name,
+          kept_value: finalValue,
+          rejected_value: rejectedValue,
+          resolution: strategyResolution,
+          source: source,
+        });
+      
+      if (resolutionError) throw resolutionError;
+      
+      // Mark as applied in UI
+      setAppliedConflicts(prev => new Set([...prev, conflictId]));
+    } catch (error) {
+      console.error('Error applying conflict resolution:', error);
+      alert('Error applying resolution. Please try again.');
+    } finally {
+      setIsProcessing(false);
     }
+  };
 
-    const diffs: TrackDiff[] = compareTrackArrays(currentTracks || [], newTracks || []);
+  // Format value for display
+  const formatValue = (value: unknown): string => {
+    return formatValueForDisplay(value);
+  };
 
-    return (
-      <div style={{ marginTop: '12px' }}>
-        <div style={{ 
-          fontWeight: 600, 
-          marginBottom: '8px',
-          color: '#e5e7eb'
-        }}>
-          Track Comparison ({diffs.length} differences)
+  return (
+    <div className={styles.duplicatesWrapper}>
+      {/* Header */}
+      <div className={styles.duplicatesNav}>
+        <button onClick={onCancel} className={styles.duplicatesBackButton}>
+          ◀ Back
+        </button>
+        <h1 className={styles.duplicatesTitle}>Resolve Import Conflicts</h1>
+      </div>
+
+      {/* Toolbar */}
+      <div className={styles.duplicatesToolbar}>
+        <div className={styles.duplicatesToolbarLabel}>
+          {conflicts.length} conflicts found across {Object.keys(groupedConflicts).length} albums
         </div>
-        <div style={{ 
-          maxHeight: '400px', 
-          overflow: 'auto',
-          border: '1px solid #374151',
-          borderRadius: '4px'
-        }}>
-          <table style={{ 
-            width: '100%', 
-            borderCollapse: 'collapse',
-            fontSize: '13px'
-          }}>
-            <thead style={{ 
-              position: 'sticky', 
-              top: 0, 
-              background: '#1f2937',
-              borderBottom: '2px solid #374151'
-            }}>
-              <tr>
-                <th style={{ padding: '8px', textAlign: 'left', color: '#9ca3af', width: '40px' }}>#</th>
-                <th style={{ padding: '8px', textAlign: 'left', color: '#9ca3af', width: '80px' }}>Status</th>
-                <th style={{ padding: '8px', textAlign: 'left', color: '#9ca3af' }}>Current DB</th>
-                <th style={{ padding: '8px', textAlign: 'left', color: '#9ca3af' }}>New CLZ</th>
-                <th style={{ padding: '8px', textAlign: 'left', color: '#9ca3af' }}>Changes</th>
+        <div className={styles.duplicatesToolbarSpacer} />
+        <button onClick={onComplete} className={styles.duplicatesFindButton}>
+          Complete
+        </button>
+      </div>
+
+      {/* Content */}
+      <div className={styles.duplicatesContent}>
+        <div className={styles.duplicatesTableWrapper}>
+          <table className={styles.duplicatesTable}>
+            <thead>
+              <tr className={styles.duplicatesTableHeaderRow}>
+                <th className={styles.duplicatesTableHeaderCell}>Artist</th>
+                <th className={styles.duplicatesTableHeaderCell}>Title</th>
+                <th className={styles.duplicatesTableHeaderCell}>Format</th>
+                <th className={styles.duplicatesTableHeaderCell}>Barcode</th>
+                <th className={styles.duplicatesTableHeaderCell}>Cat No</th>
+                <th className={styles.duplicatesTableHeaderCell}>Country</th>
+                <th className={styles.duplicatesTableHeaderCell}>Year</th>
+                <th className={styles.duplicatesTableHeaderCell}>Labels</th>
+                <th className={styles.duplicatesTableHeaderCell}>Field</th>
+                <th className={styles.duplicatesTableHeaderCell}>Current Value</th>
+                <th className={styles.duplicatesTableHeaderCell}>New Value</th>
+                <th className={styles.duplicatesTableHeaderCell}>Resolution</th>
+                <th className={styles.duplicatesTableHeaderCell}>Action</th>
               </tr>
             </thead>
             <tbody>
-              {diffs.map((diff, idx) => {
-                const bgColor = 
-                  diff.status === 'added' ? '#f0fdf4' : 
-                  diff.status === 'removed' ? '#fef2f2' : 
-                  diff.status === 'changed' ? '#fef3c7' : 
-                  'transparent';
+              {Object.entries(groupedConflicts).map(([albumKey, albumConflicts]) => {
+                const isExpanded = expandedGroups.has(albumKey);
                 
-                const statusColor =
-                  diff.status === 'added' ? '#10b981' :
-                  diff.status === 'removed' ? '#ef4444' :
-                  diff.status === 'changed' ? '#f59e0b' :
-                  '#9ca3af';
-
-                const statusText =
-                  diff.status === 'added' ? '🟢 Added' :
-                  diff.status === 'removed' ? '🔴 Removed' :
-                  diff.status === 'changed' ? '🟡 Changed' :
-                  '⚪ Same';
-
                 return (
-                  <tr key={idx} style={{ 
-                    background: bgColor,
-                    borderBottom: '1px solid #374151'
-                  }}>
-                    <td style={{ padding: '8px', color: '#9ca3af' }}>
-                      {diff.position}
-                    </td>
-                    <td style={{ padding: '8px', color: statusColor, fontWeight: 500 }}>
-                      {statusText}
-                    </td>
-                    <td style={{ padding: '8px' }}>
-                      {diff.current ? (
-                        <div>
-                          <div style={{ fontWeight: 500, color: '#e5e7eb' }}>
-                            {diff.current.title}
+                  <React.Fragment key={albumKey}>
+                    {/* Group Header */}
+                    <tr className={styles.duplicatesGroupRow}>
+                      <td colSpan={13} className={styles.duplicatesGroupCell}>
+                        <div className={styles.duplicatesGroupHeader}>
+                          <button
+                            onClick={() => toggleGroupExpanded(albumKey)}
+                            className={styles.duplicatesCollapseButton}
+                          >
+                            {isExpanded ? '−' : '+'}
+                          </button>
+                          <div className={styles.duplicatesGroupName}>{albumKey}</div>
+                          <div className={styles.duplicatesGroupActions}>
+                            {albumConflicts.length} field{albumConflicts.length !== 1 ? 's' : ''} in conflict
                           </div>
-                          {diff.current.artist && (
-                            <div style={{ fontSize: '12px', color: '#9ca3af' }}>
-                              {diff.current.artist}
-                            </div>
-                          )}
-                          {diff.current.duration && (
-                            <div style={{ fontSize: '11px', color: '#6b7280' }}>
-                              {diff.current.duration}
-                            </div>
-                          )}
                         </div>
-                      ) : (
-                        <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>—</span>
-                      )}
-                    </td>
-                    <td style={{ padding: '8px' }}>
-                      {diff.new ? (
-                        <div>
-                          <div style={{ fontWeight: 500, color: '#e5e7eb' }}>
-                            {diff.new.title}
-                          </div>
-                          {diff.new.artist && (
-                            <div style={{ fontSize: '12px', color: '#9ca3af' }}>
-                              {diff.new.artist}
-                            </div>
-                          )}
-                          {diff.new.duration && (
-                            <div style={{ fontSize: '11px', color: '#6b7280' }}>
-                              {diff.new.duration}
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>—</span>
-                      )}
-                    </td>
-                    <td style={{ padding: '8px', fontSize: '12px', color: '#9ca3af' }}>
-                      {diff.changes && diff.changes.length > 0 ? (
-                        <ul style={{ margin: 0, paddingLeft: '16px' }}>
-                          {diff.changes.map((change, cIdx) => (
-                            <li key={cIdx}>{change}</li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <span style={{ fontStyle: 'italic' }}>—</span>
-                      )}
-                    </td>
-                  </tr>
+                      </td>
+                    </tr>
+
+                    {/* Conflict Rows */}
+                    {isExpanded && albumConflicts.map((conflict) => {
+                      const conflictId = getConflictId(conflict);
+                      const isApplied = appliedConflicts.has(conflictId);
+                      const resolution = resolutions.get(conflictId) || 'current';
+                      const canMerge = canMergeField(conflict.current_value) && canMergeField(conflict.new_value);
+
+                      return (
+                        <tr key={conflictId} className={styles.duplicatesAlbumRow}>
+                          <td className={styles.duplicatesTableCell}>{conflict.artist}</td>
+                          <td className={styles.duplicatesTableCell}>{conflict.title}</td>
+                          <td className={styles.duplicatesTableCell}>{conflict.format}</td>
+                          <td className={styles.duplicatesTableCell}>{conflict.barcode || '—'}</td>
+                          <td className={styles.duplicatesTableCell}>{conflict.cat_no || '—'}</td>
+                          <td className={styles.duplicatesTableCell}>{conflict.country || '—'}</td>
+                          <td className={styles.duplicatesTableCell}>{conflict.year || '—'}</td>
+                          <td className={styles.duplicatesTableCell}>
+                            {conflict.labels.length > 0 ? conflict.labels.join(', ') : '—'}
+                          </td>
+                          <td className={styles.duplicatesTableCell}>
+                            {getFieldDisplayName(conflict.field_name)}
+                          </td>
+                          <td className={styles.duplicatesTableCell}>
+                            {formatValue(conflict.current_value)}
+                          </td>
+                          <td className={styles.duplicatesTableCell}>
+                            {formatValue(conflict.new_value)}
+                          </td>
+                          <td className={styles.duplicatesTableCell}>
+                            <select
+                              value={resolution}
+                              onChange={(e) => handleResolutionChange(conflictId, e.target.value as 'current' | 'new' | 'merge')}
+                              disabled={isApplied}
+                            >
+                              <option value="current">Keep Current</option>
+                              <option value="new">Use New</option>
+                              {canMerge && <option value="merge">Merge</option>}
+                            </select>
+                          </td>
+                          <td className={styles.duplicatesTableCell}>
+                            <button
+                              onClick={() => handleApplyConflict(conflict)}
+                              disabled={isApplied || isProcessing}
+                              className={styles.duplicatesKeepButton}
+                            >
+                              {isApplied ? 'Applied' : 'Apply'}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </React.Fragment>
                 );
               })}
             </tbody>
           </table>
-        </div>
-      </div>
-    );
-  };
-
-  return (
-    <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: 'rgba(0, 0, 0, 0.8)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 9999,
-        padding: '20px',
-      }}
-      onClick={onCancel}
-    >
-      <div
-        style={{
-          background: '#111827',
-          borderRadius: '8px',
-          maxWidth: '1400px',
-          width: '100%',
-          maxHeight: '90vh',
-          overflow: 'auto',
-          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)',
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div
-          style={{
-            position: 'sticky',
-            top: 0,
-            background: '#111827',
-            borderBottom: '1px solid #374151',
-            padding: '20px',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            zIndex: 10,
-          }}
-        >
-          <div>
-            <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 600, color: '#f3f4f6' }}>
-              Resolve Import Conflicts
-            </h2>
-            <p style={{ margin: '4px 0 0', color: '#9ca3af', fontSize: '14px' }}>
-              {conflicts.length} conflicts found across {Object.keys(groupedConflicts).length} albums
-            </p>
-          </div>
-          <button
-            onClick={onCancel}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              fontSize: '24px',
-              cursor: 'pointer',
-              color: '#9ca3af',
-              padding: '4px 8px',
-            }}
-          >
-            ×
-          </button>
-        </div>
-
-        <div style={{ padding: '20px' }}>
-          {Object.entries(groupedConflicts).map(([albumKey, albumConflicts]) => {
-            const isExpanded = expandedConflicts.has(albumKey);
-
-            return (
-              <div
-                key={albumKey}
-                style={{
-                  background: '#1f2937',
-                  borderRadius: '8px',
-                  marginBottom: '16px',
-                  overflow: 'hidden',
-                }}
-              >
-                <div
-                  style={{
-                    padding: '16px',
-                    borderBottom: isExpanded ? '1px solid #374151' : 'none',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                  }}
-                  onClick={() => toggleConflictExpanded(albumKey)}
-                >
-                  <div>
-                    <div style={{ fontSize: '16px', fontWeight: 600, color: '#f3f4f6' }}>
-                      {albumKey}
-                    </div>
-                    <div style={{ fontSize: '13px', color: '#9ca3af', marginTop: '4px' }}>
-                      {albumConflicts.length} field{albumConflicts.length !== 1 ? 's' : ''} in conflict
-                    </div>
-                  </div>
-                  <div style={{ color: '#9ca3af', fontSize: '20px' }}>
-                    {isExpanded ? '−' : '+'}
-                  </div>
-                </div>
-
-                {isExpanded && albumConflicts.map((conflict) => {
-                  const conflictId = getConflictId(conflict);
-                  const isApplied = appliedConflicts.has(conflictId);
-                  const fieldName = conflict.field_name;
-                  const fieldDisplayName = getFieldDisplayName(fieldName);
-                  const currentValue = conflict.current_value;
-                  const newValue = conflict.new_value;
-                  const canMerge = canMergeField(currentValue) && canMergeField(newValue);
-
-                  const isComplexField = 
-                    (Array.isArray(currentValue) && (currentValue as unknown[]).length > 0) ||
-                    (Array.isArray(newValue) && (newValue as unknown[]).length > 0) ||
-                    (typeof currentValue === 'object' && currentValue !== null) ||
-                    (typeof newValue === 'object' && newValue !== null);
-
-                  const isFieldExpanded = expandedFields.has(conflictId);
-
-                  return (
-                    <div
-                      key={conflictId}
-                      style={{
-                        padding: '16px',
-                        borderBottom: '1px solid #374151',
-                        background: isApplied ? '#0f1419' : 'transparent',
-                      }}
-                    >
-                      <div style={{ 
-                        display: 'flex', 
-                        justifyContent: 'space-between', 
-                        alignItems: 'flex-start',
-                        marginBottom: '12px'
-                      }}>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ 
-                            fontSize: '14px', 
-                            fontWeight: 600, 
-                            color: '#f3f4f6',
-                            marginBottom: '8px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px'
-                          }}>
-                            <span>{fieldDisplayName}</span>
-                            {canMerge && (
-                              <span style={{
-                                background: '#065f46',
-                                color: '#d1fae5',
-                                padding: '2px 6px',
-                                borderRadius: '4px',
-                                fontSize: '11px',
-                                fontWeight: 500
-                              }}>
-                                MERGEABLE
-                              </span>
-                            )}
-                            {isComplexField && (
-                              <button
-                                onClick={() => toggleFieldExpanded(conflictId)}
-                                style={{
-                                  background: '#374151',
-                                  border: 'none',
-                                  color: '#9ca3af',
-                                  padding: '2px 8px',
-                                  borderRadius: '4px',
-                                  fontSize: '11px',
-                                  cursor: 'pointer',
-                                  fontWeight: 500
-                                }}
-                              >
-                                {isFieldExpanded ? 'Collapse' : 'Expand'}
-                              </button>
-                            )}
-                          </div>
-
-                          {fieldName === 'tracks' ? (
-                            renderTrackComparison(
-                              currentValue as Track[] | undefined,
-                              newValue as Track[] | undefined
-                            )
-                          ) : (
-                            <div style={{ 
-                              display: 'grid', 
-                              gridTemplateColumns: '1fr 1fr', 
-                              gap: '12px' 
-                            }}>
-                              <div>
-                                <div style={{ 
-                                  fontSize: '12px', 
-                                  color: '#9ca3af', 
-                                  marginBottom: '4px',
-                                  fontWeight: 500
-                                }}>
-                                  Current DB Value:
-                                </div>
-                                <div style={{ 
-                                  padding: '8px', 
-                                  background: '#0f1419', 
-                                  borderRadius: '4px',
-                                  border: '1px solid #374151',
-                                  fontFamily: 'monospace',
-                                  fontSize: '13px',
-                                  color: '#e5e7eb',
-                                  wordBreak: 'break-word'
-                                }}>
-                                  {renderValue(currentValue, isFieldExpanded)}
-                                </div>
-                              </div>
-                              <div>
-                                <div style={{ 
-                                  fontSize: '12px', 
-                                  color: '#9ca3af', 
-                                  marginBottom: '4px',
-                                  fontWeight: 500
-                                }}>
-                                  New CLZ Value:
-                                </div>
-                                <div style={{ 
-                                  padding: '8px', 
-                                  background: '#0f1419', 
-                                  borderRadius: '4px',
-                                  border: '1px solid #374151',
-                                  fontFamily: 'monospace',
-                                  fontSize: '13px',
-                                  color: '#e5e7eb',
-                                  wordBreak: 'break-word'
-                                }}>
-                                  {renderValue(newValue, isFieldExpanded)}
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                        <div style={{ flex: 1 }}>
-                          <select
-                            value={resolutions.get(conflictId) || 'current'}
-                            onChange={(e) => {
-                              setResolutions(prev => new Map(prev).set(conflictId, e.target.value as 'current' | 'new' | 'merge'));
-                            }}
-                            disabled={isApplied}
-                            style={{
-                              width: '100%',
-                              padding: '8px 12px',
-                              background: '#374151',
-                              border: '1px solid #4b5563',
-                              borderRadius: '4px',
-                              color: '#f3f4f6',
-                              fontSize: '13px',
-                              cursor: isApplied ? 'not-allowed' : 'pointer',
-                              opacity: isApplied ? 0.5 : 1,
-                            }}
-                          >
-                            <option value="current">Keep Current DB Value</option>
-                            <option value="new">Use New CLZ Value</option>
-                            {canMerge && <option value="merge">Smart Merge (preserves enrichment)</option>}
-                          </select>
-                        </div>
-                        <div>
-                          <button
-                            onClick={() => applyConflict(conflict)}
-                            disabled={isApplied}
-                            style={{
-                              background: isApplied ? '#d1d5db' : '#4FC3F7',
-                              color: 'white',
-                              border: 'none',
-                              padding: '6px 16px',
-                              fontSize: '13px',
-                              fontWeight: 500,
-                              cursor: isApplied ? 'not-allowed' : 'pointer',
-                              borderRadius: '4px',
-                            }}
-                          >
-                            {isApplied ? 'Applied' : 'Apply'}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })}
         </div>
       </div>
     </div>
