@@ -3,7 +3,6 @@ import React, { useState } from 'react';
 import { 
   type FieldConflict, 
   getFieldDisplayName, 
-  formatValueForDisplay, 
   canMergeField,
   applyResolution,
   getRejectedValue,
@@ -26,17 +25,21 @@ export default function ConflictResolutionModal({
   onComplete,
   onCancel,
 }: ConflictResolutionModalProps) {
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(
+    Object.keys(conflicts.reduce((acc, conflict) => {
+      const key = `${conflict.artist} - ${conflict.title}`;
+      acc[key] = true;
+      return acc;
+    }, {} as Record<string, boolean>))
+  ));
   const [resolutions, setResolutions] = useState<Map<string, 'current' | 'new' | 'merge'>>(new Map());
   const [appliedConflicts, setAppliedConflicts] = useState<Set<string>>(new Set());
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Generate unique ID for conflict
   const getConflictId = (conflict: FieldConflict): string => {
     return `${conflict.album_id}-${conflict.field_name}`;
   };
 
-  // Group conflicts by album
   const groupedConflicts = conflicts.reduce((acc, conflict) => {
     const key = `${conflict.artist} - ${conflict.title}`;
     if (!acc[key]) {
@@ -46,7 +49,6 @@ export default function ConflictResolutionModal({
     return acc;
   }, {} as Record<string, FieldConflict[]>);
 
-  // Toggle group expansion
   const toggleGroupExpanded = (albumKey: string): void => {
     setExpandedGroups(prev => {
       const next = new Set(prev);
@@ -59,19 +61,16 @@ export default function ConflictResolutionModal({
     });
   };
 
-  // Handle resolution selection
   const handleResolutionChange = (conflictId: string, resolution: 'current' | 'new' | 'merge'): void => {
     setResolutions(prev => new Map(prev).set(conflictId, resolution));
   };
 
-  // Map UI resolution to library ResolutionStrategy
   const mapToResolutionStrategy = (uiResolution: 'current' | 'new' | 'merge'): 'keep_current' | 'use_new' | 'merge' => {
     if (uiResolution === 'current') return 'keep_current';
     if (uiResolution === 'new') return 'use_new';
     return 'merge';
   };
 
-  // Apply conflict resolution to database
   const handleApplyConflict = async (conflict: FieldConflict): Promise<void> => {
     const conflictId = getConflictId(conflict);
     const resolution = resolutions.get(conflictId) || 'current';
@@ -80,11 +79,9 @@ export default function ConflictResolutionModal({
     setIsProcessing(true);
     
     try {
-      // Determine final value
       let finalValue: unknown;
       
       if (strategyResolution === 'merge' && conflict.field_name === 'tracks') {
-        // Special handling for track merging
         finalValue = smartMergeTracks(
           conflict.current_value as Track[] | null,
           conflict.new_value as Track[] | null
@@ -93,7 +90,6 @@ export default function ConflictResolutionModal({
         finalValue = applyResolution(conflict.current_value, conflict.new_value, strategyResolution);
       }
       
-      // Update album in database
       const { error: updateError } = await supabase
         .from('collection')
         .update({ [conflict.field_name]: finalValue })
@@ -101,7 +97,6 @@ export default function ConflictResolutionModal({
       
       if (updateError) throw updateError;
       
-      // Save resolution to history
       const rejectedValue = getRejectedValue(conflict.current_value, conflict.new_value, strategyResolution);
       
       const { error: resolutionError } = await supabase
@@ -117,7 +112,6 @@ export default function ConflictResolutionModal({
       
       if (resolutionError) throw resolutionError;
       
-      // Mark as applied in UI
       setAppliedConflicts(prev => new Set([...prev, conflictId]));
     } catch (error) {
       console.error('Error applying conflict resolution:', error);
@@ -127,14 +121,60 @@ export default function ConflictResolutionModal({
     }
   };
 
-  // Format value for display
-  const formatValue = (value: unknown): string => {
-    return formatValueForDisplay(value);
+  const renderValue = (value: unknown): React.ReactNode => {
+    if (value === null || value === undefined) {
+      return <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>None</span>;
+    }
+
+    if (Array.isArray(value)) {
+      if (value.length === 0) {
+        return <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>Empty</span>;
+      }
+
+      const firstItem = value[0];
+      if (typeof firstItem === 'object' && firstItem !== null && 'position' in firstItem && 'title' in firstItem) {
+        return (
+          <div style={{ fontSize: '13px', lineHeight: '1.6' }}>
+            {value.map((track: unknown, idx: number) => {
+              const t = track as Record<string, unknown>;
+              return (
+                <div key={idx} style={{ marginBottom: '4px' }}>
+                  {String(t.position)}. {String(t.title)}
+                  {t.artist && <span style={{ color: '#666' }}> - {String(t.artist)}</span>}
+                  {t.duration && <span style={{ color: '#999' }}> ({String(t.duration)})</span>}
+                </div>
+              );
+            })}
+          </div>
+        );
+      }
+
+      if (typeof firstItem === 'string') {
+        return (
+          <div style={{ fontSize: '13px', lineHeight: '1.6' }}>
+            {value.map((item: string, idx: number) => (
+              <div key={idx}>{item}</div>
+            ))}
+          </div>
+        );
+      }
+
+      return <pre style={{ fontSize: '12px', margin: 0 }}>{JSON.stringify(value, null, 2)}</pre>;
+    }
+
+    if (typeof value === 'object') {
+      return <pre style={{ fontSize: '12px', margin: 0 }}>{JSON.stringify(value, null, 2)}</pre>;
+    }
+
+    if (typeof value === 'boolean') {
+      return <span>{value ? 'Yes' : 'No'}</span>;
+    }
+
+    return <span>{String(value)}</span>;
   };
 
   return (
     <div className={styles.duplicatesWrapper}>
-      {/* Header */}
       <div className={styles.duplicatesNav}>
         <button onClick={onCancel} className={styles.duplicatesBackButton}>
           ◀ Back
@@ -142,7 +182,6 @@ export default function ConflictResolutionModal({
         <h1 className={styles.duplicatesTitle}>Resolve Import Conflicts</h1>
       </div>
 
-      {/* Toolbar */}
       <div className={styles.duplicatesToolbar}>
         <div className={styles.duplicatesToolbarLabel}>
           {conflicts.length} conflicts found across {Object.keys(groupedConflicts).length} albums
@@ -153,36 +192,19 @@ export default function ConflictResolutionModal({
         </button>
       </div>
 
-      {/* Content */}
       <div className={styles.duplicatesContent}>
         <div className={styles.duplicatesTableWrapper}>
           <table className={styles.duplicatesTable}>
-            <thead>
-              <tr className={styles.duplicatesTableHeaderRow}>
-                <th className={styles.duplicatesTableHeaderCell}>Artist</th>
-                <th className={styles.duplicatesTableHeaderCell}>Title</th>
-                <th className={styles.duplicatesTableHeaderCell}>Format</th>
-                <th className={styles.duplicatesTableHeaderCell}>Barcode</th>
-                <th className={styles.duplicatesTableHeaderCell}>Cat No</th>
-                <th className={styles.duplicatesTableHeaderCell}>Country</th>
-                <th className={styles.duplicatesTableHeaderCell}>Year</th>
-                <th className={styles.duplicatesTableHeaderCell}>Labels</th>
-                <th className={styles.duplicatesTableHeaderCell}>Field</th>
-                <th className={styles.duplicatesTableHeaderCell}>Current Value</th>
-                <th className={styles.duplicatesTableHeaderCell}>New Value</th>
-                <th className={styles.duplicatesTableHeaderCell}>Resolution</th>
-                <th className={styles.duplicatesTableHeaderCell}>Action</th>
-              </tr>
-            </thead>
             <tbody>
-              {Object.entries(groupedConflicts).map(([albumKey, albumConflicts]) => {
+              {Object.entries(groupedConflicts).map(([albumKey, albumConflicts], groupIdx) => {
                 const isExpanded = expandedGroups.has(albumKey);
-                
+                const firstConflict = albumConflicts[0];
+
                 return (
                   <React.Fragment key={albumKey}>
-                    {/* Group Header */}
+                    {/* Album Group Header */}
                     <tr className={styles.duplicatesGroupRow}>
-                      <td colSpan={13} className={styles.duplicatesGroupCell}>
+                      <td colSpan={8} className={styles.duplicatesGroupCell}>
                         <div className={styles.duplicatesGroupHeader}>
                           <button
                             onClick={() => toggleGroupExpanded(albumKey)}
@@ -198,57 +220,145 @@ export default function ConflictResolutionModal({
                       </td>
                     </tr>
 
-                    {/* Conflict Rows */}
-                    {isExpanded && albumConflicts.map((conflict) => {
-                      const conflictId = getConflictId(conflict);
-                      const isApplied = appliedConflicts.has(conflictId);
-                      const resolution = resolutions.get(conflictId) || 'current';
-                      const canMerge = canMergeField(conflict.current_value) && canMergeField(conflict.new_value);
+                    {isExpanded && (
+                      <>
+                        {/* Identifying Data Header Row */}
+                        <tr className={styles.duplicatesTableHeaderRow}>
+                          <th className={styles.duplicatesTableHeaderCell}>Artist</th>
+                          <th className={styles.duplicatesTableHeaderCell}>Title</th>
+                          <th className={styles.duplicatesTableHeaderCell}>Format</th>
+                          <th className={styles.duplicatesTableHeaderCell}>Barcode</th>
+                          <th className={styles.duplicatesTableHeaderCell}>Cat No</th>
+                          <th className={styles.duplicatesTableHeaderCell}>Country</th>
+                          <th className={styles.duplicatesTableHeaderCell}>Year</th>
+                          <th className={styles.duplicatesTableHeaderCell}>Labels</th>
+                        </tr>
 
-                      return (
-                        <tr key={conflictId} className={styles.duplicatesAlbumRow}>
-                          <td className={styles.duplicatesTableCell}>{conflict.artist}</td>
-                          <td className={styles.duplicatesTableCell}>{conflict.title}</td>
-                          <td className={styles.duplicatesTableCell}>{conflict.format}</td>
-                          <td className={styles.duplicatesTableCell}>{conflict.barcode || '—'}</td>
-                          <td className={styles.duplicatesTableCell}>{conflict.cat_no || '—'}</td>
-                          <td className={styles.duplicatesTableCell}>{conflict.country || '—'}</td>
-                          <td className={styles.duplicatesTableCell}>{conflict.year || '—'}</td>
+                        {/* Identifying Data Values Row */}
+                        <tr className={styles.duplicatesAlbumRow}>
+                          <td className={styles.duplicatesTableCell}>{firstConflict.artist}</td>
+                          <td className={styles.duplicatesTableCell}>{firstConflict.title}</td>
+                          <td className={styles.duplicatesTableCell}>{firstConflict.format}</td>
+                          <td className={styles.duplicatesTableCell}>{firstConflict.barcode || '—'}</td>
+                          <td className={styles.duplicatesTableCell}>{firstConflict.cat_no || '—'}</td>
+                          <td className={styles.duplicatesTableCell}>{firstConflict.country || '—'}</td>
+                          <td className={styles.duplicatesTableCell}>{firstConflict.year || '—'}</td>
                           <td className={styles.duplicatesTableCell}>
-                            {conflict.labels.length > 0 ? conflict.labels.join(', ') : '—'}
-                          </td>
-                          <td className={styles.duplicatesTableCell}>
-                            {getFieldDisplayName(conflict.field_name)}
-                          </td>
-                          <td className={styles.duplicatesTableCell}>
-                            {formatValue(conflict.current_value)}
-                          </td>
-                          <td className={styles.duplicatesTableCell}>
-                            {formatValue(conflict.new_value)}
-                          </td>
-                          <td className={styles.duplicatesTableCell}>
-                            <select
-                              value={resolution}
-                              onChange={(e) => handleResolutionChange(conflictId, e.target.value as 'current' | 'new' | 'merge')}
-                              disabled={isApplied}
-                            >
-                              <option value="current">Keep Current</option>
-                              <option value="new">Use New</option>
-                              {canMerge && <option value="merge">Merge</option>}
-                            </select>
-                          </td>
-                          <td className={styles.duplicatesTableCell}>
-                            <button
-                              onClick={() => handleApplyConflict(conflict)}
-                              disabled={isApplied || isProcessing}
-                              className={styles.duplicatesKeepButton}
-                            >
-                              {isApplied ? 'Applied' : 'Apply'}
-                            </button>
+                            {firstConflict.labels.length > 0 ? firstConflict.labels.join(', ') : '—'}
                           </td>
                         </tr>
-                      );
-                    })}
+
+                        {/* Each Conflict */}
+                        {albumConflicts.map((conflict) => {
+                          const conflictId = getConflictId(conflict);
+                          const isApplied = appliedConflicts.has(conflictId);
+                          const resolution = resolutions.get(conflictId) || 'current';
+                          const canMerge = canMergeField(conflict.current_value) && canMergeField(conflict.new_value);
+
+                          return (
+                            <React.Fragment key={conflictId}>
+                              {/* Field Name Row */}
+                              <tr className={styles.duplicatesAlbumRow}>
+                                <td colSpan={8} className={styles.duplicatesTableCell}>
+                                  <strong>Field: {getFieldDisplayName(conflict.field_name)}</strong>
+                                </td>
+                              </tr>
+
+                              {/* Content Comparison Row */}
+                              <tr className={styles.duplicatesAlbumRow}>
+                                <td colSpan={4} className={styles.duplicatesTableCell}>
+                                  <div style={{ fontWeight: 600, marginBottom: '8px', color: '#374151' }}>
+                                    Current Database Value
+                                  </div>
+                                  <div style={{ padding: '8px', backgroundColor: '#f9fafb', borderRadius: '4px' }}>
+                                    {renderValue(conflict.current_value)}
+                                  </div>
+                                </td>
+                                <td colSpan={4} className={styles.duplicatesTableCell}>
+                                  <div style={{ fontWeight: 600, marginBottom: '8px', color: '#374151' }}>
+                                    New {source === 'clz' ? 'CLZ' : 'Discogs'} Value
+                                  </div>
+                                  <div style={{ padding: '8px', backgroundColor: '#f9fafb', borderRadius: '4px' }}>
+                                    {renderValue(conflict.new_value)}
+                                  </div>
+                                </td>
+                              </tr>
+
+                              {/* Decision Row */}
+                              <tr className={styles.duplicatesAlbumRow}>
+                                <td colSpan={8} className={styles.duplicatesTableCell}>
+                                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center', padding: '8px 0' }}>
+                                    <button
+                                      onClick={() => handleResolutionChange(conflictId, 'current')}
+                                      disabled={isApplied}
+                                      style={{
+                                        padding: '8px 16px',
+                                        backgroundColor: resolution === 'current' ? '#E3F2FD' : 'white',
+                                        border: '1px solid #000',
+                                        borderRadius: '4px',
+                                        cursor: isApplied ? 'not-allowed' : 'pointer',
+                                        fontWeight: resolution === 'current' ? 600 : 400,
+                                        opacity: isApplied ? 0.5 : 1,
+                                      }}
+                                    >
+                                      Keep Existing
+                                    </button>
+                                    <button
+                                      onClick={() => handleResolutionChange(conflictId, 'new')}
+                                      disabled={isApplied}
+                                      style={{
+                                        padding: '8px 16px',
+                                        backgroundColor: resolution === 'new' ? '#E3F2FD' : 'white',
+                                        border: '1px solid #000',
+                                        borderRadius: '4px',
+                                        cursor: isApplied ? 'not-allowed' : 'pointer',
+                                        fontWeight: resolution === 'new' ? 600 : 400,
+                                        opacity: isApplied ? 0.5 : 1,
+                                      }}
+                                    >
+                                      Replace with New
+                                    </button>
+                                    {canMerge && (
+                                      <button
+                                        onClick={() => handleResolutionChange(conflictId, 'merge')}
+                                        disabled={isApplied}
+                                        style={{
+                                          padding: '8px 16px',
+                                          backgroundColor: resolution === 'merge' ? '#E3F2FD' : 'white',
+                                          border: '1px solid #000',
+                                          borderRadius: '4px',
+                                          cursor: isApplied ? 'not-allowed' : 'pointer',
+                                          fontWeight: resolution === 'merge' ? 600 : 400,
+                                          opacity: isApplied ? 0.5 : 1,
+                                        }}
+                                      >
+                                        Merge Data
+                                      </button>
+                                    )}
+                                    <div style={{ marginLeft: 'auto' }}>
+                                      <button
+                                        onClick={() => handleApplyConflict(conflict)}
+                                        disabled={isApplied || isProcessing}
+                                        className={styles.duplicatesKeepButton}
+                                      >
+                                        {isApplied ? 'Applied' : 'Apply'}
+                                      </button>
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                            </React.Fragment>
+                          );
+                        })}
+                      </>
+                    )}
+
+                    {/* Spacer Row */}
+                    {groupIdx < Object.keys(groupedConflicts).length - 1 && (
+                      <tr className={styles.duplicatesSeparator}>
+                        <td colSpan={8}></td>
+                      </tr>
+                    )}
                   </React.Fragment>
                 );
               })}
