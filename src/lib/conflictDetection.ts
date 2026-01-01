@@ -233,39 +233,99 @@ function isEqual(a: unknown, b: unknown): boolean {
 }
 
 /**
- * Normalize track for comparison - removes DB metadata fields and normalizes types
- * Includes only the fields that should be compared for equality
+ * Normalize track for comparison by order
+ * Does NOT compare position since CLZ numbers sequentially (1,2,3...) 
+ * while Discogs uses vinyl sides (A1,A2,B1,B2...)
  */
 function normalizeTrack(track: unknown): Record<string, unknown> {
   if (!track || typeof track !== 'object') return {};
   
   const t = track as Record<string, unknown>;
   
+  // Skip heading/separator tracks (disc names in box sets)
+  if (t.type && String(t.type) !== 'track') {
+    return { _skip: true };
+  }
+  
   return {
-    position: String(t.position || ''),
-    title: String(t.title || ''),
-    artist: t.artist ? String(t.artist) : undefined,
-    duration: t.duration ? String(t.duration) : undefined,
-    disc_number: t.disc_number ? Number(t.disc_number) : undefined
+    title: String(t.title || '').trim(),
+    artist: t.artist ? String(t.artist).trim() : undefined,
+    duration: t.duration ? String(t.duration) : undefined
+    // Explicitly ignore: position, side, disc_number, type, id, album_id, created_at, lyrics
+    // We match by ORDER in array, not by position number
   };
 }
 
 /**
- * Compare track arrays ignoring database metadata
+ * Normalize disc metadata for comparison (ignore optional name field)
  */
-function areTracksEqual(current: unknown, incoming: unknown): boolean {
+function normalizeDiscMetadata(disc: unknown): Record<string, unknown> {
+  if (!disc || typeof disc !== 'object') return {};
+  const d = disc as Record<string, unknown>;
+  
+  return {
+    disc_number: d.disc_number ? Number(d.disc_number) : d.index ? Number(d.index) : undefined,
+    track_count: d.track_count ? Number(d.track_count) : undefined
+    // Explicitly ignore: name, index (synonym for disc_number)
+  };
+}
+
+/**
+ * Compare disc metadata arrays ignoring name field
+ * CLZ doesn't provide disc names, so we only compare structure
+ */
+function areDiscMetadataEqual(current: unknown, incoming: unknown): boolean {
   if (!Array.isArray(current) || !Array.isArray(incoming)) {
     return isEqual(current, incoming);
   }
   
   if (current.length !== incoming.length) return false;
   
-  // Normalize and compare each track
-  for (let i = 0; i < current.length; i++) {
-    const normalizedCurrent = normalizeTrack(current[i]);
-    const normalizedIncoming = normalizeTrack(incoming[i]);
+  const normalizedCurrent = current.map(normalizeDiscMetadata);
+  const normalizedIncoming = incoming.map(normalizeDiscMetadata);
+  
+  return isEqual(normalizedCurrent, normalizedIncoming);
+}
+
+/**
+ * Compare track arrays by ORDER, not position number
+ * 
+ * Why: CLZ numbers tracks sequentially (1,2,3,4,5...) across all sides,
+ * while Discogs uses vinyl notation (A1,A2,B1,B2...). Track 5 in CLZ
+ * might be B1 in Discogs. We match track[0] to track[0], track[1] to track[1], etc.
+ * 
+ * Also filters out "heading" type tracks (disc names in box sets) since CLZ doesn't have them.
+ */
+function areTracksEqual(current: unknown, incoming: unknown): boolean {
+  if (!Array.isArray(current) || !Array.isArray(incoming)) {
+    return isEqual(current, incoming);
+  }
+  
+  // Normalize and filter out headings/separators
+  const filterAndNormalize = (tracks: unknown[]) => {
+    return tracks
+      .map(normalizeTrack)
+      .filter(t => !t._skip); // Remove heading tracks
+  };
+  
+  const normalizedCurrent = filterAndNormalize(current);
+  const normalizedIncoming = filterAndNormalize(incoming);
+  
+  // Different number of actual tracks
+  if (normalizedCurrent.length !== normalizedIncoming.length) {
+    return false;
+  }
+  
+  // Compare track-by-track in order
+  for (let i = 0; i < normalizedCurrent.length; i++) {
+    const curr = { ...normalizedCurrent[i] };
+    const inc = { ...normalizedIncoming[i] };
     
-    if (!isEqual(normalizedCurrent, normalizedIncoming)) {
+    // Remove internal markers
+    delete curr._skip;
+    delete inc._skip;
+    
+    if (!isEqual(curr, inc)) {
       return false;
     }
   }
@@ -328,10 +388,16 @@ export function detectConflicts(
       existingValue !== null && existingValue !== undefined &&
       newValue !== null && newValue !== undefined
     ) {
-      // Use smart comparison for tracks
-      const valuesAreDifferent = field === 'tracks' 
-        ? !areTracksEqual(existingValue, newValue)
-        : !isEqual(existingValue, newValue);
+      // Use smart comparison for tracks and disc_metadata
+      let valuesAreDifferent = false;
+      
+      if (field === 'tracks') {
+        valuesAreDifferent = !areTracksEqual(existingValue, newValue);
+      } else if (field === 'disc_metadata') {
+        valuesAreDifferent = !areDiscMetadataEqual(existingValue, newValue);
+      } else {
+        valuesAreDifferent = !isEqual(existingValue, newValue);
+      }
       
       if (valuesAreDifferent) {
         // Check if we already resolved this exact conflict
