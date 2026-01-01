@@ -1,326 +1,540 @@
-// src/app/edit-collection/components/ImportCLZModal.tsx
+// src/app/edit-collection/components/ImportDiscogsModal.tsx
 'use client';
 
 import { useState } from 'react';
 import { supabase } from '../../../lib/supabaseClient';
-import { normalizeArtist, normalizeTitle } from '../../../lib/importUtils';
-import {
-  buildIdentifyingFieldUpdates,
-  detectConflicts,
-  type FieldConflict,
-  type PreviousResolution,
-} from '../../../lib/conflictDetection';
-import ConflictResolutionModal from './ConflictResolutionModal';
+import { parseDiscogsFormat } from '../../../lib/formatParser';
+import { normalizeArtist, normalizeTitle, normalizeArtistAlbum } from '../../../lib/importUtils';
 
-type SyncMode = 'update_all' | 'update_missing_only';
-type ImportStage = 'upload' | 'preview' | 'importing' | 'conflicts' | 'complete';
-type AlbumStatus = 'MATCHED' | 'NO_MATCH';
+type SyncMode = 'full_replacement' | 'full_sync' | 'partial_sync' | 'new_only';
+type ImportStage = 'upload' | 'preview' | 'importing' | 'complete';
+type AlbumStatus = 'NEW' | 'CHANGED' | 'UNCHANGED' | 'REMOVED';
 
-interface ParsedCLZAlbum {
+interface ParsedAlbum {
   artist: string;
   title: string;
-  year: string;
-  tracks: Array<{
-    id: string;
-    title: string;
-    position: number;
-    side: string | null;
-    duration: string;
-    disc_number: number;
-    type: 'track';
-    artist: null;
-  }>;
-  disc_metadata: Array<{
-    index: number;
-    name: string;
-  }>;
-  disc_count: number;
-  musicians: string[];
-  producers: string[];
-  engineers: string[];
-  songwriters: string[];
-  barcode: string;
-  cat_no: string;
+  format: string;
+  labels: string[];
+  cat_no: string | null;
+  barcode: string | null;
+  country: string | null;
+  year: string | null;
+  folder: string;
+  discogs_release_id: string;
+  discogs_master_id: string | null;
+  date_added: string;
+  media_condition: string;
+  package_sleeve_condition: string | null;
+  notes: string | null;
+  my_rating: number | null;
+  decade: number | null;
   artist_norm: string;
   title_norm: string;
-  labels: string[];
+  artist_album_norm: string;
+  album_norm: string;
 }
 
 interface ExistingAlbum {
   id: number;
   artist: string;
   title: string;
-  year: string | null;
-  tracks: unknown[] | null;
-  musicians: string[] | null;
-  producers: string[] | null;
-  engineers: string[] | null;
-  songwriters: string[] | null;
-  barcode: string | null;
-  cat_no: string | null;
-  labels: string[] | null;
-  format: string | null;
-  country: string | null;
-  folder: string | null;
+  artist_norm: string;
+  title_norm: string;
+  artist_album_norm: string;
   discogs_release_id: string | null;
-  discogs_master_id: string | null;
-  date_added: string | null;
+  image_url: string | null;
+  tracks: unknown[] | null;
+  discogs_genres: string[] | null;
+  packaging: string | null;
 }
 
-interface ComparedCLZAlbum extends ParsedCLZAlbum {
+interface ComparedAlbum extends ParsedAlbum {
   status: AlbumStatus;
   existingId?: number;
-  hasTracks: boolean;
-  hasCredits: boolean;
+  needsEnrichment: boolean;
+  missingFields: string[];
 }
 
-interface ImportCLZModalProps {
+interface ImportDiscogsModalProps {
   isOpen: boolean;
   onClose: () => void;
   onImportComplete?: () => void;
 }
 
-// Parse CLZ XML
-function parseCLZXML(xmlText: string): ParsedCLZAlbum[] {
-  const parser = new DOMParser();
-  const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
-  
-  const musicList = xmlDoc.querySelector('musiclist');
-  if (!musicList) return [];
+// Helper functions
+function sanitizeMediaCondition(condition: string | null | undefined): string {
+  if (!condition || condition.trim() === '') return 'Unknown';
+  return condition.trim();
+}
 
-  const albums: ParsedCLZAlbum[] = [];
-  const musicElements = musicList.querySelectorAll('music');
+function sanitizeFolder(folder: string | null | undefined): string {
+  if (!folder || folder.trim() === '') return 'Uncategorized';
+  return folder.trim();
+}
 
-  musicElements.forEach(music => {
-    // Get artist (first artist from list)
-    const artistNode = music.querySelector('artists artist displayname');
-    const artist = artistNode?.textContent || 'Unknown Artist';
-    
-    // Get title and year
-    const title = music.querySelector('title')?.textContent || 'Unknown Title';
-    const year = music.querySelector('releaseyear')?.textContent || '';
+function parseDiscogsDate(dateString: string): string {
+  if (!dateString || dateString.trim() === '') return new Date().toISOString();
+  try {
+    const parsed = new Date(dateString);
+    if (isNaN(parsed.getTime())) return new Date().toISOString();
+    return parsed.toISOString();
+  } catch {
+    return new Date().toISOString();
+  }
+}
 
-    // Get labels
-    const labels: string[] = [];
-    music.querySelectorAll('labels label displayname').forEach(node => {
-      if (node.textContent) labels.push(node.textContent);
-    });
+function calculateDecade(year: string | null): number | null {
+  if (!year) return null;
+  const yearNum = parseInt(year);
+  if (isNaN(yearNum) || yearNum <= 0) return null;
+  return Math.floor(yearNum / 10) * 10;
+}
 
-    // Parse tracks and discs
-    const tracks: ParsedCLZAlbum['tracks'] = [];
-    const discMetadata: ParsedCLZAlbum['disc_metadata'] = [];
-    const discsNodes = music.querySelectorAll('discs disc');
-    
-    if (discsNodes.length === 0) {
-      // Single disc album
-      discMetadata.push({ index: 1, name: 'Disc 1' });
-      
-      const trackNodes = music.querySelectorAll('tracks track');
-      trackNodes.forEach(track => {
-        const position = track.querySelector('position')?.textContent || '0';
-        const seconds = parseInt(track.querySelector('length')?.textContent || '0');
-        const hash = track.querySelector('hash')?.textContent || '0';
-        
-        tracks.push({
-          id: `clz-${hash}`,
-          title: track.querySelector('title')?.textContent || '',
-          position: cleanPosition(position),
-          side: position[0]?.match(/[A-Z]/) ? position[0] : null,
-          duration: formatDuration(seconds),
-          disc_number: 1,
-          type: 'track',
-          artist: null,
-        });
-      });
-    } else {
-      // Multi-disc album
-      discsNodes.forEach((disc, index) => {
-        const discIndex = index + 1;
-        const discName = disc.querySelector('displayname')?.textContent || `Disc ${discIndex}`;
-        discMetadata.push({ index: discIndex, name: discName });
-        
-        const trackNodes = disc.querySelectorAll('track');
-        trackNodes.forEach(track => {
-          const position = track.querySelector('position')?.textContent || '0';
-          const seconds = parseInt(track.querySelector('length')?.textContent || '0');
-          const hash = track.querySelector('hash')?.textContent || '0';
-          
-          tracks.push({
-            id: `clz-${hash}`,
-            title: track.querySelector('title')?.textContent || '',
-            position: cleanPosition(position),
-            side: position[0]?.match(/[A-Z]/) ? position[0] : null,
-            duration: formatDuration(seconds),
-            disc_number: discIndex,
-            type: 'track',
-            artist: null,
-          });
-        });
-      });
+// CSV parsing
+function parseDiscogsCSV(csvText: string): ParsedAlbum[] {
+  const lines = csvText.split('\n');
+  if (lines.length < 2) return [];
+
+  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+  const albums: ParsedAlbum[] = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+
+    // Handle CSV with quotes
+    const values: string[] = [];
+    let current = '';
+    let inQuotes = false;
+
+    for (let j = 0; j < line.length; j++) {
+      const char = line[j];
+      if (char === '"') {
+        inQuotes = !inQuotes;
+      } else if (char === ',' && !inQuotes) {
+        values.push(current.trim());
+        current = '';
+      } else {
+        current += char;
+      }
     }
+    values.push(current.trim());
 
-    // Extract credits
-    const musicians: string[] = [];
-    const producers: string[] = [];
-    const engineers: string[] = [];
-    const songwriters: string[] = [];
-
-    music.querySelectorAll('musicians musician displayname').forEach(node => {
-      if (node.textContent) musicians.push(node.textContent);
-    });
-    music.querySelectorAll('producers producer displayname').forEach(node => {
-      if (node.textContent) producers.push(node.textContent);
-    });
-    music.querySelectorAll('engineers engineer displayname').forEach(node => {
-      if (node.textContent) engineers.push(node.textContent);
-    });
-    music.querySelectorAll('songwriters songwriter displayname').forEach(node => {
-      if (node.textContent) songwriters.push(node.textContent);
+    const row: Record<string, string> = {};
+    headers.forEach((header, index) => {
+      row[header] = values[index] || '';
     });
 
-    albums.push({
+    const artist = row['Artist'] || row['artist'] || '';
+    const title = row['Title'] || row['title'] || '';
+    
+    if (!artist || !title) continue;
+
+    const labelsText = row['Label'] || row['label'] || '';
+    const labels = labelsText ? labelsText.split(',').map(l => l.trim()) : [];
+
+    const year = row['Released'] || row['Year'] || row['year'] || null;
+    const ratingText = row['Rating'] || row['rating'] || '';
+    const my_rating = ratingText ? parseInt(ratingText) : null;
+
+    const album: ParsedAlbum = {
       artist,
       title,
-      year,
-      tracks,
-      disc_metadata: discMetadata,
-      disc_count: discMetadata.length,
-      musicians,
-      producers,
-      engineers,
-      songwriters,
-      barcode: music.querySelector('barcode')?.textContent || '',
-      cat_no: music.querySelector('labelnumber')?.textContent || '',
+      format: row['Format'] || row['format'] || '',
       labels,
+      cat_no: row['Catalog#'] || row['Catalog #'] || row['catalog'] || row['cat_no'] || null,
+      barcode: row['Barcode'] || row['barcode'] || null,
+      country: row['Country'] || row['country'] || null,
+      year,
+      folder: sanitizeFolder(row['CollectionFolder'] || row['Folder'] || row['folder']),
+      discogs_release_id: row['release_id'] || row['Release ID'] || row['discogs_release_id'] || '',
+      discogs_master_id: row['Master ID'] || row['master_id'] || row['discogs_master_id'] || null,
+      date_added: parseDiscogsDate(row['Date Added'] || row['date_added'] || ''),
+      media_condition: sanitizeMediaCondition(row['Collection Media Condition'] || row['media_condition']),
+      package_sleeve_condition: row['Collection Sleeve Condition'] || row['package_sleeve_condition'] || null,
+      notes: row['Collection Notes'] || row['notes'] || null,
+      my_rating,
+      decade: calculateDecade(year),
       artist_norm: normalizeArtist(artist),
       title_norm: normalizeTitle(title),
-    });
-  });
+      artist_album_norm: normalizeArtistAlbum(artist, title),
+      album_norm: normalizeTitle(title),
+    };
+
+    albums.push(album);
+  }
 
   return albums;
 }
 
-function cleanPosition(pos: string): number {
-  const nums = pos.match(/\d+/);
-  return nums ? parseInt(nums[0]) : 0;
-}
-
-function formatDuration(seconds: number): string {
-  if (!seconds || seconds <= 0) return '0:00';
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
-}
-
-// Compare CLZ albums with existing collection
-function compareCLZAlbums(
-  parsed: ParsedCLZAlbum[],
+// Compare albums
+function compareAlbums(
+  parsed: ParsedAlbum[],
   existing: ExistingAlbum[]
-): ComparedCLZAlbum[] {
-  // Build lookup map by normalized artist + title
-  const existingMap = new Map<string, ExistingAlbum>();
+): ComparedAlbum[] {
+  // Build two maps: by release_id (primary) and by artist_album_norm (fallback)
+  const releaseIdMap = new Map<string, ExistingAlbum>();
+  const artistAlbumMap = new Map<string, ExistingAlbum>();
+  const matchedDbIds = new Set<number>();  // Track which database albums were matched
   
   existing.forEach(album => {
-    const key = normalizeArtist(album.artist) + normalizeTitle(album.title);
-    existingMap.set(key, album);
+    // Add to release_id map if release_id exists
+    if (album.discogs_release_id) {
+      releaseIdMap.set(album.discogs_release_id, album);
+    }
+    
+    // Add to artist_album_norm map - ALWAYS recalculate, never trust stored value
+    const normalizedKey = normalizeArtistAlbum(album.artist, album.title);
+    artistAlbumMap.set(normalizedKey, album);
   });
 
-  const compared: ComparedCLZAlbum[] = [];
+  const compared: ComparedAlbum[] = [];
 
-  for (const clzAlbum of parsed) {
-    const key = clzAlbum.artist_norm + clzAlbum.title_norm;
-    const existingAlbum = existingMap.get(key);
+  // Check parsed albums
+  for (const parsedAlbum of parsed) {
+    let existingAlbum: ExistingAlbum | undefined;
+    
+    // First, try to match by discogs_release_id (most precise)
+    if (parsedAlbum.discogs_release_id) {
+      existingAlbum = releaseIdMap.get(parsedAlbum.discogs_release_id);
+    }
+    
+    // If no match by release_id, try by artist_album_norm (fallback)
+    if (!existingAlbum) {
+      existingAlbum = artistAlbumMap.get(parsedAlbum.artist_album_norm);
+    }
 
-    if (existingAlbum) {
-      // MATCHED
+    if (!existingAlbum) {
+      // NEW album
       compared.push({
-        ...clzAlbum,
-        status: 'MATCHED',
-        existingId: existingAlbum.id,
-        hasTracks: !!(existingAlbum.tracks && existingAlbum.tracks.length > 0),
-        hasCredits: !!(
-          (existingAlbum.musicians && existingAlbum.musicians.length > 0) ||
-          (existingAlbum.producers && existingAlbum.producers.length > 0) ||
-          (existingAlbum.engineers && existingAlbum.engineers.length > 0) ||
-          (existingAlbum.songwriters && existingAlbum.songwriters.length > 0)
-        ),
+        ...parsedAlbum,
+        status: 'NEW',
+        needsEnrichment: true,
+        missingFields: ['all'],
       });
     } else {
-      // NO MATCH
+      // Exists - check what's missing
+      const missingFields: string[] = [];
+      
+      if (!existingAlbum.image_url) missingFields.push('cover images');
+      if (!existingAlbum.tracks || existingAlbum.tracks.length === 0) missingFields.push('tracks');
+      if (!existingAlbum.discogs_genres || existingAlbum.discogs_genres.length === 0) missingFields.push('genres');
+      if (!existingAlbum.packaging) missingFields.push('packaging');
+
+      const isChanged = parsedAlbum.discogs_release_id !== existingAlbum.discogs_release_id;
+
       compared.push({
-        ...clzAlbum,
-        status: 'NO_MATCH',
-        hasTracks: false,
-        hasCredits: false,
+        ...parsedAlbum,
+        status: isChanged || missingFields.length > 0 ? 'CHANGED' : 'UNCHANGED',
+        existingId: existingAlbum.id,
+        needsEnrichment: missingFields.length > 0,
+        missingFields,
       });
+
+      // Track that this database album was matched
+      matchedDbIds.add(existingAlbum.id);
+
+      // Remove from both maps to prevent duplicate matches
+      if (existingAlbum.discogs_release_id) {
+        releaseIdMap.delete(existingAlbum.discogs_release_id);
+      }
+      const existingNormalizedKey = existingAlbum.artist_album_norm || 
+        normalizeArtistAlbum(existingAlbum.artist, existingAlbum.title);
+      artistAlbumMap.delete(existingNormalizedKey);
     }
+  }
+
+  // Remaining in database but not in CSV = REMOVED
+  // Iterate over full existing array and check against matched IDs
+  for (const existingAlbum of existing) {
+    // Skip if this album was already matched
+    if (matchedDbIds.has(existingAlbum.id)) {
+      continue;
+    }
+
+    // This database album was not matched by any CSV entry
+    const normalizedKey = normalizeArtistAlbum(existingAlbum.artist, existingAlbum.title);
+      
+    compared.push({
+      artist: existingAlbum.artist,
+      title: existingAlbum.title,
+      format: '',
+      labels: [],
+      cat_no: null,
+      barcode: null,
+      country: null,
+      year: null,
+      folder: 'Unknown',
+      discogs_release_id: existingAlbum.discogs_release_id || '',
+      discogs_master_id: null,
+      date_added: new Date().toISOString(),
+      media_condition: 'Unknown',
+      package_sleeve_condition: null,
+      notes: null,
+      my_rating: null,
+      decade: null,
+      artist_norm: normalizeArtist(existingAlbum.artist),
+      title_norm: normalizeTitle(existingAlbum.title),
+      artist_album_norm: normalizedKey,
+      album_norm: normalizeTitle(existingAlbum.title),
+      status: 'REMOVED',
+      existingId: existingAlbum.id,
+      needsEnrichment: false,
+      missingFields: [],
+    });
   }
 
   return compared;
 }
 
-export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: ImportCLZModalProps) {
+// Discogs API enrichment
+async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unknown>> {
+  await new Promise(resolve => setTimeout(resolve, 1000)); // Rate limiting
+
+  const response = await fetch(`/api/discogsProxy?releaseId=${releaseId}`);
+
+  if (!response.ok) {
+    throw new Error(`Discogs API error: ${response.status}`);
+  }
+
+  const data = await response.json();
+
+  // Extract data
+  const enriched: Record<string, unknown> = {
+    image_url: data.images?.[0]?.uri || null,
+    back_image_url: data.images?.[1]?.uri || null,
+    discogs_genres: data.genres || [],
+    discogs_styles: data.styles || [],
+    packaging: data.formats?.[0]?.descriptions?.find((d: string) => 
+      ['Gatefold', 'Single Sleeve', 'Digipak'].some(p => d.includes(p))
+    ) || null,
+  };
+
+  // Extract sound (Stereo, Mono, etc.)
+  if (data.formats && Array.isArray(data.formats)) {
+    const soundDescriptions = data.formats[0]?.descriptions || [];
+    const soundTypes = ['Stereo', 'Mono', 'Quadraphonic', 'Surround'];
+    const sound = soundDescriptions.find((d: string) => 
+      soundTypes.some(type => d.includes(type))
+    );
+    if (sound) enriched.sound = sound;
+  }
+
+  // Extract identifiers (matrix numbers, SPARS code, barcode)
+  if (data.identifiers && Array.isArray(data.identifiers)) {
+    const matrixEntries: Record<string, string> = {};
+    
+    data.identifiers.forEach((identifier: { type: string; value: string; description?: string }) => {
+      if (identifier.type === 'Matrix / Runout') {
+        const desc = identifier.description || '';
+        if (desc.toLowerCase().includes('side a') || desc.toLowerCase().includes('a-side')) {
+          matrixEntries.side_a = identifier.value;
+        } else if (desc.toLowerCase().includes('side b') || desc.toLowerCase().includes('b-side')) {
+          matrixEntries.side_b = identifier.value;
+        } else if (desc.toLowerCase().includes('side c')) {
+          matrixEntries.side_c = identifier.value;
+        } else if (desc.toLowerCase().includes('side d')) {
+          matrixEntries.side_d = identifier.value;
+        } else if (!matrixEntries.side_a) {
+          matrixEntries.side_a = identifier.value;
+        } else if (!matrixEntries.side_b) {
+          matrixEntries.side_b = identifier.value;
+        }
+      } else if (identifier.type === 'SPARS Code') {
+        enriched.spars_code = identifier.value;
+      }
+    });
+
+    if (Object.keys(matrixEntries).length > 0) {
+      enriched.matrix_numbers = matrixEntries;
+    }
+  }
+
+  // Extract tracks and disc metadata
+  if (data.tracklist && Array.isArray(data.tracklist)) {
+    const tracks: unknown[] = [];
+    const discMetadata: { disc_number: number; title: string | null }[] = [];
+    let position = 1;
+    let currentDiscNumber = 1;
+    let currentDiscTitle: string | null = null;
+
+    data.tracklist.forEach((track: {
+      position?: string;
+      title?: string;
+      duration?: string;
+      artists?: { name: string }[];
+      type_?: string;
+    }) => {
+      const positionStr = track.position || '';
+      let discNumber = 1;
+      let side = '';
+      let trackPosition = position;
+
+      // Parse position
+      const sideMatch = positionStr.match(/^([A-Z])(\d+)?/);
+      if (sideMatch) {
+        side = sideMatch[1];
+        trackPosition = parseInt(sideMatch[2] || '1');
+        discNumber = Math.ceil((side.charCodeAt(0) - 64) / 2);
+      } else {
+        const discMatch = positionStr.match(/^(\d+)-(\d+)?/);
+        if (discMatch) {
+          discNumber = parseInt(discMatch[1]);
+          trackPosition = parseInt(discMatch[2] || position.toString());
+        }
+      }
+
+      const isHeader = track.type_ === 'heading';
+
+      // Check if this is a disc header/title
+      if (isHeader && discNumber !== currentDiscNumber) {
+        currentDiscNumber = discNumber;
+        currentDiscTitle = track.title || null;
+        
+        // Add to disc metadata
+        const existingDisc = discMetadata.find(d => d.disc_number === discNumber);
+        if (!existingDisc) {
+          discMetadata.push({
+            disc_number: discNumber,
+            title: currentDiscTitle,
+          });
+        }
+      }
+
+      tracks.push({
+        position: trackPosition.toString(),
+        title: track.title || '',
+        artist: track.artists?.[0]?.name || null,
+        duration: track.duration || null,
+        type: isHeader ? 'header' : 'track',
+        disc_number: discNumber,
+        side: side || undefined,
+      });
+
+      position++;
+    });
+
+    enriched.tracks = tracks;
+    
+    if (discMetadata.length > 0) {
+      enriched.disc_metadata = discMetadata;
+    }
+  }
+
+  // Extract credits
+  const engineers: string[] = [];
+  const producers: string[] = [];
+  const musicians: string[] = [];
+  const songwriters: string[] = [];
+  let studio: string | null = null;
+
+  if (data.extraartists && Array.isArray(data.extraartists)) {
+    data.extraartists.forEach((artist: { name: string; role: string }) => {
+      const role = artist.role.toLowerCase();
+      if (role.includes('engineer')) {
+        engineers.push(artist.name);
+      }
+      if (role.includes('producer')) {
+        producers.push(artist.name);
+      }
+      if (role.includes('musician') || role.includes('performer')) {
+        musicians.push(artist.name);
+      }
+      if (role.includes('written-by') || role.includes('songwriter')) {
+        songwriters.push(artist.name);
+      }
+      if (role.includes('recorded at') || role.includes('studio')) {
+        if (!studio) {
+          studio = artist.name;
+        }
+      }
+    });
+  }
+
+  if (engineers.length > 0) enriched.engineers = engineers;
+  if (producers.length > 0) enriched.producers = producers;
+  if (musicians.length > 0) enriched.musicians = musicians;
+  if (songwriters.length > 0) enriched.songwriters = songwriters;
+  if (studio) enriched.studio = studio;
+
+  return enriched;
+}
+
+export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }: ImportDiscogsModalProps) {
   const [stage, setStage] = useState<ImportStage>('upload');
-  const [syncMode, setSyncMode] = useState<SyncMode>('update_missing_only');
+  const [syncMode, setSyncMode] = useState<SyncMode>('partial_sync');
   const [file, setFile] = useState<File | null>(null);
   
-  const [comparedAlbums, setComparedAlbums] = useState<ComparedCLZAlbum[]>([]);
-  const [existingAlbums, setExistingAlbums] = useState<ExistingAlbum[]>([]);
+  const [comparedAlbums, setComparedAlbums] = useState<ComparedAlbum[]>([]);
+  const [totalDatabaseCount, setTotalDatabaseCount] = useState<number>(0);
   
   const [progress, setProgress] = useState({ current: 0, total: 0, status: '' });
   const [error, setError] = useState<string | null>(null);
   
-  const [allConflicts, setAllConflicts] = useState<FieldConflict[]>([]);
-  
   const [results, setResults] = useState({
+    added: 0,
     updated: 0,
-    skipped: 0,
-    noMatch: 0,
+    removed: 0,
+    unchanged: 0,
     errors: 0,
-    conflicts: 0,
   });
 
   if (!isOpen) return null;
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
       setFile(selectedFile);
       setError(null);
+      
+      // Parse immediately to show counts
+      try {
+        const text = await selectedFile.text();
+        const parsed = parseDiscogsCSV(text);
+
+        if (parsed.length === 0) {
+          setError('No albums found in CSV file');
+          setComparedAlbums([]);
+          return;
+        }
+
+        // Load existing collection
+        const { data: existing, error: dbError } = await supabase
+          .from('collection')
+          .select('id, artist, title, artist_norm, title_norm, artist_album_norm, discogs_release_id, image_url, tracks, discogs_genres, packaging');
+
+        if (dbError) {
+          setError(`Database error: ${dbError.message}`);
+          setComparedAlbums([]);
+          return;
+        }
+
+        if (!existing) {
+          setError('No data returned from database');
+          setComparedAlbums([]);
+          return;
+        }
+
+        // Store total database count
+        setTotalDatabaseCount(existing.length);
+
+        // Compare to show diagnostic counts
+        const compared = compareAlbums(parsed, existing as ExistingAlbum[]);
+        setComparedAlbums(compared);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to parse CSV');
+        setComparedAlbums([]);
+      }
     }
   };
 
-  const handleParseXML = async () => {
-    if (!file) return;
-
-    try {
-      setError(null);
-      const text = await file.text();
-      const parsed = parseCLZXML(text);
-
-      if (parsed.length === 0) {
-        setError('No albums found in XML file');
-        return;
-      }
-
-      // Load existing collection
-      const { data: existing, error: dbError } = await supabase
-        .from('collection')
-        .select('id, artist, title, year, tracks, musicians, producers, engineers, songwriters, barcode, cat_no, labels, format, country, folder, discogs_release_id, discogs_master_id, date_added');
-
-      if (dbError) {
-        setError(`Database error: ${dbError.message}`);
-        return;
-      }
-
-      // Compare
-      const compared = compareCLZAlbums(parsed, existing as ExistingAlbum[]);
-      setComparedAlbums(compared);
-      setExistingAlbums(existing as ExistingAlbum[]);
-      setStage('preview');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to parse XML');
+  const handleParseCSV = async () => {
+    if (!file || comparedAlbums.length === 0) {
+      setError('Please select a valid CSV file');
+      return;
     }
+
+    setStage('preview');
   };
 
   const handleStartImport = async () => {
@@ -328,123 +542,154 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
     setError(null);
 
     try {
-      // Only process MATCHED albums
-      const matchedAlbums = comparedAlbums.filter(a => a.status === 'MATCHED');
-      
-      // Filter based on sync mode
-      let albumsToProcess: ComparedCLZAlbum[] = [];
-      
-      if (syncMode === 'update_all') {
-        albumsToProcess = matchedAlbums;
-      } else if (syncMode === 'update_missing_only') {
-        // Only update albums missing tracks or credits
-        albumsToProcess = matchedAlbums.filter(a => !a.hasTracks || !a.hasCredits);
+      let albumsToProcess: ComparedAlbum[] = [];
+
+      // Determine what to process based on sync mode
+      if (syncMode === 'full_replacement') {
+        // Delete everything, process all
+        await supabase.from('collection').delete().gt('id', 0);
+        albumsToProcess = comparedAlbums.filter(a => a.status !== 'REMOVED');
+      } else if (syncMode === 'full_sync') {
+        // Process all CSV albums (scrape missing/changed data), delete REMOVED
+        const removed = comparedAlbums.filter(a => a.status === 'REMOVED' && a.existingId);
+        if (removed.length > 0) {
+          const idsToDelete = removed.map(a => a.existingId!);
+          
+          // Batch deletes to avoid URL length limits (100 IDs at a time)
+          const batchSize = 100;
+          for (let i = 0; i < idsToDelete.length; i += batchSize) {
+            const batch = idsToDelete.slice(i, i + batchSize);
+            const { error: deleteError } = await supabase
+              .from('collection')
+              .delete()
+              .in('id', batch);
+            
+            if (deleteError) {
+              console.error('Delete error:', deleteError);
+              // Continue even if some deletes fail
+            }
+          }
+        }
+        albumsToProcess = comparedAlbums.filter(a => a.status !== 'REMOVED');
+      } else if (syncMode === 'partial_sync') {
+        // Only NEW and CHANGED
+        albumsToProcess = comparedAlbums.filter(a => 
+          a.status === 'NEW' || (a.status === 'CHANGED' && a.needsEnrichment)
+        );
+      } else if (syncMode === 'new_only') {
+        // Only NEW
+        albumsToProcess = comparedAlbums.filter(a => a.status === 'NEW');
       }
 
       setProgress({ current: 0, total: albumsToProcess.length, status: 'Processing...' });
 
       const resultCounts = {
+        added: 0,
         updated: 0,
-        skipped: matchedAlbums.length - albumsToProcess.length,
-        noMatch: comparedAlbums.filter(a => a.status === 'NO_MATCH').length,
+        removed: syncMode === 'full_replacement' ? totalDatabaseCount : 
+                 syncMode === 'full_sync' ? comparedAlbums.filter(a => a.status === 'REMOVED').length : 0,
+        unchanged: 0,
         errors: 0,
-        conflicts: 0,
       };
 
-      const conflicts: FieldConflict[] = [];
+      // Process in batches of 25
+      const batchSize = 25;
+      for (let i = 0; i < albumsToProcess.length; i += batchSize) {
+        const batch = albumsToProcess.slice(i, i + batchSize);
 
-      // Process albums
-      for (let i = 0; i < albumsToProcess.length; i++) {
-        const album = albumsToProcess[i];
-        
-        setProgress({
-          current: i + 1,
-          total: albumsToProcess.length,
-          status: `Processing ${album.artist} - ${album.title}`,
-        });
+        for (const album of batch) {
+          setProgress({
+            current: i + batch.indexOf(album) + 1,
+            total: albumsToProcess.length,
+            status: `Processing ${album.artist} - ${album.title}`,
+          });
 
-        try {
-          // Find existing album
-          const existingAlbum = existingAlbums.find(e => e.id === album.existingId);
-          if (!existingAlbum) continue;
+          try {
+            // Base album data - NEVER include generated columns
+            const albumData: Record<string, unknown> = {
+              artist: album.artist,
+              title: album.title,
+              format: album.format,
+              labels: album.labels,
+              cat_no: album.cat_no,
+              barcode: album.barcode,
+              country: album.country,
+              year: album.year,
+              folder: album.folder,
+              discogs_release_id: album.discogs_release_id,
+              discogs_master_id: album.discogs_master_id,
+              date_added: album.date_added,
+              media_condition: album.media_condition,
+              package_sleeve_condition: album.package_sleeve_condition,
+              notes: album.notes,
+              my_rating: album.my_rating,
+              decade: album.decade,
+            };
+            // GENERATED COLUMNS - NEVER INCLUDE:
+            // year_int (generated from year)
+            // artist_norm (generated from artist)
+            // title_norm (generated from title)
+            // album_norm (generated from title)
+            // artist_album_norm (generated from artist + title)
 
-          // Load previous conflict resolutions
-          const { data: resolutions } = await supabase
-            .from('import_conflict_resolutions')
-            .select('*')
-            .eq('album_id', album.existingId!)
-            .eq('source', 'clz');
+            // Parse format
+            const formatData = parseDiscogsFormat(album.format);
+            Object.assign(albumData, formatData);
 
-          // Build CLZ data object
-          const clzData: Record<string, unknown> = {
-            artist: album.artist,
-            title: album.title,
-            year: album.year,
-            tracks: album.tracks,
-            disc_metadata: album.disc_metadata,
-            discs: album.disc_count,
-            musicians: album.musicians,
-            producers: album.producers,
-            engineers: album.engineers,
-            songwriters: album.songwriters,
-            barcode: album.barcode,
-            cat_no: album.cat_no,
-            labels: album.labels,
-          };
+            // Enrich from Discogs if needed
+            if (album.status === 'NEW' || 
+                (syncMode === 'full_sync' && album.missingFields.length > 0) ||
+                (syncMode === 'partial_sync' && album.needsEnrichment)) {
+              
+              const enrichedData = await enrichFromDiscogs(album.discogs_release_id);
+              
+              // For full_sync, only add missing fields
+              if (syncMode === 'full_sync') {
+                album.missingFields.forEach(field => {
+                  if (enrichedData[field]) {
+                    albumData[field] = enrichedData[field];
+                  }
+                });
+              } else {
+                // For other modes, add all enriched data
+                Object.assign(albumData, enrichedData);
+              }
+            }
 
-          // Step 1: Handle identifying fields (only fill if NULL)
-          const identifyingUpdates = buildIdentifyingFieldUpdates(
-            existingAlbum as unknown as Record<string, unknown>,
-            clzData
-          );
+            // Insert or update
+            if (album.status === 'NEW') {
+              const { error: insertError } = await supabase
+                .from('collection')
+                .insert(albumData);
 
-          // Step 2: Detect conflicts for conflictable fields
-          const { safeUpdates, conflicts: albumConflicts } = detectConflicts(
-            existingAlbum as unknown as Record<string, unknown>,
-            clzData,
-            'clz',
-            (resolutions || []) as PreviousResolution[]
-          );
+              if (insertError) throw insertError;
+              resultCounts.added++;
+            } else {
+              const { error: updateError } = await supabase
+                .from('collection')
+                .update(albumData)
+                .eq('id', album.existingId!);
 
-          // Combine identifying updates and safe updates
-          const updateData = {
-            ...identifyingUpdates,
-            ...safeUpdates,
-          };
-
-          // Update album with non-conflicting data
-          if (Object.keys(updateData).length > 0) {
-            const { error: updateError } = await supabase
-              .from('collection')
-              .update(updateData)
-              .eq('id', album.existingId!);
-
-            if (updateError) throw updateError;
-            resultCounts.updated++;
+              if (updateError) throw updateError;
+              
+              if (album.status === 'CHANGED') {
+                resultCounts.updated++;
+              } else {
+                resultCounts.unchanged++;
+              }
+            }
+          } catch (err) {
+            console.error(`Error processing ${album.artist} - ${album.title}:`, err);
+            resultCounts.errors++;
           }
-
-          // Queue conflicts for later resolution
-          if (albumConflicts.length > 0) {
-            conflicts.push(...albumConflicts);
-            resultCounts.conflicts += albumConflicts.length;
-          }
-        } catch (err) {
-          console.error(`Error processing ${album.artist} - ${album.title}:`, err);
-          resultCounts.errors++;
         }
       }
 
       setResults(resultCounts);
+      setStage('complete');
       
-      // If there are conflicts, show resolution modal
-      if (conflicts.length > 0) {
-        setAllConflicts(conflicts);
-        setStage('conflicts');
-      } else {
-        setStage('complete');
-        if (onImportComplete) {
-          onImportComplete();
-        }
+      if (onImportComplete) {
+        onImportComplete();
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Import failed');
@@ -452,42 +697,28 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
     }
   };
 
-  const handleConflictsResolved = () => {
-    setStage('complete');
-    if (onImportComplete) {
-      onImportComplete();
-    }
-  };
-
   const handleClose = () => {
     setStage('upload');
     setFile(null);
     setComparedAlbums([]);
-    setExistingAlbums([]);
+    setTotalDatabaseCount(0);
     setProgress({ current: 0, total: 0, status: '' });
     setError(null);
-    setAllConflicts([]);
-    setResults({ updated: 0, skipped: 0, noMatch: 0, errors: 0, conflicts: 0 });
+    setResults({ added: 0, updated: 0, removed: 0, unchanged: 0, errors: 0 });
     onClose();
   };
 
-  const matchedCount = comparedAlbums.filter(a => a.status === 'MATCHED').length;
-  const noMatchCount = comparedAlbums.filter(a => a.status === 'NO_MATCH').length;
-  const needsUpdateCount = comparedAlbums.filter(a => 
-    a.status === 'MATCHED' && (!a.hasTracks || !a.hasCredits)
-  ).length;
-
-  // Show conflict resolution modal
-  if (stage === 'conflicts') {
-    return (
-      <ConflictResolutionModal
-        conflicts={allConflicts}
-        source="clz"
-        onComplete={handleConflictsResolved}
-        onCancel={() => setStage('complete')}
-      />
-    );
-  }
+  const newCount = syncMode === 'full_replacement' 
+    ? comparedAlbums.filter(a => a.status !== 'REMOVED').length 
+    : comparedAlbums.filter(a => a.status === 'NEW').length;
+  const unchangedCount = syncMode === 'full_replacement'
+    ? 0
+    : comparedAlbums.filter(a => a.status === 'UNCHANGED').length;
+  const removedCount = syncMode === 'full_replacement'
+    ? totalDatabaseCount  // Show ALL albums in database will be deleted
+    : syncMode === 'full_sync'
+      ? comparedAlbums.filter(a => a.status === 'REMOVED').length
+      : 0;
 
   return (
     <div style={{
@@ -522,7 +753,7 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
           alignItems: 'center',
         }}>
           <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '600' }}>
-            Import from CLZ Music Web
+            Import from Discogs
           </h2>
           <button
             onClick={handleClose}
@@ -566,12 +797,14 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
                   color: '#374151',
                   marginBottom: '8px',
                 }}>
-                  Update Mode
+                  Sync Mode
                 </label>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {[
-                    { value: 'update_missing_only', label: 'Update Missing Only', desc: 'Only update albums missing tracks or credits (recommended)' },
-                    { value: 'update_all', label: 'Update All', desc: 'Update all matched albums with CLZ data' },
+                    { value: 'full_replacement', label: 'Full Replacement', desc: 'Delete all, import everything fresh' },
+                    { value: 'full_sync', label: 'Full Sync', desc: 'Scrape missing/changed data for all albums' },
+                    { value: 'partial_sync', label: 'Partial Sync', desc: 'Only process new & changed albums (recommended)' },
+                    { value: 'new_only', label: 'New Only', desc: 'Only import albums not in database' },
                   ].map(mode => (
                     <label key={mode.value} style={{
                       display: 'flex',
@@ -580,7 +813,7 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
                       border: `2px solid ${syncMode === mode.value ? '#f97316' : '#e5e7eb'}`,
                       borderRadius: '6px',
                       cursor: 'pointer',
-                      backgroundColor: syncMode === mode.value ? '#f5f3ff' : 'white',
+                      backgroundColor: syncMode === mode.value ? '#fff7ed' : 'white',
                     }}>
                       <input
                         type="radio"
@@ -611,11 +844,11 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
                   color: '#374151',
                   marginBottom: '8px',
                 }}>
-                  CLZ Music Web XML Export
+                  Discogs CSV File
                 </label>
                 <input
                   type="file"
-                  accept=".xml"
+                  accept=".csv"
                   onChange={handleFileChange}
                   style={{
                     display: 'block',
@@ -629,6 +862,64 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
                 {file && (
                   <div style={{ marginTop: '8px', fontSize: '13px', color: '#6b7280' }}>
                     Selected: {file.name} ({(file.size / 1024).toFixed(1)} KB)
+                  </div>
+                )}
+                
+                {file && comparedAlbums.length > 0 && (
+                  <div style={{
+                    marginTop: '16px',
+                    padding: '16px',
+                    backgroundColor: '#f9fafb',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '6px',
+                  }}>
+                    <div style={{ fontSize: '14px', fontWeight: '600', color: '#111827', marginBottom: '12px' }}>
+                      CSV Analysis
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: '#6b7280' }}>Total albums in CSV:</span>
+                        <span style={{ fontWeight: '600', color: '#111827' }}>
+                          {comparedAlbums.filter(a => a.status !== 'REMOVED').length}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: '#059669' }}>New albums (not in database):</span>
+                        <span style={{ fontWeight: '600', color: '#059669' }}>
+                          {comparedAlbums.filter(a => a.status === 'NEW').length}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: '#d97706' }}>Existing albums missing data:</span>
+                        <span style={{ fontWeight: '600', color: '#d97706' }}>
+                          {comparedAlbums.filter(a => a.status === 'CHANGED' && a.needsEnrichment).length}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: '#6b7280' }}>Unchanged albums:</span>
+                        <span style={{ fontWeight: '600', color: '#6b7280' }}>
+                          {comparedAlbums.filter(a => a.status === 'UNCHANGED').length}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: '#dc2626' }}>Albums in DB but not in CSV:</span>
+                        <span style={{ fontWeight: '600', color: '#dc2626' }}>
+                          {comparedAlbums.filter(a => a.status === 'REMOVED').length}
+                        </span>
+                      </div>
+                      <div style={{ 
+                        marginTop: '8px', 
+                        paddingTop: '8px', 
+                        borderTop: '1px solid #e5e7eb',
+                        display: 'flex',
+                        justifyContent: 'space-between'
+                      }}>
+                        <span style={{ color: '#6b7280' }}>Current database total:</span>
+                        <span style={{ fontWeight: '600', color: '#111827' }}>
+                          {totalDatabaseCount}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -649,21 +940,35 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
                   Import Summary
                 </h3>
                 <div style={{ fontSize: '14px', color: '#6b7280', marginBottom: '12px' }}>
-                  <strong>{comparedAlbums.length}</strong> albums found in XML
+                  <strong>{comparedAlbums.filter(a => a.status !== 'REMOVED').length}</strong> albums found in CSV
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '14px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#059669', fontWeight: '600' }}>Matched albums:</span>
-                    <span style={{ color: '#111827', fontWeight: '600' }}>{matchedCount}</span>
+                    <span style={{ color: '#059669', fontWeight: '600' }}>
+                      {syncMode === 'full_replacement' ? 'Albums to import:' : 'New albums to add:'}
+                    </span>
+                    <span style={{ color: '#111827', fontWeight: '600' }}>{newCount}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#d97706', fontWeight: '600' }}>Missing tracks/credits:</span>
-                    <span style={{ color: '#111827', fontWeight: '600' }}>{needsUpdateCount}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#dc2626', fontWeight: '600' }}>No match found:</span>
-                    <span style={{ color: '#111827', fontWeight: '600' }}>{noMatchCount}</span>
-                  </div>
+                  {syncMode !== 'full_replacement' && (
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: '#d97706', fontWeight: '600' }}>Existing albums missing data:</span>
+                        <span style={{ color: '#111827', fontWeight: '600' }}>
+                          {comparedAlbums.filter(a => a.status === 'CHANGED' && a.needsEnrichment).length}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: '#6b7280', fontWeight: '600' }}>Unchanged albums:</span>
+                        <span style={{ color: '#111827', fontWeight: '600' }}>{unchangedCount}</span>
+                      </div>
+                    </>
+                  )}
+                  {(syncMode === 'full_sync' || syncMode === 'full_replacement') && removedCount > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#dc2626', fontWeight: '600' }}>Albums to remove:</span>
+                      <span style={{ color: '#111827', fontWeight: '600' }}>{removedCount}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -679,11 +984,10 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
               }}>
                 <strong>Mode: {syncMode.replace(/_/g, ' ').toUpperCase()}</strong>
                 <br />
-                {syncMode === 'update_all' && `Will update all ${matchedCount} matched albums with CLZ data.`}
-                {syncMode === 'update_missing_only' && `Will only update ${needsUpdateCount} albums missing tracks or credits.`}
-                <br />
-                <br />
-                <strong>Note:</strong> Identifying fields (artist, title, format, barcode, etc.) are locked and won&apos;t be changed if they already have values. Other fields may generate conflicts that you&apos;ll resolve after import.
+                {syncMode === 'full_replacement' && `Will delete all ${removedCount} albums from database and import all ${newCount} albums from CSV.`}
+                {syncMode === 'full_sync' && 'Will scrape missing/changed data for all CSV albums and remove albums not in CSV.'}
+                {syncMode === 'partial_sync' && 'Will only process new and changed albums.'}
+                {syncMode === 'new_only' && 'Will only add albums not currently in database.'}
               </div>
 
               {/* Preview Table */}
@@ -700,7 +1004,7 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
                   fontSize: '13px',
                   color: '#6b7280',
                 }}>
-                  Preview (first 10 albums)
+                  Preview (first 10 albums that will be processed)
                 </div>
                 <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
                   <table style={{ width: '100%', fontSize: '13px', borderCollapse: 'collapse' }}>
@@ -713,29 +1017,54 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
                       </tr>
                     </thead>
                     <tbody>
-                      {comparedAlbums.slice(0, 10).map((album, idx) => {
+                      {(() => {
+                        // Filter albums based on sync mode to show only what will be processed
+                        let albumsToShow = comparedAlbums;
+                        
+                        if (syncMode === 'new_only') {
+                          albumsToShow = comparedAlbums.filter(a => a.status === 'NEW');
+                        } else if (syncMode === 'partial_sync') {
+                          albumsToShow = comparedAlbums.filter(a => 
+                            a.status === 'NEW' || (a.status === 'CHANGED' && a.needsEnrichment)
+                          );
+                        } else if (syncMode === 'full_sync') {
+                          // Show everything except unchanged
+                          albumsToShow = comparedAlbums.filter(a => a.status !== 'UNCHANGED');
+                        }
+                        // full_replacement shows everything
+                        
+                        return albumsToShow.slice(0, 10).map((album, idx) => {
                         let statusColor = '#6b7280';
-                        let statusDisplay = album.status;
+                        let statusDisplay: string = album.status;
                         let actionText = 'No action';
 
-                        if (album.status === 'MATCHED') {
-                          statusColor = '#059669';
-                          statusDisplay = 'MATCHED';
-                          if (!album.hasTracks && !album.hasCredits) {
-                            actionText = 'Update tracks + credits';
-                          } else if (!album.hasTracks) {
-                            actionText = 'Update tracks';
-                          } else if (!album.hasCredits) {
-                            actionText = 'Update credits';
-                          } else if (syncMode === 'update_all') {
-                            actionText = 'Check for conflicts';
+                        if (syncMode === 'full_replacement') {
+                          // In full replacement, show all non-removed as import, all removed as delete
+                          if (album.status === 'REMOVED') {
+                            statusColor = '#dc2626';
+                            statusDisplay = 'WILL DELETE';
+                            actionText = 'Delete from database';
                           } else {
-                            actionText = 'Skip (has data)';
+                            statusColor = '#059669';
+                            statusDisplay = 'WILL IMPORT';
+                            actionText = 'Import + enrich';
                           }
-                        } else {
+                        } else if (album.status === 'NEW') {
+                          statusColor = '#059669';
+                          statusDisplay = 'NEW';
+                          actionText = 'Add + enrich';
+                        } else if (album.status === 'CHANGED' && album.needsEnrichment) {
+                          statusColor = '#d97706';
+                          statusDisplay = 'MISSING DATA';
+                          actionText = album.missingFields.join(', ');
+                        } else if (album.status === 'UNCHANGED') {
+                          statusColor = '#6b7280';
+                          statusDisplay = 'UNCHANGED';
+                          actionText = 'Skip';
+                        } else if (album.status === 'REMOVED') {
                           statusColor = '#dc2626';
-                          statusDisplay = 'NO_MATCH';
-                          actionText = 'Skip (not in DB)';
+                          statusDisplay = 'REMOVED';
+                          actionText = syncMode === 'full_sync' ? 'Delete' : 'Keep';
                         }
 
                         return (
@@ -750,7 +1079,8 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
                             </td>
                           </tr>
                         );
-                      })}
+                      });
+                      })()}
                     </tbody>
                   </table>
                 </div>
@@ -799,12 +1129,10 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
                 Import Complete
               </h3>
               <div style={{ fontSize: '14px', color: '#6b7280' }}>
+                <div><strong>{results.added}</strong> albums added</div>
                 <div><strong>{results.updated}</strong> albums updated</div>
-                <div><strong>{results.skipped}</strong> albums skipped</div>
-                <div><strong>{results.noMatch}</strong> albums not found in database</div>
-                {results.conflicts > 0 && (
-                  <div><strong>{results.conflicts}</strong> conflicts resolved</div>
-                )}
+                {results.removed > 0 && <div><strong>{results.removed}</strong> albums removed</div>}
+                <div><strong>{results.unchanged}</strong> albums unchanged</div>
                 {results.errors > 0 && (
                   <div style={{ color: '#dc2626', marginTop: '8px' }}>
                     <strong>{results.errors}</strong> errors occurred
@@ -841,16 +1169,16 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
                 Cancel
               </button>
               <button
-                onClick={handleParseXML}
-                disabled={!file}
+                onClick={handleParseCSV}
+                disabled={!file || comparedAlbums.length === 0}
                 style={{
                   padding: '8px 16px',
-                  backgroundColor: file ? '#f97316' : '#d1d5db',
+                  backgroundColor: (file && comparedAlbums.length > 0) ? '#f97316' : '#d1d5db',
                   border: 'none',
                   borderRadius: '4px',
                   fontSize: '14px',
                   fontWeight: '600',
-                  cursor: file ? 'pointer' : 'not-allowed',
+                  cursor: (file && comparedAlbums.length > 0) ? 'pointer' : 'not-allowed',
                   color: 'white',
                 }}
               >
