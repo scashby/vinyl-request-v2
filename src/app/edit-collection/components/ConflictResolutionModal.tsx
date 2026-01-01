@@ -10,7 +10,6 @@ import {
   applyResolution,
   getRejectedValue,
   getFieldDisplayName,
-  formatValueForDisplay,
   canMergeField,
 } from '../../../lib/conflictDetection';
 import styles from '../EditCollection.module.css';
@@ -75,8 +74,11 @@ export default function ConflictResolutionModal({
     return initial;
   });
 
-  // Track which albums are collapsed
+  // Track which conflicts are collapsed
   const [collapsed, setCollapsed] = useState<Set<number>>(new Set());
+
+  // Track expanded conflicts (to show full data)
+  const [expandedConflicts, setExpandedConflicts] = useState<Set<string>>(new Set());
 
   // Track which conflicts have been applied
   const [applied, setApplied] = useState<Set<string>>(new Set());
@@ -93,6 +95,166 @@ export default function ConflictResolutionModal({
       }
       return next;
     });
+  };
+
+  const toggleExpanded = (key: string) => {
+    setExpandedConflicts(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+
+  const renderValue = (value: unknown, conflictKey: string, isExpanded: boolean) => {
+    if (value === null || value === undefined) {
+      return <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>(empty)</span>;
+    }
+
+    // Arrays
+    if (Array.isArray(value)) {
+      if (value.length === 0) {
+        return <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>(empty array)</span>;
+      }
+
+      // String arrays
+      if (typeof value[0] === 'string') {
+        if (isExpanded || value.length <= 3) {
+          return (
+            <div>
+              {value.map((item, idx) => (
+                <div key={idx} style={{ marginLeft: '8px' }}>• {item}</div>
+              ))}
+            </div>
+          );
+        }
+        return (
+          <div>
+            <div>{value.slice(0, 2).join(', ')}...</div>
+            <button
+              onClick={() => toggleExpanded(conflictKey)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#4FC3F7',
+                cursor: 'pointer',
+                fontSize: '12px',
+                padding: '4px 0',
+                textDecoration: 'underline',
+              }}
+            >
+              Show all {value.length} items
+            </button>
+          </div>
+        );
+      }
+
+      // Object arrays (like tracks)
+      if (typeof value[0] === 'object') {
+        if (isExpanded) {
+          return (
+            <div style={{ maxHeight: '300px', overflow: 'auto', border: '1px solid #e5e7eb', padding: '8px', borderRadius: '4px', fontSize: '12px' }}>
+              {value.map((item, idx) => (
+                <div key={idx} style={{ marginBottom: '4px', paddingBottom: '4px', borderBottom: '1px solid #f3f4f6' }}>
+                  {JSON.stringify(item, null, 2)}
+                </div>
+              ))}
+              <button
+                onClick={() => toggleExpanded(conflictKey)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#4FC3F7',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  padding: '4px 0',
+                  marginTop: '4px',
+                  textDecoration: 'underline',
+                }}
+              >
+                Collapse
+              </button>
+            </div>
+          );
+        }
+        return (
+          <div>
+            <div>[{value.length} items]</div>
+            <button
+              onClick={() => toggleExpanded(conflictKey)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#4FC3F7',
+                cursor: 'pointer',
+                fontSize: '12px',
+                padding: '4px 0',
+                textDecoration: 'underline',
+              }}
+            >
+              Show details
+            </button>
+          </div>
+        );
+      }
+    }
+
+    // Objects
+    if (typeof value === 'object') {
+      if (isExpanded) {
+        return (
+          <div style={{ maxHeight: '200px', overflow: 'auto', border: '1px solid #e5e7eb', padding: '8px', borderRadius: '4px' }}>
+            <pre style={{ margin: 0, fontSize: '12px', whiteSpace: 'pre-wrap' }}>
+              {JSON.stringify(value, null, 2)}
+            </pre>
+            <button
+              onClick={() => toggleExpanded(conflictKey)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#4FC3F7',
+                cursor: 'pointer',
+                fontSize: '12px',
+                padding: '4px 0',
+                marginTop: '4px',
+                textDecoration: 'underline',
+              }}
+            >
+              Collapse
+            </button>
+          </div>
+        );
+      }
+      return (
+        <div>
+          <div>[Object with {Object.keys(value).length} properties]</div>
+          <button
+            onClick={() => toggleExpanded(conflictKey)}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#4FC3F7',
+              cursor: 'pointer',
+              fontSize: '12px',
+              padding: '4px 0',
+              textDecoration: 'underline',
+            }}
+          >
+            Show details
+          </button>
+        </div>
+      );
+    }
+
+    // Primitives
+    if (typeof value === 'boolean') {
+      return <span>{value ? 'Yes' : 'No'}</span>;
+    }
+
+    return <span>{String(value)}</span>;
   };
 
   const updateResolution = (albumId: number, fieldName: string, resolution: ResolutionStrategy) => {
@@ -316,18 +478,18 @@ export default function ConflictResolutionModal({
                             )}
                           </div>
                           
-                          <div style={{ fontSize: '13px', marginBottom: '4px' }}>
-                            <span style={{ color: '#6b7280', fontWeight: 600 }}>Current DB:</span>{' '}
-                            <span style={{ color: '#111827' }}>
-                              {formatValueForDisplay(conflict.current_value)}
-                            </span>
+                          <div style={{ fontSize: '13px', marginBottom: '8px' }}>
+                            <div style={{ color: '#6b7280', fontWeight: 600, marginBottom: '4px' }}>Current DB:</div>
+                            <div style={{ color: '#111827', marginLeft: '8px' }}>
+                              {renderValue(conflict.current_value, `${key}-current`, expandedConflicts.has(`${key}-current`))}
+                            </div>
                           </div>
                           
                           <div style={{ fontSize: '13px', marginBottom: '12px' }}>
-                            <span style={{ color: '#6b7280', fontWeight: 600 }}>New {source.toUpperCase()}:</span>{' '}
-                            <span style={{ color: '#111827' }}>
-                              {formatValueForDisplay(conflict.new_value)}
-                            </span>
+                            <div style={{ color: '#6b7280', fontWeight: 600, marginBottom: '4px' }}>New {source.toUpperCase()}:</div>
+                            <div style={{ color: '#111827', marginLeft: '8px' }}>
+                              {renderValue(conflict.new_value, `${key}-new`, expandedConflicts.has(`${key}-new`))}
+                            </div>
                           </div>
 
                           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
