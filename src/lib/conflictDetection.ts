@@ -76,6 +76,34 @@ export const CONFLICTABLE_FIELDS = [
 ] as const;
 
 /**
+ * Track type definition
+ */
+export interface Track {
+  id?: string;
+  position: string;
+  title: string;
+  artist?: string | null;
+  duration?: string;
+  disc_number?: number;
+  side?: string | null;
+  type?: string;
+  lyrics_url?: string;
+  lyrics?: string;
+  lyrics_source?: string;
+}
+
+/**
+ * Track difference for comparison display
+ */
+export interface TrackDiff {
+  position: string;
+  status: 'same' | 'changed' | 'added' | 'removed';
+  current?: Track;
+  new?: Track;
+  changes?: string[];
+}
+
+/**
  * Field conflict detected during import
  */
 export interface FieldConflict {
@@ -253,6 +281,165 @@ export function detectConflicts(
 }
 
 /**
+ * Smart track merging - preserves enriched data from current DB
+ * Merges by position, keeping lyrics and other enrichment
+ */
+export function smartMergeTracks(
+  currentTracks: Track[] | null,
+  newTracks: Track[] | null
+): Track[] {
+  if (!currentTracks && !newTracks) return [];
+  if (!currentTracks) return newTracks || [];
+  if (!newTracks) return currentTracks;
+  
+  // Build map of current tracks by position for quick lookup
+  const currentMap = new Map<string, Track>();
+  currentTracks.forEach(track => {
+    currentMap.set(track.position, track);
+  });
+  
+  // Start with all new tracks as base
+  const merged: Track[] = [];
+  
+  newTracks.forEach(newTrack => {
+    const currentTrack = currentMap.get(newTrack.position);
+    
+    if (currentTrack) {
+      // Track exists in both - merge keeping enriched data
+      merged.push({
+        ...newTrack,
+        // Preserve enriched data from current DB
+        id: currentTrack.id || newTrack.id,
+        lyrics_url: currentTrack.lyrics_url || newTrack.lyrics_url,
+        lyrics: currentTrack.lyrics || newTrack.lyrics,
+        lyrics_source: currentTrack.lyrics_source || newTrack.lyrics_source,
+        // Use new track data for basic info
+        title: newTrack.title,
+        artist: newTrack.artist || currentTrack.artist,
+        duration: newTrack.duration || currentTrack.duration,
+      });
+      
+      // Remove from current map since we've processed it
+      currentMap.delete(newTrack.position);
+    } else {
+      // New track that doesn't exist in current
+      merged.push(newTrack);
+    }
+  });
+  
+  // Add any remaining current tracks that weren't in new tracks
+  // (This handles cases where new import is missing some tracks)
+  currentMap.forEach(track => {
+    merged.push(track);
+  });
+  
+  // Sort by position
+  merged.sort((a, b) => {
+    // Try numeric sort first
+    const aNum = parseInt(a.position);
+    const bNum = parseInt(b.position);
+    
+    if (!isNaN(aNum) && !isNaN(bNum)) {
+      return aNum - bNum;
+    }
+    
+    // Fall back to string sort
+    return a.position.localeCompare(b.position);
+  });
+  
+  return merged;
+}
+
+/**
+ * Compare two track arrays and return differences
+ * Used for visual diff display
+ */
+export function compareTrackArrays(
+  currentTracks: Track[],
+  newTracks: Track[]
+): TrackDiff[] {
+  const diffs: TrackDiff[] = [];
+  
+  // Build maps for quick lookup
+  const currentMap = new Map<string, Track>();
+  const newMap = new Map<string, Track>();
+  
+  currentTracks.forEach(track => currentMap.set(track.position, track));
+  newTracks.forEach(track => newMap.set(track.position, track));
+  
+  // Get all positions from both arrays
+  const allPositions = new Set([
+    ...currentTracks.map(t => t.position),
+    ...newTracks.map(t => t.position)
+  ]);
+  
+  // Sort positions
+  const sortedPositions = Array.from(allPositions).sort((a, b) => {
+    const aNum = parseInt(a);
+    const bNum = parseInt(b);
+    
+    if (!isNaN(aNum) && !isNaN(bNum)) {
+      return aNum - bNum;
+    }
+    
+    return a.localeCompare(b);
+  });
+  
+  sortedPositions.forEach(position => {
+    const current = currentMap.get(position);
+    const newTrack = newMap.get(position);
+    
+    if (!current && newTrack) {
+      // Added track
+      diffs.push({
+        position,
+        status: 'added',
+        new: newTrack,
+      });
+    } else if (current && !newTrack) {
+      // Removed track
+      diffs.push({
+        position,
+        status: 'removed',
+        current,
+      });
+    } else if (current && newTrack) {
+      // Check if changed
+      const changes: string[] = [];
+      
+      if (current.title !== newTrack.title) {
+        changes.push('title');
+      }
+      if (current.artist !== newTrack.artist) {
+        changes.push('artist');
+      }
+      if (current.duration !== newTrack.duration) {
+        changes.push('duration');
+      }
+      
+      if (changes.length > 0) {
+        diffs.push({
+          position,
+          status: 'changed',
+          current,
+          new: newTrack,
+          changes,
+        });
+      } else {
+        diffs.push({
+          position,
+          status: 'same',
+          current,
+          new: newTrack,
+        });
+      }
+    }
+  });
+  
+  return diffs;
+}
+
+/**
  * Merge two arrays - combines both and removes duplicates
  * Preserves order from new array, then adds unique items from current
  */
@@ -286,11 +473,16 @@ export function applyResolution(
       return newValue;
     
     case 'merge':
-      // Only works for arrays
+      // String arrays - merge
       if (Array.isArray(currentValue) && Array.isArray(newValue)) {
-        return mergeArrays(currentValue, newValue);
+        // Check if string array
+        if (currentValue.length > 0 && typeof currentValue[0] === 'string') {
+          return mergeArrays(currentValue as string[], newValue as string[]);
+        }
       }
-      // Fallback to new value if not arrays
+      
+      // For tracks, this should use smartMergeTracks (handled in modal)
+      // Fallback to new value
       return newValue;
     
     default:
