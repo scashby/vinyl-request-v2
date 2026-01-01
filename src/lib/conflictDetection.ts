@@ -233,6 +233,47 @@ function isEqual(a: unknown, b: unknown): boolean {
 }
 
 /**
+ * Normalize track for comparison - removes DB metadata fields and normalizes types
+ * Includes only the fields that should be compared for equality
+ */
+function normalizeTrack(track: unknown): Record<string, unknown> {
+  if (!track || typeof track !== 'object') return {};
+  
+  const t = track as Record<string, unknown>;
+  
+  return {
+    position: String(t.position || ''),
+    title: String(t.title || ''),
+    artist: t.artist ? String(t.artist) : undefined,
+    duration: t.duration ? String(t.duration) : undefined,
+    disc_number: t.disc_number ? Number(t.disc_number) : undefined
+  };
+}
+
+/**
+ * Compare track arrays ignoring database metadata
+ */
+function areTracksEqual(current: unknown, incoming: unknown): boolean {
+  if (!Array.isArray(current) || !Array.isArray(incoming)) {
+    return isEqual(current, incoming);
+  }
+  
+  if (current.length !== incoming.length) return false;
+  
+  // Normalize and compare each track
+  for (let i = 0; i < current.length; i++) {
+    const normalizedCurrent = normalizeTrack(current[i]);
+    const normalizedIncoming = normalizeTrack(incoming[i]);
+    
+    if (!isEqual(normalizedCurrent, normalizedIncoming)) {
+      return false;
+    }
+  }
+  
+  return true;
+}
+
+/**
  * Build update object for identifying fields
  * Only updates fields that are NULL/undefined in existing album
  */
@@ -285,39 +326,45 @@ export function detectConflicts(
     // Case 1: Both have values and they differ
     if (
       existingValue !== null && existingValue !== undefined &&
-      newValue !== null && newValue !== undefined &&
-      !isEqual(existingValue, newValue)
+      newValue !== null && newValue !== undefined
     ) {
-      // Check if we already resolved this exact conflict
-      const previousResolution = resolutionMap.get(field);
+      // Use smart comparison for tracks
+      const valuesAreDifferent = field === 'tracks' 
+        ? !areTracksEqual(existingValue, newValue)
+        : !isEqual(existingValue, newValue);
       
-      if (previousResolution) {
-        // Check if it's the EXACT same conflict (same values)
-        const sameKept = isEqual(previousResolution.kept_value, existingValue);
-        const sameRejected = isEqual(previousResolution.rejected_value, newValue);
+      if (valuesAreDifferent) {
+        // Check if we already resolved this exact conflict
+        const previousResolution = resolutionMap.get(field);
         
-        if (sameKept && sameRejected) {
-          // Already decided on this exact conflict - skip
-          continue;
+        if (previousResolution) {
+          // Check if it's the EXACT same conflict (same values)
+          const sameKept = isEqual(previousResolution.kept_value, existingValue);
+          const sameRejected = isEqual(previousResolution.rejected_value, newValue);
+          
+          if (sameKept && sameRejected) {
+            // Already decided on this exact conflict - skip
+            continue;
+          }
+          // Different values than before - need new decision
         }
-        // Different values than before - need new decision
+        
+        // New conflict - queue it
+        conflicts.push({
+          album_id: existingAlbum.id as number,
+          field_name: field,
+          current_value: existingValue,
+          new_value: newValue,
+          artist: existingAlbum.artist as string,
+          title: existingAlbum.title as string,
+          format: existingAlbum.format as string,
+          cat_no: existingAlbum.cat_no as string | null,
+          barcode: existingAlbum.barcode as string | null,
+          country: existingAlbum.country as string | null,
+          year: existingAlbum.year as string | null,
+          labels: (existingAlbum.labels as string[]) || [],
+        });
       }
-      
-      // New conflict - queue it
-      conflicts.push({
-        album_id: existingAlbum.id as number,
-        field_name: field,
-        current_value: existingValue,
-        new_value: newValue,
-        artist: existingAlbum.artist as string,
-        title: existingAlbum.title as string,
-        format: existingAlbum.format as string,
-        cat_no: existingAlbum.cat_no as string | null,
-        barcode: existingAlbum.barcode as string | null,
-        country: existingAlbum.country as string | null,
-        year: existingAlbum.year as string | null,
-        labels: (existingAlbum.labels as string[]) || [],
-      });
     } 
     // Case 2: Existing is null, new has value - safe to update
     else if (

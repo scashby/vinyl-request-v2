@@ -5,8 +5,9 @@ import { parseStringPromise } from 'xml2js';
 interface CLZTrack {
   position: string;
   title: string;
-  duration?: number; // in seconds
+  duration?: string; // Formatted as MM:SS or HH:MM:SS to match database
   artist?: string;
+  disc_number?: number; // Added to match database schema
 }
 
 interface CLZDisc {
@@ -91,6 +92,22 @@ function timestampToDate(timestamp: string | number | undefined): Date | undefin
   const ts = typeof timestamp === 'string' ? parseInt(timestamp, 10) : timestamp;
   if (isNaN(ts)) return undefined;
   return new Date(ts * 1000); // Unix timestamp is in seconds
+}
+
+/**
+ * Convert seconds to MM:SS or HH:MM:SS format to match database
+ */
+function formatDuration(seconds: number | undefined): string | undefined {
+  if (seconds === undefined || seconds === null || isNaN(seconds)) return undefined;
+  
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  }
+  return `${minutes}:${String(secs).padStart(2, '0')}`;
 }
 
 /**
@@ -245,12 +262,12 @@ function parseTracks(tracksNode: unknown): CLZTrack[] {
     }
     
     const length = getTextValue(trackObj.length);
-    const duration = length ? parseInt(length, 10) : undefined;
+    const durationSeconds = length ? parseInt(length, 10) : undefined;
     
     return {
       position: getTextValue(trackObj.position) || '',
       title: getTextValue(trackObj.title) || 'Unknown Track',
-      duration: duration && !isNaN(duration) ? duration : undefined,
+      duration: formatDuration(durationSeconds),
       artist: trackArtist
     };
   });
@@ -282,13 +299,20 @@ function parseDiscs(discsNode: unknown): { tracks: CLZTrack[]; disc_metadata: CL
     const discNumber = idx + 1;
     
     const discTracks = parseTracks(discObj.tracks);
+    
+    // Add disc_number to each track to match database schema
+    const tracksWithDisc = discTracks.map(track => ({
+      ...track,
+      disc_number: discNumber
+    }));
+    
     discMetadata.push({
       disc_number: discNumber,
       track_count: discTracks.length,
       tracks: discTracks
     });
     
-    allTracks.push(...discTracks);
+    allTracks.push(...tracksWithDisc);
   });
   
   return {
