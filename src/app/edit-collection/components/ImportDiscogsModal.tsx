@@ -644,21 +644,21 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
 
             // Enrich from Discogs if needed
             if (album.status === 'NEW' || 
-                (syncMode === 'full_sync' && album.missingFields.length > 0) ||
+                syncMode === 'full_sync' ||  // Full sync re-scrapes EVERYTHING
                 (syncMode === 'partial_sync' && album.needsEnrichment)) {
               
               const enrichedData = await enrichFromDiscogs(album.discogs_release_id);
               
-              // For full_sync, only add missing fields
-              if (syncMode === 'full_sync') {
+              // For full_sync and new albums, use ALL enriched data (overwrite everything)
+              if (syncMode === 'full_sync' || album.status === 'NEW') {
+                Object.assign(albumData, enrichedData);
+              } else {
+                // For partial_sync, only add missing fields
                 album.missingFields.forEach(field => {
                   if (enrichedData[field]) {
                     albumData[field] = enrichedData[field];
                   }
                 });
-              } else {
-                // For other modes, add all enriched data
-                Object.assign(albumData, enrichedData);
               }
             }
 
