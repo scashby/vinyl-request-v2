@@ -387,26 +387,32 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
       const isHeader = track.type_ === 'heading';
 
       // Check if this is a disc header/title
-      if (isHeader && discNumber !== currentDiscNumber) {
-        currentDiscNumber = discNumber;
-        currentDiscTitle = track.title || null;
-        
-        // Add to disc metadata
-        const existingDisc = discMetadata.find(d => d.disc_number === discNumber);
-        if (!existingDisc) {
-          discMetadata.push({
-            disc_number: discNumber,
-            title: currentDiscTitle,
-          });
+      if (isHeader) {
+        // Only update disc metadata for new discs
+        if (discNumber !== currentDiscNumber) {
+          currentDiscNumber = discNumber;
+          currentDiscTitle = track.title || null;
+          
+          const existingDisc = discMetadata.find(d => d.disc_number === discNumber);
+          if (!existingDisc) {
+            discMetadata.push({
+              disc_number: discNumber,
+              title: currentDiscTitle,
+            });
+          }
         }
+        
+        // Skip adding this to tracks - it's not a music track
+        return;
       }
 
+      // Only real music tracks get added to tracks array
       tracks.push({
         position: trackPosition.toString(),
         title: track.title || '',
         artist: track.artists?.[0]?.name || null,
         duration: track.duration || null,
-        type: isHeader ? 'header' : 'track',
+        type: 'track',
         disc_number: discNumber,
         side: side || undefined,
       });

@@ -233,6 +233,16 @@ function isEqual(a: unknown, b: unknown): boolean {
 }
 
 /**
+ * Normalize empty values - treat null, undefined, [], "", "0:00" as equivalent
+ */
+function normalizeEmptyValue(value: unknown): unknown | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'string' && (value.trim() === '' || value === '0:00')) return null;
+  if (Array.isArray(value) && value.length === 0) return null;
+  return value;
+}
+
+/**
  * Normalize track for comparison by order
  * Does NOT compare position since CLZ numbers sequentially (1,2,3...) 
  * while Discogs uses vinyl sides (A1,A2,B1,B2...)
@@ -247,10 +257,17 @@ function normalizeTrack(track: unknown): Record<string, unknown> {
     return { _skip: true };
   }
   
+  // Normalize duration - treat missing, "0:00", empty as equivalent
+  let normalizedDuration: string | undefined;
+  if (t.duration) {
+    const dur = String(t.duration).trim();
+    normalizedDuration = (dur === '' || dur === '0:00') ? undefined : dur;
+  }
+  
   return {
     title: String(t.title || '').trim(),
     artist: t.artist ? String(t.artist).trim() : undefined,
-    duration: t.duration ? String(t.duration) : undefined
+    duration: normalizedDuration
     // Explicitly ignore: position, side, disc_number, type, id, album_id, created_at, lyrics
     // We match by ORDER in array, not by position number
   };
@@ -325,6 +342,22 @@ function areTracksEqual(current: unknown, incoming: unknown): boolean {
     delete curr._skip;
     delete inc._skip;
     
+    // Special handling for duration: if one is empty/missing and other has value, they match
+    // This prevents conflicts when CLZ has "0:00" but database has real durations
+    if (curr.duration !== inc.duration) {
+      const currHasDuration = curr.duration && curr.duration !== undefined;
+      const incHasDuration = inc.duration && inc.duration !== undefined;
+      
+      if (currHasDuration && !incHasDuration) {
+        // Database has duration, CLZ doesn't → match (keep database)
+        inc.duration = curr.duration;
+      } else if (!currHasDuration && incHasDuration) {
+        // CLZ has duration, database doesn't → match (take CLZ)
+        curr.duration = inc.duration;
+      }
+      // If both have different durations → will fail equality check below
+    }
+    
     if (!isEqual(curr, inc)) {
       return false;
     }
@@ -383,21 +416,36 @@ export function detectConflicts(
     const existingValue = existingAlbum[field];
     const newValue = importedData[field];
     
-    // Case 1: Both have values and they differ
-    if (
-      existingValue !== null && existingValue !== undefined &&
-      newValue !== null && newValue !== undefined
-    ) {
-      // Use smart comparison for tracks and disc_metadata
-      let valuesAreDifferent = false;
-      
-      if (field === 'tracks') {
-        valuesAreDifferent = !areTracksEqual(existingValue, newValue);
-      } else if (field === 'disc_metadata') {
-        valuesAreDifferent = !areDiscMetadataEqual(existingValue, newValue);
-      } else {
-        valuesAreDifferent = !isEqual(existingValue, newValue);
-      }
+    // Normalize empty values for comparison
+    const normalizedExisting = normalizeEmptyValue(existingValue);
+    const normalizedNew = normalizeEmptyValue(newValue);
+    
+    // Case 1: Both empty - skip
+    if (normalizedExisting === null && normalizedNew === null) {
+      continue;
+    }
+    
+    // Case 2: Current empty, new has value - SAFE UPDATE
+    if (normalizedExisting === null && normalizedNew !== null) {
+      safeUpdates[field] = newValue;
+      continue;
+    }
+    
+    // Case 3: Current has value, new empty - KEEP CURRENT
+    if (normalizedExisting !== null && normalizedNew === null) {
+      continue;
+    }
+    
+    // Case 4: Both have values - check if different
+    let valuesAreDifferent = false;
+    
+    if (field === 'tracks') {
+      valuesAreDifferent = !areTracksEqual(existingValue, newValue);
+    } else if (field === 'disc_metadata') {
+      valuesAreDifferent = !areDiscMetadataEqual(existingValue, newValue);
+    } else {
+      valuesAreDifferent = !isEqual(existingValue, newValue);
+    }
       
       if (valuesAreDifferent) {
         // Check if we already resolved this exact conflict
@@ -431,16 +479,6 @@ export function detectConflicts(
           labels: (existingAlbum.labels as string[]) || [],
         });
       }
-    } 
-    // Case 2: Existing is null, new has value - safe to update
-    else if (
-      (existingValue === null || existingValue === undefined) &&
-      (newValue !== null && newValue !== undefined)
-    ) {
-      safeUpdates[field] = newValue;
-    }
-    // Case 3: New is null - keep existing (no action)
-    // Case 4: Both null - no action
   }
   
   return { safeUpdates, conflicts };
