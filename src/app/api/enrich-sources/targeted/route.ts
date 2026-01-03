@@ -13,7 +13,7 @@ import {
   enrichGenius,
   enrichDiscogsMetadata,
   enrichDiscogsTracklist
-} from '@/lib/enrichment-utils';
+} from 'lib/enrichment-utils';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,

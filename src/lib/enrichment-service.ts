@@ -20,7 +20,7 @@ const supabase = createClient(
 // VALIDATION HELPERS
 // ============================================================================
 
-function isValidDiscogsId(value: any): boolean {
+function isValidDiscogsId(value: unknown): boolean {
   if (!value) return false;
   const str = String(value);
   return str !== 'null' && str !== 'undefined' && str !== '0' && str.trim() !== '';
@@ -83,9 +83,9 @@ async function searchMusicBrainz(artist: string, title: string): Promise<string 
   const data = await response.json();
   if (data.releases && data.releases.length > 0) {
     // Prefer official releases
-    const official = data.releases.find((r: any) => 
+    const official = data.releases.find((r: Record<string, unknown>) => 
       r.status === 'Official' && 
-      r['release-group']?.['primary-type'] === 'Album'
+      (r['release-group'] as Record<string, unknown>)?.['primary-type'] === 'Album'
     );
     return official?.id || data.releases[0].id;
   }
@@ -181,7 +181,7 @@ export async function enrichMusicBrainz(albumId: number, artist: string, title: 
     }
 
     // Build update object
-    const updateData: any = {
+    const updateData: Record<string, unknown> = {
       musicbrainz_id: mbid,
       musicbrainz_url: `https://musicbrainz.org/release/${mbid}`,
     };
@@ -228,9 +228,8 @@ export async function enrichMusicBrainz(albumId: number, artist: string, title: 
 // ============================================================================
 
 const DISCOGS_TOKEN = process.env.DISCOGS_ACCESS_TOKEN!;
-const DISCOGS_RATE_LIMIT = 1000;
 
-async function searchDiscogs(artist: string, title: string): Promise<any> {
+async function searchDiscogs(artist: string, title: string): Promise<Record<string, unknown>> {
   const query = `${artist} ${title}`;
   const url = `https://api.discogs.com/database/search?q=${encodeURIComponent(query)}&type=release&token=${DISCOGS_TOKEN}`;
 
@@ -241,7 +240,7 @@ async function searchDiscogs(artist: string, title: string): Promise<any> {
   return data.results?.[0] || null;
 }
 
-async function getDiscogsRelease(releaseId: string): Promise<any> {
+async function getDiscogsRelease(releaseId: string): Promise<Record<string, unknown> | null> {
   const url = `https://api.discogs.com/releases/${releaseId}?token=${DISCOGS_TOKEN}`;
   const response = await fetch(url);
   if (!response.ok) return null;
@@ -290,22 +289,22 @@ export async function enrichDiscogsMetadata(albumId: number, artist: string, tit
     }
 
     // Build tracks array
-    const tracks = release.tracklist?.map((track: any, index: number) => ({
-      position: track.position || String(index + 1),
-      title: track.title,
-      duration: track.duration || '',
-      artist: track.artists?.[0]?.name || artist,
-      type_: track.type_ || 'track',
+    const tracks = (release.tracklist as Array<Record<string, unknown>> | undefined)?.map((track: Record<string, unknown>, index: number) => ({
+      position: (track.position as string) || String(index + 1),
+      title: track.title as string,
+      duration: (track.duration as string) || '',
+      artist: ((track.artists as Array<{ name: string }>)?.[0]?.name) || artist,
+      type_: (track.type_ as string) || 'track',
     })) || [];
 
     // Build update
-    const updateData: any = {
+    const updateData: Record<string, unknown> = {
       discogs_release_id: String(releaseId),
       discogs_master_id: release.master_id ? String(release.master_id) : null,
-      image_url: release.images?.[0]?.uri || existing?.image_url,
-      back_image_url: release.images?.[1]?.uri || null,
-      discogs_genres: release.genres || [],
-      discogs_styles: release.styles || [],
+      image_url: ((release.images as Array<{ uri: string }> | undefined)?.[0]?.uri) || existing?.image_url,
+      back_image_url: ((release.images as Array<{ uri: string }> | undefined)?.[1]?.uri) || null,
+      discogs_genres: (release.genres as string[] | undefined) || [],
+      discogs_styles: (release.styles as string[] | undefined) || [],
       tracks: tracks,
     };
 
@@ -346,7 +345,7 @@ export async function enrichDiscogsTracklist(albumId: number): Promise<{
     }
 
     // Check if already has artist info
-    const hasArtists = album.tracks.every((t: any) => t.artist);
+    const hasArtists = album.tracks.every((t: Record<string, unknown>) => t.artist);
     if (hasArtists) {
       return { success: true, skipped: true };
     }
@@ -362,11 +361,11 @@ export async function enrichDiscogsTracklist(albumId: number): Promise<{
     }
 
     // Update tracks with artist info
-    const updatedTracks = album.tracks.map((track: any, index: number) => {
-      const discogsTrack = release.tracklist?.[index];
+    const updatedTracks = album.tracks.map((track: Record<string, unknown>, index: number) => {
+      const discogsTrack = (release.tracklist as Array<Record<string, unknown>> | undefined)?.[index];
       return {
         ...track,
-        artist: discogsTrack?.artists?.[0]?.name || track.artist || album.artist,
+        artist: ((discogsTrack?.artists as Array<{ name: string }>)?.[0]?.name) || (track.artist as string) || album.artist,
       };
     });
 
@@ -395,7 +394,6 @@ export async function enrichDiscogsTracklist(albumId: number): Promise<{
 
 const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID!;
 const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET!;
-const SPOTIFY_RATE_LIMIT = 300;
 
 let spotifyToken: { token: string; expires: number } | null = null;
 
@@ -497,7 +495,8 @@ async function getAppleMusicToken(): Promise<string> {
     return appleMusicToken.token;
   }
 
-  const jwt = require('jsonwebtoken');
+  // Use dynamic import for jsonwebtoken
+  const jwt = await import('jsonwebtoken');
   const token = jwt.sign({}, APPLE_MUSIC_KEY, {
     algorithm: 'ES256',
     expiresIn: '180d',
@@ -602,7 +601,7 @@ export async function enrichGenius(albumId: number, artist: string): Promise<{
     }
 
     // Check if already has lyrics URLs
-    const hasLyricsUrls = album.tracks.every((t: any) => 
+    const hasLyricsUrls = album.tracks.every((t: Record<string, unknown>) => 
       t.lyrics_url || t.type_ !== 'track'
     );
 
@@ -612,13 +611,13 @@ export async function enrichGenius(albumId: number, artist: string): Promise<{
 
     // Search for each track
     const updatedTracks = await Promise.all(
-      album.tracks.map(async (track: any) => {
+      album.tracks.map(async (track: Record<string, unknown>) => {
         if (track.lyrics_url || track.type_ !== 'track') {
           return track;
         }
 
         try {
-          const searches = await geniusClient.songs.search(`${artist} ${track.title}`);
+          const searches = await geniusClient.songs.search(`${artist} ${track.title as string}`);
           if (searches.length > 0) {
             return {
               ...track,
@@ -626,7 +625,7 @@ export async function enrichGenius(albumId: number, artist: string): Promise<{
             };
           }
         } catch (error) {
-          console.error(`Genius search failed for ${track.title}:`, error);
+          console.error(`Genius search failed for ${track.title as string}:`, error);
         }
 
         await new Promise(resolve => setTimeout(resolve, GENIUS_RATE_LIMIT));
@@ -679,7 +678,7 @@ export async function enrichAppleLyrics(albumId: number): Promise<{
     }
 
     // Check if already has lyrics
-    const hasLyrics = album.tracks.every((t: any) =>
+    const hasLyrics = album.tracks.every((t: Record<string, unknown>) =>
       (t.lyrics && t.lyrics_source === 'apple_music') || t.type_ !== 'track'
     );
 
@@ -704,15 +703,15 @@ export async function enrichAppleLyrics(albumId: number): Promise<{
 
     // Match and fetch lyrics
     const updatedTracks = await Promise.all(
-      album.tracks.map(async (track: any) => {
+      album.tracks.map(async (track: Record<string, unknown>) => {
         if ((track.lyrics && track.lyrics_source === 'apple_music') || track.type_ !== 'track') {
           return track;
         }
 
         // Find matching Apple track
-        const normalizedTitle = normalizeTitle(track.title);
-        const appleTrack = appleTracks.find((at: any) =>
-          normalizeTitle(at.attributes.name) === normalizedTitle
+        const normalizedTitle = normalizeTitle(track.title as string);
+        const appleTrack = appleTracks.find((at: Record<string, unknown>) =>
+          normalizeTitle((at.attributes as Record<string, unknown>).name as string) === normalizedTitle
         );
 
         if (!appleTrack?.attributes?.hasLyrics) {

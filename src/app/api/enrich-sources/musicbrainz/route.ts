@@ -54,9 +54,9 @@ async function searchMusicBrainz(artist: string, title: string): Promise<string 
 
   const data = await response.json();
   if (data.releases && data.releases.length > 0) {
-    const official = data.releases.find((r: any) => 
+    const official = data.releases.find((r: Record<string, unknown>) => 
       r.status === 'Official' && 
-      r['release-group']?.['primary-type'] === 'Album'
+      (r['release-group'] as Record<string, unknown>)?.['primary-type'] === 'Album'
     );
     const mbid = official?.id || data.releases[0].id;
     console.log(`  → Found MusicBrainz release: ${mbid}`);
@@ -106,7 +106,7 @@ export async function POST(req: Request) {
 
     const { data: album, error: dbError } = await supabase
       .from('collection')
-      .select('id, artist, title, musicbrainz_id, musicians, producers, engineers, songwriters, studio')
+      .select('id, artist, title, musicbrainz_id, musicians, producers, engineers, songwriters, studio, labels')
       .eq('id', albumId)
       .single();
 
@@ -214,7 +214,7 @@ export async function POST(req: Request) {
     console.log(`✓ Found ${musiciansSet.size} musicians, ${producersSet.size} producers, ${engineersSet.size} engineers, ${songwritersSet.size} songwriters`);
 
     // Build update object
-    const updateData: any = {
+    const updateData: Record<string, unknown> = {
       musicbrainz_id: mbid,
       musicbrainz_url: `https://musicbrainz.org/release/${mbid}`,
     };
@@ -276,11 +276,11 @@ export async function POST(req: Request) {
         title: album.title,
         musicbrainz_id: mbid,
         musicbrainz_url: updateData.musicbrainz_url,
-        musicians: updateData.musicians?.length || 0,
-        producers: updateData.producers?.length || 0,
-        engineers: updateData.engineers?.length || 0,
-        songwriters: updateData.songwriters?.length || 0,
-        label: updateData.labels?.[0],
+        musicians: (updateData.musicians as unknown[] | undefined)?.length || 0,
+        producers: (updateData.producers as unknown[] | undefined)?.length || 0,
+        engineers: (updateData.engineers as unknown[] | undefined)?.length || 0,
+        songwriters: (updateData.songwriters as unknown[] | undefined)?.length || 0,
+        label: (updateData.labels as string[] | undefined)?.[0],
         catalog_number: updateData.cat_no,
         recording_date: updateData.recording_date,
         country: updateData.country

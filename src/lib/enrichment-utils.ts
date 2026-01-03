@@ -681,17 +681,68 @@ export async function enrichAcousticBrainz(albumId: number): Promise<EnrichmentR
 }
 
 // ============================================================================
-// 9. EXISTING SERVICES (STUB EXPORTS FOR BATCH/TARGETED)
+// 9. EXISTING SERVICES (CALL EXISTING ROUTES - FIXED SIGNATURES)
 // ============================================================================
 
-export async function enrichGenius(): Promise<EnrichmentResult> {
-  return { success: false, error: 'Use existing Genius route' };
+export async function enrichGenius(albumId: number): Promise<EnrichmentResult> {
+  try {
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 
+                    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+    
+    const res = await fetch(`${baseUrl}/api/enrich-sources/genius`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ albumId })
+    });
+
+    if (!res.ok) {
+      return { success: false, error: `HTTP ${res.status}` };
+    }
+
+    return await res.json();
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown' };
+  }
 }
 
-export async function enrichDiscogsMetadata(): Promise<EnrichmentResult> {
-  return { success: false, error: 'Use existing Discogs route' };
+export async function enrichDiscogsMetadata(albumId: number): Promise<EnrichmentResult> {
+  try {
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 
+                    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+    
+    const res = await fetch(`${baseUrl}/api/enrich-sources/discogs-metadata`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ albumId })
+    });
+
+    if (!res.ok) {
+      return { success: false, error: `HTTP ${res.status}` };
+    }
+
+    return await res.json();
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown' };
+  }
 }
 
-export async function enrichDiscogsTracklist(): Promise<EnrichmentResult> {
-  return { success: false, error: 'Use existing Discogs route' };
+export async function enrichDiscogsTracklist(albumId: number): Promise<EnrichmentResult> {
+  try {
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 
+                    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+    
+    const res = await fetch(`${baseUrl}/api/enrich-sources/discogs-tracklist`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ albumId })
+    });
+
+    if (!res.ok) {
+      return { success: false, error: `HTTP ${res.status}` };
+    }
+
+    return await res.json();
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown' };
+  }
 }

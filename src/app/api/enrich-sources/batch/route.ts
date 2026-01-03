@@ -48,28 +48,6 @@ type AlbumResult = {
   genius?: ServiceResult;
 };
 
-async function callService(endpoint: string, albumId: number) {
-  try {
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 
-                    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
-    
-    const res = await fetch(`${baseUrl}/api/enrich-sources/${endpoint}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ albumId })
-    });
-
-    if (!res.ok) {
-      const text = await res.text();
-      return { success: false, error: `HTTP ${res.status}: ${text.substring(0, 100)}` };
-    }
-
-    return await res.json();
-  } catch (error) {
-    return { success: false, error: error instanceof Error ? error.message : 'Unknown' };
-  }
-}
-
 function needsMusicBrainz(album: Record<string, unknown>): boolean {
   const musicians = album.musicians as unknown[] | undefined;
   const producers = album.producers as unknown[] | undefined;
