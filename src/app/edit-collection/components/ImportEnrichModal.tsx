@@ -1,8 +1,15 @@
-// src/app/edit-collection/components/ImportEnrichModal.tsx
+// src/app/edit-collection/components/ImportEnrichModal.tsx - DATA-FOCUSED REDESIGN
 'use client';
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
+import { 
+  DataCategory, 
+  DATA_CATEGORY_LABELS, 
+  DATA_CATEGORY_DESCRIPTIONS,
+  DATA_CATEGORY_ICONS,
+  dataCategoriesToServices 
+} from '../../../lib/enrichment-data-mapping';
 
 interface ImportEnrichModalProps {
   isOpen: boolean;
@@ -14,35 +21,53 @@ type EnrichmentStats = {
   total: number;
   needsEnrichment: number;
   fullyEnriched: number;
-  missingDiscogsId: number;
-  missingMasterId: number;
-  missingImage: number;
-  missingBackImage: number;
-  missingGenres: number;
-  missingTracklists: number;
+  
+  // Artwork
+  missingArtwork: number;
+  missingBackCover: number;
+  missingSpineCover: number;
+  missingInnerSleeves: number;
+  missingLabelImages: number;
+  
+  // Credits
+  missingCredits: number;
   missingMusicians: number;
   missingProducers: number;
-  missingSpotify: number;
-  missingApple: number;
-  missingLastFm: number;
-  missingAllMusic: number;
-  missingWikipedia: number;
+  missingEngineers: number;
+  missingSongwriters: number;
+  
+  // Tracklists
+  missingTracklists: number;
+  
+  // Audio Analysis
+  missingAudioAnalysis: number;
   missingTempo: number;
-  missingAudioFeatures: number;
-};
-
-type ServiceSelection = {
-  musicbrainz: boolean;
-  lastfm: boolean;
-  spotifyEnhanced: boolean;
-  appleMusicEnhanced: boolean;
-  allmusic: boolean;
-  wikipedia: boolean;
-  coverArtArchive: boolean;
-  acousticbrainz: boolean;
-  discogsMetadata: boolean;
-  discogsTracklist: boolean;
-  genius: boolean;
+  missingKey: number;
+  missingMoodData: number;
+  
+  // Genres
+  missingGenres: number;
+  
+  // Streaming Links
+  missingStreamingLinks: number;
+  missingSpotify: number;
+  missingAppleMusic: number;
+  missingLastFm: number;
+  
+  // Reviews
+  missingReviews: number;
+  missingRatings: number;
+  
+  // Chart Data
+  missingChartData: number;
+  
+  // Release Metadata
+  missingReleaseMetadata: number;
+  missingDiscogsIds: number;
+  missingLabels: number;
+  missingCatalogNumber: number;
+  missingBarcode: number;
+  missingCountry: number;
 };
 
 type Album = {
@@ -56,17 +81,7 @@ type AlbumResult = {
   albumId: number;
   artist: string;
   title: string;
-  musicbrainz?: { success: boolean; error?: string; skipped?: boolean };
-  lastfm?: { success: boolean; error?: string; skipped?: boolean };
-  spotifyEnhanced?: { success: boolean; error?: string; skipped?: boolean };
-  appleMusicEnhanced?: { success: boolean; error?: string; skipped?: boolean };
-  allmusic?: { success: boolean; error?: string; skipped?: boolean };
-  wikipedia?: { success: boolean; error?: string; skipped?: boolean };
-  coverArtArchive?: { success: boolean; error?: string; skipped?: boolean };
-  acousticbrainz?: { success: boolean; error?: string; skipped?: boolean };
-  discogsMetadata?: { success: boolean; error?: string; skipped?: boolean };
-  discogsTracklist?: { success: boolean; error?: string; skipped?: boolean };
-  genius?: { success: boolean; error?: string; skipped?: boolean };
+  [key: string]: unknown;
 };
 
 export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }: ImportEnrichModalProps) {
@@ -77,19 +92,16 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   const [status, setStatus] = useState('');
   const [folderFilter, setFolderFilter] = useState('');
   const [batchSize, setBatchSize] = useState('100');
-  const [services, setServices] = useState<ServiceSelection>({
-    musicbrainz: true,
-    lastfm: true,
-    spotifyEnhanced: true,
-    appleMusicEnhanced: true,
-    allmusic: true,
-    wikipedia: true,
-    coverArtArchive: true,
-    acousticbrainz: true,
-    discogsMetadata: true,
-    discogsTracklist: true,
-    genius: true,
-  });
+  
+  // Data category selections (what data to enrich)
+  const [selectedCategories, setSelectedCategories] = useState<Set<DataCategory>>(new Set([
+    'artwork',
+    'credits',
+    'tracklists',
+    'audio_analysis',
+    'genres',
+    'streaming_links',
+  ]));
   
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [categoryTitle, setCategoryTitle] = useState('');
@@ -145,16 +157,12 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   async function enrichCategory() {
     if (categoryAlbums.length === 0) return;
 
-    const serviceNames = Object.entries(services)
-      .filter(([, enabled]) => enabled)
-      .map(([key]) => key);
-
-    if (serviceNames.length === 0) {
-      alert('Please select at least one service');
+    if (selectedCategories.size === 0) {
+      alert('Please select at least one data category');
       return;
     }
 
-    if (!confirm(`Enrich ${categoryAlbums.length} albums?\n\nServices: ${serviceNames.join(', ')}\n\nThis may take several minutes.`)) {
+    if (!confirm(`Enrich ${categoryAlbums.length} albums with selected data?\n\nThis may take several minutes.`)) {
       return;
     }
 
@@ -163,6 +171,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
     try {
       const albumIds = categoryAlbums.map(a => a.id);
+      const services = dataCategoriesToServices(Array.from(selectedCategories));
+      
       const res = await fetch('/api/enrich-sources/targeted', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -183,34 +193,16 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   }
 
   async function startEnrichment() {
-    const selectedCount = Object.values(services).filter(Boolean).length;
-    if (selectedCount === 0) {
-      alert('Please select at least one service');
+    if (selectedCategories.size === 0) {
+      alert('Please select at least one data category');
       return;
     }
 
-    const serviceNames = Object.entries(services)
-      .filter(([, enabled]) => enabled)
-      .map(([key]) => {
-        const names: Record<string, string> = {
-          musicbrainz: 'MusicBrainz',
-          lastfm: 'Last.fm',
-          spotifyEnhanced: 'Spotify Enhanced',
-          appleMusicEnhanced: 'Apple Music Enhanced',
-          allmusic: 'AllMusic',
-          wikipedia: 'Wikipedia',
-          coverArtArchive: 'Cover Art Archive',
-          acousticbrainz: 'AcousticBrainz',
-          discogsMetadata: 'Discogs Metadata',
-          discogsTracklist: 'Discogs Tracklist',
-          genius: 'Genius',
-        };
-        return names[key] || key;
-      });
+    const categoryNames = Array.from(selectedCategories).map(c => DATA_CATEGORY_LABELS[c]);
 
     const message = folderFilter 
-      ? `Enrich albums in "${folderFilter}" with: ${serviceNames.join(', ')}?`
-      : `Enrich up to ${batchSize} albums with: ${serviceNames.join(', ')}?`;
+      ? `Enrich albums in "${folderFilter}" with: ${categoryNames.join(', ')}?`
+      : `Enrich up to ${batchSize} albums with: ${categoryNames.join(', ')}?`;
 
     if (!confirm(`${message}\n\nThis may take several minutes. Continue?`)) {
       return;
@@ -226,6 +218,9 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       const limit = batchSize === 'all' ? 10000 : parseInt(batchSize);
       const allResults: AlbumResult[] = [];
       let totalProcessed = 0;
+
+      // Convert data categories to service selections
+      const services = dataCategoriesToServices(Array.from(selectedCategories));
 
       while (totalProcessed < limit) {
         setStatus(`Processing batch from ID ${cursor}...`);
@@ -272,7 +267,83 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     }
   }
 
+  function toggleCategory(category: DataCategory) {
+    const newSet = new Set(selectedCategories);
+    if (newSet.has(category)) {
+      newSet.delete(category);
+    } else {
+      newSet.add(category);
+    }
+    setSelectedCategories(newSet);
+  }
+
   if (!isOpen) return null;
+
+  const dataCategories: { 
+    category: DataCategory; 
+    count: number; 
+    subcounts?: { label: string; count: number }[] 
+  }[] = stats ? [
+    { 
+      category: 'artwork', 
+      count: stats.missingArtwork,
+      subcounts: [
+        { label: 'Back covers', count: stats.missingBackCover },
+        { label: 'Spine images', count: stats.missingSpineCover },
+        { label: 'Inner sleeves', count: stats.missingInnerSleeves },
+        { label: 'Label images', count: stats.missingLabelImages },
+      ]
+    },
+    { 
+      category: 'credits', 
+      count: stats.missingCredits,
+      subcounts: [
+        { label: 'Musicians', count: stats.missingMusicians },
+        { label: 'Producers', count: stats.missingProducers },
+        { label: 'Engineers', count: stats.missingEngineers },
+        { label: 'Songwriters', count: stats.missingSongwriters },
+      ]
+    },
+    { category: 'tracklists', count: stats.missingTracklists },
+    { 
+      category: 'audio_analysis', 
+      count: stats.missingAudioAnalysis,
+      subcounts: [
+        { label: 'Tempo (BPM)', count: stats.missingTempo },
+        { label: 'Musical key', count: stats.missingKey },
+        { label: 'Mood data', count: stats.missingMoodData },
+      ]
+    },
+    { category: 'genres', count: stats.missingGenres },
+    { 
+      category: 'streaming_links', 
+      count: stats.missingStreamingLinks,
+      subcounts: [
+        { label: 'Spotify', count: stats.missingSpotify },
+        { label: 'Apple Music', count: stats.missingAppleMusic },
+        { label: 'Last.fm', count: stats.missingLastFm },
+      ]
+    },
+    { 
+      category: 'reviews', 
+      count: stats.missingReviews,
+      subcounts: [
+        { label: 'Ratings', count: stats.missingRatings },
+      ]
+    },
+    { category: 'chart_data', count: stats.missingChartData },
+    { 
+      category: 'release_metadata', 
+      count: stats.missingReleaseMetadata,
+      subcounts: [
+        { label: 'Discogs IDs', count: stats.missingDiscogsIds },
+        { label: 'Labels', count: stats.missingLabels },
+        { label: 'Catalog numbers', count: stats.missingCatalogNumber },
+        { label: 'Barcodes', count: stats.missingBarcode },
+        { label: 'Countries', count: stats.missingCountry },
+      ]
+    },
+  ] : [];
 
   return (
     <>
@@ -298,7 +369,6 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           flexDirection: 'column',
           overflow: 'hidden',
         }}>
-          {/* Header - matches Discogs import style */}
           <div style={{
             padding: '16px 20px',
             borderBottom: '1px solid #e5e7eb',
@@ -309,7 +379,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
             alignItems: 'center',
           }}>
             <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '600' }}>
-              ⚡ Multi-Source Enrichment (9 Services)
+              ⚡ Collection Data Enrichment
             </h2>
             <button
               onClick={onClose}
@@ -368,7 +438,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
                   </div>
                 </div>
 
-                {/* Service Selection */}
+                {/* Data Categories Selection */}
                 <div style={{
                   marginBottom: '20px',
                   padding: '16px',
@@ -376,80 +446,29 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
                   border: '1px solid #e5e7eb',
                   borderRadius: '6px',
                 }}>
-                  <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px', color: '#111827' }}>
-                    Select Services
+                  <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '8px', color: '#111827' }}>
+                    Select Data to Enrich
                   </h3>
+                  <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '16px', margin: '0 0 16px 0' }}>
+                    Choose which types of data you want to fetch for your albums. Multiple sources may be used for each category.
+                  </p>
+                  
                   <div style={{ 
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                    gap: '8px'
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+                    gap: '12px'
                   }}>
-                    <ServiceCheckbox 
-                      label="🎼 MusicBrainz" 
-                      checked={services.musicbrainz} 
-                      onChange={(c) => setServices(p => ({ ...p, musicbrainz: c }))} 
-                      disabled={enriching} 
-                    />
-                    <ServiceCheckbox 
-                      label="🎵 Last.fm" 
-                      checked={services.lastfm} 
-                      onChange={(c) => setServices(p => ({ ...p, lastfm: c }))} 
-                      disabled={enriching} 
-                    />
-                    <ServiceCheckbox 
-                      label="🎧 Spotify Enhanced" 
-                      checked={services.spotifyEnhanced} 
-                      onChange={(c) => setServices(p => ({ ...p, spotifyEnhanced: c }))} 
-                      disabled={enriching} 
-                    />
-                    <ServiceCheckbox 
-                      label="🍎 Apple Music Enhanced" 
-                      checked={services.appleMusicEnhanced} 
-                      onChange={(c) => setServices(p => ({ ...p, appleMusicEnhanced: c }))} 
-                      disabled={enriching} 
-                    />
-                    <ServiceCheckbox 
-                      label="📚 AllMusic" 
-                      checked={services.allmusic} 
-                      onChange={(c) => setServices(p => ({ ...p, allmusic: c }))} 
-                      disabled={enriching} 
-                    />
-                    <ServiceCheckbox 
-                      label="📖 Wikipedia" 
-                      checked={services.wikipedia} 
-                      onChange={(c) => setServices(p => ({ ...p, wikipedia: c }))} 
-                      disabled={enriching} 
-                    />
-                    <ServiceCheckbox 
-                      label="🖼️ Cover Art Archive" 
-                      checked={services.coverArtArchive} 
-                      onChange={(c) => setServices(p => ({ ...p, coverArtArchive: c }))} 
-                      disabled={enriching} 
-                    />
-                    <ServiceCheckbox 
-                      label="🎹 AcousticBrainz" 
-                      checked={services.acousticbrainz} 
-                      onChange={(c) => setServices(p => ({ ...p, acousticbrainz: c }))} 
-                      disabled={enriching} 
-                    />
-                    <ServiceCheckbox 
-                      label="💿 Discogs Metadata" 
-                      checked={services.discogsMetadata} 
-                      onChange={(c) => setServices(p => ({ ...p, discogsMetadata: c }))} 
-                      disabled={enriching} 
-                    />
-                    <ServiceCheckbox 
-                      label="💿 Discogs Tracklist" 
-                      checked={services.discogsTracklist} 
-                      onChange={(c) => setServices(p => ({ ...p, discogsTracklist: c }))} 
-                      disabled={enriching} 
-                    />
-                    <ServiceCheckbox 
-                      label="📝 Genius" 
-                      checked={services.genius} 
-                      onChange={(c) => setServices(p => ({ ...p, genius: c }))} 
-                      disabled={enriching} 
-                    />
+                    {dataCategories.map(({ category, count, subcounts }) => (
+                      <DataCategoryCard
+                        key={category}
+                        category={category}
+                        count={count}
+                        subcounts={subcounts}
+                        selected={selectedCategories.has(category)}
+                        onToggle={() => toggleCategory(category)}
+                        disabled={enriching}
+                      />
+                    ))}
                   </div>
                 </div>
 
@@ -599,18 +618,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
                           <div style={{ fontWeight: '600', marginBottom: '4px' }}>
                             {result.artist} - {result.title}
                           </div>
-                          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                            {result.musicbrainz && <ResultIcon result={result.musicbrainz} label="MB" />}
-                            {result.lastfm && <ResultIcon result={result.lastfm} label="LFM" />}
-                            {result.spotifyEnhanced && <ResultIcon result={result.spotifyEnhanced} label="SP" />}
-                            {result.appleMusicEnhanced && <ResultIcon result={result.appleMusicEnhanced} label="AM" />}
-                            {result.allmusic && <ResultIcon result={result.allmusic} label="AMG" />}
-                            {result.wikipedia && <ResultIcon result={result.wikipedia} label="WP" />}
-                            {result.coverArtArchive && <ResultIcon result={result.coverArtArchive} label="CAA" />}
-                            {result.acousticbrainz && <ResultIcon result={result.acousticbrainz} label="AB" />}
-                            {result.discogsMetadata && <ResultIcon result={result.discogsMetadata} label="DM" />}
-                            {result.discogsTracklist && <ResultIcon result={result.discogsTracklist} label="DT" />}
-                            {result.genius && <ResultIcon result={result.genius} label="GE" />}
+                          <div style={{ fontSize: '11px', color: '#6b7280' }}>
+                            Enriched with selected data sources
                           </div>
                         </div>
                       ))}
@@ -680,15 +689,15 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
               </button>
               <button 
                 onClick={startEnrichment} 
-                disabled={enriching || !stats || Object.values(services).every(v => !v)} 
+                disabled={enriching || !stats || selectedCategories.size === 0} 
                 style={{
                   padding: '8px 16px',
-                  backgroundColor: enriching || !stats || Object.values(services).every(v => !v) ? '#d1d5db' : '#f59e0b',
+                  backgroundColor: enriching || !stats || selectedCategories.size === 0 ? '#d1d5db' : '#f59e0b',
                   border: 'none',
                   borderRadius: '4px',
                   fontSize: '14px',
                   fontWeight: '600',
-                  cursor: enriching || !stats || Object.values(services).every(v => !v) ? 'not-allowed' : 'pointer',
+                  cursor: enriching || !stats || selectedCategories.size === 0 ? 'not-allowed' : 'pointer',
                   color: 'white',
                 }}
               >
@@ -754,15 +763,15 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
                 <div style={{ marginBottom: '16px' }}>
                   <button 
                     onClick={enrichCategory} 
-                    disabled={enrichingCategory} 
+                    disabled={enrichingCategory || selectedCategories.size === 0} 
                     style={{
                       padding: '10px 20px',
-                      backgroundColor: enrichingCategory ? '#d1d5db' : '#f59e0b',
+                      backgroundColor: enrichingCategory || selectedCategories.size === 0 ? '#d1d5db' : '#f59e0b',
                       border: 'none',
                       borderRadius: '4px',
                       fontSize: '14px',
                       fontWeight: '600',
-                      cursor: enrichingCategory ? 'not-allowed' : 'pointer',
+                      cursor: enrichingCategory || selectedCategories.size === 0 ? 'not-allowed' : 'pointer',
                       color: 'white',
                     }}
                   >
@@ -925,56 +934,113 @@ function StatBox({ label, value, color, onClick, disabled = false }: {
   );
 }
 
-function ServiceCheckbox({ label, checked, onChange, disabled }: { 
-  label: string; 
-  checked: boolean; 
-  onChange: (checked: boolean) => void; 
+function DataCategoryCard({ 
+  category, 
+  count, 
+  subcounts,
+  selected, 
+  onToggle, 
+  disabled 
+}: { 
+  category: DataCategory;
+  count: number;
+  subcounts?: { label: string; count: number }[];
+  selected: boolean; 
+  onToggle: () => void; 
   disabled: boolean;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  
   return (
-    <label style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: '8px',
-      padding: '10px 12px',
-      backgroundColor: checked ? '#fff7ed' : 'white',
-      border: `2px solid ${checked ? '#f59e0b' : '#e5e7eb'}`,
+    <div style={{
+      border: `2px solid ${selected ? '#f59e0b' : '#e5e7eb'}`,
       borderRadius: '6px',
+      padding: '12px',
+      backgroundColor: selected ? '#fff7ed' : 'white',
       cursor: disabled ? 'not-allowed' : 'pointer',
       opacity: disabled ? 0.6 : 1,
-      fontSize: '14px',
-      fontWeight: '500',
-      color: '#111827',
       transition: 'all 0.2s',
     }}>
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        disabled={disabled}
-        style={{ width: '16px', height: '16px', cursor: disabled ? 'not-allowed' : 'pointer' }}
-      />
-      <span>{label}</span>
-    </label>
-  );
-}
-
-function ResultIcon({ result, label }: { result: { success: boolean; skipped?: boolean }; label: string }) {
-  const icon = result.skipped ? '⏭️' : result.success ? '✅' : '❌';
-  const color = result.skipped ? '#9ca3af' : result.success ? '#10b981' : '#ef4444';
-  return (
-    <span 
-      style={{ 
-        fontSize: '11px', 
-        color,
-        padding: '2px 6px',
-        backgroundColor: result.skipped ? '#f3f4f6' : result.success ? '#dcfce7' : '#fee2e2',
-        borderRadius: '3px',
-        fontWeight: '500',
-      }} 
-      title={label}
-    >
-      {icon} {label}
-    </span>
+      <div 
+        onClick={disabled ? undefined : onToggle}
+        style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}
+      >
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={onToggle}
+          disabled={disabled}
+          style={{ 
+            marginTop: '2px',
+            width: '18px', 
+            height: '18px', 
+            cursor: disabled ? 'not-allowed' : 'pointer',
+            flexShrink: 0,
+          }}
+        />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+            <span style={{ fontSize: '16px' }}>{DATA_CATEGORY_ICONS[category]}</span>
+            <span style={{ fontWeight: '600', fontSize: '14px', color: '#111827' }}>
+              {DATA_CATEGORY_LABELS[category]}
+            </span>
+            <span style={{ 
+              marginLeft: 'auto',
+              fontSize: '16px',
+              fontWeight: '700',
+              color: count > 0 ? '#f59e0b' : '#10b981',
+            }}>
+              {count.toLocaleString()}
+            </span>
+          </div>
+          <div style={{ fontSize: '12px', color: '#6b7280', lineHeight: '1.4', marginBottom: '6px' }}>
+            {DATA_CATEGORY_DESCRIPTIONS[category]}
+          </div>
+          
+          {subcounts && subcounts.length > 0 && (
+            <>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setExpanded(!expanded);
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: '4px 0',
+                  fontSize: '11px',
+                  color: '#3b82f6',
+                  cursor: 'pointer',
+                  fontWeight: '500',
+                }}
+              >
+                {expanded ? '▼ Hide details' : '▶ Show details'}
+              </button>
+              
+              {expanded && (
+                <div style={{ 
+                  marginTop: '8px', 
+                  paddingTop: '8px', 
+                  borderTop: '1px solid #e5e7eb',
+                  fontSize: '11px',
+                  color: '#6b7280',
+                }}>
+                  {subcounts.map((sub, idx) => (
+                    <div key={idx} style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between',
+                      padding: '2px 0',
+                    }}>
+                      <span>{sub.label}:</span>
+                      <span style={{ fontWeight: '600', color: '#111827' }}>{sub.count.toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
