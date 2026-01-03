@@ -298,6 +298,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           flexDirection: 'column',
           overflow: 'hidden',
         }}>
+          {/* Header - matches Discogs import style */}
           <div style={{
             padding: '16px 20px',
             borderBottom: '1px solid #e5e7eb',
@@ -335,25 +336,47 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
               </div>
             ) : stats ? (
               <>
+                {/* Collection Overview */}
                 <div style={{ marginBottom: '24px' }}>
-                  <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px', color: '#1f2937' }}>
+                  <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px', color: '#111827' }}>
                     Collection Overview
                   </h3>
                   <div style={{ 
                     display: 'grid', 
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                    gridTemplateColumns: 'repeat(3, 1fr)',
                     gap: '12px'
                   }}>
-                    <StatBox label="Total" value={stats.total} color="#3b82f6" onClick={() => {}} disabled />
-                    <StatBox label="Fully Enriched" value={stats.fullyEnriched} color="#10b981" 
-                      onClick={() => showCategory('fully-enriched', 'Fully Enriched Albums')} />
-                    <StatBox label="Needs Enrichment" value={stats.needsEnrichment} color="#f59e0b"
-                      onClick={() => showCategory('needs-enrichment', 'Albums Needing Enrichment')} />
+                    <StatBox 
+                      label="Total Albums" 
+                      value={stats.total} 
+                      color="#3b82f6" 
+                      onClick={() => {}} 
+                      disabled 
+                    />
+                    <StatBox 
+                      label="Fully Enriched" 
+                      value={stats.fullyEnriched} 
+                      color="#10b981"
+                      onClick={() => showCategory('fully-enriched', 'Fully Enriched Albums')} 
+                    />
+                    <StatBox 
+                      label="Needs Enrichment" 
+                      value={stats.needsEnrichment} 
+                      color="#f59e0b"
+                      onClick={() => showCategory('needs-enrichment', 'Albums Needing Enrichment')} 
+                    />
                   </div>
                 </div>
 
-                <div style={{ marginBottom: '20px' }}>
-                  <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px', color: '#1f2937' }}>
+                {/* Service Selection */}
+                <div style={{
+                  marginBottom: '20px',
+                  padding: '16px',
+                  backgroundColor: '#f9fafb',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '6px',
+                }}>
+                  <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px', color: '#111827' }}>
                     Select Services
                   </h3>
                   <div style={{ 
@@ -361,71 +384,155 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
                     gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
                     gap: '8px'
                   }}>
-                    <ServiceCheckbox label="🎼 MusicBrainz" checked={services.musicbrainz} onChange={(c) => setServices(p => ({ ...p, musicbrainz: c }))} disabled={enriching} />
-                    <ServiceCheckbox label="🎵 Last.fm" checked={services.lastfm} onChange={(c) => setServices(p => ({ ...p, lastfm: c }))} disabled={enriching} />
-                    <ServiceCheckbox label="🎧 Spotify Enhanced" checked={services.spotifyEnhanced} onChange={(c) => setServices(p => ({ ...p, spotifyEnhanced: c }))} disabled={enriching} />
-                    <ServiceCheckbox label="🍎 Apple Music Enhanced" checked={services.appleMusicEnhanced} onChange={(c) => setServices(p => ({ ...p, appleMusicEnhanced: c }))} disabled={enriching} />
-                    <ServiceCheckbox label="📚 AllMusic" checked={services.allmusic} onChange={(c) => setServices(p => ({ ...p, allmusic: c }))} disabled={enriching} />
-                    <ServiceCheckbox label="📖 Wikipedia" checked={services.wikipedia} onChange={(c) => setServices(p => ({ ...p, wikipedia: c }))} disabled={enriching} />
-                    <ServiceCheckbox label="🖼️ Cover Art Archive" checked={services.coverArtArchive} onChange={(c) => setServices(p => ({ ...p, coverArtArchive: c }))} disabled={enriching} />
-                    <ServiceCheckbox label="🎹 AcousticBrainz" checked={services.acousticbrainz} onChange={(c) => setServices(p => ({ ...p, acousticbrainz: c }))} disabled={enriching} />
-                    <ServiceCheckbox label="💿 Discogs Metadata" checked={services.discogsMetadata} onChange={(c) => setServices(p => ({ ...p, discogsMetadata: c }))} disabled={enriching} />
-                    <ServiceCheckbox label="💿 Discogs Tracklist" checked={services.discogsTracklist} onChange={(c) => setServices(p => ({ ...p, discogsTracklist: c }))} disabled={enriching} />
-                    <ServiceCheckbox label="📝 Genius" checked={services.genius} onChange={(c) => setServices(p => ({ ...p, genius: c }))} disabled={enriching} />
+                    <ServiceCheckbox 
+                      label="🎼 MusicBrainz" 
+                      checked={services.musicbrainz} 
+                      onChange={(c) => setServices(p => ({ ...p, musicbrainz: c }))} 
+                      disabled={enriching} 
+                    />
+                    <ServiceCheckbox 
+                      label="🎵 Last.fm" 
+                      checked={services.lastfm} 
+                      onChange={(c) => setServices(p => ({ ...p, lastfm: c }))} 
+                      disabled={enriching} 
+                    />
+                    <ServiceCheckbox 
+                      label="🎧 Spotify Enhanced" 
+                      checked={services.spotifyEnhanced} 
+                      onChange={(c) => setServices(p => ({ ...p, spotifyEnhanced: c }))} 
+                      disabled={enriching} 
+                    />
+                    <ServiceCheckbox 
+                      label="🍎 Apple Music Enhanced" 
+                      checked={services.appleMusicEnhanced} 
+                      onChange={(c) => setServices(p => ({ ...p, appleMusicEnhanced: c }))} 
+                      disabled={enriching} 
+                    />
+                    <ServiceCheckbox 
+                      label="📚 AllMusic" 
+                      checked={services.allmusic} 
+                      onChange={(c) => setServices(p => ({ ...p, allmusic: c }))} 
+                      disabled={enriching} 
+                    />
+                    <ServiceCheckbox 
+                      label="📖 Wikipedia" 
+                      checked={services.wikipedia} 
+                      onChange={(c) => setServices(p => ({ ...p, wikipedia: c }))} 
+                      disabled={enriching} 
+                    />
+                    <ServiceCheckbox 
+                      label="🖼️ Cover Art Archive" 
+                      checked={services.coverArtArchive} 
+                      onChange={(c) => setServices(p => ({ ...p, coverArtArchive: c }))} 
+                      disabled={enriching} 
+                    />
+                    <ServiceCheckbox 
+                      label="🎹 AcousticBrainz" 
+                      checked={services.acousticbrainz} 
+                      onChange={(c) => setServices(p => ({ ...p, acousticbrainz: c }))} 
+                      disabled={enriching} 
+                    />
+                    <ServiceCheckbox 
+                      label="💿 Discogs Metadata" 
+                      checked={services.discogsMetadata} 
+                      onChange={(c) => setServices(p => ({ ...p, discogsMetadata: c }))} 
+                      disabled={enriching} 
+                    />
+                    <ServiceCheckbox 
+                      label="💿 Discogs Tracklist" 
+                      checked={services.discogsTracklist} 
+                      onChange={(c) => setServices(p => ({ ...p, discogsTracklist: c }))} 
+                      disabled={enriching} 
+                    />
+                    <ServiceCheckbox 
+                      label="📝 Genius" 
+                      checked={services.genius} 
+                      onChange={(c) => setServices(p => ({ ...p, genius: c }))} 
+                      disabled={enriching} 
+                    />
                   </div>
                 </div>
 
-                <div style={{ 
-                  display: 'flex', 
-                  gap: '12px', 
+                {/* Filters */}
+                <div style={{
                   marginBottom: '16px',
-                  flexWrap: 'wrap',
-                  alignItems: 'center'
+                  padding: '16px',
+                  backgroundColor: '#f9fafb',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '6px',
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <label style={{ fontSize: '14px', fontWeight: '600', color: '#374151' }}>Folder:</label>
-                    <select
-                      value={folderFilter}
-                      onChange={(e) => setFolderFilter(e.target.value)}
-                      disabled={enriching}
-                      style={{
-                        padding: '6px 10px',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '4px',
-                        fontSize: '13px',
-                        cursor: enriching ? 'not-allowed' : 'pointer',
-                      }}
-                    >
-                      <option value="">All Folders</option>
-                      {folders.map(folder => (
-                        <option key={folder} value={folder}>{folder}</option>
-                      ))}
-                    </select>
-                  </div>
+                  <div style={{ 
+                    display: 'flex', 
+                    gap: '16px',
+                    flexWrap: 'wrap',
+                    alignItems: 'center'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <label style={{ 
+                        fontSize: '14px', 
+                        fontWeight: '600', 
+                        color: '#111827',
+                        minWidth: '50px'
+                      }}>
+                        Folder:
+                      </label>
+                      <select
+                        value={folderFilter}
+                        onChange={(e) => setFolderFilter(e.target.value)}
+                        disabled={enriching}
+                        style={{
+                          padding: '6px 10px',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '4px',
+                          fontSize: '14px',
+                          backgroundColor: 'white',
+                          color: '#111827',
+                          cursor: enriching ? 'not-allowed' : 'pointer',
+                          minWidth: '180px',
+                        }}
+                      >
+                        <option value="">All Folders</option>
+                        {folders.map(folder => (
+                          <option key={folder} value={folder}>{folder}</option>
+                        ))}
+                      </select>
+                    </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <label style={{ fontSize: '14px', fontWeight: '600', color: '#374151' }}>Batch Size:</label>
-                    <select
-                      value={batchSize}
-                      onChange={(e) => setBatchSize(e.target.value)}
-                      disabled={enriching}
-                      style={{
-                        padding: '6px 10px',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '4px',
-                        fontSize: '13px',
-                        cursor: enriching ? 'not-allowed' : 'pointer',
-                      }}
-                    >
-                      <option value="50">50</option>
-                      <option value="100">100</option>
-                      <option value="200">200</option>
-                      <option value="500">500</option>
-                      <option value="all">ALL</option>
-                    </select>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <label style={{ 
+                        fontSize: '14px', 
+                        fontWeight: '600', 
+                        color: '#111827',
+                        minWidth: '80px'
+                      }}>
+                        Batch Size:
+                      </label>
+                      <select
+                        value={batchSize}
+                        onChange={(e) => setBatchSize(e.target.value)}
+                        disabled={enriching}
+                        style={{
+                          padding: '6px 10px',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '4px',
+                          fontSize: '14px',
+                          backgroundColor: 'white',
+                          color: '#111827',
+                          cursor: enriching ? 'not-allowed' : 'pointer',
+                          minWidth: '100px',
+                        }}
+                      >
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                        <option value="200">200</option>
+                        <option value="500">500</option>
+                        <option value="all">ALL</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
 
+                {/* Status Message */}
                 {status && (
                   <div style={{
                     padding: '12px 16px',
@@ -453,56 +560,68 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
                   }}>
                     {status}
                     {processedCount > 0 && (
-                      <div style={{ marginTop: '4px', fontSize: '12px' }}>
+                      <div style={{ marginTop: '4px', fontSize: '13px' }}>
                         Processed: {processedCount} albums
                       </div>
                     )}
                   </div>
                 )}
 
+                {/* Results Display */}
                 {enrichmentResults.length > 0 && (
                   <div style={{
                     maxHeight: '300px',
                     overflow: 'auto',
                     border: '1px solid #e5e7eb',
                     borderRadius: '6px',
-                    padding: '12px',
-                    backgroundColor: '#f9fafb',
+                    backgroundColor: 'white',
                   }}>
-                    <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#1f2937' }}>
+                    <div style={{
+                      padding: '12px 16px',
+                      backgroundColor: '#f9fafb',
+                      borderBottom: '1px solid #e5e7eb',
+                      fontWeight: '600',
+                      fontSize: '14px',
+                      color: '#111827',
+                      position: 'sticky',
+                      top: 0,
+                    }}>
                       Recent Results ({enrichmentResults.length})
-                    </h4>
-                    {enrichmentResults.slice(-10).reverse().map((result, idx) => (
-                      <div key={idx} style={{
-                        fontSize: '12px',
-                        padding: '6px',
-                        borderBottom: '1px solid #e5e7eb',
-                        color: '#374151',
-                      }}>
-                        <strong>{result.artist} - {result.title}</strong>
-                        <div style={{ display: 'flex', gap: '8px', marginTop: '2px', flexWrap: 'wrap' }}>
-                          {result.musicbrainz && <ResultIcon result={result.musicbrainz} label="MB" />}
-                          {result.lastfm && <ResultIcon result={result.lastfm} label="LFM" />}
-                          {result.spotifyEnhanced && <ResultIcon result={result.spotifyEnhanced} label="SP" />}
-                          {result.appleMusicEnhanced && <ResultIcon result={result.appleMusicEnhanced} label="AM" />}
-                          {result.allmusic && <ResultIcon result={result.allmusic} label="AMG" />}
-                          {result.wikipedia && <ResultIcon result={result.wikipedia} label="WP" />}
-                          {result.coverArtArchive && <ResultIcon result={result.coverArtArchive} label="CAA" />}
-                          {result.acousticbrainz && <ResultIcon result={result.acousticbrainz} label="AB" />}
-                          {result.discogsMetadata && <ResultIcon result={result.discogsMetadata} label="DM" />}
-                          {result.discogsTracklist && <ResultIcon result={result.discogsTracklist} label="DT" />}
-                          {result.genius && <ResultIcon result={result.genius} label="GE" />}
+                    </div>
+                    <div style={{ padding: '8px' }}>
+                      {enrichmentResults.slice(-10).reverse().map((result, idx) => (
+                        <div key={idx} style={{
+                          fontSize: '13px',
+                          padding: '8px 12px',
+                          borderBottom: idx < 9 ? '1px solid #f3f4f6' : 'none',
+                          color: '#111827',
+                        }}>
+                          <div style={{ fontWeight: '600', marginBottom: '4px' }}>
+                            {result.artist} - {result.title}
+                          </div>
+                          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                            {result.musicbrainz && <ResultIcon result={result.musicbrainz} label="MB" />}
+                            {result.lastfm && <ResultIcon result={result.lastfm} label="LFM" />}
+                            {result.spotifyEnhanced && <ResultIcon result={result.spotifyEnhanced} label="SP" />}
+                            {result.appleMusicEnhanced && <ResultIcon result={result.appleMusicEnhanced} label="AM" />}
+                            {result.allmusic && <ResultIcon result={result.allmusic} label="AMG" />}
+                            {result.wikipedia && <ResultIcon result={result.wikipedia} label="WP" />}
+                            {result.coverArtArchive && <ResultIcon result={result.coverArtArchive} label="CAA" />}
+                            {result.acousticbrainz && <ResultIcon result={result.acousticbrainz} label="AB" />}
+                            {result.discogsMetadata && <ResultIcon result={result.discogsMetadata} label="DM" />}
+                            {result.discogsTracklist && <ResultIcon result={result.discogsTracklist} label="DT" />}
+                            {result.genius && <ResultIcon result={result.genius} label="GE" />}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
                 )}
               </>
             ) : (
               <div style={{ textAlign: 'center', padding: '40px' }}>
-                <p style={{ color: '#dc2626', margin: 0 }}>Failed to load statistics</p>
+                <p style={{ color: '#dc2626', margin: '0 0 12px 0', fontSize: '14px' }}>Failed to load statistics</p>
                 <button onClick={loadStats} style={{
-                  marginTop: '12px',
                   padding: '8px 16px',
                   backgroundColor: '#f59e0b',
                   border: 'none',
@@ -516,6 +635,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
             )}
           </div>
 
+          {/* Footer */}
           <div style={{
             padding: '16px 20px',
             borderTop: '1px solid #e5e7eb',
@@ -524,43 +644,62 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
             alignItems: 'center',
             gap: '12px',
           }}>
-            <button onClick={loadStats} disabled={enriching || loading} style={{
-              padding: '8px 16px',
-              backgroundColor: enriching || loading ? '#d1d5db' : '#3b82f6',
-              border: 'none',
-              borderRadius: '4px',
-              fontSize: '14px',
-              fontWeight: '600',
-              cursor: enriching || loading ? 'not-allowed' : 'pointer',
-              color: 'white',
-            }}>🔄 Refresh Stats</button>
-            
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button onClick={onClose} disabled={enriching} style={{
+            <button 
+              onClick={loadStats} 
+              disabled={enriching || loading} 
+              style={{
                 padding: '8px 16px',
-                backgroundColor: 'white',
-                border: '1px solid #d1d5db',
-                borderRadius: '4px',
-                fontSize: '14px',
-                fontWeight: '600',
-                cursor: enriching ? 'not-allowed' : 'pointer',
-                color: '#374151',
-              }}>Close</button>
-              <button onClick={startEnrichment} disabled={enriching || !stats || Object.values(services).every(v => !v)} style={{
-                padding: '8px 16px',
-                backgroundColor: enriching || !stats || Object.values(services).every(v => !v) ? '#d1d5db' : '#f59e0b',
+                backgroundColor: enriching || loading ? '#d1d5db' : '#3b82f6',
                 border: 'none',
                 borderRadius: '4px',
                 fontSize: '14px',
                 fontWeight: '600',
-                cursor: enriching || !stats || Object.values(services).every(v => !v) ? 'not-allowed' : 'pointer',
+                cursor: enriching || loading ? 'not-allowed' : 'pointer',
                 color: 'white',
-              }}>{enriching ? '⚡ Enriching...' : '⚡ Start Enrichment'}</button>
+              }}
+            >
+              🔄 Refresh Stats
+            </button>
+            
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button 
+                onClick={onClose} 
+                disabled={enriching} 
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: '#f3f4f6',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '4px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  cursor: enriching ? 'not-allowed' : 'pointer',
+                  color: '#374151',
+                }}
+              >
+                Close
+              </button>
+              <button 
+                onClick={startEnrichment} 
+                disabled={enriching || !stats || Object.values(services).every(v => !v)} 
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: enriching || !stats || Object.values(services).every(v => !v) ? '#d1d5db' : '#f59e0b',
+                  border: 'none',
+                  borderRadius: '4px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: enriching || !stats || Object.values(services).every(v => !v) ? 'not-allowed' : 'pointer',
+                  color: 'white',
+                }}
+              >
+                {enriching ? '⚡ Enriching...' : '⚡ Start Enrichment'}
+              </button>
             </div>
           </div>
         </div>
       </div>
 
+      {/* Category Modal */}
       {showCategoryModal && (
         <div style={{
           position: 'fixed',
@@ -587,52 +726,74 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
             <div style={{
               padding: '16px 20px',
               borderBottom: '1px solid #e5e7eb',
+              backgroundColor: '#f59e0b',
+              color: 'white',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
             }}>
-              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '600' }}>{categoryTitle}</h3>
-              <button onClick={() => setShowCategoryModal(false)} disabled={enrichingCategory} style={{
-                background: 'none',
-                border: 'none',
-                fontSize: '24px',
-                cursor: enrichingCategory ? 'not-allowed' : 'pointer',
-                padding: 0,
-              }}>×</button>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '600' }}>{categoryTitle}</h3>
+              <button 
+                onClick={() => setShowCategoryModal(false)} 
+                disabled={enrichingCategory} 
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'white',
+                  fontSize: '24px',
+                  cursor: enrichingCategory ? 'not-allowed' : 'pointer',
+                  padding: 0,
+                }}
+              >
+                ×
+              </button>
             </div>
 
             <div style={{ flex: 1, overflow: 'auto', padding: '20px' }}>
               {categoryAlbums.length > 0 && (
                 <div style={{ marginBottom: '16px' }}>
-                  <button onClick={enrichCategory} disabled={enrichingCategory} style={{
-                    padding: '10px 20px',
-                    backgroundColor: enrichingCategory ? '#d1d5db' : '#f59e0b',
-                    border: 'none',
-                    borderRadius: '4px',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    cursor: enrichingCategory ? 'not-allowed' : 'pointer',
-                    color: 'white',
-                  }}>{enrichingCategory ? '⚡ Enriching...' : `⚡ Enrich ${categoryAlbums.length} Albums`}</button>
+                  <button 
+                    onClick={enrichCategory} 
+                    disabled={enrichingCategory} 
+                    style={{
+                      padding: '10px 20px',
+                      backgroundColor: enrichingCategory ? '#d1d5db' : '#f59e0b',
+                      border: 'none',
+                      borderRadius: '4px',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      cursor: enrichingCategory ? 'not-allowed' : 'pointer',
+                      color: 'white',
+                    }}
+                  >
+                    {enrichingCategory ? '⚡ Enriching...' : `⚡ Enrich ${categoryAlbums.length} Albums`}
+                  </button>
                 </div>
               )}
 
               {categoryResults.length > 0 && (
                 <div style={{
                   marginBottom: '16px',
-                  padding: '12px',
+                  padding: '12px 16px',
                   backgroundColor: '#dcfce7',
                   border: '1px solid #16a34a',
                   borderRadius: '6px',
                   fontSize: '14px',
                   color: '#15803d',
-                }}>✅ Enriched {categoryResults.length} albums</div>
+                  fontWeight: '500',
+                }}>
+                  ✅ Enriched {categoryResults.length} albums
+                </div>
               )}
 
               {loadingCategory ? (
-                <div style={{ textAlign: 'center', padding: '40px' }}><p style={{ color: '#666' }}>Loading albums...</p></div>
+                <div style={{ textAlign: 'center', padding: '40px' }}>
+                  <p style={{ color: '#666', margin: 0 }}>Loading albums...</p>
+                </div>
               ) : categoryAlbums.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '40px' }}><p style={{ color: '#666' }}>No albums found</p></div>
+                <div style={{ textAlign: 'center', padding: '40px' }}>
+                  <p style={{ color: '#666', margin: 0 }}>No albums found</p>
+                </div>
               ) : (
                 <div style={{
                   display: 'grid',
@@ -644,7 +805,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
                       border: '1px solid #e5e7eb',
                       borderRadius: '6px',
                       padding: '8px',
-                      fontSize: '11px',
+                      backgroundColor: 'white',
                     }}>
                       <Image
                         src={album.image_url || '/images/placeholder.png'}
@@ -661,8 +822,26 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
                         }}
                         unoptimized
                       />
-                      <div style={{ fontWeight: '600', marginBottom: '2px' }}>{album.title}</div>
-                      <div style={{ color: '#666' }}>{album.artist}</div>
+                      <div style={{ 
+                        fontWeight: '600', 
+                        marginBottom: '2px', 
+                        fontSize: '11px',
+                        color: '#111827',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}>
+                        {album.title}
+                      </div>
+                      <div style={{ 
+                        color: '#6b7280', 
+                        fontSize: '11px',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}>
+                        {album.artist}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -675,16 +854,22 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
               display: 'flex',
               justifyContent: 'flex-end',
             }}>
-              <button onClick={() => setShowCategoryModal(false)} disabled={enrichingCategory} style={{
-                padding: '8px 16px',
-                backgroundColor: 'white',
-                border: '1px solid #d1d5db',
-                borderRadius: '4px',
-                fontSize: '14px',
-                fontWeight: '600',
-                cursor: enrichingCategory ? 'not-allowed' : 'pointer',
-                color: '#374151',
-              }}>Close</button>
+              <button 
+                onClick={() => setShowCategoryModal(false)} 
+                disabled={enrichingCategory} 
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: '#f3f4f6',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '4px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  cursor: enrichingCategory ? 'not-allowed' : 'pointer',
+                  color: '#374151',
+                }}
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
@@ -704,7 +889,7 @@ function StatBox({ label, value, color, onClick, disabled = false }: {
     <div 
       onClick={disabled ? undefined : onClick}
       style={{
-        padding: '12px',
+        padding: '16px',
         backgroundColor: 'white',
         border: `2px solid ${color}`,
         borderRadius: '6px',
@@ -715,7 +900,7 @@ function StatBox({ label, value, color, onClick, disabled = false }: {
       onMouseEnter={(e) => {
         if (!disabled) {
           e.currentTarget.style.transform = 'translateY(-2px)';
-          e.currentTarget.style.boxShadow = `0 4px 12px ${color}40`;
+          e.currentTarget.style.boxShadow = `0 4px 12px ${color}33`;
         }
       }}
       onMouseLeave={(e) => {
@@ -725,11 +910,17 @@ function StatBox({ label, value, color, onClick, disabled = false }: {
         }
       }}
     >
-      <div style={{ fontSize: '24px', fontWeight: '700', color, marginBottom: '4px' }}>
+      <div style={{ fontSize: '28px', fontWeight: '700', color, marginBottom: '4px' }}>
         {value.toLocaleString()}
       </div>
-      <div style={{ fontSize: '11px', color: '#6b7280', fontWeight: '500' }}>{label}</div>
-      {!disabled && <div style={{ fontSize: '9px', color: '#9ca3af', marginTop: '2px' }}>Click to view</div>}
+      <div style={{ fontSize: '12px', color: '#6b7280', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+        {label}
+      </div>
+      {!disabled && (
+        <div style={{ fontSize: '10px', color: '#9ca3af', marginTop: '4px' }}>
+          Click to view
+        </div>
+      )}
     </div>
   );
 }
@@ -745,14 +936,15 @@ function ServiceCheckbox({ label, checked, onChange, disabled }: {
       display: 'flex',
       alignItems: 'center',
       gap: '8px',
-      padding: '8px 12px',
-      backgroundColor: checked ? '#fef3c7' : '#f9fafb',
+      padding: '10px 12px',
+      backgroundColor: checked ? '#fff7ed' : 'white',
       border: `2px solid ${checked ? '#f59e0b' : '#e5e7eb'}`,
       borderRadius: '6px',
       cursor: disabled ? 'not-allowed' : 'pointer',
       opacity: disabled ? 0.6 : 1,
-      fontSize: '13px',
+      fontSize: '14px',
       fontWeight: '500',
+      color: '#111827',
       transition: 'all 0.2s',
     }}>
       <input
@@ -769,8 +961,19 @@ function ServiceCheckbox({ label, checked, onChange, disabled }: {
 
 function ResultIcon({ result, label }: { result: { success: boolean; skipped?: boolean }; label: string }) {
   const icon = result.skipped ? '⏭️' : result.success ? '✅' : '❌';
+  const color = result.skipped ? '#9ca3af' : result.success ? '#10b981' : '#ef4444';
   return (
-    <span style={{ fontSize: '10px', color: '#6b7280' }} title={label}>
+    <span 
+      style={{ 
+        fontSize: '11px', 
+        color,
+        padding: '2px 6px',
+        backgroundColor: result.skipped ? '#f3f4f6' : result.success ? '#dcfce7' : '#fee2e2',
+        borderRadius: '3px',
+        fontWeight: '500',
+      }} 
+      title={label}
+    >
       {icon} {label}
     </span>
   );
