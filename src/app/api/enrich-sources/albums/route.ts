@@ -1,266 +1,129 @@
-// src/app/api/enrich-sources/albums/route.ts - FIXED WITH PROPER DISCOGS ID VALIDATION
+// src/app/api/enrich-sources/albums/route.ts
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { INVALID_DISCOGS_ID_FILTER } from "lib/discogs-validation";
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
-
-type Track = {
-  lyrics_url?: string;
-  lyrics?: string;
-  lyrics_source?: 'apple_music' | 'genius';
-  artist?: string;
-};
-
-function hasAppleMusicLyrics(tracklists: unknown): boolean {
-  try {
-    const tracks = typeof tracklists === 'string' 
-      ? JSON.parse(tracklists)
-      : tracklists;
-    
-    if (!Array.isArray(tracks)) return false;
-    
-    return tracks.some((t: Track) => t.lyrics && t.lyrics_source === 'apple_music');
-  } catch {
-    return false;
-  }
-}
-
-function hasGeniusLinks(tracklists: unknown): boolean {
-  try {
-    const tracks = typeof tracklists === 'string' 
-      ? JSON.parse(tracklists)
-      : tracklists;
-    
-    if (!Array.isArray(tracks)) return false;
-    
-    return tracks.some((t: Track) => t.lyrics_url);
-  } catch {
-    return false;
-  }
-}
-
-function hasTrackArtists(tracklists: unknown): boolean {
-  try {
-    const tracks = typeof tracklists === 'string' 
-      ? JSON.parse(tracklists)
-      : tracklists;
-    
-    if (!Array.isArray(tracks)) return false;
-    
-    return tracks.some((t: Track) => t.artist);
-  } catch {
-    return false;
-  }
-}
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  { auth: { persistSession: false } }
+);
 
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const category = searchParams.get('category');
-    const limit = parseInt(searchParams.get('limit') || '100');
+    const limit = parseInt(searchParams.get('limit') || '200');
 
     if (!category) {
-      return NextResponse.json({ error: 'Category required' }, { status: 400 });
+      return NextResponse.json({
+        success: false,
+        error: 'category parameter required'
+      }, { status: 400 });
     }
 
     let query = supabase
       .from('collection')
-      .select('id, artist, title, image_url, spotify_id, apple_music_id, tracklists, discogs_release_id, discogs_genres, is_1001')
-      .order('artist', { ascending: true })
+      .select('id,artist,title,image_url,musicbrainz_id,musicians,producers,spotify_id,apple_music_id,lastfm_id,allmusic_id,wikipedia_url,tempo_bpm,discogs_release_id,discogs_master_id,discogs_genres,back_image_url,tracklists')
       .limit(limit);
 
     // Apply filters based on category
     switch (category) {
-      case 'fully-enriched':
-        // Will filter after fetch to check for Apple Music lyrics
-        query = query
-          .not('spotify_id', 'is', null)
-          .not('apple_music_id', 'is', null)
-          .not('tracklists', 'is', null);
-        break;
-
       case 'needs-enrichment':
-        query = query.or('spotify_id.is.null,apple_music_id.is.null');
+        // Albums missing any enrichment data
+        break; // Return all, filter in code below
+      
+      case 'fully-enriched':
+        // Albums with all enrichment data
+        break; // Filter in code below
+      
+      case 'missing-musicians':
+        query = query.or('musicians.is.null,musicians.eq.[]');
         break;
-
-      case 'no-data':
-        query = query
-          .is('spotify_id', null)
-          .is('apple_music_id', null);
+      
+      case 'missing-producers':
+        query = query.or('producers.is.null,producers.eq.[]');
         break;
-
+      
       case 'missing-spotify':
-        query = query
-          .is('spotify_id', null)
-          .not('apple_music_id', 'is', null);
+        query = query.is('spotify_id', null);
         break;
-
+      
       case 'missing-apple':
-        query = query
-          .not('spotify_id', 'is', null)
-          .is('apple_music_id', null);
+        query = query.is('apple_music_id', null);
         break;
-
-      case 'with-lyrics':
-        query = query.not('tracklists', 'is', null);
+      
+      case 'missing-lastfm':
+        query = query.is('lastfm_id', null);
         break;
-
-      case 'needs-apple-lyrics':
-        // Albums with Apple Music ID but need to check for lyrics
-        query = query
-          .not('apple_music_id', 'is', null)
-          .not('tracklists', 'is', null);
+      
+      case 'missing-allmusic':
+        query = query.is('allmusic_id', null);
         break;
-
-      case 'has-apple-lyrics':
-        // Albums with Apple Music lyrics - will filter after fetch
-        query = query.not('tracklists', 'is', null);
+      
+      case 'missing-wikipedia':
+        query = query.is('wikipedia_url', null);
         break;
-
-      case 'has-genius-links':
-        // Albums with Genius lyrics URLs - will filter after fetch
-        query = query.not('tracklists', 'is', null);
+      
+      case 'missing-tempo':
+        query = query.is('tempo_bpm', null);
         break;
-
-      case 'both-services':
-        query = query
-          .not('spotify_id', 'is', null)
-          .not('apple_music_id', 'is', null);
+      
+      case 'missing-back-image':
+        query = query.is('back_image_url', null);
         break;
-
-      case 'has-discogs-tracklist':
-        // Will filter after fetch
-        query = query.not('tracklists', 'is', null);
-        break;
-
-      case 'needs-discogs-tracklist':
-        // Will filter after fetch
-        query = query
-          .not('discogs_release_id', 'is', null)
-          .not('tracklists', 'is', null);
-        break;
-
-      case 'missing-discogs-id':
-        // FIXED: Now catches null, '', 'null', 'undefined', '0'
-        query = query.or(INVALID_DISCOGS_ID_FILTER);
-        break;
-
-      case 'missing-image':
-        query = query
-          .not('discogs_release_id', 'is', null)
-          .is('image_url', null);
-        break;
-
+      
       case 'missing-genres':
-        query = query.or('discogs_genres.is.null,discogs_genres.eq.{}');
+        query = query.or('discogs_genres.is.null,discogs_genres.eq.[]');
         break;
-
-      case '1001-albums':
-        query = query.eq('is_1001', true);
-        break;
-
-      case 'missing-master-id':
-        query = query.or('discogs_master_id.is.null,discogs_master_id.eq.,discogs_master_id.eq.null,discogs_master_id.eq.undefined,discogs_master_id.eq.0');
-        break;
-
-      case 'missing-styles':
-        query = query.or('discogs_styles.is.null,discogs_styles.eq.{}');
-        break;
-
-      case 'missing-tracklists':
-        query = query.is('tracklists', null);
-        break;
-
-      case 'missing-source':
-        query = query.is('discogs_source', null);
-        break;
-
-      case 'missing-year':
-        query = query.or('year.is.null,year.eq.,year.eq.0');
-        break;
-
-      default:
-        return NextResponse.json({ error: 'Invalid category' }, { status: 400 });
     }
 
     const { data: albums, error } = await query;
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({
+        success: false,
+        error: error.message
+      }, { status: 500 });
     }
 
-    // Post-fetch filtering for categories that need tracklist inspection
     let filteredAlbums = albums || [];
 
-    switch (category) {
-      case 'with-lyrics':
-        filteredAlbums = filteredAlbums.filter(album => {
-          try {
-            const tracks = typeof album.tracklists === 'string' 
-              ? JSON.parse(album.tracklists)
-              : album.tracklists;
-            return Array.isArray(tracks) && tracks.some((t: Track) => 
-              t.lyrics_url || (t.lyrics && t.lyrics_source === 'apple_music')
-            );
-          } catch {
-            return false;
-          }
-        });
-        break;
-
-      case 'needs-apple-lyrics':
-        filteredAlbums = filteredAlbums.filter(album => {
-          // Has Apple Music ID but NO Apple Music lyrics
-          return album.apple_music_id && !hasAppleMusicLyrics(album.tracklists);
-        });
-        break;
-
-      case 'has-apple-lyrics':
-        filteredAlbums = filteredAlbums.filter(album => {
-          return hasAppleMusicLyrics(album.tracklists);
-        });
-        break;
-
-      case 'has-genius-links':
-        filteredAlbums = filteredAlbums.filter(album => {
-          return hasGeniusLinks(album.tracklists);
-        });
-        break;
-
-      case 'fully-enriched':
-        // Fully enriched = has both services AND has Apple Music lyrics
-        filteredAlbums = filteredAlbums.filter(album => {
-          return album.spotify_id && 
-                 album.apple_music_id && 
-                 hasAppleMusicLyrics(album.tracklists);
-        });
-        break;
-
-      case 'has-discogs-tracklist':
-        filteredAlbums = filteredAlbums.filter(album => {
-          return hasTrackArtists(album.tracklists);
-        });
-        break;
-
-      case 'needs-discogs-tracklist':
-        filteredAlbums = filteredAlbums.filter(album => {
-          return !hasTrackArtists(album.tracklists);
-        });
-        break;
+    // Post-filter for complex categories
+    if (category === 'needs-enrichment') {
+      filteredAlbums = filteredAlbums.filter(album => {
+        const hasMusicBrainz = album.musicbrainz_id && album.musicians?.length > 0 && album.producers?.length > 0;
+        const hasDiscogs = album.discogs_release_id && album.discogs_master_id && album.discogs_genres?.length > 0;
+        const hasImages = album.image_url && album.back_image_url;
+        const hasStreaming = album.spotify_id && album.apple_music_id;
+        const hasMetadata = album.lastfm_id && album.allmusic_id && album.wikipedia_url;
+        const hasAudio = album.tempo_bpm;
+        return !(hasMusicBrainz && hasDiscogs && hasImages && hasStreaming && hasMetadata && hasAudio);
+      });
+    } else if (category === 'fully-enriched') {
+      filteredAlbums = filteredAlbums.filter(album => {
+        const hasMusicBrainz = album.musicbrainz_id && album.musicians?.length > 0 && album.producers?.length > 0;
+        const hasDiscogs = album.discogs_release_id && album.discogs_master_id && album.discogs_genres?.length > 0;
+        const hasImages = album.image_url && album.back_image_url;
+        const hasStreaming = album.spotify_id && album.apple_music_id;
+        const hasMetadata = album.lastfm_id && album.allmusic_id && album.wikipedia_url;
+        const hasAudio = album.tempo_bpm;
+        return hasMusicBrainz && hasDiscogs && hasImages && hasStreaming && hasMetadata && hasAudio;
+      });
     }
 
     return NextResponse.json({
       success: true,
-      albums: filteredAlbums,
-      count: filteredAlbums.length
+      albums: filteredAlbums.map(a => ({
+        id: a.id,
+        artist: a.artist,
+        title: a.title,
+        image_url: a.image_url
+      }))
     });
 
   } catch (error) {
-    console.error('Albums fetch error:', error);
     return NextResponse.json({
+      success: false,
       error: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
   }
