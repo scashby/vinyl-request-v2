@@ -1,6 +1,7 @@
-// src/app/edit-collection/page.tsx - WITH CRATES FUNCTIONALITY AND PRINT TO PDF
+// src/app/edit-collection/page.tsx
 'use client';
 
+// ... (Previous imports remain unchanged)
 import { useCallback, useEffect, useState, useMemo, Suspense, memo } from 'react';
 import Image from 'next/image';
 import { supabase } from '../../lib/supabaseClient';
@@ -18,6 +19,7 @@ import { albumMatchesSmartCrate } from '../../lib/crateUtils';
 import { BoxIcon } from '../../components/BoxIcon';
 import styles from './EditCollection.module.css';
 
+// ... (Sort Options remain unchanged)
 type SortOption = 
   | 'artist-asc' | 'artist-desc' 
   | 'title-asc' | 'title-desc' 
@@ -175,9 +177,10 @@ const AlbumInfoPanel = memo(function AlbumInfoPanel({ album }: { album: Album | 
         {album.year && ` (${album.year})`}
       </div>
 
-      {(album.discogs_genres || album.spotify_genres) && (
+      {/* FIXED: Check canonical genres/styles */}
+      {(album.genres || album.styles || album.spotify_genres) && (
         <div className={styles.infoGenres}>
-          {toSafeStringArray(album.discogs_genres || album.spotify_genres).join(' | ')}
+          {toSafeStringArray(album.genres || album.styles || album.spotify_genres).join(' | ')}
         </div>
       )}
 
@@ -549,7 +552,8 @@ function CollectionBrowserPage() {
           album.format,
           album.year,
           toSafeSearchString(album.custom_tags),
-          toSafeSearchString(album.discogs_genres),
+          // FIXED: Search canonical genres instead of discogs_genres
+          toSafeSearchString(album.genres),
           toSafeSearchString(album.spotify_label),
           toSafeSearchString(album.apple_music_label)
         ].join(' ').toLowerCase();

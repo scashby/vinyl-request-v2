@@ -196,7 +196,7 @@ async function mergeSmartList(column: string, targetName: string, sourceNames: s
     // TypeScript Fix: Cast row to unknown first, then to CollectionRow
     const updates = rows.reduce((acc: { id: string; [key: string]: unknown }[], row) => {
       const collectionRow = row as unknown as CollectionRow;
-      const list = collectionRow[column] as SmartListItem[]; // Fixed: changed 'let' to 'const'
+      const list = collectionRow[column] as SmartListItem[]; 
       
       if (!Array.isArray(list)) return acc;
 
@@ -260,11 +260,13 @@ export async function fetchFormats(): Promise<PickerDataItem[]> {
 
 export async function fetchGenres(): Promise<PickerDataItem[]> {
   try {
-    const { data, error } = await supabase.from('collection').select('discogs_genres, spotify_genres');
+    // UPDATED: Select canonical 'genres' instead of discogs/spotify specific ones
+    const { data, error } = await supabase.from('collection').select('genres').not('genres', 'is', null);
     if (error) return [];
     const genreCounts = new Map<string, number>();
     data?.forEach(row => {
-      const allGenres = [...(row.discogs_genres || []), ...(row.spotify_genres || [])];
+      // row.genres is already string[] per your schema
+      const allGenres = Array.isArray(row.genres) ? row.genres : [];
       allGenres.forEach(genre => { if (genre) genreCounts.set(genre, (genreCounts.get(genre) || 0) + 1); });
     });
     return Array.from(genreCounts.entries()).map(([name, count]) => ({ id: name, name, count })).sort((a, b) => a.name.localeCompare(b.name));
@@ -304,10 +306,8 @@ export async function fetchArtists(): Promise<PickerDataItem[]> {
   } catch { return []; }
 }
 
-// ============================================================================
-// DYNAMIC FETCHING: MEDIA & PACKAGE CONDITIONS
-// Replaces hardcoded lists with DB values, sorted by Rank
-// ============================================================================
+// ... (Rest of the file remains unchanged as it doesn't touch genres/styles columns)
+// ... (Media Conditions, Package Conditions, etc.)
 
 export async function fetchMediaConditions(): Promise<PickerDataItem[]> {
   try {
@@ -331,7 +331,6 @@ export async function fetchMediaConditions(): Promise<PickerDataItem[]> {
       .sort((a, b) => {
         const rankA = getGradeRank(a.name);
         const rankB = getGradeRank(b.name);
-        // If ranks are equal (both unknown), sort alphabetically
         if (rankA === rankB) return a.name.localeCompare(b.name);
         return rankA - rankB;
       });

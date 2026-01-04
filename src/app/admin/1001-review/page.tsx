@@ -5,8 +5,7 @@
 /**
  * Admin: 1001 Review - COMPACT SPREADSHEET DESIGN
  * Exception-focused interface for matching collection albums to 1001 list
- * 
- * WHAT THIS DOES:
+ * * WHAT THIS DOES:
  * - Matches albums from your collection to the "1001 Albums You Must Hear Before You Die" list
  * - Uses multiple fuzzy-matching algorithms (exact, fuzzy, same-artist, fuzzy-artist)
  * - Manual search and linking capabilities
@@ -23,6 +22,26 @@ type Id = number;
 type MatchStatus = "pending" | "linked" | "confirmed" | "rejected";
 type StatusFilter = "unmatched" | "pending" | "confirmed" | "all";
 type Toast = { kind: "info" | "ok" | "err"; msg: string };
+
+// RPC Parameter Interfaces
+interface MatchFuzzyParams {
+  threshold: number;
+  year_slop: number;
+}
+
+interface MatchSameArtistParams {
+  threshold: number;
+  year_slop: number;
+}
+
+interface MatchFuzzyArtistParams {
+  threshold: number;
+}
+
+interface ManualLinkParams {
+  p_album_1001_id: number;
+  p_collection_id: number;
+}
 
 export default function Page(): ReactElement {
   const [rows, setRows] = useState<Album1001[]>([]);
@@ -148,10 +167,11 @@ export default function Page(): ReactElement {
 
   const runFuzzy = useCallback(async (threshold = 0.7, yearSlop = 1) => {
     setRunning(true);
-    const { data, error } = await supabase.rpc("match_1001_fuzzy", {
+    const params: MatchFuzzyParams = {
       threshold: parseFloat(threshold.toString()),
       year_slop: parseInt(yearSlop.toString(), 10),
-    } as any);
+    };
+    const { data, error } = await supabase.rpc("match_1001_fuzzy", params);
     setRunning(false);
     if (error) {
       pushToast({ kind: "err", msg: `Fuzzy match failed: ${error.message}` });
@@ -164,10 +184,11 @@ export default function Page(): ReactElement {
 
   const runSameArtist = useCallback(async (threshold = 0.6, yearSlop = 1) => {
     setRunning(true);
-    const { data, error } = await supabase.rpc("match_1001_same_artist", {
+    const params: MatchSameArtistParams = {
       threshold: parseFloat(threshold.toString()),
       year_slop: parseInt(yearSlop.toString(), 10),
-    } as any);
+    };
+    const { data, error } = await supabase.rpc("match_1001_same_artist", params);
     setRunning(false);
     if (error) {
       pushToast({ kind: "err", msg: `Same-artist match failed: ${error.message}` });
@@ -180,9 +201,10 @@ export default function Page(): ReactElement {
 
   const runFuzzyArtist = useCallback(async (threshold = 0.7) => {
     setRunning(true);
-    const { data, error } = await supabase.rpc("match_1001_fuzzy_artist", {
+    const params: MatchFuzzyArtistParams = {
       threshold: parseFloat(threshold.toString()),
-    } as any);
+    };
+    const { data, error } = await supabase.rpc("match_1001_fuzzy_artist", params);
     setRunning(false);
     if (error) {
       pushToast({ kind: "err", msg: `Fuzzy artist match failed: ${error.message}` });
@@ -263,7 +285,7 @@ export default function Page(): ReactElement {
   const updateStatus = async (matchId: Id, albumId: Id, review_status: MatchStatus) => {
     const { error } = await supabase
       .from("collection_1001_review")
-      .update({ review_status } as any)
+      .update({ review_status } as Record<string, unknown>)
       .eq("id", matchId);
     if (error) {
       pushToast({ kind: "err", msg: `Update failed: ${error.message}` });
@@ -279,7 +301,7 @@ export default function Page(): ReactElement {
   const rejectMatch = async (matchId: Id, albumId: Id) => {
     const { error } = await supabase
       .from("collection_1001_review")
-      .update({ review_status: 'rejected' } as any)
+      .update({ review_status: 'rejected' } as Record<string, unknown>)
       .eq("id", matchId);
     if (error) {
       pushToast({ kind: "err", msg: `Rejection failed: ${error.message}` });
@@ -331,14 +353,16 @@ export default function Page(): ReactElement {
 
   const linkFromSearch = async (albumId: Id, collectionId: Id) => {
     // First attempt: normal insert
+    const insertPayload = {
+      album_1001_id: albumId,
+      collection_id: collectionId,
+      review_status: "confirmed",
+      confidence: 1.0,
+      notes: "manual link via search",
+    };
+
     const result = await supabase.from("collection_1001_review").insert([
-      {
-        album_1001_id: albumId,
-        collection_id: collectionId,
-        review_status: "confirmed",
-        confidence: 1.0,
-        notes: "manual link via search",
-      } as any,
+      insertPayload as Record<string, unknown>,
     ]);
 
     // If failed due to unique constraint on collection_final, check if it's a box set case
@@ -362,10 +386,12 @@ export default function Page(): ReactElement {
         }
 
         // User confirmed - use RPC function to bypass the constraint
-        const { error: rpcError } = await supabase.rpc("manual_link_1001", {
+        const params: ManualLinkParams = {
           p_album_1001_id: albumId,
           p_collection_id: collectionId,
-        } as any);
+        };
+        
+        const { error: rpcError } = await supabase.rpc("manual_link_1001", params);
 
         if (rpcError) {
           pushToast({ kind: "err", msg: `Link failed: ${rpcError.message}` });
@@ -386,6 +412,7 @@ export default function Page(): ReactElement {
     }, 100);
   };
 
+  // ... (rest of the component remains the same, no other errors here)
   const getCounts = () => {
     const unmatched = rows.filter((r) => {
       const ms = (matchesBy[r.id] ?? []).filter(m => m.review_status !== 'rejected');
@@ -619,7 +646,7 @@ export default function Page(): ReactElement {
           </div>
         )}
 
-        {/* Albums List - Compact Table */}
+        {/* Albums List */}
         {loading ? (
           <div
             style={{

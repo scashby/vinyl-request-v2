@@ -113,8 +113,9 @@ export function StatisticsModal({ isOpen, onClose, albums }: StatisticsModalProp
       // Genre data
       const genreCounts: Record<string, number> = {};
       albums.forEach(album => {
-        const genreString = album.discogs_genres || album.spotify_genres || '';
-        const genres = (Array.isArray(genreString) ? genreString : genreString.split(',')).map((g: string) => g.trim()).filter(Boolean);
+        // FIXED: Use canonical 'genres' field
+        const genreList = album.genres || album.spotify_genres || [];
+        const genres = (Array.isArray(genreList) ? genreList : []).map((g: string) => g.trim()).filter(Boolean);
         if (genres.length === 0) genres.push('Unknown');
         genres.forEach(genre => {
           genreCounts[genre] = (genreCounts[genre] || 0) + 1;

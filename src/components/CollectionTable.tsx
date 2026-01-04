@@ -128,8 +128,9 @@ const CollectionTable = memo(function CollectionTable({
       studio: (album: Album) => album.studio || '—',
       vinyl_color: (album: Album) => album.vinyl_color || '—',
       vinyl_weight: (album: Album) => album.vinyl_weight || '—',
-      genres: (album: Album) => formatArray(album.discogs_genres || album.spotify_genres),
-      styles: (album: Album) => formatArray(album.discogs_styles),
+      // UPDATED: Use canonical genres and styles
+      genres: (album: Album) => formatArray(album.genres),
+      styles: (album: Album) => formatArray(album.styles),
       label: (album: Album) => album.spotify_label || album.apple_music_label || '—',
       original_release_date: (album: Album) => formatDate(album.original_release_date),
       original_release_year: (album: Album) => album.original_release_year || '—',

@@ -159,8 +159,11 @@ export type Album = {
   // ============================================================================
   // GENRES & STYLES
   // ============================================================================
-  discogs_genres: string[] | null;
-  discogs_styles: string[] | null;
+  // UPDATED: Canonical columns
+  genres: string[] | null;
+  styles: string[] | null;
+  
+  // Legacy/Other source genres
   spotify_genres: string[] | null;
   apple_music_genres: string[] | null;
   apple_music_genre: string | null;

@@ -124,8 +124,9 @@ export const COLUMN_DEFINITIONS: ColumnDefinition[] = [
   { id: 'decade', label: 'Decade', width: 100, sortable: true, searchable: true },
   
   // GENRES
-  { id: 'discogs_genres', label: 'Genres', width: 200, sortable: false, searchable: true },
-  { id: 'discogs_styles', label: 'Styles', width: 200, sortable: false, searchable: true },
+  // UPDATED: Replaced discogs_ columns with canonical genres/styles
+  { id: 'genres', label: 'Genres', width: 200, sortable: false, searchable: true },
+  { id: 'styles', label: 'Styles', width: 200, sortable: false, searchable: true },
   { id: 'spotify_genres', label: 'Spotify Genres', width: 200, sortable: false, searchable: true },
   { id: 'apple_music_genres', label: 'Apple Genres', width: 200, sortable: false, searchable: true },
   { id: 'apple_music_genre', label: 'Apple Genre', width: 150, sortable: true, searchable: true },
@@ -337,8 +338,8 @@ export const COLUMN_GROUPS: ColumnGroup[] = [
     color: '#6366f1',
     description: 'Genres, styles, and labels',
     columns: [
-      'discogs_genres',
-      'discogs_styles',
+      'genres', // UPDATED
+      'styles', // UPDATED
       'spotify_genres',
       'apple_music_genres',
       'apple_music_genre',

@@ -249,7 +249,8 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
         if (!album.length_seconds) return '—';
         return `${Math.floor(album.length_seconds / 60)}:${(album.length_seconds % 60).toString().padStart(2, '0')}`;
       case 'Genre': 
-        return album.discogs_genres ? (Array.isArray(album.discogs_genres) ? album.discogs_genres[0] : album.discogs_genres) : '—';
+        // FIXED: Use canonical 'genres'
+        return album.genres ? (Array.isArray(album.genres) ? album.genres[0] : album.genres) : '—';
       case 'Label': 
         return album.labels ? (Array.isArray(album.labels) ? album.labels[0] : album.labels) : album.spotify_label || album.apple_music_label || '—';
       case 'Added Date': 
@@ -283,6 +284,7 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
         </div>
 
         <div className={styles.duplicatesToolbar}>
+          {/* ... (rest of the render remains the same) ... */}
           <span className={styles.duplicatesToolbarLabel}>Find duplicates based on</span>
           <div className={styles.duplicatesDropdownWrapper}>
             <button onClick={() => setShowMethodDropdown(!showMethodDropdown)} className={styles.duplicatesDropdownButton}>

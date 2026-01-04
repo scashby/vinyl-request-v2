@@ -138,7 +138,7 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
           ? album.labels[0]
           : (album.spotify_label || album.apple_music_label || '');
       case 'format': return album.format || '';
-      case 'genre': return album.discogs_genres || [];
+      case 'genre': return album.genres || []; // FIXED: Use 'genres'
       case 'location': return album.location || '';
       case 'artist': return album.artist || '';
       default: return '';
@@ -172,7 +172,7 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
     if (Array.isArray(selectedIds)) {
       // Multi-select (genres only)
       const selectedNames = selectedIds.map(id => items.find(item => item.id === id)?.name || '');
-      onChange('discogs_genres', selectedNames);
+      onChange('genres', selectedNames); // FIXED: Update 'genres' instead of 'discogs_genres'
     } else {
       // Single-select
       const selectedName = items.find(item => item.id === selectedIds)?.name || '';
@@ -714,9 +714,10 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
                 backgroundColor: 'white',
                 boxSizing: 'border-box',
               }}>
-                {album.discogs_genres && album.discogs_genres.length > 0 ? (
+                {/* FIXED: Iterate over canonical 'genres' */}
+                {album.genres && album.genres.length > 0 ? (
                   <>
-                    {album.discogs_genres.map((genre, idx) => (
+                    {album.genres.map((genre, idx) => (
                       <span
                         key={idx}
                         style={{

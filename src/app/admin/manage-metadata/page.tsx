@@ -4,7 +4,18 @@
 import { useEffect, useState, useCallback } from 'react';
 import Image from 'next/image';
 import { supabase } from 'lib/supabaseClient';
-import type { Collection, DbTagDefinition } from 'types/supabase';
+import type { DbTagDefinition } from 'types/supabase';
+
+// Local type matching exactly what we select from the DB
+type CollectionWithMetadata = {
+  id: number;
+  artist: string;
+  title: string;
+  genres: string[] | null;
+  styles: string[] | null;
+  image_url: string | null;
+  custom_tags: string[] | null;
+};
 
 type TagDefinition = {
   id: number;
@@ -19,8 +30,8 @@ type Album = {
   artist: string;
   title: string;
   custom_tags: string[];
-  discogs_genres: string[];
-  discogs_styles: string[];
+  genres: string[];
+  styles: string[];
   image_url: string | null;
 };
 
@@ -72,7 +83,8 @@ export default function ManageMetadata() {
       .order('category', { ascending: true })
       .order('tag_name', { ascending: true });
     
-    const typedData = (data || []) as DbTagDefinition[];
+    // Cast via unknown to avoid overlap errors if types drift
+    const typedData = data as unknown as DbTagDefinition[];
     
     if (error) {
       console.error('Error loading tag definitions:', error);
@@ -84,9 +96,10 @@ export default function ManageMetadata() {
   async function calculateGenreStats() {
     const { data, error } = await supabase
       .from('collection')
-      .select('id, artist, title, discogs_genres, image_url');
+      .select('id, artist, title, genres, image_url');
     
-    const typedData = (data || []) as Collection[];
+    // Explicitly cast to our local type to guarantee property access
+    const typedData = data as unknown as CollectionWithMetadata[];
     
     if (error) {
       console.error('Error calculating genre stats:', error);
@@ -96,13 +109,10 @@ export default function ManageMetadata() {
     const genreMap = new Map<string, Album[]>();
     
     typedData?.forEach(album => {
-      const genres = album.discogs_genres;
-      // Parse if it's a string, otherwise assume it's already an array
-      const genreArray = typeof genres === 'string' 
-        ? (genres ? JSON.parse(genres) : [])
-        : (Array.isArray(genres) ? genres : []);
+      const genres = album.genres;
+      const genreArray = Array.isArray(genres) ? genres : [];
         
-      if (genreArray && Array.isArray(genreArray)) {
+      if (genreArray.length > 0) {
         genreArray.forEach((genre: string) => {
           if (!genreMap.has(genre)) {
             genreMap.set(genre, []);
@@ -112,8 +122,8 @@ export default function ManageMetadata() {
             artist: album.artist,
             title: album.title,
             custom_tags: [],
-            discogs_genres: genreArray,
-            discogs_styles: [],
+            genres: genreArray,
+            styles: [],
             image_url: album.image_url
           });
         });
@@ -132,9 +142,10 @@ export default function ManageMetadata() {
   async function calculateStyleStats() {
     const { data, error } = await supabase
       .from('collection')
-      .select('id, artist, title, discogs_styles, image_url');
+      .select('id, artist, title, styles, image_url');
     
-    const typedData = (data || []) as Collection[];
+    // Explicitly cast to our local type
+    const typedData = data as unknown as CollectionWithMetadata[];
     
     if (error) {
       console.error('Error calculating style stats:', error);
@@ -144,13 +155,10 @@ export default function ManageMetadata() {
     const styleMap = new Map<string, Album[]>();
     
     typedData?.forEach(album => {
-      const styles = album.discogs_styles;
-      // Parse if it's a string, otherwise assume it's already an array
-      const styleArray = typeof styles === 'string'
-        ? (styles ? JSON.parse(styles) : [])
-        : (Array.isArray(styles) ? styles : []);
+      const styles = album.styles;
+      const styleArray = Array.isArray(styles) ? styles : [];
         
-      if (styleArray && Array.isArray(styleArray)) {
+      if (styleArray.length > 0) {
         styleArray.forEach((style: string) => {
           if (!styleMap.has(style)) {
             styleMap.set(style, []);
@@ -160,8 +168,8 @@ export default function ManageMetadata() {
             artist: album.artist,
             title: album.title,
             custom_tags: [],
-            discogs_genres: [],
-            discogs_styles: styleArray,
+            genres: [],
+            styles: styleArray,
             image_url: album.image_url
           });
         });
@@ -183,9 +191,17 @@ export default function ManageMetadata() {
       return;
     }
 
+    const insertPayload: Partial<DbTagDefinition> = {
+      tag_name: newTag.tag_name,
+      category: newTag.category,
+      color: newTag.color,
+      description: newTag.description
+    };
+
+    // Use Record<string, unknown> to satisfy strict typing on insert
     const { error } = await supabase
       .from('tag_definitions')
-      .insert([newTag] as any);
+      .insert([insertPayload as Record<string, unknown>]);
 
     if (error) {
       console.error('Error creating tag:', error);
@@ -217,12 +233,12 @@ export default function ManageMetadata() {
       return;
     }
 
-    // Remove tag from all albums - fetch ALL albums and filter client-side
     const { data, error: fetchError } = await supabase
       .from('collection')
       .select('id, custom_tags');
     
-    const allAlbums = (data || []) as Collection[];
+    // Cast to ensure we can read custom_tags
+    const allAlbums = data as unknown as CollectionWithMetadata[];
     
     if (fetchError) {
       console.error('Error fetching albums:', fetchError);
@@ -232,22 +248,18 @@ export default function ManageMetadata() {
     if (allAlbums) {
       const albumsWithTag = allAlbums.filter(album => {
         const tags = album.custom_tags;
-        const tagArray = typeof tags === 'string' 
-          ? (tags ? JSON.parse(tags) : [])
-          : (Array.isArray(tags) ? tags : []);
-        return tagArray && Array.isArray(tagArray) && tagArray.includes(tagName);
+        const tagArray = Array.isArray(tags) ? tags : [];
+        return tagArray.includes(tagName);
       });
 
       for (const album of albumsWithTag) {
         const tags = album.custom_tags;
-        const tagArray = typeof tags === 'string'
-          ? (tags ? JSON.parse(tags) : [])
-          : (Array.isArray(tags) ? tags : []);
-        const updatedTags = (tagArray || []).filter(t => t !== tagName);
+        const tagArray = Array.isArray(tags) ? tags : [];
+        const updatedTags = tagArray.filter(t => t !== tagName);
         
         const { error: updateError } = await supabase
           .from('collection')
-          .update({ custom_tags: updatedTags } as any)
+          .update({ custom_tags: updatedTags } as Record<string, unknown>)
           .eq('id', album.id);
         
         if (updateError) {
@@ -273,13 +285,13 @@ export default function ManageMetadata() {
     setRenaming(true);
 
     try {
-      const field = renamingItem.type === 'genre' ? 'discogs_genres' : 'discogs_styles';
+      const field = renamingItem.type === 'genre' ? 'genres' : 'styles';
       
       const { data, error: fetchError } = await supabase
         .from('collection')
         .select(`id, ${field}`);
 
-      const albumsWithItem = (data || []) as Collection[];
+      const albumsWithItem = data as unknown as CollectionWithMetadata[];
 
       if (fetchError) {
         throw fetchError;
@@ -288,25 +300,21 @@ export default function ManageMetadata() {
       if (albumsWithItem) {
         // Filter albums that contain the old name
         const filteredAlbums = albumsWithItem.filter(album => {
-          const items = album[field as keyof Collection];
-          const itemArray = typeof items === 'string'
-            ? (items ? JSON.parse(items) : [])
-            : (Array.isArray(items) ? items : []);
-          return Array.isArray(itemArray) && itemArray.includes(renamingItem.oldName);
+          const items = field === 'genres' ? album.genres : album.styles;
+          const itemArray = Array.isArray(items) ? items : [];
+          return itemArray.includes(renamingItem.oldName);
         });
 
         for (const album of filteredAlbums) {
-          const items = album[field as keyof Collection];
-          const itemArray = typeof items === 'string'
-            ? (items ? JSON.parse(items) : [])
-            : (Array.isArray(items) ? items : []);
+          const items = field === 'genres' ? album.genres : album.styles;
+          const itemArray = Array.isArray(items) ? items : [];
           const updated = itemArray.map((item: string) => 
             item === renamingItem.oldName ? renamingItem.newName : item
           );
           
           const { error: updateError } = await supabase
             .from('collection')
-            .update({ [field]: updated } as any)
+            .update({ [field]: updated } as Record<string, unknown>)
             .eq('id', album.id);
           
           if (updateError) {
@@ -326,6 +334,7 @@ export default function ManageMetadata() {
     }
   }
 
+  // ... (Rest of the component: filteredDefinitions, categoryColors, tabStyle, return statement remains unchanged)
   const filteredDefinitions = selectedCategory === 'all' 
     ? tagDefinitions 
     : tagDefinitions.filter(t => t.category === selectedCategory);
@@ -369,6 +378,7 @@ export default function ManageMetadata() {
     );
   }
 
+  // ... (JSX return statement exactly as before)
   return (
     <div style={{ padding: 24, background: '#f8fafc', minHeight: '100vh', maxWidth: 1600, margin: '0 auto' }}>
       {/* Header */}
