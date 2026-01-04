@@ -4,7 +4,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { supabase } from 'lib/supabaseClient';
-import ConflictResolutionModal from './ConflictResolutionModal';
+import EnrichmentReviewModal from './EnrichmentReviewModal';
 import { type FieldConflict } from 'lib/conflictDetection';
 
 // --- 1. DATA CATEGORY DEFINITIONS ---
@@ -232,7 +232,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     // Removed: discogs_genres, discogs_styles (per SQL cleanup)
     const ALLOWED_COLUMNS = new Set([
       'artist', 'title', 'year', 'format', 'country', 'barcode', 'labels',
-      'tracklists', 'image_url', 'sell_price', 'media_condition', 'folder',
+      'tracklists', 'image_url', 'back_image_url', 'sell_price', 'media_condition', 'folder',
       'discogs_master_id', 'discogs_release_id', 'spotify_id', 'spotify_url',
       'apple_music_id', 'apple_music_url', 
       'genres', 'styles', // Canonical columns only
@@ -366,10 +366,10 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   if (!isOpen) return null;
 
   if (showReview) {
+    // UPDATED: Using the new dedicated Enrichment Review Modal
     return (
-      <ConflictResolutionModal 
+      <EnrichmentReviewModal 
         conflicts={conflicts} 
-        source="discogs" 
         onComplete={handleApplyChanges}
         onCancel={() => { setShowReview(false); setStatus('Review cancelled.'); }}
       />

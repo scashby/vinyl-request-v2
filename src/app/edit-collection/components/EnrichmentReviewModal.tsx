@@ -2,6 +2,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { type FieldConflict } from 'lib/conflictDetection';
 
 interface EnrichmentReviewModalProps {
@@ -11,7 +12,7 @@ interface EnrichmentReviewModalProps {
 }
 
 // --- HELPER: Smart Value Component ---
-function ConflictValue({ value, onClick, isSelected, label }: { value: any, onClick: () => void, isSelected: boolean, label: string }) {
+function ConflictValue({ value, onClick, isSelected, label }: { value: unknown, onClick: () => void, isSelected: boolean, label: string }) {
   const [dimensions, setDimensions] = useState<{ w: number, h: number } | null>(null);
   const [isImage, setIsImage] = useState(false);
 
@@ -21,11 +22,6 @@ function ConflictValue({ value, onClick, isSelected, label }: { value: any, onCl
       setIsImage(true);
     }
   }, [value]);
-
-  const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
-    const img = e.currentTarget;
-    setDimensions({ w: img.naturalWidth, h: img.naturalHeight });
-  };
 
   const baseStyle = {
     padding: '16px',
@@ -54,11 +50,15 @@ function ConflictValue({ value, onClick, isSelected, label }: { value: any, onCl
       <div onClick={onClick} style={baseStyle}>
         <div style={labelStyle}>{label}</div>
         <div style={{ position: 'relative', width: '100%', minHeight: '200px', backgroundColor: '#f3f4f6', borderRadius: '6px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <img 
-            src={value} 
+          <Image 
+            src={value as string} 
             alt="Candidate" 
-            onLoad={handleImageLoad}
-            style={{ maxWidth: '100%', maxHeight: '200px', objectFit: 'contain' }} 
+            fill
+            style={{ objectFit: 'contain' }}
+            unoptimized // Allowed for external metadata sources
+            onLoadingComplete={(img) => {
+              setDimensions({ w: img.naturalWidth, h: img.naturalHeight });
+            }}
           />
         </div>
         <div style={{ fontSize: '12px', color: '#6b7280', textAlign: 'center', borderTop: '1px solid #e5e7eb', paddingTop: '8px' }}>
@@ -87,13 +87,13 @@ function ConflictValue({ value, onClick, isSelected, label }: { value: any, onCl
 
 export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel }: EnrichmentReviewModalProps) {
   // Map of Field Name -> Selected Value
-  const [resolutions, setResolutions] = useState<Record<string, any>>({});
+  const [resolutions, setResolutions] = useState<Record<string, unknown>>({});
   const [currentStep, setCurrentStep] = useState(0);
 
   const currentConflict = conflicts[currentStep];
   const isLast = currentStep === conflicts.length - 1;
 
-  const handleResolve = (value: any) => {
+  const handleResolve = (value: unknown) => {
     setResolutions(prev => ({
       ...prev,
       [currentConflict.field_name]: value
