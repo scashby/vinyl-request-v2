@@ -1,7 +1,6 @@
-// src/app/edit-collection/components/EnrichmentReviewModal.tsx
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import { type FieldConflict } from 'lib/conflictDetection';
 
@@ -12,185 +11,318 @@ interface EnrichmentReviewModalProps {
 }
 
 // --- HELPER: Smart Value Component ---
-function ConflictValue({ value, onClick, isSelected, label }: { value: unknown, onClick: () => void, isSelected: boolean, label: string }) {
+function ConflictValue({ 
+  value, 
+  onClick, 
+  isSelected, 
+  label, 
+  color 
+}: { 
+  value: unknown; 
+  onClick: () => void; 
+  isSelected: boolean; 
+  label: string;
+  color: 'green' | 'blue';
+}) {
   const [dimensions, setDimensions] = useState<{ w: number, h: number } | null>(null);
   const [isImage, setIsImage] = useState(false);
 
-  // Detect image URLs
+  // Robust Image Detection
   useEffect(() => {
-    if (typeof value === 'string' && (value.match(/\.(jpeg|jpg|gif|png|webp)$/i) || value.includes('images.discogs.com'))) {
-      setIsImage(true);
+    if (typeof value === 'string') {
+      const url = value.toLowerCase();
+      if (
+        url.match(/\.(jpeg|jpg|gif|png|webp|bmp)$/i) || 
+        url.includes('images.discogs.com') ||
+        url.includes('i.scdn.co') || // Spotify images
+        url.includes('mzstatic.com')  // Apple images
+      ) {
+        setIsImage(true);
+      }
     }
   }, [value]);
 
+  const borderColor = isSelected ? (color === 'green' ? '#10b981' : '#3b82f6') : '#e5e7eb';
+  const bgColor = isSelected ? (color === 'green' ? '#f0fdf4' : '#eff6ff') : 'white';
+  const labelColor = color === 'green' ? '#047857' : '#1d4ed8';
+
   const baseStyle = {
-    padding: '16px',
+    padding: '12px',
     borderRadius: '8px',
-    border: `2px solid ${isSelected ? '#f59e0b' : '#e5e7eb'}`,
-    backgroundColor: isSelected ? '#fff7ed' : 'white',
+    border: `2px solid ${borderColor}`,
+    backgroundColor: bgColor,
     cursor: 'pointer',
     transition: 'all 0.2s',
     display: 'flex',
     flexDirection: 'column' as const,
-    gap: '12px',
+    gap: '8px',
+    position: 'relative' as const,
     height: '100%',
-    position: 'relative' as const
+    minWidth: '0' // Flexbox overflow fix
   };
 
-  const labelStyle = {
-    fontSize: '12px',
-    fontWeight: '600',
-    color: '#6b7280',
+  const headerStyle = {
+    fontSize: '11px',
+    fontWeight: '700',
+    color: labelColor,
     textTransform: 'uppercase' as const,
-    marginBottom: '4px'
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center'
   };
 
-  if (isImage) {
+  if (isImage && typeof value === 'string') {
     return (
       <div onClick={onClick} style={baseStyle}>
-        <div style={labelStyle}>{label}</div>
-        <div style={{ position: 'relative', width: '100%', minHeight: '200px', backgroundColor: '#f3f4f6', borderRadius: '6px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={headerStyle}>
+          <span>{label}</span>
+          {isSelected && <span>✓ SELECTED</span>}
+        </div>
+        <div style={{ position: 'relative', width: '100%', aspectRatio: '1', backgroundColor: '#f3f4f6', borderRadius: '4px', overflow: 'hidden' }}>
           <Image 
-            src={value as string} 
-            alt="Candidate" 
+            src={value} 
+            alt={label} 
             fill
             style={{ objectFit: 'contain' }}
-            unoptimized // Allowed for external metadata sources
-            onLoadingComplete={(img) => {
-              setDimensions({ w: img.naturalWidth, h: img.naturalHeight });
-            }}
+            unoptimized
+            onLoadingComplete={(img) => setDimensions({ w: img.naturalWidth, h: img.naturalHeight })}
+            onError={() => setIsImage(false)} // Fallback to text if image fails
           />
         </div>
-        <div style={{ fontSize: '12px', color: '#6b7280', textAlign: 'center', borderTop: '1px solid #e5e7eb', paddingTop: '8px' }}>
-          {dimensions ? (
-            <strong>{dimensions.w} x {dimensions.h} px</strong>
-          ) : (
-            <span>Loading size...</span>
-          )}
+        <div style={{ fontSize: '11px', color: '#6b7280', textAlign: 'center', marginTop: 'auto', paddingTop: '4px' }}>
+          {dimensions ? `${dimensions.w} x ${dimensions.h} px` : 'Loading...'}
         </div>
       </div>
     );
   }
 
-  // Fallback for text/objects
-  const displayValue = typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value);
-  
+  const displayValue = typeof value === 'object' && value !== null 
+    ? JSON.stringify(value, null, 2) 
+    : String(value ?? '');
+
   return (
     <div onClick={onClick} style={baseStyle}>
-      <div style={labelStyle}>{label}</div>
-      <div style={{ fontSize: '14px', color: '#111827', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-        {displayValue || <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>Empty</span>}
+      <div style={headerStyle}>
+        <span>{label}</span>
+        {isSelected && <span>✓ SELECTED</span>}
+      </div>
+      <div style={{ 
+        fontSize: '13px', 
+        color: value ? '#111827' : '#9ca3af', 
+        whiteSpace: 'pre-wrap', 
+        wordBreak: 'break-word',
+        fontStyle: value ? 'normal' : 'italic',
+        lineHeight: '1.5'
+      }}>
+        {value ? displayValue : 'Empty / None'}
       </div>
     </div>
   );
 }
 
 export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel }: EnrichmentReviewModalProps) {
-  // Map of Field Name -> Selected Value
+  // Map of FieldConflictID -> Selected Value
   const [resolutions, setResolutions] = useState<Record<string, unknown>>({});
-  const [currentStep, setCurrentStep] = useState(0);
 
-  const currentConflict = conflicts[currentStep];
-  const isLast = currentStep === conflicts.length - 1;
+  // Group conflicts by Album ID
+  const groupedConflicts = useMemo(() => {
+    const groups: Record<number, FieldConflict[]> = {};
+    conflicts.forEach(c => {
+      if (!groups[c.album_id]) groups[c.album_id] = [];
+      groups[c.album_id].push(c);
+    });
+    return groups;
+  }, [conflicts]);
 
-  const handleResolve = (value: unknown) => {
-    setResolutions(prev => ({
-      ...prev,
-      [currentConflict.field_name]: value
-    }));
+  // Initial Auto-Select: Default to KEEP CURRENT (Safe)
+  // Or User can click "Select All New"
+  useEffect(() => {
+    const defaults: Record<string, unknown> = {};
+    conflicts.forEach(c => {
+      // Unique key: albumId + fieldName
+      const key = `${c.album_id}-${c.field_name}`;
+      defaults[key] = c.current_value; 
+    });
+    setResolutions(defaults);
+  }, [conflicts]); // Only run once on mount
+
+  const handleResolve = (conflict: FieldConflict, value: unknown) => {
+    const key = `${conflict.album_id}-${conflict.field_name}`;
+    setResolutions(prev => ({ ...prev, [key]: value }));
   };
 
-  const handleNext = () => {
-    if (isLast) {
-      // Apply resolutions to the conflicts array in place
-      conflicts.forEach(c => {
-        if (resolutions[c.field_name] !== undefined) {
-          c.new_value = resolutions[c.field_name];
-        }
-      });
-      onComplete();
-    } else {
-      setCurrentStep(prev => prev + 1);
-    }
+  const handleSelectAllNew = () => {
+    const newResolutions: Record<string, unknown> = {};
+    conflicts.forEach(c => {
+      const key = `${c.album_id}-${c.field_name}`;
+      newResolutions[key] = c.new_value;
+    });
+    setResolutions(newResolutions);
   };
 
-  if (!currentConflict) return null;
+  const handleSelectAllCurrent = () => {
+    const newResolutions: Record<string, unknown> = {};
+    conflicts.forEach(c => {
+      const key = `${c.album_id}-${c.field_name}`;
+      newResolutions[key] = c.current_value;
+    });
+    setResolutions(newResolutions);
+  };
 
-  // Determine current selection for visual state
-  const selectedValue = resolutions[currentConflict.field_name];
-  const isCurrentSelected = selectedValue === currentConflict.current_value;
-  const isNewSelected = selectedValue === currentConflict.new_value;
+  const handleSave = () => {
+    // Update the original conflict objects with the chosen values
+    conflicts.forEach(c => {
+      const key = `${c.album_id}-${c.field_name}`;
+      if (resolutions[key] !== undefined) {
+        c.new_value = resolutions[key]; // Parent uses c.new_value to write to DB
+      }
+    });
+    onComplete();
+  };
+
+  const totalChanges = Object.keys(groupedConflicts).length;
 
   return (
     <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 4000 }}>
-      <div style={{ backgroundColor: 'white', borderRadius: '12px', width: '800px', maxWidth: '95vw', maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}>
+      <div style={{ 
+        backgroundColor: 'white', 
+        borderRadius: '12px', 
+        width: '1000px', 
+        maxWidth: '95vw', 
+        maxHeight: '90vh', 
+        display: 'flex', 
+        flexDirection: 'column', 
+        overflow: 'hidden', 
+        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' 
+      }}>
         
         {/* HEADER */}
-        <div style={{ padding: '20px 24px', borderBottom: '1px solid #e5e7eb', backgroundColor: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid #e5e7eb', backgroundColor: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '700', color: '#111827' }}>
-              Review Enrichment ({currentStep + 1}/{conflicts.length})
+              Review Enrichment Data
             </h3>
             <div style={{ fontSize: '14px', color: '#6b7280', marginTop: '4px' }}>
-              {currentConflict.artist} - {currentConflict.title}
+              {totalChanges} album{totalChanges !== 1 ? 's' : ''} with conflicting data found
             </div>
           </div>
-          <div style={{ padding: '4px 12px', backgroundColor: '#f3f4f6', borderRadius: '99px', fontSize: '12px', fontWeight: '600', color: '#4b5563' }}>
-            {currentConflict.field_name.replace(/_/g, ' ')}
+          
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <button 
+              onClick={handleSelectAllCurrent}
+              style={{ padding: '8px 16px', fontSize: '13px', fontWeight: '600', color: '#047857', backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '6px', cursor: 'pointer' }}
+            >
+              Keep All Current
+            </button>
+            <button 
+              onClick={handleSelectAllNew}
+              style={{ padding: '8px 16px', fontSize: '13px', fontWeight: '600', color: '#1d4ed8', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', cursor: 'pointer' }}
+            >
+              Use All New Data
+            </button>
           </div>
         </div>
 
-        {/* CONTENT */}
-        <div style={{ padding: '32px', flex: 1, overflowY: 'auto', backgroundColor: '#fafafa' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', height: '100%' }}>
-            
-            {/* CURRENT */}
-            <ConflictValue 
-              label="Keep Current"
-              value={currentConflict.current_value} 
-              onClick={() => handleResolve(currentConflict.current_value)}
-              isSelected={isCurrentSelected}
-            />
+        {/* LIST CONTENT */}
+        <div style={{ flex: 1, overflowY: 'auto', backgroundColor: '#f9fafb', padding: '24px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            {Object.values(groupedConflicts).map((group, idx) => {
+              const albumInfo = group[0]; // All conflicts in group share the same album info context
+              
+              return (
+                <div key={idx} style={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e5e7eb', overflow: 'hidden' }}>
+                  
+                  {/* ALBUM CONTEXT HEADER */}
+                  <div style={{ padding: '12px 16px', backgroundColor: '#f3f4f6', borderBottom: '1px solid #e5e7eb', display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <div style={{ fontWeight: '700', fontSize: '15px', color: '#111827', marginRight: 'auto' }}>
+                      {albumInfo.artist} - {albumInfo.title}
+                    </div>
+                    
+                    {/* Identification Badges */}
+                    <div style={{ display: 'flex', gap: '8px', fontSize: '12px' }}>
+                      {albumInfo.format && (
+                        <span style={{ padding: '2px 8px', borderRadius: '4px', backgroundColor: '#e5e7eb', color: '#374151', border: '1px solid #d1d5db' }}>
+                          {albumInfo.format}
+                        </span>
+                      )}
+                      {albumInfo.year && (
+                        <span style={{ padding: '2px 8px', borderRadius: '4px', backgroundColor: '#e5e7eb', color: '#374151', border: '1px solid #d1d5db' }}>
+                          {albumInfo.year}
+                        </span>
+                      )}
+                      {albumInfo.cat_no && (
+                        <span style={{ padding: '2px 8px', borderRadius: '4px', backgroundColor: '#e5e7eb', color: '#374151', border: '1px solid #d1d5db' }}>
+                          Cat: {albumInfo.cat_no}
+                        </span>
+                      )}
+                      {albumInfo.country && (
+                        <span style={{ padding: '2px 8px', borderRadius: '4px', backgroundColor: '#e5e7eb', color: '#374151', border: '1px solid #d1d5db' }}>
+                          {albumInfo.country}
+                        </span>
+                      )}
+                    </div>
+                  </div>
 
-            {/* NEW */}
-            <ConflictValue 
-              label="Accept New Data"
-              value={currentConflict.new_value} 
-              onClick={() => handleResolve(currentConflict.new_value)}
-              isSelected={isNewSelected}
-            />
-
+                  {/* CONFLICT ROWS */}
+                  <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    {group.map((conflict) => {
+                      const key = `${conflict.album_id}-${conflict.field_name}`;
+                      const selected = resolutions[key];
+                      
+                      return (
+                        <div key={key}>
+                          <div style={{ fontSize: '12px', fontWeight: '700', color: '#4b5563', marginBottom: '8px', textTransform: 'uppercase' }}>
+                            {conflict.field_name.replace(/_/g, ' ')}
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                            {/* Option A: Current */}
+                            <ConflictValue 
+                              label="Current"
+                              color="green"
+                              value={conflict.current_value}
+                              isSelected={selected === conflict.current_value}
+                              onClick={() => handleResolve(conflict, conflict.current_value)}
+                            />
+                            {/* Option B: New */}
+                            <ConflictValue 
+                              label="New Data"
+                              color="blue"
+                              value={conflict.new_value}
+                              isSelected={selected === conflict.new_value}
+                              onClick={() => handleResolve(conflict, conflict.new_value)}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
         {/* FOOTER */}
-        <div style={{ padding: '20px 24px', borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'white' }}>
-          <button onClick={onCancel} style={{ padding: '10px 20px', border: '1px solid #d1d5db', borderRadius: '6px', backgroundColor: 'white', cursor: 'pointer', color: '#374151', fontWeight: '500' }}>
+        <div style={{ padding: '20px 24px', borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'flex-end', gap: '12px', backgroundColor: 'white' }}>
+          <button onClick={onCancel} style={{ padding: '10px 24px', border: '1px solid #d1d5db', borderRadius: '6px', backgroundColor: 'white', cursor: 'pointer', color: '#374151', fontWeight: '600' }}>
             Cancel
           </button>
-          
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-             <span style={{ fontSize: '13px', color: '#9ca3af', marginRight: '8px' }}>
-               {selectedValue === undefined ? 'Please select an option' : 'Selection saved'}
-             </span>
-             <button 
-               onClick={handleNext}
-               disabled={selectedValue === undefined}
-               style={{ 
-                 padding: '10px 24px', 
-                 backgroundColor: selectedValue === undefined ? '#d1d5db' : '#f59e0b', 
-                 color: 'white', 
-                 border: 'none', 
-                 borderRadius: '6px', 
-                 cursor: selectedValue === undefined ? 'not-allowed' : 'pointer',
-                 fontWeight: '600',
-                 fontSize: '14px',
-                 boxShadow: selectedValue !== undefined ? '0 4px 6px -1px rgba(245, 158, 11, 0.2)' : 'none'
-               }}
-             >
-               {isLast ? 'Finish & Save' : 'Next Conflict →'}
-             </button>
-          </div>
+          <button 
+            onClick={handleSave}
+            style={{ 
+              padding: '10px 32px', 
+              backgroundColor: '#f59e0b', 
+              color: 'white', 
+              border: 'none', 
+              borderRadius: '6px', 
+              cursor: 'pointer',
+              fontWeight: '600',
+              fontSize: '14px',
+              boxShadow: '0 4px 6px -1px rgba(245, 158, 11, 0.3)'
+            }}
+          >
+            Save Changes
+          </button>
         </div>
 
       </div>
