@@ -17,21 +17,18 @@ const DATA_CATEGORY_CONFIG: Record<DataCategory, { label: string; desc: string; 
     label: 'Artwork & Images',
     desc: 'Front covers, back covers, spine images, and inner sleeves.',
     icon: '🖼️',
-    // Removed 'discogs' - leveraging CoverArtArchive, Spotify, Apple
     services: ['coverArt', 'spotify', 'appleMusic']
   },
   credits: {
     label: 'Credits & Personnel',
     desc: 'Musicians, producers, engineers, and songwriters.',
     icon: '👥',
-    // Removed 'discogs' - leveraging MusicBrainz, Wikipedia
     services: ['musicbrainz', 'wikipedia']
   },
   tracklists: {
     label: 'Tracklists & Durations',
     desc: 'Complete track listings, disk sides, and track durations.',
     icon: '📝',
-    // Removed 'discogs' - leveraging Streaming services
     services: ['spotify', 'appleMusic']
   },
   audio_analysis: {
@@ -44,7 +41,6 @@ const DATA_CATEGORY_CONFIG: Record<DataCategory, { label: string; desc: string; 
     label: 'Genres & Styles',
     desc: 'Primary genres, sub-styles, and mood tags.',
     icon: '🏷️',
-    // Removed 'discogs' - leveraging Last.fm, Spotify
     services: ['lastfm', 'spotify']
   },
   streaming_links: {
@@ -55,10 +51,8 @@ const DATA_CATEGORY_CONFIG: Record<DataCategory, { label: string; desc: string; 
   },
   release_metadata: {
     label: 'Release Metadata',
-    // Removed 'Catalog numbers' from description
     desc: 'Barcodes, record labels, and original release dates.',
     icon: '💿',
-    // Removed 'discogs' - using MB for canonical dates/labels
     services: ['musicbrainz']
   }
 };
@@ -251,10 +245,14 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       const autoFilledFields: string[] = [];
 
       Object.entries(combined).forEach(([key, value]) => {
+        // Skip technical ID fields and URLs
         if (key.endsWith('_id') || key.endsWith('_url')) {
             updatesForAlbum[key] = value;
             return;
         }
+
+        // --- FIX: Explicitly ignore catalog numbers ---
+        if (key === 'cat_no') return;
 
         const currentVal = album[key];
         const newVal = value;
