@@ -43,13 +43,14 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { 
       albumIds,      // Option A: Specific IDs
-      cursor = 0,    // Option B: Pagination Cursor
+      cursor = 0,    // Option B: Pagination Cursor (Last ID checked)
       limit = 10,    // Option B: Batch Size
       folder,        // Option B: Filter by Folder
       services       // Selected Services map
     } = body;
 
     let targetAlbums: Record<string, unknown>[] = [];
+    let nextCursor = null;
 
     // --- STRATEGY 1: Explicit IDs (User selected specific rows) ---
     if (albumIds && albumIds.length > 0) {
@@ -61,7 +62,7 @@ export async function POST(req: Request) {
       if (error) throw error;
       targetAlbums = data || [];
     } 
-    // --- STRATEGY 2: Batch Discovery (User clicked "Enrich Next 50") ---
+    // --- STRATEGY 2: Batch Discovery (Scan mode) ---
     else {
       let query = supabase
         .from('collection')
@@ -76,6 +77,13 @@ export async function POST(req: Request) {
       if (error) throw error;
       const fetched = data || [];
 
+      // Determine the next cursor based on what we FETCHED, not what we filtered.
+      // This ensures we don't get stuck in a loop if all fetched items are skipped.
+      if (fetched.length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        nextCursor = (fetched[fetched.length - 1] as any).id;
+      }
+
       // Filter in memory to find ones that actually need help based on selected services
       targetAlbums = fetched.filter(album => {
         return Object.entries(services).some(([serviceKey, isEnabled]) => {
@@ -88,8 +96,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ 
         success: true, 
         results: [], 
-        nextCursor: null,
-        message: "No albums found needing enrichment." 
+        nextCursor: nextCursor, // Return cursor so client knows where to resume
+        message: "No albums found needing enrichment in this batch." 
       });
     }
 
@@ -136,14 +144,10 @@ export async function POST(req: Request) {
       }
     }
 
-    // Determine next cursor for pagination
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const lastId = targetAlbums.length > 0 ? (targetAlbums[targetAlbums.length - 1] as any).id : null;
-
     return NextResponse.json({ 
       success: true, 
       results, 
-      nextCursor: lastId,
+      nextCursor: nextCursor,
       processedCount: targetAlbums.length
     });
 
