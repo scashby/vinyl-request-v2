@@ -145,7 +145,7 @@ export async function GET() {
       if (!hasCountry) stats.missingCountry++;
       if (!hasLabels) stats.missingLabels++;
 
-      // Aggregate metadata check - Expanded to catch more missing data
+      // Aggregate metadata check - Expanded definition
       if (!hasDiscogs || !hasCat || !hasBarcode || !hasCountry || !hasLabels) {
         stats.missingReleaseMetadata++;
       }
