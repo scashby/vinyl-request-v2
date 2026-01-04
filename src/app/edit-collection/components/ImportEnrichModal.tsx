@@ -189,6 +189,9 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       return;
     }
 
+    // Console log for verification (hidden from UI)
+    console.log('--- ENRICHMENT FIX v4 ACTIVE: Blocking cat_no and generated columns ---');
+
     setEnriching(true);
     setStatus('Scanning for missing data...');
     setConflicts([]);
@@ -263,7 +266,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       const autoFilledFields: string[] = [];
 
       Object.entries(combined).forEach(([key, value]) => {
-        // 2. AGGRESSIVE FILTERING
+        // 2. AGGRESSIVE FILTERING (First Pass)
         // Skip technical IDs, URLs, and anything in the Blocklist
         if (
           key.endsWith('_id') || 
@@ -324,10 +327,16 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
     setEnriching(false);
 
-    if (newConflicts.length > 0) {
-      setConflicts(newConflicts);
+    // 3. FINAL SAFETY FILTER (Double Lock)
+    // Explicitly filter cat_no and blocked fields from the final conflict list
+    const filteredConflicts = newConflicts.filter(c => 
+      !BLOCKED_FIELDS.has(c.field_name) && c.field_name !== 'cat_no'
+    );
+
+    if (filteredConflicts.length > 0) {
+      setConflicts(filteredConflicts);
       setShowReview(true);
-      setStatus(autoUpdates.length > 0 ? `Auto-filled ${filledCount} fields. Reviewing ${newConflicts.length} conflicts.` : `Review required for ${newConflicts.length} items.`);
+      setStatus(autoUpdates.length > 0 ? `Auto-filled ${filledCount} fields. Reviewing ${filteredConflicts.length} conflicts.` : `Review required for ${filteredConflicts.length} items.`);
     } else {
       setStatus(autoUpdates.length > 0 ? `✅ Success! Auto-filled ${filledCount} missing fields.` : 'Analysis complete. No better data found.');
       if (autoUpdates.length > 0) loadStats();
