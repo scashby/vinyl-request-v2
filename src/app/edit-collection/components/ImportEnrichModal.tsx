@@ -225,6 +225,24 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   }
 
   async function processCandidates(results: CandidateResult[]) {
+    // 1. DEFINE BLOCKED FIELDS
+    // These fields cause 400 errors or unwanted data conflicts if sent to Supabase
+    const BLOCKED_FIELDS = new Set([
+      'id',
+      // Block Catalog Numbers (User Request & Data Type Risks)
+      'cat_no', 'catalog_number', 'catalognumber', 'catno',
+      // Block Generated/Computed Columns (Writing these causes DB Crash)
+      'year_int', 
+      'album_norm', 
+      'artist_norm', 
+      'title_norm', 
+      'artist_album_norm',
+      // Block Technical Timestamps
+      'created_at', 
+      'updated_at', 
+      'last_enriched_at'
+    ]);
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const autoUpdates: { id: number; fields: Record<string, any> }[] = [];
     const newConflicts: FieldConflict[] = [];
@@ -245,17 +263,25 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       const autoFilledFields: string[] = [];
 
       Object.entries(combined).forEach(([key, value]) => {
-        // Skip technical ID fields and URLs
-        if (key.endsWith('_id') || key.endsWith('_url')) {
-            updatesForAlbum[key] = value;
+        // 2. AGGRESSIVE FILTERING
+        // Skip technical IDs, URLs, and anything in the Blocklist
+        if (
+          key.endsWith('_id') || 
+          key.endsWith('_url') || 
+          BLOCKED_FIELDS.has(key)
+        ) {
             return;
         }
 
-        // --- FIX: Explicitly ignore catalog numbers ---
-        if (key === 'cat_no') return;
-
         const currentVal = album[key];
         const newVal = value;
+
+        // Skip if value is an object/array trying to go into a text field 
+        // (prevents "Invalid input syntax" 400 errors)
+        if (typeof newVal === 'object' && newVal !== null && !Array.isArray(newVal)) {
+             return; 
+        }
+
         const isCurrentEmpty = !currentVal || (Array.isArray(currentVal) && currentVal.length === 0);
         const isDifferent = JSON.stringify(currentVal) !== JSON.stringify(newVal);
 
