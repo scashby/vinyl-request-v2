@@ -130,6 +130,10 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   const [sessionLog, setSessionLog] = useState<LogEntry[]>([]);
   const logEndRef = useRef<HTMLDivElement>(null);
 
+  // Loop Control Refs
+  const hasMoreRef = useRef(true);
+  const isLoopingRef = useRef(false);
+
   useEffect(() => {
     if (isOpen) loadStats();
   }, [isOpen]);
@@ -183,53 +187,105 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     }]);
   }
 
+  // --- MAIN LOOP LOGIC ---
+
   async function startEnrichment(specificAlbumIds?: number[]) {
     if (selectedCategories.size === 0) {
       alert('Please select at least one data category');
       return;
     }
 
-    console.log('--- ENRICHMENT ALLOWLIST ACTIVE (v6): Discogs Bloat Removed ---');
+    // Reset loop state
+    hasMoreRef.current = true;
+    isLoopingRef.current = true;
+    setConflicts([]);
+    
+    // If specific IDs are provided, we only run once
+    if (specificAlbumIds && specificAlbumIds.length > 0) {
+      isLoopingRef.current = false;
+    }
+
+    await runScanLoop(specificAlbumIds);
+  }
+
+  async function runScanLoop(specificAlbumIds?: number[]) {
+    if (!hasMoreRef.current && !specificAlbumIds) {
+      setStatus('Collection scan complete.');
+      setEnriching(false);
+      isLoopingRef.current = false;
+      return;
+    }
 
     setEnriching(true);
-    setStatus('Scanning for missing data...');
-    setConflicts([]);
+    
+    const targetConflicts = parseInt(batchSize);
+    let collectedConflicts: FieldConflict[] = [];
 
-    try {
-      const payload = {
-        albumIds: specificAlbumIds,
-        limit: specificAlbumIds ? undefined : parseInt(batchSize),
-        folder: folderFilter || undefined,
-        services: getServicesForSelection()
-      };
+    // Fetch batches until we have enough conflicts OR run out of items
+    while ((collectedConflicts.length < targetConflicts || specificAlbumIds) && hasMoreRef.current) {
+      setStatus(`Scanning... Found ${collectedConflicts.length}/${targetConflicts} conflicts to review.`);
 
-      const res = await fetch('/api/enrich-sources/fetch-candidates', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+      try {
+        const payload = {
+          albumIds: specificAlbumIds,
+          limit: specificAlbumIds ? undefined : 50, // Fetch in chunks of 50
+          folder: folderFilter || undefined,
+          services: getServicesForSelection()
+        };
 
-      const result = await res.json();
-      if (!result.success) throw new Error(result.error);
+        const res = await fetch('/api/enrich-sources/fetch-candidates', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
 
-      if (!result.results || result.results.length === 0) {
-        setStatus('No new data found for these albums.');
+        const result = await res.json();
+        if (!result.success) throw new Error(result.error);
+
+        const candidates = result.results || [];
+
+        // If no more candidates, stop loop
+        if (candidates.length === 0) {
+          hasMoreRef.current = false;
+          break;
+        }
+
+        // Process this batch
+        const { conflicts: batchConflicts } = await processBatchAndSave(candidates);
+        
+        collectedConflicts = [...collectedConflicts, ...batchConflicts];
+
+        // If we are processing specific IDs, we're done after one pass
+        if (specificAlbumIds) break;
+
+      } catch (error) {
+        setStatus(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
         setEnriching(false);
+        isLoopingRef.current = false;
         return;
       }
+    }
 
-      await processCandidates(result.results);
+    setEnriching(false);
 
-    } catch (error) {
-      setStatus(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      setEnriching(false);
+    if (collectedConflicts.length > 0) {
+      setConflicts(collectedConflicts);
+      setShowReview(true);
+      setStatus(`Review required for ${collectedConflicts.length} items.`);
+    } else {
+      setStatus('✅ No conflicts found in this batch.');
+      if (isLoopingRef.current && hasMoreRef.current) {
+        // Automatically continue if nothing to review
+        setTimeout(() => runScanLoop(), 1000);
+      } else {
+        setStatus('Enrichment complete.');
+        loadStats();
+      }
     }
   }
 
-  async function processCandidates(results: CandidateResult[]) {
+  async function processBatchAndSave(results: CandidateResult[]) {
     // 1. DEFINE ALLOWLIST (The "Parsing" Step)
-    // Only these exact columns exist in the DB.
-    // Removed: discogs_genres, discogs_styles (per SQL cleanup)
     const ALLOWED_COLUMNS = new Set([
       'artist', 'title', 'year', 'format', 'country', 'barcode', 'labels',
       'tracklists', 'image_url', 'back_image_url', 'sell_price', 'media_condition', 'folder',
@@ -242,9 +298,10 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const autoUpdates: { id: number; fields: Record<string, any> }[] = [];
     const newConflicts: FieldConflict[] = [];
-    let filledCount = 0;
+    const processedIds: number[] = [];
 
     results.forEach((item) => {
+      processedIds.push(item.album.id);
       const { album, candidates } = item;
       if (Object.keys(candidates).length === 0) return;
 
@@ -259,22 +316,15 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       const autoFilledFields: string[] = [];
 
       Object.entries(combined).forEach(([key, value]) => {
-        
         // 2. PARSE/FILTER
-        // If the key is not in our allowed columns, ignore it.
-        // This implicitly blocks 'cat_no', 'status', 'generated_columns', and now 'discogs_genres'
-        if (!ALLOWED_COLUMNS.has(key)) {
-            return;
-        }
+        if (!ALLOWED_COLUMNS.has(key)) return;
 
         const currentVal = album[key];
         const newVal = value;
 
-        // Extra Safety: Don't try to write objects to text fields
+        // Skip invalid objects
         if (typeof newVal === 'object' && newVal !== null && !Array.isArray(newVal)) {
-             if (!['musicians', 'producers', 'engineers', 'writers', 'credits'].includes(key)) {
-                return;
-             }
+             if (!['musicians', 'producers', 'engineers', 'writers', 'credits'].includes(key)) return;
         }
 
         const isCurrentEmpty = !currentVal || (Array.isArray(currentVal) && currentVal.length === 0);
@@ -283,7 +333,6 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         if (isCurrentEmpty && newVal) {
            updatesForAlbum[key] = newVal;
            autoFilledFields.push(key);
-           filledCount++;
         } else if (isDifferent) {
            newConflicts.push({
               album_id: album.id,
@@ -295,7 +344,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
               format: (album.format as string) || 'Unknown',
               year: album.year as string,
               country: album.country as string,
-              cat_no: '', // Force empty so UI doesn't crash if it expects it
+              cat_no: '', 
               barcode: (album.barcode as string) || '',
               labels: (album.labels as string[]) || []
            });
@@ -303,6 +352,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       });
 
       if (Object.keys(updatesForAlbum).length > 0) {
+        // Add last_enriched_at to the update
+        updatesForAlbum.last_enriched_at = new Date().toISOString();
         autoUpdates.push({ id: album.id, fields: updatesForAlbum });
         if (autoFilledFields.length > 0) {
           addLog(`${album.artist} - ${album.title}`, 'auto-fill', `Added: ${autoFilledFields.join(', ')}`);
@@ -310,34 +361,72 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       }
     });
 
+    // 1. PERFORM AUTO UPDATES
     if (autoUpdates.length > 0) {
-      setStatus(`Auto-filling ${filledCount} missing fields...`);
       await Promise.all(autoUpdates.map(u => 
         supabase.from('collection').update(u.fields).eq('id', u.id)
       ));
     }
 
-    setEnriching(false);
-
-    if (newConflicts.length > 0) {
-      setConflicts(newConflicts);
-      setShowReview(true);
-      setStatus(autoUpdates.length > 0 ? `Auto-filled ${filledCount} fields. Reviewing ${newConflicts.length} conflicts.` : `Review required for ${newConflicts.length} items.`);
-    } else {
-      setStatus(autoUpdates.length > 0 ? `✅ Success! Auto-filled ${filledCount} missing fields.` : 'Analysis complete. No better data found.');
-      if (autoUpdates.length > 0) loadStats();
+    // 2. "TOUCH" UNCHANGED ALBUMS
+    // We must update last_enriched_at for albums that had no data or conflicts,
+    // otherwise the API will keep fetching them in the loop.
+    const changedIds = new Set(autoUpdates.map(u => u.id));
+    // Don't touch conflict ones yet, we wait for user resolution
+    newConflicts.forEach(c => changedIds.add(c.album_id));
+    
+    const untouchedIds = processedIds.filter(id => !changedIds.has(id));
+    
+    if (untouchedIds.length > 0) {
+      await supabase
+        .from('collection')
+        .update({ last_enriched_at: new Date().toISOString() })
+        .in('id', untouchedIds);
     }
+
+    return { conflicts: newConflicts };
   }
 
   async function handleApplyChanges() {
-    setShowReview(false);
-    setShowCategoryModal(false);
+    // 1. SAVE RESOLUTIONS TO DB
+    const updatesByAlbum: Record<number, Record<string, unknown>> = {};
+    
     conflicts.forEach(c => {
-       addLog(`${c.artist} - ${c.title}`, 'conflict-resolved', `Updated ${c.field_name}`);
+      // If a resolution was selected (new_value might differ from original new_value if user chose current)
+      // Note: EnrichmentReviewModal updates c.new_value in place based on user choice.
+      if (!updatesByAlbum[c.album_id]) updatesByAlbum[c.album_id] = {};
+      
+      // If user chose the NEW value, we update. 
+      // If user chose CURRENT, we effectively do nothing (or update last_enriched_at)
+      // But we should verify. The Review Modal sets c.new_value to the CHOSEN value.
+      updatesByAlbum[c.album_id][c.field_name] = c.new_value;
     });
-    setStatus('✅ Updates applied successfully!');
-    await loadStats(); 
-    if (onImportComplete) onImportComplete();
+
+    // Execute updates
+    const updatePromises = Object.entries(updatesByAlbum).map(([albumId, fields]) => {
+      return supabase
+        .from('collection')
+        .update({
+          ...fields,
+          last_enriched_at: new Date().toISOString()
+        })
+        .eq('id', albumId);
+    });
+
+    await Promise.all(updatePromises);
+
+    // 2. CONTINUE LOOP
+    setShowReview(false);
+    
+    if (isLoopingRef.current && hasMoreRef.current) {
+      addLog('System', 'auto-fill', 'Batch saved. Continuing scan...');
+      // Small delay to allow UI to breathe
+      setTimeout(() => runScanLoop(), 500);
+    } else {
+      await loadStats(); 
+      setStatus('✅ Enrichment session complete.');
+      if (onImportComplete) onImportComplete();
+    }
   }
 
   function toggleCategory(category: DataCategory) {
@@ -366,12 +455,15 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   if (!isOpen) return null;
 
   if (showReview) {
-    // UPDATED: Using the new dedicated Enrichment Review Modal
     return (
       <EnrichmentReviewModal 
         conflicts={conflicts} 
         onComplete={handleApplyChanges}
-        onCancel={() => { setShowReview(false); setStatus('Review cancelled.'); }}
+        onCancel={() => { 
+          setShowReview(false); 
+          isLoopingRef.current = false; // Stop the loop
+          setStatus('Review cancelled. Scanning stopped.'); 
+        }}
       />
     );
   }
