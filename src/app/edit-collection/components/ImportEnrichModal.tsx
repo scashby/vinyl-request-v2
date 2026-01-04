@@ -122,15 +122,18 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   const [folderFilter, setFolderFilter] = useState('');
   const [batchSize, setBatchSize] = useState('25');
   
+  // Selection State
   const [selectedCategories, setSelectedCategories] = useState<Set<DataCategory>>(new Set([
     'artwork', 'credits', 'tracklists', 'genres'
   ]));
   
+  // Drill-down Modal State
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [categoryTitle, setCategoryTitle] = useState('');
   const [categoryAlbums, setCategoryAlbums] = useState<Album[]>([]);
   const [loadingCategory, setLoadingCategory] = useState(false);
   
+  // Review & Logs
   const [showReview, setShowReview] = useState(false);
   const [conflicts, setConflicts] = useState<FieldConflict[]>([]);
   const [sessionLog, setSessionLog] = useState<LogEntry[]>([]);
@@ -139,7 +142,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   // Loop Control Refs
   const hasMoreRef = useRef(true);
   const isLoopingRef = useRef(false);
-  const cursorRef = useRef(0); // Tracks current position in DB
+  const cursorRef = useRef(0);
 
   useEffect(() => {
     if (isOpen) loadStats();
@@ -236,7 +239,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         const payload = {
           albumIds: specificAlbumIds,
           limit: specificAlbumIds ? undefined : 50,
-          cursor: specificAlbumIds ? undefined : cursorRef.current, // Pass current position
+          cursor: specificAlbumIds ? undefined : cursorRef.current,
           folder: folderFilter || undefined,
           services: getServicesForSelection()
         };
@@ -250,11 +253,11 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         const result = await res.json();
         if (!result.success) throw new Error(result.error);
 
-        // Update Cursor for next iteration
-        if (result.nextCursor) {
+        // Update Cursor from API response
+        if (result.nextCursor !== undefined && result.nextCursor !== null) {
           cursorRef.current = result.nextCursor;
         } else {
-          // If api returned no cursor, we might be done
+          // If no cursor returned, we might be at the end
           if (!result.results || result.results.length === 0) {
              hasMoreRef.current = false;
           }
@@ -400,7 +403,6 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     }
 
     // 2. "TOUCH" UNCHANGED ALBUMS
-    // Mark them as processed so we don't immediately re-process in future sessions (optional, but good practice)
     const changedIds = new Set(autoUpdates.map(u => u.id));
     newConflicts.forEach(c => changedIds.add(c.album_id));
     
@@ -441,6 +443,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         album_id: c.album_id,
         field_name: c.field_name,
         kept_value: chosenValue,
+        // IF user chose NEW: rejected is current. IF user chose CURRENT: rejected is NEW.
         rejected_value: userChoseNew ? c.current_value : c.new_value, 
         resolution: userChoseNew ? 'use_new' : 'keep_current',
         source: 'discogs',
@@ -448,12 +451,11 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       });
     });
 
-    // LOGGING
     console.log('[DB SAVE] Starting Batch Save...');
     console.log(`[DB SAVE] Updates Pending: ${Object.keys(updatesByAlbum).length} albums`);
     console.log(`[DB SAVE] History Records: ${resolutionRecords.length}`);
 
-    // A. Update Albums
+    // A. Execute Album Updates (Updates + Timestamp)
     const updatePromises = Array.from(involvedAlbumIds).map(async (albumId) => {
       const fields = updatesByAlbum[albumId] || {};
       
@@ -469,7 +471,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       else console.log(`[DB SUCCESS] Updated album ${albumId}`);
     });
 
-    // B. Save History
+    // B. Execute History Inserts
     if (resolutionRecords.length > 0) {
       const { error: histError } = await supabase
         .from('import_conflict_resolutions')

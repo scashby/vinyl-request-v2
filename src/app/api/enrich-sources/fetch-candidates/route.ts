@@ -43,7 +43,7 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { 
       albumIds,      // Option A: Specific IDs
-      cursor = 0,    // Option B: Pagination Cursor (Last ID checked)
+      cursor = 0,    // Option B: Pagination Cursor
       limit = 10,    // Option B: Batch Size
       folder,        // Option B: Filter by Folder
       services       // Selected Services map
@@ -77,8 +77,8 @@ export async function POST(req: Request) {
       if (error) throw error;
       const fetched = data || [];
 
-      // Determine the next cursor based on what we FETCHED, not what we filtered.
-      // This ensures we don't get stuck in a loop if all fetched items are skipped.
+      // FIXED: Calculate nextCursor based on the RAW fetched data, not the filtered targets.
+      // This ensures we always advance the cursor, even if we skip all items in this batch.
       if (fetched.length > 0) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         nextCursor = (fetched[fetched.length - 1] as any).id;
@@ -93,10 +93,11 @@ export async function POST(req: Request) {
     }
 
     if (!targetAlbums.length) {
+      // Return the new cursor even if results are empty, so client knows where to continue
       return NextResponse.json({ 
         success: true, 
         results: [], 
-        nextCursor: nextCursor, // Return cursor so client knows where to resume
+        nextCursor: nextCursor,
         message: "No albums found needing enrichment in this batch." 
       });
     }
