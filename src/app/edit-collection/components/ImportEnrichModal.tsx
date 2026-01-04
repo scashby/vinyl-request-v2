@@ -103,6 +103,15 @@ type LogEntry = {
   timestamp: Date;
 };
 
+// Helper to normalize values for comparison (handles "1999" vs 1999)
+const normalizeValue = (val: unknown): string => {
+  if (val === null || val === undefined) return '';
+  if (typeof val === 'number') return String(val);
+  if (Array.isArray(val)) return JSON.stringify(val.sort()); // Sort arrays for consistency
+  if (typeof val === 'object') return JSON.stringify(val);
+  return String(val).trim();
+};
+
 // --- 3. MAIN COMPONENT ---
 export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }: ImportEnrichModalProps) {
   const [stats, setStats] = useState<EnrichmentStats | null>(null);
@@ -285,7 +294,15 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   }
 
   async function processBatchAndSave(results: CandidateResult[]) {
-    // 1. DEFINE ALLOWLIST (The "Parsing" Step)
+    // 1. FETCH PREVIOUS RESOLUTIONS to check history
+    const albumIds = results.map(r => r.album.id);
+    const { data: resolutions } = await supabase
+      .from('import_conflict_resolutions')
+      .select('album_id, field_name, rejected_value')
+      .in('album_id', albumIds)
+      .eq('source', 'discogs'); 
+
+    // 2. DEFINE ALLOWLIST (The "Parsing" Step)
     const ALLOWED_COLUMNS = new Set([
       'artist', 'title', 'year', 'format', 'country', 'barcode', 'labels',
       'tracklists', 'image_url', 'back_image_url', 'sell_price', 'media_condition', 'folder',
@@ -316,7 +333,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       const autoFilledFields: string[] = [];
 
       Object.entries(combined).forEach(([key, value]) => {
-        // 2. PARSE/FILTER
+        // A. PARSE/FILTER
         if (!ALLOWED_COLUMNS.has(key)) return;
 
         const currentVal = album[key];
@@ -328,8 +345,21 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         }
 
         const isCurrentEmpty = !currentVal || (Array.isArray(currentVal) && currentVal.length === 0);
-        const isDifferent = JSON.stringify(currentVal) !== JSON.stringify(newVal);
+        // Use normalized comparison for accurate diffing
+        const isDifferent = normalizeValue(currentVal) !== normalizeValue(newVal);
 
+        // B. CHECK HISTORY
+        // Check if we already rejected this EXACT value
+        const normalizedNew = normalizeValue(newVal);
+        const previouslyRejected = resolutions?.some(r => 
+          r.album_id === album.id && 
+          r.field_name === key && 
+          normalizeValue(r.rejected_value) === normalizedNew
+        );
+
+        if (previouslyRejected) return;
+
+        // C. ACTION
         if (isCurrentEmpty && newVal) {
            updatesForAlbum[key] = newVal;
            autoFilledFields.push(key);
@@ -344,7 +374,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
               format: (album.format as string) || 'Unknown',
               year: album.year as string,
               country: album.country as string,
-              cat_no: '', 
+              cat_no: (album.cat_no as string) || '', // Pass context
               barcode: (album.barcode as string) || '',
               labels: (album.labels as string[]) || []
            });
@@ -369,10 +399,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     }
 
     // 2. "TOUCH" UNCHANGED ALBUMS
-    // We must update last_enriched_at for albums that had no data or conflicts,
-    // otherwise the API will keep fetching them in the loop.
     const changedIds = new Set(autoUpdates.map(u => u.id));
-    // Don't touch conflict ones yet, we wait for user resolution
     newConflicts.forEach(c => changedIds.add(c.album_id));
     
     const untouchedIds = processedIds.filter(id => !changedIds.has(id));
@@ -388,39 +415,78 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   }
 
   async function handleApplyChanges() {
-    // 1. SAVE RESOLUTIONS TO DB
+    // 1. SAVE RESOLUTIONS TO DB & HISTORY
     const updatesByAlbum: Record<number, Record<string, unknown>> = {};
+    const resolutionRecords = [];
+    const timestamp = new Date().toISOString();
     
-    conflicts.forEach(c => {
-      // If a resolution was selected (new_value might differ from original new_value if user chose current)
-      // Note: EnrichmentReviewModal updates c.new_value in place based on user choice.
-      if (!updatesByAlbum[c.album_id]) updatesByAlbum[c.album_id] = {};
-      
-      // If user chose the NEW value, we update. 
-      // If user chose CURRENT, we effectively do nothing (or update last_enriched_at)
-      // But we should verify. The Review Modal sets c.new_value to the CHOSEN value.
-      updatesByAlbum[c.album_id][c.field_name] = c.new_value;
-    });
+    // Identify all album IDs involved in conflicts to ensure they get touched
+    const involvedAlbumIds = new Set<number>();
 
-    // Execute updates
-    const updatePromises = Object.entries(updatesByAlbum).map(([albumId, fields]) => {
+    for (const c of conflicts) {
+      involvedAlbumIds.add(c.album_id);
+      
+      const normalizedChosen = normalizeValue(c.new_value);
+      const normalizedCurrent = normalizeValue(c.current_value);
+      const userChoseNew = normalizedChosen !== normalizedCurrent;
+      
+      const chosenValue = c.new_value;
+      
+      if (userChoseNew) {
+        if (!updatesByAlbum[c.album_id]) updatesByAlbum[c.album_id] = {};
+        updatesByAlbum[c.album_id][c.field_name] = chosenValue;
+      }
+
+      // Record history
+      resolutionRecords.push({
+        album_id: c.album_id,
+        field_name: c.field_name,
+        kept_value: chosenValue,
+        // Critical: store the value the user explicitly rejected
+        rejected_value: userChoseNew ? c.current_value : c.new_value, 
+        resolution: userChoseNew ? 'use_new' : 'keep_current',
+        source: 'discogs',
+        resolved_at: timestamp
+      });
+    }
+
+    // DEBUG LOGS - Check console to verify save
+    console.log('--- ENRICHMENT SAVE DEBUG ---');
+    console.log(`Saving ${resolutionRecords.length} history records`);
+    console.log(`Updating ${Object.keys(updatesByAlbum).length} albums with new data`);
+    console.log('Resolution Data:', resolutionRecords);
+
+    // A. Execute Album Updates (Updates + Timestamp)
+    // We iterate over ALL involved albums, not just those with updates
+    const updatePromises = Array.from(involvedAlbumIds).map(albumId => {
+      const fields = updatesByAlbum[albumId] || {};
+      
       return supabase
         .from('collection')
         .update({
           ...fields,
-          last_enriched_at: new Date().toISOString()
+          last_enriched_at: timestamp // CRITICAL FIX: Always update this!
         })
         .eq('id', albumId);
     });
 
+    // B. Execute History Inserts
+    if (resolutionRecords.length > 0) {
+      const { error: histError } = await supabase
+        .from('import_conflict_resolutions')
+        .upsert(resolutionRecords, { onConflict: 'album_id,field_name,source' });
+        
+      if (histError) console.error('❌ Error saving resolution history:', histError);
+      else console.log('✅ History saved successfully');
+    }
+
     await Promise.all(updatePromises);
 
-    // 2. CONTINUE LOOP
+    // 3. CONTINUE LOOP
     setShowReview(false);
     
     if (isLoopingRef.current && hasMoreRef.current) {
       addLog('System', 'auto-fill', 'Batch saved. Continuing scan...');
-      // Small delay to allow UI to breathe
       setTimeout(() => runScanLoop(), 500);
     } else {
       await loadStats(); 
@@ -495,8 +561,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         maxHeight: '95vh', 
         display: 'flex', 
         flexDirection: 'column', 
-        overflow: 'hidden',
-        color: '#111827'
+        overflow: 'hidden', 
+        color: '#111827' 
       }}>
         
         {/* HEADER */}

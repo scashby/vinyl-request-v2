@@ -11,7 +11,6 @@ const supabase = createClient(
 export async function GET() {
   try {
     // 1. Select all columns needed for the detailed stats
-    // FIXED: Swapped 'discogs_genres' for 'genres'
     const { data: albums, error } = await supabase
       .from('collection')
       .select(`
@@ -34,7 +33,8 @@ export async function GET() {
         cat_no,
         barcode,
         country,
-        folder
+        folder,
+        labels
       `);
 
     if (error || !albums) {
@@ -112,9 +112,9 @@ export async function GET() {
       const hasBarcode = !!album.barcode;
       const hasCountry = !!album.country;
       const hasTempo = !!album.tempo_bpm;
-      // FIXED: Check canonical genres
       const hasGenres = album.genres && album.genres.length > 0;
       const hasTracks = !!album.tracklists;
+      const hasLabels = album.labels && album.labels.length > 0;
 
       // -- Increment Counters --
       if (!hasImage) stats.missingArtwork++;
@@ -143,8 +143,12 @@ export async function GET() {
       if (!hasCat) stats.missingCatalogNumber++;
       if (!hasBarcode) stats.missingBarcode++;
       if (!hasCountry) stats.missingCountry++;
-      // Aggregate metadata check
-      if (!hasDiscogs || !hasCat) stats.missingReleaseMetadata++;
+      if (!hasLabels) stats.missingLabels++;
+
+      // Aggregate metadata check - Expanded to catch more missing data
+      if (!hasDiscogs || !hasCat || !hasBarcode || !hasCountry || !hasLabels) {
+        stats.missingReleaseMetadata++;
+      }
 
       // -- Total "Health" Check --
       const isRich = hasImage && hasBack && hasMusicians && hasSpotify && hasDiscogs && hasGenres;
