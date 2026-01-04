@@ -44,7 +44,7 @@ interface ExistingAlbum {
   discogs_release_id: string | null;
   image_url: string | null;
   tracks: unknown[] | null;
-  discogs_genres: string[] | null;
+  genres: string[] | null; // FIXED: Was discogs_genres
   packaging: string | null;
 }
 
@@ -172,40 +172,32 @@ function compareAlbums(
   parsed: ParsedAlbum[],
   existing: ExistingAlbum[]
 ): ComparedAlbum[] {
-  // Build two maps: by release_id (primary) and by artist_album_norm (fallback)
   const releaseIdMap = new Map<string, ExistingAlbum>();
   const artistAlbumMap = new Map<string, ExistingAlbum>();
-  const matchedDbIds = new Set<number>();  // Track which database albums were matched
+  const matchedDbIds = new Set<number>();
   
   existing.forEach(album => {
-    // Add to release_id map if release_id exists
     if (album.discogs_release_id) {
       releaseIdMap.set(album.discogs_release_id, album);
     }
-    
-    // Add to artist_album_norm map - ALWAYS recalculate, never trust stored value
     const normalizedKey = normalizeArtistAlbum(album.artist, album.title);
     artistAlbumMap.set(normalizedKey, album);
   });
 
   const compared: ComparedAlbum[] = [];
 
-  // Check parsed albums
   for (const parsedAlbum of parsed) {
     let existingAlbum: ExistingAlbum | undefined;
     
-    // First, try to match by discogs_release_id (most precise)
     if (parsedAlbum.discogs_release_id) {
       existingAlbum = releaseIdMap.get(parsedAlbum.discogs_release_id);
     }
     
-    // If no match by release_id, try by artist_album_norm (fallback)
     if (!existingAlbum) {
       existingAlbum = artistAlbumMap.get(parsedAlbum.artist_album_norm);
     }
 
     if (!existingAlbum) {
-      // NEW album
       compared.push({
         ...parsedAlbum,
         status: 'NEW',
@@ -213,12 +205,12 @@ function compareAlbums(
         missingFields: ['all'],
       });
     } else {
-      // Exists - check what's missing
       const missingFields: string[] = [];
       
       if (!existingAlbum.image_url) missingFields.push('cover images');
       if (!existingAlbum.tracks || existingAlbum.tracks.length === 0) missingFields.push('tracks');
-      if (!existingAlbum.discogs_genres || existingAlbum.discogs_genres.length === 0) missingFields.push('genres');
+      // FIXED: Check genres instead of discogs_genres
+      if (!existingAlbum.genres || existingAlbum.genres.length === 0) missingFields.push('genres');
       if (!existingAlbum.packaging) missingFields.push('packaging');
 
       const isChanged = parsedAlbum.discogs_release_id !== existingAlbum.discogs_release_id;
@@ -231,10 +223,8 @@ function compareAlbums(
         missingFields,
       });
 
-      // Track that this database album was matched
       matchedDbIds.add(existingAlbum.id);
 
-      // Remove from both maps to prevent duplicate matches
       if (existingAlbum.discogs_release_id) {
         releaseIdMap.delete(existingAlbum.discogs_release_id);
       }
@@ -244,15 +234,11 @@ function compareAlbums(
     }
   }
 
-  // Remaining in database but not in CSV = REMOVED
-  // Iterate over full existing array and check against matched IDs
   for (const existingAlbum of existing) {
-    // Skip if this album was already matched
     if (matchedDbIds.has(existingAlbum.id)) {
       continue;
     }
 
-    // This database album was not matched by any CSV entry
     const normalizedKey = normalizeArtistAlbum(existingAlbum.artist, existingAlbum.title);
       
     compared.push({
@@ -303,14 +289,14 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
   const enriched: Record<string, unknown> = {
     image_url: data.images?.[0]?.uri || null,
     back_image_url: data.images?.[1]?.uri || null,
-    discogs_genres: data.genres || [],
-    discogs_styles: data.styles || [],
+    // FIXED: Map to canonical columns
+    genres: data.genres || [],
+    styles: data.styles || [],
     packaging: data.formats?.[0]?.descriptions?.find((d: string) => 
       ['Gatefold', 'Single Sleeve', 'Digipak'].some(p => d.includes(p))
     ) || null,
   };
 
-  // Extract sound (Stereo, Mono, etc.)
   if (data.formats && Array.isArray(data.formats)) {
     const soundDescriptions = data.formats[0]?.descriptions || [];
     const soundTypes = ['Stereo', 'Mono', 'Quadraphonic', 'Surround'];
@@ -320,7 +306,6 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
     if (sound) enriched.sound = sound;
   }
 
-  // Extract identifiers (matrix numbers, SPARS code, barcode)
   if (data.identifiers && Array.isArray(data.identifiers)) {
     const matrixEntries: Record<string, string> = {};
     
@@ -350,7 +335,6 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
     }
   }
 
-  // Extract tracks and disc metadata
   if (data.tracklist && Array.isArray(data.tracklist)) {
     const tracks: unknown[] = [];
     const discMetadata: { disc_number: number; title: string | null }[] = [];
@@ -370,7 +354,6 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
       let side = '';
       let trackPosition = position;
 
-      // Parse position
       const sideMatch = positionStr.match(/^([A-Z])(\d+)?/);
       if (sideMatch) {
         side = sideMatch[1];
@@ -386,9 +369,7 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
 
       const isHeader = track.type_ === 'heading';
 
-      // Check if this is a disc header/title
       if (isHeader) {
-        // Only update disc metadata for new discs
         if (discNumber !== currentDiscNumber) {
           currentDiscNumber = discNumber;
           currentDiscTitle = track.title || null;
@@ -401,12 +382,9 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
             });
           }
         }
-        
-        // Skip adding this to tracks - it's not a music track
         return;
       }
 
-      // Only real music tracks get added to tracks array
       tracks.push({
         position: trackPosition.toString(),
         title: track.title || '',
@@ -427,7 +405,6 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
     }
   }
 
-  // Extract credits
   const engineers: string[] = [];
   const producers: string[] = [];
   const musicians: string[] = [];
@@ -437,23 +414,11 @@ async function enrichFromDiscogs(releaseId: string): Promise<Record<string, unkn
   if (data.extraartists && Array.isArray(data.extraartists)) {
     data.extraartists.forEach((artist: { name: string; role: string }) => {
       const role = artist.role.toLowerCase();
-      if (role.includes('engineer')) {
-        engineers.push(artist.name);
-      }
-      if (role.includes('producer')) {
-        producers.push(artist.name);
-      }
-      if (role.includes('musician') || role.includes('performer')) {
-        musicians.push(artist.name);
-      }
-      if (role.includes('written-by') || role.includes('songwriter')) {
-        songwriters.push(artist.name);
-      }
-      if (role.includes('recorded at') || role.includes('studio')) {
-        if (!studio) {
-          studio = artist.name;
-        }
-      }
+      if (role.includes('engineer')) engineers.push(artist.name);
+      if (role.includes('producer')) producers.push(artist.name);
+      if (role.includes('musician') || role.includes('performer')) musicians.push(artist.name);
+      if (role.includes('written-by') || role.includes('songwriter')) songwriters.push(artist.name);
+      if ((role.includes('recorded at') || role.includes('studio')) && !studio) studio = artist.name;
     });
   }
 
@@ -493,7 +458,6 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
       setFile(selectedFile);
       setError(null);
       
-      // Parse immediately to show counts
       try {
         const text = await selectedFile.text();
         const parsed = parseDiscogsCSV(text);
@@ -504,10 +468,10 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
           return;
         }
 
-        // Load existing collection
+        // FIXED: Select genres instead of discogs_genres
         const { data: existing, error: dbError } = await supabase
           .from('collection')
-          .select('id, artist, title, artist_norm, title_norm, artist_album_norm, discogs_release_id, image_url, tracks, discogs_genres, packaging');
+          .select('id, artist, title, artist_norm, title_norm, artist_album_norm, discogs_release_id, image_url, tracks, genres, packaging');
 
         if (dbError) {
           setError(`Database error: ${dbError.message}`);
@@ -521,10 +485,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
           return;
         }
 
-        // Store total database count
         setTotalDatabaseCount(existing.length);
-
-        // Compare to show diagnostic counts
         const compared = compareAlbums(parsed, existing as ExistingAlbum[]);
         setComparedAlbums(compared);
       } catch (err) {
@@ -539,7 +500,6 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
       setError('Please select a valid CSV file');
       return;
     }
-
     setStage('preview');
   };
 
@@ -550,40 +510,25 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
     try {
       let albumsToProcess: ComparedAlbum[] = [];
 
-      // Determine what to process based on sync mode
       if (syncMode === 'full_replacement') {
-        // Delete everything, process all
         await supabase.from('collection').delete().gt('id', 0);
         albumsToProcess = comparedAlbums.filter(a => a.status !== 'REMOVED');
       } else if (syncMode === 'full_sync') {
-        // Process all CSV albums (scrape missing/changed data), delete REMOVED
         const removed = comparedAlbums.filter(a => a.status === 'REMOVED' && a.existingId);
         if (removed.length > 0) {
           const idsToDelete = removed.map(a => a.existingId!);
-          
-          // Batch deletes to avoid URL length limits (100 IDs at a time)
           const batchSize = 100;
           for (let i = 0; i < idsToDelete.length; i += batchSize) {
             const batch = idsToDelete.slice(i, i + batchSize);
-            const { error: deleteError } = await supabase
-              .from('collection')
-              .delete()
-              .in('id', batch);
-            
-            if (deleteError) {
-              console.error('Delete error:', deleteError);
-              // Continue even if some deletes fail
-            }
+            await supabase.from('collection').delete().in('id', batch);
           }
         }
         albumsToProcess = comparedAlbums.filter(a => a.status !== 'REMOVED');
       } else if (syncMode === 'partial_sync') {
-        // Only NEW and CHANGED
         albumsToProcess = comparedAlbums.filter(a => 
           a.status === 'NEW' || (a.status === 'CHANGED' && a.needsEnrichment)
         );
       } else if (syncMode === 'new_only') {
-        // Only NEW
         albumsToProcess = comparedAlbums.filter(a => a.status === 'NEW');
       }
 
@@ -598,7 +543,6 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
         errors: 0,
       };
 
-      // Process in batches of 25
       const batchSize = 25;
       for (let i = 0; i < albumsToProcess.length; i += batchSize) {
         const batch = albumsToProcess.slice(i, i + batchSize);
@@ -611,7 +555,6 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
           });
 
           try {
-            // Base album data - NEVER include generated columns
             const albumData: Record<string, unknown> = {
               artist: album.artist,
               title: album.title,
@@ -631,58 +574,39 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
               my_rating: album.my_rating,
               decade: album.decade,
             };
-            // GENERATED COLUMNS - NEVER INCLUDE:
-            // year_int (generated from year)
-            // artist_norm (generated from artist)
-            // title_norm (generated from title)
-            // album_norm (generated from title)
-            // artist_album_norm (generated from artist + title)
 
-            // Parse format
             const formatData = parseDiscogsFormat(album.format);
             Object.assign(albumData, formatData);
 
-            // Enrich from Discogs if needed
             if (album.status === 'NEW' || 
-                syncMode === 'full_sync' ||  // Full sync re-scrapes EVERYTHING
+                syncMode === 'full_sync' || 
                 (syncMode === 'partial_sync' && album.needsEnrichment)) {
               
               const enrichedData = await enrichFromDiscogs(album.discogs_release_id);
               
-              // For full_sync and new albums, use ALL enriched data (overwrite everything)
               if (syncMode === 'full_sync' || album.status === 'NEW') {
                 Object.assign(albumData, enrichedData);
               } else {
-                // For partial_sync, only add missing fields
                 album.missingFields.forEach(field => {
                   if (enrichedData[field]) {
-                    albumData[field] = enrichedData[field];
+                    // FIXED: Handle mapping correctly
+                    if (field === 'genres') albumData.genres = enrichedData.genres;
+                    else if (field === 'styles') albumData.styles = enrichedData.styles;
+                    else albumData[field] = enrichedData[field];
                   }
                 });
               }
             }
 
-            // Insert or update
             if (album.status === 'NEW') {
-              const { error: insertError } = await supabase
-                .from('collection')
-                .insert(albumData);
-
+              const { error: insertError } = await supabase.from('collection').insert(albumData);
               if (insertError) throw insertError;
               resultCounts.added++;
             } else {
-              const { error: updateError } = await supabase
-                .from('collection')
-                .update(albumData)
-                .eq('id', album.existingId!);
-
+              const { error: updateError } = await supabase.from('collection').update(albumData).eq('id', album.existingId!);
               if (updateError) throw updateError;
-              
-              if (album.status === 'CHANGED') {
-                resultCounts.updated++;
-              } else {
-                resultCounts.unchanged++;
-              }
+              if (album.status === 'CHANGED') resultCounts.updated++;
+              else resultCounts.unchanged++;
             }
           } catch (err) {
             console.error(`Error processing ${album.artist} - ${album.title}:`, err);
@@ -693,10 +617,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
 
       setResults(resultCounts);
       setStage('complete');
-      
-      if (onImportComplete) {
-        onImportComplete();
-      }
+      if (onImportComplete) onImportComplete();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Import failed');
       setStage('preview');
@@ -721,7 +642,7 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
     ? 0
     : comparedAlbums.filter(a => a.status === 'UNCHANGED').length;
   const removedCount = syncMode === 'full_replacement'
-    ? totalDatabaseCount  // Show ALL albums in database will be deleted
+    ? totalDatabaseCount
     : syncMode === 'full_sync'
       ? comparedAlbums.filter(a => a.status === 'REMOVED').length
       : 0;
@@ -1024,68 +945,57 @@ export default function ImportDiscogsModal({ isOpen, onClose, onImportComplete }
                     </thead>
                     <tbody>
                       {(() => {
-                        // Filter albums based on sync mode to show only what will be processed
                         let albumsToShow = comparedAlbums;
-                        
-                        if (syncMode === 'new_only') {
-                          albumsToShow = comparedAlbums.filter(a => a.status === 'NEW');
-                        } else if (syncMode === 'partial_sync') {
-                          albumsToShow = comparedAlbums.filter(a => 
-                            a.status === 'NEW' || (a.status === 'CHANGED' && a.needsEnrichment)
-                          );
-                        } else if (syncMode === 'full_sync') {
-                          // Show everything except unchanged
-                          albumsToShow = comparedAlbums.filter(a => a.status !== 'UNCHANGED');
-                        }
-                        // full_replacement shows everything
+                        if (syncMode === 'new_only') albumsToShow = comparedAlbums.filter(a => a.status === 'NEW');
+                        else if (syncMode === 'partial_sync') albumsToShow = comparedAlbums.filter(a => a.status === 'NEW' || (a.status === 'CHANGED' && a.needsEnrichment));
+                        else if (syncMode === 'full_sync') albumsToShow = comparedAlbums.filter(a => a.status !== 'UNCHANGED');
                         
                         return albumsToShow.slice(0, 10).map((album, idx) => {
-                        let statusColor = '#6b7280';
-                        let statusDisplay: string = album.status;
-                        let actionText = 'No action';
+                          let statusColor = '#6b7280';
+                          let statusDisplay: string = album.status;
+                          let actionText = 'No action';
 
-                        if (syncMode === 'full_replacement') {
-                          // In full replacement, show all non-removed as import, all removed as delete
-                          if (album.status === 'REMOVED') {
-                            statusColor = '#dc2626';
-                            statusDisplay = 'WILL DELETE';
-                            actionText = 'Delete from database';
-                          } else {
+                          if (syncMode === 'full_replacement') {
+                            if (album.status === 'REMOVED') {
+                              statusColor = '#dc2626';
+                              statusDisplay = 'WILL DELETE';
+                              actionText = 'Delete from database';
+                            } else {
+                              statusColor = '#059669';
+                              statusDisplay = 'WILL IMPORT';
+                              actionText = 'Import + enrich';
+                            }
+                          } else if (album.status === 'NEW') {
                             statusColor = '#059669';
-                            statusDisplay = 'WILL IMPORT';
-                            actionText = 'Import + enrich';
+                            statusDisplay = 'NEW';
+                            actionText = 'Add + enrich';
+                          } else if (album.status === 'CHANGED' && album.needsEnrichment) {
+                            statusColor = '#d97706';
+                            statusDisplay = 'MISSING DATA';
+                            actionText = album.missingFields.join(', ');
+                          } else if (album.status === 'UNCHANGED') {
+                            statusColor = '#6b7280';
+                            statusDisplay = 'UNCHANGED';
+                            actionText = 'Skip';
+                          } else if (album.status === 'REMOVED') {
+                            statusColor = '#dc2626';
+                            statusDisplay = 'REMOVED';
+                            actionText = syncMode === 'full_sync' ? 'Delete' : 'Keep';
                           }
-                        } else if (album.status === 'NEW') {
-                          statusColor = '#059669';
-                          statusDisplay = 'NEW';
-                          actionText = 'Add + enrich';
-                        } else if (album.status === 'CHANGED' && album.needsEnrichment) {
-                          statusColor = '#d97706';
-                          statusDisplay = 'MISSING DATA';
-                          actionText = album.missingFields.join(', ');
-                        } else if (album.status === 'UNCHANGED') {
-                          statusColor = '#6b7280';
-                          statusDisplay = 'UNCHANGED';
-                          actionText = 'Skip';
-                        } else if (album.status === 'REMOVED') {
-                          statusColor = '#dc2626';
-                          statusDisplay = 'REMOVED';
-                          actionText = syncMode === 'full_sync' ? 'Delete' : 'Keep';
-                        }
 
-                        return (
-                          <tr key={idx} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                            <td style={{ padding: '8px 12px', color: '#111827' }}>{album.artist}</td>
-                            <td style={{ padding: '8px 12px', color: '#111827' }}>{album.title}</td>
-                            <td style={{ padding: '8px 12px', color: statusColor, fontWeight: '600' }}>
-                              {statusDisplay}
-                            </td>
-                            <td style={{ padding: '8px 12px', color: '#6b7280', fontSize: '12px' }}>
-                              {actionText}
-                            </td>
-                          </tr>
-                        );
-                      });
+                          return (
+                            <tr key={idx} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                              <td style={{ padding: '8px 12px', color: '#111827' }}>{album.artist}</td>
+                              <td style={{ padding: '8px 12px', color: '#111827' }}>{album.title}</td>
+                              <td style={{ padding: '8px 12px', color: statusColor, fontWeight: '600' }}>
+                                {statusDisplay}
+                              </td>
+                              <td style={{ padding: '8px 12px', color: '#6b7280', fontSize: '12px' }}>
+                                {actionText}
+                              </td>
+                            </tr>
+                          );
+                        });
                       })()}
                     </tbody>
                   </table>

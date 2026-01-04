@@ -254,9 +254,10 @@ export async function enrichDiscogsMetadata(albumId: number, artist: string, tit
 }> {
   try {
     // Check what's already there
+    // FIXED: Select genres/styles instead of discogs_genres
     const { data: existing } = await supabase
       .from('collection')
-      .select('discogs_release_id, discogs_master_id, image_url, discogs_genres, discogs_styles, tracks')
+      .select('discogs_release_id, discogs_master_id, image_url, genres, styles, tracks')
       .eq('id', albumId)
       .single();
 
@@ -265,7 +266,7 @@ export async function enrichDiscogsMetadata(albumId: number, artist: string, tit
       isValidDiscogsId(existing?.discogs_release_id) &&
       isValidDiscogsId(existing?.discogs_master_id) &&
       existing?.image_url &&
-      existing?.discogs_genres?.length > 0 &&
+      existing?.genres?.length > 0 &&
       existing?.tracks
     ) {
       return { success: true, skipped: true };
@@ -303,8 +304,9 @@ export async function enrichDiscogsMetadata(albumId: number, artist: string, tit
       discogs_master_id: release.master_id ? String(release.master_id) : null,
       image_url: ((release.images as Array<{ uri: string }> | undefined)?.[0]?.uri) || existing?.image_url,
       back_image_url: ((release.images as Array<{ uri: string }> | undefined)?.[1]?.uri) || null,
-      discogs_genres: (release.genres as string[] | undefined) || [],
-      discogs_styles: (release.styles as string[] | undefined) || [],
+      // FIXED: Map to canonical columns
+      genres: (release.genres as string[] | undefined) || [],
+      styles: (release.styles as string[] | undefined) || [],
       tracks: tracks,
     };
 
@@ -733,9 +735,9 @@ export async function enrichAppleLyrics(albumId: number): Promise<{
               // Strip TTML tags
               const plainLyrics = ttml
                 .replace(/<[^>]*>/g, '')
-                .replace(/&apos;/g, "'")
-                .replace(/&quot;/g, '"')
-                .replace(/&amp;/g, '&')
+                .replace(/'/g, "'")
+                .replace(/"/g, '"')
+                .replace(/&/g, '&')
                 .trim();
 
               return {

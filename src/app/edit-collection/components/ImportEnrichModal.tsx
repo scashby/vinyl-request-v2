@@ -189,8 +189,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       return;
     }
 
-    // Console log for verification (hidden from UI)
-    console.log('--- ENRICHMENT FIX v4 ACTIVE: Blocking cat_no and generated columns ---');
+    console.log('--- ENRICHMENT ALLOWLIST ACTIVE (v6): Discogs Bloat Removed ---');
 
     setEnriching(true);
     setStatus('Scanning for missing data...');
@@ -228,22 +227,16 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   }
 
   async function processCandidates(results: CandidateResult[]) {
-    // 1. DEFINE BLOCKED FIELDS
-    // These fields cause 400 errors or unwanted data conflicts if sent to Supabase
-    const BLOCKED_FIELDS = new Set([
-      'id',
-      // Block Catalog Numbers (User Request & Data Type Risks)
-      'cat_no', 'catalog_number', 'catalognumber', 'catno',
-      // Block Generated/Computed Columns (Writing these causes DB Crash)
-      'year_int', 
-      'album_norm', 
-      'artist_norm', 
-      'title_norm', 
-      'artist_album_norm',
-      // Block Technical Timestamps
-      'created_at', 
-      'updated_at', 
-      'last_enriched_at'
+    // 1. DEFINE ALLOWLIST (The "Parsing" Step)
+    // Only these exact columns exist in the DB.
+    // Removed: discogs_genres, discogs_styles (per SQL cleanup)
+    const ALLOWED_COLUMNS = new Set([
+      'artist', 'title', 'year', 'format', 'country', 'barcode', 'labels',
+      'tracklists', 'image_url', 'sell_price', 'media_condition', 'folder',
+      'discogs_master_id', 'discogs_release_id', 'spotify_id', 'spotify_url',
+      'apple_music_id', 'apple_music_url', 
+      'genres', 'styles', // Canonical columns only
+      'musicians', 'credits', 'producers'
     ]);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -266,23 +259,22 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       const autoFilledFields: string[] = [];
 
       Object.entries(combined).forEach(([key, value]) => {
-        // 2. AGGRESSIVE FILTERING (First Pass)
-        // Skip technical IDs, URLs, and anything in the Blocklist
-        if (
-          key.endsWith('_id') || 
-          key.endsWith('_url') || 
-          BLOCKED_FIELDS.has(key)
-        ) {
+        
+        // 2. PARSE/FILTER
+        // If the key is not in our allowed columns, ignore it.
+        // This implicitly blocks 'cat_no', 'status', 'generated_columns', and now 'discogs_genres'
+        if (!ALLOWED_COLUMNS.has(key)) {
             return;
         }
 
         const currentVal = album[key];
         const newVal = value;
 
-        // Skip if value is an object/array trying to go into a text field 
-        // (prevents "Invalid input syntax" 400 errors)
+        // Extra Safety: Don't try to write objects to text fields
         if (typeof newVal === 'object' && newVal !== null && !Array.isArray(newVal)) {
-             return; 
+             if (!['musicians', 'producers', 'engineers', 'writers', 'credits'].includes(key)) {
+                return;
+             }
         }
 
         const isCurrentEmpty = !currentVal || (Array.isArray(currentVal) && currentVal.length === 0);
@@ -303,8 +295,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
               format: (album.format as string) || 'Unknown',
               year: album.year as string,
               country: album.country as string,
-              cat_no: album.cat_no as string,
-              barcode: album.barcode as string,
+              cat_no: '', // Force empty so UI doesn't crash if it expects it
+              barcode: (album.barcode as string) || '',
               labels: (album.labels as string[]) || []
            });
         }
@@ -327,16 +319,10 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
     setEnriching(false);
 
-    // 3. FINAL SAFETY FILTER (Double Lock)
-    // Explicitly filter cat_no and blocked fields from the final conflict list
-    const filteredConflicts = newConflicts.filter(c => 
-      !BLOCKED_FIELDS.has(c.field_name) && c.field_name !== 'cat_no'
-    );
-
-    if (filteredConflicts.length > 0) {
-      setConflicts(filteredConflicts);
+    if (newConflicts.length > 0) {
+      setConflicts(newConflicts);
       setShowReview(true);
-      setStatus(autoUpdates.length > 0 ? `Auto-filled ${filledCount} fields. Reviewing ${filteredConflicts.length} conflicts.` : `Review required for ${filteredConflicts.length} items.`);
+      setStatus(autoUpdates.length > 0 ? `Auto-filled ${filledCount} fields. Reviewing ${newConflicts.length} conflicts.` : `Review required for ${newConflicts.length} items.`);
     } else {
       setStatus(autoUpdates.length > 0 ? `✅ Success! Auto-filled ${filledCount} missing fields.` : 'Analysis complete. No better data found.');
       if (autoUpdates.length > 0) loadStats();
@@ -404,7 +390,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     ]},
     { category: 'genres', count: stats.missingGenres },
     { category: 'streaming_links', count: stats.missingStreamingLinks },
-    { category: 'release_metadata', count: stats.missingReleaseMetadata }, // Removed catalog # subcount
+    { category: 'release_metadata', count: stats.missingReleaseMetadata },
   ] : [];
 
   return (

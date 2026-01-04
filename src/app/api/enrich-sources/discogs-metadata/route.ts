@@ -1,4 +1,4 @@
-// src/app/api/enrich-sources/discogs-metadata/route.ts - COMPLETE FILE
+// src/app/api/enrich-sources/discogs-metadata/route.ts
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { hasValidDiscogsId } from 'lib/discogs-validation';
@@ -96,9 +96,10 @@ export async function POST(req: Request) {
       }, { status: 500 });
     }
 
+    // FIXED: Select genres/styles instead of discogs_genres
     const { data: album, error: dbError } = await supabase
       .from('collection')
-      .select('id, artist, title, year, discogs_release_id, discogs_master_id, image_url, discogs_genres, discogs_styles, tracklists')
+      .select('id, artist, title, year, discogs_release_id, discogs_master_id, image_url, genres, styles, tracklists')
       .eq('id', albumId)
       .single();
 
@@ -136,7 +137,8 @@ export async function POST(req: Request) {
     // Check what needs enrichment
     const needsMasterId = !hasValidDiscogsId(album.discogs_master_id);
     const needsImage = !album.image_url;
-    const needsGenres = !album.discogs_genres || album.discogs_genres.length === 0;
+    // FIXED: Check canonical genres
+    const needsGenres = !album.genres || album.genres.length === 0;
     const needsTracklist = !album.tracklists;
 
     if (!foundReleaseId && !needsMasterId && !needsImage && !needsGenres && !needsTracklist) {
@@ -176,8 +178,9 @@ export async function POST(req: Request) {
       const unique = Array.from(new Set(combined));
       
       if (unique.length > 0) {
-        updateData.discogs_genres = unique;
-        updateData.discogs_styles = unique;
+        // FIXED: Write to canonical columns
+        updateData.genres = unique;
+        updateData.styles = unique;
         console.log(`✓ Found ${unique.length} genres/styles: ${unique.join(', ')}`);
       }
     }
@@ -228,7 +231,7 @@ export async function POST(req: Request) {
         foundReleaseId: foundReleaseId ? releaseId : undefined,
         addedMasterId: !!updateData.discogs_master_id,
         addedImage: !!updateData.image_url,
-        addedGenres: !!updateData.discogs_genres,
+        addedGenres: !!updateData.genres,
         addedTracklist: !!updateData.tracklists
       }
     });
