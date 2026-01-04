@@ -11,7 +11,8 @@ const supabase = createClient(
 export async function GET() {
   try {
     // 1. Select all columns needed for the detailed stats
-    const { data: albums } = await supabase
+    // FIXED: Swapped 'discogs_genres' for 'genres'
+    const { data: albums, error } = await supabase
       .from('collection')
       .select(`
         id,
@@ -28,7 +29,7 @@ export async function GET() {
         discogs_master_id,
         image_url,
         back_image_url,
-        discogs_genres,
+        genres,
         tracklists,
         cat_no,
         barcode,
@@ -36,7 +37,8 @@ export async function GET() {
         folder
       `);
 
-    if (!albums) {
+    if (error || !albums) {
+      console.error("Supabase Error:", error);
       return NextResponse.json({
         success: false,
         error: 'Failed to fetch albums'
@@ -52,16 +54,16 @@ export async function GET() {
       // Artwork
       missingArtwork: 0,
       missingBackCover: 0,
-      missingSpineCover: 0, // Placeholder (not tracked in DB yet)
-      missingInnerSleeves: 0, // Placeholder
-      missingLabelImages: 0, // Placeholder
+      missingSpineCover: 0,
+      missingInnerSleeves: 0,
+      missingLabelImages: 0,
       
       // Credits
       missingCredits: 0,
       missingMusicians: 0,
       missingProducers: 0,
-      missingEngineers: 0, // Placeholder
-      missingSongwriters: 0, // Placeholder
+      missingEngineers: 0,
+      missingSongwriters: 0,
       
       // Tracklists
       missingTracklists: 0,
@@ -69,8 +71,8 @@ export async function GET() {
       // Audio
       missingAudioAnalysis: 0,
       missingTempo: 0,
-      missingKey: 0, // Placeholder
-      missingMoodData: 0, // Placeholder
+      missingKey: 0,
+      missingMoodData: 0,
       
       // Genres
       missingGenres: 0,
@@ -82,14 +84,14 @@ export async function GET() {
       missingLastFm: 0,
       
       // Reviews/Charts
-      missingReviews: 0, // Placeholder
-      missingRatings: 0, // Placeholder
-      missingChartData: 0, // Placeholder
+      missingReviews: 0,
+      missingRatings: 0,
+      missingChartData: 0,
       
       // Metadata
       missingReleaseMetadata: 0,
       missingDiscogsIds: 0,
-      missingLabels: 0, // Placeholder (or map to label field if added)
+      missingLabels: 0,
       missingCatalogNumber: 0,
       missingBarcode: 0,
       missingCountry: 0,
@@ -110,7 +112,8 @@ export async function GET() {
       const hasBarcode = !!album.barcode;
       const hasCountry = !!album.country;
       const hasTempo = !!album.tempo_bpm;
-      const hasGenres = album.discogs_genres && album.discogs_genres.length > 0;
+      // FIXED: Check canonical genres
+      const hasGenres = album.genres && album.genres.length > 0;
       const hasTracks = !!album.tracklists;
 
       // -- Increment Counters --
