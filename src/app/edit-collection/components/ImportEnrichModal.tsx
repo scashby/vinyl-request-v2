@@ -17,19 +17,22 @@ const DATA_CATEGORY_CONFIG: Record<DataCategory, { label: string; desc: string; 
     label: 'Artwork & Images',
     desc: 'Front covers, back covers, spine images, and inner sleeves.',
     icon: '🖼️',
-    services: ['coverArt', 'spotify', 'discogs', 'appleMusic']
+    // Removed 'discogs' - leveraging CoverArtArchive, Spotify, Apple
+    services: ['coverArt', 'spotify', 'appleMusic']
   },
   credits: {
     label: 'Credits & Personnel',
     desc: 'Musicians, producers, engineers, and songwriters.',
     icon: '👥',
-    services: ['musicbrainz', 'discogs', 'wikipedia']
+    // Removed 'discogs' - leveraging MusicBrainz, Wikipedia
+    services: ['musicbrainz', 'wikipedia']
   },
   tracklists: {
     label: 'Tracklists & Durations',
     desc: 'Complete track listings, disk sides, and track durations.',
     icon: '📝',
-    services: ['discogs', 'spotify', 'appleMusic']
+    // Removed 'discogs' - leveraging Streaming services
+    services: ['spotify', 'appleMusic']
   },
   audio_analysis: {
     label: 'Audio Analysis',
@@ -41,7 +44,8 @@ const DATA_CATEGORY_CONFIG: Record<DataCategory, { label: string; desc: string; 
     label: 'Genres & Styles',
     desc: 'Primary genres, sub-styles, and mood tags.',
     icon: '🏷️',
-    services: ['discogs', 'lastfm', 'spotify']
+    // Removed 'discogs' - leveraging Last.fm, Spotify
+    services: ['lastfm', 'spotify']
   },
   streaming_links: {
     label: 'Streaming IDs & URLs',
@@ -51,9 +55,11 @@ const DATA_CATEGORY_CONFIG: Record<DataCategory, { label: string; desc: string; 
   },
   release_metadata: {
     label: 'Release Metadata',
-    desc: 'Catalog numbers, barcodes, record labels, and release dates.',
+    // Removed 'Catalog numbers' from description
+    desc: 'Barcodes, record labels, and original release dates.',
     icon: '💿',
-    services: ['discogs', 'musicbrainz']
+    // Removed 'discogs' - using MB for canonical dates/labels
+    services: ['musicbrainz']
   }
 };
 
@@ -351,26 +357,22 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     );
   }
 
-  const dataCategoriesConfig: { category: DataCategory; count: number; subcounts?: { label: string; count: number }[] }[] = [
-    { category: 'artwork', count: stats?.missingArtwork || 0, subcounts: [
-        { label: 'Back covers', count: stats?.missingBackCover || 0 },
+  const dataCategoriesConfig: { category: DataCategory; count: number; subcounts?: { label: string; count: number }[] }[] = stats ? [
+    { category: 'artwork', count: stats.missingArtwork, subcounts: [
+        { label: 'Back covers', count: stats.missingBackCover },
     ]},
-    { category: 'credits', count: stats?.missingCredits || 0, subcounts: [
-        { label: 'Musicians', count: stats?.missingMusicians || 0 },
-        { label: 'Producers', count: stats?.missingProducers || 0 },
+    { category: 'credits', count: stats.missingCredits, subcounts: [
+        { label: 'Musicians', count: stats.missingMusicians },
+        { label: 'Producers', count: stats.missingProducers },
     ]},
-    { category: 'tracklists', count: stats?.missingTracklists || 0 },
-    { category: 'audio_analysis', count: stats?.missingAudioAnalysis || 0, subcounts: [
-        { label: 'Tempo', count: stats?.missingTempo || 0 },
+    { category: 'tracklists', count: stats.missingTracklists },
+    { category: 'audio_analysis', count: stats.missingAudioAnalysis, subcounts: [
+        { label: 'Tempo', count: stats.missingTempo },
     ]},
-    { category: 'genres', count: stats?.missingGenres || 0 },
-    { category: 'streaming_links', count: stats?.missingStreamingLinks || 0, subcounts: [
-        { label: 'Spotify', count: stats?.missingSpotify || 0 },
-    ]},
-    { category: 'release_metadata', count: stats?.missingReleaseMetadata || 0, subcounts: [
-        { label: 'Catalog #', count: stats?.missingCatalogNumber || 0 },
-    ]},
-  ];
+    { category: 'genres', count: stats.missingGenres },
+    { category: 'streaming_links', count: stats.missingStreamingLinks },
+    { category: 'release_metadata', count: stats.missingReleaseMetadata }, // Removed catalog # subcount
+  ] : [];
 
   return (
     <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3000 }}>
