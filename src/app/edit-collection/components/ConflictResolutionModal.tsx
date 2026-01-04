@@ -61,15 +61,24 @@ export default function ConflictResolutionModal({
     });
   };
 
-  const handleApplyResolution = async (conflict: FieldConflict, resolution: 'current' | 'new' | 'merge'): Promise<void> => {
-    const conflictId = getConflictId(conflict);
-    
-    // Set the resolution state for visual feedback
+  const handleResolutionChange = (conflictId: string, resolution: 'current' | 'new' | 'merge'): void => {
     setResolutions(prev => new Map(prev).set(conflictId, resolution));
+  };
+
+  const mapToResolutionStrategy = (uiResolution: 'current' | 'new' | 'merge'): 'keep_current' | 'use_new' | 'merge' => {
+    if (uiResolution === 'current') return 'keep_current';
+    if (uiResolution === 'new') return 'use_new';
+    return 'merge';
+  };
+
+  const handleApplyConflict = async (conflict: FieldConflict): Promise<void> => {
+    const conflictId = getConflictId(conflict);
+    const resolution = resolutions.get(conflictId) || 'current';
+    const strategyResolution = mapToResolutionStrategy(resolution);
+    
     setIsProcessing(true);
     
     try {
-      const strategyResolution = mapToResolutionStrategy(resolution);
       let finalValue: unknown;
       
       if (strategyResolution === 'merge' && conflict.field_name === 'tracks') {
@@ -110,12 +119,6 @@ export default function ConflictResolutionModal({
     } finally {
       setIsProcessing(false);
     }
-  };
-
-  const mapToResolutionStrategy = (uiResolution: 'current' | 'new' | 'merge'): 'keep_current' | 'use_new' | 'merge' => {
-    if (uiResolution === 'current') return 'keep_current';
-    if (uiResolution === 'new') return 'use_new';
-    return 'merge';
   };
 
   const renderValue = (value: unknown): React.ReactNode => {
@@ -286,55 +289,61 @@ export default function ConflictResolutionModal({
                                 <td colSpan={8} className={styles.duplicatesTableCell}>
                                   <div style={{ display: 'flex', gap: '12px', alignItems: 'center', padding: '8px 0' }}>
                                     <button
-                                      onClick={() => handleApplyResolution(conflict, 'current')}
-                                      disabled={isApplied || isProcessing}
+                                      onClick={() => handleResolutionChange(conflictId, 'current')}
+                                      disabled={isApplied}
                                       style={{
                                         padding: '8px 16px',
-                                        backgroundColor: resolution === 'current' ? '#4CAF50' : 'white',
-                                        color: resolution === 'current' ? 'white' : '#000',
+                                        backgroundColor: resolution === 'current' ? '#E3F2FD' : 'white',
                                         border: '1px solid #000',
                                         borderRadius: '4px',
-                                        cursor: (isApplied || isProcessing) ? 'not-allowed' : 'pointer',
+                                        cursor: isApplied ? 'not-allowed' : 'pointer',
                                         fontWeight: resolution === 'current' ? 600 : 400,
-                                        opacity: (isApplied || isProcessing) ? 0.5 : 1,
+                                        opacity: isApplied ? 0.5 : 1,
                                       }}
                                     >
-                                      {isApplied && resolution === 'current' ? '✓ Kept' : 'Keep Existing'}
+                                      Keep Existing
                                     </button>
                                     <button
-                                      onClick={() => handleApplyResolution(conflict, 'new')}
-                                      disabled={isApplied || isProcessing}
+                                      onClick={() => handleResolutionChange(conflictId, 'new')}
+                                      disabled={isApplied}
                                       style={{
                                         padding: '8px 16px',
-                                        backgroundColor: resolution === 'new' ? '#4CAF50' : 'white',
-                                        color: resolution === 'new' ? 'white' : '#000',
+                                        backgroundColor: resolution === 'new' ? '#E3F2FD' : 'white',
                                         border: '1px solid #000',
                                         borderRadius: '4px',
-                                        cursor: (isApplied || isProcessing) ? 'not-allowed' : 'pointer',
+                                        cursor: isApplied ? 'not-allowed' : 'pointer',
                                         fontWeight: resolution === 'new' ? 600 : 400,
-                                        opacity: (isApplied || isProcessing) ? 0.5 : 1,
+                                        opacity: isApplied ? 0.5 : 1,
                                       }}
                                     >
-                                      {isApplied && resolution === 'new' ? '✓ Replaced' : 'Replace with New'}
+                                      Replace with New
                                     </button>
                                     {canMerge && (
                                       <button
-                                        onClick={() => handleApplyResolution(conflict, 'merge')}
-                                        disabled={isApplied || isProcessing}
+                                        onClick={() => handleResolutionChange(conflictId, 'merge')}
+                                        disabled={isApplied}
                                         style={{
                                           padding: '8px 16px',
-                                          backgroundColor: resolution === 'merge' ? '#4CAF50' : 'white',
-                                          color: resolution === 'merge' ? 'white' : '#000',
+                                          backgroundColor: resolution === 'merge' ? '#E3F2FD' : 'white',
                                           border: '1px solid #000',
                                           borderRadius: '4px',
-                                          cursor: (isApplied || isProcessing) ? 'not-allowed' : 'pointer',
+                                          cursor: isApplied ? 'not-allowed' : 'pointer',
                                           fontWeight: resolution === 'merge' ? 600 : 400,
-                                          opacity: (isApplied || isProcessing) ? 0.5 : 1,
+                                          opacity: isApplied ? 0.5 : 1,
                                         }}
                                       >
-                                        {isApplied && resolution === 'merge' ? '✓ Merged' : 'Merge Data'}
+                                        Merge Data
                                       </button>
                                     )}
+                                    <div style={{ marginLeft: 'auto' }}>
+                                      <button
+                                        onClick={() => handleApplyConflict(conflict)}
+                                        disabled={isApplied || isProcessing}
+                                        className={styles.duplicatesKeepButton}
+                                      >
+                                        {isApplied ? 'Applied' : 'Apply'}
+                                      </button>
+                                    </div>
                                   </div>
                                 </td>
                               </tr>
