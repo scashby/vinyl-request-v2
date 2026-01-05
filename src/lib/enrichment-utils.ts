@@ -35,6 +35,9 @@ export type CandidateData = {
   // Images
   image_url?: string;
   back_image_url?: string;
+  spine_image_url?: string;         // Added
+  inner_sleeve_images?: string[];   // Added
+  vinyl_label_images?: string[];    // Added
   
   // Audio Features
   tempo_bpm?: number;
@@ -319,15 +322,41 @@ export async function fetchCoverArtData(album: { musicbrainz_id?: string }): Pro
         if (!res.ok) return { success: false, source: 'coverArt', error: 'Not Found' };
         
         const data = await res.json();
+        const images = data.images || [];
+
+        // 1. Front (Default to first if no explicit front)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const front = data.images?.find((i: any) => i.front)?.image;
+        const front = images.find((i: any) => i.front)?.image || images[0]?.image;
+        
+        // 2. Back
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const back = data.images?.find((i: any) => i.back)?.image;
+        const back = images.find((i: any) => i.back)?.image;
+
+        // 3. Spine (Look for type "Spine")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const spine = images.find((i: any) => i.types?.includes('Spine'))?.image;
+
+        // 4. Inner Sleeves (Look for type "Inner")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const inner = images.filter((i: any) => i.types?.includes('Inner')).map((i: any) => i.image);
+
+        // 5. Vinyl Labels (Look for type "Medium")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const labels = images.filter((i: any) => i.types?.includes('Medium')).map((i: any) => i.image);
+
+        const resultData: CandidateData = { 
+            image_url: front, 
+            back_image_url: back 
+        };
+
+        if (spine) resultData.spine_image_url = spine;
+        if (inner.length > 0) resultData.inner_sleeve_images = inner;
+        if (labels.length > 0) resultData.vinyl_label_images = labels;
 
         return { 
             success: true, 
             source: 'coverArt', 
-            data: { image_url: front, back_image_url: back } 
+            data: resultData
         };
     } catch (e) {
         return { success: false, source: 'coverArt', error: (e as Error).message };
