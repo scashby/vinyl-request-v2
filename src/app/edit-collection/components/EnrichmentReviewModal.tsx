@@ -313,7 +313,8 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
 
                             {/* Option C: New */}
                             <ConflictValue 
-                              label="New Data"
+                              // @ts-expect-error - source added in previous step
+                              label={`New Data (${conflict.source || 'Unknown'})`}
                               color="blue"
                               value={conflict.new_value}
                               isSelected={areValuesEqual(selected, conflict.new_value)}

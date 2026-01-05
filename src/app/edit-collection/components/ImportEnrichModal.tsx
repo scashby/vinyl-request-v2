@@ -320,9 +320,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     const albumIds = results.map(r => r.album.id);
     const { data: resolutions, error: resError } = await supabase
       .from('import_conflict_resolutions')
-      .select('album_id, field_name')
-      .in('album_id', albumIds)
-      .eq('source', 'discogs');
+      .select('album_id, field_name, source') // CHANGED: Added source
+      .in('album_id', albumIds);
       
     if (resError) console.error('Error fetching history:', resError);
 
@@ -344,7 +343,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const autoUpdates: { id: number; fields: Record<string, any> }[] = [];
-    const newConflicts: FieldConflict[] = [];
+    // CHANGED: Added source to newConflicts type definition to support source-specific logic
+    const newConflicts: (FieldConflict & { source?: string })[] = [];
     const processedIds: number[] = [];
 
     // Helper for async track saving
@@ -379,6 +379,11 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       const updatesForAlbum: Record<string, any> = {};
       const autoFilledFields: string[] = [];
 
+      // PRIORITY ORDER (Must match reverse of the spread order used to create 'combined')
+      // Spread was: MB, Apple, LastFM, Spotify, Discogs, Cover, Wiki, Genius.
+      // So Genius overwrites Wiki, which overwrites Cover...
+      const SOURCE_PRIORITY = ['genius', 'wikipedia', 'coverArt', 'discogs', 'spotify', 'lastfm', 'appleMusic', 'musicbrainz'];
+
       Object.entries(combined).forEach(([key, value]) => {
         if (!ALLOWED_COLUMNS.has(key)) return;
         
@@ -398,10 +403,27 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
              if (!isValidDate(newVal)) return;
         }
 
-        // "DO NOT DISTURB" LOGIC:
+        // 1. DETECT SOURCE
+        // We find which provider actually supplied this value
+        let detectedSource = 'enrichment';
+        for (const s of SOURCE_PRIORITY) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const sourceData = (candidates as any)[s];
+            if (sourceData && sourceData[key] !== undefined) {
+               if (areValuesEqual(sourceData[key], value)) {
+                   detectedSource = s;
+                   break;
+               }
+            }
+        }
+
+        // 2. CHECK HISTORY FOR THIS SPECIFIC SOURCE
+        // "If I already said NO to MusicBrainz for this field, ignore it. But show me Apple Music."
         const alreadyResolved = resolutions?.some(r => 
           r.album_id === album.id && 
-          r.field_name === key
+          r.field_name === key &&
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ((r as any).source === detectedSource || (r as any).source === 'discogs' && detectedSource === 'discogs') 
         );
 
         if (alreadyResolved) return;
@@ -427,6 +449,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
               field_name: key,
               current_value: currentVal,
               new_value: newVal,
+              source: detectedSource, 
               artist: album.artist,
               title: album.title,
               format: (album.format as string) || 'Unknown',
@@ -555,7 +578,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         kept_value: chosenValue,
         rejected_value: rejectedVal, 
         resolution: resolutionType,
-        source: 'discogs',
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        source: (c as any).source || 'enrichment', 
         resolved_at: timestamp
       });
     });
