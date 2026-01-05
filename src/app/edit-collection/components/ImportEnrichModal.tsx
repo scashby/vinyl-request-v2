@@ -1,4 +1,3 @@
-// src/app/edit-collection/components/ImportEnrichModal.tsx
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -234,7 +233,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
     // Fetch batches until we have enough conflicts OR run out of items
     while ((collectedConflicts.length < targetConflicts || specificAlbumIds) && hasMoreRef.current) {
-      setStatus(`Scanning (Cursor: ${cursorRef.current})... Found ${collectedConflicts.length}/${targetConflicts} conflicts.`);
+      setStatus(`Scanning (Cursor: ${cursorRef.current})... Found ${collectedConflicts.length}/${targetConflicts} conflicts to review.`);
 
       try {
         const payload = {
@@ -322,7 +321,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       'apple_music_id', 'apple_music_url', 
       'genres', 'styles',
       'musicians', 'credits', 'producers',
-      'original_release_date' // <--- ADDED AS REQUESTED
+      'original_release_date' // <--- ADDED: Fix for Release Metadata
     ]);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

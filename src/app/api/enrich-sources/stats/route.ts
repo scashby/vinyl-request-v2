@@ -8,8 +8,8 @@ const supabase = createClient(
 
 export async function GET() {
   try {
-    // Fetch all collection items to calculate stats
-    // REMOVED 'cat_no' from this list to prevent 500 Error
+    // 1. Fetch Albums
+    // AUDIT FIX: 'tempo_bpm' matches schema. 'cat_no' removed to prevent 500 error if column issue persists.
     const { data: albums, error } = await supabase
       .from('collection')
       .select(`
@@ -19,19 +19,30 @@ export async function GET() {
         back_image_url,
         musicians,
         producers,
-        tracklists,
-        tempo,
+        tempo_bpm, 
         genres,
         spotify_id,
         apple_music_id,
         lastfm_url,
         barcode,
         labels,
-        original_release_date
+        original_release_date,
+        cat_no
       `);
 
     if (error) throw error;
     if (!albums) return NextResponse.json({ success: true, stats: null });
+
+    // 2. Fetch Track Data (Source of Truth)
+    // We query the separate 'tracks' table to see which albums actually have tracks.
+    const { data: trackRows, error: trackError } = await supabase
+      .from('tracks')
+      .select('album_id');
+    
+    if (trackError) console.error("Track Fetch Error:", trackError);
+
+    // Create a Set of Album IDs that have tracks (converted to String to ensure safe comparison)
+    const albumsWithTracks = new Set(trackRows?.map(t => String(t.album_id)) || []);
 
     // Initialize Counters
     let fullyEnriched = 0;
@@ -39,24 +50,17 @@ export async function GET() {
     
     let missingArtwork = 0;
     let missingBackCover = 0;
-    
     let missingCredits = 0;
     let missingMusicians = 0;
     let missingProducers = 0;
-    
     let missingTracklists = 0;
-    
     let missingAudioAnalysis = 0;
     let missingTempo = 0;
-    
     let missingGenres = 0;
-    
     let missingStreamingLinks = 0;
     let missingSpotify = 0;
-    
     let missingReleaseMetadata = 0;
-    // We default this to 0 since we can't query the column
-    const missingCatalogNumber = 0;
+    let missingCatalogNumber = 0;
 
     const folders = new Set<string>();
 
@@ -80,12 +84,12 @@ export async function GET() {
         if (!hasProducers) missingProducers++;
       }
 
-      // 3. TRACKLISTS
-      const hasTracks = Array.isArray(album.tracklists) && album.tracklists.length > 0;
+      // 3. TRACKLISTS (Using separate table)
+      const hasTracks = albumsWithTracks.has(String(album.id));
       if (!hasTracks) missingTracklists++;
 
-      // 4. AUDIO ANALYSIS
-      const hasTempo = album.tempo !== null && album.tempo !== 0;
+      // 4. AUDIO ANALYSIS (Using tempo_bpm)
+      const hasTempo = album.tempo_bpm !== null && album.tempo_bpm !== 0;
       if (!hasTempo) {
         missingAudioAnalysis++;
         missingTempo++;
@@ -100,27 +104,28 @@ export async function GET() {
       const hasApple = !!album.apple_music_id;
       const hasLastfm = !!album.lastfm_url;
       
-      // LOGIC: Only count as "Missing Streaming Links" if ALL are missing
+      // LOGIC: Only "Missing" if ALL sources are empty
       if (!hasSpotify && !hasApple && !hasLastfm) {
         missingStreamingLinks++;
       }
 
-      if (!hasSpotify) {
-        missingSpotify++;
-      }
+      if (!hasSpotify) missingSpotify++;
 
       // 7. RELEASE METADATA
       const hasBarcode = !!album.barcode;
       const hasLabel = Array.isArray(album.labels) && album.labels.length > 0;
       const hasOriginalDate = !!album.original_release_date;
       
-      // We only flag metadata as missing if barcode, label, or original date is gone.
+      // LOGIC: 'cat_no' excluded from "Needs Enrichment" check
       if (!hasBarcode || !hasLabel || !hasOriginalDate) {
         missingReleaseMetadata++;
       }
 
+      // Tracking stat only
+      if (!album.cat_no) missingCatalogNumber++;
+
       // 8. TOTAL SCORE
-      // Streaming is satisfied if ANY source exists (Spotify OR Apple OR LastFM)
+      // "Fully Enriched" def: Has main assets + ANY streaming link + Metadata (minus cat_no)
       const isComplete = 
         hasFront && hasBack &&
         hasMusicians && hasProducers &&
