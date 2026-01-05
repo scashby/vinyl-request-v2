@@ -354,6 +354,11 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         ...candidates.spotify as object, ...candidates.discogs as object, ...candidates.coverArt as object, 
         ...candidates.wikipedia as object, ...candidates.genius as object 
       };
+
+      // DEBUG: Verify new fields are present in the payload
+      if (Object.keys(combined).some(k => ['spine_image_url', 'inner_sleeve_images', 'vinyl_label_images'].includes(k))) {
+         console.log('[Enrich Debug] Found extended image fields for:', album.title, combined);
+      }
       
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const updatesForAlbum: Record<string, any> = {};
@@ -392,7 +397,10 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         const isCurrentEmpty = !currentVal || (Array.isArray(currentVal) && currentVal.length === 0);
         const isDifferent = !areValuesEqual(currentVal, newVal);
 
-        if (isCurrentEmpty && newVal) {
+        // TEST OVERRIDE: Prevent auto-fill for new fields to force them into the Conflict Review Modal
+        const isTestField = ['spine_image_url', 'inner_sleeve_images', 'vinyl_label_images'].includes(key);
+
+        if (isCurrentEmpty && newVal && !isTestField) {
            updatesForAlbum[key] = newVal;
            autoFilledFields.push(key);
         } else if (isDifferent) {

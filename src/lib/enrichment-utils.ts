@@ -1,4 +1,3 @@
-// src/lib/enrichment-utils.ts
 import Genius from 'genius-lyrics';
 
 // Initialize Genius Client if token exists
@@ -42,6 +41,9 @@ export type CandidateData = {
   // Audio Features
   tempo_bpm?: number;
   
+  // Content
+  tracklist?: string; // Added: Simple text representation of tracks
+  
   // Extra
   lastfm_tags?: string[];
   lyrics?: string;
@@ -55,7 +57,8 @@ export type EnrichmentResult = {
   error?: string;
 };
 
-// Helper interface to avoid 'any' in MusicBrainz response
+// --- Helper Interfaces for Type Safety (ESLint Fixes) ---
+
 interface MusicBrainzRelease {
   id: string;
   status?: string;
@@ -65,6 +68,33 @@ interface MusicBrainzRelease {
     label?: { name: string };
     'catalog-number'?: string;
   }>;
+}
+
+interface SpotifyTrack {
+  name: string;
+  duration_ms: number;
+}
+
+interface DiscogsTrack {
+  position: string;
+  title: string;
+  duration: string;
+}
+
+interface LastFMTag {
+  name: string;
+}
+
+interface LastFMImage {
+  size: string;
+  '#text': string;
+}
+
+interface CAAImage {
+  front: boolean;
+  back: boolean;
+  types: string[];
+  image: string;
 }
 
 const USER_AGENT = 'DeadwaxDialogues/1.0 (https://deadwaxdialogues.com)';
@@ -171,7 +201,8 @@ export async function fetchSpotifyData(album: { artist: string, title: string, s
       original_release_date: data.release_date,
       image_url: data.images?.[0]?.url,
       label: data.label ? [data.label] : undefined,
-      genres: data.genres?.length ? data.genres : undefined 
+      genres: data.genres?.length ? data.genres : undefined,
+      tracklist: data.tracks?.items?.map((t: SpotifyTrack, i: number) => `${i + 1}. ${t.name} (${Math.floor(t.duration_ms / 60000)}:${String(Math.floor((t.duration_ms % 60000) / 1000)).padStart(2, '0')})`).join('\n')
     };
 
     if (!candidate.genres && data.artists?.[0]?.id) {
@@ -268,7 +299,8 @@ export async function fetchDiscogsData(album: { artist: string, title: string, d
       original_release_date: data.released,
       image_url: data.images?.[0]?.uri,
       label: data.labels?.[0]?.name ? [data.labels[0].name] : undefined,
-      country: data.country
+      country: data.country,
+      tracklist: data.tracklist?.map((t: DiscogsTrack) => `${t.position} - ${t.title} (${t.duration})`).join('\n')
     };
 
     return { success: true, source: 'discogs', data: candidate };
@@ -291,11 +323,9 @@ export async function fetchLastFmData(album: { artist: string, title: string }):
     
     if (!data.album) return { success: false, source: 'lastfm', error: 'Not found' };
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const tags = data.album.tags?.tag?.map((t: any) => t.name) || [];
+    const tags = data.album.tags?.tag?.map((t: LastFMTag) => t.name) || [];
     const images = data.album.image;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const largeImg = images?.find((i: any) => i.size === 'extralarge' || i.size === 'large')?.['#text'];
+    const largeImg = images?.find((i: LastFMImage) => i.size === 'extralarge' || i.size === 'large')?.['#text'];
 
     const candidate: CandidateData = {
       lastfm_url: data.album.url,
@@ -325,24 +355,19 @@ export async function fetchCoverArtData(album: { musicbrainz_id?: string }): Pro
         const images = data.images || [];
 
         // 1. Front (Default to first if no explicit front)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const front = images.find((i: any) => i.front)?.image || images[0]?.image;
+        const front = images.find((i: CAAImage) => i.front)?.image || images[0]?.image;
         
         // 2. Back
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const back = images.find((i: any) => i.back)?.image;
+        const back = images.find((i: CAAImage) => i.back)?.image;
 
         // 3. Spine (Look for type "Spine")
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const spine = images.find((i: any) => i.types?.includes('Spine'))?.image;
+        const spine = images.find((i: CAAImage) => i.types?.includes('Spine'))?.image;
 
         // 4. Inner Sleeves (Look for type "Inner")
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const inner = images.filter((i: any) => i.types?.includes('Inner')).map((i: any) => i.image);
+        const inner = images.filter((i: CAAImage) => i.types?.includes('Inner')).map((i: CAAImage) => i.image);
 
         // 5. Vinyl Labels (Look for type "Medium")
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const labels = images.filter((i: any) => i.types?.includes('Medium')).map((i: any) => i.image);
+        const labels = images.filter((i: CAAImage) => i.types?.includes('Medium')).map((i: CAAImage) => i.image);
 
         const resultData: CandidateData = { 
             image_url: front, 
