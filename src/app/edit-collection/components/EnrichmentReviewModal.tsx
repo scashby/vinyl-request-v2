@@ -1,3 +1,4 @@
+// src/app/edit-collection/components/EnrichmentReviewModal.tsx
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -6,7 +7,7 @@ import { type FieldConflict } from 'lib/conflictDetection';
 
 interface EnrichmentReviewModalProps {
   conflicts: FieldConflict[];
-  onComplete: () => void;
+  onComplete: (resolutions: Record<string, unknown>) => void;
   onCancel: () => void;
 }
 
@@ -27,15 +28,14 @@ function ConflictValue({
   const [dimensions, setDimensions] = useState<{ w: number, h: number } | null>(null);
   const [isImage, setIsImage] = useState(false);
 
-  // Robust Image Detection
   useEffect(() => {
     if (typeof value === 'string') {
       const url = value.toLowerCase();
       if (
         url.match(/\.(jpeg|jpg|gif|png|webp|bmp)$/i) || 
         url.includes('images.discogs.com') ||
-        url.includes('i.scdn.co') || // Spotify images
-        url.includes('mzstatic.com')  // Apple images
+        url.includes('i.scdn.co') || 
+        url.includes('mzstatic.com')
       ) {
         setIsImage(true);
       }
@@ -58,7 +58,7 @@ function ConflictValue({
     gap: '8px',
     position: 'relative' as const,
     height: '100%',
-    minWidth: '0' // Flexbox overflow fix
+    minWidth: '0'
   };
 
   const headerStyle = {
@@ -86,7 +86,7 @@ function ConflictValue({
             style={{ objectFit: 'contain' }}
             unoptimized
             onLoadingComplete={(img) => setDimensions({ w: img.naturalWidth, h: img.naturalHeight })}
-            onError={() => setIsImage(false)} // Fallback to text if image fails
+            onError={() => setIsImage(false)}
           />
         </div>
         <div style={{ fontSize: '11px', color: '#6b7280', textAlign: 'center', marginTop: 'auto', paddingTop: '4px' }}>
@@ -121,10 +121,9 @@ function ConflictValue({
 }
 
 export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel }: EnrichmentReviewModalProps) {
-  // Map of FieldConflictID -> Selected Value
+  // Map of "AlbumID-FieldName" -> Selected Value
   const [resolutions, setResolutions] = useState<Record<string, unknown>>({});
 
-  // Group conflicts by Album ID
   const groupedConflicts = useMemo(() => {
     const groups: Record<number, FieldConflict[]> = {};
     conflicts.forEach(c => {
@@ -134,17 +133,15 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
     return groups;
   }, [conflicts]);
 
-  // Initial Auto-Select: Default to KEEP CURRENT (Safe)
-  // Or User can click "Select All New"
+  // Initial Auto-Select: Default to KEEP CURRENT
   useEffect(() => {
     const defaults: Record<string, unknown> = {};
     conflicts.forEach(c => {
-      // Unique key: albumId + fieldName
       const key = `${c.album_id}-${c.field_name}`;
       defaults[key] = c.current_value; 
     });
     setResolutions(defaults);
-  }, [conflicts]); // Only run once on mount
+  }, [conflicts]);
 
   const handleResolve = (conflict: FieldConflict, value: unknown) => {
     const key = `${conflict.album_id}-${conflict.field_name}`;
@@ -170,14 +167,8 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
   };
 
   const handleSave = () => {
-    // Update the original conflict objects with the chosen values
-    conflicts.forEach(c => {
-      const key = `${c.album_id}-${c.field_name}`;
-      if (resolutions[key] !== undefined) {
-        c.new_value = resolutions[key]; // Parent uses c.new_value to write to DB
-      }
-    });
-    onComplete();
+    // Pass the resolutions map back to parent instead of mutating props
+    onComplete(resolutions);
   };
 
   const totalChanges = Object.keys(groupedConflicts).length;
@@ -227,7 +218,7 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
         <div style={{ flex: 1, overflowY: 'auto', backgroundColor: '#f9fafb', padding: '24px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             {Object.values(groupedConflicts).map((group, idx) => {
-              const albumInfo = group[0]; // All conflicts in group share the same album info context
+              const albumInfo = group[0];
               
               return (
                 <div key={idx} style={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e5e7eb', overflow: 'hidden' }}>

@@ -19,24 +19,6 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-function needsService(album: Record<string, unknown>, service: string): boolean {
-  switch (service) {
-    case 'musicbrainz':
-      const musicians = album.musicians as unknown[] | undefined;
-      const producers = album.producers as unknown[] | undefined;
-      return !album.musicbrainz_id || (!musicians?.length && !producers?.length);
-    case 'spotify':
-      return !album.spotify_id || !album.spotify_release_date; 
-    case 'discogs':
-      const genres = album.genres as unknown[] | undefined;
-      return !album.discogs_release_id || !genres?.length;
-    case 'coverArt':
-      return !album.image_url;
-    default:
-      return true; 
-  }
-}
-
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -73,17 +55,15 @@ export async function POST(req: Request) {
       if (error) throw error;
       const fetched = data || [];
 
-      // ALWAYS calculate cursor from raw fetch to ensure progress
+      // Always advance cursor based on raw fetch to ensure progress
       if (fetched.length > 0) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         nextCursor = (fetched[fetched.length - 1] as any).id;
       }
 
-      targetAlbums = fetched.filter(album => {
-        return Object.entries(services).some(([serviceKey, isEnabled]) => {
-          return isEnabled && needsService(album, serviceKey);
-        });
-      });
+      // NO FILTERING: We process everything we fetched.
+      // This ensures we check for upgrades even if data exists.
+      targetAlbums = fetched;
     }
 
     if (!targetAlbums.length) {
@@ -91,7 +71,7 @@ export async function POST(req: Request) {
         success: true, 
         results: [], 
         nextCursor: nextCursor,
-        message: "No albums found needing enrichment in this batch." 
+        message: "No albums found in this batch." 
       });
     }
 
@@ -104,6 +84,7 @@ export async function POST(req: Request) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const typedAlbum = album as any;
 
+      // Always fetch requested services
       if (services.musicbrainz) promises.push(fetchMusicBrainzData(typedAlbum));
       if (services.discogs) promises.push(fetchDiscogsData(typedAlbum));
       if (services.spotify) promises.push(fetchSpotifyData(typedAlbum));

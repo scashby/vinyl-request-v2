@@ -7,6 +7,7 @@ import { supabase } from 'lib/supabaseClient';
 import EnrichmentReviewModal from './EnrichmentReviewModal';
 import { type FieldConflict } from 'lib/conflictDetection';
 
+// --- 1. DATA CATEGORY DEFINITIONS ---
 export type DataCategory = 
   | 'artwork' | 'credits' | 'tracklists' | 'audio_analysis' 
   | 'genres' | 'streaming_links' | 'release_metadata';
@@ -56,6 +57,7 @@ const DATA_CATEGORY_CONFIG: Record<DataCategory, { label: string; desc: string; 
   }
 };
 
+// --- 2. TYPES ---
 interface ImportEnrichModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -101,26 +103,20 @@ type LogEntry = {
   timestamp: Date;
 };
 
-// --- HELPER: ROBUST EQUALITY CHECK ---
-// Handles string vs number ("1999" vs 1999), array order, and null/undefined
-const areValuesEqual = (a: unknown, b: unknown): boolean => {
-  if ((a === null || a === undefined || a === '') && (b === null || b === undefined || b === '')) return true;
-  if (!a || !b) return a === b;
-
-  if (typeof a !== 'object' && typeof b !== 'object') {
-    return String(a).trim() === String(b).trim();
-  }
-
-  if (Array.isArray(a) && Array.isArray(b)) {
-    if (a.length !== b.length) return false;
-    const sortedA = [...a].sort().map(val => (typeof val === 'object' ? JSON.stringify(val) : String(val)));
-    const sortedB = [...b].sort().map(val => (typeof val === 'object' ? JSON.stringify(val) : String(val)));
-    return JSON.stringify(sortedA) === JSON.stringify(sortedB);
-  }
-
-  return JSON.stringify(a) === JSON.stringify(b);
+// Helper to normalize values for comparison
+const normalizeValue = (val: unknown): string => {
+  if (val === null || val === undefined) return '';
+  if (typeof val === 'number') return String(val);
+  if (Array.isArray(val)) return JSON.stringify(val.sort());
+  if (typeof val === 'object') return JSON.stringify(val);
+  return String(val).trim();
 };
 
+const areValuesEqual = (a: unknown, b: unknown): boolean => {
+  return normalizeValue(a) === normalizeValue(b);
+};
+
+// --- 3. MAIN COMPONENT ---
 export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }: ImportEnrichModalProps) {
   const [stats, setStats] = useState<EnrichmentStats | null>(null);
   const [folders, setFolders] = useState<string[]>([]);
@@ -144,6 +140,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   const [sessionLog, setSessionLog] = useState<LogEntry[]>([]);
   const logEndRef = useRef<HTMLDivElement>(null);
 
+  // Loop Control Refs
   const hasMoreRef = useRef(true);
   const isLoopingRef = useRef(false);
   const cursorRef = useRef(0);
@@ -201,15 +198,18 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     }]);
   }
 
+  // --- MAIN LOOP LOGIC ---
+
   async function startEnrichment(specificAlbumIds?: number[]) {
     if (selectedCategories.size === 0) {
       alert('Please select at least one data category');
       return;
     }
 
+    // Reset loop state
     hasMoreRef.current = true;
     isLoopingRef.current = true;
-    cursorRef.current = 0;
+    cursorRef.current = 0; // Start from beginning
     setConflicts([]);
     
     if (specificAlbumIds && specificAlbumIds.length > 0) {
@@ -232,8 +232,9 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     const targetConflicts = parseInt(batchSize);
     let collectedConflicts: FieldConflict[] = [];
 
+    // Fetch batches until we have enough conflicts OR run out of items
     while ((collectedConflicts.length < targetConflicts || specificAlbumIds) && hasMoreRef.current) {
-      setStatus(`Scanning (Cursor: ${cursorRef.current})... Found ${collectedConflicts.length}/${targetConflicts} conflicts to review.`);
+      setStatus(`Scanning (Cursor: ${cursorRef.current})... Found ${collectedConflicts.length}/${targetConflicts} conflicts.`);
 
       try {
         const payload = {
@@ -253,6 +254,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         const result = await res.json();
         if (!result.success) throw new Error(result.error);
 
+        // Update Cursor
         if (result.nextCursor !== undefined && result.nextCursor !== null) {
           cursorRef.current = result.nextCursor;
         } else {
@@ -264,9 +266,10 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         const candidates = result.results || [];
 
         if (candidates.length === 0 && hasMoreRef.current === false) {
-          break;
+          break; // Done
         }
 
+        // Process this batch
         const { conflicts: batchConflicts } = await processBatchAndSave(candidates);
         
         collectedConflicts = [...collectedConflicts, ...batchConflicts];
@@ -299,15 +302,18 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   }
 
   async function processBatchAndSave(results: CandidateResult[]) {
+    // 1. FETCH PREVIOUS RESOLUTIONS
+    // Optimization: Just check if a record exists for this field/album/source
     const albumIds = results.map(r => r.album.id);
     const { data: resolutions, error: resError } = await supabase
       .from('import_conflict_resolutions')
-      .select('album_id, field_name, rejected_value')
+      .select('album_id, field_name')
       .in('album_id', albumIds)
       .eq('source', 'discogs');
       
     if (resError) console.error('Error fetching history:', resError);
 
+    // 2. DEFINE ALLOWLIST
     const ALLOWED_COLUMNS = new Set([
       'artist', 'title', 'year', 'format', 'country', 'barcode', 'labels',
       'tracklists', 'image_url', 'back_image_url', 'sell_price', 'media_condition', 'folder',
@@ -340,6 +346,16 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       Object.entries(combined).forEach(([key, value]) => {
         if (!ALLOWED_COLUMNS.has(key)) return;
 
+        // "DO NOT DISTURB" LOGIC (Fixed):
+        // If we have ANY resolution for this album+field, we skip it.
+        // This solves the Groundhog Day loop permanently.
+        const alreadyResolved = resolutions?.some(r => 
+          r.album_id === album.id && 
+          r.field_name === key
+        );
+
+        if (alreadyResolved) return;
+
         const currentVal = album[key];
         const newVal = value;
 
@@ -348,17 +364,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         }
 
         const isCurrentEmpty = !currentVal || (Array.isArray(currentVal) && currentVal.length === 0);
-        // Use ROBUST EQUALITY CHECK
         const isDifferent = !areValuesEqual(currentVal, newVal);
-
-        // CHECK HISTORY - Use ROBUST EQUALITY CHECK
-        const previouslyRejected = resolutions?.some(r => 
-          r.album_id === album.id && 
-          r.field_name === key && 
-          areValuesEqual(r.rejected_value, newVal) 
-        );
-
-        if (previouslyRejected) return;
 
         if (isCurrentEmpty && newVal) {
            updatesForAlbum[key] = newVal;
@@ -390,12 +396,14 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       }
     });
 
+    // 1. PERFORM AUTO UPDATES
     if (autoUpdates.length > 0) {
       await Promise.all(autoUpdates.map(u => 
         supabase.from('collection').update(u.fields).eq('id', u.id)
       ));
     }
 
+    // 2. "TOUCH" UNCHANGED ALBUMS
     const changedIds = new Set(autoUpdates.map(u => u.id));
     newConflicts.forEach(c => changedIds.add(c.album_id));
     
@@ -411,7 +419,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     return { conflicts: newConflicts };
   }
 
-  async function handleApplyChanges() {
+  async function handleApplyChanges(resolutions: Record<string, unknown>) {
     const updatesByAlbum: Record<number, Record<string, unknown>> = {};
     const resolutionRecords: Record<string, unknown>[] = [];
     const timestamp = new Date().toISOString();
@@ -421,29 +429,44 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     conflicts.forEach(c => {
       involvedAlbumIds.add(c.album_id);
       
-      const userChoseNew = !areValuesEqual(c.new_value, c.current_value);
-      const chosenValue = c.new_value;
+      const key = `${c.album_id}-${c.field_name}`;
+      const chosenValue = resolutions[key]; 
+      const userChoseNew = !areValuesEqual(chosenValue, c.current_value);
       
       if (userChoseNew) {
         if (!updatesByAlbum[c.album_id]) updatesByAlbum[c.album_id] = {};
         updatesByAlbum[c.album_id][c.field_name] = chosenValue;
       }
 
+      // CRITICAL FIX: Ensure rejected_value is the NEW proposal if user kept current.
+      // This is for NEW decisions. It ensures history is clean moving forward.
+      const rejectedVal = userChoseNew ? c.current_value : c.new_value;
+
       resolutionRecords.push({
         album_id: c.album_id,
         field_name: c.field_name,
         kept_value: chosenValue,
-        rejected_value: userChoseNew ? c.current_value : c.new_value, 
+        rejected_value: rejectedVal, 
         resolution: userChoseNew ? 'use_new' : 'keep_current',
         source: 'discogs',
         resolved_at: timestamp
       });
     });
 
+    // LOGGING
     console.log('[DB SAVE] Starting Batch Save...');
     console.log(`[DB SAVE] Updates Pending: ${Object.keys(updatesByAlbum).length} albums`);
     console.log(`[DB SAVE] History Records: ${resolutionRecords.length}`);
+    if (resolutionRecords.length > 0) {
+       console.table(resolutionRecords.map(r => ({ 
+         id: r.album_id, 
+         field: r.field_name, 
+         result: r.resolution,
+         rejected: r.rejected_value
+       })));
+    }
 
+    // A. Update Albums
     const updatePromises = Array.from(involvedAlbumIds).map(async (albumId) => {
       const fields = updatesByAlbum[albumId] || {};
       
@@ -459,6 +482,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       else console.log(`[DB SUCCESS] Updated album ${albumId}`);
     });
 
+    // B. Save History
     if (resolutionRecords.length > 0) {
       const { error: histError } = await supabase
         .from('import_conflict_resolutions')
@@ -470,6 +494,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
     await Promise.all(updatePromises);
 
+    // 3. CONTINUE LOOP
     setShowReview(false);
     
     if (isLoopingRef.current && hasMoreRef.current) {
@@ -514,7 +539,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         onComplete={handleApplyChanges}
         onCancel={() => { 
           setShowReview(false); 
-          isLoopingRef.current = false; 
+          isLoopingRef.current = false; // Stop the loop
           setStatus('Review cancelled. Scanning stopped.'); 
         }}
       />
@@ -697,6 +722,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     </div>
   );
 }
+
+// --- SUB-COMPONENTS ---
 
 function StatBox({ label, value, color, onClick, disabled }: { label: string; value: number; color: string; onClick: () => void; disabled?: boolean }) {
   return (
