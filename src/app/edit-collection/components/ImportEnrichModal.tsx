@@ -328,21 +328,27 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
     // 2. DEFINE ALLOWLIST
     // CRITICAL UPDATE: Added 'spine_image_url', 'inner_sleeve_images', 'vinyl_label_images'
+    // PLUS: Musicians, Credits, BPM, Lyrics, Classical info
     const ALLOWED_COLUMNS = new Set([
       'artist', 'title', 'year', 'format', 'country', 'barcode', 'labels',
       'tracklists', 'image_url', 'back_image_url', 'sell_price', 'media_condition', 'folder',
       'discogs_master_id', 'discogs_release_id', 'spotify_id', 'spotify_url',
       'apple_music_id', 'apple_music_url', 
       'genres', 'styles',
-      'musicians', 'credits', 'producers',
       'original_release_date',
-      'spine_image_url', 'inner_sleeve_images', 'vinyl_label_images'
+      'spine_image_url', 'inner_sleeve_images', 'vinyl_label_images',
+      // NEW ADDITIONS:
+      'musicians', 'credits', 'producers', 'composer', 'conductor', 'orchestra',
+      'bpm', 'key', 'lyrics', 'time_signature'
     ]);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const autoUpdates: { id: number; fields: Record<string, any> }[] = [];
     const newConflicts: FieldConflict[] = [];
     const processedIds: number[] = [];
+
+    // Helper for async track saving
+    const trackSavePromises: Promise<void>[] = [];
 
     results.forEach((item) => {
       processedIds.push(item.album.id);
@@ -359,6 +365,15 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       if (Object.keys(combined).some(k => ['spine_image_url', 'inner_sleeve_images', 'vinyl_label_images'].includes(k))) {
          console.log('[Enrich Debug] Found extended image fields for:', album.title, combined);
       }
+
+      // 1. EXTRACT TRACK DATA FIRST
+      // Check if the candidate source (e.g. Spotify) provided a 'tracks' array with enriched data
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const enrichedTracks = (candidates.spotify as any)?.tracks || (candidates.genius as any)?.tracks || [];
+      
+      if (Array.isArray(enrichedTracks) && enrichedTracks.length > 0) {
+         trackSavePromises.push(saveTrackData(album.id, enrichedTracks));
+      }
       
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const updatesForAlbum: Record<string, any> = {};
@@ -366,6 +381,9 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
       Object.entries(combined).forEach(([key, value]) => {
         if (!ALLOWED_COLUMNS.has(key)) return;
+        
+        // SKIP TRACK DATA FOR ALBUM UPDATES
+        if (['lyrics', 'bpm', 'key', 'time_signature'].includes(key)) return;
 
         // CHANGED: We use 'let' so we can transform the value (for dates)
         let newVal = value;
@@ -430,14 +448,19 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       }
     });
 
-    // 1. PERFORM AUTO UPDATES
+    // 1. PERFORM AUTO UPDATES (ALBUMS)
     if (autoUpdates.length > 0) {
       await Promise.all(autoUpdates.map(u => 
         supabase.from('collection').update(u.fields).eq('id', u.id)
       ));
     }
+    
+    // 2. WAIT FOR TRACK UPDATES
+    if (trackSavePromises.length > 0) {
+      await Promise.all(trackSavePromises);
+    }
 
-    // 2. "TOUCH" UNCHANGED ALBUMS
+    // 3. "TOUCH" UNCHANGED ALBUMS
     const changedIds = new Set(autoUpdates.map(u => u.id));
     newConflicts.forEach(c => changedIds.add(c.album_id));
     
@@ -451,6 +474,47 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     }
 
     return { conflicts: newConflicts };
+  }
+  
+  // NEW HELPER: Save enriched track data
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async function saveTrackData(albumId: number, enrichedTracks: any[]) {
+    // 1. Get existing tracks for this album
+    const { data: existingTracks } = await supabase
+      .from('dj_tracks')
+      .select('id, track_name, track_number')
+      .eq('collection_id', albumId);
+
+    if (!existingTracks || existingTracks.length === 0) return;
+
+    // 2. Map and Update
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const updates: any[] = [];
+    
+    for (const t of existingTracks) {
+       // Fuzzy match the enriched track to our DB track
+       const match = enrichedTracks.find(et => 
+         et.title.toLowerCase() === t.track_name.toLowerCase() ||
+         (et.position && et.position === t.track_number)
+       );
+
+       if (match) {
+         // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         const patch: Record<string, any> = {};
+         if (match.bpm) patch.bpm = match.bpm;
+         if (match.key) patch.musical_key = match.key;
+         if (match.lyrics) patch.lyrics = match.lyrics;
+
+         if (Object.keys(patch).length > 0) {
+            updates.push(supabase.from('dj_tracks').update(patch).eq('id', t.id));
+         }
+       }
+    }
+    
+    if (updates.length > 0) {
+       await Promise.all(updates);
+       console.log(`[Track Sync] Updated ${updates.length} tracks for album ${albumId}`);
+    }
   }
 
   // UPDATED: Now accepts resolutions map

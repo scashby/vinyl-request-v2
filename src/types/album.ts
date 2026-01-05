@@ -42,6 +42,10 @@ export type Album = {
     type: 'track' | 'header';
     disc_number: number;
     side?: string;
+    // EXTENDED TRACK DATA
+    lyrics?: string | null;
+    bpm?: number | null;
+    musical_key?: string | null;
   }> | null;
   disc_metadata: Array<{
     disc_number: number;
@@ -219,6 +223,7 @@ export type Album = {
   musicians: string[] | null;
   producers: string[] | null;
   songwriters: string[] | null;
+  credits: Record<string, unknown>[] | null;
   
   // ============================================================================
   // CLASSICAL MUSIC FIELDS

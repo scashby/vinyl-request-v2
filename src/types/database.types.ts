@@ -304,6 +304,14 @@ export interface Database {
           apple_music_url: string | null
           genius_song_id: number | null
           lyrics_cached_at: string | null
+          // NEW FIELDS START
+          musicians: string[] | null
+          producers: string[] | null
+          credits: Json | null
+          composer: string | null
+          conductor: string | null
+          orchestra: string | null
+          // NEW FIELDS END
         }
         Insert: {
           id?: number
@@ -330,6 +338,14 @@ export interface Database {
           apple_music_url?: string | null
           genius_song_id?: number | null
           lyrics_cached_at?: string | null
+          // NEW FIELDS START
+          musicians?: string[] | null
+          producers?: string[] | null
+          credits?: Json | null
+          composer?: string | null
+          conductor?: string | null
+          orchestra?: string | null
+          // NEW FIELDS END
         }
         Update: {
           id?: number
@@ -356,6 +372,14 @@ export interface Database {
           apple_music_url?: string | null
           genius_song_id?: number | null
           lyrics_cached_at?: string | null
+          // NEW FIELDS START
+          musicians?: string[] | null
+          producers?: string[] | null
+          credits?: Json | null
+          composer?: string | null
+          conductor?: string | null
+          orchestra?: string | null
+          // NEW FIELDS END
         }
       }
       dj_tracks: {
@@ -371,6 +395,11 @@ export interface Database {
           isrc: string | null
           created_at: string
           updated_at: string | null
+          // NEW FIELDS START
+          lyrics: string | null
+          bpm: number | null
+          musical_key: string | null
+          // NEW FIELDS END
         }
         Insert: {
           id?: number
@@ -384,6 +413,11 @@ export interface Database {
           isrc?: string | null
           created_at?: string
           updated_at?: string | null
+          // NEW FIELDS START
+          lyrics?: string | null
+          bpm?: number | null
+          musical_key?: string | null
+          // NEW FIELDS END
         }
         Update: {
           id?: number
@@ -397,6 +431,11 @@ export interface Database {
           isrc?: string | null
           created_at?: string
           updated_at?: string | null
+          // NEW FIELDS START
+          lyrics?: string | null
+          bpm?: number | null
+          musical_key?: string | null
+          // NEW FIELDS END
         }
       }
       dj_crates: {
