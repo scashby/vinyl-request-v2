@@ -4,149 +4,176 @@ import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { persistSession: false } }
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
 export async function GET() {
   try {
+    // Fetch all collection items to calculate stats
+    // We select specific fields to minimize data transfer
     const { data: albums, error } = await supabase
       .from('collection')
       .select(`
         id,
-        musicbrainz_id,
-        musicians,
-        producers,
-        spotify_id,
-        apple_music_id,
-        lastfm_id,
-        allmusic_id,
-        wikipedia_url,
-        tempo_bpm,
-        discogs_release_id,
-        discogs_master_id,
+        folder,
         image_url,
         back_image_url,
-        genres,
+        musicians,
+        producers,
         tracklists,
-        cat_no,
+        tempo,
+        genres,
+        spotify_id,
+        apple_music_id,
+        lastfm_url,
         barcode,
-        country,
-        folder,
-        labels
+        labels,
+        original_release_date,
+        cat_no
       `);
 
-    if (error || !albums) {
-      console.error("Supabase Error:", error);
-      return NextResponse.json({
-        success: false,
-        error: 'Failed to fetch albums'
-      }, { status: 500 });
-    }
+    if (error) throw error;
+    if (!albums) return NextResponse.json({ success: true, stats: null });
+
+    // Initialize Counters
+    let fullyEnriched = 0;
+    let needsEnrichment = 0;
+    
+    let missingArtwork = 0;
+    let missingBackCover = 0;
+    
+    let missingCredits = 0;
+    let missingMusicians = 0;
+    let missingProducers = 0;
+    
+    let missingTracklists = 0;
+    
+    let missingAudioAnalysis = 0;
+    let missingTempo = 0;
+    
+    let missingGenres = 0;
+    
+    let missingStreamingLinks = 0;
+    let missingSpotify = 0;
+    
+    let missingReleaseMetadata = 0;
+    let missingCatalogNumber = 0;
+
+    const folders = new Set<string>();
+
+    albums.forEach(album => {
+      if (album.folder) folders.add(album.folder);
+
+      // 1. ARTWORK
+      const hasFront = !!album.image_url;
+      const hasBack = !!album.back_image_url;
+      if (!hasFront || !hasBack) {
+        if (!hasFront) missingArtwork++; // Main stat tracks front cover
+        if (!hasBack) missingBackCover++;
+      }
+
+      // 2. CREDITS
+      // Check if array exists and has length > 0
+      const hasMusicians = Array.isArray(album.musicians) && album.musicians.length > 0;
+      const hasProducers = Array.isArray(album.producers) && album.producers.length > 0;
+      if (!hasMusicians || !hasProducers) {
+        missingCredits++;
+        if (!hasMusicians) missingMusicians++;
+        if (!hasProducers) missingProducers++;
+      }
+
+      // 3. TRACKLISTS
+      const hasTracks = Array.isArray(album.tracklists) && album.tracklists.length > 0;
+      if (!hasTracks) missingTracklists++;
+
+      // 4. AUDIO ANALYSIS
+      const hasTempo = album.tempo !== null && album.tempo !== 0;
+      if (!hasTempo) {
+        missingAudioAnalysis++;
+        missingTempo++;
+      }
+
+      // 5. GENRES
+      const hasGenres = Array.isArray(album.genres) && album.genres.length > 0;
+      if (!hasGenres) missingGenres++;
+
+      // 6. STREAMING
+      const hasSpotify = !!album.spotify_id;
+      const hasApple = !!album.apple_music_id;
+      const hasLastfm = !!album.lastfm_url;
+      
+      // LOGIC UPDATE: Only count as "Missing Streaming Links" if ALL are missing
+      if (!hasSpotify && !hasApple && !hasLastfm) {
+        missingStreamingLinks++;
+      }
+
+      // We track missingSpotify separately for specific reporting
+      if (!hasSpotify) {
+        missingSpotify++;
+      }
+
+      // 7. RELEASE METADATA
+      const hasBarcode = !!album.barcode;
+      const hasLabel = Array.isArray(album.labels) && album.labels.length > 0;
+      const hasOriginalDate = !!album.original_release_date;
+      
+      // Note: 'cat_no' excluded from enrichment requirements as requested
+      if (!hasBarcode || !hasLabel || !hasOriginalDate) {
+        missingReleaseMetadata++;
+      }
+
+      if (!album.cat_no) missingCatalogNumber++;
+
+      // 8. TOTAL SCORE
+      // An album is "Fully Enriched" if it passes all MAIN checks
+      // UPDATED: Streaming is satisfied if ANY source exists (Spotify OR Apple OR LastFM)
+      const isComplete = 
+        hasFront && hasBack &&
+        hasMusicians && hasProducers &&
+        hasTracks &&
+        hasTempo &&
+        hasGenres &&
+        (hasSpotify || hasApple || hasLastfm) && 
+        (hasBarcode && hasLabel && hasOriginalDate);
+
+      if (isComplete) fullyEnriched++;
+      else needsEnrichment++;
+    });
 
     const stats = {
       total: albums.length,
-      needsEnrichment: 0,
-      fullyEnriched: 0,
+      fullyEnriched,
+      needsEnrichment,
       
-      missingArtwork: 0,
-      missingBackCover: 0,
-      missingSpineCover: 0,
-      missingInnerSleeves: 0,
-      missingLabelImages: 0,
-      missingCredits: 0,
-      missingMusicians: 0,
-      missingProducers: 0,
-      missingEngineers: 0,
-      missingSongwriters: 0,
-      missingTracklists: 0,
-      missingAudioAnalysis: 0,
-      missingTempo: 0,
-      missingKey: 0,
-      missingMoodData: 0,
-      missingGenres: 0,
-      missingStreamingLinks: 0,
-      missingSpotify: 0,
-      missingAppleMusic: 0,
-      missingLastFm: 0,
-      missingReviews: 0,
-      missingRatings: 0,
-      missingChartData: 0,
-      missingReleaseMetadata: 0,
-      missingDiscogsIds: 0,
-      missingLabels: 0,
-      missingCatalogNumber: 0,
-      missingBarcode: 0,
-      missingCountry: 0,
+      missingArtwork,
+      missingBackCover,
+      
+      missingCredits,
+      missingMusicians,
+      missingProducers,
+      
+      missingTracklists,
+      
+      missingAudioAnalysis,
+      missingTempo,
+      
+      missingGenres,
+      
+      missingStreamingLinks,
+      missingSpotify,
+      
+      missingReleaseMetadata,
+      missingCatalogNumber
     };
 
-    albums.forEach(album => {
-      const hasImage = !!album.image_url;
-      const hasBack = !!album.back_image_url;
-      const hasMusicians = album.musicians && album.musicians.length > 0;
-      const hasProducers = album.producers && album.producers.length > 0;
-      const hasSpotify = !!album.spotify_id;
-      const hasApple = !!album.apple_music_id;
-      const hasLastFm = !!album.lastfm_id;
-      const hasDiscogs = !!album.discogs_release_id;
-      const hasCat = !!album.cat_no;
-      const hasBarcode = !!album.barcode;
-      const hasCountry = !!album.country;
-      const hasTempo = !!album.tempo_bpm;
-      const hasGenres = album.genres && album.genres.length > 0;
-      const hasTracks = !!album.tracklists;
-      const hasLabels = album.labels && album.labels.length > 0;
-
-      if (!hasImage) stats.missingArtwork++;
-      if (!hasBack) stats.missingBackCover++;
-      
-      if (!hasMusicians) stats.missingMusicians++;
-      if (!hasProducers) stats.missingProducers++;
-      if (!hasMusicians && !hasProducers) stats.missingCredits++;
-
-      if (!hasTracks) stats.missingTracklists++;
-
-      if (!hasTempo) stats.missingTempo++;
-      if (!hasTempo) stats.missingAudioAnalysis++; 
-
-      if (!hasGenres) stats.missingGenres++;
-
-      if (!hasSpotify) stats.missingSpotify++;
-      if (!hasApple) stats.missingAppleMusic++;
-      if (!hasLastFm) stats.missingLastFm++;
-      if (!hasSpotify || !hasApple) stats.missingStreamingLinks++;
-
-      if (!hasDiscogs) stats.missingDiscogsIds++;
-      if (!hasCat) stats.missingCatalogNumber++;
-      if (!hasBarcode) stats.missingBarcode++;
-      if (!hasCountry) stats.missingCountry++;
-      if (!hasLabels) stats.missingLabels++;
-
-      if (!hasDiscogs || !hasCat || !hasBarcode || !hasCountry || !hasLabels) {
-        stats.missingReleaseMetadata++;
-      }
-
-      const isRich = hasImage && hasBack && hasMusicians && hasSpotify && hasDiscogs && hasGenres;
-      if (isRich) {
-        stats.fullyEnriched++;
-      } else {
-        stats.needsEnrichment++;
-      }
-    });
-
-    const folders = Array.from(new Set(albums.map(a => a.folder).filter(Boolean)));
-
-    return NextResponse.json({
-      success: true,
+    return NextResponse.json({ 
+      success: true, 
       stats,
-      folders
+      folders: Array.from(folders).sort()
     });
 
   } catch (error) {
     console.error("Stats Error:", error);
-    return NextResponse.json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 });
+    return NextResponse.json({ success: false, error: 'Internal Server Error' }, { status: 500 });
   }
 }

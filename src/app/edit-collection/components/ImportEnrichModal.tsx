@@ -143,7 +143,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   // Loop Control Refs
   const hasMoreRef = useRef(true);
   const isLoopingRef = useRef(false);
-  const cursorRef = useRef(0);
+  const cursorRef = useRef(0); // Tracks current position in DB
 
   useEffect(() => {
     if (isOpen) loadStats();
@@ -240,7 +240,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         const payload = {
           albumIds: specificAlbumIds,
           limit: specificAlbumIds ? undefined : 50,
-          cursor: specificAlbumIds ? undefined : cursorRef.current,
+          cursor: specificAlbumIds ? undefined : cursorRef.current, // Pass current position
           folder: folderFilter || undefined,
           services: getServicesForSelection()
         };
@@ -254,10 +254,11 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         const result = await res.json();
         if (!result.success) throw new Error(result.error);
 
-        // Update Cursor
+        // Update Cursor for next iteration
         if (result.nextCursor !== undefined && result.nextCursor !== null) {
           cursorRef.current = result.nextCursor;
         } else {
+          // If api returned no cursor, we might be done
           if (!result.results || result.results.length === 0) {
              hasMoreRef.current = false;
           }
@@ -320,7 +321,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       'discogs_master_id', 'discogs_release_id', 'spotify_id', 'spotify_url',
       'apple_music_id', 'apple_music_url', 
       'genres', 'styles',
-      'musicians', 'credits', 'producers'
+      'musicians', 'credits', 'producers',
+      'original_release_date' // <--- ADDED AS REQUESTED
     ]);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -419,6 +421,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     return { conflicts: newConflicts };
   }
 
+  // UPDATED: Now accepts resolutions map
   async function handleApplyChanges(resolutions: Record<string, unknown>) {
     const updatesByAlbum: Record<number, Record<string, unknown>> = {};
     const resolutionRecords: Record<string, unknown>[] = [];
@@ -431,6 +434,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       
       const key = `${c.album_id}-${c.field_name}`;
       const chosenValue = resolutions[key]; 
+      
       const userChoseNew = !areValuesEqual(chosenValue, c.current_value);
       
       if (userChoseNew) {
@@ -453,7 +457,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       });
     });
 
-    // LOGGING
+    // LOGGING (Restored)
     console.log('[DB SAVE] Starting Batch Save...');
     console.log(`[DB SAVE] Updates Pending: ${Object.keys(updatesByAlbum).length} albums`);
     console.log(`[DB SAVE] History Records: ${resolutionRecords.length}`);
@@ -462,7 +466,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
          id: r.album_id, 
          field: r.field_name, 
          result: r.resolution,
-         rejected: r.rejected_value
+         rejected: r.rejected_value // Verify this matches the API proposal
        })));
     }
 
