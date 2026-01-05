@@ -320,7 +320,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     const albumIds = results.map(r => r.album.id);
     const { data: resolutions, error: resError } = await supabase
       .from('import_conflict_resolutions')
-      .select('album_id, field_name, source') // CHANGED: Added source
+      .select('album_id, field_name, source') // CHANGED: Added source selection
       .in('album_id', albumIds);
       
     if (resError) console.error('Error fetching history:', resError);
@@ -343,12 +343,19 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const autoUpdates: { id: number; fields: Record<string, any> }[] = [];
-    // CHANGED: Added source to newConflicts type definition to support source-specific logic
+    // CHANGED: Update type to include optional source property
     const newConflicts: (FieldConflict & { source?: string })[] = [];
     const processedIds: number[] = [];
 
+    // NEW: History updates for Auto-Fills (The "Red Dot" application)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const historyUpdates: { album_id: number; field_name: string; source: string; resolution: string; kept_value: any; resolved_at: string }[] = [];
+
     // Helper for async track saving
     const trackSavePromises: Promise<void>[] = [];
+
+    // Source Priority Order
+    const SOURCE_PRIORITY = ['musicbrainz', 'spotify', 'appleMusic', 'discogs', 'lastfm', 'coverArt', 'wikipedia', 'genius'];
 
     results.forEach((item) => {
       processedIds.push(item.album.id);
@@ -365,102 +372,107 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       if (Object.keys(combined).some(k => ['spine_image_url', 'inner_sleeve_images', 'vinyl_label_images'].includes(k))) {
          console.log('[Enrich Debug] Found extended image fields for:', album.title, combined);
       }
-
-      // 1. EXTRACT TRACK DATA FIRST
-      // Check if the candidate source (e.g. Spotify) provided a 'tracks' array with enriched data
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const enrichedTracks = (candidates.spotify as any)?.tracks || (candidates.genius as any)?.tracks || [];
-      
-      if (Array.isArray(enrichedTracks) && enrichedTracks.length > 0) {
-         trackSavePromises.push(saveTrackData(album.id, enrichedTracks));
-      }
       
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const updatesForAlbum: Record<string, any> = {};
       const autoFilledFields: string[] = [];
 
-      // PRIORITY ORDER (Must match reverse of the spread order used to create 'combined')
-      // Spread was: MB, Apple, LastFM, Spotify, Discogs, Cover, Wiki, Genius.
-      // So Genius overwrites Wiki, which overwrites Cover...
-      const SOURCE_PRIORITY = ['genius', 'wikipedia', 'coverArt', 'discogs', 'spotify', 'lastfm', 'appleMusic', 'musicbrainz'];
+      // === NEW LOGIC: Iterate by Source to apply "Red Dot" per source ===
+      for (const source of SOURCE_PRIORITY) {
+         // Safe access with casting to avoid TS errors without suppression
+         // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         const sourceData = (candidates as any)[source];
+         if (!sourceData) continue;
 
-      Object.entries(combined).forEach(([key, value]) => {
-        if (!ALLOWED_COLUMNS.has(key)) return;
-        
-        // SKIP TRACK DATA FOR ALBUM UPDATES
-        if (['lyrics', 'bpm', 'key', 'time_signature'].includes(key)) return;
+         // A. Handle Album Fields
+         Object.entries(sourceData).forEach(([key, value]) => {
+            if (!ALLOWED_COLUMNS.has(key)) return;
+            
+            // Skip track fields here (handled in B)
+            if (['lyrics', 'bpm', 'key', 'time_signature', 'tracks'].includes(key)) return;
 
-        // CHANGED: We use 'let' so we can transform the value (for dates)
-        let newVal = value;
+            // CHECK RED DOT: Have we seen this specific field from this specific source?
+            const alreadySeen = resolutions?.some(r => 
+              r.album_id === album.id && 
+              r.field_name === key && 
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              ((r as any).source === source)
+            );
+            if (alreadySeen) return; // Skip if red dot exists
 
-        // DATE FIX: Handle Year-Only dates (e.g. "1984" -> "1984-12-25")
-        // This prevents 400 Bad Request on Postgres Date columns
-        if (key === 'original_release_date' && typeof newVal === 'string') {
-             if (/^\d{4}$/.test(newVal)) {
-                 newVal = `${newVal}-12-25`; // Default to Christmas
-             }
-             // Final check: if it's still not YYYY-MM-DD, skip it to prevent crash
-             if (!isValidDate(newVal)) return;
-        }
+            // CHANGED: We use 'let' so we can transform the value (for dates)
+            let newVal = value;
 
-        // 1. DETECT SOURCE
-        // We find which provider actually supplied this value
-        let detectedSource = 'enrichment';
-        for (const s of SOURCE_PRIORITY) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const sourceData = (candidates as any)[s];
-            if (sourceData && sourceData[key] !== undefined) {
-               if (areValuesEqual(sourceData[key], value)) {
-                   detectedSource = s;
-                   break;
-               }
+            // DATE FIX: Handle Year-Only dates (e.g. "1984" -> "1984-12-25")
+            // This prevents 400 Bad Request on Postgres Date columns
+            if (key === 'original_release_date' && typeof newVal === 'string') {
+                 if (/^\d{4}$/.test(newVal)) {
+                     newVal = `${newVal}-12-25`; // Default to Christmas
+                 }
+                 // Final check: if it's still not YYYY-MM-DD, skip it to prevent crash
+                 if (!isValidDate(newVal)) return;
             }
-        }
 
-        // 2. CHECK HISTORY FOR THIS SPECIFIC SOURCE
-        // "If I already said NO to MusicBrainz for this field, ignore it. But show me Apple Music."
-        const alreadyResolved = resolutions?.some(r => 
-          r.album_id === album.id && 
-          r.field_name === key &&
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          ((r as any).source === detectedSource || (r as any).source === 'discogs' && detectedSource === 'discogs') 
-        );
+            const currentVal = album[key];
 
-        if (alreadyResolved) return;
+            if (typeof newVal === 'object' && newVal !== null && !Array.isArray(newVal)) {
+                 if (!['musicians', 'producers', 'engineers', 'writers', 'credits'].includes(key)) return;
+            }
 
-        const currentVal = album[key];
+            const isCurrentEmpty = !currentVal || (Array.isArray(currentVal) && currentVal.length === 0);
+            const isDifferent = !areValuesEqual(currentVal, newVal);
 
-        if (typeof newVal === 'object' && newVal !== null && !Array.isArray(newVal)) {
-             if (!['musicians', 'producers', 'engineers', 'writers', 'credits'].includes(key)) return;
-        }
+            // TEST OVERRIDE: Prevent auto-fill for new fields to force them into the Conflict Review Modal
+            const isTestField = ['spine_image_url', 'inner_sleeve_images', 'vinyl_label_images'].includes(key);
 
-        const isCurrentEmpty = !currentVal || (Array.isArray(currentVal) && currentVal.length === 0);
-        const isDifferent = !areValuesEqual(currentVal, newVal);
+            if (isCurrentEmpty && newVal && !isTestField) {
+               updatesForAlbum[key] = newVal;
+               autoFilledFields.push(key);
+               // APPLY RED DOT (Important!)
+               historyUpdates.push({
+                 album_id: album.id, field_name: key, source, resolution: 'use_new', kept_value: newVal, resolved_at: new Date().toISOString()
+               });
+            } else if (isDifferent) {
+               newConflicts.push({
+                  album_id: album.id,
+                  field_name: key,
+                  current_value: currentVal,
+                  new_value: newVal,
+                  source: source, // Pass source to Modal
+                  artist: album.artist,
+                  title: album.title,
+                  format: (album.format as string) || 'Unknown',
+                  year: album.year as string,
+                  country: album.country as string,
+                  cat_no: (album.cat_no as string) || '', 
+                  barcode: (album.barcode as string) || '',
+                  labels: (album.labels as string[]) || []
+               });
+            }
+         });
 
-        // TEST OVERRIDE: Prevent auto-fill for new fields to force them into the Conflict Review Modal
-        const isTestField = ['spine_image_url', 'inner_sleeve_images', 'vinyl_label_images'].includes(key);
-
-        if (isCurrentEmpty && newVal && !isTestField) {
-           updatesForAlbum[key] = newVal;
-           autoFilledFields.push(key);
-        } else if (isDifferent) {
-           newConflicts.push({
-              album_id: album.id,
-              field_name: key,
-              current_value: currentVal,
-              new_value: newVal,
-              source: detectedSource, 
-              artist: album.artist,
-              title: album.title,
-              format: (album.format as string) || 'Unknown',
-              year: album.year as string,
-              country: album.country as string,
-              cat_no: (album.cat_no as string) || '', 
-              barcode: (album.barcode as string) || '',
-              labels: (album.labels as string[]) || []
-           });
-        }
-      });
+         // B. Handle Track Data (BPM, Lyrics) - Now inside source loop
+         // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         const tracks = (sourceData as any).tracks;
+         if (Array.isArray(tracks) && tracks.length > 0) {
+            // Check Red Dot for "Track Data"
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const trackDot = resolutions?.some(r => r.album_id === album.id && r.field_name === 'track_data' && (r as any).source === source);
+            
+            if (!trackDot) {
+               trackSavePromises.push(saveTrackData(album.id, tracks).then(count => {
+                  // Promise handles logging internally
+                  if (count > 0) {
+                    // Note: We can't log here synchronously for the UI, but it's handled.
+                  }
+               }));
+               // Mark as seen
+               historyUpdates.push({
+                 album_id: album.id, field_name: 'track_data', source, resolution: 'use_new', kept_value: 'tracks_updated', resolved_at: new Date().toISOString()
+               });
+            }
+         }
+      }
 
       if (Object.keys(updatesForAlbum).length > 0) {
         updatesForAlbum.last_enriched_at = new Date().toISOString();
@@ -471,19 +483,24 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       }
     });
 
-    // 1. PERFORM AUTO UPDATES (ALBUMS)
+    // 1. SAVE HISTORY (RED DOTS)
+    if (historyUpdates.length > 0) {
+       await supabase.from('import_conflict_resolutions').upsert(historyUpdates, { onConflict: 'album_id,field_name,source' });
+    }
+
+    // 2. PERFORM AUTO UPDATES (ALBUMS)
     if (autoUpdates.length > 0) {
       await Promise.all(autoUpdates.map(u => 
         supabase.from('collection').update(u.fields).eq('id', u.id)
       ));
     }
     
-    // 2. WAIT FOR TRACK UPDATES
+    // 3. WAIT FOR TRACK UPDATES
     if (trackSavePromises.length > 0) {
       await Promise.all(trackSavePromises);
     }
 
-    // 3. "TOUCH" UNCHANGED ALBUMS
+    // 4. "TOUCH" UNCHANGED ALBUMS
     const changedIds = new Set(autoUpdates.map(u => u.id));
     newConflicts.forEach(c => changedIds.add(c.album_id));
     
@@ -508,7 +525,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       .select('id, track_name, track_number')
       .eq('collection_id', albumId);
 
-    if (!existingTracks || existingTracks.length === 0) return;
+    if (!existingTracks || existingTracks.length === 0) return 0;
 
     // 2. Map and Update
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -537,7 +554,9 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     if (updates.length > 0) {
        await Promise.all(updates);
        console.log(`[Track Sync] Updated ${updates.length} tracks for album ${albumId}`);
+       return updates.length; // RETURN COUNT
     }
+    return 0;
   }
 
   // UPDATED: Now accepts resolutions map
@@ -551,7 +570,9 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     conflicts.forEach(c => {
       involvedAlbumIds.add(c.album_id);
       
-      const key = `${c.album_id}-${c.field_name}`;
+      // CHANGED: Key now matches the Modal's source-specific format
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const key = `${c.album_id}-${c.field_name}-${(c as any).source || 'enrichment'}`;
       const chosenValue = resolutions[key]; 
       
       const userChoseNew = !areValuesEqual(chosenValue, c.current_value);

@@ -5,6 +5,28 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import { type FieldConflict } from 'lib/conflictDetection';
 
+interface EnrichmentReviewModalProps {
+  // CHANGED: Added source property to type definition
+  conflicts: (FieldConflict & { source?: string })[];
+  onComplete: (resolutions: Record<string, unknown>) => void;
+  onCancel: () => void;
+}
+
+// --- HELPERS ---
+const areValuesEqual = (a: unknown, b: unknown): boolean => {
+  if (a === b) return true;
+  if (Array.isArray(a) && Array.isArray(b)) {
+    return JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
+  }
+  return JSON.stringify(a) === JSON.stringify(b);
+};
+
+const mergeArrays = (a: unknown, b: unknown): unknown[] | null => {
+  if (!Array.isArray(a) || !Array.isArray(b)) return null;
+  const set = new Set([...a, ...b]);
+  return Array.from(set).sort();
+};
+
 // --- HELPER: Smart Value Component ---
 function ConflictValue({ 
   value, 
@@ -114,35 +136,11 @@ function ConflictValue({
   );
 }
 
-// --- HELPERS ---
-const areValuesEqual = (a: unknown, b: unknown): boolean => {
-  if (a === b) return true;
-  if (Array.isArray(a) && Array.isArray(b)) {
-    // Simple sort comparison for arrays
-    return JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
-  }
-  return JSON.stringify(a) === JSON.stringify(b);
-};
-
-const mergeArrays = (a: unknown, b: unknown): unknown[] | null => {
-  if (!Array.isArray(a) || !Array.isArray(b)) return null;
-  // Combine and deduplicate
-  const set = new Set([...a, ...b]);
-  return Array.from(set).sort();
-};
-
-interface EnrichmentReviewModalProps {
-  conflicts: FieldConflict[];
-  onComplete: (resolutions: Record<string, unknown>) => void;
-  onCancel: () => void;
-}
-
 export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel }: EnrichmentReviewModalProps) {
-  // Map of "AlbumID-FieldName" -> Selected Value
   const [resolutions, setResolutions] = useState<Record<string, unknown>>({});
 
   const groupedConflicts = useMemo(() => {
-    const groups: Record<number, FieldConflict[]> = {};
+    const groups: Record<number, (FieldConflict & { source?: string })[]> = {};
     conflicts.forEach(c => {
       if (!groups[c.album_id]) groups[c.album_id] = [];
       groups[c.album_id].push(c);
@@ -154,21 +152,23 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
   useEffect(() => {
     const defaults: Record<string, unknown> = {};
     conflicts.forEach(c => {
-      const key = `${c.album_id}-${c.field_name}`;
+      // CHANGED: Key includes source
+      const key = `${c.album_id}-${c.field_name}-${c.source || 'enrichment'}`;
       defaults[key] = c.current_value; 
     });
     setResolutions(defaults);
   }, [conflicts]);
 
-  const handleResolve = (conflict: FieldConflict, value: unknown) => {
-    const key = `${conflict.album_id}-${conflict.field_name}`;
+  const handleResolve = (conflict: FieldConflict & { source?: string }, value: unknown) => {
+    // KEY CHANGE: Include source in key
+    const key = `${conflict.album_id}-${conflict.field_name}-${conflict.source || 'enrichment'}`;
     setResolutions(prev => ({ ...prev, [key]: value }));
   };
 
   const handleSelectAllNew = () => {
     const newResolutions: Record<string, unknown> = {};
     conflicts.forEach(c => {
-      const key = `${c.album_id}-${c.field_name}`;
+      const key = `${c.album_id}-${c.field_name}-${c.source || 'enrichment'}`;
       newResolutions[key] = c.new_value;
     });
     setResolutions(newResolutions);
@@ -177,14 +177,13 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
   const handleSelectAllCurrent = () => {
     const newResolutions: Record<string, unknown> = {};
     conflicts.forEach(c => {
-      const key = `${c.album_id}-${c.field_name}`;
+      const key = `${c.album_id}-${c.field_name}-${c.source || 'enrichment'}`;
       newResolutions[key] = c.current_value;
     });
     setResolutions(newResolutions);
   };
 
   const handleSave = () => {
-    // Pass the resolutions map back to parent instead of mutating props
     onComplete(resolutions);
   };
 
@@ -274,10 +273,10 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
                   {/* CONFLICT ROWS */}
                   <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                     {group.map((conflict) => {
-                      const key = `${conflict.album_id}-${conflict.field_name}`;
+                      // KEY CHANGE: Include source in key
+                      const key = `${conflict.album_id}-${conflict.field_name}-${conflict.source || 'enrichment'}`;
                       const selected = resolutions[key];
                       
-                      // Check for merge capability
                       const mergedValue = mergeArrays(conflict.current_value, conflict.new_value);
                       const isMergeable = mergedValue !== null;
 
@@ -313,7 +312,6 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
 
                             {/* Option C: New */}
                             <ConflictValue 
-                              // @ts-expect-error - source added in previous step
                               label={`New Data (${conflict.source || 'Unknown'})`}
                               color="blue"
                               value={conflict.new_value}
