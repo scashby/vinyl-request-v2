@@ -1,4 +1,3 @@
-// src/app/api/enrich-sources/stats/route.ts
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -10,7 +9,7 @@ const supabase = createClient(
 export async function GET() {
   try {
     // Fetch all collection items to calculate stats
-    // We select specific fields to minimize data transfer
+    // REMOVED 'cat_no' from this list to prevent 500 Error
     const { data: albums, error } = await supabase
       .from('collection')
       .select(`
@@ -28,8 +27,7 @@ export async function GET() {
         lastfm_url,
         barcode,
         labels,
-        original_release_date,
-        cat_no
+        original_release_date
       `);
 
     if (error) throw error;
@@ -57,7 +55,8 @@ export async function GET() {
     let missingSpotify = 0;
     
     let missingReleaseMetadata = 0;
-    let missingCatalogNumber = 0;
+    // We default this to 0 since we can't query the column
+    const missingCatalogNumber = 0;
 
     const folders = new Set<string>();
 
@@ -68,12 +67,11 @@ export async function GET() {
       const hasFront = !!album.image_url;
       const hasBack = !!album.back_image_url;
       if (!hasFront || !hasBack) {
-        if (!hasFront) missingArtwork++; // Main stat tracks front cover
+        if (!hasFront) missingArtwork++; 
         if (!hasBack) missingBackCover++;
       }
 
       // 2. CREDITS
-      // Check if array exists and has length > 0
       const hasMusicians = Array.isArray(album.musicians) && album.musicians.length > 0;
       const hasProducers = Array.isArray(album.producers) && album.producers.length > 0;
       if (!hasMusicians || !hasProducers) {
@@ -102,12 +100,11 @@ export async function GET() {
       const hasApple = !!album.apple_music_id;
       const hasLastfm = !!album.lastfm_url;
       
-      // LOGIC UPDATE: Only count as "Missing Streaming Links" if ALL are missing
+      // LOGIC: Only count as "Missing Streaming Links" if ALL are missing
       if (!hasSpotify && !hasApple && !hasLastfm) {
         missingStreamingLinks++;
       }
 
-      // We track missingSpotify separately for specific reporting
       if (!hasSpotify) {
         missingSpotify++;
       }
@@ -117,16 +114,13 @@ export async function GET() {
       const hasLabel = Array.isArray(album.labels) && album.labels.length > 0;
       const hasOriginalDate = !!album.original_release_date;
       
-      // Note: 'cat_no' excluded from enrichment requirements as requested
+      // We only flag metadata as missing if barcode, label, or original date is gone.
       if (!hasBarcode || !hasLabel || !hasOriginalDate) {
         missingReleaseMetadata++;
       }
 
-      if (!album.cat_no) missingCatalogNumber++;
-
       // 8. TOTAL SCORE
-      // An album is "Fully Enriched" if it passes all MAIN checks
-      // UPDATED: Streaming is satisfied if ANY source exists (Spotify OR Apple OR LastFM)
+      // Streaming is satisfied if ANY source exists (Spotify OR Apple OR LastFM)
       const isComplete = 
         hasFront && hasBack &&
         hasMusicians && hasProducers &&
