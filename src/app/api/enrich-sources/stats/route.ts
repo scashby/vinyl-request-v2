@@ -9,7 +9,7 @@ const supabase = createClient(
 export async function GET() {
   try {
     // 1. Fetch Albums
-    // AUDIT FIX: 'tempo_bpm' matches schema. 'cat_no' removed to prevent 500 error if column issue persists.
+    // AUDIT FIX: Added spine, inner, vinyl columns to query
     const { data: albums, error } = await supabase
       .from('collection')
       .select(`
@@ -17,6 +17,9 @@ export async function GET() {
         folder,
         image_url,
         back_image_url,
+        spine_image_url,
+        inner_sleeve_images,
+        vinyl_label_images,
         musicians,
         producers,
         tempo_bpm, 
@@ -34,14 +37,12 @@ export async function GET() {
     if (!albums) return NextResponse.json({ success: true, stats: null });
 
     // 2. Fetch Track Data (Source of Truth)
-    // We query the separate 'tracks' table to see which albums actually have tracks.
     const { data: trackRows, error: trackError } = await supabase
       .from('tracks')
       .select('album_id');
     
     if (trackError) console.error("Track Fetch Error:", trackError);
 
-    // Create a Set of Album IDs that have tracks (converted to String to ensure safe comparison)
     const albumsWithTracks = new Set(trackRows?.map(t => String(t.album_id)) || []);
 
     // Initialize Counters
@@ -50,6 +51,10 @@ export async function GET() {
     
     let missingArtwork = 0;
     let missingBackCover = 0;
+    let missingSpine = 0;        // New
+    let missingInnerSleeve = 0;  // New
+    let missingVinylLabel = 0;   // New
+    
     let missingCredits = 0;
     let missingMusicians = 0;
     let missingProducers = 0;
@@ -68,11 +73,21 @@ export async function GET() {
       if (album.folder) folders.add(album.folder);
 
       // 1. ARTWORK
+      // Strict check: We now require ALL 5 components for "Complete Artwork"
       const hasFront = !!album.image_url;
       const hasBack = !!album.back_image_url;
-      if (!hasFront || !hasBack) {
-        if (!hasFront) missingArtwork++; 
+      const hasSpine = !!album.spine_image_url;
+      // Check for non-empty arrays for JSONB image fields
+      const hasInner = Array.isArray(album.inner_sleeve_images) && album.inner_sleeve_images.length > 0;
+      const hasVinyl = Array.isArray(album.vinyl_label_images) && album.vinyl_label_images.length > 0;
+
+      if (!hasFront || !hasBack || !hasSpine || !hasInner || !hasVinyl) {
+        missingArtwork++; 
+        if (!hasFront) { /* Tracked by main missingArtwork usually, but logic implies we just want the agg here */ }
         if (!hasBack) missingBackCover++;
+        if (!hasSpine) missingSpine++;
+        if (!hasInner) missingInnerSleeve++;
+        if (!hasVinyl) missingVinylLabel++;
       }
 
       // 2. CREDITS
@@ -121,14 +136,13 @@ export async function GET() {
         missingReleaseMetadata++;
       }
 
-      // Tracking stat only
       if (!album.cat_no) missingCatalogNumber++;
 
       // 8. TOTAL SCORE
-      // "Fully Enriched" def: Has main assets + ANY streaming link + Metadata (minus cat_no)
+      // "Fully Enriched" def: Has ALL assets + ANY streaming link + Metadata
       const isComplete = 
-        hasFront && hasBack &&
-        hasMusicians && hasProducers &&
+        (hasFront && hasBack && hasSpine && hasInner && hasVinyl) &&
+        (hasMusicians && hasProducers) &&
         hasTracks &&
         hasTempo &&
         hasGenres &&
@@ -146,6 +160,9 @@ export async function GET() {
       
       missingArtwork,
       missingBackCover,
+      missingSpine,       // New
+      missingInnerSleeve, // New
+      missingVinylLabel,  // New
       
       missingCredits,
       missingMusicians,
