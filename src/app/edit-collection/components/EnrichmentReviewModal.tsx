@@ -5,12 +5,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import { type FieldConflict } from 'lib/conflictDetection';
 
-interface EnrichmentReviewModalProps {
-  conflicts: FieldConflict[];
-  onComplete: (resolutions: Record<string, unknown>) => void;
-  onCancel: () => void;
-}
-
 // --- HELPER: Smart Value Component ---
 function ConflictValue({ 
   value, 
@@ -118,6 +112,29 @@ function ConflictValue({
       </div>
     </div>
   );
+}
+
+// --- HELPERS ---
+const areValuesEqual = (a: unknown, b: unknown): boolean => {
+  if (a === b) return true;
+  if (Array.isArray(a) && Array.isArray(b)) {
+    // Simple sort comparison for arrays
+    return JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
+  }
+  return JSON.stringify(a) === JSON.stringify(b);
+};
+
+const mergeArrays = (a: unknown, b: unknown): unknown[] | null => {
+  if (!Array.isArray(a) || !Array.isArray(b)) return null;
+  // Combine and deduplicate
+  const set = new Set([...a, ...b]);
+  return Array.from(set).sort();
+};
+
+interface EnrichmentReviewModalProps {
+  conflicts: FieldConflict[];
+  onComplete: (resolutions: Record<string, unknown>) => void;
+  onCancel: () => void;
 }
 
 export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel }: EnrichmentReviewModalProps) {
@@ -260,26 +277,46 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
                       const key = `${conflict.album_id}-${conflict.field_name}`;
                       const selected = resolutions[key];
                       
+                      // Check for merge capability
+                      const mergedValue = mergeArrays(conflict.current_value, conflict.new_value);
+                      const isMergeable = mergedValue !== null;
+
                       return (
                         <div key={key}>
                           <div style={{ fontSize: '12px', fontWeight: '700', color: '#4b5563', marginBottom: '8px', textTransform: 'uppercase' }}>
                             {conflict.field_name.replace(/_/g, ' ')}
                           </div>
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                          <div style={{ 
+                            display: 'grid', 
+                            gridTemplateColumns: isMergeable ? '1fr 1fr 1fr' : '1fr 1fr', 
+                            gap: '16px' 
+                          }}>
                             {/* Option A: Current */}
                             <ConflictValue 
                               label="Current"
                               color="green"
                               value={conflict.current_value}
-                              isSelected={selected === conflict.current_value}
+                              isSelected={areValuesEqual(selected, conflict.current_value)}
                               onClick={() => handleResolve(conflict, conflict.current_value)}
                             />
-                            {/* Option B: New */}
+                            
+                            {/* Option B: Merge (If Array) */}
+                            {isMergeable && (
+                              <ConflictValue 
+                                label="Combined"
+                                color="blue"
+                                value={mergedValue}
+                                isSelected={areValuesEqual(selected, mergedValue)}
+                                onClick={() => handleResolve(conflict, mergedValue)}
+                              />
+                            )}
+
+                            {/* Option C: New */}
                             <ConflictValue 
                               label="New Data"
                               color="blue"
                               value={conflict.new_value}
-                              isSelected={selected === conflict.new_value}
+                              isSelected={areValuesEqual(selected, conflict.new_value)}
                               onClick={() => handleResolve(conflict, conflict.new_value)}
                             />
                           </div>

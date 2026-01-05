@@ -469,21 +469,28 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       
       const userChoseNew = !areValuesEqual(chosenValue, c.current_value);
       
+      // LOGIC: Detect if this was a merge (value is different from BOTH Current and New)
+      const isMerge = userChoseNew && !areValuesEqual(chosenValue, c.new_value);
+
       if (userChoseNew) {
         if (!updatesByAlbum[c.album_id]) updatesByAlbum[c.album_id] = {};
         updatesByAlbum[c.album_id][c.field_name] = chosenValue;
       }
 
-      // CRITICAL FIX: Ensure rejected_value is the NEW proposal if user kept current.
-      // This is for NEW decisions. It ensures history is clean moving forward.
+      // If merged, we default to tracking the 'new' value as the reference for what was "rejected" 
+      // (or rather, what was not strictly chosen).
       const rejectedVal = userChoseNew ? c.current_value : c.new_value;
+
+      let resolutionType = 'keep_current';
+      if (isMerge) resolutionType = 'merged';
+      else if (userChoseNew) resolutionType = 'use_new';
 
       resolutionRecords.push({
         album_id: c.album_id,
         field_name: c.field_name,
         kept_value: chosenValue,
         rejected_value: rejectedVal, 
-        resolution: userChoseNew ? 'use_new' : 'keep_current',
+        resolution: resolutionType,
         source: 'discogs',
         resolved_at: timestamp
       });
