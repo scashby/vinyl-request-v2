@@ -10,7 +10,6 @@ const supabase = createClient(
 
 export async function GET() {
   try {
-    // 1. Select all columns needed for the detailed stats
     const { data: albums, error } = await supabase
       .from('collection')
       .select(`
@@ -45,50 +44,34 @@ export async function GET() {
       }, { status: 500 });
     }
 
-    // 2. Initialize stats strictly matching the 'EnrichmentStats' type in the frontend
     const stats = {
       total: albums.length,
       needsEnrichment: 0,
       fullyEnriched: 0,
       
-      // Artwork
       missingArtwork: 0,
       missingBackCover: 0,
       missingSpineCover: 0,
       missingInnerSleeves: 0,
       missingLabelImages: 0,
-      
-      // Credits
       missingCredits: 0,
       missingMusicians: 0,
       missingProducers: 0,
       missingEngineers: 0,
       missingSongwriters: 0,
-      
-      // Tracklists
       missingTracklists: 0,
-      
-      // Audio
       missingAudioAnalysis: 0,
       missingTempo: 0,
       missingKey: 0,
       missingMoodData: 0,
-      
-      // Genres
       missingGenres: 0,
-      
-      // Streaming
       missingStreamingLinks: 0,
       missingSpotify: 0,
       missingAppleMusic: 0,
       missingLastFm: 0,
-      
-      // Reviews/Charts
       missingReviews: 0,
       missingRatings: 0,
       missingChartData: 0,
-      
-      // Metadata
       missingReleaseMetadata: 0,
       missingDiscogsIds: 0,
       missingLabels: 0,
@@ -97,9 +80,7 @@ export async function GET() {
       missingCountry: 0,
     };
 
-    // 3. Calculate stats
     albums.forEach(album => {
-      // -- Check Individual Fields --
       const hasImage = !!album.image_url;
       const hasBack = !!album.back_image_url;
       const hasMusicians = album.musicians && album.musicians.length > 0;
@@ -116,19 +97,16 @@ export async function GET() {
       const hasTracks = !!album.tracklists;
       const hasLabels = album.labels && album.labels.length > 0;
 
-      // -- Increment Counters --
       if (!hasImage) stats.missingArtwork++;
       if (!hasBack) stats.missingBackCover++;
       
       if (!hasMusicians) stats.missingMusicians++;
       if (!hasProducers) stats.missingProducers++;
-      // Aggregate credits check
       if (!hasMusicians && !hasProducers) stats.missingCredits++;
 
       if (!hasTracks) stats.missingTracklists++;
 
       if (!hasTempo) stats.missingTempo++;
-      // Aggregate audio check
       if (!hasTempo) stats.missingAudioAnalysis++; 
 
       if (!hasGenres) stats.missingGenres++;
@@ -136,7 +114,6 @@ export async function GET() {
       if (!hasSpotify) stats.missingSpotify++;
       if (!hasApple) stats.missingAppleMusic++;
       if (!hasLastFm) stats.missingLastFm++;
-      // Aggregate streaming check (missing ALL is bad, missing ANY is also a gap)
       if (!hasSpotify || !hasApple) stats.missingStreamingLinks++;
 
       if (!hasDiscogs) stats.missingDiscogsIds++;
@@ -145,12 +122,10 @@ export async function GET() {
       if (!hasCountry) stats.missingCountry++;
       if (!hasLabels) stats.missingLabels++;
 
-      // Aggregate metadata check - Expanded definition
       if (!hasDiscogs || !hasCat || !hasBarcode || !hasCountry || !hasLabels) {
         stats.missingReleaseMetadata++;
       }
 
-      // -- Total "Health" Check --
       const isRich = hasImage && hasBack && hasMusicians && hasSpotify && hasDiscogs && hasGenres;
       if (isRich) {
         stats.fullyEnriched++;
