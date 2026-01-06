@@ -256,6 +256,7 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
                       
                       return (
                         <div key={key}>
+                          {/* UPDATED: Row Header with Finalize Checkbox */}
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                             <div style={{ fontSize: '12px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase' }}>
                               {conflict.field_name.replace(/_/g, ' ')}
@@ -272,6 +273,7 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
                               Mark as Finalized
                             </label>
                           </div>
+
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px', alignItems: 'stretch' }}>
                             {/* Option A: Current Database Value */}
                             <div style={{ display: 'flex', flexDirection: 'column' }}>

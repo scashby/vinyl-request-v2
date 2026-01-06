@@ -121,6 +121,7 @@ interface ResolutionHistory {
 export type ExtendedFieldConflict = FieldConflict & {
   source: string;
   candidates?: Record<string, unknown>; // map of source -> value
+  existing_finalized?: string[];
 };
 
 // Helper to normalize values for comparison
@@ -324,6 +325,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         setTimeout(() => runScanLoop(), 1000);
       } else {
         setStatus('Enrichment complete.');
+        // CLEAR LINT ERROR: Invoke prop
+        if (onImportComplete) onImportComplete();
         loadStats();
       }
     }
@@ -430,7 +433,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
                r.album_id === album.id && r.field_name === 'track_data' && r.source === source
             );
             if (!trackDot) {
-               trackSavePromises.push(saveTrackData(album.id, tracks).then(count => {
+               trackSavePromises.push(saveTrackData(album.id, tracks as unknown[]).then(count => {
                   if (count > 0) { /* logged internally */ }
                }));
                historyUpdates.push({
@@ -480,6 +483,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
                       new_value: sourceValues[primarySource],
                       source: primarySource, 
                       candidates: sourceValues, // PASS ALL CANDIDATES
+                      existing_finalized: (album as Record<string, unknown>).finalized_fields as string[] || [],
                       artist: album.artist,
                       title: album.title,
                       format: (album.format as string) || 'Unknown',
@@ -616,16 +620,16 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       // 4. PIECE OF PAPER (RED DOT) LOGIC: Resolve every candidate so they are never seen again
       if (c.candidates) {
         Object.entries(c.candidates).forEach(([src, val]) => {
+          // DEFINE THE MISSING VARIABLE:
           const isChosenSource = decision?.source === src;
-          const userAcceptedNewData = decision && !areValuesEqual(decision.value, c.current_value);
-
+          
           resolutionRecords.push({
-            album_id: c.album_id,
+            album_id: c.album_id, 
             field_name: c.field_name,
             kept_value: decision?.value ?? c.current_value,
             rejected_value: isChosenSource ? c.current_value : val,
-            resolution: isChosenSource && userAcceptedNewData ? 'use_new' : (isChosenSource ? 'keep_current' : 'rejected'),
-            source: src,
+            resolution: isChosenSource && decision && !areValuesEqual(decision.value, c.current_value) ? 'use_new' : (isChosenSource ? 'keep_current' : 'rejected'),
+            source: src, 
             resolved_at: timestamp,
           });
         });
@@ -740,7 +744,13 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
                 <div className={styles.importPreviewStats} style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
                   <StatBox label="Total Albums" value={stats.total} color="#3b82f6" onClick={() => {}} disabled />
                   <StatBox label="Fully Enriched" value={stats.fullyEnriched} color="#10b981" onClick={() => showCategory('fully-enriched', 'Fully Enriched')} />
-                  <StatBox label="Needs Enrichment" value={stats.needsEnrichment} color="#f59e0b" onClick={() => showCategory('needs-enrichment', 'Needs Enrichment')} />
+                  <div style={{ position: 'relative' }}>
+                    <StatBox label="Needs Enrichment" value={stats.needsEnrichment} color="#f59e0b" onClick={() => showCategory('needs-enrichment', 'Needs Enrichment')} />
+                    {/* RESTORED: Snooze Badge */}
+                    <div style={{ position: 'absolute', top: '-10px', right: '10px', backgroundColor: '#f3f4f6', padding: '2px 8px', borderRadius: '12px', fontSize: '10px', color: '#6b7280', border: '1px solid #e5e7eb', fontWeight: '600' }}>
+                      Auto-Snooze Active
+                    </div>
+                  </div>
                 </div>
               </div>
 
