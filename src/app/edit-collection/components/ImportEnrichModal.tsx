@@ -324,13 +324,16 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
   async function processBatchAndSave(results: CandidateResult[]) {
     // 1. FETCH PREVIOUS RESOLUTIONS
+    // FIX: INCREASE LIMIT to 10,000 to prevent truncated history from causing re-prompts
     const albumIds = results.map(r => r.album.id);
     const { data: resolutions, error: resError } = await supabase
       .from('import_conflict_resolutions')
       .select('album_id, field_name, source')
-      .in('album_id', albumIds);
+      .in('album_id', albumIds)
+      .limit(10000); // CRITICAL FIX
       
     if (resError) console.error('Error fetching history:', resError);
+    else console.log(`[History] Fetched ${resolutions?.length || 0} existing resolution records.`);
 
     // 2. DEFINE ALLOWLIST
     // CRITICAL UPDATE: Added 'spine_image_url', 'inner_sleeve_images', 'vinyl_label_images'
@@ -367,12 +370,6 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       processedIds.push(item.album.id);
       const { album, candidates } = item;
       if (Object.keys(candidates).length === 0) return;
-
-      // DEBUG: Verify new fields are present in the payload (Restored from legacy)
-      const allCandidateKeys = Object.values(candidates).flatMap(c => Object.keys(c as object));
-      if (allCandidateKeys.some(k => ['spine_image_url', 'inner_sleeve_images', 'vinyl_label_images'].includes(k))) {
-         console.log('[Enrich Debug] Found extended image fields for:', album.title, candidates);
-      }
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const updatesForAlbum: Record<string, any> = {};
@@ -671,6 +668,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
        console.table(resolutionRecords.map(r => ({ 
          id: r.album_id, 
          field: r.field_name, 
+         src: r.source,
          result: r.resolution,
          rejected: r.rejected_value
        })));
