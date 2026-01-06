@@ -11,6 +11,7 @@ import Image from 'next/image';
 import { supabase } from 'lib/supabaseClient';
 import EnrichmentReviewModal from './EnrichmentReviewModal';
 import { type FieldConflict } from 'lib/conflictDetection';
+import styles from '../EditCollection.module.css';
 
 // --- 1. DATA CATEGORY DEFINITIONS ---
 export type DataCategory = 
@@ -109,6 +110,13 @@ type LogEntry = {
   timestamp: Date;
 };
 
+// Extended type for Multi-Source Conflicts
+// FIX: Added 'source' property explicitly
+export type ExtendedFieldConflict = FieldConflict & {
+  source: string; 
+  candidates?: Record<string, unknown>; // map of source -> value
+};
+
 // Helper to normalize values for comparison
 const normalizeValue = (val: unknown): string => {
   if (val === null || val === undefined) return '';
@@ -149,7 +157,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   const [loadingCategory, setLoadingCategory] = useState(false);
   
   const [showReview, setShowReview] = useState(false);
-  const [conflicts, setConflicts] = useState<FieldConflict[]>([]);
+  const [conflicts, setConflicts] = useState<ExtendedFieldConflict[]>([]);
   const [sessionLog, setSessionLog] = useState<LogEntry[]>([]);
   const logEndRef = useRef<HTMLDivElement>(null);
 
@@ -243,7 +251,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     setEnriching(true);
     
     const targetConflicts = parseInt(batchSize);
-    let collectedConflicts: FieldConflict[] = [];
+    let collectedConflicts: ExtendedFieldConflict[] = [];
 
     // Fetch batches until we have enough conflicts OR run out of items
     while ((collectedConflicts.length < targetConflicts || specificAlbumIds) && hasMoreRef.current) {
@@ -320,7 +328,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     const albumIds = results.map(r => r.album.id);
     const { data: resolutions, error: resError } = await supabase
       .from('import_conflict_resolutions')
-      .select('album_id, field_name, source') // CHANGED: Added source selection
+      .select('album_id, field_name, source')
       .in('album_id', albumIds);
       
     if (resError) console.error('Error fetching history:', resError);
@@ -343,8 +351,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const autoUpdates: { id: number; fields: Record<string, any> }[] = [];
-    // CHANGED: Update type to include optional source property
-    const newConflicts: (FieldConflict & { source?: string })[] = [];
+    const newConflicts: ExtendedFieldConflict[] = [];
     const processedIds: number[] = [];
 
     // NEW: History updates for Auto-Fills (The "Red Dot" application)
@@ -362,117 +369,120 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       const { album, candidates } = item;
       if (Object.keys(candidates).length === 0) return;
 
-      const combined = { 
-        ...candidates.musicbrainz as object, ...candidates.appleMusic as object, ...candidates.lastfm as object, 
-        ...candidates.spotify as object, ...candidates.discogs as object, ...candidates.coverArt as object, 
-        ...candidates.wikipedia as object, ...candidates.genius as object 
-      };
-
-      // DEBUG: Verify new fields are present in the payload
-      if (Object.keys(combined).some(k => ['spine_image_url', 'inner_sleeve_images', 'vinyl_label_images'].includes(k))) {
-         console.log('[Enrich Debug] Found extended image fields for:', album.title, combined);
-      }
-      
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const updatesForAlbum: Record<string, any> = {};
       const autoFilledFields: string[] = [];
 
-      // === NEW LOGIC: Iterate by Source to apply "Red Dot" per source ===
+      // --- LOGIC UPDATE: Collect Candidates First ---
+      // We gather all potential values for each field from all sources
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const fieldCandidates: Record<string, Record<string, any>> = {};
+
       for (const source of SOURCE_PRIORITY) {
-         // Safe access with casting to avoid TS errors without suppression
          // eslint-disable-next-line @typescript-eslint/no-explicit-any
          const sourceData = (candidates as any)[source];
          if (!sourceData) continue;
 
-         // A. Handle Album Fields
+         // A. Gather Album Fields
          Object.entries(sourceData).forEach(([key, value]) => {
             if (!ALLOWED_COLUMNS.has(key)) return;
-            
-            // Skip track fields here (handled in B)
+            // Skip track fields here (handled differently)
             if (['lyrics', 'bpm', 'key', 'time_signature', 'tracks'].includes(key)) return;
 
-            // CHECK RED DOT: Have we seen this specific field from this specific source?
-            const alreadySeen = resolutions?.some(r => 
-              r.album_id === album.id && 
-              r.field_name === key && 
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              ((r as any).source === source)
-            );
-            if (alreadySeen) return; // Skip if red dot exists
+            // CHECK RED DOT: Has this specific source value been handled?
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const alreadySeen = resolutions?.some(r => r.album_id === album.id && r.field_name === key && (r as any).source === source);
+            if (alreadySeen) return; 
 
-            // CHANGED: We use 'let' so we can transform the value (for dates)
+            // Transform value (Date Fix)
             let newVal = value;
-
-            // DATE FIX: Handle Year-Only dates (e.g. "1984" -> "1984-12-25")
-            // This prevents 400 Bad Request on Postgres Date columns
             if (key === 'original_release_date' && typeof newVal === 'string') {
-                 if (/^\d{4}$/.test(newVal)) {
-                     newVal = `${newVal}-12-25`; // Default to Christmas
-                 }
-                 // Final check: if it's still not YYYY-MM-DD, skip it to prevent crash
+                 if (/^\d{4}$/.test(newVal)) newVal = `${newVal}-12-25`;
                  if (!isValidDate(newVal)) return;
             }
-
-            const currentVal = album[key];
-
-            if (typeof newVal === 'object' && newVal !== null && !Array.isArray(newVal)) {
-                 if (!['musicians', 'producers', 'engineers', 'writers', 'credits'].includes(key)) return;
-            }
-
-            const isCurrentEmpty = !currentVal || (Array.isArray(currentVal) && currentVal.length === 0);
-            const isDifferent = !areValuesEqual(currentVal, newVal);
-
-            // TEST OVERRIDE: Prevent auto-fill for new fields to force them into the Conflict Review Modal
-            const isTestField = ['spine_image_url', 'inner_sleeve_images', 'vinyl_label_images'].includes(key);
-
-            if (isCurrentEmpty && newVal && !isTestField) {
-               updatesForAlbum[key] = newVal;
-               autoFilledFields.push(key);
-               // APPLY RED DOT (Important!)
-               historyUpdates.push({
-                 album_id: album.id, field_name: key, source, resolution: 'use_new', kept_value: newVal, resolved_at: new Date().toISOString()
-               });
-            } else if (isDifferent) {
-               newConflicts.push({
-                  album_id: album.id,
-                  field_name: key,
-                  current_value: currentVal,
-                  new_value: newVal,
-                  source: source, // Pass source to Modal
-                  artist: album.artist,
-                  title: album.title,
-                  format: (album.format as string) || 'Unknown',
-                  year: album.year as string,
-                  country: album.country as string,
-                  cat_no: (album.cat_no as string) || '', 
-                  barcode: (album.barcode as string) || '',
-                  labels: (album.labels as string[]) || []
-               });
+            
+            // Only add if defined
+            if (newVal !== null && newVal !== undefined && newVal !== '') {
+               if (!fieldCandidates[key]) fieldCandidates[key] = {};
+               fieldCandidates[key][source] = newVal;
             }
          });
 
-         // B. Handle Track Data (BPM, Lyrics) - Now inside source loop
+         // B. Handle Track Data immediately (Simplified for tracks as per original logic structure)
+         // Note: Logic kept separate as tracks aren't in standard field flow
          // eslint-disable-next-line @typescript-eslint/no-explicit-any
          const tracks = (sourceData as any).tracks;
          if (Array.isArray(tracks) && tracks.length > 0) {
-            // Check Red Dot for "Track Data"
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const trackDot = resolutions?.some(r => r.album_id === album.id && r.field_name === 'track_data' && (r as any).source === source);
-            
             if (!trackDot) {
+               // We only process tracks if we haven't seen them.
                trackSavePromises.push(saveTrackData(album.id, tracks).then(count => {
-                  // Promise handles logging internally
-                  if (count > 0) {
-                    // Note: We can't log here synchronously for the UI, but it's handled.
-                  }
+                  if (count > 0) { /* logged internally */ }
                }));
-               // Mark as seen
                historyUpdates.push({
                  album_id: album.id, field_name: 'track_data', source, resolution: 'use_new', kept_value: 'tracks_updated', resolved_at: new Date().toISOString()
                });
             }
          }
       }
+
+      // --- PROCESS GROUPED CANDIDATES ---
+      Object.entries(fieldCandidates).forEach(([key, sourceValues]) => {
+          const currentVal = album[key];
+          const isCurrentEmpty = !currentVal || (Array.isArray(currentVal) && currentVal.length === 0);
+          
+          // Get unique values to check for agreement
+          const uniqueValues = new Set(Object.values(sourceValues).map(v => normalizeValue(v)));
+          const sources = Object.keys(sourceValues);
+          
+          if (sources.length === 0) return;
+
+          // TEST OVERRIDE: Prevent auto-fill for new fields
+          const isTestField = ['spine_image_url', 'inner_sleeve_images', 'vinyl_label_images'].includes(key);
+
+          // 1. AUTO-FILL: If DB is empty and all sources agree (or only one source)
+          if (isCurrentEmpty && uniqueValues.size === 1 && !isTestField) {
+              const winningVal = Object.values(sourceValues)[0];
+              updatesForAlbum[key] = winningVal;
+              autoFilledFields.push(key);
+              
+              // Mark all agreeing sources as resolved
+              sources.forEach(src => {
+                 historyUpdates.push({
+                    album_id: album.id, field_name: key, source: src, resolution: 'use_new', kept_value: winningVal, resolved_at: new Date().toISOString()
+                 });
+              });
+          } 
+          // 2. CONFLICT: Values differ from DB, or multiple sources disagree
+          else {
+              // If DB has value, check if candidates are actually different
+              const candidatesDifferFromDB = sources.some(src => !areValuesEqual(currentVal, sourceValues[src]));
+              
+              if (candidatesDifferFromDB || (isCurrentEmpty && uniqueValues.size > 1)) {
+                  // We pick the "new_value" as the highest priority one for the simplified view,
+                  // but we pass ALL candidates to the UI.
+                  const primarySource = SOURCE_PRIORITY.find(s => sources.includes(s)) || sources[0];
+                  
+                  newConflicts.push({
+                      album_id: album.id,
+                      field_name: key,
+                      current_value: currentVal,
+                      new_value: sourceValues[primarySource], // Default "primary" proposal
+                      source: primarySource, // Explicitly set source
+                      candidates: sourceValues, // PASS ALL CANDIDATES
+                      artist: album.artist,
+                      title: album.title,
+                      format: (album.format as string) || 'Unknown',
+                      year: album.year as string,
+                      country: album.country as string,
+                      cat_no: (album.cat_no as string) || '', 
+                      barcode: (album.barcode as string) || '',
+                      labels: (album.labels as string[]) || []
+                   });
+              }
+          }
+      });
 
       if (Object.keys(updatesForAlbum).length > 0) {
         updatesForAlbum.last_enriched_at = new Date().toISOString();
@@ -559,8 +569,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     return 0;
   }
 
-  // UPDATED: Now accepts resolutions map
-  async function handleApplyChanges(resolutions: Record<string, unknown>) {
+  // UPDATED: Now accepts resolutions map with extended source info
+  async function handleApplyChanges(resolutions: Record<string, { value: unknown, source: string }>) {
     const updatesByAlbum: Record<number, Record<string, unknown>> = {};
     const resolutionRecords: Record<string, unknown>[] = [];
     const timestamp = new Date().toISOString();
@@ -570,53 +580,86 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     conflicts.forEach(c => {
       involvedAlbumIds.add(c.album_id);
       
-      // CHANGED: Key now matches the Modal's source-specific format
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const key = `${c.album_id}-${c.field_name}-${(c as any).source || 'enrichment'}`;
-      const chosenValue = resolutions[key]; 
+      const baseKey = `${c.album_id}-${c.field_name}`;
+      const decision = resolutions[baseKey]; // { value, source }
       
+      if (!decision) {
+          // Default: Keep Current. Log rejection for all candidates.
+          if (c.candidates) {
+            Object.keys(c.candidates).forEach(src => {
+                resolutionRecords.push({
+                    album_id: c.album_id,
+                    field_name: c.field_name,
+                    kept_value: c.current_value,
+                    rejected_value: c.candidates![src],
+                    resolution: 'keep_current',
+                    source: src,
+                    resolved_at: timestamp
+                });
+            });
+          }
+          return;
+      }
+
+      const { value: chosenValue, source: chosenSource } = decision;
       const userChoseNew = !areValuesEqual(chosenValue, c.current_value);
-      
-      // LOGIC: Detect if this was a merge (value is different from BOTH Current and New)
-      const isMerge = userChoseNew && !areValuesEqual(chosenValue, c.new_value);
 
       if (userChoseNew) {
         if (!updatesByAlbum[c.album_id]) updatesByAlbum[c.album_id] = {};
         updatesByAlbum[c.album_id][c.field_name] = chosenValue;
       }
 
-      // If merged, we default to tracking the 'new' value as the reference for what was "rejected" 
-      // (or rather, what was not strictly chosen).
-      const rejectedVal = userChoseNew ? c.current_value : c.new_value;
-
-      let resolutionType = 'keep_current';
-      if (isMerge) resolutionType = 'merged';
-      else if (userChoseNew) resolutionType = 'use_new';
-
-      resolutionRecords.push({
-        album_id: c.album_id,
-        field_name: c.field_name,
-        kept_value: chosenValue,
-        rejected_value: rejectedVal, 
-        resolution: resolutionType,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        source: (c as any).source || 'enrichment', 
-        resolved_at: timestamp
-      });
+      // HISTORY LOGIC:
+      // 1. Mark the winner as 'use_new'
+      // 2. Mark all other candidates as 'rejected'
+      
+      if (c.candidates) {
+          Object.entries(c.candidates).forEach(([src, val]) => {
+              const isWinner = src === chosenSource;
+              
+              if (userChoseNew && isWinner) {
+                  resolutionRecords.push({
+                      album_id: c.album_id,
+                      field_name: c.field_name,
+                      kept_value: chosenValue,
+                      rejected_value: c.current_value,
+                      resolution: 'use_new',
+                      source: src,
+                      resolved_at: timestamp
+                  });
+              } else {
+                  if (!userChoseNew) {
+                      // Kept Current
+                      resolutionRecords.push({
+                        album_id: c.album_id,
+                        field_name: c.field_name,
+                        kept_value: c.current_value,
+                        rejected_value: val,
+                        resolution: 'keep_current',
+                        source: src,
+                        resolved_at: timestamp
+                    });
+                  } else {
+                      // We picked a new value, but this source wasn't it
+                      resolutionRecords.push({
+                          album_id: c.album_id,
+                          field_name: c.field_name,
+                          kept_value: chosenValue,
+                          rejected_value: val,
+                          resolution: 'rejected', // Explicit rejection
+                          source: src,
+                          resolved_at: timestamp
+                      });
+                  }
+              }
+          });
+      }
     });
 
     // MODEL: DO NOT REMOVE DEBUG LOGGING
     console.log('[DB SAVE] Starting Batch Save...');
     console.log(`[DB SAVE] Updates Pending: ${Object.keys(updatesByAlbum).length} albums`);
     console.log(`[DB SAVE] History Records: ${resolutionRecords.length}`);
-    if (resolutionRecords.length > 0) {
-       console.table(resolutionRecords.map(r => ({ 
-         id: r.album_id, 
-         field: r.field_name, 
-         result: r.resolution,
-         rejected: r.rejected_value // Verify this matches the API proposal
-       })));
-    }
 
     // A. Update Albums
     const updatePromises = Array.from(involvedAlbumIds).map(async (albumId) => {
@@ -716,23 +759,14 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   ] : [];
 
   return (
-    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3000 }}>
-      <div style={{ 
-        backgroundColor: 'white', 
-        borderRadius: '8px', 
-        width: '1200px', 
-        maxWidth: '95vw', 
-        maxHeight: '95vh', 
-        display: 'flex', 
-        flexDirection: 'column', 
-        overflow: 'hidden',
-        color: '#111827'
-      }}>
+    <div className={styles.importModalContainer}>
+      <div className={styles.importModalContent} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.5)' }}>
+        <div style={{ backgroundColor: 'white', borderRadius: '8px', width: '1200px', maxWidth: '95vw', maxHeight: '95vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         
         {/* HEADER */}
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', backgroundColor: '#f59e0b', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '600', color: 'white' }}>⚡ Collection Data Enrichment</h2>
-          <button onClick={onClose} disabled={enriching} style={{ background: 'none', border: 'none', color: 'white', fontSize: '24px', cursor: 'pointer' }}>×</button>
+        <div className={styles.importModalHeader}>
+          <h2 className={styles.importModalTitle}>⚡ Collection Data Enrichment</h2>
+          <button onClick={onClose} disabled={enriching} className={styles.importModalCloseButton}>×</button>
         </div>
 
         <div style={{ flex: 1, overflow: 'auto', padding: '20px' }}>
@@ -743,7 +777,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
               {/* 1. OVERVIEW STATS */}
               <div style={{ marginBottom: '24px' }}>
                 <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px', color: '#111827' }}>Collection Overview</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+                <div className={styles.importPreviewStats} style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
                   <StatBox label="Total Albums" value={stats.total} color="#3b82f6" onClick={() => {}} disabled />
                   <StatBox label="Fully Enriched" value={stats.fullyEnriched} color="#10b981" onClick={() => showCategory('fully-enriched', 'Fully Enriched')} />
                   <StatBox label="Needs Enrichment" value={stats.needsEnrichment} color="#f59e0b" onClick={() => showCategory('needs-enrichment', 'Needs Enrichment')} />
@@ -751,8 +785,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
               </div>
 
               {/* 2. DATA CATEGORY SELECTION */}
-              <div style={{ marginBottom: '20px', padding: '16px', backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px' }}>
-                <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px', color: '#111827' }}>Select Data to Enrich</h3>
+              <div className={styles.importEnrichCard}>
+                <h3 className={styles.importEnrichHeader}>Select Data to Enrich</h3>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '12px' }}>
                   {dataCategoriesConfig.map(({ category, count, subcounts }) => (
                     <DataCategoryCard
@@ -769,7 +803,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
               </div>
 
               {/* 3. FILTERS */}
-              <div style={{ marginBottom: '16px', padding: '16px', backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+              <div className={styles.importEnrichCard} style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <label style={{ fontWeight: '600', fontSize: '14px', color: '#111827' }}>Folder:</label>
                   <select value={folderFilter} onChange={(e) => setFolderFilter(e.target.value)} disabled={enriching} style={{ padding: '6px', borderRadius: '4px', border: '1px solid #d1d5db', color: '#111827' }}>
@@ -817,30 +851,33 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
               )}
             </>
           ) : (
-            <div style={{ textAlign: 'center', padding: '40px', color: 'red' }}>Failed to load statistics.</div>
+            <div className={styles.importError}>Failed to load statistics.</div>
           )}
         </div>
 
         {/* FOOTER */}
-        <div style={{ padding: '16px 20px', borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-          <button onClick={onClose} disabled={enriching} style={{ padding: '8px 16px', backgroundColor: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: '4px', color: '#374151' }}>Close</button>
+        <div className={styles.importButtonContainer} style={{ padding: '16px 20px', borderTop: '1px solid #e5e7eb' }}>
+          <button onClick={onClose} disabled={enriching} className={styles.importCancelButton}>Close</button>
           <button 
             onClick={() => startEnrichment()} 
             disabled={enriching || !stats || selectedCategories.size === 0} 
-            style={{ padding: '8px 16px', backgroundColor: enriching ? '#d1d5db' : '#f59e0b', border: 'none', borderRadius: '4px', fontWeight: '600', color: 'white', cursor: enriching ? 'not-allowed' : 'pointer' }}
+            className={styles.importConfirmButton}
+            style={{ backgroundColor: enriching ? '#d1d5db' : undefined, cursor: enriching ? 'not-allowed' : undefined }}
           >
             {enriching ? 'Scanning...' : '⚡ Start Scan & Review'}
           </button>
+        </div>
         </div>
       </div>
 
       {/* DRILL DOWN MODAL */}
       {showCategoryModal && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 40000 }}>
-          <div style={{ backgroundColor: 'white', borderRadius: '8px', width: '1000px', maxWidth: '90vw', maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', color: '#111827' }}>
-            <div style={{ padding: '16px 20px', backgroundColor: '#f59e0b', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '600', color: 'white' }}>{categoryTitle}</h3>
-              <button onClick={() => setShowCategoryModal(false)} style={{ background: 'none', border: 'none', color: 'white', fontSize: '24px', cursor: 'pointer' }}>×</button>
+        <div className={styles.importModalContainer} style={{ background: 'rgba(0,0,0,0.7)' }}>
+           <div className={styles.importModalContent} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ backgroundColor: 'white', borderRadius: '8px', width: '1000px', maxWidth: '90vw', maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', color: '#111827' }}>
+            <div className={styles.importModalHeader}>
+              <h3 className={styles.importModalTitle}>{categoryTitle}</h3>
+              <button onClick={() => setShowCategoryModal(false)} className={styles.importModalCloseButton}>×</button>
             </div>
             <div style={{ flex: 1, overflow: 'auto', padding: '20px' }}>
               {loadingCategory ? (
@@ -850,7 +887,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
                   <button 
                      onClick={() => startEnrichment(categoryAlbums.map(a => a.id))}
                      disabled={enriching || categoryAlbums.length === 0}
-                     style={{ marginBottom: '16px', padding: '10px 20px', backgroundColor: '#f59e0b', color: 'white', border: 'none', borderRadius: '4px', fontWeight: '600', width: '100%', cursor: 'pointer' }}
+                     className={styles.importConfirmButton}
+                     style={{ width: '100%', marginBottom: '16px' }}
                   >
                     Scan These {categoryAlbums.length} Albums
                   </button>
@@ -869,6 +907,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
               )}
             </div>
           </div>
+          </div>
         </div>
       )}
     </div>
@@ -879,9 +918,9 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
 function StatBox({ label, value, color, onClick, disabled }: { label: string; value: number; color: string; onClick: () => void; disabled?: boolean }) {
   return (
-    <div onClick={disabled ? undefined : onClick} style={{ padding: '16px', backgroundColor: 'white', border: `2px solid ${color}`, borderRadius: '6px', textAlign: 'center', cursor: disabled ? 'default' : 'pointer' }}>
-      <div style={{ fontSize: '28px', fontWeight: '700', color }}>{value.toLocaleString()}</div>
-      <div style={{ fontSize: '12px', color: '#6b7280', fontWeight: '600', textTransform: 'uppercase' }}>{label}</div>
+    <div onClick={disabled ? undefined : onClick} className={styles.importPreviewStat} style={{ border: `2px solid ${color}`, cursor: disabled ? 'default' : 'pointer' }}>
+      <div className={styles.importPreviewStatValue} style={{ color }}>{value.toLocaleString()}</div>
+      <div className={styles.importPreviewStatLabel}>{label}</div>
     </div>
   );
 }
@@ -893,12 +932,10 @@ function DataCategoryCard({ category, count, subcounts, selected, onToggle, disa
   return (
     <div 
       onClick={disabled ? undefined : onToggle}
+      className={styles.importSelectionCard}
       style={{ 
-        border: `2px solid ${selected ? '#f59e0b' : '#e5e7eb'}`, 
-        borderRadius: '6px', 
-        padding: '12px', 
+        borderColor: selected ? '#f59e0b' : '#e5e7eb', 
         backgroundColor: selected ? '#fff7ed' : 'white', 
-        cursor: disabled ? 'not-allowed' : 'pointer', 
         opacity: disabled ? 0.6 : 1,
         display: 'flex',
         gap: '10px'
@@ -908,10 +945,10 @@ function DataCategoryCard({ category, count, subcounts, selected, onToggle, disa
       <div style={{ flex: 1 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
           <span style={{ fontSize: '16px' }}>{config.icon}</span>
-          <span style={{ fontWeight: '600', fontSize: '14px', color: '#111827' }}>{config.label}</span>
+          <span className={styles.importSelectionCardTitle} style={{ fontSize: '14px', marginBottom: 0 }}>{config.label}</span>
           <span style={{ marginLeft: 'auto', fontWeight: '700', color: count > 0 ? '#ef4444' : '#10b981' }}>{count.toLocaleString()}</span>
         </div>
-        <div style={{ fontSize: '12px', color: '#6b7280', lineHeight: '1.4' }}>{config.desc}</div>
+        <div className={styles.importSelectionCardDescription}>{config.desc}</div>
         
         {subcounts && subcounts.length > 0 && (
           <>

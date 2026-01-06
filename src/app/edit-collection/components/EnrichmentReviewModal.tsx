@@ -3,29 +3,15 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
-import { type FieldConflict } from 'lib/conflictDetection';
+import { type ExtendedFieldConflict } from './ImportEnrichModal';
+import styles from '../EditCollection.module.css';
 
 interface EnrichmentReviewModalProps {
-  // CHANGED: Added source property to type definition
-  conflicts: (FieldConflict & { source?: string })[];
-  onComplete: (resolutions: Record<string, unknown>) => void;
+  // Use extended type to support 'candidates'
+  conflicts: ExtendedFieldConflict[];
+  onComplete: (resolutions: Record<string, { value: unknown, source: string }>) => void;
   onCancel: () => void;
 }
-
-// --- HELPERS ---
-const areValuesEqual = (a: unknown, b: unknown): boolean => {
-  if (a === b) return true;
-  if (Array.isArray(a) && Array.isArray(b)) {
-    return JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
-  }
-  return JSON.stringify(a) === JSON.stringify(b);
-};
-
-const mergeArrays = (a: unknown, b: unknown): unknown[] | null => {
-  if (!Array.isArray(a) || !Array.isArray(b)) return null;
-  const set = new Set([...a, ...b]);
-  return Array.from(set).sort();
-};
 
 // --- HELPER: Smart Value Component ---
 function ConflictValue({ 
@@ -74,7 +60,8 @@ function ConflictValue({
     gap: '8px',
     position: 'relative' as const,
     height: '100%',
-    minWidth: '0'
+    minWidth: '0',
+    flex: 1
   };
 
   const headerStyle = {
@@ -137,10 +124,11 @@ function ConflictValue({
 }
 
 export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel }: EnrichmentReviewModalProps) {
-  const [resolutions, setResolutions] = useState<Record<string, unknown>>({});
+  // Map of "AlbumID-Field" -> { value, source }
+  const [resolutions, setResolutions] = useState<Record<string, { value: unknown, source: string }>>({});
 
   const groupedConflicts = useMemo(() => {
-    const groups: Record<number, (FieldConflict & { source?: string })[]> = {};
+    const groups: Record<number, ExtendedFieldConflict[]> = {};
     conflicts.forEach(c => {
       if (!groups[c.album_id]) groups[c.album_id] = [];
       groups[c.album_id].push(c);
@@ -148,37 +136,35 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
     return groups;
   }, [conflicts]);
 
-  // Initial Auto-Select: Default to KEEP CURRENT
+  // Initial Auto-Select: Default to KEEP CURRENT for all
   useEffect(() => {
-    const defaults: Record<string, unknown> = {};
+    const defaults: Record<string, { value: unknown, source: string }> = {};
     conflicts.forEach(c => {
-      // CHANGED: Key includes source
-      const key = `${c.album_id}-${c.field_name}-${c.source || 'enrichment'}`;
-      defaults[key] = c.current_value; 
+      const key = `${c.album_id}-${c.field_name}`;
+      defaults[key] = { value: c.current_value, source: 'current' };
     });
     setResolutions(defaults);
   }, [conflicts]);
 
-  const handleResolve = (conflict: FieldConflict & { source?: string }, value: unknown) => {
-    // KEY CHANGE: Include source in key
-    const key = `${conflict.album_id}-${conflict.field_name}-${conflict.source || 'enrichment'}`;
-    setResolutions(prev => ({ ...prev, [key]: value }));
+  const handleResolve = (conflict: ExtendedFieldConflict, value: unknown, source: string) => {
+    const key = `${conflict.album_id}-${conflict.field_name}`;
+    setResolutions(prev => ({ ...prev, [key]: { value, source } }));
   };
 
   const handleSelectAllNew = () => {
-    const newResolutions: Record<string, unknown> = {};
+    const newResolutions: Record<string, { value: unknown, source: string }> = {};
     conflicts.forEach(c => {
-      const key = `${c.album_id}-${c.field_name}-${c.source || 'enrichment'}`;
-      newResolutions[key] = c.new_value;
+      const key = `${c.album_id}-${c.field_name}`;
+      newResolutions[key] = { value: c.new_value, source: c.source || 'enrichment' };
     });
     setResolutions(newResolutions);
   };
 
   const handleSelectAllCurrent = () => {
-    const newResolutions: Record<string, unknown> = {};
+    const newResolutions: Record<string, { value: unknown, source: string }> = {};
     conflicts.forEach(c => {
-      const key = `${c.album_id}-${c.field_name}-${c.source || 'enrichment'}`;
-      newResolutions[key] = c.current_value;
+      const key = `${c.album_id}-${c.field_name}`;
+      newResolutions[key] = { value: c.current_value, source: 'current' };
     });
     setResolutions(newResolutions);
   };
@@ -190,7 +176,8 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
   const totalChanges = Object.keys(groupedConflicts).length;
 
   return (
-    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 4000 }}>
+    <div className={styles.importModalContainer} style={{ background: 'rgba(0,0,0,0.6)' }}>
+      <div className={styles.importModalContent} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ 
         backgroundColor: 'white', 
         borderRadius: '12px', 
@@ -204,7 +191,7 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
       }}>
         
         {/* HEADER */}
-        <div style={{ padding: '20px 24px', borderBottom: '1px solid #e5e7eb', backgroundColor: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className={styles.importModalHeader} style={{ backgroundColor: 'white', borderBottom: '1px solid #e5e7eb' }}>
           <div>
             <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '700', color: '#111827' }}>
               Review Enrichment Data
@@ -237,7 +224,7 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
               const albumInfo = group[0];
               
               return (
-                <div key={idx} style={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e5e7eb', overflow: 'hidden' }}>
+                <div key={idx} className={styles.importEnrichCard} style={{ padding: 0, overflow: 'hidden' }}>
                   
                   {/* ALBUM CONTEXT HEADER */}
                   <div style={{ padding: '12px 16px', backgroundColor: '#f3f4f6', borderBottom: '1px solid #e5e7eb', display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -257,67 +244,61 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
                           {albumInfo.year}
                         </span>
                       )}
-                      {albumInfo.cat_no && (
-                        <span style={{ padding: '2px 8px', borderRadius: '4px', backgroundColor: '#e5e7eb', color: '#374151', border: '1px solid #d1d5db' }}>
-                          Cat: {albumInfo.cat_no}
-                        </span>
-                      )}
-                      {albumInfo.country && (
-                        <span style={{ padding: '2px 8px', borderRadius: '4px', backgroundColor: '#e5e7eb', color: '#374151', border: '1px solid #d1d5db' }}>
-                          {albumInfo.country}
-                        </span>
-                      )}
                     </div>
                   </div>
 
                   {/* CONFLICT ROWS */}
                   <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                     {group.map((conflict) => {
-                      // KEY CHANGE: Include source in key
-                      const key = `${conflict.album_id}-${conflict.field_name}-${conflict.source || 'enrichment'}`;
-                      const selected = resolutions[key];
+                      const key = `${conflict.album_id}-${conflict.field_name}`;
+                      // Default to current if not set
+                      const selected = resolutions[key] || { value: conflict.current_value, source: 'current' };
                       
-                      const mergedValue = mergeArrays(conflict.current_value, conflict.new_value);
-                      const isMergeable = mergedValue !== null;
-
                       return (
                         <div key={key}>
                           <div style={{ fontSize: '12px', fontWeight: '700', color: '#4b5563', marginBottom: '8px', textTransform: 'uppercase' }}>
                             {conflict.field_name.replace(/_/g, ' ')}
                           </div>
-                          <div style={{ 
-                            display: 'grid', 
-                            gridTemplateColumns: isMergeable ? '1fr 1fr 1fr' : '1fr 1fr', 
-                            gap: '16px' 
-                          }}>
+                          <div style={{ display: 'flex', gap: '16px', alignItems: 'stretch' }}>
                             {/* Option A: Current */}
-                            <ConflictValue 
-                              label="Current"
-                              color="green"
-                              value={conflict.current_value}
-                              isSelected={areValuesEqual(selected, conflict.current_value)}
-                              onClick={() => handleResolve(conflict, conflict.current_value)}
-                            />
-                            
-                            {/* Option B: Merge (If Array) */}
-                            {isMergeable && (
-                              <ConflictValue 
-                                label="Combined"
-                                color="blue"
-                                value={mergedValue}
-                                isSelected={areValuesEqual(selected, mergedValue)}
-                                onClick={() => handleResolve(conflict, mergedValue)}
-                              />
-                            )}
+                            <div style={{ flex: 1 }}>
+                                <ConflictValue 
+                                label="Current (DB)"
+                                color="green"
+                                value={conflict.current_value}
+                                isSelected={selected.source === 'current'}
+                                onClick={() => handleResolve(conflict, conflict.current_value, 'current')}
+                                />
+                            </div>
 
-                            {/* Option C: New */}
-                            <ConflictValue 
-                              label={`New Data (${conflict.source || 'Unknown'})`}
-                              color="blue"
-                              value={conflict.new_value}
-                              isSelected={areValuesEqual(selected, conflict.new_value)}
-                              onClick={() => handleResolve(conflict, conflict.new_value)}
-                            />
+                            {/* Option B: Candidates Grid */}
+                            {conflict.candidates && Object.keys(conflict.candidates).length > 0 && (
+                                <div style={{ flex: 2, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px' }}>
+                                    {Object.entries(conflict.candidates).map(([source, val]) => (
+                                        <ConflictValue 
+                                            key={source}
+                                            label={source}
+                                            color="blue"
+                                            value={val}
+                                            isSelected={selected.source === source}
+                                            onClick={() => handleResolve(conflict, val, source)}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+                            
+                            {/* Fallback for legacy single-source conflicts (if candidates obj missing) */}
+                            {(!conflict.candidates || Object.keys(conflict.candidates).length === 0) && (
+                                <div style={{ flex: 1 }}>
+                                    <ConflictValue 
+                                        label={`New (${conflict.source || 'Unknown'})`}
+                                        color="blue"
+                                        value={conflict.new_value}
+                                        isSelected={selected.source === (conflict.source || 'enrichment')}
+                                        onClick={() => handleResolve(conflict, conflict.new_value, conflict.source || 'enrichment')}
+                                    />
+                                </div>
+                            )}
                           </div>
                         </div>
                       );
@@ -330,28 +311,20 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
         </div>
 
         {/* FOOTER */}
-        <div style={{ padding: '20px 24px', borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'flex-end', gap: '12px', backgroundColor: 'white' }}>
-          <button onClick={onCancel} style={{ padding: '10px 24px', border: '1px solid #d1d5db', borderRadius: '6px', backgroundColor: 'white', cursor: 'pointer', color: '#374151', fontWeight: '600' }}>
+        <div className={styles.importButtonContainer} style={{ padding: '20px 24px', borderTop: '1px solid #e5e7eb', backgroundColor: 'white', justifyContent: 'flex-end' }}>
+          <button onClick={onCancel} className={styles.importCancelButton}>
             Cancel
           </button>
           <button 
             onClick={handleSave}
-            style={{ 
-              padding: '10px 32px', 
-              backgroundColor: '#f59e0b', 
-              color: 'white', 
-              border: 'none', 
-              borderRadius: '6px', 
-              cursor: 'pointer',
-              fontWeight: '600',
-              fontSize: '14px',
-              boxShadow: '0 4px 6px -1px rgba(245, 158, 11, 0.3)'
-            }}
+            className={styles.importConfirmButton}
+            style={{ backgroundColor: '#f59e0b' }}
           >
             Save Changes
           </button>
         </div>
 
+      </div>
       </div>
     </div>
   );
