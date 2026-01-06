@@ -111,9 +111,8 @@ type LogEntry = {
 };
 
 // Extended type for Multi-Source Conflicts
-// FIX: Added 'source' property explicitly
 export type ExtendedFieldConflict = FieldConflict & {
-  source: string; 
+  source: string;
   candidates?: Record<string, unknown>; // map of source -> value
 };
 
@@ -368,6 +367,12 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       processedIds.push(item.album.id);
       const { album, candidates } = item;
       if (Object.keys(candidates).length === 0) return;
+
+      // DEBUG: Verify new fields are present in the payload (Restored from legacy)
+      const allCandidateKeys = Object.values(candidates).flatMap(c => Object.keys(c as object));
+      if (allCandidateKeys.some(k => ['spine_image_url', 'inner_sleeve_images', 'vinyl_label_images'].includes(k))) {
+         console.log('[Enrich Debug] Found extended image fields for:', album.title, candidates);
+      }
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const updatesForAlbum: Record<string, any> = {};
@@ -660,6 +665,16 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     console.log('[DB SAVE] Starting Batch Save...');
     console.log(`[DB SAVE] Updates Pending: ${Object.keys(updatesByAlbum).length} albums`);
     console.log(`[DB SAVE] History Records: ${resolutionRecords.length}`);
+    
+    // RESTORED: Console table for history records to see exactly WHAT is updated
+    if (resolutionRecords.length > 0) {
+       console.table(resolutionRecords.map(r => ({ 
+         id: r.album_id, 
+         field: r.field_name, 
+         result: r.resolution,
+         rejected: r.rejected_value
+       })));
+    }
 
     // A. Update Albums
     const updatePromises = Array.from(involvedAlbumIds).map(async (albumId) => {
@@ -674,7 +689,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         .eq('id', albumId);
         
       if (error) console.error(`[DB ERROR] Failed to update album ${albumId}:`, error);
-      else console.log(`[DB SUCCESS] Updated album ${albumId}`);
+      // ENHANCED: Log the fields being updated
+      else console.log(`[DB SUCCESS] Updated album ${albumId}`, fields);
     });
 
     // B. Save History
