@@ -8,7 +8,10 @@ import styles from '../EditCollection.module.css';
 
 interface EnrichmentReviewModalProps {
   conflicts: ExtendedFieldConflict[];
-  onComplete: (resolutions: Record<string, { value: unknown, source: string }>) => void;
+  onComplete: (
+    resolutions: Record<string, { value: unknown, source: string }>,
+    finalizedFields: Record<string, boolean>
+  ) => void;
   onCancel: () => void;
 }
 
@@ -124,6 +127,7 @@ function ConflictValue({
 
 export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel }: EnrichmentReviewModalProps) {
   const [resolutions, setResolutions] = useState<Record<string, { value: unknown, source: string }>>({});
+  const [finalizedFields, setFinalizedFields] = useState<Record<string, boolean>>({});
 
   const groupedConflicts = useMemo(() => {
     const groups: Record<number, ExtendedFieldConflict[]> = {};
@@ -167,7 +171,7 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
   };
 
   const handleSave = () => {
-    onComplete(resolutions);
+    onComplete(resolutions, finalizedFields);
   };
 
   const totalChanges = Object.keys(groupedConflicts).length;
@@ -252,8 +256,21 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
                       
                       return (
                         <div key={key}>
-                          <div style={{ fontSize: '12px', fontWeight: '700', color: '#4b5563', marginBottom: '8px', textTransform: 'uppercase' }}>
-                            {conflict.field_name.replace(/_/g, ' ')}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                            <div style={{ fontSize: '12px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase' }}>
+                              {conflict.field_name.replace(/_/g, ' ')}
+                            </div>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '12px', color: '#6b7280' }}>
+                              <input 
+                                type="checkbox" 
+                                checked={finalizedFields[key] || false}
+                                onChange={(e) => setFinalizedFields(prev => ({
+                                  ...prev, 
+                                  [key]: e.target.checked
+                                }))}
+                              />
+                              Mark as Finalized
+                            </label>
                           </div>
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px', alignItems: 'stretch' }}>
                             {/* Option A: Current Database Value */}
