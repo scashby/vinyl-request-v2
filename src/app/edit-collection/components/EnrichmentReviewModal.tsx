@@ -255,22 +255,22 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
                           <div style={{ fontSize: '12px', fontWeight: '700', color: '#4b5563', marginBottom: '8px', textTransform: 'uppercase' }}>
                             {conflict.field_name.replace(/_/g, ' ')}
                           </div>
-                          <div style={{ display: 'flex', gap: '16px', alignItems: 'stretch' }}>
-                            {/* Option A: Current */}
-                            <div style={{ flex: 1 }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px', alignItems: 'stretch' }}>
+                            {/* Option A: Current Database Value */}
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
                                 <ConflictValue 
-                                label="Current (DB)"
-                                color="green"
-                                value={conflict.current_value}
-                                isSelected={selected.source === 'current'}
-                                onClick={() => handleResolve(conflict, conflict.current_value, 'current')}
+                                  label="Current (DB)"
+                                  color="green"
+                                  value={conflict.current_value}
+                                  isSelected={selected.source === 'current'}
+                                  onClick={() => handleResolve(conflict, conflict.current_value, 'current')}
                                 />
                             </div>
 
-                            {/* Option B: Candidates Grid */}
-                            {conflict.candidates && Object.keys(conflict.candidates).length > 0 && (
-                                <div style={{ flex: 2, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px' }}>
-                                    {Object.entries(conflict.candidates).map(([source, val]) => (
+                            {/* Option B: Grouped Candidates Grid (Multi-Source Selection) */}
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px' }}>
+                                {conflict.candidates ? (
+                                    Object.entries(conflict.candidates).map(([source, val]) => (
                                         <ConflictValue 
                                             key={source}
                                             label={source}
@@ -279,13 +279,9 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
                                             isSelected={selected.source === source}
                                             onClick={() => handleResolve(conflict, val, source)}
                                         />
-                                    ))}
-                                </div>
-                            )}
-                            
-                            {/* Fallback for legacy single-source conflicts */}
-                            {(!conflict.candidates || Object.keys(conflict.candidates).length === 0) && (
-                                <div style={{ flex: 1 }}>
+                                    ))
+                                ) : (
+                                    /* Fallback for legacy single-source data if map is missing */
                                     <ConflictValue 
                                         label={`New (${conflict.source || 'Unknown'})`}
                                         color="blue"
@@ -293,8 +289,8 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
                                         isSelected={selected.source === (conflict.source || 'enrichment')}
                                         onClick={() => handleResolve(conflict, conflict.new_value, conflict.source || 'enrichment')}
                                     />
-                                </div>
-                            )}
+                                )}
+                            </div>
                           </div>
                         </div>
                       );
@@ -325,4 +321,3 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
     </div>
   );
 }
-// this shows you are using the one from the repository and not your cache
