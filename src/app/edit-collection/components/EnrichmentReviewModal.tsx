@@ -283,7 +283,7 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
                                 </div>
                             )}
                             
-                            {/* Fallback for legacy single-source conflicts (if candidates obj missing) */}
+                            {/* Fallback for legacy single-source conflicts */}
                             {(!conflict.candidates || Object.keys(conflict.candidates).length === 0) && (
                                 <div style={{ flex: 1 }}>
                                     <ConflictValue 
@@ -325,3 +325,4 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
     </div>
   );
 }
+// this shows you are using the one from the repository and not your cache
