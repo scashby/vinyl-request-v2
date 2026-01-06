@@ -110,7 +110,7 @@ type LogEntry = {
   timestamp: Date;
 };
 
-// Local interface for resolution history to avoid 'any'
+// Local interface for resolution history
 interface ResolutionHistory {
   album_id: number;
   field_name: string;
@@ -331,20 +331,18 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
   async function processBatchAndSave(results: CandidateResult[]) {
     // 1. FETCH PREVIOUS RESOLUTIONS
-    // FIX: INCREASE LIMIT to 10,000 to prevent truncated history from causing re-prompts
+    // FIX: INCREASE LIMIT to 10,000
     const albumIds = results.map(r => r.album.id);
     const { data: resolutions, error: resError } = await supabase
       .from('import_conflict_resolutions')
       .select('album_id, field_name, source')
       .in('album_id', albumIds)
-      .limit(10000); // CRITICAL FIX
+      .limit(10000); //
       
     if (resError) console.error('Error fetching history:', resError);
     else console.log(`[History] Fetched ${resolutions?.length || 0} existing resolution records.`);
 
     // 2. DEFINE ALLOWLIST
-    // CRITICAL UPDATE: Added 'spine_image_url', 'inner_sleeve_images', 'vinyl_label_images'
-    // PLUS: Musicians, Credits, BPM, Lyrics, Classical info
     const ALLOWED_COLUMNS = new Set([
       'artist', 'title', 'year', 'format', 'country', 'barcode', 'labels',
       'tracklists', 'image_url', 'back_image_url', 'sell_price', 'media_condition', 'folder',
@@ -383,7 +381,6 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       const autoFilledFields: string[] = [];
 
       // --- LOGIC UPDATE: Collect Candidates First ---
-      // We gather all potential values for each field from all sources
       const fieldCandidates: Record<string, Record<string, unknown>> = {};
 
       for (const source of SOURCE_PRIORITY) {
@@ -393,7 +390,6 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
          // A. Gather Album Fields
          Object.entries(sourceData).forEach(([key, value]) => {
             if (!ALLOWED_COLUMNS.has(key)) return;
-            // Skip track fields here (handled in B)
             if (['lyrics', 'bpm', 'key', 'time_signature', 'tracks'].includes(key)) return;
 
             // CHECK RED DOT: Has this specific source value been handled?
@@ -416,15 +412,13 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
             }
          });
 
-         // B. Handle Track Data immediately (Simplified for tracks as per original logic structure)
-         // Note: Logic kept separate as tracks aren't in standard field flow
+         // B. Handle Track Data immediately
          const tracks = sourceData.tracks;
          if (Array.isArray(tracks) && tracks.length > 0) {
             const trackDot = (resolutions as ResolutionHistory[] | null)?.some(r => 
                r.album_id === album.id && r.field_name === 'track_data' && r.source === source
             );
             if (!trackDot) {
-               // We only process tracks if we haven't seen them.
                trackSavePromises.push(saveTrackData(album.id, tracks).then(count => {
                   if (count > 0) { /* logged internally */ }
                }));
@@ -449,13 +443,12 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           // TEST OVERRIDE: Prevent auto-fill for new fields
           const isTestField = ['spine_image_url', 'inner_sleeve_images', 'vinyl_label_images'].includes(key);
 
-          // 1. AUTO-FILL: If DB is empty and all candidate papers agree
+          // 1. AUTO-FILL: If DB is empty and all candidates agree
           if (isCurrentEmpty && uniqueValues.size === 1 && !isTestField) {
               const winningVal = Object.values(sourceValues)[0];
               updatesForAlbum[key] = winningVal;
               autoFilledFields.push(key);
               
-              // Mark all agreeing sources as resolved
               sources.forEach(src => {
                  historyUpdates.push({
                     album_id: album.id, field_name: key, source: src, resolution: 'use_new', kept_value: winningVal, resolved_at: new Date().toISOString()
@@ -464,19 +457,16 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           } 
           // 2. CONFLICT: Values differ from DB, or multiple sources disagree
           else {
-              // If DB has value, check if candidates are actually different
               const candidatesDifferFromDB = sources.some(src => !areValuesEqual(currentVal, sourceValues[src]));
               
               if (candidatesDifferFromDB || (isCurrentEmpty && uniqueValues.size > 1)) {
-                  // We pick the "new_value" as the highest priority one for the simplified view,
-                  // but we pass ALL candidates to the UI.
                   const primarySource = SOURCE_PRIORITY.find(s => sources.includes(s)) || sources[0];
                   
                   newConflicts.push({
                       album_id: album.id,
                       field_name: key,
                       current_value: currentVal,
-                      new_value: sourceValues[primarySource], // Default "primary" proposal
+                      new_value: sourceValues[primarySource],
                       source: primarySource, 
                       candidates: sourceValues, // PASS ALL CANDIDATES
                       artist: album.artist,
@@ -548,7 +538,6 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     const updates: Promise<unknown>[] = [];
     
     for (const t of existingTracks) {
-       // Fuzzy match the enriched track to our DB track
        const match = (enrichedTracks as Record<string, unknown>[]).find(et => 
          String(et.title).toLowerCase() === t.track_name.toLowerCase() ||
          (et.position && et.position === t.track_number)
@@ -561,7 +550,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
          if (match.lyrics) patch.lyrics = match.lyrics;
 
          if (Object.keys(patch).length > 0) {
-            // FIX: Explicitly resolve as Promise to avoid typescript error
+            // FIX: Explicitly resolve as Promise to avoid type error
             updates.push(Promise.resolve(supabase.from('dj_tracks').update(patch).eq('id', t.id)));
          }
        }
@@ -570,7 +559,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     if (updates.length > 0) {
        await Promise.all(updates);
        console.log(`[Track Sync] Updated ${updates.length} tracks for album ${albumId}`);
-       return updates.length; // RETURN COUNT
+       return updates.length;
     }
     return 0;
   }
@@ -587,22 +576,15 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       involvedAlbumIds.add(c.album_id);
       
       const baseKey = `${c.album_id}-${c.field_name}`;
-      
-      // We check our local resolutions map for this entry
-      const decision = resolutions[baseKey]; // { value, source }
+      const decision = resolutions[baseKey]; 
       
       if (!decision) {
           // Default: Keep Current. Log rejection for all candidates.
           if (c.candidates) {
             Object.keys(c.candidates).forEach(src => {
                 resolutionRecords.push({
-                    album_id: c.album_id,
-                    field_name: c.field_name,
-                    kept_value: c.current_value,
-                    rejected_value: c.candidates![src],
-                    resolution: 'keep_current',
-                    source: src,
-                    resolved_at: timestamp
+                    album_id: c.album_id, field_name: c.field_name, kept_value: c.current_value,
+                    rejected_value: c.candidates![src], resolution: 'keep_current', source: src, resolved_at: timestamp
                 });
             });
           }
@@ -624,36 +606,19 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
               
               if (userChoseNew && isWinner) {
                   resolutionRecords.push({
-                      album_id: c.album_id,
-                      field_name: c.field_name,
-                      kept_value: chosenValue,
-                      rejected_value: c.current_value,
-                      resolution: 'use_new',
-                      source: src,
-                      resolved_at: timestamp
+                      album_id: c.album_id, field_name: c.field_name, kept_value: chosenValue,
+                      rejected_value: c.current_value, resolution: 'use_new', source: src, resolved_at: timestamp
                   });
               } else {
                   if (!userChoseNew) {
-                      // Kept Current
                       resolutionRecords.push({
-                        album_id: c.album_id,
-                        field_name: c.field_name,
-                        kept_value: c.current_value,
-                        rejected_value: val,
-                        resolution: 'keep_current',
-                        source: src,
-                        resolved_at: timestamp
+                        album_id: c.album_id, field_name: c.field_name, kept_value: c.current_value,
+                        rejected_value: val, resolution: 'keep_current', source: src, resolved_at: timestamp
                     });
                   } else {
-                      // We picked a new value, but this source wasn't it
                       resolutionRecords.push({
-                          album_id: c.album_id,
-                          field_name: c.field_name,
-                          kept_value: chosenValue,
-                          rejected_value: val,
-                          resolution: 'rejected', // Explicit rejection
-                          source: src,
-                          resolved_at: timestamp
+                          album_id: c.album_id, field_name: c.field_name, kept_value: chosenValue,
+                          rejected_value: val, resolution: 'rejected', source: src, resolved_at: timestamp
                       });
                   }
               }
@@ -666,7 +631,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     console.log(`[DB SAVE] Updates Pending: ${Object.keys(updatesByAlbum).length} albums`);
     console.log(`[DB SAVE] History Records: ${resolutionRecords.length}`);
     
-    // RESTORED: Console table for history records to see exactly WHAT is updated
+    // RESTORED: Console table for history records
     if (resolutionRecords.length > 0) {
        console.table(resolutionRecords.map(r => ({ 
          id: (r as Record<string, unknown>).album_id, 
@@ -690,7 +655,6 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         .eq('id', albumId);
         
       if (error) console.error(`[DB ERROR] Failed to update album ${albumId}:`, error);
-      // ENHANCED: Log the fields being updated
       else console.log(`[DB SUCCESS] Updated album ${albumId}`, fields);
     });
 
@@ -758,17 +722,10 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   }
 
   const dataCategoriesConfig: { category: DataCategory; count: number; subcounts?: { label: string; count: number }[] }[] = stats ? [
-    { category: 'artwork', count: stats.missingArtwork, subcounts: [
-        { label: 'Back covers', count: stats.missingBackCover },
-    ]},
-    { category: 'credits', count: stats.missingCredits, subcounts: [
-        { label: 'Musicians', count: stats.missingMusicians },
-        { label: 'Producers', count: stats.missingProducers },
-    ]},
+    { category: 'artwork', count: stats.missingArtwork, subcounts: [{ label: 'Back covers', count: stats.missingBackCover }]},
+    { category: 'credits', count: stats.missingCredits, subcounts: [{ label: 'Musicians', count: stats.missingMusicians }, { label: 'Producers', count: stats.missingProducers }]},
     { category: 'tracklists', count: stats.missingTracklists },
-    { category: 'audio_analysis', count: stats.missingAudioAnalysis, subcounts: [
-        { label: 'Tempo', count: stats.missingTempo },
-    ]},
+    { category: 'audio_analysis', count: stats.missingAudioAnalysis, subcounts: [{ label: 'Tempo', count: stats.missingTempo }]},
     { category: 'genres', count: stats.missingGenres },
     { category: 'streaming_links', count: stats.missingStreamingLinks },
     { category: 'release_metadata', count: stats.missingReleaseMetadata },
@@ -806,12 +763,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '12px' }}>
                   {dataCategoriesConfig.map(({ category, count, subcounts }) => (
                     <DataCategoryCard
-                      key={category}
-                      category={category}
-                      count={count}
-                      subcounts={subcounts}
-                      selected={selectedCategories.has(category)}
-                      onToggle={() => toggleCategory(category)}
+                      key={category} category={category} count={count} subcounts={subcounts}
+                      selected={selectedCategories.has(category)} onToggle={() => toggleCategory(category)}
                       disabled={enriching}
                     />
                   ))}
