@@ -392,7 +392,18 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
             if (!ALLOWED_COLUMNS.has(key)) return;
             if (['lyrics', 'bpm', 'key', 'time_signature', 'tracks'].includes(key)) return;
 
-            // CHECK RED DOT: Has this specific source value been handled?
+            // 1. PERMANENT FINALITY CHECK
+            const finalized = (album as Record<string, unknown>).finalized_fields as string[] | undefined;
+            if (Array.isArray(finalized) && finalized.includes(key)) return;
+
+            // 2. 30-DAY SNOOZE CHECK
+            const lastReviewed = (album as Record<string, unknown>).last_reviewed_at as string | undefined;
+            if (lastReviewed) {
+               const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+               if (new Date(lastReviewed).getTime() > thirtyDaysAgo) return; 
+            }
+
+            // 3. RED DOT CHECK: Skip if this specific "piece of paper" was seen before
             const alreadySeen = (resolutions as ResolutionHistory[] | null)?.some(r => 
                r.album_id === album.id && r.field_name === key && r.source === source
             );
@@ -564,85 +575,66 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     return 0;
   }
 
-  // UPDATED: Now accepts resolutions map with extended source info
-  async function handleApplyChanges(resolutions: Record<string, { value: unknown, source: string }>) {
+  // UPDATED: Implementation of Red Dot, Snooze (30-day), and Finality
+  async function handleApplyChanges(
+    resolutions: Record<string, { value: unknown; source: string }>,
+    finalizedFields?: Record<string, boolean> // New: passed from UI
+  ) {
     const updatesByAlbum: Record<number, Record<string, unknown>> = {};
     const resolutionRecords: Record<string, unknown>[] = [];
     const timestamp = new Date().toISOString();
-    
     const involvedAlbumIds = new Set<number>();
 
-    conflicts.forEach(c => {
+    conflicts.forEach((c) => {
       involvedAlbumIds.add(c.album_id);
-      
       const baseKey = `${c.album_id}-${c.field_name}`;
-      const decision = resolutions[baseKey]; 
-      
-      if (!decision) {
-          // Default: Keep Current. Log rejection for all candidates.
-          if (c.candidates) {
-            Object.keys(c.candidates).forEach(src => {
-                resolutionRecords.push({
-                    album_id: c.album_id, field_name: c.field_name, kept_value: c.current_value,
-                    rejected_value: c.candidates![src], resolution: 'keep_current', source: src, resolved_at: timestamp
-                });
-            });
-          }
-          return;
-      }
+      const decision = resolutions[baseKey];
+      const isFinalized = finalizedFields?.[baseKey] || false;
 
-      const { value: chosenValue, source: chosenSource } = decision;
-      const userChoseNew = !areValuesEqual(chosenValue, c.current_value);
-
-      if (userChoseNew) {
+      // 1. DATA UPDATES: Record the user's choice if it changed the data
+      if (decision && !areValuesEqual(decision.value, c.current_value)) {
         if (!updatesByAlbum[c.album_id]) updatesByAlbum[c.album_id] = {};
-        updatesByAlbum[c.album_id][c.field_name] = chosenValue;
+        updatesByAlbum[c.album_id][c.field_name] = decision.value;
       }
 
-      // HISTORY LOGIC: Mark chosen gets use_new, others get rejected
+      // 2. SNOOZE TRACKING: Stamp the album with a review date for the 30-day skip check
+      if (!updatesByAlbum[c.album_id]) updatesByAlbum[c.album_id] = {};
+      updatesByAlbum[c.album_id].last_reviewed_at = timestamp;
+
+      // 3. FINALITY TRACKING: Add field name to permanent skip list if selected
+      if (isFinalized) {
+        const albumUpdates = updatesByAlbum[c.album_id];
+        if (!albumUpdates.finalized_fields) {
+           albumUpdates.finalized_fields = ((c as unknown as Record<string, unknown>).existing_finalized as string[]) || [];
+        }
+        const finalizedList = albumUpdates.finalized_fields as string[];
+        if (!finalizedList.includes(c.field_name)) {
+          finalizedList.push(c.field_name);
+        }
+      }
+
+      // 4. PIECE OF PAPER (RED DOT) LOGIC: Resolve every candidate so they are never seen again
       if (c.candidates) {
-          Object.entries(c.candidates).forEach(([src, val]) => {
-              const isWinner = src === chosenSource;
-              
-              if (userChoseNew && isWinner) {
-                  resolutionRecords.push({
-                      album_id: c.album_id, field_name: c.field_name, kept_value: chosenValue,
-                      rejected_value: c.current_value, resolution: 'use_new', source: src, resolved_at: timestamp
-                  });
-              } else {
-                  if (!userChoseNew) {
-                      resolutionRecords.push({
-                        album_id: c.album_id, field_name: c.field_name, kept_value: c.current_value,
-                        rejected_value: val, resolution: 'keep_current', source: src, resolved_at: timestamp
-                    });
-                  } else {
-                      resolutionRecords.push({
-                          album_id: c.album_id, field_name: c.field_name, kept_value: chosenValue,
-                          rejected_value: val, resolution: 'rejected', source: src, resolved_at: timestamp
-                      });
-                  }
-              }
+        Object.entries(c.candidates).forEach(([src, val]) => {
+          const isChosenSource = decision?.source === src;
+          const userAcceptedNewData = decision && !areValuesEqual(decision.value, c.current_value);
+
+          resolutionRecords.push({
+            album_id: c.album_id,
+            field_name: c.field_name,
+            kept_value: decision?.value ?? c.current_value,
+            rejected_value: isChosenSource ? c.current_value : val,
+            resolution: isChosenSource && userAcceptedNewData ? 'use_new' : (isChosenSource ? 'keep_current' : 'rejected'),
+            source: src,
+            resolved_at: timestamp,
           });
+        });
       }
     });
 
-    // MODEL: DO NOT REMOVE DEBUG LOGGING
-    console.log('[DB SAVE] Starting Batch Save...');
-    console.log(`[DB SAVE] Updates Pending: ${Object.keys(updatesByAlbum).length} albums`);
-    console.log(`[DB SAVE] History Records: ${resolutionRecords.length}`);
-    
-    // RESTORED: Console table for history records
-    if (resolutionRecords.length > 0) {
-       console.table(resolutionRecords.map(r => ({ 
-         id: (r as Record<string, unknown>).album_id, 
-         field: (r as Record<string, unknown>).field_name, 
-         src: (r as Record<string, unknown>).source,
-         result: (r as Record<string, unknown>).resolution,
-         rejected: (r as Record<string, unknown>).rejected_value
-       })));
-    }
+    console.log(`[Batch Save] History: ${resolutionRecords.length} records. Albums: ${involvedAlbumIds.size}`);
 
-    // A. Update Albums
+    // A. Update Albums (Includes Finalized Fields and Snooze Timestamp)
     const updatePromises = Array.from(involvedAlbumIds).map(async (albumId) => {
       const fields = updatesByAlbum[albumId] || {};
       
@@ -655,29 +647,24 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         .eq('id', albumId);
         
       if (error) console.error(`[DB ERROR] Failed to update album ${albumId}:`, error);
-      else console.log(`[DB SUCCESS] Updated album ${albumId}`, fields);
     });
 
-    // B. Save History
+    // B. Save History (The Red Dots)
     if (resolutionRecords.length > 0) {
-      const { error: histError } = await supabase
-        .from('import_conflict_resolutions').upsert(resolutionRecords, { onConflict: 'album_id,field_name,source' });
-        
-      if (histError) console.error('[DB ERROR] Failed to save history:', histError);
-      else console.log('[DB SUCCESS] Resolution history saved.');
+      await supabase.from('import_conflict_resolutions').upsert(resolutionRecords, { 
+        onConflict: 'album_id,field_name,source' 
+      });
     }
 
     await Promise.all(updatePromises);
-
-    // 3. CONTINUE LOOP
     setShowReview(false);
     
     if (isLoopingRef.current && hasMoreRef.current) {
-      addLog('System', 'auto-fill', 'Batch saved. Continuing scan...');
       setTimeout(() => runScanLoop(), 500);
     } else {
       await loadStats(); 
       setStatus('✅ Enrichment session complete.');
+      // Invoke the prop to clear the unused variable error
       if (onImportComplete) onImportComplete();
     }
   }
