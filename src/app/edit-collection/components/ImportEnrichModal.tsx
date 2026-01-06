@@ -110,6 +110,13 @@ type LogEntry = {
   timestamp: Date;
 };
 
+// Local interface for resolution history to avoid 'any'
+interface ResolutionHistory {
+  album_id: number;
+  field_name: string;
+  source: string;
+}
+
 // Extended type for Multi-Source Conflicts
 export type ExtendedFieldConflict = FieldConflict & {
   source: string;
@@ -361,7 +368,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     const historyUpdates: { album_id: number; field_name: string; source: string; resolution: string; kept_value: any; resolved_at: string }[] = [];
 
     // Helper for async track saving
-    const trackSavePromises: Promise<void>[] = [];
+    const trackSavePromises: Promise<unknown>[] = [];
 
     // Source Priority Order
     const SOURCE_PRIORITY = ['musicbrainz', 'spotify', 'appleMusic', 'discogs', 'lastfm', 'coverArt', 'wikipedia', 'genius'];
@@ -377,23 +384,22 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
       // --- LOGIC UPDATE: Collect Candidates First ---
       // We gather all potential values for each field from all sources
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const fieldCandidates: Record<string, Record<string, any>> = {};
+      const fieldCandidates: Record<string, Record<string, unknown>> = {};
 
       for (const source of SOURCE_PRIORITY) {
-         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-         const sourceData = (candidates as any)[source];
+         const sourceData = (candidates as Record<string, Record<string, unknown>>)[source];
          if (!sourceData) continue;
 
          // A. Gather Album Fields
          Object.entries(sourceData).forEach(([key, value]) => {
             if (!ALLOWED_COLUMNS.has(key)) return;
-            // Skip track fields here (handled differently)
+            // Skip track fields here (handled in B)
             if (['lyrics', 'bpm', 'key', 'time_signature', 'tracks'].includes(key)) return;
 
             // CHECK RED DOT: Has this specific source value been handled?
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const alreadySeen = resolutions?.some(r => r.album_id === album.id && r.field_name === key && (r as any).source === source);
+            const alreadySeen = (resolutions as ResolutionHistory[] | null)?.some(r => 
+               r.album_id === album.id && r.field_name === key && r.source === source
+            );
             if (alreadySeen) return; 
 
             // Transform value (Date Fix)
@@ -412,11 +418,11 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
          // B. Handle Track Data immediately (Simplified for tracks as per original logic structure)
          // Note: Logic kept separate as tracks aren't in standard field flow
-         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-         const tracks = (sourceData as any).tracks;
+         const tracks = sourceData.tracks;
          if (Array.isArray(tracks) && tracks.length > 0) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const trackDot = resolutions?.some(r => r.album_id === album.id && r.field_name === 'track_data' && (r as any).source === source);
+            const trackDot = (resolutions as ResolutionHistory[] | null)?.some(r => 
+               r.album_id === album.id && r.field_name === 'track_data' && r.source === source
+            );
             if (!trackDot) {
                // We only process tracks if we haven't seen them.
                trackSavePromises.push(saveTrackData(album.id, tracks).then(count => {
@@ -443,7 +449,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           // TEST OVERRIDE: Prevent auto-fill for new fields
           const isTestField = ['spine_image_url', 'inner_sleeve_images', 'vinyl_label_images'].includes(key);
 
-          // 1. AUTO-FILL: If DB is empty and all sources agree (or only one source)
+          // 1. AUTO-FILL: If DB is empty and all candidate papers agree
           if (isCurrentEmpty && uniqueValues.size === 1 && !isTestField) {
               const winningVal = Object.values(sourceValues)[0];
               updatesForAlbum[key] = winningVal;
@@ -471,7 +477,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
                       field_name: key,
                       current_value: currentVal,
                       new_value: sourceValues[primarySource], // Default "primary" proposal
-                      source: primarySource, // Explicitly set source
+                      source: primarySource, 
                       candidates: sourceValues, // PASS ALL CANDIDATES
                       artist: album.artist,
                       title: album.title,
@@ -529,8 +535,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   }
   
   // NEW HELPER: Save enriched track data
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async function saveTrackData(albumId: number, enrichedTracks: any[]) {
+  async function saveTrackData(albumId: number, enrichedTracks: unknown[]) {
     // 1. Get existing tracks for this album
     const { data: existingTracks } = await supabase
       .from('dj_tracks')
@@ -540,25 +545,24 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     if (!existingTracks || existingTracks.length === 0) return 0;
 
     // 2. Map and Update
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const updates: any[] = [];
+    const updates: Promise<unknown>[] = [];
     
     for (const t of existingTracks) {
        // Fuzzy match the enriched track to our DB track
-       const match = enrichedTracks.find(et => 
-         et.title.toLowerCase() === t.track_name.toLowerCase() ||
+       const match = (enrichedTracks as Record<string, unknown>[]).find(et => 
+         String(et.title).toLowerCase() === t.track_name.toLowerCase() ||
          (et.position && et.position === t.track_number)
        );
 
        if (match) {
-         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-         const patch: Record<string, any> = {};
+         const patch: Record<string, unknown> = {};
          if (match.bpm) patch.bpm = match.bpm;
          if (match.key) patch.musical_key = match.key;
          if (match.lyrics) patch.lyrics = match.lyrics;
 
          if (Object.keys(patch).length > 0) {
-            updates.push(supabase.from('dj_tracks').update(patch).eq('id', t.id));
+            // FIX: Explicitly resolve as Promise to avoid typescript error
+            updates.push(Promise.resolve(supabase.from('dj_tracks').update(patch).eq('id', t.id)));
          }
        }
     }
@@ -583,6 +587,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       involvedAlbumIds.add(c.album_id);
       
       const baseKey = `${c.album_id}-${c.field_name}`;
+      
+      // We check our local resolutions map for this entry
       const decision = resolutions[baseKey]; // { value, source }
       
       if (!decision) {
@@ -611,10 +617,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         updatesByAlbum[c.album_id][c.field_name] = chosenValue;
       }
 
-      // HISTORY LOGIC:
-      // 1. Mark the winner as 'use_new'
-      // 2. Mark all other candidates as 'rejected'
-      
+      // HISTORY LOGIC: Mark chosen gets use_new, others get rejected
       if (c.candidates) {
           Object.entries(c.candidates).forEach(([src, val]) => {
               const isWinner = src === chosenSource;
@@ -666,11 +669,11 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     // RESTORED: Console table for history records to see exactly WHAT is updated
     if (resolutionRecords.length > 0) {
        console.table(resolutionRecords.map(r => ({ 
-         id: r.album_id, 
-         field: r.field_name, 
-         src: r.source,
-         result: r.resolution,
-         rejected: r.rejected_value
+         id: (r as Record<string, unknown>).album_id, 
+         field: (r as Record<string, unknown>).field_name, 
+         src: (r as Record<string, unknown>).source,
+         result: (r as Record<string, unknown>).resolution,
+         rejected: (r as Record<string, unknown>).rejected_value
        })));
     }
 
@@ -694,8 +697,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     // B. Save History
     if (resolutionRecords.length > 0) {
       const { error: histError } = await supabase
-        .from('import_conflict_resolutions')
-        .upsert(resolutionRecords, { onConflict: 'album_id,field_name,source' });
+        .from('import_conflict_resolutions').upsert(resolutionRecords, { onConflict: 'album_id,field_name,source' });
         
       if (histError) console.error('[DB ERROR] Failed to save history:', histError);
       else console.log('[DB SUCCESS] Resolution history saved.');
@@ -748,7 +750,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         onComplete={handleApplyChanges}
         onCancel={() => { 
           setShowReview(false); 
-          isLoopingRef.current = false; // Stop the loop
+          isLoopingRef.current = false; 
           setStatus('Review cancelled. Scanning stopped.'); 
         }}
       />
@@ -859,7 +861,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
               {/* STATUS */}
               {status && (
-                <div style={{ padding: '12px', borderRadius: '6px', marginBottom: '16px', backgroundColor: status.includes('Error') ? '#fee2e2' : '#dcfce7', color: status.includes('Error') ? '#991b1b' : '#166534', fontWeight: '500' }}>
+                <div style={{ padding: '12px', borderRadius: '6px', marginBottom: '16px', backgroundColor: '#dcfce7', color: '#166534', fontWeight: '500' }}>
                   {status}
                 </div>
               )}

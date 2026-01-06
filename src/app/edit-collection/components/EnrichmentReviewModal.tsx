@@ -7,7 +7,6 @@ import { type ExtendedFieldConflict } from './ImportEnrichModal';
 import styles from '../EditCollection.module.css';
 
 interface EnrichmentReviewModalProps {
-  // Use extended type to support 'candidates'
   conflicts: ExtendedFieldConflict[];
   onComplete: (resolutions: Record<string, { value: unknown, source: string }>) => void;
   onCancel: () => void;
@@ -124,7 +123,6 @@ function ConflictValue({
 }
 
 export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel }: EnrichmentReviewModalProps) {
-  // Map of "AlbumID-Field" -> { value, source }
   const [resolutions, setResolutions] = useState<Record<string, { value: unknown, source: string }>>({});
 
   const groupedConflicts = useMemo(() => {
@@ -136,7 +134,6 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
     return groups;
   }, [conflicts]);
 
-  // Initial Auto-Select: Default to KEEP CURRENT for all
   useEffect(() => {
     const defaults: Record<string, { value: unknown, source: string }> = {};
     conflicts.forEach(c => {
@@ -251,7 +248,6 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
                   <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                     {group.map((conflict) => {
                       const key = `${conflict.album_id}-${conflict.field_name}`;
-                      // Default to current if not set
                       const selected = resolutions[key] || { value: conflict.current_value, source: 'current' };
                       
                       return (
