@@ -590,23 +590,24 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     const resolutionRecords: Record<string, unknown>[] = [];
     const timestamp = new Date().toISOString();
     const involvedAlbumIds = new Set<number>();
+    // NEW: Initialize local summary array to avoid 400 Error and undefined references
+    const localSummary: { field: string, album: string, action: string }[] = [];
 
     conflicts.forEach((c) => {
       involvedAlbumIds.add(c.album_id);
       const baseKey = `${c.album_id}-${c.field_name}`;
-      const decision = resolutions[baseKey];
-      // Capture for Audit Summary
+      const decision = resolutions[baseKey] as { value: unknown, source: string, selectedSources?: string[] };
+      
       if (decision) {
         if (!updatesByAlbum[c.album_id]) updatesByAlbum[c.album_id] = {};
         updatesByAlbum[c.album_id][c.field_name] = decision.value;
         
-       // Determine action text for summary
+        // Use localSummary to record the action for the audit screen
         let actionText = 'Updated';
         if (decision.source === 'current') actionText = 'Kept Current';
-        // Use type cast to check for the 'merge' source safely
-        if ((decision as { source: string }).source === 'merge') actionText = 'Merged';
+        if (decision.source === 'merge') actionText = 'Merged';
         
-        summary.push({ 
+        localSummary.push({ 
           field: c.field_name, 
           album: `${c.artist} - ${c.title}`, 
           action: actionText 
@@ -685,25 +686,11 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     await Promise.all(updatePromises);
     
     // 1. Generate the summary data for the audit screen
-    const summary = conflicts.map(c => {
-      const decision = resolutions[`${c.album_id}-${c.field_name}`];
-      let actionText = 'Updated';
-      
-      // FIX: Use a type-safe check instead of 'as any'
-      const res = decision as { source: string } | undefined;
-      
-      if (res?.source === 'current') actionText = 'Kept Current';
-      if (res?.source === 'merge') actionText = 'Merged';
-      
-      return {
-        album: `${c.artist} - ${c.title}`,
-        field: c.field_name,
-        action: actionText
-      };
-    });
+    // Note: 'const summary' was removed here because we are now using 'localSummary' 
+    // populated inside the conflicts.forEach loop to avoid 400 errors.
     
-    // 2. Set the summary state to trigger the Summary UI
-    setBatchSummary(summary);
+    // 2. Set the summary state using our localSummary array to trigger the Audit Summary UI
+    setBatchSummary(localSummary);
     
     // 3. Close the review modal
     setShowReview(false);

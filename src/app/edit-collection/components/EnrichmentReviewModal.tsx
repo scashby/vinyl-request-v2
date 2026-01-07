@@ -326,6 +326,7 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
                                   label="Current (DB)"
                                   color="green"
                                   value={conflict.current_value}
+                                  // Restore highlight: Green if source is 'current' OR part of 'merge'
                                   isSelected={selected.source === 'current' || (selected.selectedSources?.includes('current') ?? false)}
                                   isMultiSelect={['genres', 'styles', 'musicians', 'credits', 'producers', 'tags'].includes(conflict.field_name)}
                                   onClick={() => handleResolve(conflict, conflict.current_value, 'current')}
@@ -341,7 +342,9 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
                                             label={source}
                                             color="blue"
                                             value={val}
+                                            // Restore highlight: Blue if source matches OR is part of 'selectedSources' merge
                                             isSelected={selected.source === source || (selected.selectedSources?.includes(source) ?? false)}
+                                            // Enable checkbox UI for mergeable array fields
                                             isMultiSelect={['genres', 'styles', 'musicians', 'credits', 'producers', 'tags'].includes(conflict.field_name)}
                                             onClick={() => handleResolve(conflict, val, source)}
                                         />
