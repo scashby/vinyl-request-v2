@@ -21,13 +21,15 @@ function ConflictValue({
   onClick, 
   isSelected, 
   label, 
-  color 
+  color,
+  isMultiSelect = false // NEW
 }: { 
   value: unknown; 
   onClick: () => void; 
   isSelected: boolean; 
   label: string;
   color: 'green' | 'blue';
+  isMultiSelect?: boolean; // NEW
 }) {
   const [dimensions, setDimensions] = useState<{ w: number, h: number } | null>(null);
   const [isImage, setIsImage] = useState(false);
@@ -78,10 +80,19 @@ function ConflictValue({
 
   if (isImage && typeof value === 'string') {
     return (
-      <div onClick={onClick} style={baseStyle}>
+    <div onClick={onClick} style={baseStyle}>
         <div style={headerStyle}>
-          <span>{label}</span>
-          {isSelected && <span>✓ SELECTED</span>}
+          <span>{label} {dimensions && `(${dimensions.w} x ${dimensions.h} px)`}</span>
+          {isMultiSelect ? (
+            <input 
+              type="checkbox" 
+              checked={isSelected} 
+              readOnly 
+              style={{ cursor: 'pointer', width: '16px', height: '16px' }} 
+            />
+          ) : (
+            isSelected && <span>✓ SELECTED</span>
+          )}
         </div>
         <div style={{ position: 'relative', width: '100%', aspectRatio: '1', backgroundColor: '#f3f4f6', borderRadius: '4px', overflow: 'hidden' }}>
           <Image 
@@ -93,9 +104,6 @@ function ConflictValue({
             onLoadingComplete={(img) => setDimensions({ w: img.naturalWidth, h: img.naturalHeight })}
             onError={() => setIsImage(false)}
           />
-        </div>
-        <div style={{ fontSize: '11px', color: '#6b7280', textAlign: 'center', marginTop: 'auto', paddingTop: '4px' }}>
-          {dimensions ? `${dimensions.w} x ${dimensions.h} px` : 'Loading...'}
         </div>
       </div>
     );
@@ -126,7 +134,7 @@ function ConflictValue({
 }
 
 export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel }: EnrichmentReviewModalProps) {
-  const [resolutions, setResolutions] = useState<Record<string, { value: unknown, source: string }>>({});
+  const [resolutions, setResolutions] = useState<Record<string, { value: unknown, source: string, selectedSources?: string[] }>>({});
   const [finalizedFields, setFinalizedFields] = useState<Record<string, boolean>>({});
 
   const groupedConflicts = useMemo(() => {
@@ -149,7 +157,33 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
 
   const handleResolve = (conflict: ExtendedFieldConflict, value: unknown, source: string) => {
     const key = `${conflict.album_id}-${conflict.field_name}`;
-    setResolutions(prev => ({ ...prev, [key]: { value, source } }));
+    const MERGEABLE_FIELDS = ['genres', 'styles', 'musicians', 'credits', 'producers', 'tags'];
+    const isMergeable = MERGEABLE_FIELDS.includes(conflict.field_name);
+
+    if (isMergeable) {
+      setResolutions(prev => {
+        const current = prev[key] || { value: [], source: 'merge', selectedSources: [] };
+        const sources = current.selectedSources || [];
+        // Toggle the source: add if missing, remove if present
+        const newSources = sources.includes(source) ? sources.filter(s => s !== source) : [...sources, source];
+        
+        // Construct the merged value (Unique Array)
+        const mergedSet = new Set<string>();
+        newSources.forEach(src => {
+          const val = src === 'current' ? conflict.current_value : conflict.candidates?.[src];
+          if (Array.isArray(val)) val.forEach(v => mergedSet.add(String(v)));
+          else if (val) mergedSet.add(String(val));
+        });
+
+        return { 
+          ...prev, 
+          [key]: { value: Array.from(mergedSet), source: 'merge', selectedSources: newSources } 
+        };
+      });
+    } else {
+      // Standard Radio-style behavior for static fields (Image, Date, etc)
+      setResolutions(prev => ({ ...prev, [key]: { value, source } }));
+    }
   };
 
   const handleSelectAllNew = () => {
@@ -204,10 +238,25 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
           
           <div style={{ display: 'flex', gap: '12px' }}>
             <button 
+              onClick={() => {
+                const nonMergableFields = ['image_url', 'original_release_date', 'country', 'barcode', 'year'];
+                const newFinalized = { ...finalizedFields };
+                conflicts.forEach(c => {
+                  if (nonMergableFields.includes(c.field_name)) {
+                    newFinalized[`${c.album_id}-${c.field_name}`] = true;
+                  }
+                });
+                setFinalizedFields(newFinalized);
+              }}
+              style={{ padding: '8px 16px', fontSize: '13px', fontWeight: '600', color: '#7c3aed', backgroundColor: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: '6px', cursor: 'pointer' }}
+            >
+              Finalize All (Static Fields)
+            </button>
+            <button 
               onClick={handleSelectAllCurrent}
               style={{ padding: '8px 16px', fontSize: '13px', fontWeight: '600', color: '#047857', backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '6px', cursor: 'pointer' }}
             >
-              Keep All Current
+              Keep Current
             </button>
             <button 
               onClick={handleSelectAllNew}

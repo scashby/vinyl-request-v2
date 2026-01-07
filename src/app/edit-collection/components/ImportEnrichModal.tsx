@@ -167,6 +167,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   const [conflicts, setConflicts] = useState<ExtendedFieldConflict[]>([]);
   const [sessionLog, setSessionLog] = useState<LogEntry[]>([]);
   const logEndRef = useRef<HTMLDivElement>(null);
+// NEW: State for the Audit Summary after a batch is saved
+  const [batchSummary, setBatchSummary] = useState<{album: string, field: string, action: string}[] | null>(null);
 
   // Loop Control Refs
   const hasMoreRef = useRef(true);
@@ -593,6 +595,23 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       involvedAlbumIds.add(c.album_id);
       const baseKey = `${c.album_id}-${c.field_name}`;
       const decision = resolutions[baseKey];
+      // Capture for Audit Summary
+      if (decision) {
+        if (!updatesByAlbum[c.album_id]) updatesByAlbum[c.album_id] = {};
+        updatesByAlbum[c.album_id][c.field_name] = decision.value;
+        
+       // Determine action text for summary
+        let actionText = 'Updated';
+        if (decision.source === 'current') actionText = 'Kept Current';
+        // Use type cast to check for the 'merge' source safely
+        if ((decision as { source: string }).source === 'merge') actionText = 'Merged';
+        
+        summary.push({ 
+          field: c.field_name, 
+          album: `${c.artist} - ${c.title}`, 
+          action: actionText 
+        });
+      }
       const isFinalized = finalizedFields?.[baseKey] || false;
 
       // 1. DATA UPDATES: Record the user's choice if it changed the data
@@ -620,15 +639,18 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       // 4. PIECE OF PAPER (RED DOT) LOGIC: Resolve every candidate so they are never seen again
       if (c.candidates) {
         Object.entries(c.candidates).forEach(([src, val]) => {
-          // DEFINE THE MISSING VARIABLE:
-          const isChosenSource = decision?.source === src;
+          // Define the resolution type to avoid 'any'
+          const res = decision as { value: unknown; source: string; selectedSources?: string[] };
+          const isChosenSource = res?.source === src || res?.selectedSources?.includes(src);
           
           resolutionRecords.push({
             album_id: c.album_id, 
             field_name: c.field_name,
             kept_value: decision?.value ?? c.current_value,
             rejected_value: isChosenSource ? c.current_value : val,
-            resolution: isChosenSource && decision && !areValuesEqual(decision.value, c.current_value) ? 'use_new' : (isChosenSource ? 'keep_current' : 'rejected'),
+            resolution: isChosenSource 
+              ? (decision && !areValuesEqual(decision.value, c.current_value) ? 'use_new' : 'keep_current') 
+              : 'rejected',
             source: src, 
             resolved_at: timestamp,
           });
@@ -661,16 +683,33 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     }
 
     await Promise.all(updatePromises);
-    setShowReview(false);
     
-    if (isLoopingRef.current && hasMoreRef.current) {
-      setTimeout(() => runScanLoop(), 500);
-    } else {
-      await loadStats(); 
-      setStatus('✅ Enrichment session complete.');
-      // Invoke the prop to clear the unused variable error
-      if (onImportComplete) onImportComplete();
-    }
+    // 1. Generate the summary data for the audit screen
+    const summary = conflicts.map(c => {
+      const decision = resolutions[`${c.album_id}-${c.field_name}`];
+      let actionText = 'Updated';
+      
+      // FIX: Use a type-safe check instead of 'as any'
+      const res = decision as { source: string } | undefined;
+      
+      if (res?.source === 'current') actionText = 'Kept Current';
+      if (res?.source === 'merge') actionText = 'Merged';
+      
+      return {
+        album: `${c.artist} - ${c.title}`,
+        field: c.field_name,
+        action: actionText
+      };
+    });
+    
+    // 2. Set the summary state to trigger the Summary UI
+    setBatchSummary(summary);
+    
+    // 3. Close the review modal
+    setShowReview(false);
+
+    // NOTE: We REMOVED the automatic runScanLoop() here. 
+    // The loop will now be resumed by the "Continue to Next Batch" button in the Summary UI.
   }
 
   function toggleCategory(category: DataCategory) {
@@ -709,6 +748,52 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           setStatus('Review cancelled. Scanning stopped.'); 
         }}
       />
+    );
+  }
+
+  if (batchSummary) {
+    return (
+      <div className={styles.importModalContainer} style={{ background: 'rgba(0,0,0,0.8)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 10000 }}>
+        <div style={{ background: 'white', padding: '30px', borderRadius: '12px', width: '500px', color: '#111827' }}>
+          <h3 style={{ marginBottom: '15px', fontWeight: '700' }}>Batch Review Summary</h3>
+          <div style={{ maxHeight: '300px', overflowY: 'auto', border: '1px solid #eee', marginBottom: '20px', borderRadius: '6px' }}>
+            <table style={{ width: '100%', fontSize: '12px', textAlign: 'left', borderCollapse: 'collapse' }}>
+              <thead style={{ background: '#f9fafb', position: 'sticky', top: 0 }}>
+                <tr>
+                  <th style={{ padding: '10px', borderBottom: '1px solid #eee' }}>Album / Field</th>
+                  <th style={{ padding: '10px', borderBottom: '1px solid #eee' }}>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {batchSummary.map((s, i) => (
+                  <tr key={i} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                    <td style={{ padding: '10px' }}>
+                      <div style={{ fontWeight: '600' }}>{s.album}</div>
+                      <div style={{ color: '#6b7280', fontSize: '11px' }}>{s.field.toUpperCase()}</div>
+                    </td>
+                    <td style={{ padding: '10px' }}>{s.action}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <button 
+            onClick={() => {
+              setBatchSummary(null);
+              if (isLoopingRef.current && hasMoreRef.current) {
+                runScanLoop();
+              } else {
+                loadStats();
+                if (onImportComplete) onImportComplete();
+              }
+            }} 
+            className={styles.importConfirmButton}
+            style={{ width: '100%', padding: '12px' }}
+          >
+            Continue to Next Batch
+          </button>
+        </div>
+      </div>
     );
   }
 
