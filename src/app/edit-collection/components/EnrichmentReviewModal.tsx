@@ -331,8 +331,25 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
                         <div key={key}>
                           {/* UPDATED: Row Header with Finalize Checkbox */}
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                            <div style={{ fontSize: '12px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase' }}>
-                              {conflict.field_name.replace(/_/g, ' ')}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                              <div style={{ fontSize: '12px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase' }}>
+                                {conflict.field_name.replace(/_/g, ' ')}
+                              </div>
+                              
+                              {/* ACTION BAR: This was the missing piece for Keep/Merge/Reject */}
+                              {['genres', 'styles', 'musicians', 'credits', 'producers', 'tags'].includes(conflict.field_name) && (
+                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                  <button 
+                                    onClick={() => handleResolve(conflict, conflict.current_value, 'current')}
+                                    style={{ padding: '2px 8px', fontSize: '10px', borderRadius: '4px', backgroundColor: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', fontWeight: 'bold', cursor: 'pointer' }}
+                                  >
+                                    KEEP CURRENT ONLY
+                                  </button>
+                                  <div style={{ padding: '2px 8px', fontSize: '10px', borderRadius: '4px', backgroundColor: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', fontWeight: 'bold' }}>
+                                    {selected.selectedSources?.length || 0} SOURCES SELECTED TO MERGE
+                                  </div>
+                                </div>
+                              )}
                             </div>
                             <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '12px', color: '#6b7280' }}>
                               <input 
