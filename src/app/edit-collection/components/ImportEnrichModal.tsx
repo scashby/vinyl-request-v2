@@ -236,10 +236,9 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       return;
     }
 
-    // Reset loop state
     hasMoreRef.current = true;
     isLoopingRef.current = true;
-    cursorRef.current = 0; // Start from beginning
+    cursorRef.current = 0; 
     setConflicts([]);
     
     if (specificAlbumIds && specificAlbumIds.length > 0) {
@@ -258,11 +257,9 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     }
 
     setEnriching(true);
-    
     const targetConflicts = parseInt(batchSize);
     let collectedConflicts: ExtendedFieldConflict[] = [];
 
-    // Fetch batches until we have enough conflicts OR run out of items
     while ((collectedConflicts.length < targetConflicts || specificAlbumIds) && hasMoreRef.current) {
       setStatus(`Scanning (Cursor: ${cursorRef.current})... Found ${collectedConflicts.length}/${targetConflicts} conflicts.`);
 
@@ -270,7 +267,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         const payload = {
           albumIds: specificAlbumIds,
           limit: specificAlbumIds ? undefined : 50,
-          cursor: specificAlbumIds ? undefined : cursorRef.current, // Pass current position
+          cursor: specificAlbumIds ? undefined : cursorRef.current,
           folder: folderFilter || undefined,
           services: getServicesForSelection()
         };
@@ -284,11 +281,9 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         const result = await res.json();
         if (!result.success) throw new Error(result.error);
 
-        // Update Cursor for next iteration
         if (result.nextCursor !== undefined && result.nextCursor !== null) {
           cursorRef.current = result.nextCursor;
         } else {
-          // If api returned no cursor, we might be done
           if (!result.results || result.results.length === 0) {
              hasMoreRef.current = false;
           }
@@ -297,14 +292,11 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         const candidates = result.results || [];
 
         if (candidates.length === 0 && hasMoreRef.current === false) {
-          break; // Done
+          break; 
         }
 
-        // Process this batch
         const { conflicts: batchConflicts } = await processBatchAndSave(candidates);
-        
         collectedConflicts = [...collectedConflicts, ...batchConflicts];
-
         if (specificAlbumIds) break;
 
       } catch (error) {
@@ -327,7 +319,6 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         setTimeout(() => runScanLoop(), 1000);
       } else {
         setStatus('Enrichment complete.');
-        // CLEAR LINT ERROR: Invoke prop
         if (onImportComplete) onImportComplete();
         loadStats();
       }
@@ -335,45 +326,30 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   }
 
   async function processBatchAndSave(results: CandidateResult[]) {
-    // 1. FETCH PREVIOUS RESOLUTIONS
-    // FIX: INCREASE LIMIT to 10,000
     const albumIds = results.map(r => r.album.id);
     const { data: resolutions, error: resError } = await supabase
       .from('import_conflict_resolutions')
       .select('album_id, field_name, source')
       .in('album_id', albumIds)
-      .limit(10000); //
+      .limit(10000);
       
     if (resError) console.error('Error fetching history:', resError);
-    else console.log(`[History] Fetched ${resolutions?.length || 0} existing resolution records.`);
 
-    // 2. DEFINE ALLOWLIST
     const ALLOWED_COLUMNS = new Set([
       'artist', 'title', 'year', 'format', 'country', 'barcode', 'labels',
       'tracklists', 'image_url', 'back_image_url', 'sell_price', 'media_condition', 'folder',
       'discogs_master_id', 'discogs_release_id', 'spotify_id', 'spotify_url',
-      'apple_music_id', 'apple_music_url', 
-      'genres', 'styles',
-      'original_release_date',
+      'apple_music_id', 'apple_music_url', 'genres', 'styles', 'original_release_date',
       'spine_image_url', 'inner_sleeve_images', 'vinyl_label_images',
-      // NEW ADDITIONS:
       'musicians', 'credits', 'producers', 'composer', 'conductor', 'orchestra',
       'bpm', 'key', 'lyrics', 'time_signature'
     ]);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const autoUpdates: { id: number; fields: Record<string, any> }[] = [];
+    const autoUpdates: { id: number; fields: Record<string, unknown> }[] = [];
     const newConflicts: ExtendedFieldConflict[] = [];
     const processedIds: number[] = [];
-
-    // NEW: History updates for Auto-Fills (The "Red Dot" application)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const historyUpdates: { album_id: number; field_name: string; source: string; resolution: string; kept_value: any; resolved_at: string }[] = [];
-
-    // Helper for async track saving
+    const historyUpdates: { album_id: number; field_name: string; source: string; resolution: string; kept_value: unknown; resolved_at: string }[] = [];
     const trackSavePromises: Promise<unknown>[] = [];
-
-    // Source Priority Order
     const SOURCE_PRIORITY = ['musicbrainz', 'spotify', 'appleMusic', 'discogs', 'lastfm', 'coverArt', 'wikipedia', 'genius'];
 
     results.forEach((item) => {
@@ -381,110 +357,87 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       const { album, candidates } = item;
       if (Object.keys(candidates).length === 0) return;
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const updatesForAlbum: Record<string, any> = {};
+      const updatesForAlbum: Record<string, unknown> = {};
       const autoFilledFields: string[] = [];
-
-      // --- LOGIC UPDATE: Collect Candidates First ---
       const fieldCandidates: Record<string, Record<string, unknown>> = {};
 
       for (const source of SOURCE_PRIORITY) {
          const sourceData = (candidates as Record<string, Record<string, unknown>>)[source];
          if (!sourceData) continue;
 
-         // A. Gather Album Fields
          Object.entries(sourceData).forEach(([key, value]) => {
             if (!ALLOWED_COLUMNS.has(key)) return;
             if (['lyrics', 'bpm', 'key', 'time_signature', 'tracks'].includes(key)) return;
 
-            // 1. PERMANENT FINALITY CHECK
             const finalized = (album as Record<string, unknown>).finalized_fields as string[] | undefined;
             if (Array.isArray(finalized) && finalized.includes(key)) return;
 
-            // 2. 30-DAY SNOOZE CHECK
             const lastReviewed = (album as Record<string, unknown>).last_reviewed_at as string | undefined;
             if (lastReviewed) {
                const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
                if (new Date(lastReviewed).getTime() > thirtyDaysAgo) return; 
             }
 
-            // 3. RED DOT CHECK: Skip if this specific "piece of paper" was seen before
             const alreadySeen = (resolutions as ResolutionHistory[] | null)?.some(r => 
                r.album_id === album.id && r.field_name === key && r.source === source
             );
             if (alreadySeen) return; 
 
-            // Transform value (Date Fix)
             let newVal = value;
             if (key === 'original_release_date' && typeof newVal === 'string') {
                  if (/^\d{4}$/.test(newVal)) newVal = `${newVal}-12-25`;
                  if (!isValidDate(newVal)) return;
             }
             
-            // Only add if defined
             if (newVal !== null && newVal !== undefined && newVal !== '') {
                if (!fieldCandidates[key]) fieldCandidates[key] = {};
                fieldCandidates[key][source] = newVal;
             }
          });
 
-         // B. Handle Track Data immediately
          const tracks = sourceData.tracks;
          if (Array.isArray(tracks) && tracks.length > 0) {
             const trackDot = (resolutions as ResolutionHistory[] | null)?.some(r => 
                r.album_id === album.id && r.field_name === 'track_data' && r.source === source
             );
             if (!trackDot) {
-               trackSavePromises.push(saveTrackData(album.id, tracks as unknown[]).then(count => {
-                  if (count > 0) { /* logged internally */ }
-               }));
+               trackSavePromises.push(saveTrackData(album.id, tracks as unknown[]));
                historyUpdates.push({
-                 album_id: album.id, field_name: 'track_data', source, resolution: 'use_new', kept_value: 'tracks_updated', resolved_at: new Date().toISOString()
+                 album_id: album.id, field_name: 'track_data', source, resolution: 'keep_current', kept_value: 'tracks_updated', resolved_at: new Date().toISOString()
                });
             }
          }
       }
 
-      // --- PROCESS GROUPED CANDIDATES ---
       Object.entries(fieldCandidates).forEach(([key, sourceValues]) => {
           const currentVal = album[key];
           const isCurrentEmpty = !currentVal || (Array.isArray(currentVal) && currentVal.length === 0);
-          
-          // Get unique values to check for agreement
           const uniqueValues = new Set(Object.values(sourceValues).map(v => normalizeValue(v)));
           const sources = Object.keys(sourceValues);
           
           if (sources.length === 0) return;
 
-          // TEST OVERRIDE: Prevent auto-fill for new fields
-          const isTestField = ['spine_image_url', 'inner_sleeve_images', 'vinyl_label_images'].includes(key);
-
-          // 1. AUTO-FILL: If DB is empty and all candidates agree
-          if (isCurrentEmpty && uniqueValues.size === 1 && !isTestField) {
+          if (isCurrentEmpty && uniqueValues.size === 1) {
               const winningVal = Object.values(sourceValues)[0];
               updatesForAlbum[key] = winningVal;
               autoFilledFields.push(key);
               
               sources.forEach(src => {
                  historyUpdates.push({
-                    album_id: album.id, field_name: key, source: src, resolution: 'use_new', kept_value: winningVal, resolved_at: new Date().toISOString()
+                    album_id: album.id, field_name: key, source: src, resolution: 'keep_current', kept_value: winningVal, resolved_at: new Date().toISOString()
                  });
               });
-          } 
-          // 2. CONFLICT: Values differ from DB, or multiple sources disagree
-          else {
+          } else {
               const candidatesDifferFromDB = sources.some(src => !areValuesEqual(currentVal, sourceValues[src]));
-              
               if (candidatesDifferFromDB || (isCurrentEmpty && uniqueValues.size > 1)) {
                   const primarySource = SOURCE_PRIORITY.find(s => sources.includes(s)) || sources[0];
-                  
                   newConflicts.push({
                       album_id: album.id,
                       field_name: key,
                       current_value: currentVal,
                       new_value: sourceValues[primarySource],
                       source: primarySource, 
-                      candidates: sourceValues, // PASS ALL CANDIDATES
+                      candidates: sourceValues,
                       existing_finalized: (album as Record<string, unknown>).finalized_fields as string[] || [],
                       artist: album.artist,
                       title: album.title,
@@ -502,96 +455,86 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       if (Object.keys(updatesForAlbum).length > 0) {
         updatesForAlbum.last_enriched_at = new Date().toISOString();
         autoUpdates.push({ id: album.id, fields: updatesForAlbum });
+        autoFilledFields.forEach(field => {
+          setBatchSummary(prev => [...(prev || []), {
+            album: `${album.artist} - ${album.title}`,
+            field: field,
+            action: 'Auto-Filled (Background)'
+          }]);
+        });
         if (autoFilledFields.length > 0) {
           addLog(`${album.artist} - ${album.title}`, 'auto-fill', `Added: ${autoFilledFields.join(', ')}`);
         }
       }
     });
 
-    // 1. SAVE HISTORY (RED DOTS)
     if (historyUpdates.length > 0) {
        await supabase.from('import_conflict_resolutions').upsert(historyUpdates, { onConflict: 'album_id,field_name,source' });
     }
 
-    // 2. PERFORM AUTO UPDATES (ALBUMS)
     if (autoUpdates.length > 0) {
-      await Promise.all(autoUpdates.map(u => 
-        supabase.from('collection').update(u.fields).eq('id', u.id)
-      ));
+      await Promise.all(autoUpdates.map(u => supabase.from('collection').update(u.fields).eq('id', u.id)));
     }
     
-    // 3. WAIT FOR TRACK UPDATES
     if (trackSavePromises.length > 0) {
       await Promise.all(trackSavePromises);
     }
 
-    // 4. "TOUCH" UNCHANGED ALBUMS
     const changedIds = new Set(autoUpdates.map(u => u.id));
     newConflicts.forEach(c => changedIds.add(c.album_id));
-    
     const untouchedIds = processedIds.filter(id => !changedIds.has(id));
     
     if (untouchedIds.length > 0) {
-      await supabase
-        .from('collection')
-        .update({ last_enriched_at: new Date().toISOString() })
-        .in('id', untouchedIds);
+      await supabase.from('collection').update({ last_enriched_at: new Date().toISOString() }).in('id', untouchedIds);
     }
 
     return { conflicts: newConflicts };
   }
   
-  // NEW HELPER: Save enriched track data
   async function saveTrackData(albumId: number, enrichedTracks: unknown[]) {
-    // 1. Get existing tracks for this album
     const { data: existingTracks } = await supabase
-      .from('dj_tracks')
-      .select('id, track_name, track_number')
-      .eq('collection_id', albumId);
+      .from('tracks')
+      .select('id, title, position')
+      .eq('album_id', albumId);
 
     if (!existingTracks || existingTracks.length === 0) return 0;
 
-    // 2. Map and Update
     const updates: Promise<unknown>[] = [];
-    
     for (const t of existingTracks) {
        const match = (enrichedTracks as Record<string, unknown>[]).find(et => 
-         String(et.title).toLowerCase() === t.track_name.toLowerCase() ||
-         (et.position && et.position === t.track_number)
+         String(et.title).toLowerCase() === t.title.toLowerCase() ||
+         (et.position && et.position === t.position)
        );
 
        if (match) {
          const patch: Record<string, unknown> = {};
-         if (match.bpm) patch.bpm = match.bpm;
+         if (match.bpm) patch.tempo_bpm = match.bpm;
          if (match.key) patch.musical_key = match.key;
          if (match.lyrics) patch.lyrics = match.lyrics;
 
          if (Object.keys(patch).length > 0) {
-            // FIX: Explicitly resolve as Promise to avoid type error
-            updates.push(Promise.resolve(supabase.from('dj_tracks').update(patch).eq('id', t.id)));
+            updates.push(Promise.resolve(supabase.from('tracks').update(patch).eq('id', t.id)));
          }
        }
     }
     
     if (updates.length > 0) {
        await Promise.all(updates);
-       console.log(`[Track Sync] Updated ${updates.length} tracks for album ${albumId}`);
        return updates.length;
     }
     return 0;
   }
 
-  // UPDATED: Implementation of Red Dot, Snooze (30-day), and Finality
   async function handleApplyChanges(
     resolutions: Record<string, { value: unknown; source: string }>,
-    finalizedFields?: Record<string, boolean> // New: passed from UI
+    finalizedFields?: Record<string, boolean>
   ) {
     const updatesByAlbum: Record<number, Record<string, unknown>> = {};
     const resolutionRecords: Record<string, unknown>[] = [];
     const timestamp = new Date().toISOString();
     const involvedAlbumIds = new Set<number>();
-    // NEW: Initialize local summary array to avoid 400 Error and undefined references
     const localSummary: { field: string, album: string, action: string }[] = [];
+    const trackSavePromises: Promise<number>[] = [];
 
     conflicts.forEach((c) => {
       involvedAlbumIds.add(c.album_id);
@@ -602,7 +545,6 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         if (!updatesByAlbum[c.album_id]) updatesByAlbum[c.album_id] = {};
         updatesByAlbum[c.album_id][c.field_name] = decision.value;
         
-        // Use localSummary to record the action for the audit screen
         let actionText = 'Updated';
         if (decision.source === 'current') actionText = 'Kept Current';
         if (decision.source === 'merge') actionText = 'Merged';
@@ -612,43 +554,37 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           album: `${c.artist} - ${c.title}`, 
           action: actionText 
         });
+
+        const trackSource = (decision.source === 'current' || decision.source === 'merge') ? null : decision.source;
+        if (trackSource && c.candidates?.[trackSource]) {
+          // Cast to specific type to avoid 'any' error
+          const candidateData = c.candidates[trackSource] as { tracks?: unknown[] };
+          if (candidateData.tracks) {
+            trackSavePromises.push(saveTrackData(c.album_id, candidateData.tracks));
+          }
+        }
       }
+
       const isFinalized = finalizedFields?.[baseKey] || false;
-
-      // 1. DATA UPDATES: Record the user's choice if it changed the data
-      if (decision && !areValuesEqual(decision.value, c.current_value)) {
+      if (isFinalized) {
         if (!updatesByAlbum[c.album_id]) updatesByAlbum[c.album_id] = {};
-        updatesByAlbum[c.album_id][c.field_name] = decision.value;
+        const finalizedList = c.existing_finalized || [];
+        if (!finalizedList.includes(c.field_name)) {
+          updatesByAlbum[c.album_id].finalized_fields = [...finalizedList, c.field_name];
+        }
       }
 
-      // 2. SNOOZE TRACKING: Stamp the album with a review date for the 30-day skip check
       if (!updatesByAlbum[c.album_id]) updatesByAlbum[c.album_id] = {};
       updatesByAlbum[c.album_id].last_reviewed_at = timestamp;
 
-      // 3. FINALITY TRACKING: Add field name to permanent skip list if selected
-      if (isFinalized) {
-        const albumUpdates = updatesByAlbum[c.album_id];
-        if (!albumUpdates.finalized_fields) {
-           albumUpdates.finalized_fields = ((c as unknown as Record<string, unknown>).existing_finalized as string[]) || [];
-        }
-        const finalizedList = albumUpdates.finalized_fields as string[];
-        if (!finalizedList.includes(c.field_name)) {
-          finalizedList.push(c.field_name);
-        }
-      }
-
-      // 4. PIECE OF PAPER (RED DOT) LOGIC: Resolve every candidate so they are never seen again
       if (c.candidates) {
         Object.entries(c.candidates).forEach(([src]) => {
-          // Define the resolution type to avoid 'any'
-          const res = decision as { value: unknown; source: string; selectedSources?: string[] };
-          const isChosenSource = res?.source === src || res?.selectedSources?.includes(src);
-          
+          const isChosenSource = decision?.source === src || decision?.selectedSources?.includes(src);
           resolutionRecords.push({
             album_id: c.album_id, 
             field_name: c.field_name,
             source: src, 
-            resolution: isChosenSource ? 'resolved' : 'rejected',
+            resolution: isChosenSource ? 'use_new' : 'keep_current',
             kept_value: decision?.value ?? c.current_value,
             resolved_at: timestamp
           });
@@ -656,44 +592,23 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       }
     });
 
-    console.log(`[Batch Save] History: ${resolutionRecords.length} records. Albums: ${involvedAlbumIds.size}`);
-
-    // A. Update Albums (Includes Finalized Fields and Snooze Timestamp)
     const updatePromises = Array.from(involvedAlbumIds).map(async (albumId) => {
-      const fields = updatesByAlbum[albumId] || {};
-      
       const { error } = await supabase
         .from('collection')
-        .update({
-          ...fields,
-          last_enriched_at: timestamp
-        })
+        .update({ ...updatesByAlbum[albumId], last_enriched_at: timestamp })
         .eq('id', albumId);
-        
-      if (error) console.error(`[DB ERROR] Failed to update album ${albumId}:`, error);
+      if (error) console.error(`[DB ERROR] Album ${albumId}:`, error);
     });
 
-    // B. Save History (The Red Dots)
     if (resolutionRecords.length > 0) {
       await supabase.from('import_conflict_resolutions').upsert(resolutionRecords, { 
         onConflict: 'album_id,field_name,source' 
       });
     }
 
-    await Promise.all(updatePromises);
-    
-    // 1. Generate the summary data for the audit screen
-    // Note: 'const summary' was removed here because we are now using 'localSummary' 
-    // populated inside the conflicts.forEach loop to avoid 400 errors.
-    
-    // 2. Set the summary state using our localSummary array to trigger the Audit Summary UI
-    setBatchSummary(localSummary);
-    
-    // 3. Close the review modal
+    await Promise.all([...updatePromises, ...trackSavePromises]);
+    setBatchSummary(prev => [...(prev || []), ...localSummary]);
     setShowReview(false);
-
-    // NOTE: We REMOVED the automatic runScanLoop() here. 
-    // The loop will now be resumed by the "Continue to Next Batch" button in the Summary UI.
   }
 
   function toggleCategory(category: DataCategory) {
@@ -752,10 +667,21 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
                 {batchSummary.map((s, i) => (
                   <tr key={i} style={{ borderBottom: '1px solid #f3f4f6' }}>
                     <td style={{ padding: '10px' }}>
-                      <div style={{ fontWeight: '600' }}>{s.album}</div>
-                      <div style={{ color: '#6b7280', fontSize: '11px' }}>{s.field.toUpperCase()}</div>
+                      <div style={{ fontWeight: '600', color: '#111827' }}>{s.album}</div>
+                      <div style={{ color: '#6b7280', fontSize: '11px' }}>{s.field.replace(/_/g, ' ').toUpperCase()}</div>
                     </td>
-                    <td style={{ padding: '10px' }}>{s.action}</td>
+                    <td style={{ padding: '10px' }}>
+                      <span style={{ 
+                        padding: '2px 6px', 
+                        borderRadius: '4px', 
+                        fontSize: '11px', 
+                        fontWeight: '700',
+                        backgroundColor: s.action.includes('Auto') ? '#ecfdf5' : (s.action.includes('No') ? '#fef2f2' : '#eff6ff'),
+                        color: s.action.includes('Auto') ? '#047857' : (s.action.includes('No') ? '#991b1b' : '#1d4ed8')
+                      }}>
+                        {s.action}
+                      </span>
+                    </td>
                   </tr>
                 ))}
               </tbody>
