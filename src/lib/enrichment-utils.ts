@@ -29,20 +29,26 @@ export type CandidateData = {
   original_release_date?: string;
   label?: string[];
   cat_no?: string;
+  barcode?: string;
   country?: string;
   
   // Images
   image_url?: string;
   back_image_url?: string;
-  spine_image_url?: string;         // Added
-  inner_sleeve_images?: string[];   // Added
-  vinyl_label_images?: string[];    // Added
+  spine_image_url?: string;
+  inner_sleeve_images?: string[];
+  vinyl_label_images?: string[];
   
   // Audio Features
   tempo_bpm?: number;
+  musical_key?: string;
+  danceability?: number;
+  energy?: number;
+  mood_acoustic?: number;
+  mood_happy?: number; // Valence
   
   // Content
-  tracklist?: string; // Added: Simple text representation of tracks
+  tracklist?: string;
   
   // Extra
   lastfm_tags?: string[];
@@ -57,22 +63,69 @@ export type EnrichmentResult = {
   error?: string;
 };
 
-// --- Helper Interfaces for Type Safety (ESLint Fixes) ---
+// --- TYPE DEFINITIONS FOR API RESPONSES ---
 
-interface MusicBrainzRelease {
+interface MBRelease {
   id: string;
   status?: string;
   date?: string;
   country?: string;
+  barcode?: string;
   'label-info'?: Array<{
     label?: { name: string };
     'catalog-number'?: string;
   }>;
 }
 
+interface MBSearchResponse {
+  releases: MBRelease[];
+}
+
+interface SpotifyImage {
+  url: string;
+  height: number;
+  width: number;
+}
+
+interface SpotifyArtist {
+  id: string;
+  name: string;
+  genres?: string[];
+}
+
 interface SpotifyTrack {
+  id: string;
   name: string;
   duration_ms: number;
+}
+
+interface SpotifyAlbum {
+  release_date: string;
+  images: SpotifyImage[];
+  label?: string;
+  genres?: string[];
+  artists: SpotifyArtist[];
+  tracks: {
+    items: SpotifyTrack[];
+  };
+}
+
+interface SpotifyAudioFeature {
+  tempo: number;
+  energy: number;
+  danceability: number;
+  acousticness: number;
+  valence: number;
+  key: number;
+  mode: number;
+}
+
+interface DiscogsImage {
+  uri: string;
+}
+
+interface DiscogsLabel {
+  name: string;
 }
 
 interface DiscogsTrack {
@@ -81,13 +134,36 @@ interface DiscogsTrack {
   duration: string;
 }
 
-interface LastFMTag {
+interface DiscogsIdentifier {
+  type: string;
+  value: string;
+}
+
+interface DiscogsArtist {
   name: string;
+  role: string;
+}
+
+interface DiscogsRelease {
+  master_id?: number;
+  genres?: string[];
+  styles?: string[];
+  released?: string;
+  images?: DiscogsImage[];
+  labels?: DiscogsLabel[];
+  country?: string;
+  tracklist?: DiscogsTrack[];
+  identifiers?: DiscogsIdentifier[];
+  extraartists?: DiscogsArtist[];
 }
 
 interface LastFMImage {
   size: string;
   '#text': string;
+}
+
+interface LastFMTag {
+  name: string;
 }
 
 interface CAAImage {
@@ -109,21 +185,21 @@ async function mbSearch(artist: string, title: string): Promise<string | null> {
     const query = `artist:"${artist}" AND release:"${title}"`;
     const url = `${MB_BASE}/release/?query=${encodeURIComponent(query)}&fmt=json&limit=3`;
     const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
-    const data = await res.json();
+    const data = await res.json() as MBSearchResponse;
     
     // Prefer "Official" releases
-    const releases = data.releases as MusicBrainzRelease[];
+    const releases = data.releases;
     const release = releases?.find((r) => r.status === 'Official') || releases?.[0];
     
     return release?.id || null;
   } catch { return null; }
 }
 
-async function mbGetRelease(mbid: string): Promise<MusicBrainzRelease | null> {
+async function mbGetRelease(mbid: string): Promise<MBRelease | null> {
   try {
     const url = `${MB_BASE}/release/${mbid}?inc=artists+labels+recordings+release-groups&fmt=json`;
     const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
-    return res.ok ? res.json() : null;
+    return res.ok ? (await res.json() as MBRelease) : null;
   } catch { return null; }
 }
 
@@ -137,7 +213,7 @@ export async function fetchMusicBrainzData(album: { artist: string, title: strin
 
     const candidate: CandidateData = {
       musicbrainz_id: mbid,
-      original_release_date: release.date, // Format: YYYY-MM-DD
+      original_release_date: release.date,
       country: release.country,
     };
 
@@ -147,6 +223,8 @@ export async function fetchMusicBrainzData(album: { artist: string, title: strin
       if (info['catalog-number']) candidate.cat_no = info['catalog-number'];
     }
     
+    if (release.barcode) candidate.barcode = release.barcode;
+
     return { success: true, source: 'musicbrainz', data: candidate };
   } catch (e) {
     return { success: false, source: 'musicbrainz', error: (e as Error).message };
@@ -154,7 +232,7 @@ export async function fetchMusicBrainzData(album: { artist: string, title: strin
 }
 
 // ============================================================================
-// 2. SPOTIFY (Genres, Dates, BPM, Images)
+// 2. SPOTIFY (Genres, Dates, BPM, Key, Energy, Danceability)
 // ============================================================================
 const SP_ID = process.env.SPOTIFY_CLIENT_ID!;
 const SP_SECRET = process.env.SPOTIFY_CLIENT_SECRET!;
@@ -175,6 +253,8 @@ async function spGetToken(): Promise<string> {
   return spToken.token;
 }
 
+const KEY_MAP = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
 export async function fetchSpotifyData(album: { artist: string, title: string, spotify_id?: string }): Promise<EnrichmentResult> {
   try {
     const token = await spGetToken();
@@ -194,7 +274,7 @@ export async function fetchSpotifyData(album: { artist: string, title: string, s
     const albumRes = await fetch(`https://api.spotify.com/v1/albums/${spId}`, {
       headers: { 'Authorization': `Bearer ${token}` }
     });
-    const data = await albumRes.json();
+    const data = await albumRes.json() as SpotifyAlbum;
 
     const candidate: CandidateData = {
       spotify_id: spId,
@@ -202,24 +282,49 @@ export async function fetchSpotifyData(album: { artist: string, title: string, s
       image_url: data.images?.[0]?.url,
       label: data.label ? [data.label] : undefined,
       genres: data.genres?.length ? data.genres : undefined,
-      tracklist: data.tracks?.items?.map((t: SpotifyTrack, i: number) => `${i + 1}. ${t.name} (${Math.floor(t.duration_ms / 60000)}:${String(Math.floor((t.duration_ms % 60000) / 1000)).padStart(2, '0')})`).join('\n')
+      tracklist: data.tracks?.items?.map((t: SpotifyTrack, i: number) => 
+        `${i + 1}. ${t.name} (${Math.floor(t.duration_ms / 60000)}:${String(Math.floor((t.duration_ms % 60000) / 1000)).padStart(2, '0')})`
+      ).join('\n')
     };
 
     if (!candidate.genres && data.artists?.[0]?.id) {
        const artistRes = await fetch(`https://api.spotify.com/v1/artists/${data.artists[0].id}`, {
          headers: { 'Authorization': `Bearer ${token}` }
        });
-       const artistData = await artistRes.json();
+       const artistData = await artistRes.json() as SpotifyArtist;
        if (artistData.genres) candidate.genres = artistData.genres;
     }
 
-    if (data.tracks?.items?.[0]?.id) {
-        const featRes = await fetch(`https://api.spotify.com/v1/audio-features/${data.tracks.items[0].id}`, {
+    if (data.tracks?.items?.length > 0) {
+        const trackIds = data.tracks.items.map((t: SpotifyTrack) => t.id).slice(0, 50).join(',');
+        const featRes = await fetch(`https://api.spotify.com/v1/audio-features?ids=${trackIds}`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
+        
         if (featRes.ok) {
-            const feat = await featRes.json();
-            if (feat.tempo) candidate.tempo_bpm = Math.round(feat.tempo);
+            const featData = await featRes.json();
+            const features = (featData.audio_features as (SpotifyAudioFeature | null)[]).filter((f): f is SpotifyAudioFeature => f !== null);
+            
+            if (features.length > 0) {
+                const avgTempo = features.reduce((sum, f) => sum + f.tempo, 0) / features.length;
+                const avgEnergy = features.reduce((sum, f) => sum + f.energy, 0) / features.length;
+                const avgDance = features.reduce((sum, f) => sum + f.danceability, 0) / features.length;
+                const avgAcoustic = features.reduce((sum, f) => sum + f.acousticness, 0) / features.length;
+                const avgValence = features.reduce((sum, f) => sum + f.valence, 0) / features.length;
+                
+                const firstKey = features[0].key;
+                const firstMode = features[0].mode;
+                
+                candidate.tempo_bpm = Math.round(avgTempo);
+                candidate.energy = Number(avgEnergy.toFixed(3));
+                candidate.danceability = Number(avgDance.toFixed(3));
+                candidate.mood_acoustic = Number(avgAcoustic.toFixed(3));
+                candidate.mood_happy = Number(avgValence.toFixed(3));
+                
+                if (firstKey >= 0 && firstKey < KEY_MAP.length) {
+                    candidate.musical_key = `${KEY_MAP[firstKey]} ${firstMode === 1 ? 'Major' : 'Minor'}`;
+                }
+            }
         }
     }
 
@@ -271,7 +376,7 @@ export async function fetchAppleMusicData(album: { artist: string, title: string
 }
 
 // ============================================================================
-// 4. DISCOGS (Styles, Genres, Year)
+// 4. DISCOGS (Styles, Genres, Year, Credits, Barcodes, Deep Images)
 // ============================================================================
 const DISCOGS_TOKEN = process.env.DISCOGS_ACCESS_TOKEN!;
 
@@ -281,15 +386,19 @@ export async function fetchDiscogsData(album: { artist: string, title: string, d
 
     if (!releaseId) {
       const q = `${album.artist} - ${album.title}`;
-      const searchRes = await fetch(`https://api.discogs.com/database/search?q=${encodeURIComponent(q)}&type=release&token=${DISCOGS_TOKEN}`);
+      const searchRes = await fetch(`https://api.discogs.com/database/search?q=${encodeURIComponent(q)}&type=release&token=${DISCOGS_TOKEN}`, {
+          headers: { 'User-Agent': USER_AGENT }
+      });
       const searchData = await searchRes.json();
       releaseId = searchData.results?.[0]?.id;
     }
 
     if (!releaseId) return { success: false, source: 'discogs', error: 'Not found' };
 
-    const releaseRes = await fetch(`https://api.discogs.com/releases/${releaseId}?token=${DISCOGS_TOKEN}`);
-    const data = await releaseRes.json();
+    const releaseRes = await fetch(`https://api.discogs.com/releases/${releaseId}?token=${DISCOGS_TOKEN}`, {
+        headers: { 'User-Agent': USER_AGENT }
+    });
+    const data = await releaseRes.json() as DiscogsRelease;
 
     const candidate: CandidateData = {
       discogs_release_id: String(releaseId),
@@ -302,6 +411,33 @@ export async function fetchDiscogsData(album: { artist: string, title: string, d
       country: data.country,
       tracklist: data.tracklist?.map((t: DiscogsTrack) => `${t.position} - ${t.title} (${t.duration})`).join('\n')
     };
+
+    // 1. EXTRACT BARCODE
+    if (data.identifiers) {
+        const barcode = data.identifiers.find((id: DiscogsIdentifier) => id.type === 'Barcode');
+        if (barcode) candidate.barcode = barcode.value;
+    }
+
+    // 2. EXTRACT DEEP CREDITS (Producers, Engineers)
+    if (data.extraartists) {
+        candidate.producers = data.extraartists
+            .filter((a: DiscogsArtist) => a.role.toLowerCase().includes('producer'))
+            .map((a: DiscogsArtist) => a.name);
+            
+        candidate.engineers = data.extraartists
+            .filter((a: DiscogsArtist) => a.role.toLowerCase().includes('engineer') || a.role.toLowerCase().includes('mixed'))
+            .map((a: DiscogsArtist) => a.name);
+            
+        candidate.musicians = data.extraartists
+            .filter((a: DiscogsArtist) => !a.role.toLowerCase().includes('producer') && !a.role.toLowerCase().includes('engineer'))
+            .map((a: DiscogsArtist) => `${a.name} (${a.role})`);
+    }
+
+    // 3. EXTRACT EXTRA IMAGES
+    if (data.images && data.images.length > 1) {
+        const secondary = data.images.slice(1);
+        if (secondary.length > 0) candidate.back_image_url = secondary[0].uri; 
+    }
 
     return { success: true, source: 'discogs', data: candidate };
   } catch (e) {
