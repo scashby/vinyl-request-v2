@@ -187,25 +187,21 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
   };
 
   const handleSelectAllNew = () => {
-    const newResolutions: Record<string, { value: unknown, source: string }> = {};
+    const newResolutions: Record<string, { value: unknown, source: string, selectedSources?: string[] }> = {};
     conflicts.forEach(c => {
       const key = `${c.album_id}-${c.field_name}`;
-      newResolutions[key] = { value: c.new_value, source: c.source || 'enrichment' };
+      newResolutions[key] = { value: c.new_value, source: c.source || 'enrichment', selectedSources: [c.source || 'enrichment'] };
     });
     setResolutions(newResolutions);
   };
 
   const handleSelectAllCurrent = () => {
-    const newResolutions: Record<string, { value: unknown, source: string }> = {};
+    const newResolutions: Record<string, { value: unknown, source: string, selectedSources?: string[] }> = {};
     conflicts.forEach(c => {
       const key = `${c.album_id}-${c.field_name}`;
-      newResolutions[key] = { value: c.current_value, source: 'current' };
+      newResolutions[key] = { value: c.current_value, source: 'current', selectedSources: ['current'] };
     });
     setResolutions(newResolutions);
-  };
-
-  const handleSave = () => {
-    onComplete(resolutions, finalizedFields);
   };
 
   const totalChanges = Object.keys(groupedConflicts).length;
@@ -330,7 +326,8 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
                                   label="Current (DB)"
                                   color="green"
                                   value={conflict.current_value}
-                                  isSelected={selected.source === 'current'}
+                                  isSelected={selected.source === 'current' || (selected.selectedSources?.includes('current') ?? false)}
+                                  isMultiSelect={['genres', 'styles', 'musicians', 'credits', 'producers', 'tags'].includes(conflict.field_name)}
                                   onClick={() => handleResolve(conflict, conflict.current_value, 'current')}
                                 />
                             </div>
@@ -344,7 +341,8 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
                                             label={source}
                                             color="blue"
                                             value={val}
-                                            isSelected={selected.source === source}
+                                            isSelected={selected.source === source || (selected.selectedSources?.includes(source) ?? false)}
+                                            isMultiSelect={['genres', 'styles', 'musicians', 'credits', 'producers', 'tags'].includes(conflict.field_name)}
                                             onClick={() => handleResolve(conflict, val, source)}
                                         />
                                     ))
@@ -376,9 +374,9 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
             Cancel
           </button>
           <button 
-            onClick={handleSave}
+            onClick={() => onComplete(resolutions, finalizedFields)}
             className={styles.importConfirmButton}
-            style={{ backgroundColor: '#f59e0b' }}
+            style={{ backgroundColor: '#f59e0b', cursor: 'pointer' }}
           >
             Save Changes
           </button>
