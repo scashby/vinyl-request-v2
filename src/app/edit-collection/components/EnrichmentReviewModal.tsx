@@ -81,17 +81,26 @@ function ConflictValue({
   if (isImage && typeof value === 'string') {
     return (
     <div onClick={onClick} style={baseStyle}>
-        <div style={headerStyle}>
+       <div style={headerStyle}>
           <span>{label} {dimensions && `(${dimensions.w} x ${dimensions.h} px)`}</span>
           {isMultiSelect ? (
             <input 
               type="checkbox" 
               checked={isSelected} 
               readOnly 
-              style={{ cursor: 'pointer', width: '16px', height: '16px' }} 
+              style={{ 
+                appearance: 'checkbox',
+                WebkitAppearance: 'checkbox',
+                cursor: 'pointer', 
+                width: '18px', 
+                height: '18px',
+                zIndex: 50,
+                position: 'relative',
+                accentColor: '#3b82f6'
+              }} 
             />
           ) : (
-            isSelected && <span>✓ SELECTED</span>
+            isSelected && <span style={{ zIndex: 50, position: 'relative' }}>✓ SELECTED</span>
           )}
         </div>
         <div style={{ position: 'relative', width: '100%', aspectRatio: '1', backgroundColor: '#f3f4f6', borderRadius: '4px', overflow: 'hidden' }}>
@@ -117,7 +126,24 @@ function ConflictValue({
     <div onClick={onClick} style={baseStyle}>
       <div style={headerStyle}>
         <span>{label}</span>
-        {isSelected && <span>✓ SELECTED</span>}
+        {isMultiSelect ? (
+          <input 
+            type="checkbox" 
+            checked={isSelected} 
+            readOnly 
+            style={{ 
+              appearance: 'checkbox',
+              WebkitAppearance: 'checkbox',
+              cursor: 'pointer', 
+              width: '18px', 
+              height: '18px',
+              zIndex: 50,
+              position: 'relative'
+            }} 
+          />
+        ) : (
+          isSelected && <span style={{ zIndex: 50, position: 'relative' }}>✓ SELECTED</span>
+        )}
       </div>
       <div style={{ 
         fontSize: '13px', 
@@ -125,7 +151,8 @@ function ConflictValue({
         whiteSpace: 'pre-wrap', 
         wordBreak: 'break-word',
         fontStyle: value ? 'normal' : 'italic',
-        lineHeight: '1.5'
+        lineHeight: '1.5',
+        marginTop: '4px'
       }}>
         {value ? displayValue : 'Empty / None'}
       </div>
@@ -235,7 +262,8 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
           <div style={{ display: 'flex', gap: '12px' }}>
             <button 
               onClick={() => {
-                const nonMergableFields = ['image_url', 'original_release_date', 'country', 'barcode', 'year'];
+                // Matches the exact field names in your database to ensure Finalize actually works
+                const nonMergableFields = ['image_url', 'back_image_url', 'original_release_date', 'country', 'barcode', 'year', 'format', 'label', 'catalog_no'];
                 const newFinalized = { ...finalizedFields };
                 conflicts.forEach(c => {
                   if (nonMergableFields.includes(c.field_name)) {
@@ -377,9 +405,15 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
             Cancel
           </button>
           <button 
-            onClick={() => onComplete(resolutions, finalizedFields)}
+            onClick={() => {
+                // Ensure we pass the local state correctly to handleApplyChanges
+                onComplete(
+                    resolutions as Record<string, { value: unknown, source: string }>, 
+                    finalizedFields
+                );
+            }}
             className={styles.importConfirmButton}
-            style={{ backgroundColor: '#f59e0b', cursor: 'pointer' }}
+            style={{ backgroundColor: '#f59e0b', cursor: 'pointer', fontWeight: '700' }}
           >
             Save Changes
           </button>

@@ -639,7 +639,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
       // 4. PIECE OF PAPER (RED DOT) LOGIC: Resolve every candidate so they are never seen again
       if (c.candidates) {
-        Object.entries(c.candidates).forEach(([src, val]) => {
+        Object.entries(c.candidates).forEach(([src]) => {
           // Define the resolution type to avoid 'any'
           const res = decision as { value: unknown; source: string; selectedSources?: string[] };
           const isChosenSource = res?.source === src || res?.selectedSources?.includes(src);
@@ -647,13 +647,10 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           resolutionRecords.push({
             album_id: c.album_id, 
             field_name: c.field_name,
-            kept_value: decision?.value ?? c.current_value,
-            rejected_value: isChosenSource ? c.current_value : val,
-            resolution: isChosenSource 
-              ? (decision && !areValuesEqual(decision.value, c.current_value) ? 'use_new' : 'keep_current') 
-              : 'rejected',
             source: src, 
-            resolved_at: timestamp,
+            resolution: isChosenSource ? 'resolved' : 'rejected',
+            kept_value: decision?.value ?? c.current_value,
+            resolved_at: timestamp
           });
         });
       }
