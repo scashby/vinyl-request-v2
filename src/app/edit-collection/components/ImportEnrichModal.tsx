@@ -35,19 +35,22 @@ const DATA_CATEGORY_CONFIG: Partial<Record<DataCategory, { label: string; desc: 
     label: 'Artwork & Images',
     desc: 'Front covers, back covers, spine images, and inner sleeves.',
     icon: '🖼️',
-    services: ['coverArt', 'spotify', 'appleMusic']
+    // ADDED: discogs
+    services: ['coverArt', 'spotify', 'appleMusic', 'discogs']
   },
   credits: {
     label: 'Credits & Personnel',
     desc: 'Musicians, producers, engineers, and songwriters.',
     icon: '👥',
-    services: ['musicbrainz', 'wikipedia']
+    // ADDED: discogs, genius
+    services: ['musicbrainz', 'wikipedia', 'discogs', 'genius']
   },
   tracklists: {
     label: 'Tracklists & Durations',
     desc: 'Complete track listings, disk sides, and track durations.',
     icon: '📝',
-    services: ['spotify', 'appleMusic']
+    // ADDED: discogs
+    services: ['spotify', 'appleMusic', 'discogs']
   },
   audio_analysis: {
     label: 'Audio Analysis',
@@ -59,19 +62,22 @@ const DATA_CATEGORY_CONFIG: Partial<Record<DataCategory, { label: string; desc: 
     label: 'Genres & Styles',
     desc: 'Primary genres and sub-styles.', // Fixed description
     icon: '🏷️',
-    services: ['lastfm', 'spotify']
+    // ADDED: discogs
+    services: ['lastfm', 'spotify', 'discogs']
   },
   streaming_links: {
     label: 'Streaming IDs & URLs',
     desc: 'Links to Spotify, Apple Music, and Last.fm.',
     icon: '🔗',
-    services: ['spotify', 'appleMusic', 'lastfm']
+    // ADDED: genius, wikipedia
+    services: ['spotify', 'appleMusic', 'lastfm', 'genius', 'wikipedia']
   },
   release_metadata: {
     label: 'Release Metadata',
     desc: 'Barcodes, record labels, and original release dates.',
     icon: '💿',
-    services: ['musicbrainz']
+    // ADDED: discogs
+    services: ['musicbrainz', 'discogs']
   }
 };
 
