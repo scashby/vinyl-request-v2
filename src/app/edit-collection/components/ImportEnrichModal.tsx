@@ -483,20 +483,31 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         updatesForAlbum.last_enriched_at = new Date().toISOString();
         autoUpdates.push({ id: album.id, fields: updatesForAlbum });
         
+        const logDetails: string[] = [];
+
         autoFilledFields.forEach(field => {
-          // UPDATED: More descriptive action message
           const val = updatesForAlbum[field];
-          const valStr = typeof val === 'object' ? 'Complex Data' : String(val);
+          
+          // Fix: Proper string conversion for arrays (genres, credits) to avoid "Complex Data"
+          let valStr = String(val);
+          if (Array.isArray(val)) {
+            valStr = val.join(', ');
+          } else if (typeof val === 'object' && val !== null) {
+            valStr = JSON.stringify(val);
+          }
           
           localBatchSummary.push({
             album: `${album.artist} - ${album.title}`,
             field: field,
-            action: `Auto-Filled: ${valStr.substring(0, 30)}${valStr.length > 30 ? '...' : ''}`
+            action: `Auto-Filled: ${valStr.substring(0, 50)}${valStr.length > 50 ? '...' : ''}`
           });
+
+          // Fix: Log actual values instead of just field names
+          logDetails.push(`${field} (${valStr.substring(0, 20)}${valStr.length > 20 ? '...' : ''})`);
         });
 
-        if (autoFilledFields.length > 0) {
-          addLog(`${album.artist} - ${album.title}`, 'auto-fill', `Added: ${autoFilledFields.join(', ')}`);
+        if (logDetails.length > 0) {
+          addLog(`${album.artist} - ${album.title}`, 'auto-fill', `Added: ${logDetails.join(', ')}`);
         }
       }
     });
