@@ -5,6 +5,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import Genius from 'genius-lyrics';
 
 // ============================================================================
 // SUPABASE CLIENT
@@ -35,7 +36,7 @@ function formatMusicalKey(key: number, mode: number): string | null {
 }
 
 // ============================================================================
-// MUSICBRAINZ SERVICE
+// 1. MUSICBRAINZ SERVICE
 // ============================================================================
 
 const MB_BASE = 'https://musicbrainz.org/ws/2';
@@ -177,7 +178,7 @@ export async function enrichMusicBrainz(albumId: number, artist: string, title: 
 }
 
 // ============================================================================
-// DISCOGS SERVICE
+// 2. DISCOGS SERVICE
 // ============================================================================
 
 const DISCOGS_TOKEN = process.env.DISCOGS_ACCESS_TOKEN!;
@@ -231,6 +232,14 @@ export async function enrichDiscogsMetadata(albumId: number, artist: string, tit
     const producers = new Set<string>();
 
     const extraArtists = (release.extraartists as Array<{ name: string; role: string }> | undefined) || [];
+    
+    // DEBUG LOG: Check if we are finding artists
+    if (extraArtists.length > 0) {
+      console.log(`[Discogs] Found ${extraArtists.length} extra artists for ${title}`);
+    } else {
+      console.log(`[Discogs] No extra artists found for ${title} (Release ID: ${releaseId})`);
+    }
+
     extraArtists.forEach(artist => {
       const role = artist.role.toLowerCase();
       if (role.includes('producer')) producers.add(artist.name);
@@ -251,7 +260,7 @@ export async function enrichDiscogsMetadata(albumId: number, artist: string, tit
       discogs_master_id: release.master_id ? String(release.master_id) : null,
       image_url: primaryImage,
       back_image_url: backImage,
-      inner_sleeve_images: galleryImages, // Storing extras here for gallery
+      inner_sleeve_images: galleryImages, 
       genres: (release.genres as string[] | undefined) || [],
       styles: (release.styles as string[] | undefined) || [],
       tracks: tracks,
@@ -295,7 +304,7 @@ export async function enrichDiscogsTracklist(albumId: number): Promise<{ success
 }
 
 // ============================================================================
-// SPOTIFY SERVICE (UPGRADED)
+// 3. SPOTIFY SERVICE
 // ============================================================================
 
 const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID!;
@@ -315,7 +324,7 @@ interface SpotifyAudioFeature {
   valence: number;
   key: number;
   mode: number;
-  [key: string]: number; // Allow indexing
+  [key: string]: number; 
 }
 
 async function getSpotifyToken(): Promise<string> {
@@ -357,8 +366,7 @@ export async function enrichSpotify(albumId: number, artist: string, title: stri
       original_release_date: (album.release_date && album.release_date.length === 4) ? `${album.release_date}-01-01` : album.release_date,
     };
 
-    // 2. Fetch Audio Features (The "Lazy" Fix)
-    // We must fetch tracks first to get IDs
+    // 2. Fetch Audio Features
     try {
         const tracksUrl = `https://api.spotify.com/v1/albums/${album.id}/tracks?limit=50`;
         const tracksRes = await fetch(tracksUrl, { headers: { 'Authorization': `Bearer ${token}` } });
@@ -382,10 +390,9 @@ export async function enrichSpotify(albumId: number, artist: string, title: stri
                     updateData.tempo_bpm = Math.round(avg('tempo'));
                     updateData.energy = parseFloat(avg('energy').toFixed(2));
                     updateData.danceability = parseFloat(avg('danceability').toFixed(2));
-                    updateData.mood_happy = parseFloat(avg('valence').toFixed(2)); // Valence ≈ Happiness
+                    updateData.mood_happy = parseFloat(avg('valence').toFixed(2)); 
                     
                     // Estimate Key (Mode + Key)
-                    // We take the most frequent key
                     const keyCounts = features.reduce((acc: Record<string, number>, f) => {
                          const k = `${f.key}-${f.mode}`;
                          acc[k] = (acc[k] || 0) + 1;
@@ -400,7 +407,6 @@ export async function enrichSpotify(albumId: number, artist: string, title: stri
         }
     } catch (featError) {
         console.error('Failed to fetch Spotify audio features:', featError);
-        // Do not fail the whole enrichment, just skip audio features
     }
 
     const { error } = await supabase.from('collection').update(updateData).eq('id', albumId);
@@ -413,26 +419,152 @@ export async function enrichSpotify(albumId: number, artist: string, title: stri
 }
 
 // ============================================================================
-// APPLE MUSIC & GENIUS (STUBS TO AVOID UNUSED IMPORTS)
+// 4. APPLE MUSIC SERVICE
 // ============================================================================
 
-export async function enrichAppleMusic(albumId: number, artist: string, title: string) {
-    // Placeholder - logic can be restored if needed
-    void albumId;
-    void artist;
-    void title;
-    return { success: true, skipped: true }; 
+const APPLE_MUSIC_TOKEN = process.env.APPLE_MUSIC_TOKEN!;
+
+export async function enrichAppleMusic(albumId: number, artist: string, title: string): Promise<{ success: boolean; error?: string; skipped?: boolean }> {
+  try {
+    if (!APPLE_MUSIC_TOKEN) return { success: false, error: 'Apple Music Token missing' };
+
+    const query = `${artist} ${title}`;
+    const searchUrl = `https://api.music.apple.com/v1/catalog/us/search?term=${encodeURIComponent(query)}&types=albums&limit=1`;
+    
+    const response = await fetch(searchUrl, { 
+      headers: { 'Authorization': `Bearer ${APPLE_MUSIC_TOKEN}` } 
+    });
+
+    if (!response.ok) return { success: false, error: 'Apple Music search failed' };
+    
+    const data = await response.json();
+    const album = data.results?.albums?.data?.[0];
+
+    if (!album) return { success: false, error: 'Not found on Apple Music' };
+
+    const attrs = album.attributes;
+    const updateData: Record<string, unknown> = {
+      apple_music_id: album.id,
+      apple_music_url: attrs.url,
+    };
+
+    if (attrs.genreNames && attrs.genreNames.length > 0) {
+        // We generally treat these as Styles, as Apple Genres are broad
+        updateData.styles = attrs.genreNames;
+    }
+
+    const { error } = await supabase.from('collection').update(updateData).eq('id', albumId);
+    if (error) return { success: false, error: error.message };
+
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
 }
 
-export async function enrichGenius(albumId: number, artist: string) {
-    // Placeholder - logic can be restored if needed
-    void albumId;
-    void artist;
-    return { success: true, skipped: true };
+// ============================================================================
+// 5. GENIUS SERVICE
+// ============================================================================
+
+const GENIUS_ACCESS_TOKEN = process.env.GENIUS_ACCESS_TOKEN!;
+const geniusClient = GENIUS_ACCESS_TOKEN ? new Genius.Client(GENIUS_ACCESS_TOKEN) : null;
+
+export async function enrichGenius(albumId: number, artist: string, title: string): Promise<{ success: boolean; error?: string; skipped?: boolean }> {
+  try {
+    if (!geniusClient) return { success: false, error: 'Genius Token missing' };
+
+    // Search for the album (Genius API is song-focused, but we can search for the "album" context)
+    const search = await geniusClient.songs.search(`${artist} ${title}`);
+    if (!search || search.length === 0) return { success: false, error: 'Not found on Genius' };
+
+    // Currently, without a specific target column (like genius_url) or logic to parse producers,
+    // this service primarily validates existence on Genius.
+    // Logic for updating producers or genius_url can be added here when the database columns exist.
+
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
 }
 
 export async function enrichAppleLyrics(albumId: number) {
-   // Placeholder - logic can be restored if needed
+   // Placeholder - Apple Lyrics requires a separate, complex scraping logic or private API
+   // We will keep this skipped for now as it's non-standard
    void albumId;
    return { success: true, skipped: true };
+}
+
+// ============================================================================
+// 6. WIKIPEDIA SERVICE (NEW)
+// ============================================================================
+
+export async function enrichWikipedia(albumId: number, artist: string, title: string): Promise<{ success: boolean; error?: string; skipped?: boolean }> {
+    try {
+        const query = `${artist} ${title} album`;
+        const url = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json`;
+        
+        const response = await fetch(url);
+        if (!response.ok) return { success: false, error: 'Wikipedia search failed' };
+        
+        const data = await response.json();
+        if (!data.query?.search || data.query.search.length === 0) return { success: false, error: 'Not found on Wikipedia' };
+        
+        const pageId = data.query.search[0].pageid;
+        const wikiUrl = `https://en.wikipedia.org/?curid=${pageId}`;
+        
+        const updateData = {
+            wikipedia_url: wikiUrl
+        };
+        
+        const { error } = await supabase.from('collection').update(updateData).eq('id', albumId);
+        if (error) return { success: false, error: error.message };
+
+        return { success: true };
+    } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+}
+
+// ============================================================================
+// 7. COVER ART ARCHIVE SERVICE (NEW)
+// ============================================================================
+
+const CAA_BASE = 'https://coverartarchive.org';
+
+export async function enrichCoverArtArchive(albumId: number): Promise<{ success: boolean; error?: string; skipped?: boolean }> {
+    try {
+        // 1. Get MBID from DB
+        const { data: album } = await supabase.from('collection').select('musicbrainz_id').eq('id', albumId).single();
+        if (!album?.musicbrainz_id) return { success: false, error: 'No MusicBrainz ID' };
+
+        // 2. Fetch Images
+        const url = `${CAA_BASE}/release/${album.musicbrainz_id}`;
+        const response = await fetch(url);
+        if (!response.ok) return { success: false, error: 'Not found in CAA' };
+
+        const data = await response.json();
+        const images = data.images || [];
+        
+        const updateData: Record<string, unknown> = {};
+        const gallery: string[] = [];
+
+        images.forEach((img: { front: boolean, back: boolean, image: string }) => {
+            if (img.front && !updateData.image_url) updateData.image_url = img.image;
+            else if (img.back && !updateData.back_image_url) updateData.back_image_url = img.image;
+            else gallery.push(img.image);
+        });
+
+        if (gallery.length > 0) {
+            updateData.inner_sleeve_images = gallery;
+        }
+
+        if (Object.keys(updateData).length > 0) {
+            const { error } = await supabase.from('collection').update(updateData).eq('id', albumId);
+            if (error) return { success: false, error: error.message };
+        }
+
+        return { success: true };
+    } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
 }

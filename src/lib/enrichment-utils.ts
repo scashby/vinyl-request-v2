@@ -1,3 +1,4 @@
+// src/lib/enrichment-utils.ts
 import Genius from 'genius-lyrics';
 
 // Initialize Genius Client if token exists
@@ -35,9 +36,7 @@ export type CandidateData = {
   // Images
   image_url?: string;
   back_image_url?: string;
-  spine_image_url?: string;
-  inner_sleeve_images?: string[];
-  vinyl_label_images?: string[];
+  inner_sleeve_images?: string[]; // Acts as universal gallery (Spine/Inner/Vinyl)
   
   // Audio Features
   tempo_bpm?: number;
@@ -133,7 +132,7 @@ interface SpotifyAlbum {
 }
 
 interface SpotifyAudioFeature {
-  id: string; // Fixes TS2339
+  id: string; 
   tempo: number;
   energy: number;
   danceability: number;
@@ -220,7 +219,6 @@ async function mbSearch(artist: string, title: string): Promise<string | null> {
 
 async function mbGetRelease(mbid: string): Promise<MBRelease | null> {
   try {
-    // UPDATED: Added 'artist-rels' to fetch credits
     const url = `${MB_BASE}/release/${mbid}?inc=artists+labels+recordings+release-groups+artist-rels&fmt=json`;
     const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
     return res.ok ? (await res.json() as MBRelease) : null;
@@ -249,7 +247,6 @@ export async function fetchMusicBrainzData(album: { artist: string, title: strin
     
     if (release.barcode) candidate.barcode = release.barcode;
 
-    // UPDATED: Parse relationships for credits
     if (release.relations) {
         candidate.producers = release.relations
             .filter(r => r.type === 'producer' && r.artist)
@@ -262,6 +259,10 @@ export async function fetchMusicBrainzData(album: { artist: string, title: strin
         candidate.musicians = release.relations
             .filter(r => (r.type === 'instrument' || r.type === 'vocal') && r.artist)
             .map(r => `${r.artist!.name} (${r.attributes?.join(', ') || 'Musician'})`);
+            
+        candidate.songwriters = release.relations
+            .filter(r => (r.type === 'composer' || r.type === 'writer' || r.type === 'lyricist') && r.artist)
+            .map(r => r.artist!.name);
     }
 
     return { success: true, source: 'musicbrainz', data: candidate };
@@ -359,8 +360,6 @@ export async function fetchSpotifyData(album: { artist: string, title: string, s
                 candidate.danceability = Number(avgDance.toFixed(3));
                 candidate.mood_acoustic = Number(avgAcoustic.toFixed(3));
                 candidate.mood_happy = Number(avgValence.toFixed(3));
-                
-                // UPDATED: Derived mood fields
                 candidate.mood_sad = Number((1 - avgValence).toFixed(3));
                 candidate.mood_party = Number(avgEnergy.toFixed(3));
                 candidate.mood_relaxed = Number((1 - avgEnergy).toFixed(3));
@@ -371,14 +370,6 @@ export async function fetchSpotifyData(album: { artist: string, title: string, s
                     candidate.musical_key = `${KEY_MAP[firstKey]} ${firstMode === 1 ? 'Major' : 'Minor'}`;
                 }
 
-                // Derived mood fields
-                candidate.mood_sad = Number((1 - avgValence).toFixed(3));
-                candidate.mood_party = Number(avgEnergy.toFixed(3));
-                candidate.mood_relaxed = Number((1 - avgEnergy).toFixed(3));
-                candidate.mood_aggressive = (avgEnergy > 0.7 && avgValence < 0.4) ? 1.0 : 0.0;
-                candidate.mood_electronic = (avgAcoustic < 0.1 && avgEnergy > 0.6) ? 1.0 : 0.0;
-
-                // Attach per-track data for the Modal to save
                 candidate.tracks = data.tracks.items.map((t, i) => {
                     const feat = features.find(f => f.id === t.id);
                     let keyStr = undefined;
@@ -468,13 +459,28 @@ export async function fetchDiscogsData(album: { artist: string, title: string, d
     });
     const data = await releaseRes.json() as DiscogsRelease;
 
+    // --- FIX: CAPTURE ALL IMAGES INTO GALLERY ---
+    const allImages = data.images || [];
+    const galleryImages: string[] = [];
+    let primaryImage: string | undefined = undefined;
+    let backImage: string | undefined = undefined;
+
+    if (allImages.length > 0) primaryImage = allImages[0].uri;
+    if (allImages.length > 1) backImage = allImages[1].uri;
+    if (allImages.length > 2) {
+       // Capture everything else for the gallery UI
+       galleryImages.push(...allImages.slice(2).map(i => i.uri));
+    }
+
     const candidate: CandidateData = {
       discogs_release_id: String(releaseId),
       discogs_master_id: data.master_id ? String(data.master_id) : undefined,
       genres: data.genres,
       styles: data.styles,
       original_release_date: data.released,
-      image_url: data.images?.[0]?.uri,
+      image_url: primaryImage,
+      back_image_url: backImage,
+      inner_sleeve_images: galleryImages.length > 0 ? galleryImages : undefined,
       label: data.labels?.[0]?.name ? [data.labels[0].name] : undefined,
       country: data.country,
       tracklist: data.tracklist?.map((t: DiscogsTrack) => `${t.position} - ${t.title} (${t.duration})`).join('\n')
@@ -497,11 +503,10 @@ export async function fetchDiscogsData(album: { artist: string, title: string, d
         candidate.musicians = data.extraartists
             .filter((a: DiscogsArtist) => !a.role.toLowerCase().includes('producer') && !a.role.toLowerCase().includes('engineer'))
             .map((a: DiscogsArtist) => `${a.name} (${a.role})`);
-    }
-
-    if (data.images && data.images.length > 1) {
-        const secondary = data.images.slice(1);
-        if (secondary.length > 0) candidate.back_image_url = secondary[0].uri; 
+            
+        candidate.songwriters = data.extraartists
+            .filter((a: DiscogsArtist) => a.role.toLowerCase().includes('written') || a.role.toLowerCase().includes('lyrics'))
+            .map((a: DiscogsArtist) => a.name);
     }
 
     return { success: true, source: 'discogs', data: candidate };
@@ -516,7 +521,6 @@ export async function fetchDiscogsData(album: { artist: string, title: string, d
 const LFM_KEY = process.env.LASTFM_API_KEY!;
 const LFM_BASE = 'https://ws.audioscrobbler.com/2.0/';
 
-// Helper to map tags to mood scores
 function mapTagsToMoods(tags: string[], candidate: CandidateData) {
     const MOOD_KEYWORDS: Record<string, keyof CandidateData> = {
         'sad': 'mood_sad', 'melancholy': 'mood_sad', 'depressive': 'mood_sad',
@@ -531,9 +535,7 @@ function mapTagsToMoods(tags: string[], candidate: CandidateData) {
         const lower = tag.toLowerCase();
         for (const [keyword, field] of Object.entries(MOOD_KEYWORDS)) {
             if (lower.includes(keyword)) {
-                // If tag matches, set high score if not already set
                 if (typeof candidate[field] !== 'number') {
-                    // Fixes ESLint error by casting to Record instead of any
                     (candidate as Record<string, unknown>)[field] = 0.8; 
                 }
             }
@@ -559,7 +561,6 @@ export async function fetchLastFmData(album: { artist: string, title: string }):
       image_url: largeImg || undefined
     };
 
-    // UPDATED: Map tags to mood columns
     mapTagsToMoods(tags, candidate);
 
     return { success: true, source: 'lastfm', data: candidate };
@@ -585,18 +586,25 @@ export async function fetchCoverArtData(album: { musicbrainz_id?: string }): Pro
 
         const front = images.find((i: CAAImage) => i.front)?.image || images[0]?.image;
         const back = images.find((i: CAAImage) => i.back)?.image;
-        const spine = images.find((i: CAAImage) => i.types?.includes('Spine'))?.image;
-        const inner = images.filter((i: CAAImage) => i.types?.includes('Inner')).map((i: CAAImage) => i.image);
-        const labels = images.filter((i: CAAImage) => i.types?.includes('Medium')).map((i: CAAImage) => i.image);
+        
+        // --- FIX: CONSOLIDATE INTO GALLERY ---
+        const gallery: string[] = [];
+        
+        images.forEach((img: CAAImage) => {
+            // If it's not the chosen front or back, put it in the gallery
+            if (img.image !== front && img.image !== back) {
+                gallery.push(img.image);
+            }
+        });
 
         const resultData: CandidateData = { 
             image_url: front, 
             back_image_url: back 
         };
 
-        if (spine) resultData.spine_image_url = spine;
-        if (inner.length > 0) resultData.inner_sleeve_images = inner;
-        if (labels.length > 0) resultData.vinyl_label_images = labels;
+        if (gallery.length > 0) {
+            resultData.inner_sleeve_images = gallery;
+        }
 
         return { 
             success: true, 
@@ -609,7 +617,7 @@ export async function fetchCoverArtData(album: { musicbrainz_id?: string }): Pro
 }
 
 // ============================================================================
-// 7. GENIUS (Album Link)
+// 7. GENIUS (Album Link & Cleaned)
 // ============================================================================
 export async function fetchGeniusData(album: { artist: string, title: string }): Promise<EnrichmentResult> {
     try {
@@ -624,6 +632,7 @@ export async function fetchGeniusData(album: { artist: string, title: string }):
 
         if (!songMatch) return { success: false, source: 'genius', error: 'Not Found' };
 
+        // --- FIX: REMOVED INVALID PROPERTY ACCESS ---
         return { 
             success: true, 
             source: 'genius', 
