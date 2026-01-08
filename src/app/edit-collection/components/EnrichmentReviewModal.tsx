@@ -15,37 +15,105 @@ interface EnrichmentReviewModalProps {
   onCancel: () => void;
 }
 
-// --- HELPER: Smart Value Component ---
+// --- HELPER: Image Detection ---
+function isImageUrl(url: unknown): boolean {
+  if (typeof url !== 'string') return false;
+  return !!url.match(/\.(jpeg|jpg|gif|png|webp|bmp)$/i) || 
+         url.includes('images.discogs.com') ||
+         url.includes('i.scdn.co') || 
+         url.includes('mzstatic.com');
+}
+
+function isImageArray(value: unknown): boolean {
+  return Array.isArray(value) && value.length > 0 && value.every(v => isImageUrl(v));
+}
+
+// --- COMPONENT: Image Grid Selector (For Galleries) ---
+function ImageGridSelector({
+  images,
+  selectedImages,
+  onToggle,
+  label,
+  color
+}: {
+  images: string[];
+  selectedImages: Set<string>;
+  onToggle: (url: string) => void;
+  label: string;
+  color: 'green' | 'blue';
+}) {
+  const labelColor = color === 'green' ? '#047857' : '#1d4ed8';
+  const borderColor = color === 'green' ? '#10b981' : '#3b82f6';
+
+  return (
+    <div style={{ 
+      border: `2px solid ${borderColor}`, 
+      borderRadius: '8px', 
+      padding: '12px',
+      backgroundColor: color === 'green' ? '#f0fdf4' : '#eff6ff'
+    }}>
+      <div style={{ 
+        fontSize: '11px', fontWeight: '700', color: labelColor, 
+        marginBottom: '8px', textTransform: 'uppercase', display: 'flex', justifyContent: 'space-between' 
+      }}>
+        <span>{label} ({images.length})</span>
+        <span>{Array.from(selectedImages).filter(img => images.includes(img)).length} Selected</span>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: '8px' }}>
+        {images.map((url, idx) => {
+          const isSelected = selectedImages.has(url);
+          return (
+            <div 
+              key={`${idx}-${url}`} 
+              onClick={() => onToggle(url)}
+              style={{ 
+                position: 'relative', 
+                aspectRatio: '1', 
+                borderRadius: '4px', 
+                overflow: 'hidden', 
+                cursor: 'pointer',
+                border: isSelected ? `3px solid ${labelColor}` : '1px solid #d1d5db',
+                opacity: isSelected ? 1 : 0.6
+              }}
+            >
+              <Image src={url} alt="" fill style={{ objectFit: 'cover' }} unoptimized />
+              {isSelected && (
+                <div style={{ 
+                  position: 'absolute', top: '2px', right: '2px', 
+                  background: labelColor, color: 'white', borderRadius: '50%', 
+                  width: '16px', height: '16px', fontSize: '10px', 
+                  display: 'flex', alignItems: 'center', justifyContent: 'center' 
+                }}>✓</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// --- HELPER: Standard Value Component ---
 function ConflictValue({ 
   value, 
   onClick, 
   isSelected, 
   label, 
   color,
-  isMultiSelect = false // NEW
+  isMultiSelect = false 
 }: { 
   value: unknown; 
   onClick: () => void; 
   isSelected: boolean; 
   label: string;
   color: 'green' | 'blue';
-  isMultiSelect?: boolean; // NEW
+  isMultiSelect?: boolean; 
 }) {
   const [dimensions, setDimensions] = useState<{ w: number, h: number } | null>(null);
   const [isImage, setIsImage] = useState(false);
 
   useEffect(() => {
-    if (typeof value === 'string') {
-      const url = value.toLowerCase();
-      if (
-        url.match(/\.(jpeg|jpg|gif|png|webp|bmp)$/i) || 
-        url.includes('images.discogs.com') ||
-        url.includes('i.scdn.co') || 
-        url.includes('mzstatic.com')
-      ) {
-        setIsImage(true);
-      }
-    }
+    if (isImageUrl(value)) setIsImage(true);
   }, [value]);
 
   const borderColor = isSelected ? (color === 'green' ? '#10b981' : '#3b82f6') : '#e5e7eb';
@@ -89,14 +157,7 @@ function ConflictValue({
               checked={isSelected} 
               readOnly 
               style={{ 
-                appearance: 'checkbox',
-                WebkitAppearance: 'checkbox',
-                cursor: 'pointer', 
-                width: '18px', 
-                height: '18px',
-                zIndex: 50,
-                position: 'relative',
-                accentColor: '#3b82f6'
+                cursor: 'pointer', width: '18px', height: '18px', zIndex: 50, position: 'relative', accentColor: '#3b82f6'
               }} 
             />
           ) : (
@@ -132,13 +193,7 @@ function ConflictValue({
             checked={isSelected} 
             readOnly 
             style={{ 
-              appearance: 'checkbox',
-              WebkitAppearance: 'checkbox',
-              cursor: 'pointer', 
-              width: '18px', 
-              height: '18px',
-              zIndex: 50,
-              position: 'relative'
+              cursor: 'pointer', width: '18px', height: '18px', zIndex: 50, position: 'relative'
             }} 
           />
         ) : (
@@ -161,6 +216,7 @@ function ConflictValue({
 }
 
 export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel }: EnrichmentReviewModalProps) {
+  // State tracks the RESOLVED VALUE, not just the source
   const [resolutions, setResolutions] = useState<Record<string, { value: unknown, source: string, selectedSources?: string[] }>>({});
   const [finalizedFields, setFinalizedFields] = useState<Record<string, boolean>>({});
 
@@ -184,17 +240,43 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
 
   const handleResolve = (conflict: ExtendedFieldConflict, value: unknown, source: string) => {
     const key = `${conflict.album_id}-${conflict.field_name}`;
-    const MERGEABLE_FIELDS = ['genres', 'styles', 'musicians', 'credits', 'producers', 'tags'];
+    const MERGEABLE_FIELDS = ['genres', 'styles', 'musicians', 'credits', 'producers', 'tags', 'inner_sleeve_images', 'vinyl_label_images', 'spine_image_url'];
     const isMergeable = MERGEABLE_FIELDS.includes(conflict.field_name);
 
     if (isMergeable) {
       setResolutions(prev => {
         const current = prev[key] || { value: [], source: 'merge', selectedSources: [] };
-        const sources = current.selectedSources || [];
-        // Toggle the source: add if missing, remove if present
-        const newSources = sources.includes(source) ? sources.filter(s => s !== source) : [...sources, source];
         
-        // Construct the merged value (Unique Array)
+        // Special Handling for Image Arrays (Gallery)
+        if (isImageArray(conflict.current_value) || isImageArray(conflict.new_value)) {
+           // For images, 'value' holds the actual selected URLs array
+           const currentSelection = new Set(Array.isArray(current.value) ? current.value as string[] : []);
+           const toggledUrl = String(value); // In image grid mode, value passed is the single URL toggled
+           
+           // If the value passed is NOT a single URL string (e.g. "Select All"), handle differently
+           if (typeof value !== 'string') {
+              // Fallback to standard merge if not clicking specific image
+              const sources = current.selectedSources || [];
+              const newSources = sources.includes(source) ? sources.filter(s => s !== source) : [...sources, source];
+              // Re-calculate full set based on sources
+              const mergedSet = new Set<string>();
+              newSources.forEach(src => {
+                const val = src === 'current' ? conflict.current_value : conflict.candidates?.[src];
+                if (Array.isArray(val)) val.forEach(v => mergedSet.add(String(v)));
+              });
+              return { ...prev, [key]: { value: Array.from(mergedSet), source: 'merge', selectedSources: newSources } };
+           }
+
+           // Toggle individual image
+           if (currentSelection.has(toggledUrl)) currentSelection.delete(toggledUrl);
+           else currentSelection.add(toggledUrl);
+           
+           return { ...prev, [key]: { value: Array.from(currentSelection), source: 'custom', selectedSources: ['custom'] } };
+        }
+
+        // Standard Text Array Merge (Genres, etc.)
+        const sources = current.selectedSources || [];
+        const newSources = sources.includes(source) ? sources.filter(s => s !== source) : [...sources, source];
         const mergedSet = new Set<string>();
         newSources.forEach(src => {
           const val = src === 'current' ? conflict.current_value : conflict.candidates?.[src];
@@ -208,7 +290,7 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
         };
       });
     } else {
-      // Standard Radio-style behavior for static fields (Image, Date, etc)
+      // Standard Radio-style behavior for static fields
       setResolutions(prev => ({ ...prev, [key]: { value, source } }));
     }
   };
@@ -260,32 +342,10 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
           </div>
           
           <div style={{ display: 'flex', gap: '12px' }}>
-            <button 
-              onClick={() => {
-                // Matches the exact field names in your database to ensure Finalize actually works
-                const nonMergableFields = ['image_url', 'back_image_url', 'original_release_date', 'country', 'barcode', 'year', 'format', 'label', 'catalog_no'];
-                const newFinalized = { ...finalizedFields };
-                conflicts.forEach(c => {
-                  if (nonMergableFields.includes(c.field_name)) {
-                    newFinalized[`${c.album_id}-${c.field_name}`] = true;
-                  }
-                });
-                setFinalizedFields(newFinalized);
-              }}
-              style={{ padding: '8px 16px', fontSize: '13px', fontWeight: '600', color: '#7c3aed', backgroundColor: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: '6px', cursor: 'pointer' }}
-            >
-              Finalize All (Static Fields)
-            </button>
-            <button 
-              onClick={handleSelectAllCurrent}
-              style={{ padding: '8px 16px', fontSize: '13px', fontWeight: '600', color: '#047857', backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '6px', cursor: 'pointer' }}
-            >
+            <button onClick={handleSelectAllCurrent} style={{ padding: '8px 16px', fontSize: '13px', fontWeight: '600', color: '#047857', backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '6px', cursor: 'pointer' }}>
               Keep Current
             </button>
-            <button 
-              onClick={handleSelectAllNew}
-              style={{ padding: '8px 16px', fontSize: '13px', fontWeight: '600', color: '#1d4ed8', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', cursor: 'pointer' }}
-            >
+            <button onClick={handleSelectAllNew} style={{ padding: '8px 16px', fontSize: '13px', fontWeight: '600', color: '#1d4ed8', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', cursor: 'pointer' }}>
               Use All New Data
             </button>
           </div>
@@ -305,19 +365,9 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
                     <div style={{ fontWeight: '700', fontSize: '15px', color: '#111827', marginRight: 'auto' }}>
                       {albumInfo.artist} - {albumInfo.title}
                     </div>
-                    
-                    {/* Identification Badges */}
                     <div style={{ display: 'flex', gap: '8px', fontSize: '12px' }}>
-                      {albumInfo.format && (
-                        <span style={{ padding: '2px 8px', borderRadius: '4px', backgroundColor: '#e5e7eb', color: '#374151', border: '1px solid #d1d5db' }}>
-                          {albumInfo.format}
-                        </span>
-                      )}
-                      {albumInfo.year && (
-                        <span style={{ padding: '2px 8px', borderRadius: '4px', backgroundColor: '#e5e7eb', color: '#374151', border: '1px solid #d1d5db' }}>
-                          {albumInfo.year}
-                        </span>
-                      )}
+                      {albumInfo.format && <span style={{ padding: '2px 8px', borderRadius: '4px', backgroundColor: '#e5e7eb', color: '#374151', border: '1px solid #d1d5db' }}>{albumInfo.format}</span>}
+                      {albumInfo.year && <span style={{ padding: '2px 8px', borderRadius: '4px', backgroundColor: '#e5e7eb', color: '#374151', border: '1px solid #d1d5db' }}>{albumInfo.year}</span>}
                     </div>
                   </div>
 
@@ -326,83 +376,99 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
                     {group.map((conflict) => {
                       const key = `${conflict.album_id}-${conflict.field_name}`;
                       const selected = resolutions[key] || { value: conflict.current_value, source: 'current' };
+                      const isImageArrayField = isImageArray(conflict.current_value) || isImageArray(conflict.new_value);
                       
                       return (
                         <div key={key}>
-                          {/* UPDATED: Row Header with Finalize Checkbox */}
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                               <div style={{ fontSize: '12px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase' }}>
                                 {conflict.field_name.replace(/_/g, ' ')}
                               </div>
-                              
-                              {/* ACTION BAR: This was the missing piece for Keep/Merge/Reject */}
-                              {['genres', 'styles', 'musicians', 'credits', 'producers', 'tags'].includes(conflict.field_name) && (
-                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                  <button 
-                                    onClick={() => handleResolve(conflict, conflict.current_value, 'current')}
-                                    style={{ padding: '2px 8px', fontSize: '10px', borderRadius: '4px', backgroundColor: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', fontWeight: 'bold', cursor: 'pointer' }}
-                                  >
-                                    KEEP CURRENT ONLY
-                                  </button>
-                                  <div style={{ padding: '2px 8px', fontSize: '10px', borderRadius: '4px', backgroundColor: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', fontWeight: 'bold' }}>
-                                    {selected.selectedSources?.length || 0} SOURCES SELECTED TO MERGE
-                                  </div>
-                                </div>
+                              {isImageArrayField && (
+                                <span style={{ fontSize: '10px', color: '#6b7280', background: '#f3f4f6', padding: '2px 6px', borderRadius: '4px' }}>
+                                  GALLERY MODE: Click images to Keep/Reject
+                                </span>
                               )}
                             </div>
                             <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '12px', color: '#6b7280' }}>
                               <input 
                                 type="checkbox" 
                                 checked={finalizedFields[key] || false}
-                                onChange={(e) => setFinalizedFields(prev => ({
-                                  ...prev, 
-                                  [key]: e.target.checked
-                                }))}
+                                onChange={(e) => setFinalizedFields(prev => ({ ...prev, [key]: e.target.checked }))}
                               />
                               Mark as Finalized
                             </label>
                           </div>
 
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px', alignItems: 'stretch' }}>
-                            {/* Option A: Current Database Value */}
+                            
+                            {/* CURRENT VALUE */}
                             <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                <ConflictValue 
-                                  label="Current (DB)"
-                                  color="green"
-                                  value={conflict.current_value}
-                                  // Restore highlight: Green if source is 'current' OR part of 'merge'
-                                  isSelected={selected.source === 'current' || (selected.selectedSources?.includes('current') ?? false)}
-                                  isMultiSelect={['genres', 'styles', 'musicians', 'credits', 'producers', 'tags'].includes(conflict.field_name)}
-                                  onClick={() => handleResolve(conflict, conflict.current_value, 'current')}
-                                />
+                                {isImageArrayField && Array.isArray(conflict.current_value) ? (
+                                  <ImageGridSelector 
+                                    label="Current Gallery"
+                                    color="green"
+                                    images={conflict.current_value as string[]}
+                                    selectedImages={new Set(Array.isArray(selected.value) ? selected.value as string[] : [])}
+                                    onToggle={(url) => handleResolve(conflict, url, 'current')}
+                                  />
+                                ) : (
+                                  <ConflictValue 
+                                    label="Current (DB)"
+                                    color="green"
+                                    value={conflict.current_value}
+                                    isSelected={selected.source === 'current' || (selected.selectedSources?.includes('current') ?? false)}
+                                    isMultiSelect={!isImageArrayField && ['genres', 'styles', 'musicians'].includes(conflict.field_name)}
+                                    onClick={() => handleResolve(conflict, conflict.current_value, 'current')}
+                                  />
+                                )}
                             </div>
 
-                            {/* Option B: Grouped Candidates Grid (Multi-Source Selection) */}
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px' }}>
+                            {/* NEW CANDIDATES */}
+                            <div style={{ display: 'grid', gridTemplateColumns: isImageArrayField ? '1fr' : 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px' }}>
                                 {conflict.candidates ? (
                                     Object.entries(conflict.candidates).map(([source, val]) => (
-                                        <ConflictValue 
+                                        isImageArrayField && Array.isArray(val) ? (
+                                          <ImageGridSelector 
                                             key={source}
-                                            label={source}
+                                            label={`${source} Candidates`}
                                             color="blue"
-                                            value={val}
-                                            // Restore highlight: Blue if source matches OR is part of 'selectedSources' merge
-                                            isSelected={selected.source === source || (selected.selectedSources?.includes(source) ?? false)}
-                                            // Enable checkbox UI for mergeable array fields
-                                            isMultiSelect={['genres', 'styles', 'musicians', 'credits', 'producers', 'tags'].includes(conflict.field_name)}
-                                            onClick={() => handleResolve(conflict, val, source)}
-                                        />
+                                            images={val as string[]}
+                                            selectedImages={new Set(Array.isArray(selected.value) ? selected.value as string[] : [])}
+                                            onToggle={(url) => handleResolve(conflict, url, source)}
+                                          />
+                                        ) : (
+                                          <ConflictValue 
+                                              key={source}
+                                              label={source}
+                                              color="blue"
+                                              value={val}
+                                              isSelected={selected.source === source || (selected.selectedSources?.includes(source) ?? false)}
+                                              isMultiSelect={!isImageArrayField && ['genres', 'styles', 'musicians'].includes(conflict.field_name)}
+                                              onClick={() => handleResolve(conflict, val, source)}
+                                          />
+                                        )
                                     ))
                                 ) : (
-                                    /* Fallback for legacy single-source data if map is missing */
-                                    <ConflictValue 
-                                        label={`New (${conflict.source || 'Unknown'})`}
+                                    // Fallback if no detailed candidates map
+                                    isImageArrayField && Array.isArray(conflict.new_value) ? (
+                                      <ImageGridSelector 
+                                        label="New Candidates"
                                         color="blue"
-                                        value={conflict.new_value}
-                                        isSelected={selected.source === (conflict.source || 'enrichment')}
-                                        onClick={() => handleResolve(conflict, conflict.new_value, conflict.source || 'enrichment')}
-                                    />
+                                        images={conflict.new_value as string[]}
+                                        selectedImages={new Set(Array.isArray(selected.value) ? selected.value as string[] : [])}
+                                        onToggle={(url) => handleResolve(conflict, url, 'enrichment')}
+                                      />
+                                    ) : (
+                                      <ConflictValue 
+                                          label={`New (${conflict.source || 'Unknown'})`}
+                                          color="blue"
+                                          value={conflict.new_value}
+                                          isSelected={selected.source === (conflict.source || 'enrichment')}
+                                          onClick={() => handleResolve(conflict, conflict.new_value, conflict.source || 'enrichment')}
+                                      />
+                                    )
                                 )}
                             </div>
                           </div>
@@ -418,17 +484,9 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
 
         {/* FOOTER */}
         <div className={styles.importButtonContainer} style={{ padding: '20px 24px', borderTop: '1px solid #e5e7eb', backgroundColor: 'white', justifyContent: 'flex-end' }}>
-          <button onClick={onCancel} className={styles.importCancelButton}>
-            Cancel
-          </button>
+          <button onClick={onCancel} className={styles.importCancelButton}>Cancel</button>
           <button 
-            onClick={() => {
-                // Ensure we pass the local state correctly to handleApplyChanges
-                onComplete(
-                    resolutions as Record<string, { value: unknown, source: string }>, 
-                    finalizedFields
-                );
-            }}
+            onClick={() => onComplete(resolutions as Record<string, { value: unknown, source: string }>, finalizedFields)}
             className={styles.importConfirmButton}
             style={{ backgroundColor: '#f59e0b', cursor: 'pointer', fontWeight: '700' }}
           >

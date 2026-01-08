@@ -21,7 +21,7 @@ const ALLOWED_COLUMNS = new Set([
   'discogs_master_id', 'discogs_release_id', 'spotify_id', 'spotify_url',
   'apple_music_id', 'apple_music_url', 'lastfm_id', 'lastfm_url', // Added LastFM
   'genres', 'styles', 'original_release_date',
-  'spine_image_url', 'inner_sleeve_images', 'vinyl_label_images',
+  'inner_sleeve_images', // Acts as Gallery
   'musicians', 'credits', 'producers', 'engineers', 'songwriters', 'composer', 'conductor', 'orchestra',
   'bpm', 'key', 'lyrics', 'time_signature', 'musical_key', // Added musical_key
   // New columns from audit:

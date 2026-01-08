@@ -11,11 +11,12 @@ const supabase = createClient(
 export async function GET() {
   try {
     // 1. Fetch Albums with all relevant columns
+    // CLEANUP: Removed spine_image_url and vinyl_label_images
     const { data: albums, error } = await supabase
       .from('collection')
       .select(`
         id, folder,
-        image_url, back_image_url, spine_image_url, inner_sleeve_images, vinyl_label_images,
+        image_url, back_image_url, inner_sleeve_images,
         musicians, producers, engineers, songwriters,
         tempo_bpm, musical_key, danceability, energy,
         genres, styles,
@@ -42,9 +43,7 @@ export async function GET() {
     // Artwork
     let missingArtwork = 0;
     let missingBackCover = 0;
-    let missingSpine = 0;
-    let missingInnerSleeve = 0;
-    let missingVinylLabel = 0;
+    let missingInnerSleeve = 0; // This is now your Gallery
     
     // Credits
     let missingCredits = 0;
@@ -88,17 +87,18 @@ export async function GET() {
       // 1. ARTWORK
       const hasFront = !!album.image_url;
       const hasBack = !!album.back_image_url;
-      const hasSpine = !!album.spine_image_url;
+      
+      // Secondary/Manual Images
+      // CLEANUP: We only check inner_sleeve_images (the Gallery) now
       const hasInner = Array.isArray(album.inner_sleeve_images) && album.inner_sleeve_images.length > 0;
-      const hasVinyl = Array.isArray(album.vinyl_label_images) && album.vinyl_label_images.length > 0;
 
-      if (!hasFront || !hasBack || !hasSpine || !hasInner || !hasVinyl) {
+      if (!hasFront || !hasBack) {
         missingArtwork++; 
         if (!hasBack) missingBackCover++;
-        if (!hasSpine) missingSpine++;
-        if (!hasInner) missingInnerSleeve++;
-        if (!hasVinyl) missingVinylLabel++;
       }
+      
+      // Track gallery stats
+      if (!hasInner) missingInnerSleeve++;
 
       // 2. CREDITS
       const hasMusicians = Array.isArray(album.musicians) && album.musicians.length > 0;
@@ -106,13 +106,15 @@ export async function GET() {
       const hasEngineers = Array.isArray(album.engineers) && album.engineers.length > 0;
       const hasSongwriters = Array.isArray(album.songwriters) && album.songwriters.length > 0;
 
-      if (!hasMusicians || !hasProducers || !hasEngineers || !hasSongwriters) {
+      // Strict Requirement: Musicians & Producers. Optional: Engineers/Writers
+      if (!hasMusicians || !hasProducers) {
         missingCredits++;
-        if (!hasMusicians) missingMusicians++;
-        if (!hasProducers) missingProducers++;
-        if (!hasEngineers) missingEngineers++;
-        if (!hasSongwriters) missingSongwriters++;
       }
+      
+      if (!hasMusicians) missingMusicians++;
+      if (!hasProducers) missingProducers++;
+      if (!hasEngineers) missingEngineers++;
+      if (!hasSongwriters) missingSongwriters++;
 
       // 3. TRACKLISTS
       const hasTracks = albumsWithTracks.has(String(album.id));
@@ -124,13 +126,15 @@ export async function GET() {
       const hasDance = album.danceability !== null;
       const hasEnergy = album.energy !== null;
 
-      if (!hasTempo || !hasKey || !hasDance || !hasEnergy) {
+      // Strict Requirement: Tempo & Key. Optional: Dance/Energy
+      if (!hasTempo || !hasKey) {
         missingAudioAnalysis++;
-        if (!hasTempo) missingTempo++;
-        if (!hasKey) missingMusicalKey++;
-        if (!hasDance) missingDanceability++;
-        if (!hasEnergy) missingEnergy++;
       }
+      
+      if (!hasTempo) missingTempo++;
+      if (!hasKey) missingMusicalKey++;
+      if (!hasDance) missingDanceability++;
+      if (!hasEnergy) missingEnergy++;
 
       // 5. GENRES
       const hasGenres = Array.isArray(album.genres) && album.genres.length > 0;
@@ -166,9 +170,10 @@ export async function GET() {
       if (!hasOriginalDate) missingOriginalDate++;
       if (!hasCatNo) missingCatalogNumber++;
 
-      // 8. TOTAL SCORE (Strict)
+      // 8. TOTAL SCORE
+      // "Fully Enriched" Logic - RELAXED
       const isComplete = 
-        (hasFront && hasBack && hasSpine && hasInner && hasVinyl) &&
+        (hasFront && hasBack) && // Only front/back required
         (hasMusicians && hasProducers) &&
         hasTracks &&
         (hasTempo && hasKey) &&
@@ -187,9 +192,7 @@ export async function GET() {
       
       missingArtwork,
       missingBackCover,
-      missingSpine,
-      missingInnerSleeve,
-      missingVinylLabel,
+      missingInnerSleeve, // Gallery
       
       missingCredits,
       missingMusicians,
