@@ -259,6 +259,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     setEnriching(true);
     const targetConflicts = parseInt(batchSize);
     let collectedConflicts: ExtendedFieldConflict[] = [];
+    let collectedSummary: {album: string, field: string, action: string}[] = [];
 
     while ((collectedConflicts.length < targetConflicts || specificAlbumIds) && hasMoreRef.current) {
       setStatus(`Scanning (Cursor: ${cursorRef.current})... Found ${collectedConflicts.length}/${targetConflicts} conflicts.`);
@@ -291,12 +292,27 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
         const candidates = result.results || [];
 
+        if (result.processedCount > candidates.length) {
+          collectedSummary.push({
+            album: 'Batch Scan',
+            field: 'Multiple Albums',
+            action: 'No New Data Found for some items'
+          });
+        }
+
         if (candidates.length === 0 && hasMoreRef.current === false) {
           break; 
         }
 
-        const { conflicts: batchConflicts } = await processBatchAndSave(candidates);
+        // UPDATED: Destructure summary from return logic
+        const { conflicts: batchConflicts, summary: batchSummaryItems } = await processBatchAndSave(candidates);
+        
         collectedConflicts = [...collectedConflicts, ...batchConflicts];
+        // Safely add items only if they exist
+        if (batchSummaryItems && batchSummaryItems.length > 0) {
+            collectedSummary = [...collectedSummary, ...batchSummaryItems];
+        }
+
         if (specificAlbumIds) break;
 
       } catch (error) {
@@ -308,6 +324,11 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     }
 
     setEnriching(false);
+
+    // UPDATED: Push the accumulated summary to the UI only at the end
+    if (collectedSummary.length > 0) {
+        setBatchSummary(prev => [...(prev || []), ...collectedSummary]);
+    }
 
     if (collectedConflicts.length > 0) {
       setConflicts(collectedConflicts);
@@ -335,14 +356,13 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       
     if (resError) console.error('Error fetching history:', resError);
 
-    // ADDED: Missing fields to ALLOWED_COLUMNS
     const ALLOWED_COLUMNS = new Set([
       'artist', 'title', 'year', 'format', 'country', 'barcode', 'labels',
       'tracklists', 'image_url', 'back_image_url', 'sell_price', 'media_condition', 'folder',
       'discogs_master_id', 'discogs_release_id', 'spotify_id', 'spotify_url',
       'apple_music_id', 'apple_music_url', 'genres', 'styles', 'original_release_date',
       'spine_image_url', 'inner_sleeve_images', 'vinyl_label_images',
-      'musicians', 'credits', 'producers', 'composer', 'conductor', 'orchestra',
+      'musicians', 'credits', 'producers', 'engineers', 'songwriters', 'composer', 'conductor', 'orchestra',
       'bpm', 'key', 'lyrics', 'time_signature',
       // New columns from audit:
       'danceability', 'energy', 'mood_acoustic', 'mood_happy', 'mood_sad',
@@ -355,6 +375,9 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     const historyUpdates: { album_id: number; field_name: string; source: string; resolution: string; kept_value: unknown; resolved_at: string }[] = [];
     const trackSavePromises: Promise<unknown>[] = [];
     const SOURCE_PRIORITY = ['musicbrainz', 'spotify', 'appleMusic', 'discogs', 'lastfm', 'coverArt', 'wikipedia', 'genius'];
+    
+    // NEW: Local summary collector to avoid setting state in loop
+    const localBatchSummary: {album: string, field: string, action: string}[] = [];
 
     results.forEach((item) => {
       processedIds.push(item.album.id);
@@ -459,13 +482,19 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       if (Object.keys(updatesForAlbum).length > 0) {
         updatesForAlbum.last_enriched_at = new Date().toISOString();
         autoUpdates.push({ id: album.id, fields: updatesForAlbum });
+        
         autoFilledFields.forEach(field => {
-          setBatchSummary(prev => [...(prev || []), {
+          // UPDATED: More descriptive action message
+          const val = updatesForAlbum[field];
+          const valStr = typeof val === 'object' ? 'Complex Data' : String(val);
+          
+          localBatchSummary.push({
             album: `${album.artist} - ${album.title}`,
             field: field,
-            action: 'Auto-Filled (Background)'
-          }]);
+            action: `Auto-Filled: ${valStr.substring(0, 30)}${valStr.length > 30 ? '...' : ''}`
+          });
         });
+
         if (autoFilledFields.length > 0) {
           addLog(`${album.artist} - ${album.title}`, 'auto-fill', `Added: ${autoFilledFields.join(', ')}`);
         }
@@ -492,7 +521,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       await supabase.from('collection').update({ last_enriched_at: new Date().toISOString() }).in('id', untouchedIds);
     }
 
-    return { conflicts: newConflicts };
+    // UPDATED: Return summary instead of setting state directly
+    return { conflicts: newConflicts, summary: localBatchSummary };
   }
   
   async function saveTrackData(albumId: number, enrichedTracks: unknown[]) {
