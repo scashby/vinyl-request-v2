@@ -11,15 +11,11 @@ import Image from 'next/image';
 import { supabase } from 'lib/supabaseClient';
 import EnrichmentReviewModal from './EnrichmentReviewModal';
 import { type FieldConflict } from 'lib/conflictDetection';
+import { getFieldCategory, type DataCategory } from 'lib/enrichment-data-mapping';
 import styles from '../EditCollection.module.css';
 
-// --- 1. DATA CATEGORY DEFINITIONS ---
-export type DataCategory = 
-  | 'artwork' | 'credits' | 'tracklists' | 'audio_analysis' 
-  | 'genres' | 'streaming_links' | 'release_metadata';
-
 // MODEL INSTRUCTION: DO NOT COLLAPSE THIS OBJECT. KEEP EXPANDED.
-const DATA_CATEGORY_CONFIG: Record<DataCategory, { label: string; desc: string; icon: string; services: string[] }> = {
+const DATA_CATEGORY_CONFIG: Partial<Record<DataCategory, { label: string; desc: string; icon: string; services: string[] }>> = {
   artwork: {
     label: 'Artwork & Images',
     desc: 'Front covers, back covers, spine images, and inner sleeves.',
@@ -394,6 +390,16 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
          Object.entries(sourceData).forEach(([key, value]) => {
             if (!ALLOWED_COLUMNS.has(key)) return;
+            
+            // ------------------------------------------------------------------
+            // FIX: Filter based on User's Selected Categories
+            // ------------------------------------------------------------------
+            const fieldCategory = getFieldCategory(key);
+            if (fieldCategory && !selectedCategories.has(fieldCategory)) {
+              return; // Skip this field if its category is not checked
+            }
+            // ------------------------------------------------------------------
+
             if (['lyrics', 'bpm', 'key', 'time_signature', 'tracks'].includes(key)) return;
 
             const finalized = (album as Record<string, unknown>).finalized_fields as string[] | undefined;
@@ -939,6 +945,8 @@ function DataCategoryCard({ category, count, subcounts, selected, onToggle, disa
   const config = DATA_CATEGORY_CONFIG[category];
   const [expanded, setExpanded] = useState(false);
   
+  if (!config) return null;
+
   return (
     <div 
       onClick={disabled ? undefined : onToggle}

@@ -145,6 +145,8 @@ export const DATA_CATEGORY_CHECK_FIELDS: Record<DataCategory, string[]> = {
     'mood_sad'
   ],
   genres: [
+    'genres', // Canonical
+    'styles', // Canonical
     'discogs_genres',
     'spotify_genres',
     'apple_music_genres',
