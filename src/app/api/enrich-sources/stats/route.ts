@@ -11,7 +11,6 @@ const supabase = createClient(
 export async function GET() {
   try {
     // 1. Fetch Albums with all relevant columns
-    // CLEANUP: Removed spine_image_url and vinyl_label_images
     const { data: albums, error } = await supabase
       .from('collection')
       .select(`
@@ -28,13 +27,25 @@ export async function GET() {
     if (!albums) return NextResponse.json({ success: true, stats: null });
 
     // 2. Fetch Track Data (Source of Truth)
+    // UPGRADE: Fetch duration to check for missing times
     const { data: trackRows, error: trackError } = await supabase
       .from('tracks')
-      .select('album_id');
+      .select('album_id, duration');
     
     if (trackError) console.error("Track Fetch Error:", trackError);
 
-    const albumsWithTracks = new Set(trackRows?.map(t => String(t.album_id)) || []);
+    // Analyze Track Data
+    const albumsWithTracks = new Set<string>();
+    const albumsWithMissingDurations = new Set<string>();
+
+    trackRows?.forEach(t => {
+      const aId = String(t.album_id);
+      albumsWithTracks.add(aId);
+      // If duration is missing/empty, flag this album
+      if (!t.duration || t.duration.trim() === '') {
+        albumsWithMissingDurations.add(aId);
+      }
+    });
 
     // Initialize Counters
     let fullyEnriched = 0;
@@ -43,7 +54,7 @@ export async function GET() {
     // Artwork
     let missingArtwork = 0;
     let missingBackCover = 0;
-    let missingInnerSleeve = 0; // This is now your Gallery
+    let missingInnerSleeve = 0;
     
     // Credits
     let missingCredits = 0;
@@ -54,6 +65,7 @@ export async function GET() {
     
     // Tracklists
     let missingTracklists = 0;
+    let missingDurations = 0; // NEW STAT
     
     // Audio
     let missingAudioAnalysis = 0;
@@ -83,21 +95,17 @@ export async function GET() {
 
     albums.forEach(album => {
       if (album.folder) folders.add(album.folder);
+      const albumIdStr = String(album.id);
 
       // 1. ARTWORK
       const hasFront = !!album.image_url;
       const hasBack = !!album.back_image_url;
-      
-      // Secondary/Manual Images
-      // CLEANUP: We only check inner_sleeve_images (the Gallery) now
       const hasInner = Array.isArray(album.inner_sleeve_images) && album.inner_sleeve_images.length > 0;
 
       if (!hasFront || !hasBack) {
         missingArtwork++; 
         if (!hasBack) missingBackCover++;
       }
-      
-      // Track gallery stats
       if (!hasInner) missingInnerSleeve++;
 
       // 2. CREDITS
@@ -106,19 +114,25 @@ export async function GET() {
       const hasEngineers = Array.isArray(album.engineers) && album.engineers.length > 0;
       const hasSongwriters = Array.isArray(album.songwriters) && album.songwriters.length > 0;
 
-      // Strict Requirement: Musicians & Producers. Optional: Engineers/Writers
       if (!hasMusicians || !hasProducers) {
         missingCredits++;
       }
-      
       if (!hasMusicians) missingMusicians++;
       if (!hasProducers) missingProducers++;
       if (!hasEngineers) missingEngineers++;
       if (!hasSongwriters) missingSongwriters++;
 
-      // 3. TRACKLISTS
-      const hasTracks = albumsWithTracks.has(String(album.id));
-      if (!hasTracks) missingTracklists++;
+      // 3. TRACKLISTS & DURATIONS
+      const hasTracks = albumsWithTracks.has(albumIdStr);
+      // It has missing durations if it has tracks AND is in the missing set
+      const hasMissingDurations = hasTracks && albumsWithMissingDurations.has(albumIdStr);
+
+      if (!hasTracks) {
+        missingTracklists++;
+      }
+      if (hasMissingDurations) {
+        missingDurations++;
+      }
 
       // 4. AUDIO ANALYSIS
       const hasTempo = album.tempo_bpm !== null && album.tempo_bpm !== 0;
@@ -126,11 +140,9 @@ export async function GET() {
       const hasDance = album.danceability !== null;
       const hasEnergy = album.energy !== null;
 
-      // Strict Requirement: Tempo & Key. Optional: Dance/Energy
       if (!hasTempo || !hasKey) {
         missingAudioAnalysis++;
       }
-      
       if (!hasTempo) missingTempo++;
       if (!hasKey) missingMusicalKey++;
       if (!hasDance) missingDanceability++;
@@ -140,9 +152,11 @@ export async function GET() {
       const hasGenres = Array.isArray(album.genres) && album.genres.length > 0;
       const hasStyles = Array.isArray(album.styles) && album.styles.length > 0;
       if (!hasGenres || !hasStyles) {
-        missingGenres++; // Aggregated metric
-        if (!hasStyles) missingStyles++;
+        missingGenres++; 
       }
+      // Note: We don't increment a global "missingGenres" for styles alone, 
+      // but we track the specific sub-stat
+      if (!hasStyles) missingStyles++;
 
       // 6. STREAMING
       const hasSpotify = !!album.spotify_id;
@@ -171,9 +185,8 @@ export async function GET() {
       if (!hasCatNo) missingCatalogNumber++;
 
       // 8. TOTAL SCORE
-      // "Fully Enriched" Logic - RELAXED
       const isComplete = 
-        (hasFront && hasBack) && // Only front/back required
+        (hasFront && hasBack) &&
         (hasMusicians && hasProducers) &&
         hasTracks &&
         (hasTempo && hasKey) &&
@@ -192,7 +205,7 @@ export async function GET() {
       
       missingArtwork,
       missingBackCover,
-      missingInnerSleeve, // Gallery
+      missingInnerSleeve,
       
       missingCredits,
       missingMusicians,
@@ -201,6 +214,7 @@ export async function GET() {
       missingSongwriters,
       
       missingTracklists,
+      missingDurations, // Added to response
       
       missingAudioAnalysis,
       missingTempo,

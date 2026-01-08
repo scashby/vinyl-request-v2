@@ -57,7 +57,7 @@ const DATA_CATEGORY_CONFIG: Partial<Record<DataCategory, { label: string; desc: 
   },
   genres: {
     label: 'Genres & Styles',
-    desc: 'Primary genres, sub-styles, and mood tags.',
+    desc: 'Primary genres and sub-styles.', // Fixed description
     icon: '🏷️',
     services: ['lastfm', 'spotify']
   },
@@ -97,6 +97,7 @@ type EnrichmentStats = {
   missingEngineers?: number;
   missingSongwriters?: number;
   missingTracklists: number;
+  missingDurations?: number; // New Type
   missingAudioAnalysis: number;
   missingTempo: number;
   missingMusicalKey?: number;
@@ -824,7 +825,9 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         { label: 'Engineers', count: stats.missingEngineers || 0 },
         { label: 'Songwriters', count: stats.missingSongwriters || 0 }
     ]},
-    { category: 'tracklists', count: stats.missingTracklists },
+    { category: 'tracklists', count: stats.missingTracklists, subcounts: [
+        { label: 'Missing Durations', count: stats.missingDurations || 0 } // New Subcount
+    ]},
     { category: 'audio_analysis', count: stats.missingAudioAnalysis, subcounts: [
         { label: 'Tempo', count: stats.missingTempo },
         { label: 'Key', count: stats.missingMusicalKey || 0 },
