@@ -16,12 +16,14 @@ import styles from '../EditCollection.module.css';
 
 const ALLOWED_COLUMNS = new Set([
   'artist', 'title', 'year', 'format', 'country', 'barcode', 'labels',
-  'tracklists', 'image_url', 'back_image_url', 'sell_price', 'media_condition', 'folder',
+  'tracklists', 'tracks', 'disc_metadata', // Added tracks/disc_metadata
+  'image_url', 'back_image_url', 'sell_price', 'media_condition', 'folder',
   'discogs_master_id', 'discogs_release_id', 'spotify_id', 'spotify_url',
-  'apple_music_id', 'apple_music_url', 'genres', 'styles', 'original_release_date',
+  'apple_music_id', 'apple_music_url', 'lastfm_id', 'lastfm_url', // Added LastFM
+  'genres', 'styles', 'original_release_date',
   'spine_image_url', 'inner_sleeve_images', 'vinyl_label_images',
   'musicians', 'credits', 'producers', 'engineers', 'songwriters', 'composer', 'conductor', 'orchestra',
-  'bpm', 'key', 'lyrics', 'time_signature',
+  'bpm', 'key', 'lyrics', 'time_signature', 'musical_key', // Added musical_key
   // New columns from audit:
   'danceability', 'energy', 'mood_acoustic', 'mood_happy', 'mood_sad',
   'mood_aggressive', 'mood_electronic', 'mood_party', 'mood_relaxed'
@@ -86,16 +88,30 @@ type EnrichmentStats = {
   fullyEnriched: number;
   missingArtwork: number;
   missingBackCover: number;
+  missingSpine?: number;
+  missingInnerSleeve?: number;
+  missingVinylLabel?: number;
   missingCredits: number;
   missingMusicians: number;
   missingProducers: number;
+  missingEngineers?: number;
+  missingSongwriters?: number;
   missingTracklists: number;
   missingAudioAnalysis: number;
   missingTempo: number;
+  missingMusicalKey?: number;
+  missingDanceability?: number;
+  missingEnergy?: number;
   missingGenres: number;
+  missingStyles?: number;
   missingStreamingLinks: number;
   missingSpotify: number;
+  missingAppleMusic?: number;
+  missingLastFM?: number;
   missingReleaseMetadata: number;
+  missingBarcode?: number;
+  missingLabels?: number;
+  missingOriginalDate?: number;
   missingCatalogNumber: number;
 };
 
@@ -796,13 +812,39 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   }
 
   const dataCategoriesConfig: { category: DataCategory; count: number; subcounts?: { label: string; count: number }[] }[] = stats ? [
-    { category: 'artwork', count: stats.missingArtwork, subcounts: [{ label: 'Back covers', count: stats.missingBackCover }]},
-    { category: 'credits', count: stats.missingCredits, subcounts: [{ label: 'Musicians', count: stats.missingMusicians }, { label: 'Producers', count: stats.missingProducers }]},
+    { category: 'artwork', count: stats.missingArtwork, subcounts: [
+        { label: 'Back covers', count: stats.missingBackCover },
+        { label: 'Spine', count: stats.missingSpine || 0 },
+        { label: 'Inner Sleeves', count: stats.missingInnerSleeve || 0 },
+        { label: 'Vinyl Labels', count: stats.missingVinylLabel || 0 }
+    ]},
+    { category: 'credits', count: stats.missingCredits, subcounts: [
+        { label: 'Musicians', count: stats.missingMusicians },
+        { label: 'Producers', count: stats.missingProducers },
+        { label: 'Engineers', count: stats.missingEngineers || 0 },
+        { label: 'Songwriters', count: stats.missingSongwriters || 0 }
+    ]},
     { category: 'tracklists', count: stats.missingTracklists },
-    { category: 'audio_analysis', count: stats.missingAudioAnalysis, subcounts: [{ label: 'Tempo', count: stats.missingTempo }]},
-    { category: 'genres', count: stats.missingGenres },
-    { category: 'streaming_links', count: stats.missingStreamingLinks },
-    { category: 'release_metadata', count: stats.missingReleaseMetadata },
+    { category: 'audio_analysis', count: stats.missingAudioAnalysis, subcounts: [
+        { label: 'Tempo', count: stats.missingTempo },
+        { label: 'Key', count: stats.missingMusicalKey || 0 },
+        { label: 'Energy', count: stats.missingEnergy || 0 },
+        { label: 'Danceability', count: stats.missingDanceability || 0 }
+    ]},
+    { category: 'genres', count: stats.missingGenres, subcounts: [
+        { label: 'Styles', count: stats.missingStyles || 0 }
+    ]},
+    { category: 'streaming_links', count: stats.missingStreamingLinks, subcounts: [
+        { label: 'Spotify', count: stats.missingSpotify },
+        { label: 'Apple Music', count: stats.missingAppleMusic || 0 },
+        { label: 'Last.fm', count: stats.missingLastFM || 0 }
+    ]},
+    { category: 'release_metadata', count: stats.missingReleaseMetadata, subcounts: [
+        { label: 'Barcodes', count: stats.missingBarcode || 0 },
+        { label: 'Labels', count: stats.missingLabels || 0 },
+        { label: 'Dates', count: stats.missingOriginalDate || 0 },
+        { label: 'Cat #', count: stats.missingCatalogNumber }
+    ]},
   ] : [];
 
   return (

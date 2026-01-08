@@ -10,29 +10,17 @@ const supabase = createClient(
 
 export async function GET() {
   try {
-    // 1. Fetch Albums
-    // AUDIT FIX: Added spine, inner, vinyl columns to query
+    // 1. Fetch Albums with all relevant columns
     const { data: albums, error } = await supabase
       .from('collection')
       .select(`
-        id,
-        folder,
-        image_url,
-        back_image_url,
-        spine_image_url,
-        inner_sleeve_images,
-        vinyl_label_images,
-        musicians,
-        producers,
-        tempo_bpm, 
-        genres,
-        spotify_id,
-        apple_music_id,
-        lastfm_url,
-        barcode,
-        labels,
-        original_release_date,
-        cat_no
+        id, folder,
+        image_url, back_image_url, spine_image_url, inner_sleeve_images, vinyl_label_images,
+        musicians, producers, engineers, songwriters,
+        tempo_bpm, musical_key, danceability, energy,
+        genres, styles,
+        spotify_id, apple_music_id, lastfm_url,
+        barcode, labels, original_release_date, cat_no
       `);
 
     if (error) throw error;
@@ -51,22 +39,45 @@ export async function GET() {
     let fullyEnriched = 0;
     let needsEnrichment = 0;
     
+    // Artwork
     let missingArtwork = 0;
     let missingBackCover = 0;
-    let missingSpine = 0;        // New
-    let missingInnerSleeve = 0;  // New
-    let missingVinylLabel = 0;   // New
+    let missingSpine = 0;
+    let missingInnerSleeve = 0;
+    let missingVinylLabel = 0;
     
+    // Credits
     let missingCredits = 0;
     let missingMusicians = 0;
     let missingProducers = 0;
+    let missingEngineers = 0;
+    let missingSongwriters = 0;
+    
+    // Tracklists
     let missingTracklists = 0;
+    
+    // Audio
     let missingAudioAnalysis = 0;
     let missingTempo = 0;
+    let missingMusicalKey = 0;
+    let missingDanceability = 0;
+    let missingEnergy = 0;
+    
+    // Genres
     let missingGenres = 0;
+    let missingStyles = 0;
+    
+    // Streaming
     let missingStreamingLinks = 0;
     let missingSpotify = 0;
+    let missingAppleMusic = 0;
+    let missingLastFM = 0;
+    
+    // Metadata
     let missingReleaseMetadata = 0;
+    let missingBarcode = 0;
+    let missingLabels = 0;
+    let missingOriginalDate = 0;
     let missingCatalogNumber = 0;
 
     const folders = new Set<string>();
@@ -75,17 +86,14 @@ export async function GET() {
       if (album.folder) folders.add(album.folder);
 
       // 1. ARTWORK
-      // Strict check: We now require ALL 5 components for "Complete Artwork"
       const hasFront = !!album.image_url;
       const hasBack = !!album.back_image_url;
       const hasSpine = !!album.spine_image_url;
-      // Check for non-empty arrays for JSONB image fields
       const hasInner = Array.isArray(album.inner_sleeve_images) && album.inner_sleeve_images.length > 0;
       const hasVinyl = Array.isArray(album.vinyl_label_images) && album.vinyl_label_images.length > 0;
 
       if (!hasFront || !hasBack || !hasSpine || !hasInner || !hasVinyl) {
         missingArtwork++; 
-        if (!hasFront) { /* Tracked by main missingArtwork usually, but logic implies we just want the agg here */ }
         if (!hasBack) missingBackCover++;
         if (!hasSpine) missingSpine++;
         if (!hasInner) missingInnerSleeve++;
@@ -95,58 +103,75 @@ export async function GET() {
       // 2. CREDITS
       const hasMusicians = Array.isArray(album.musicians) && album.musicians.length > 0;
       const hasProducers = Array.isArray(album.producers) && album.producers.length > 0;
-      if (!hasMusicians || !hasProducers) {
+      const hasEngineers = Array.isArray(album.engineers) && album.engineers.length > 0;
+      const hasSongwriters = Array.isArray(album.songwriters) && album.songwriters.length > 0;
+
+      if (!hasMusicians || !hasProducers || !hasEngineers || !hasSongwriters) {
         missingCredits++;
         if (!hasMusicians) missingMusicians++;
         if (!hasProducers) missingProducers++;
+        if (!hasEngineers) missingEngineers++;
+        if (!hasSongwriters) missingSongwriters++;
       }
 
-      // 3. TRACKLISTS (Using separate table)
+      // 3. TRACKLISTS
       const hasTracks = albumsWithTracks.has(String(album.id));
       if (!hasTracks) missingTracklists++;
 
-      // 4. AUDIO ANALYSIS (Using tempo_bpm)
+      // 4. AUDIO ANALYSIS
       const hasTempo = album.tempo_bpm !== null && album.tempo_bpm !== 0;
-      if (!hasTempo) {
+      const hasKey = !!album.musical_key;
+      const hasDance = album.danceability !== null;
+      const hasEnergy = album.energy !== null;
+
+      if (!hasTempo || !hasKey || !hasDance || !hasEnergy) {
         missingAudioAnalysis++;
-        missingTempo++;
+        if (!hasTempo) missingTempo++;
+        if (!hasKey) missingMusicalKey++;
+        if (!hasDance) missingDanceability++;
+        if (!hasEnergy) missingEnergy++;
       }
 
       // 5. GENRES
       const hasGenres = Array.isArray(album.genres) && album.genres.length > 0;
-      if (!hasGenres) missingGenres++;
+      const hasStyles = Array.isArray(album.styles) && album.styles.length > 0;
+      if (!hasGenres || !hasStyles) {
+        missingGenres++; // Aggregated metric
+        if (!hasStyles) missingStyles++;
+      }
 
       // 6. STREAMING
       const hasSpotify = !!album.spotify_id;
       const hasApple = !!album.apple_music_id;
       const hasLastfm = !!album.lastfm_url;
       
-      // LOGIC: Only "Missing" if ALL sources are empty
       if (!hasSpotify && !hasApple && !hasLastfm) {
         missingStreamingLinks++;
       }
-
       if (!hasSpotify) missingSpotify++;
+      if (!hasApple) missingAppleMusic++;
+      if (!hasLastfm) missingLastFM++;
 
       // 7. RELEASE METADATA
       const hasBarcode = !!album.barcode;
       const hasLabel = Array.isArray(album.labels) && album.labels.length > 0;
       const hasOriginalDate = !!album.original_release_date;
+      const hasCatNo = !!album.cat_no;
       
-      // LOGIC: 'cat_no' excluded from "Needs Enrichment" check
       if (!hasBarcode || !hasLabel || !hasOriginalDate) {
         missingReleaseMetadata++;
       }
+      if (!hasBarcode) missingBarcode++;
+      if (!hasLabel) missingLabels++;
+      if (!hasOriginalDate) missingOriginalDate++;
+      if (!hasCatNo) missingCatalogNumber++;
 
-      if (!album.cat_no) missingCatalogNumber++;
-
-      // 8. TOTAL SCORE
-      // "Fully Enriched" def: Has ALL assets + ANY streaming link + Metadata
+      // 8. TOTAL SCORE (Strict)
       const isComplete = 
         (hasFront && hasBack && hasSpine && hasInner && hasVinyl) &&
         (hasMusicians && hasProducers) &&
         hasTracks &&
-        hasTempo &&
+        (hasTempo && hasKey) &&
         hasGenres &&
         (hasSpotify || hasApple || hasLastfm) && 
         (hasBarcode && hasLabel && hasOriginalDate);
@@ -162,25 +187,36 @@ export async function GET() {
       
       missingArtwork,
       missingBackCover,
-      missingSpine,       // New
-      missingInnerSleeve, // New
-      missingVinylLabel,  // New
+      missingSpine,
+      missingInnerSleeve,
+      missingVinylLabel,
       
       missingCredits,
       missingMusicians,
       missingProducers,
+      missingEngineers,
+      missingSongwriters,
       
       missingTracklists,
       
       missingAudioAnalysis,
       missingTempo,
+      missingMusicalKey,
+      missingDanceability,
+      missingEnergy,
       
       missingGenres,
+      missingStyles,
       
       missingStreamingLinks,
       missingSpotify,
+      missingAppleMusic,
+      missingLastFM,
       
       missingReleaseMetadata,
+      missingBarcode,
+      missingLabels,
+      missingOriginalDate,
       missingCatalogNumber
     };
 
