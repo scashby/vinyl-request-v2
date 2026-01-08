@@ -342,6 +342,22 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
           </div>
           
           <div style={{ display: 'flex', gap: '12px' }}>
+            {/* RESTORED: Finalize All Button */}
+            <button 
+              onClick={() => {
+                const nonMergableFields = ['image_url', 'back_image_url', 'original_release_date', 'country', 'barcode', 'year', 'format', 'label', 'catalog_no'];
+                const newFinalized = { ...finalizedFields };
+                conflicts.forEach(c => {
+                  if (nonMergableFields.includes(c.field_name)) {
+                    newFinalized[`${c.album_id}-${c.field_name}`] = true;
+                  }
+                });
+                setFinalizedFields(newFinalized);
+              }}
+              style={{ padding: '8px 16px', fontSize: '13px', fontWeight: '600', color: '#7c3aed', backgroundColor: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: '6px', cursor: 'pointer' }}
+            >
+              Finalize All (Static Fields)
+            </button>
             <button onClick={handleSelectAllCurrent} style={{ padding: '8px 16px', fontSize: '13px', fontWeight: '600', color: '#047857', backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '6px', cursor: 'pointer' }}>
               Keep Current
             </button>
@@ -385,10 +401,25 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
                               <div style={{ fontSize: '12px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase' }}>
                                 {conflict.field_name.replace(/_/g, ' ')}
                               </div>
-                              {isImageArrayField && (
+                              {/* RESTORED: Action Bar for merging text fields OR Gallery Mode for images */}
+                              {isImageArrayField ? (
                                 <span style={{ fontSize: '10px', color: '#6b7280', background: '#f3f4f6', padding: '2px 6px', borderRadius: '4px' }}>
                                   GALLERY MODE: Click images to Keep/Reject
                                 </span>
+                              ) : (
+                                ['genres', 'styles', 'musicians', 'credits', 'producers', 'tags'].includes(conflict.field_name) && (
+                                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                    <button 
+                                      onClick={() => handleResolve(conflict, conflict.current_value, 'current')}
+                                      style={{ padding: '2px 8px', fontSize: '10px', borderRadius: '4px', backgroundColor: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', fontWeight: 'bold', cursor: 'pointer' }}
+                                    >
+                                      KEEP CURRENT ONLY
+                                    </button>
+                                    <div style={{ padding: '2px 8px', fontSize: '10px', borderRadius: '4px', backgroundColor: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', fontWeight: 'bold' }}>
+                                      {selected.selectedSources?.length || 0} SOURCES SELECTED TO MERGE
+                                    </div>
+                                  </div>
+                                )
                               )}
                             </div>
                             <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '12px', color: '#6b7280' }}>
