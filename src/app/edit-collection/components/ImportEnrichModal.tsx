@@ -11,8 +11,21 @@ import Image from 'next/image';
 import { supabase } from 'lib/supabaseClient';
 import EnrichmentReviewModal from './EnrichmentReviewModal';
 import { type FieldConflict } from 'lib/conflictDetection';
-import { getFieldCategory, type DataCategory } from 'lib/enrichment-data-mapping';
+import { type DataCategory, DATA_CATEGORY_CHECK_FIELDS } from 'lib/enrichment-data-mapping';
 import styles from '../EditCollection.module.css';
+
+const ALLOWED_COLUMNS = new Set([
+  'artist', 'title', 'year', 'format', 'country', 'barcode', 'labels',
+  'tracklists', 'image_url', 'back_image_url', 'sell_price', 'media_condition', 'folder',
+  'discogs_master_id', 'discogs_release_id', 'spotify_id', 'spotify_url',
+  'apple_music_id', 'apple_music_url', 'genres', 'styles', 'original_release_date',
+  'spine_image_url', 'inner_sleeve_images', 'vinyl_label_images',
+  'musicians', 'credits', 'producers', 'engineers', 'songwriters', 'composer', 'conductor', 'orchestra',
+  'bpm', 'key', 'lyrics', 'time_signature',
+  // New columns from audit:
+  'danceability', 'energy', 'mood_acoustic', 'mood_happy', 'mood_sad',
+  'mood_aggressive', 'mood_electronic', 'mood_party', 'mood_relaxed'
+]);
 
 // MODEL INSTRUCTION: DO NOT COLLAPSE THIS OBJECT. KEEP EXPANDED.
 const DATA_CATEGORY_CONFIG: Partial<Record<DataCategory, { label: string; desc: string; icon: string; services: string[] }>> = {
@@ -150,9 +163,28 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   const [folderFilter, setFolderFilter] = useState('');
   const [batchSize, setBatchSize] = useState('25');
   
-  const [selectedCategories, setSelectedCategories] = useState<Set<DataCategory>>(new Set([
-    'artwork', 'credits', 'tracklists', 'genres'
-  ]));
+  // Granular Field Selection State
+  const [selectedFields, setSelectedFields] = useState<Set<string>>(() => {
+    const defaults = new Set<string>();
+    const defaultCats: DataCategory[] = ['artwork', 'credits', 'tracklists', 'genres'];
+    defaultCats.forEach(cat => {
+      const fields = DATA_CATEGORY_CHECK_FIELDS[cat] || [];
+      fields.forEach(f => {
+        if (ALLOWED_COLUMNS.has(f)) defaults.add(f);
+      });
+    });
+    return defaults;
+  });
+
+  // Derived active categories for service selection
+  const selectedCategories = new Set<DataCategory>();
+  (Object.keys(DATA_CATEGORY_CONFIG) as DataCategory[]).forEach(cat => {
+      const fields = DATA_CATEGORY_CHECK_FIELDS[cat] || [];
+      // If any field in this category is selected, the category is "active" for service fetching
+      if (fields.some(f => selectedFields.has(f))) {
+        selectedCategories.add(cat);
+      }
+  });
   
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [categoryTitle, setCategoryTitle] = useState('');
@@ -227,8 +259,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   // --- MAIN LOOP LOGIC ---
 
   async function startEnrichment(specificAlbumIds?: number[]) {
-    if (selectedCategories.size === 0) {
-      alert('Please select at least one data category');
+    if (selectedFields.size === 0) {
+      alert('Please select at least one field to enrich');
       return;
     }
 
@@ -352,19 +384,6 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       
     if (resError) console.error('Error fetching history:', resError);
 
-    const ALLOWED_COLUMNS = new Set([
-      'artist', 'title', 'year', 'format', 'country', 'barcode', 'labels',
-      'tracklists', 'image_url', 'back_image_url', 'sell_price', 'media_condition', 'folder',
-      'discogs_master_id', 'discogs_release_id', 'spotify_id', 'spotify_url',
-      'apple_music_id', 'apple_music_url', 'genres', 'styles', 'original_release_date',
-      'spine_image_url', 'inner_sleeve_images', 'vinyl_label_images',
-      'musicians', 'credits', 'producers', 'engineers', 'songwriters', 'composer', 'conductor', 'orchestra',
-      'bpm', 'key', 'lyrics', 'time_signature',
-      // New columns from audit:
-      'danceability', 'energy', 'mood_acoustic', 'mood_happy', 'mood_sad',
-      'mood_aggressive', 'mood_electronic', 'mood_party', 'mood_relaxed'
-    ]);
-
     const autoUpdates: { id: number; fields: Record<string, unknown> }[] = [];
     const newConflicts: ExtendedFieldConflict[] = [];
     const processedIds: number[] = [];
@@ -392,11 +411,10 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
             if (!ALLOWED_COLUMNS.has(key)) return;
             
             // ------------------------------------------------------------------
-            // FIX: Filter based on User's Selected Categories
+            // FIX: Filter based on User's Selected Fields (Granularity)
             // ------------------------------------------------------------------
-            const fieldCategory = getFieldCategory(key);
-            if (fieldCategory && !selectedCategories.has(fieldCategory)) {
-              return; // Skip this field if its category is not checked
+            if (!selectedFields.has(key)) {
+              return; // Skip this field if explicitly unchecked
             }
             // ------------------------------------------------------------------
 
@@ -667,10 +685,25 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   }
 
   function toggleCategory(category: DataCategory) {
-    const newSet = new Set(selectedCategories);
-    if (newSet.has(category)) newSet.delete(category);
-    else newSet.add(category);
-    setSelectedCategories(newSet);
+    const fields = DATA_CATEGORY_CHECK_FIELDS[category] || [];
+    const importableFields = fields.filter(f => ALLOWED_COLUMNS.has(f));
+    
+    // Check if ALL importable fields are currently selected
+    const allSelected = importableFields.every(f => selectedFields.has(f));
+    
+    const next = new Set(selectedFields);
+    importableFields.forEach(f => {
+      if (allSelected) next.delete(f); // Unselect all
+      else next.add(f); // Select all
+    });
+    setSelectedFields(next);
+  }
+
+  function toggleField(field: string) {
+    const next = new Set(selectedFields);
+    if (next.has(field)) next.delete(field);
+    else next.add(field);
+    setSelectedFields(next);
   }
 
   async function showCategory(category: string, title: string) {
@@ -810,8 +843,13 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '12px' }}>
                   {dataCategoriesConfig.map(({ category, count, subcounts }) => (
                     <DataCategoryCard
-                      key={category} category={category} count={count} subcounts={subcounts}
-                      selected={selectedCategories.has(category)} onToggle={() => toggleCategory(category)}
+                      key={category} 
+                      category={category} 
+                      count={count} 
+                      subcounts={subcounts}
+                      selectedFields={selectedFields}
+                      onToggleCategory={() => toggleCategory(category)}
+                      onToggleField={toggleField}
                       disabled={enriching}
                     />
                   ))}
@@ -876,7 +914,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           <button onClick={onClose} disabled={enriching} className={styles.importCancelButton}>Close</button>
           <button 
             onClick={() => startEnrichment()} 
-            disabled={enriching || !stats || selectedCategories.size === 0} 
+            disabled={enriching || !stats || selectedFields.size === 0} 
             className={styles.importConfirmButton}
             style={{ backgroundColor: enriching ? '#d1d5db' : undefined, cursor: enriching ? 'not-allowed' : undefined }}
           >
@@ -941,54 +979,107 @@ function StatBox({ label, value, color, onClick, disabled }: { label: string; va
   );
 }
 
-function DataCategoryCard({ category, count, subcounts, selected, onToggle, disabled }: { category: DataCategory; count: number; subcounts?: { label: string; count: number }[]; selected: boolean; onToggle: () => void; disabled: boolean; }) {
+function DataCategoryCard({ 
+  category, count, subcounts, selectedFields, onToggleCategory, onToggleField, disabled 
+}: { 
+  category: DataCategory; 
+  count: number; 
+  subcounts?: { label: string; count: number }[]; 
+  selectedFields: Set<string>;
+  onToggleCategory: () => void;
+  onToggleField: (field: string) => void;
+  disabled: boolean; 
+}) {
   const config = DATA_CATEGORY_CONFIG[category];
   const [expanded, setExpanded] = useState(false);
   
   if (!config) return null;
 
+  const fields = DATA_CATEGORY_CHECK_FIELDS[category] || [];
+  const importableFields = fields.filter(f => ALLOWED_COLUMNS.has(f));
+  
+  const allSelected = importableFields.length > 0 && importableFields.every(f => selectedFields.has(f));
+  const someSelected = importableFields.some(f => selectedFields.has(f));
+  const isIndeterminate = someSelected && !allSelected;
+
+  // Pretty print helper
+  const formatLabel = (f: string) => f.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+
   return (
     <div 
-      onClick={disabled ? undefined : onToggle}
       className={styles.importSelectionCard}
       style={{ 
-        borderColor: selected ? '#f59e0b' : '#e5e7eb', 
-        backgroundColor: selected ? '#fff7ed' : 'white', 
+        borderColor: someSelected ? '#f59e0b' : '#e5e7eb', 
+        backgroundColor: someSelected ? '#fff7ed' : 'white', 
         opacity: disabled ? 0.6 : 1,
         display: 'flex',
-        gap: '10px'
+        flexDirection: 'column',
+        gap: '0'
       }}
     >
-      <input type="checkbox" checked={selected} onChange={onToggle} disabled={disabled} style={{ marginTop: '2px', cursor: 'pointer' }} />
-      <div style={{ flex: 1 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-          <span style={{ fontSize: '16px' }}>{config.icon}</span>
-          <span className={styles.importSelectionCardTitle} style={{ fontSize: '14px', marginBottom: 0 }}>{config.label}</span>
-          <span style={{ marginLeft: 'auto', fontWeight: '700', color: count > 0 ? '#ef4444' : '#10b981' }}>{count.toLocaleString()}</span>
+      <div 
+        onClick={disabled ? undefined : onToggleCategory}
+        style={{ display: 'flex', gap: '10px', cursor: disabled ? 'default' : 'pointer' }}
+      >
+        <input 
+          type="checkbox" 
+          checked={allSelected} 
+          ref={input => { if (input) input.indeterminate = isIndeterminate; }}
+          onChange={onToggleCategory} 
+          disabled={disabled} 
+          style={{ marginTop: '4px', cursor: 'pointer' }} 
+        />
+        <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+            <span style={{ fontSize: '16px' }}>{config.icon}</span>
+            <span className={styles.importSelectionCardTitle} style={{ fontSize: '14px', marginBottom: 0 }}>{config.label}</span>
+            <span style={{ marginLeft: 'auto', fontWeight: '700', color: count > 0 ? '#ef4444' : '#10b981' }}>{count.toLocaleString()}</span>
+          </div>
+          <div className={styles.importSelectionCardDescription}>{config.desc}</div>
         </div>
-        <div className={styles.importSelectionCardDescription}>{config.desc}</div>
-        
-        {subcounts && subcounts.length > 0 && (
-          <>
-            <button
-              onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
-              style={{ background: 'none', border: 'none', padding: '4px 0', fontSize: '11px', color: '#3b82f6', cursor: 'pointer', fontWeight: '500' }}
-            >
-              {expanded ? '▼ Hide details' : '▶ Show details'}
-            </button>
-            {expanded && (
-              <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #e5e7eb', fontSize: '11px', color: '#6b7280' }}>
-                {subcounts.map((sub, idx) => (
-                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
+      </div>
+      
+      {/* Footer Area: Stats & Expansion */}
+      <div style={{ marginLeft: '26px', marginTop: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+         <button
+            onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
+            style={{ background: 'none', border: 'none', padding: '4px 0', fontSize: '11px', color: '#3b82f6', cursor: 'pointer', fontWeight: '500' }}
+          >
+            {expanded ? '▼ Hide Fields' : `▶ Select Fields (${importableFields.filter(f => selectedFields.has(f)).length}/${importableFields.length})`}
+          </button>
+      </div>
+
+      {/* Expanded Area: Granular Checkboxes */}
+      {expanded && (
+        <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #e5e7eb', marginLeft: '26px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+             {importableFields.map(field => (
+                <label key={field} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#374151', cursor: 'pointer' }}>
+                   <input 
+                      type="checkbox" 
+                      checked={selectedFields.has(field)} 
+                      onChange={() => onToggleField(field)}
+                      disabled={disabled}
+                   />
+                   {formatLabel(field)}
+                </label>
+             ))}
+          </div>
+          
+          {/* Keep Subcounts for Stats visibility if needed */}
+          {subcounts && subcounts.length > 0 && (
+            <div style={{ marginTop: '12px', paddingTop: '8px', borderTop: '1px dashed #e5e7eb', fontSize: '10px', color: '#6b7280' }}>
+               <strong>Missing Data Stats:</strong>
+               {subcounts.map((sub, idx) => (
+                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '1px 0' }}>
                     <span>{sub.label}:</span>
-                    <span style={{ fontWeight: '600', color: '#111827' }}>{sub.count.toLocaleString()}</span>
+                    <span>{sub.count.toLocaleString()}</span>
                   </div>
                 ))}
-              </div>
-            )}
-          </>
-        )}
-      </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
