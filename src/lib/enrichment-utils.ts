@@ -46,6 +46,11 @@ export type CandidateData = {
   energy?: number;
   mood_acoustic?: number;
   mood_happy?: number; // Valence
+  mood_sad?: number;
+  mood_party?: number;
+  mood_relaxed?: number;
+  mood_aggressive?: number;
+  mood_electronic?: number;
   
   // Content
   tracklist?: string;
@@ -54,6 +59,15 @@ export type CandidateData = {
   lastfm_tags?: string[];
   lyrics?: string;
   lyrics_url?: string;
+  
+  // Per-Track Data
+  tracks?: Array<{
+    position: string;
+    title: string;
+    tempo_bpm?: number;
+    musical_key?: string;
+    lyrics?: string;
+  }>;
 };
 
 export type EnrichmentResult = {
@@ -65,6 +79,13 @@ export type EnrichmentResult = {
 
 // --- TYPE DEFINITIONS FOR API RESPONSES ---
 
+interface MBRelation {
+  type: string;
+  direction: string;
+  artist?: { name: string };
+  attributes?: string[];
+}
+
 interface MBRelease {
   id: string;
   status?: string;
@@ -75,6 +96,7 @@ interface MBRelease {
     label?: { name: string };
     'catalog-number'?: string;
   }>;
+  relations?: MBRelation[];
 }
 
 interface MBSearchResponse {
@@ -111,6 +133,7 @@ interface SpotifyAlbum {
 }
 
 interface SpotifyAudioFeature {
+  id: string; // Fixes TS2339
   tempo: number;
   energy: number;
   danceability: number;
@@ -176,7 +199,7 @@ interface CAAImage {
 const USER_AGENT = 'DeadwaxDialogues/1.0 (https://deadwaxdialogues.com)';
 
 // ============================================================================
-// 1. MUSICBRAINZ (Dates, Labels, Country)
+// 1. MUSICBRAINZ (Dates, Labels, Country, Deep Credits)
 // ============================================================================
 const MB_BASE = 'https://musicbrainz.org/ws/2';
 
@@ -197,7 +220,8 @@ async function mbSearch(artist: string, title: string): Promise<string | null> {
 
 async function mbGetRelease(mbid: string): Promise<MBRelease | null> {
   try {
-    const url = `${MB_BASE}/release/${mbid}?inc=artists+labels+recordings+release-groups&fmt=json`;
+    // UPDATED: Added 'artist-rels' to fetch credits
+    const url = `${MB_BASE}/release/${mbid}?inc=artists+labels+recordings+release-groups+artist-rels&fmt=json`;
     const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
     return res.ok ? (await res.json() as MBRelease) : null;
   } catch { return null; }
@@ -225,6 +249,21 @@ export async function fetchMusicBrainzData(album: { artist: string, title: strin
     
     if (release.barcode) candidate.barcode = release.barcode;
 
+    // UPDATED: Parse relationships for credits
+    if (release.relations) {
+        candidate.producers = release.relations
+            .filter(r => r.type === 'producer' && r.artist)
+            .map(r => r.artist!.name);
+            
+        candidate.engineers = release.relations
+            .filter(r => r.type === 'engineer' && r.artist)
+            .map(r => r.artist!.name);
+            
+        candidate.musicians = release.relations
+            .filter(r => (r.type === 'instrument' || r.type === 'vocal') && r.artist)
+            .map(r => `${r.artist!.name} (${r.attributes?.join(', ') || 'Musician'})`);
+    }
+
     return { success: true, source: 'musicbrainz', data: candidate };
   } catch (e) {
     return { success: false, source: 'musicbrainz', error: (e as Error).message };
@@ -232,7 +271,7 @@ export async function fetchMusicBrainzData(album: { artist: string, title: strin
 }
 
 // ============================================================================
-// 2. SPOTIFY (Genres, Dates, BPM, Key, Energy, Danceability)
+// 2. SPOTIFY (Genres, Dates, BPM, Key, Energy, Danceability, Moods)
 // ============================================================================
 const SP_ID = process.env.SPOTIFY_CLIENT_ID!;
 const SP_SECRET = process.env.SPOTIFY_CLIENT_SECRET!;
@@ -321,9 +360,38 @@ export async function fetchSpotifyData(album: { artist: string, title: string, s
                 candidate.mood_acoustic = Number(avgAcoustic.toFixed(3));
                 candidate.mood_happy = Number(avgValence.toFixed(3));
                 
+                // UPDATED: Derived mood fields
+                candidate.mood_sad = Number((1 - avgValence).toFixed(3));
+                candidate.mood_party = Number(avgEnergy.toFixed(3));
+                candidate.mood_relaxed = Number((1 - avgEnergy).toFixed(3));
+                candidate.mood_aggressive = (avgEnergy > 0.7 && avgValence < 0.4) ? 1.0 : 0.0;
+                candidate.mood_electronic = (avgAcoustic < 0.1 && avgEnergy > 0.6) ? 1.0 : 0.0;
+                
                 if (firstKey >= 0 && firstKey < KEY_MAP.length) {
                     candidate.musical_key = `${KEY_MAP[firstKey]} ${firstMode === 1 ? 'Major' : 'Minor'}`;
                 }
+
+                // Derived mood fields
+                candidate.mood_sad = Number((1 - avgValence).toFixed(3));
+                candidate.mood_party = Number(avgEnergy.toFixed(3));
+                candidate.mood_relaxed = Number((1 - avgEnergy).toFixed(3));
+                candidate.mood_aggressive = (avgEnergy > 0.7 && avgValence < 0.4) ? 1.0 : 0.0;
+                candidate.mood_electronic = (avgAcoustic < 0.1 && avgEnergy > 0.6) ? 1.0 : 0.0;
+
+                // Attach per-track data for the Modal to save
+                candidate.tracks = data.tracks.items.map((t, i) => {
+                    const feat = features.find(f => f.id === t.id);
+                    let keyStr = undefined;
+                    if (feat && feat.key >= 0 && feat.key < KEY_MAP.length) {
+                        keyStr = `${KEY_MAP[feat.key]} ${feat.mode === 1 ? 'Major' : 'Minor'}`;
+                    }
+                    return {
+                        position: String(i + 1),
+                        title: t.name,
+                        tempo_bpm: feat ? Math.round(feat.tempo) : undefined,
+                        musical_key: keyStr
+                    };
+                });
             }
         }
     }
@@ -412,13 +480,11 @@ export async function fetchDiscogsData(album: { artist: string, title: string, d
       tracklist: data.tracklist?.map((t: DiscogsTrack) => `${t.position} - ${t.title} (${t.duration})`).join('\n')
     };
 
-    // 1. EXTRACT BARCODE
     if (data.identifiers) {
         const barcode = data.identifiers.find((id: DiscogsIdentifier) => id.type === 'Barcode');
         if (barcode) candidate.barcode = barcode.value;
     }
 
-    // 2. EXTRACT DEEP CREDITS (Producers, Engineers)
     if (data.extraartists) {
         candidate.producers = data.extraartists
             .filter((a: DiscogsArtist) => a.role.toLowerCase().includes('producer'))
@@ -433,7 +499,6 @@ export async function fetchDiscogsData(album: { artist: string, title: string, d
             .map((a: DiscogsArtist) => `${a.name} (${a.role})`);
     }
 
-    // 3. EXTRACT EXTRA IMAGES
     if (data.images && data.images.length > 1) {
         const secondary = data.images.slice(1);
         if (secondary.length > 0) candidate.back_image_url = secondary[0].uri; 
@@ -446,10 +511,35 @@ export async function fetchDiscogsData(album: { artist: string, title: string, d
 }
 
 // ============================================================================
-// 5. LAST.FM (Tags/Genres)
+// 5. LAST.FM (Tags/Genres/Moods)
 // ============================================================================
 const LFM_KEY = process.env.LASTFM_API_KEY!;
 const LFM_BASE = 'https://ws.audioscrobbler.com/2.0/';
+
+// Helper to map tags to mood scores
+function mapTagsToMoods(tags: string[], candidate: CandidateData) {
+    const MOOD_KEYWORDS: Record<string, keyof CandidateData> = {
+        'sad': 'mood_sad', 'melancholy': 'mood_sad', 'depressive': 'mood_sad',
+        'happy': 'mood_happy', 'upbeat': 'mood_happy', 'cheerful': 'mood_happy',
+        'aggressive': 'mood_aggressive', 'angry': 'mood_aggressive', 'heavy': 'mood_aggressive',
+        'relaxed': 'mood_relaxed', 'chill': 'mood_relaxed', 'calm': 'mood_relaxed',
+        'party': 'mood_party', 'dance': 'mood_party',
+        'electronic': 'mood_electronic', 'synth': 'mood_electronic'
+    };
+
+    tags.forEach(tag => {
+        const lower = tag.toLowerCase();
+        for (const [keyword, field] of Object.entries(MOOD_KEYWORDS)) {
+            if (lower.includes(keyword)) {
+                // If tag matches, set high score if not already set
+                if (typeof candidate[field] !== 'number') {
+                    // Fixes ESLint error by casting to Record instead of any
+                    (candidate as Record<string, unknown>)[field] = 0.8; 
+                }
+            }
+        }
+    });
+}
 
 export async function fetchLastFmData(album: { artist: string, title: string }): Promise<EnrichmentResult> {
   try {
@@ -468,6 +558,9 @@ export async function fetchLastFmData(album: { artist: string, title: string }):
       lastfm_tags: tags,
       image_url: largeImg || undefined
     };
+
+    // UPDATED: Map tags to mood columns
+    mapTagsToMoods(tags, candidate);
 
     return { success: true, source: 'lastfm', data: candidate };
   } catch (e) {
@@ -490,19 +583,10 @@ export async function fetchCoverArtData(album: { musicbrainz_id?: string }): Pro
         const data = await res.json();
         const images = data.images || [];
 
-        // 1. Front (Default to first if no explicit front)
         const front = images.find((i: CAAImage) => i.front)?.image || images[0]?.image;
-        
-        // 2. Back
         const back = images.find((i: CAAImage) => i.back)?.image;
-
-        // 3. Spine (Look for type "Spine")
         const spine = images.find((i: CAAImage) => i.types?.includes('Spine'))?.image;
-
-        // 4. Inner Sleeves (Look for type "Inner")
         const inner = images.filter((i: CAAImage) => i.types?.includes('Inner')).map((i: CAAImage) => i.image);
-
-        // 5. Vinyl Labels (Look for type "Medium")
         const labels = images.filter((i: CAAImage) => i.types?.includes('Medium')).map((i: CAAImage) => i.image);
 
         const resultData: CandidateData = { 

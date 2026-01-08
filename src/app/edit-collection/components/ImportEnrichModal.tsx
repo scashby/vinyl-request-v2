@@ -335,6 +335,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       
     if (resError) console.error('Error fetching history:', resError);
 
+    // ADDED: Missing fields to ALLOWED_COLUMNS
     const ALLOWED_COLUMNS = new Set([
       'artist', 'title', 'year', 'format', 'country', 'barcode', 'labels',
       'tracklists', 'image_url', 'back_image_url', 'sell_price', 'media_condition', 'folder',
@@ -342,7 +343,10 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       'apple_music_id', 'apple_music_url', 'genres', 'styles', 'original_release_date',
       'spine_image_url', 'inner_sleeve_images', 'vinyl_label_images',
       'musicians', 'credits', 'producers', 'composer', 'conductor', 'orchestra',
-      'bpm', 'key', 'lyrics', 'time_signature'
+      'bpm', 'key', 'lyrics', 'time_signature',
+      // New columns from audit:
+      'danceability', 'energy', 'mood_acoustic', 'mood_happy', 'mood_sad',
+      'mood_aggressive', 'mood_electronic', 'mood_party', 'mood_relaxed'
     ]);
 
     const autoUpdates: { id: number; fields: Record<string, unknown> }[] = [];
@@ -508,8 +512,9 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
        if (match) {
          const patch: Record<string, unknown> = {};
-         if (match.bpm) patch.tempo_bpm = match.bpm;
-         if (match.key) patch.musical_key = match.key;
+         // FIXED: Use correct property names from enrichment-utils
+         if (match.tempo_bpm) patch.tempo_bpm = match.tempo_bpm;
+         if (match.musical_key) patch.musical_key = match.musical_key;
          if (match.lyrics) patch.lyrics = match.lyrics;
 
          if (Object.keys(patch).length > 0) {
@@ -554,6 +559,9 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           album: `${c.artist} - ${c.title}`, 
           action: actionText 
         });
+        
+        // ADDED: Logging for manual changes
+        addLog(`${c.artist} - ${c.title}`, 'conflict-resolved', `${actionText} ${c.field_name}`);
 
         const trackSource = (decision.source === 'current' || decision.source === 'merge') ? null : decision.source;
         if (trackSource && c.candidates?.[trackSource]) {
