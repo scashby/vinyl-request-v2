@@ -16,15 +16,16 @@ import styles from '../EditCollection.module.css';
 
 const ALLOWED_COLUMNS = new Set([
   'artist', 'title', 'year', 'format', 'country', 'barcode', 'labels',
-  'tracklists', 'tracks', 'disc_metadata', // Added tracks/disc_metadata
+  'tracklists', 'tracklist', 'tracks', 'disc_metadata', // ADDED: tracklist
   'image_url', 'back_image_url', 'sell_price', 'media_condition', 'folder',
   'discogs_master_id', 'discogs_release_id', 'spotify_id', 'spotify_url',
-  'apple_music_id', 'apple_music_url', 'lastfm_id', 'lastfm_url', // Added LastFM
-  'wikipedia_url', // ADDED: Wikipedia Link
+  'apple_music_id', 'apple_music_url', 'lastfm_id', 'lastfm_url', 
+  'wikipedia_url', 'genius_url', 'lastfm_tags', 'notes', // ADDED: tags, notes
   'genres', 'styles', 'original_release_date',
   'inner_sleeve_images', // Acts as Gallery
   'musicians', 'credits', 'producers', 'engineers', 'songwriters', 'composer', 'conductor', 'orchestra',
-  'bpm', 'key', 'lyrics', 'time_signature', 'musical_key', // Added musical_key
+  'tempo_bpm', 'musical_key', 'lyrics', 'time_signature', // FIXED: bpm -> tempo_bpm
+  'wikipedia_url', 'genius_url', // ADDED: Missing URL fields
   // New columns from audit:
   'danceability', 'energy', 'mood_acoustic', 'mood_happy', 'mood_sad',
   'mood_aggressive', 'mood_electronic', 'mood_party', 'mood_relaxed'
@@ -138,7 +139,7 @@ interface CandidateResult {
 type LogEntry = {
   id: string;
   album: string;
-  action: 'auto-fill' | 'conflict-resolved' | 'skipped';
+  action: 'auto-fill' | 'conflict-resolved' | 'skipped' | 'info';
   details: string;
   timestamp: Date;
 };
@@ -421,6 +422,27 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     results.forEach((item) => {
       processedIds.push(item.album.id);
       const { album, candidates } = item;
+      
+      // LOGGING: Explicitly report what was found before processing
+      const foundKeys = new Set<string>();
+      Object.values(candidates).forEach((c) => {
+        if (c && typeof c === 'object') {
+          Object.keys(c as Record<string, unknown>).forEach(k => foundKeys.add(k));
+        }
+      });
+      
+      if (foundKeys.size > 0) {
+         // Create a readable summary of what was found
+         const summary = Array.from(foundKeys)
+            .filter(k => !['artist', 'title'].includes(k)) // Skip basics
+            .map(k => k.replace(/_/g, ' '))
+            .join(', ');
+            
+         if (summary) {
+             addLog(`${album.artist} - ${album.title}`, 'info', `Found: ${summary}`);
+         }
+      }
+
       if (Object.keys(candidates).length === 0) return;
 
       const updatesForAlbum: Record<string, unknown> = {};
@@ -432,7 +454,11 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
          if (!sourceData) continue;
 
          Object.entries(sourceData).forEach(([key, value]) => {
-            if (!ALLOWED_COLUMNS.has(key)) return;
+            if (!ALLOWED_COLUMNS.has(key)) {
+                // VISIBILITY FIX: Log blocked columns to console so you can see what's being ignored
+                console.warn(`[Blocked] Field '${key}' from ${source} found but not in ALLOWED_COLUMNS.`);
+                return;
+            }
             
             // ------------------------------------------------------------------
             // FIX: Filter based on User's Selected Fields (Granularity)

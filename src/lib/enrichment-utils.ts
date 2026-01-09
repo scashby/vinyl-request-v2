@@ -58,6 +58,7 @@ export type CandidateData = {
   lastfm_tags?: string[];
   lyrics?: string;
   lyrics_url?: string;
+  notes?: string; // ADDED: Field for Wikipedia summary
   
   // Per-Track Data
   tracks?: Array<{
@@ -659,10 +660,19 @@ export async function fetchWikipediaData(album: { artist: string, title: string 
         
         const pageId = data.query.search[0].pageid;
         
+        // Step 2: Fetch the actual summary
+        const summaryUrl = `https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro&explaintext&pageids=${pageId}&format=json`;
+        const summaryRes = await fetch(summaryUrl);
+        const summaryData = await summaryRes.json();
+        const extract = summaryData.query?.pages?.[pageId]?.extract;
+
         return { 
             success: true, 
             source: 'wikipedia', 
-            data: { wikipedia_url: `https://en.wikipedia.org/?curid=${pageId}` } 
+            data: { 
+                wikipedia_url: `https://en.wikipedia.org/?curid=${pageId}`,
+                notes: extract // Map summary to 'notes' field
+            } 
         };
     } catch (e) {
         return { success: false, source: 'wikipedia', error: (e as Error).message };
