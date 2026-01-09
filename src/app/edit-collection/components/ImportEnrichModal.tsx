@@ -468,7 +468,8 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
             }
             // ------------------------------------------------------------------
 
-            if (['lyrics', 'bpm', 'key', 'time_signature', 'tracks'].includes(key)) return;
+            // Allow tracks and lyrics to pass through to fieldCandidates for review/save 
+            if (['bpm', 'key', 'time_signature'].includes(key)) return;
 
             const finalized = (album as Record<string, unknown>).finalized_fields as string[] | undefined;
             if (Array.isArray(finalized) && finalized.includes(key)) return;
