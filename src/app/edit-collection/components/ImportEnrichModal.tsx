@@ -717,11 +717,29 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     });
 
     const updatePromises = Array.from(involvedAlbumIds).map(async (albumId) => {
+      const rawUpdates = updatesByAlbum[albumId];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sanitizedUpdates: Record<string, any> = { ...rawUpdates, last_enriched_at: timestamp };
+
+      // Ensure Array columns (text[]) match the database type to prevent 400 errors
+      const arrayFields = ['labels', 'genres', 'styles', 'finalized_fields'];
+      arrayFields.forEach(field => {
+        if (sanitizedUpdates[field] !== undefined && sanitizedUpdates[field] !== null) {
+           if (!Array.isArray(sanitizedUpdates[field])) {
+              sanitizedUpdates[field] = [sanitizedUpdates[field]];
+           }
+        }
+      });
+
       const { error } = await supabase
         .from('collection')
-        .update({ ...updatesByAlbum[albumId], last_enriched_at: timestamp })
+        .update(sanitizedUpdates)
         .eq('id', albumId);
-      if (error) console.error(`[DB ERROR] Album ${albumId}:`, error);
+        
+      if (error) {
+          console.error(`[DB ERROR] Album ${albumId}:`, error.message, error.details);
+          addLog(`${albumId}`, 'skipped', `Save Failed: ${error.message}`);
+      }
     });
 
     if (resolutionRecords.length > 0) {

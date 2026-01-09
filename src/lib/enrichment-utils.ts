@@ -28,7 +28,7 @@ export type CandidateData = {
   engineers?: string[];
   songwriters?: string[];
   original_release_date?: string;
-  label?: string[];
+  labels?: string[]; // FIXED: Match schema plural
   cat_no?: string;
   barcode?: string;
   country?: string;
@@ -242,7 +242,7 @@ export async function fetchMusicBrainzData(album: { artist: string, title: strin
 
     if (release['label-info']?.[0]) {
       const info = release['label-info'][0];
-      if (info.label?.name) candidate.label = [info.label.name];
+      if (info.label?.name) candidate.labels = [info.label.name]; // FIXED: labels
       if (info['catalog-number']) candidate.cat_no = info['catalog-number'];
     }
     
@@ -321,7 +321,7 @@ export async function fetchSpotifyData(album: { artist: string, title: string, s
       spotify_id: spId,
       original_release_date: data.release_date,
       image_url: data.images?.[0]?.url,
-      label: data.label ? [data.label] : undefined,
+      labels: data.label ? [data.label] : undefined, // FIXED: labels
       genres: data.genres?.length ? data.genres : undefined,
       tracklist: data.tracks?.items?.map((t: SpotifyTrack, i: number) => 
         `${i + 1}. ${t.name} (${Math.floor(t.duration_ms / 60000)}:${String(Math.floor((t.duration_ms % 60000) / 1000)).padStart(2, '0')})`
@@ -482,7 +482,7 @@ export async function fetchDiscogsData(album: { artist: string, title: string, d
       image_url: primaryImage,
       back_image_url: backImage,
       inner_sleeve_images: galleryImages.length > 0 ? galleryImages : undefined,
-      label: data.labels?.[0]?.name ? [data.labels[0].name] : undefined,
+      labels: data.labels?.[0]?.name ? [data.labels[0].name] : undefined, // FIXED: labels
       country: data.country,
       tracklist: data.tracklist?.map((t: DiscogsTrack) => `${t.position} - ${t.title} (${t.duration})`).join('\n')
     };
