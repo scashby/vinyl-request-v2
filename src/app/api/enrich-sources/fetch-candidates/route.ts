@@ -1,121 +1,704 @@
-// src/app/api/enrich-sources/fetch-candidates/route.ts
-import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { 
-  fetchSpotifyData, 
-  fetchMusicBrainzData, 
-  fetchDiscogsData, 
-  fetchLastFmData, 
-  fetchAppleMusicData, 
-  fetchCoverArtData, 
-  fetchWikipediaData, 
-  fetchGeniusData,
-  type CandidateData, 
-  type EnrichmentResult
-} from "lib/enrichment-utils";
+// src/lib/enrichment-utils.ts
+import Genius from 'genius-lyrics';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// Initialize Genius Client if token exists
+const GENIUS_TOKEN = process.env.GENIUS_ACCESS_TOKEN;
+const geniusClient = GENIUS_TOKEN ? new Genius.Client(GENIUS_TOKEN) : null;
 
-export async function POST(req: Request) {
+// ============================================================================
+// TYPES
+// ============================================================================
+
+export type CandidateData = {
+  // Linking IDs
+  musicbrainz_id?: string;
+  spotify_id?: string;
+  apple_music_id?: string;
+  discogs_release_id?: string;
+  discogs_master_id?: string;
+  lastfm_url?: string;
+  wikipedia_url?: string;
+  genius_url?: string;
+
+  // Canonical Metadata
+  genres?: string[];
+  styles?: string[];
+  musicians?: string[];
+  producers?: string[];
+  engineers?: string[];
+  songwriters?: string[];
+  original_release_date?: string;
+  labels?: string[]; // Canonical Plural
+  cat_no?: string;
+  barcode?: string;
+  country?: string;
+  
+  // Images
+  image_url?: string;
+  back_image_url?: string;
+  inner_sleeve_images?: string[]; 
+  
+  // Audio Features
+  tempo_bpm?: number;
+  musical_key?: string;
+  danceability?: number;
+  energy?: number;
+  mood_acoustic?: number;
+  mood_happy?: number; 
+  mood_sad?: number;
+  mood_party?: number;
+  mood_relaxed?: number;
+  mood_aggressive?: number;
+  mood_electronic?: number;
+  
+  // Content
+  tracklist?: string;
+  
+  // Extra
+  lastfm_tags?: string[];
+  lyrics?: string;
+  lyrics_url?: string;
+  notes?: string; 
+  
+  // Per-Track Data
+  tracks?: Array<{
+    position: string;
+    title: string;
+    tempo_bpm?: number;
+    musical_key?: string;
+    lyrics?: string;
+    samples?: string[]; // NEW: For future sample integration
+    covers?: string[];  // NEW: For future cover integration
+  }>;
+};
+
+export type EnrichmentResult = {
+  success: boolean;
+  source: string;
+  data?: CandidateData;
+  error?: string;
+};
+
+// --- TYPE DEFINITIONS FOR API RESPONSES ---
+
+interface MBRelation {
+  type: string;
+  direction: string;
+  artist?: { name: string };
+  attributes?: string[];
+}
+
+interface MBRelease {
+  id: string;
+  status?: string;
+  date?: string;
+  country?: string;
+  barcode?: string;
+  'label-info'?: Array<{
+    label?: { name: string };
+    'catalog-number'?: string;
+  }>;
+  relations?: MBRelation[];
+}
+
+interface MBSearchResponse {
+  releases: MBRelease[];
+}
+
+interface SpotifyImage {
+  url: string;
+  height: number;
+  width: number;
+}
+
+interface SpotifyArtist {
+  id: string;
+  name: string;
+  genres?: string[];
+}
+
+interface SpotifyTrack {
+  id: string;
+  name: string;
+  duration_ms: number;
+}
+
+interface SpotifyAlbum {
+  release_date: string;
+  images: SpotifyImage[];
+  label?: string;
+  genres?: string[];
+  artists: SpotifyArtist[];
+  tracks: {
+    items: SpotifyTrack[];
+  };
+}
+
+interface SpotifyAudioFeature {
+  id: string; 
+  tempo: number;
+  energy: number;
+  danceability: number;
+  acousticness: number;
+  valence: number;
+  key: number;
+  mode: number;
+}
+
+interface DiscogsImage {
+  uri: string;
+}
+
+interface DiscogsLabel {
+  name: string;
+}
+
+interface DiscogsTrack {
+  position: string;
+  title: string;
+  duration: string;
+}
+
+interface DiscogsIdentifier {
+  type: string;
+  value: string;
+}
+
+interface DiscogsArtist {
+  name: string;
+  role: string;
+}
+
+interface DiscogsRelease {
+  master_id?: number;
+  genres?: string[];
+  styles?: string[];
+  released?: string;
+  images?: DiscogsImage[];
+  labels?: DiscogsLabel[];
+  country?: string;
+  tracklist?: DiscogsTrack[];
+  identifiers?: DiscogsIdentifier[];
+  extraartists?: DiscogsArtist[];
+}
+
+interface LastFMImage {
+  size: string;
+  '#text': string;
+}
+
+interface LastFMTag {
+  name: string;
+}
+
+interface CAAImage {
+  front: boolean;
+  back: boolean;
+  types: string[];
+  image: string;
+}
+
+const USER_AGENT = 'DeadwaxDialogues/1.0 (https://deadwaxdialogues.com)';
+
+// ============================================================================
+// 1. MUSICBRAINZ (Dates, Labels, Country, Deep Credits)
+// ============================================================================
+const MB_BASE = 'https://musicbrainz.org/ws/2';
+
+async function mbSearch(artist: string, title: string): Promise<string | null> {
   try {
-    const body = await req.json();
-    const { 
-      albumIds,
-      cursor = 0,
-      limit = 10,
-      folder,
-      services
-    } = body;
+    const query = `artist:"${artist}" AND release:"${title}"`;
+    const url = `${MB_BASE}/release/?query=${encodeURIComponent(query)}&fmt=json&limit=3`;
+    const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
+    const data = await res.json() as MBSearchResponse;
+    
+    // Prefer "Official" releases
+    const releases = data.releases;
+    const release = releases?.find((r) => r.status === 'Official') || releases?.[0];
+    
+    return release?.id || null;
+  } catch { return null; }
+}
 
-    let targetAlbums: Record<string, unknown>[] = [];
-    let nextCursor = null;
+async function mbGetRelease(mbid: string): Promise<MBRelease | null> {
+  try {
+    const url = `${MB_BASE}/release/${mbid}?inc=artists+labels+recordings+release-groups+artist-rels&fmt=json`;
+    const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
+    return res.ok ? (await res.json() as MBRelease) : null;
+  } catch { return null; }
+}
 
-    if (albumIds && albumIds.length > 0) {
-      const { data, error } = await supabase
-        .from('collection')
-        .select('*')
-        .in('id', albumIds);
-        
-      if (error) throw error;
-      targetAlbums = data || [];
-    } else {
-      let query = supabase
-        .from('collection')
-        .select('*')
-        .gt('id', cursor)
-        .order('id', { ascending: true })
-        .limit(limit);
+export async function fetchMusicBrainzData(album: { artist: string, title: string, musicbrainz_id?: string }): Promise<EnrichmentResult> {
+  try {
+    const mbid = album.musicbrainz_id || await mbSearch(album.artist, album.title);
+    if (!mbid) return { success: false, source: 'musicbrainz', error: 'Not found' };
 
-      if (folder) query = query.eq('folder', folder);
+    const release = await mbGetRelease(mbid);
+    if (!release) return { success: false, source: 'musicbrainz', error: 'Fetch failed' };
 
-      const { data, error } = await query;
-      if (error) throw error;
-      const fetched = data || [];
+    const candidate: CandidateData = {
+      musicbrainz_id: mbid,
+      original_release_date: release.date,
+      country: release.country,
+    };
 
-      // Always advance cursor based on raw fetch to ensure progress
-      if (fetched.length > 0) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        nextCursor = (fetched[fetched.length - 1] as any).id;
-      }
+    if (release['label-info']?.[0]) {
+      const info = release['label-info'][0];
+      if (info.label?.name) candidate.labels = [info.label.name]; // FIXED: labels
+      if (info['catalog-number']) candidate.cat_no = info['catalog-number'];
+    }
+    
+    if (release.barcode) candidate.barcode = release.barcode;
 
-      // NO FILTERING: We process everything we fetched.
-      // This ensures we check for upgrades even if data exists.
-      targetAlbums = fetched;
+    if (release.relations) {
+        candidate.producers = release.relations
+            .filter((r: any) => r.type === 'producer' && r.artist)
+            .map((r: any) => r.artist!.name);
+            
+        candidate.engineers = release.relations
+            .filter((r: any) => r.type === 'engineer' && r.artist)
+            .map((r: any) => r.artist!.name);
+            
+        candidate.musicians = release.relations
+            .filter((r: any) => (r.type === 'instrument' || r.type === 'vocal') && r.artist)
+            .map((r: any) => `${r.artist!.name} (${r.attributes?.join(', ') || 'Musician'})`);
+            
+        candidate.songwriters = release.relations
+            .filter((r: any) => (r.type === 'composer' || r.type === 'writer' || r.type === 'lyricist') && r.artist)
+            .map((r: any) => r.artist!.name);
     }
 
-    if (!targetAlbums.length) {
-      return NextResponse.json({ 
-        success: true, 
-        results: [], 
-        nextCursor: nextCursor,
-        message: "No albums found in this batch." 
-      });
+    // NEW: Parse Cover Songs from Work Relations
+    if (release.media?.[0]?.tracks) {
+        candidate.tracks = release.media[0].tracks.map((t: any) => {
+            const recording = t.recording;
+            const covers: string[] = [];
+            
+            if (recording?.relations) {
+                recording.relations.forEach((rel: any) => {
+                    // Check for "cover" relationship or "based on"
+                    if ((rel.type === 'cover' || rel.type === 'based on') && rel.direction === 'backward' && rel.work) {
+                         covers.push(`Original: ${rel.work.title}`);
+                    }
+                });
+            }
+            return {
+                position: String(t.position),
+                title: t.title,
+                covers: covers.length > 0 ? covers : undefined
+            };
+        });
     }
 
-    const results = [];
-
-    for (const album of targetAlbums) {
-      const candidates: Record<string, CandidateData> = {};
-      const promises: Promise<EnrichmentResult | null>[] = [];
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const typedAlbum = album as any;
-
-      // Always fetch requested services
-      if (services.musicbrainz) promises.push(fetchMusicBrainzData(typedAlbum));
-      if (services.discogs) promises.push(fetchDiscogsData(typedAlbum));
-      if (services.spotify) promises.push(fetchSpotifyData(typedAlbum));
-      if (services.appleMusicEnhanced) promises.push(fetchAppleMusicData(typedAlbum));
-      if (services.lastfm) promises.push(fetchLastFmData(typedAlbum));
-      if (services.wikipedia) promises.push(fetchWikipediaData(typedAlbum));
-      if (services.genius) promises.push(fetchGeniusData(typedAlbum));
-      if (services.coverArt) promises.push(fetchCoverArtData(typedAlbum));
-
-      const settled = await Promise.allSettled(promises);
-      
-      settled.forEach(res => {
-        if (res.status === 'fulfilled' && res.value && res.value.success && res.value.data) {
-          candidates[res.value.source] = res.value.data;
-        }
-      });
-
-      if (Object.keys(candidates).length > 0) {
-        results.push({ album, candidates });
-      }
-    }
-
-    return NextResponse.json({ 
-      success: true, 
-      results, 
-      nextCursor: nextCursor,
-      processedCount: targetAlbums.length
-    });
-
-  } catch (error) {
-    console.error("Enrichment Batch Error:", error);
-    return NextResponse.json({ success: false, error: 'Internal Server Error' }, { status: 500 });
+    return { success: true, source: 'musicbrainz', data: candidate };
+  } catch (e) {
+    return { success: false, source: 'musicbrainz', error: (e as Error).message };
   }
+}
+
+// ============================================================================
+// 2. SPOTIFY (Genres, Dates, BPM, Key, Energy, Danceability, Moods)
+// ============================================================================
+const SP_ID = process.env.SPOTIFY_CLIENT_ID!;
+const SP_SECRET = process.env.SPOTIFY_CLIENT_SECRET!;
+let spToken: { token: string; exp: number } | null = null;
+
+async function spGetToken(): Promise<string> {
+  if (spToken && spToken.exp > Date.now()) return spToken.token;
+  const res = await fetch('https://accounts.spotify.com/api/token', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Authorization': 'Basic ' + Buffer.from(`${SP_ID}:${SP_SECRET}`).toString('base64')
+    },
+    body: 'grant_type=client_credentials'
+  });
+  const data = await res.json();
+  spToken = { token: data.access_token, exp: Date.now() + (data.expires_in * 1000) - 60000 };
+  return spToken.token;
+}
+
+const KEY_MAP = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+export async function fetchSpotifyData(album: { artist: string, title: string, spotify_id?: string }): Promise<EnrichmentResult> {
+  try {
+    const token = await spGetToken();
+    let spId = album.spotify_id;
+
+    if (!spId) {
+      const q = `album:${album.title} artist:${album.artist}`;
+      const searchRes = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=album&limit=1`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const searchData = await searchRes.json();
+      spId = searchData.albums?.items?.[0]?.id;
+    }
+
+    if (!spId) return { success: false, source: 'spotify', error: 'Not found' };
+
+    const albumRes = await fetch(`https://api.spotify.com/v1/albums/${spId}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const data = await albumRes.json() as SpotifyAlbum;
+
+    const candidate: CandidateData = {
+      spotify_id: spId,
+      original_release_date: data.release_date,
+      image_url: data.images?.[0]?.url,
+      labels: data.label ? [data.label] : undefined, // FIXED: labels
+      genres: data.genres?.length ? data.genres : undefined,
+      tracklist: data.tracks?.items?.map((t: SpotifyTrack, i: number) => 
+        `${i + 1}. ${t.name} (${Math.floor(t.duration_ms / 60000)}:${String(Math.floor((t.duration_ms % 60000) / 1000)).padStart(2, '0')})`
+      ).join('\n')
+    };
+
+    if (!candidate.genres && data.artists?.[0]?.id) {
+       const artistRes = await fetch(`https://api.spotify.com/v1/artists/${data.artists[0].id}`, {
+         headers: { 'Authorization': `Bearer ${token}` }
+       });
+       const artistData = await artistRes.json() as SpotifyArtist;
+       if (artistData.genres) candidate.genres = artistData.genres;
+    }
+
+    if (data.tracks?.items?.length > 0) {
+        const trackIds = data.tracks.items.map((t: SpotifyTrack) => t.id).slice(0, 50).join(',');
+        const featRes = await fetch(`https://api.spotify.com/v1/audio-features?ids=${trackIds}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (featRes.ok) {
+            const featData = await featRes.json();
+            const features = (featData.audio_features as (SpotifyAudioFeature | null)[]).filter((f): f is SpotifyAudioFeature => f !== null);
+            
+            if (features.length > 0) {
+                const avgTempo = features.reduce((sum, f) => sum + f.tempo, 0) / features.length;
+                const avgEnergy = features.reduce((sum, f) => sum + f.energy, 0) / features.length;
+                const avgDance = features.reduce((sum, f) => sum + f.danceability, 0) / features.length;
+                const avgAcoustic = features.reduce((sum, f) => sum + f.acousticness, 0) / features.length;
+                const avgValence = features.reduce((sum, f) => sum + f.valence, 0) / features.length;
+                
+                const firstKey = features[0].key;
+                const firstMode = features[0].mode;
+                
+                candidate.tempo_bpm = Math.round(avgTempo);
+                candidate.energy = Number(avgEnergy.toFixed(3));
+                candidate.danceability = Number(avgDance.toFixed(3));
+                candidate.mood_acoustic = Number(avgAcoustic.toFixed(3));
+                candidate.mood_happy = Number(avgValence.toFixed(3));
+                candidate.mood_sad = Number((1 - avgValence).toFixed(3));
+                candidate.mood_party = Number(avgEnergy.toFixed(3));
+                candidate.mood_relaxed = Number((1 - avgEnergy).toFixed(3));
+                candidate.mood_aggressive = (avgEnergy > 0.7 && avgValence < 0.4) ? 1.0 : 0.0;
+                candidate.mood_electronic = (avgAcoustic < 0.1 && avgEnergy > 0.6) ? 1.0 : 0.0;
+                
+                if (firstKey >= 0 && firstKey < KEY_MAP.length) {
+                    candidate.musical_key = `${KEY_MAP[firstKey]} ${firstMode === 1 ? 'Major' : 'Minor'}`;
+                }
+
+                candidate.tracks = data.tracks.items.map((t, i) => {
+                    const feat = features.find(f => f.id === t.id);
+                    let keyStr = undefined;
+                    if (feat && feat.key >= 0 && feat.key < KEY_MAP.length) {
+                        keyStr = `${KEY_MAP[feat.key]} ${feat.mode === 1 ? 'Major' : 'Minor'}`;
+                    }
+                    return {
+                        position: String(i + 1),
+                        title: t.name,
+                        tempo_bpm: feat ? Math.round(feat.tempo) : undefined,
+                        musical_key: keyStr
+                    };
+                });
+            }
+        }
+    }
+
+    return { success: true, source: 'spotify', data: candidate };
+  } catch (e) {
+    return { success: false, source: 'spotify', error: (e as Error).message };
+  }
+}
+
+// ============================================================================
+// 3. APPLE MUSIC (Genres, Dates, High-Res Images)
+// ============================================================================
+const AM_TOKEN = process.env.APPLE_MUSIC_TOKEN!;
+
+export async function fetchAppleMusicData(album: { artist: string, title: string, apple_music_id?: string }): Promise<EnrichmentResult> {
+  try {
+    if (!AM_TOKEN) return { success: false, source: 'appleMusic', error: 'No Token' };
+    
+    let amId = album.apple_music_id;
+    if (!amId) {
+        const q = `${album.artist} ${album.title}`;
+        const searchRes = await fetch(`https://api.music.apple.com/v1/catalog/us/search?term=${encodeURIComponent(q)}&types=albums&limit=1`, {
+            headers: { 'Authorization': `Bearer ${AM_TOKEN}` }
+        });
+        const searchData = await searchRes.json();
+        amId = searchData.results?.albums?.data?.[0]?.id;
+    }
+
+    if (!amId) return { success: false, source: 'appleMusic', error: 'Not found' };
+
+    const albumRes = await fetch(`https://api.music.apple.com/v1/catalog/us/albums/${amId}`, {
+        headers: { 'Authorization': `Bearer ${AM_TOKEN}` }
+    });
+    const data = await albumRes.json();
+    const attrs = data.data?.[0]?.attributes;
+
+    const candidate: CandidateData = {
+        apple_music_id: amId,
+        image_url: attrs?.artwork?.url?.replace('{w}', '1000').replace('{h}', '1000'),
+        genres: attrs?.genreNames,
+        labels: attrs?.recordLabel ? [attrs.recordLabel] : undefined, // FIXED: Changed label to labels
+        original_release_date: attrs?.releaseDate
+    };
+
+    return { success: true, source: 'appleMusic', data: candidate };
+  } catch (e) {
+    return { success: false, source: 'appleMusic', error: (e as Error).message };
+  }
+}
+
+// ============================================================================
+// 4. DISCOGS (Styles, Genres, Year, Credits, Barcodes, Deep Images)
+// ============================================================================
+const DISCOGS_TOKEN = process.env.DISCOGS_ACCESS_TOKEN!;
+
+export async function fetchDiscogsData(album: { artist: string, title: string, discogs_release_id?: string }): Promise<EnrichmentResult> {
+  try {
+    let releaseId = album.discogs_release_id;
+
+    if (!releaseId) {
+      const q = `${album.artist} - ${album.title}`;
+      const searchRes = await fetch(`https://api.discogs.com/database/search?q=${encodeURIComponent(q)}&type=release&token=${DISCOGS_TOKEN}`, {
+          headers: { 'User-Agent': USER_AGENT }
+      });
+      const searchData = await searchRes.json();
+      releaseId = searchData.results?.[0]?.id;
+    }
+
+    if (!releaseId) return { success: false, source: 'discogs', error: 'Not found' };
+
+    const releaseRes = await fetch(`https://api.discogs.com/releases/${releaseId}?token=${DISCOGS_TOKEN}`, {
+        headers: { 'User-Agent': USER_AGENT }
+    });
+    const data = await releaseRes.json() as DiscogsRelease;
+
+    // --- FIX: CAPTURE ALL IMAGES INTO GALLERY ---
+    const allImages = data.images || [];
+    const galleryImages: string[] = [];
+    let primaryImage: string | undefined = undefined;
+    let backImage: string | undefined = undefined;
+
+    if (allImages.length > 0) primaryImage = allImages[0].uri;
+    if (allImages.length > 1) backImage = allImages[1].uri;
+    if (allImages.length > 2) {
+       // Capture everything else for the gallery UI
+       galleryImages.push(...allImages.slice(2).map(i => i.uri));
+    }
+
+    const candidate: CandidateData = {
+      discogs_release_id: String(releaseId),
+      discogs_master_id: data.master_id ? String(data.master_id) : undefined,
+      genres: data.genres,
+      styles: data.styles,
+      original_release_date: data.released,
+      image_url: primaryImage,
+      back_image_url: backImage,
+      inner_sleeve_images: galleryImages.length > 0 ? galleryImages : undefined,
+      labels: data.labels?.[0]?.name ? [data.labels[0].name] : undefined, // FIXED: labels
+      country: data.country,
+      tracklist: data.tracklist?.map((t: DiscogsTrack) => `${t.position} - ${t.title} (${t.duration})`).join('\n')
+    };
+
+    if (data.identifiers) {
+        const barcode = data.identifiers.find((id: DiscogsIdentifier) => id.type === 'Barcode');
+        if (barcode) candidate.barcode = barcode.value;
+    }
+
+    if (data.extraartists) {
+        candidate.producers = data.extraartists
+            .filter((a: DiscogsArtist) => a.role.toLowerCase().includes('producer'))
+            .map((a: DiscogsArtist) => a.name);
+            
+        candidate.engineers = data.extraartists
+            .filter((a: DiscogsArtist) => a.role.toLowerCase().includes('engineer') || a.role.toLowerCase().includes('mixed'))
+            .map((a: DiscogsArtist) => a.name);
+            
+        candidate.musicians = data.extraartists
+            .filter((a: DiscogsArtist) => !a.role.toLowerCase().includes('producer') && !a.role.toLowerCase().includes('engineer'))
+            .map((a: DiscogsArtist) => `${a.name} (${a.role})`);
+            
+        candidate.songwriters = data.extraartists
+            .filter((a: DiscogsArtist) => a.role.toLowerCase().includes('written') || a.role.toLowerCase().includes('lyrics'))
+            .map((a: DiscogsArtist) => a.name);
+    }
+
+    return { success: true, source: 'discogs', data: candidate };
+  } catch (e) {
+    return { success: false, source: 'discogs', error: (e as Error).message };
+  }
+}
+
+// ============================================================================
+// 5. LAST.FM (Tags/Genres/Moods)
+// ============================================================================
+const LFM_KEY = process.env.LASTFM_API_KEY!;
+const LFM_BASE = 'https://ws.audioscrobbler.com/2.0/';
+
+function mapTagsToMoods(tags: string[], candidate: CandidateData) {
+    const MOOD_KEYWORDS: Record<string, keyof CandidateData> = {
+        'sad': 'mood_sad', 'melancholy': 'mood_sad', 'depressive': 'mood_sad',
+        'happy': 'mood_happy', 'upbeat': 'mood_happy', 'cheerful': 'mood_happy',
+        'aggressive': 'mood_aggressive', 'angry': 'mood_aggressive', 'heavy': 'mood_aggressive',
+        'relaxed': 'mood_relaxed', 'chill': 'mood_relaxed', 'calm': 'mood_relaxed',
+        'party': 'mood_party', 'dance': 'mood_party',
+        'electronic': 'mood_electronic', 'synth': 'mood_electronic'
+    };
+
+    tags.forEach(tag => {
+        const lower = tag.toLowerCase();
+        for (const [keyword, field] of Object.entries(MOOD_KEYWORDS)) {
+            if (lower.includes(keyword)) {
+                if (typeof candidate[field] !== 'number') {
+                    (candidate as Record<string, unknown>)[field] = 0.8; 
+                }
+            }
+        }
+    });
+}
+
+export async function fetchLastFmData(album: { artist: string, title: string }): Promise<EnrichmentResult> {
+  try {
+    const url = `${LFM_BASE}?method=album.getinfo&artist=${encodeURIComponent(album.artist)}&album=${encodeURIComponent(album.title)}&api_key=${LFM_KEY}&format=json`;
+    const res = await fetch(url);
+    const data = await res.json();
+    
+    if (!data.album) return { success: false, source: 'lastfm', error: 'Not found' };
+
+    const tags = data.album.tags?.tag?.map((t: LastFMTag) => t.name) || [];
+    const images = data.album.image;
+    const largeImg = images?.find((i: LastFMImage) => i.size === 'extralarge' || i.size === 'large')?.['#text'];
+
+    const candidate: CandidateData = {
+      lastfm_url: data.album.url,
+      lastfm_tags: tags,
+      image_url: largeImg || undefined
+    };
+
+    mapTagsToMoods(tags, candidate);
+
+    return { success: true, source: 'lastfm', data: candidate };
+  } catch (e) {
+    return { success: false, source: 'lastfm', error: (e as Error).message };
+  }
+}
+
+// ============================================================================
+// 6. COVER ART ARCHIVE (Images from MBID)
+// ============================================================================
+const CAA_BASE = 'https://coverartarchive.org';
+
+export async function fetchCoverArtData(album: { musicbrainz_id?: string }): Promise<EnrichmentResult> {
+    try {
+        if (!album.musicbrainz_id) return { success: false, source: 'coverArt', error: 'No MBID' };
+        
+        const res = await fetch(`${CAA_BASE}/release/${album.musicbrainz_id}`);
+        if (!res.ok) return { success: false, source: 'coverArt', error: 'Not Found' };
+        
+        const data = await res.json();
+        const images = data.images || [];
+
+        const front = images.find((i: CAAImage) => i.front)?.image || images[0]?.image;
+        const back = images.find((i: CAAImage) => i.back)?.image;
+        
+        // --- FIX: CONSOLIDATE INTO GALLERY ---
+        const gallery: string[] = [];
+        
+        images.forEach((img: CAAImage) => {
+            // If it's not the chosen front or back, put it in the gallery
+            if (img.image !== front && img.image !== back) {
+                gallery.push(img.image);
+            }
+        });
+
+        const resultData: CandidateData = { 
+            image_url: front, 
+            back_image_url: back 
+        };
+
+        if (gallery.length > 0) {
+            resultData.inner_sleeve_images = gallery;
+        }
+
+        return { 
+            success: true, 
+            source: 'coverArt', 
+            data: resultData
+        };
+    } catch (e) {
+        return { success: false, source: 'coverArt', error: (e as Error).message };
+    }
+}
+
+// ============================================================================
+// 7. GENIUS (Album Link & Cleaned)
+// ============================================================================
+export async function fetchGeniusData(album: { artist: string, title: string }): Promise<EnrichmentResult> {
+    try {
+        if (!geniusClient) return { success: false, source: 'genius', error: 'No Token' };
+        
+        const search = await geniusClient.songs.search(`${album.artist} ${album.title}`);
+        
+        const songMatch = search.find(s => 
+            s.album?.name?.toLowerCase().includes(album.title.toLowerCase()) ||
+            s.title.toLowerCase().includes(album.title.toLowerCase())
+        );
+
+        if (!songMatch) return { success: false, source: 'genius', error: 'Not Found' };
+
+        // --- FIX: REMOVED INVALID PROPERTY ACCESS ---
+        return { 
+            success: true, 
+            source: 'genius', 
+            data: { 
+                genius_url: songMatch.url,
+                image_url: songMatch.image
+            } 
+        };
+    } catch (e) {
+        return { success: false, source: 'genius', error: (e as Error).message };
+    }
+}
+
+// ============================================================================
+// 8. WIKIPEDIA (Links & Summary)
+// ============================================================================
+export async function fetchWikipediaData(album: { artist: string, title: string }): Promise<EnrichmentResult> {
+    try {
+        const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(album.artist + ' ' + album.title + ' album')}&format=json`;
+        const res = await fetch(searchUrl);
+        const data = await res.json();
+        
+        if (!data.query?.search?.length) return { success: false, source: 'wikipedia', error: 'Not found' };
+        
+        const pageId = String(data.query.search[0].pageid);
+        
+        // STAGE 2: Fetch the actual intro text (Extract)
+        const summaryUrl = `https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro&explaintext&pageids=${pageId}&format=json`;
+        const summaryRes = await fetch(summaryUrl);
+        const summaryData = await summaryRes.json();
+        const extract = summaryData.query?.pages?.[pageId]?.extract;
+
+        return { 
+            success: true, 
+            source: 'wikipedia', 
+            data: { 
+                wikipedia_url: `https://en.wikipedia.org/?curid=${pageId}`,
+                notes: extract || undefined
+            } 
+        };
+    } catch (e) {
+        return { success: false, source: 'wikipedia', error: (e as Error).message };
+    }
 }

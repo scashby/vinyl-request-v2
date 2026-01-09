@@ -6,7 +6,7 @@
  */
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import Image from 'next/image';
 import { supabase } from 'lib/supabaseClient';
 import EnrichmentReviewModal from './EnrichmentReviewModal';
@@ -29,57 +29,39 @@ const ALLOWED_COLUMNS = new Set([
   'mood_aggressive', 'mood_electronic', 'mood_party', 'mood_relaxed'
 ]);
 
-// MODEL INSTRUCTION: DO NOT COLLAPSE THIS OBJECT. KEEP EXPANDED.
-const DATA_CATEGORY_CONFIG: Partial<Record<DataCategory, { label: string; desc: string; icon: string; services: string[] }>> = {
-  artwork: {
-    label: 'Artwork & Images',
-    desc: 'Front covers, back covers, spine images, and inner sleeves.',
+// CAMPAIGN DEFINITIONS
+const ENRICHMENT_CAMPAIGNS = {
+  visuals: {
+    label: 'Visual Identity',
     icon: '🖼️',
-    // ADDED: discogs
-    services: ['coverArt', 'spotify', 'appleMusic', 'discogs']
+    desc: 'Covers, Spine, and Inner Sleeves.',
+    fields: ['image_url', 'back_image_url', 'inner_sleeve_images'],
+    services: ['coverArt', 'discogs', 'appleMusic', 'spotify']
   },
-  credits: {
-    label: 'Credits & Personnel',
-    desc: 'Musicians, producers, engineers, and songwriters.',
-    icon: '👥',
-    // ADDED: discogs, genius
-    services: ['musicbrainz', 'wikipedia', 'discogs', 'genius']
-  },
-  tracklists: {
-    label: 'Tracklists & Durations',
-    desc: 'Complete track listings, disk sides, and track durations.',
-    icon: '📝',
-    // ADDED: discogs
-    services: ['spotify', 'appleMusic', 'discogs']
-  },
-  audio_analysis: {
-    label: 'Audio Analysis',
-    desc: 'Tempo (BPM), musical key, danceability, and energy metrics.',
-    icon: '📊',
-    services: ['spotify']
-  },
-  genres: {
-    label: 'Genres & Styles',
-    desc: 'Primary genres and sub-styles.', // Fixed description
-    icon: '🏷️',
-    // ADDED: discogs
-    services: ['lastfm', 'spotify', 'discogs']
-  },
-  streaming_links: {
-    label: 'Streaming IDs & URLs',
-    desc: 'Links to Spotify, Apple Music, and Last.fm.',
-    icon: '🔗',
-    // ADDED: genius, wikipedia
-    services: ['spotify', 'appleMusic', 'lastfm', 'genius', 'wikipedia']
-  },
-  release_metadata: {
-    label: 'Release Metadata',
-    desc: 'Barcodes, record labels, and original release dates.',
+  release: {
+    label: 'Release Details',
     icon: '💿',
-    // ADDED: discogs
-    services: ['musicbrainz', 'discogs']
+    desc: 'Labels, Pressing Dates, Barcodes, and Country.',
+    fields: ['labels', 'cat_no', 'barcode', 'country', 'original_release_date'],
+    services: ['musicbrainz', 'discogs', 'appleMusic']
+  },
+  content: {
+    label: 'Song Intelligence',
+    icon: '📝',
+    desc: 'Tracklists, BPM, Key, Lyrics, Samples, and Covers.',
+    fields: ['tracks', 'tracklist', 'tempo_bpm', 'musical_key', 'lyrics', 'samples', 'covers'],
+    services: ['spotify', 'discogs', 'genius', 'appleMusic']
+  },
+  context: {
+    label: 'Context & Bio',
+    icon: '📖',
+    desc: 'Wikipedia Summaries and Streaming Links.',
+    fields: ['notes', 'wikipedia_url', 'genius_url', 'lastfm_tags', 'lastfm_url'],
+    services: ['wikipedia', 'genius', 'lastfm', 'spotify']
   }
 };
+
+type CampaignKey = keyof typeof ENRICHMENT_CAMPAIGNS;
 
 // --- 2. TYPES ---
 interface ImportEnrichModalProps {
@@ -186,28 +168,19 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   const [folderFilter, setFolderFilter] = useState('');
   const [batchSize, setBatchSize] = useState('25');
   
-  // Granular Field Selection State
-  const [selectedFields, setSelectedFields] = useState<Set<string>>(() => {
-    const defaults = new Set<string>();
-    const defaultCats: DataCategory[] = ['artwork', 'credits', 'tracklists', 'genres'];
-    defaultCats.forEach(cat => {
-      const fields = DATA_CATEGORY_CHECK_FIELDS[cat] || [];
-      fields.forEach(f => {
-        if (ALLOWED_COLUMNS.has(f)) defaults.add(f);
-      });
-    });
-    return defaults;
-  });
+  // CAMPAIGN STATE
+  const [activeCampaigns, setActiveCampaigns] = useState<Set<CampaignId>>(new Set(['visuals']));
+  // SERVICE STATE (The Monkey Wrench: Checked = Enabled, so we track what is DISABLED)
+  const [disabledServices, setDisabledServices] = useState<Set<string>>(new Set());
 
-  // Derived active categories for service selection
-  const selectedCategories = new Set<DataCategory>();
-  (Object.keys(DATA_CATEGORY_CONFIG) as DataCategory[]).forEach(cat => {
-      const fields = DATA_CATEGORY_CHECK_FIELDS[cat] || [];
-      // If any field in this category is selected, the category is "active" for service fetching
-      if (fields.some(f => selectedFields.has(f))) {
-        selectedCategories.add(cat);
-      }
-  });
+  // Derive Fields from Active Campaigns
+  const selectedFields = useMemo(() => {
+    const fields = new Set<string>();
+    activeCampaigns.forEach(cId => {
+      ENRICHMENT_CAMPAIGNS[cId].fields.forEach((f: string) => fields.add(f));
+    });
+    return fields;
+  }, [activeCampaigns]);
   
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [categoryTitle, setCategoryTitle] = useState('');
@@ -256,14 +229,15 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       appleMusicEnhanced: false, wikipedia: false, genius: false, coverArt: false,
     };
 
-    selectedCategories.forEach(cat => {
-      const config = DATA_CATEGORY_CONFIG[cat];
-      if (config) {
-        config.services.forEach(service => {
+    activeCampaigns.forEach(cId => {
+      const config = ENRICHMENT_CAMPAIGNS[cId];
+      config.services.forEach(service => {
+        // Only enable if NOT disabled by user
+        if (!disabledServices.has(service)) {
           if (service === 'appleMusic') serviceMap.appleMusicEnhanced = true;
           else serviceMap[service] = true;
-        });
-      }
+        }
+      });
     });
     
     return serviceMap;
@@ -754,28 +728,6 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     setShowReview(false);
   }
 
-  function toggleCategory(category: DataCategory) {
-    const fields = DATA_CATEGORY_CHECK_FIELDS[category] || [];
-    const importableFields = fields.filter(f => ALLOWED_COLUMNS.has(f));
-    
-    // Check if ALL importable fields are currently selected
-    const allSelected = importableFields.every(f => selectedFields.has(f));
-    
-    const next = new Set(selectedFields);
-    importableFields.forEach(f => {
-      if (allSelected) next.delete(f); // Unselect all
-      else next.add(f); // Select all
-    });
-    setSelectedFields(next);
-  }
-
-  function toggleField(field: string) {
-    const next = new Set(selectedFields);
-    if (next.has(field)) next.delete(field);
-    else next.add(field);
-    setSelectedFields(next);
-  }
-
   async function showCategory(category: string, title: string) {
     setShowCategoryModal(true);
     setCategoryTitle(title);
@@ -865,44 +817,6 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     );
   }
 
-  const dataCategoriesConfig: { category: DataCategory; count: number; subcounts?: { label: string; count: number }[] }[] = stats ? [
-    { category: 'artwork', count: stats.missingArtwork, subcounts: [
-        { label: 'Back covers', count: stats.missingBackCover },
-        { label: 'Spine', count: stats.missingSpine || 0 },
-        { label: 'Inner Sleeves', count: stats.missingInnerSleeve || 0 },
-        { label: 'Vinyl Labels', count: stats.missingVinylLabel || 0 }
-    ]},
-    { category: 'credits', count: stats.missingCredits, subcounts: [
-        { label: 'Musicians', count: stats.missingMusicians },
-        { label: 'Producers', count: stats.missingProducers },
-        { label: 'Engineers', count: stats.missingEngineers || 0 },
-        { label: 'Songwriters', count: stats.missingSongwriters || 0 }
-    ]},
-    { category: 'tracklists', count: stats.missingTracklists, subcounts: [
-        { label: 'Missing Durations', count: stats.missingDurations || 0 } // New Subcount
-    ]},
-    { category: 'audio_analysis', count: stats.missingAudioAnalysis, subcounts: [
-        { label: 'Tempo', count: stats.missingTempo },
-        { label: 'Key', count: stats.missingMusicalKey || 0 },
-        { label: 'Energy', count: stats.missingEnergy || 0 },
-        { label: 'Danceability', count: stats.missingDanceability || 0 }
-    ]},
-    { category: 'genres', count: stats.missingGenres, subcounts: [
-        { label: 'Styles', count: stats.missingStyles || 0 }
-    ]},
-    { category: 'streaming_links', count: stats.missingStreamingLinks, subcounts: [
-        { label: 'Spotify', count: stats.missingSpotify },
-        { label: 'Apple Music', count: stats.missingAppleMusic || 0 },
-        { label: 'Last.fm', count: stats.missingLastFM || 0 }
-    ]},
-    { category: 'release_metadata', count: stats.missingReleaseMetadata, subcounts: [
-        { label: 'Barcodes', count: stats.missingBarcode || 0 },
-        { label: 'Labels', count: stats.missingLabels || 0 },
-        { label: 'Dates', count: stats.missingOriginalDate || 0 },
-        { label: 'Cat #', count: stats.missingCatalogNumber }
-    ]},
-  ] : [];
-
   return (
     <div className={styles.importModalContainer}>
       <div className={styles.importModalContent} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.5)' }}>
@@ -935,21 +849,67 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
                 </div>
               </div>
 
-              {/* 2. DATA CATEGORY SELECTION */}
+              {/* 2. CAMPAIGN SELECTION */}
               <div className={styles.importEnrichCard}>
-                <h3 className={styles.importEnrichHeader}>Select Data to Enrich</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '12px' }}>
-                  {dataCategoriesConfig.map(({ category, count, subcounts }) => (
-                    <DataCategoryCard
-                      key={category} 
-                      category={category} 
-                      count={count} 
-                      subcounts={subcounts}
-                      selectedFields={selectedFields}
-                      onToggleCategory={() => toggleCategory(category)}
-                      onToggleField={toggleField}
-                      disabled={enriching}
-                    />
+                <h3 className={styles.importEnrichHeader}>Select Enrichment Campaign</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
+                  {Object.entries(ENRICHMENT_CAMPAIGNS).map(([key, config]) => (
+                    <div key={key} style={{ 
+                      border: activeCampaigns.has(key as CampaignKey) ? '2px solid #3b82f6' : '1px solid #e5e7eb', 
+                      borderRadius: '8px', 
+                      padding: '12px',
+                      backgroundColor: activeCampaigns.has(key as CampaignKey) ? '#eff6ff' : 'white',
+                      opacity: enriching ? 0.6 : 1
+                    }}>
+                      {/* Campaign Header */}
+                      <div 
+                        onClick={() => {
+                           if (enriching) return;
+                           const next = new Set(activeCampaigns);
+                           if (next.has(key as CampaignKey)) next.delete(key as CampaignKey);
+                           else next.add(key as CampaignKey);
+                           setActiveCampaigns(next);
+                        }}
+                        style={{ cursor: enriching ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}
+                      >
+                         <span style={{ fontSize: '20px' }}>{config.icon}</span>
+                         <div>
+                            <div style={{ fontWeight: '700', fontSize: '14px', color: '#111827' }}>{config.label}</div>
+                            <div style={{ fontSize: '11px', color: '#6b7280' }}>{config.desc}</div>
+                         </div>
+                         <input 
+                           type="checkbox" 
+                           checked={activeCampaigns.has(key as CampaignKey)} 
+                           readOnly
+                           style={{ marginLeft: 'auto', cursor: 'pointer' }}
+                         />
+                      </div>
+
+                      {/* Service Toggles (The Monkey Wrench) */}
+                      {activeCampaigns.has(key as CampaignKey) && (
+                        <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #dbeafe' }}>
+                           <div style={{ fontSize: '10px', fontWeight: '600', color: '#1e40af', marginBottom: '4px' }}>ACTIVE SERVICES:</div>
+                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                              {config.services.map(s => (
+                                 <label key={s} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', cursor: 'pointer', color: '#374151' }}>
+                                    <input 
+                                       type="checkbox" 
+                                       checked={!disabledServices.has(s)} 
+                                       onChange={(e) => {
+                                          const next = new Set(disabledServices);
+                                          if (e.target.checked) next.delete(s);
+                                          else next.add(s);
+                                          setDisabledServices(next);
+                                       }}
+                                       disabled={enriching}
+                                    />
+                                    {s}
+                                 </label>
+                              ))}
+                           </div>
+                        </div>
+                      )}
+                    </div>
                   ))}
                 </div>
               </div>
