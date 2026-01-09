@@ -15,18 +15,16 @@ import { type DataCategory, DATA_CATEGORY_CHECK_FIELDS } from 'lib/enrichment-da
 import styles from '../EditCollection.module.css';
 
 const ALLOWED_COLUMNS = new Set([
-  'artist', 'title', 'year', 'format', 'country', 'barcode', 'labels',
-  'tracklists', 'tracklist', 'tracks', 'disc_metadata', // ADDED: tracklist
+  'artist', 'title', 'year', 'format', 'country', 'barcode', 'labels', 'cat_no',
+  'tracklists', 'tracklist', 'tracks', 'disc_metadata', 
   'image_url', 'back_image_url', 'sell_price', 'media_condition', 'folder',
   'discogs_master_id', 'discogs_release_id', 'spotify_id', 'spotify_url',
   'apple_music_id', 'apple_music_url', 'lastfm_id', 'lastfm_url', 
-  'wikipedia_url', 'genius_url', 'lastfm_tags', 'notes', // ADDED: tags, notes
-  'genres', 'styles', 'original_release_date',
-  'inner_sleeve_images', // Acts as Gallery
-  'musicians', 'credits', 'producers', 'engineers', 'songwriters', 'composer', 'conductor', 'orchestra',
-  'tempo_bpm', 'musical_key', 'lyrics', 'time_signature', // FIXED: bpm -> tempo_bpm
-  'wikipedia_url', 'genius_url', // ADDED: Missing URL fields
-  // New columns from audit:
+  'musicbrainz_id', 'musicbrainz_url', 'wikipedia_url', 'genius_url', 
+  'lastfm_tags', 'notes', 'genres', 'styles', 'original_release_date',
+  'inner_sleeve_images', 'musicians', 'credits', 'producers', 'engineers', 
+  'songwriters', 'composer', 'conductor', 'orchestra',
+  'tempo_bpm', 'musical_key', 'lyrics', 'time_signature', 
   'danceability', 'energy', 'mood_acoustic', 'mood_happy', 'mood_sad',
   'mood_aggressive', 'mood_electronic', 'mood_party', 'mood_relaxed'
 ]);
@@ -492,8 +490,10 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
             }
             
             if (newVal !== null && newVal !== undefined && newVal !== '') {
-               if (!fieldCandidates[key]) fieldCandidates[key] = {};
-               fieldCandidates[key][source] = newVal;
+               // Normalization: Ensure plural 'labels' column correctly receives data from 'label' key
+               const targetKey = key === 'label' ? 'labels' : key;
+               if (!fieldCandidates[targetKey]) fieldCandidates[targetKey] = {};
+               fieldCandidates[targetKey][source] = newVal;
             }
          });
 
@@ -722,7 +722,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       const sanitizedUpdates: Record<string, any> = { ...rawUpdates, last_enriched_at: timestamp };
 
       // Ensure Array columns (text[]) match the database type to prevent 400 errors
-      const arrayFields = ['labels', 'genres', 'styles', 'finalized_fields'];
+      const arrayFields = ['labels', 'genres', 'styles', 'finalized_fields', 'enrichment_sources'];
       arrayFields.forEach(field => {
         if (sanitizedUpdates[field] !== undefined && sanitizedUpdates[field] !== null) {
            if (!Array.isArray(sanitizedUpdates[field])) {
@@ -738,6 +738,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
         
       if (error) {
           console.error(`[DB ERROR] Album ${albumId}:`, error.message, error.details);
+          // VISIBILITY: Log why the save failed
           addLog(`${albumId}`, 'skipped', `Save Failed: ${error.message}`);
       }
     });

@@ -425,7 +425,7 @@ export async function fetchAppleMusicData(album: { artist: string, title: string
         apple_music_id: amId,
         image_url: attrs?.artwork?.url?.replace('{w}', '1000').replace('{h}', '1000'),
         genres: attrs?.genreNames,
-        label: attrs?.recordLabel ? [attrs.recordLabel] : undefined,
+        labels: attrs?.recordLabel ? [attrs.recordLabel] : undefined, // FIXED: Changed label to labels
         original_release_date: attrs?.releaseDate
     };
 
