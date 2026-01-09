@@ -20,6 +20,7 @@ const ALLOWED_COLUMNS = new Set([
   'image_url', 'back_image_url', 'sell_price', 'media_condition', 'folder',
   'discogs_master_id', 'discogs_release_id', 'spotify_id', 'spotify_url',
   'apple_music_id', 'apple_music_url', 'lastfm_id', 'lastfm_url', // Added LastFM
+  'wikipedia_url', // ADDED: Wikipedia Link
   'genres', 'styles', 'original_release_date',
   'inner_sleeve_images', // Acts as Gallery
   'musicians', 'credits', 'producers', 'engineers', 'songwriters', 'composer', 'conductor', 'orchestra',
