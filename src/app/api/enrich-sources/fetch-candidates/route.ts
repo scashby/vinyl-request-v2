@@ -79,39 +79,22 @@ export async function POST(req: Request) {
 
     for (const album of targetAlbums) {
       const candidates: Record<string, CandidateData> = {};
-      
+      const promises: Promise<EnrichmentResult | null>[] = [];
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const typedAlbum = album as any;
 
-      // 1. STAGE ONE: Core Identities (MusicBrainz)
-      // We do this first because CoverArtArchive needs the MBID to work.
-      let mbid = typedAlbum.musicbrainz_id;
-      
-      if (services.musicbrainz && !mbid) {
-        const mbRes = await fetchMusicBrainzData(typedAlbum);
-        if (mbRes.success && mbRes.data) {
-          candidates['musicbrainz'] = mbRes.data;
-          mbid = mbRes.data.musicbrainz_id; // Capture for CAA usage in Stage 2
-        }
-      }
+      // Always fetch requested services
+      if (services.musicbrainz) promises.push(fetchMusicBrainzData(typedAlbum));
+      if (services.discogs) promises.push(fetchDiscogsData(typedAlbum));
+      if (services.spotify) promises.push(fetchSpotifyData(typedAlbum));
+      if (services.appleMusicEnhanced) promises.push(fetchAppleMusicData(typedAlbum));
+      if (services.lastfm) promises.push(fetchLastFmData(typedAlbum));
+      if (services.wikipedia) promises.push(fetchWikipediaData(typedAlbum));
+      if (services.genius) promises.push(fetchGeniusData(typedAlbum));
+      if (services.coverArt) promises.push(fetchCoverArtData(typedAlbum));
 
-      // 2. STAGE TWO: Content & Context
-      const secondaryPromises: Promise<EnrichmentResult | null>[] = [];
-      
-      if (services.discogs) secondaryPromises.push(fetchDiscogsData(typedAlbum));
-      if (services.spotify) secondaryPromises.push(fetchSpotifyData(typedAlbum));
-      if (services.appleMusicEnhanced) secondaryPromises.push(fetchAppleMusicData(typedAlbum));
-      if (services.lastfm) secondaryPromises.push(fetchLastFmData(typedAlbum));
-      if (services.wikipedia) secondaryPromises.push(fetchWikipediaData(typedAlbum));
-      if (services.genius) secondaryPromises.push(fetchGeniusData(typedAlbum));
-      
-      // Now we can check CoverArt, potentially using the ID we just found
-      if (services.coverArt) {
-         // Pass the potentially newly found MBID
-         secondaryPromises.push(fetchCoverArtData({ ...typedAlbum, musicbrainz_id: mbid || typedAlbum.musicbrainz_id }));
-      }
-
-      const settled = await Promise.allSettled(secondaryPromises);
+      const settled = await Promise.allSettled(promises);
       
       settled.forEach(res => {
         if (res.status === 'fulfilled' && res.value && res.value.success && res.value.data) {

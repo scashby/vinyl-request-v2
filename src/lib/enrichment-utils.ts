@@ -28,7 +28,7 @@ export type CandidateData = {
   engineers?: string[];
   songwriters?: string[];
   original_release_date?: string;
-  labels?: string[]; // Canonical Plural
+  labels?: string[]; // FIXED: Match schema plural
   cat_no?: string;
   barcode?: string;
   country?: string;
@@ -36,7 +36,7 @@ export type CandidateData = {
   // Images
   image_url?: string;
   back_image_url?: string;
-  inner_sleeve_images?: string[]; 
+  inner_sleeve_images?: string[]; // Acts as universal gallery (Spine/Inner/Vinyl)
   
   // Audio Features
   tempo_bpm?: number;
@@ -44,7 +44,7 @@ export type CandidateData = {
   danceability?: number;
   energy?: number;
   mood_acoustic?: number;
-  mood_happy?: number; 
+  mood_happy?: number; // Valence
   mood_sad?: number;
   mood_party?: number;
   mood_relaxed?: number;
@@ -58,7 +58,7 @@ export type CandidateData = {
   lastfm_tags?: string[];
   lyrics?: string;
   lyrics_url?: string;
-  notes?: string; 
+  notes?: string; // ADDED: Field for Wikipedia summary
   
   // Per-Track Data
   tracks?: Array<{
@@ -67,8 +67,6 @@ export type CandidateData = {
     tempo_bpm?: number;
     musical_key?: string;
     lyrics?: string;
-    samples?: string[]; // NEW: For future sample integration
-    covers?: string[];  // NEW: For future cover integration
   }>;
 };
 
@@ -99,19 +97,6 @@ interface MBRelease {
     'catalog-number'?: string;
   }>;
   relations?: MBRelation[];
-  media?: Array<{
-    tracks?: Array<{
-      position: string;
-      title: string;
-      recording?: {
-        relations?: Array<{
-          type: string;
-          direction: string;
-          work?: { title: string };
-        }>;
-      };
-    }>;
-  }>;
 }
 
 interface MBSearchResponse {
@@ -264,37 +249,21 @@ export async function fetchMusicBrainzData(album: { artist: string, title: strin
     if (release.barcode) candidate.barcode = release.barcode;
 
     if (release.relations) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        candidate.producers = release.relations.filter((r: any) => r.type === 'producer').map((r: any) => r.artist?.name);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        candidate.engineers = release.relations.filter((r: any) => r.type === 'engineer').map((r: any) => r.artist?.name);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        candidate.musicians = release.relations.filter((r: any) => ['instrument', 'vocal'].includes(r.type)).map((r: any) => `${r.artist?.name} (${r.attributes?.join(', ') || 'Musician'})`);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        candidate.songwriters = release.relations.filter((r: any) => ['composer', 'writer'].includes(r.type)).map((r: any) => r.artist?.name);
-    }
-
-    // NEW: Parse Cover Songs from Work Relations
-    if (release.media?.[0]?.tracks) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        candidate.tracks = release.media[0].tracks.map((t: any) => {
-            const recording = t.recording;
-            const covers: string[] = [];
+        candidate.producers = release.relations
+            .filter(r => r.type === 'producer' && r.artist)
+            .map(r => r.artist!.name);
             
-            if (recording?.relations) {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                recording.relations.forEach((rel: any) => {
-                    if ((rel.type === 'cover' || rel.type === 'based on') && rel.direction === 'backward' && rel.work) {
-                         covers.push(`Original: ${rel.work.title}`);
-                    }
-                });
-            }
-            return {
-                position: String(t.position),
-                title: t.title,
-                covers: covers.length > 0 ? covers : undefined
-            };
-        });
+        candidate.engineers = release.relations
+            .filter(r => r.type === 'engineer' && r.artist)
+            .map(r => r.artist!.name);
+            
+        candidate.musicians = release.relations
+            .filter(r => (r.type === 'instrument' || r.type === 'vocal') && r.artist)
+            .map(r => `${r.artist!.name} (${r.attributes?.join(', ') || 'Musician'})`);
+            
+        candidate.songwriters = release.relations
+            .filter(r => (r.type === 'composer' || r.type === 'writer' || r.type === 'lyricist') && r.artist)
+            .map(r => r.artist!.name);
     }
 
     return { success: true, source: 'musicbrainz', data: candidate };
@@ -689,9 +658,9 @@ export async function fetchWikipediaData(album: { artist: string, title: string 
         
         if (!data.query?.search?.length) return { success: false, source: 'wikipedia', error: 'Not found' };
         
-        const pageId = String(data.query.search[0].pageid);
+        const pageId = data.query.search[0].pageid;
         
-        // STAGE 2: Fetch the actual intro text (Extract)
+        // Step 2: Fetch the actual summary
         const summaryUrl = `https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro&explaintext&pageids=${pageId}&format=json`;
         const summaryRes = await fetch(summaryUrl);
         const summaryData = await summaryRes.json();
@@ -702,7 +671,7 @@ export async function fetchWikipediaData(album: { artist: string, title: string 
             source: 'wikipedia', 
             data: { 
                 wikipedia_url: `https://en.wikipedia.org/?curid=${pageId}`,
-                notes: extract || undefined
+                notes: extract // Map summary to 'notes' field
             } 
         };
     } catch (e) {
