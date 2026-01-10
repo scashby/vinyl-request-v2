@@ -4,6 +4,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import { type ExtendedFieldConflict } from './ImportEnrichModal';
+import { SERVICE_ICONS } from 'lib/enrichment-data-mapping';
 import styles from '../EditCollection.module.css';
 
 interface EnrichmentReviewModalProps {
@@ -143,14 +144,26 @@ function ConflictValue({
     textTransform: 'uppercase' as const,
     display: 'flex',
     justifyContent: 'space-between',
-    alignItems: 'center'
+    alignItems: 'center',
+    gap: '6px'
+  };
+
+  // Helper to get icon
+  const getIcon = (lbl: string) => {
+    // Check if label matches a known service key (case-insensitive)
+    const key = Object.keys(SERVICE_ICONS).find(k => lbl.toLowerCase().includes(k.toLowerCase()));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return key ? (SERVICE_ICONS as any)[key] : null;
   };
 
   if (isImage && typeof value === 'string') {
     return (
     <div onClick={onClick} style={baseStyle}>
        <div style={headerStyle}>
-          <span>{label} {dimensions && `(${dimensions.w} x ${dimensions.h} px)`}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+             <span>{getIcon(label)}</span>
+             <span>{label} {dimensions && `(${dimensions.w} x ${dimensions.h} px)`}</span>
+          </div>
           {isMultiSelect ? (
             <input 
               type="checkbox" 
@@ -186,7 +199,10 @@ function ConflictValue({
   return (
     <div onClick={onClick} style={baseStyle}>
       <div style={headerStyle}>
-        <span>{label}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+           <span>{getIcon(label)}</span>
+           <span>{label}</span>
+        </div>
         {isMultiSelect ? (
           <input 
             type="checkbox" 

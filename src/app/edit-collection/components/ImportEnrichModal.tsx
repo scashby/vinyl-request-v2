@@ -135,10 +135,18 @@ type Album = {
   artist: string;
   title: string;
   image_url: string | null;
+  finalized_fields?: string[];
+  last_reviewed_at?: string;
+  [key: string]: unknown; // Allows dynamic access like album[key]
 };
 
 interface CandidateResult {
-  album: Record<string, unknown> & { id: number; artist: string; title: string };
+  album: Record<string, unknown> & { 
+    id: number; 
+    artist: string; 
+    title: string; 
+    finalized_fields?: string[]; 
+  };
   candidates: Record<string, unknown>;
 }
 
@@ -568,36 +576,82 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
          }
       }
 
+      // SMART MERGE & CONFLICT DETECTION
       Object.entries(fieldCandidates).forEach(([key, sourceValues]) => {
-          const currentVal = album[key];
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const currentVal = (album as any)[key];
           const isCurrentEmpty = !currentVal || (Array.isArray(currentVal) && currentVal.length === 0);
-          const uniqueValues = new Set(Object.values(sourceValues).map(v => normalizeValue(v)));
           const sources = Object.keys(sourceValues);
-          
           if (sources.length === 0) return;
 
-          if (isCurrentEmpty && uniqueValues.size === 1) {
-              const winningVal = Object.values(sourceValues)[0];
-              updatesForAlbum[key] = winningVal;
+          const ARRAY_FIELDS = ['genres', 'styles', 'musicians', 'producers', 'engineers', 'songwriters'];
+          const isArrayField = ARRAY_FIELDS.includes(key);
+
+          let proposedValue: unknown;
+          let isMerge = false;
+
+          // Strategy 1: Arrays -> Smart Union
+          if (isArrayField) {
+             const mergedSet = new Set<string>();
+             const lowerCaseMap = new Set<string>();
+             
+             Object.values(sourceValues).forEach(val => {
+                if (Array.isArray(val)) {
+                   val.forEach(item => {
+                      const str = String(item).trim();
+                      const lower = str.toLowerCase().replace(/[^a-z0-9]/g, ''); // Normalize
+                      if (!lowerCaseMap.has(lower)) {
+                         mergedSet.add(str);
+                         lowerCaseMap.add(lower);
+                      }
+                   });
+                }
+             });
+             proposedValue = Array.from(mergedSet);
+             isMerge = true;
+          } 
+          // Strategy 2: Single Values -> Priority Winner
+          else {
+             // Pick the value from the highest priority source available
+             const winnerSrc = SOURCE_PRIORITY.find(s => sources.includes(s)) || sources[0];
+             proposedValue = sourceValues[winnerSrc];
+          }
+
+          // DECISION: Auto-Fill vs Conflict
+          
+          // Case A: Auto-Fill (Database is empty AND we have a valid proposal)
+          // For Single values, we also check if sources disagree. If they do, we might want to review even if DB is empty.
+          // But for Arrays, we always trust the merge if DB is empty.
+          const uniqueSingleValues = new Set(Object.values(sourceValues).map(v => normalizeValue(v)));
+          const singleValuesAgree = !isArrayField && uniqueSingleValues.size === 1;
+
+          if (isCurrentEmpty && (isMerge || singleValuesAgree)) {
+              updatesForAlbum[key] = proposedValue;
               autoFilledFields.push(key);
               
+              // Log history for all contributing sources
               sources.forEach(src => {
                  historyUpdates.push({
-                    album_id: album.id, field_name: key, source: src, resolution: 'keep_current', kept_value: winningVal, resolved_at: new Date().toISOString()
+                    album_id: album.id, field_name: key, source: src, resolution: 'auto_fill', kept_value: proposedValue, resolved_at: new Date().toISOString()
                  });
               });
-          } else {
-              const candidatesDifferFromDB = sources.some(src => !areValuesEqual(currentVal, sourceValues[src]));
-              if (candidatesDifferFromDB || (isCurrentEmpty && uniqueValues.size > 1)) {
-                  const primarySource = SOURCE_PRIORITY.find(s => sources.includes(s)) || sources[0];
+          } 
+          // Case B: Conflict (Database has data OR Sources disagree on a single value)
+          else {
+              // Check if the proposed value is actually different from DB
+              if (!areValuesEqual(currentVal, proposedValue)) {
+                  // If it's a merge, the "source" is a composite key 'merge'
+                  // If it's a single value, we attribute it to the priority source
+                  const primarySource = isMerge ? 'merge' : (SOURCE_PRIORITY.find(s => sources.includes(s)) || sources[0]);
+                  
                   newConflicts.push({
                       album_id: album.id,
                       field_name: key,
                       current_value: currentVal,
-                      new_value: sourceValues[primarySource],
+                      new_value: proposedValue,
                       source: primarySource, 
-                      candidates: sourceValues,
-                      existing_finalized: (album as Record<string, unknown>).finalized_fields as string[] || [],
+                      candidates: sourceValues, // Keep raw candidates for the dropdown picker
+                      existing_finalized: album.finalized_fields || [],
                       artist: album.artist,
                       title: album.title,
                       format: (album.format as string) || 'Unknown',
