@@ -11,7 +11,6 @@ import Image from 'next/image';
 import { supabase } from 'lib/supabaseClient';
 import EnrichmentReviewModal from './EnrichmentReviewModal';
 import { type FieldConflict } from 'lib/conflictDetection';
-import { type DataCategory, DATA_CATEGORY_CHECK_FIELDS } from 'lib/enrichment-data-mapping';
 import styles from '../EditCollection.module.css';
 
 const ALLOWED_COLUMNS = new Set([
@@ -61,7 +60,8 @@ const ENRICHMENT_CAMPAIGNS = {
   }
 };
 
-type CampaignKey = keyof typeof ENRICHMENT_CAMPAIGNS;
+type CampaignId = keyof typeof ENRICHMENT_CAMPAIGNS;
+type CampaignKey = CampaignId;
 
 // --- 2. TYPES ---
 interface ImportEnrichModalProps {
@@ -1033,111 +1033,6 @@ function StatBox({ label, value, color, onClick, disabled }: { label: string; va
     <div onClick={disabled ? undefined : onClick} className={styles.importPreviewStat} style={{ border: `2px solid ${color}`, cursor: disabled ? 'default' : 'pointer' }}>
       <div className={styles.importPreviewStatValue} style={{ color }}>{value.toLocaleString()}</div>
       <div className={styles.importPreviewStatLabel}>{label}</div>
-    </div>
-  );
-}
-
-function DataCategoryCard({ 
-  category, count, subcounts, selectedFields, onToggleCategory, onToggleField, disabled 
-}: { 
-  category: DataCategory; 
-  count: number; 
-  subcounts?: { label: string; count: number }[]; 
-  selectedFields: Set<string>;
-  onToggleCategory: () => void;
-  onToggleField: (field: string) => void;
-  disabled: boolean; 
-}) {
-  const config = DATA_CATEGORY_CONFIG[category];
-  const [expanded, setExpanded] = useState(false);
-  
-  if (!config) return null;
-
-  const fields = DATA_CATEGORY_CHECK_FIELDS[category] || [];
-  const importableFields = fields.filter(f => ALLOWED_COLUMNS.has(f));
-  
-  const allSelected = importableFields.length > 0 && importableFields.every(f => selectedFields.has(f));
-  const someSelected = importableFields.some(f => selectedFields.has(f));
-  const isIndeterminate = someSelected && !allSelected;
-
-  // Pretty print helper
-  const formatLabel = (f: string) => f.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-
-  return (
-    <div 
-      className={styles.importSelectionCard}
-      style={{ 
-        borderColor: someSelected ? '#f59e0b' : '#e5e7eb', 
-        backgroundColor: someSelected ? '#fff7ed' : 'white', 
-        opacity: disabled ? 0.6 : 1,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '0'
-      }}
-    >
-      <div 
-        onClick={disabled ? undefined : onToggleCategory}
-        style={{ display: 'flex', gap: '10px', cursor: disabled ? 'default' : 'pointer' }}
-      >
-        <input 
-          type="checkbox" 
-          checked={allSelected} 
-          ref={input => { if (input) input.indeterminate = isIndeterminate; }}
-          onChange={onToggleCategory} 
-          disabled={disabled} 
-          style={{ marginTop: '4px', cursor: 'pointer' }} 
-        />
-        <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-            <span style={{ fontSize: '16px' }}>{config.icon}</span>
-            <span className={styles.importSelectionCardTitle} style={{ fontSize: '14px', marginBottom: 0 }}>{config.label}</span>
-            <span style={{ marginLeft: 'auto', fontWeight: '700', color: count > 0 ? '#ef4444' : '#10b981' }}>{count.toLocaleString()}</span>
-          </div>
-          <div className={styles.importSelectionCardDescription}>{config.desc}</div>
-        </div>
-      </div>
-      
-      {/* Footer Area: Stats & Expansion */}
-      <div style={{ marginLeft: '26px', marginTop: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-         <button
-            onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
-            style={{ background: 'none', border: 'none', padding: '4px 0', fontSize: '11px', color: '#3b82f6', cursor: 'pointer', fontWeight: '500' }}
-          >
-            {expanded ? '▼ Hide Fields' : `▶ Select Fields (${importableFields.filter(f => selectedFields.has(f)).length}/${importableFields.length})`}
-          </button>
-      </div>
-
-      {/* Expanded Area: Granular Checkboxes */}
-      {expanded && (
-        <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #e5e7eb', marginLeft: '26px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-             {importableFields.map(field => (
-                <label key={field} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#374151', cursor: 'pointer' }}>
-                   <input 
-                      type="checkbox" 
-                      checked={selectedFields.has(field)} 
-                      onChange={() => onToggleField(field)}
-                      disabled={disabled}
-                   />
-                   {formatLabel(field)}
-                </label>
-             ))}
-          </div>
-          
-          {/* Keep Subcounts for Stats visibility if needed */}
-          {subcounts && subcounts.length > 0 && (
-            <div style={{ marginTop: '12px', paddingTop: '8px', borderTop: '1px dashed #e5e7eb', fontSize: '10px', color: '#6b7280' }}>
-               <strong>Missing Data Stats:</strong>
-               {subcounts.map((sub, idx) => (
-                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '1px 0' }}>
-                    <span>{sub.label}:</span>
-                    <span>{sub.count.toLocaleString()}</span>
-                  </div>
-                ))}
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }
