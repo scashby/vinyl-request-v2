@@ -11,7 +11,12 @@ import Image from 'next/image';
 import { supabase } from 'lib/supabaseClient';
 import EnrichmentReviewModal from './EnrichmentReviewModal';
 import { type FieldConflict } from 'lib/conflictDetection';
-import { type DataCategory, DATA_CATEGORY_CHECK_FIELDS } from 'lib/enrichment-data-mapping';
+import { 
+  type DataCategory, 
+  DATA_CATEGORY_CHECK_FIELDS, 
+  FIELD_TO_SERVICES,
+  SERVICE_ICONS
+} from 'lib/enrichment-data-mapping';
 import styles from '../EditCollection.module.css';
 
 const ALLOWED_COLUMNS = new Set([
@@ -87,6 +92,9 @@ interface ImportEnrichModalProps {
   onClose: () => void;
   onImportComplete?: () => void;
 }
+
+// Map: FieldName -> Set of Allowed Service IDs
+export type FieldConfigMap = Record<string, Set<string>>;
 
 type EnrichmentStats = {
   total: number;
@@ -186,28 +194,34 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   const [folderFilter, setFolderFilter] = useState('');
   const [batchSize, setBatchSize] = useState('25');
   
-  // Granular Field Selection State
-  const [selectedFields, setSelectedFields] = useState<Set<string>>(() => {
-    const defaults = new Set<string>();
-    const defaultCats: DataCategory[] = ['artwork', 'credits', 'tracklists', 'genres'];
-    defaultCats.forEach(cat => {
-      const fields = DATA_CATEGORY_CHECK_FIELDS[cat] || [];
-      fields.forEach(f => {
-        if (ALLOWED_COLUMNS.has(f)) defaults.add(f);
-      });
-    });
-    return defaults;
-  });
+  // Granular Configuration State
+  // Map: FieldName -> Set of Allowed Service IDs
+  // If a field is present in this object, it is enabled. The Set contains its allowed sources.
+  
+  
+  const [fieldConfig, setFieldConfig] = useState<FieldConfigMap>({});
 
-  // Derived active categories for service selection
-  const selectedCategories = new Set<DataCategory>();
-  (Object.keys(DATA_CATEGORY_CONFIG) as DataCategory[]).forEach(cat => {
-      const fields = DATA_CATEGORY_CHECK_FIELDS[cat] || [];
-      // If any field in this category is selected, the category is "active" for service fetching
-      if (fields.some(f => selectedFields.has(f))) {
-        selectedCategories.add(cat);
-      }
-  });
+  // Initialize Default State on Load
+  useEffect(() => {
+    if (isOpen) {
+      const initialConfig: FieldConfigMap = {};
+      // Default enabled categories
+      const defaultCats: DataCategory[] = ['artwork', 'credits', 'tracklists', 'genres', 'audio_analysis'];
+      
+      defaultCats.forEach(cat => {
+        const fields = DATA_CATEGORY_CHECK_FIELDS[cat] || [];
+        fields.forEach(field => {
+          if (ALLOWED_COLUMNS.has(field)) {
+            const services = FIELD_TO_SERVICES[field] || [];
+            if (services.length > 0) {
+              initialConfig[field] = new Set(services);
+            }
+          }
+        });
+      });
+      setFieldConfig(initialConfig);
+    }
+  }, [isOpen]);
   
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [categoryTitle, setCategoryTitle] = useState('');
@@ -251,23 +265,66 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   }
 
   function getServicesForSelection() {
-    const serviceMap: Record<string, boolean> = {
-      musicbrainz: false, spotify: false, discogs: false, lastfm: false,
-      appleMusicEnhanced: false, wikipedia: false, genius: false, coverArt: false,
-    };
-
-    selectedCategories.forEach(cat => {
-      const config = DATA_CATEGORY_CONFIG[cat];
-      if (config) {
-        config.services.forEach(service => {
-          if (service === 'appleMusic') serviceMap.appleMusicEnhanced = true;
-          else serviceMap[service] = true;
-        });
-      }
-    });
+    // Calculate which services are needed based on the enabled fields
+    const activeServices = new Set<string>();
     
-    return serviceMap;
+    Object.values(fieldConfig).forEach(allowedSources => {
+      allowedSources.forEach(s => activeServices.add(s));
+    });
+
+    return {
+      musicbrainz: activeServices.has('musicbrainz'),
+      spotify: activeServices.has('spotify'),
+      discogs: activeServices.has('discogs'),
+      lastfm: activeServices.has('lastfm'),
+      appleMusicEnhanced: activeServices.has('appleMusic'),
+      wikipedia: activeServices.has('wikipedia'),
+      genius: activeServices.has('genius'),
+      coverArt: activeServices.has('coverArtArchive'),
+    };
   }
+
+  const toggleField = (field: string) => {
+    setFieldConfig(prev => {
+      const next = { ...prev };
+      if (next[field]) {
+        delete next[field];
+      } else {
+        const defaults = FIELD_TO_SERVICES[field] || [];
+        next[field] = new Set(defaults);
+      }
+      return next;
+    });
+  };
+
+  const toggleFieldSource = (field: string, service: string) => {
+    setFieldConfig(prev => {
+      if (!prev[field]) return prev;
+      const nextSources = new Set(prev[field]);
+      if (nextSources.has(service)) nextSources.delete(service);
+      else nextSources.add(service);
+      return { ...prev, [field]: nextSources };
+    });
+  };
+
+  const toggleCategory = (category: DataCategory) => {
+    const fields = DATA_CATEGORY_CHECK_FIELDS[category] || [];
+    const validFields = fields.filter(f => ALLOWED_COLUMNS.has(f));
+    const allEnabled = validFields.every(f => !!fieldConfig[f]);
+
+    setFieldConfig(prev => {
+      const next = { ...prev };
+      validFields.forEach(f => {
+        if (allEnabled) {
+          delete next[f];
+        } else {
+          const defaults = FIELD_TO_SERVICES[f] || [];
+          next[f] = new Set(defaults);
+        }
+      });
+      return next;
+    });
+  };
 
   function addLog(album: string, action: LogEntry['action'], details: string) {
     setSessionLog(prev => [...prev, {
@@ -282,7 +339,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   // --- MAIN LOOP LOGIC ---
 
   async function startEnrichment(specificAlbumIds?: number[]) {
-    if (selectedFields.size === 0) {
+    if (Object.keys(fieldConfig).length === 0) {
       alert('Please select at least one field to enrich');
       return;
     }
@@ -452,18 +509,18 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
          if (!sourceData) continue;
 
          Object.entries(sourceData).forEach(([key, value]) => {
-            if (!ALLOWED_COLUMNS.has(key)) {
-                // VISIBILITY FIX: Log blocked columns to console so you can see what's being ignored
-                console.warn(`[Blocked] Field '${key}' from ${source} found but not in ALLOWED_COLUMNS.`);
-                return;
-            }
+            if (!ALLOWED_COLUMNS.has(key)) return;
             
-            // ------------------------------------------------------------------
-            // FIX: Filter based on User's Selected Fields (Granularity)
-            // ------------------------------------------------------------------
-            if (!selectedFields.has(key)) {
-              return; // Skip this field if explicitly unchecked
-            }
+            // 1. Check Field Granularity: Is this field enabled?
+            const allowedSources = fieldConfig[key];
+            if (!allowedSources) return; // Field is disabled
+
+            // 2. Check Source Granularity: Is this specific source allowed for this field?
+            let normalizedSource = source;
+            if (source === 'appleMusicEnhanced') normalizedSource = 'appleMusic';
+            if (source === 'coverArt') normalizedSource = 'coverArtArchive';
+            
+            if (!allowedSources.has(normalizedSource)) return; // Source is disabled for this field
             // ------------------------------------------------------------------
 
             // Allow tracks and lyrics to pass through to fieldCandidates for review/save 
@@ -754,28 +811,6 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     setShowReview(false);
   }
 
-  function toggleCategory(category: DataCategory) {
-    const fields = DATA_CATEGORY_CHECK_FIELDS[category] || [];
-    const importableFields = fields.filter(f => ALLOWED_COLUMNS.has(f));
-    
-    // Check if ALL importable fields are currently selected
-    const allSelected = importableFields.every(f => selectedFields.has(f));
-    
-    const next = new Set(selectedFields);
-    importableFields.forEach(f => {
-      if (allSelected) next.delete(f); // Unselect all
-      else next.add(f); // Select all
-    });
-    setSelectedFields(next);
-  }
-
-  function toggleField(field: string) {
-    const next = new Set(selectedFields);
-    if (next.has(field)) next.delete(field);
-    else next.add(field);
-    setSelectedFields(next);
-  }
-
   async function showCategory(category: string, title: string) {
     setShowCategoryModal(true);
     setCategoryTitle(title);
@@ -939,15 +974,16 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
               <div className={styles.importEnrichCard}>
                 <h3 className={styles.importEnrichHeader}>Select Data to Enrich</h3>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '12px' }}>
-                  {dataCategoriesConfig.map(({ category, count, subcounts }) => (
+                  {/* Note: dataCategoriesConfig is used for sorting/structure, but props are new */}
+                  {dataCategoriesConfig.map(({ category }) => (
                     <DataCategoryCard
                       key={category} 
                       category={category} 
-                      count={count} 
-                      subcounts={subcounts}
-                      selectedFields={selectedFields}
+                      stats={stats}
+                      fieldConfig={fieldConfig}
                       onToggleCategory={() => toggleCategory(category)}
                       onToggleField={toggleField}
+                      onToggleFieldSource={toggleFieldSource}
                       disabled={enriching}
                     />
                   ))}
@@ -1012,7 +1048,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           <button onClick={onClose} disabled={enriching} className={styles.importCancelButton}>Close</button>
           <button 
             onClick={() => startEnrichment()} 
-            disabled={enriching || !stats || selectedFields.size === 0} 
+            disabled={enriching || !stats || Object.keys(fieldConfig).length === 0} 
             className={styles.importConfirmButton}
             style={{ backgroundColor: enriching ? '#d1d5db' : undefined, cursor: enriching ? 'not-allowed' : undefined }}
           >
@@ -1078,106 +1114,138 @@ function StatBox({ label, value, color, onClick, disabled }: { label: string; va
 }
 
 function DataCategoryCard({ 
-  category, count, subcounts, selectedFields, onToggleCategory, onToggleField, disabled 
+  category, 
+  stats,
+  fieldConfig,
+  onToggleCategory,
+  onToggleField,
+  onToggleFieldSource,
+  disabled 
 }: { 
   category: DataCategory; 
-  count: number; 
-  subcounts?: { label: string; count: number }[]; 
-  selectedFields: Set<string>;
+  stats: EnrichmentStats | null; // Use specific type
+  fieldConfig: FieldConfigMap;
   onToggleCategory: () => void;
-  onToggleField: (field: string) => void;
+  onToggleField: (f: string) => void;
+  onToggleFieldSource: (f: string, s: string) => void;
   disabled: boolean; 
 }) {
-  const config = DATA_CATEGORY_CONFIG[category];
-  const [expanded, setExpanded] = useState(false);
-  
-  if (!config) return null;
-
+  // Use ALLOWED_COLUMNS to filter what we show
   const fields = DATA_CATEGORY_CHECK_FIELDS[category] || [];
-  const importableFields = fields.filter(f => ALLOWED_COLUMNS.has(f));
+  const validFields = fields.filter(f => ALLOWED_COLUMNS.has(f));
   
-  const allSelected = importableFields.length > 0 && importableFields.every(f => selectedFields.has(f));
-  const someSelected = importableFields.some(f => selectedFields.has(f));
-  const isIndeterminate = someSelected && !allSelected;
+  if (validFields.length === 0) return null;
+
+  const activeCount = validFields.filter(f => !!fieldConfig[f]).length;
+  const isAllSelected = activeCount === validFields.length;
+  const isIndeterminate = activeCount > 0 && !isAllSelected;
 
   // Pretty print helper
   const formatLabel = (f: string) => f.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 
+  // Helper to get missing count from stats object (needs mapping)
+  const getMissing = (field: string) => {
+    if (!stats) return 0;
+    // Simple heuristic mapping - can be improved
+    if (field === 'image_url') return stats.missingArtwork;
+    if (field === 'back_image_url') return stats.missingBackCover;
+    if (field.includes('musicians')) return stats.missingMusicians;
+    if (field.includes('bpm')) return stats.missingTempo;
+    return 0;
+  };
+
   return (
-    <div 
-      className={styles.importSelectionCard}
-      style={{ 
-        borderColor: someSelected ? '#f59e0b' : '#e5e7eb', 
-        backgroundColor: someSelected ? '#fff7ed' : 'white', 
-        opacity: disabled ? 0.6 : 1,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '0'
-      }}
-    >
+    <div className={styles.importSelectionCard} style={{ cursor: 'default', opacity: disabled ? 0.6 : 1 }}>
+      {/* HEADER */}
       <div 
-        onClick={disabled ? undefined : onToggleCategory}
-        style={{ display: 'flex', gap: '10px', cursor: disabled ? 'default' : 'pointer' }}
+        className={styles.cardHeader}
+        style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingBottom: '8px', borderBottom: '1px solid #e5e7eb', marginBottom: '8px' }}
       >
-        <input 
-          type="checkbox" 
-          checked={allSelected} 
-          ref={input => { if (input) input.indeterminate = isIndeterminate; }}
-          onChange={onToggleCategory} 
-          disabled={disabled} 
-          style={{ marginTop: '4px', cursor: 'pointer' }} 
-        />
-        <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-            <span style={{ fontSize: '16px' }}>{config.icon}</span>
-            <span className={styles.importSelectionCardTitle} style={{ fontSize: '14px', marginBottom: 0 }}>{config.label}</span>
-            <span style={{ marginLeft: 'auto', fontWeight: '700', color: count > 0 ? '#ef4444' : '#10b981' }}>{count.toLocaleString()}</span>
-          </div>
-          <div className={styles.importSelectionCardDescription}>{config.desc}</div>
-        </div>
-      </div>
-      
-      {/* Footer Area: Stats & Expansion */}
-      <div style={{ marginLeft: '26px', marginTop: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-         <button
-            onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
-            style={{ background: 'none', border: 'none', padding: '4px 0', fontSize: '11px', color: '#3b82f6', cursor: 'pointer', fontWeight: '500' }}
-          >
-            {expanded ? '▼ Hide Fields' : `▶ Select Fields (${importableFields.filter(f => selectedFields.has(f)).length}/${importableFields.length})`}
-          </button>
+         <input 
+            type="checkbox" 
+            checked={isAllSelected}
+            ref={el => { if(el) el.indeterminate = isIndeterminate; }}
+            onChange={onToggleCategory}
+            disabled={disabled}
+            style={{ cursor: 'pointer' }}
+         />
+         <span style={{ fontSize: '16px' }}>{DATA_CATEGORY_CONFIG[category]?.icon}</span>
+         <span style={{ fontWeight: '700', fontSize: '13px' }}>{DATA_CATEGORY_CONFIG[category]?.label}</span>
       </div>
 
-      {/* Expanded Area: Granular Checkboxes */}
-      {expanded && (
-        <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #e5e7eb', marginLeft: '26px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-             {importableFields.map(field => (
-                <label key={field} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#374151', cursor: 'pointer' }}>
-                   <input 
-                      type="checkbox" 
-                      checked={selectedFields.has(field)} 
-                      onChange={() => onToggleField(field)}
-                      disabled={disabled}
-                   />
-                   {formatLabel(field)}
-                </label>
-             ))}
-          </div>
-          
-          {/* Keep Subcounts for Stats visibility if needed */}
-          {subcounts && subcounts.length > 0 && (
-            <div style={{ marginTop: '12px', paddingTop: '8px', borderTop: '1px dashed #e5e7eb', fontSize: '10px', color: '#6b7280' }}>
-               <strong>Missing Data Stats:</strong>
-               {subcounts.map((sub, idx) => (
-                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '1px 0' }}>
-                    <span>{sub.label}:</span>
-                    <span>{sub.count.toLocaleString()}</span>
+      {/* FIELD ROWS (Dashboard Style) */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+         {validFields.map(field => {
+            const isEnabled = !!fieldConfig[field];
+            const activeSources = fieldConfig[field] || new Set();
+            const services = FIELD_TO_SERVICES[field] || [];
+            const missing = getMissing(field);
+
+            return (
+               <div key={field} style={{ 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  gap: '4px',
+                  padding: '6px',
+                  borderRadius: '4px',
+                  backgroundColor: isEnabled ? '#f9fafb' : 'transparent',
+                  border: isEnabled ? '1px solid #e5e7eb' : '1px solid transparent'
+               }}>
+                  {/* Row Top: Checkbox + Name + Stats */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                     <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '500', cursor: 'pointer', color: isEnabled ? '#111827' : '#9ca3af' }}>
+                        <input 
+                           type="checkbox" 
+                           checked={isEnabled} 
+                           onChange={() => onToggleField(field)}
+                           disabled={disabled}
+                        />
+                        {formatLabel(field)}
+                     </label>
+                     {missing > 0 && <span style={{ fontSize: '10px', color: '#ef4444', backgroundColor: '#fee2e2', padding: '1px 4px', borderRadius: '4px' }}>{missing}</span>}
                   </div>
-                ))}
-            </div>
-          )}
-        </div>
-      )}
+
+                  {/* Row Bottom: Source Toggles (Only if enabled) */}
+                  {isEnabled && services.length > 0 && (
+                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginLeft: '20px', marginTop: '2px' }}>
+                        {services.map(srv => {
+                           const isActive = activeSources.has(srv);
+                           return (
+                              <label 
+                                key={srv} 
+                                title={srv}
+                                style={{ 
+                                   display: 'flex', 
+                                   alignItems: 'center', 
+                                   gap: '3px', 
+                                   fontSize: '10px', 
+                                   padding: '2px 6px', 
+                                   borderRadius: '12px',
+                                   border: isActive ? '1px solid #3b82f6' : '1px solid #e5e7eb',
+                                   backgroundColor: isActive ? '#eff6ff' : 'white',
+                                   color: isActive ? '#1d4ed8' : '#6b7280',
+                                   cursor: 'pointer',
+                                   transition: 'all 0.2s'
+                                }}
+                              >
+                                 <input 
+                                    type="checkbox" 
+                                    checked={isActive} 
+                                    onChange={() => onToggleFieldSource(field, srv)}
+                                    disabled={disabled}
+                                    style={{ display: 'none' }} // Hide native checkbox for cleaner look
+                                 />
+                                 <span>{SERVICE_ICONS[srv]}</span>
+                                 <span>{srv}</span>
+                              </label>
+                           );
+                        })}
+                     </div>
+                  )}
+               </div>
+            );
+         })}
+      </div>
     </div>
   );
 }
