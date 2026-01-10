@@ -142,7 +142,11 @@ export const DATA_CATEGORY_CHECK_FIELDS: Record<DataCategory, string[]> = {
     'energy',
     'mood_acoustic',
     'mood_happy',
-    'mood_sad'
+    'mood_sad',
+    // Sonic Domain / Covers
+    'is_cover',
+    'original_artist',
+    'original_year'
   ],
   genres: [
     'genres', // Canonical
@@ -208,18 +212,18 @@ export const FIELD_TO_SERVICES: Record<string, EnrichmentService[]> = {
   // CANONICAL ARTWORK
   'image_url': ['coverArtArchive', 'musicbrainz', 'discogs', 'spotify', 'appleMusic', 'lastfm'],
   'back_image_url': ['coverArtArchive', 'musicbrainz', 'discogs'],
-  'spine_image_url': ['coverArtArchive', 'musicbrainz'],
-  'inner_sleeve_images': ['coverArtArchive', 'musicbrainz'],
-  'vinyl_label_images': ['coverArtArchive', 'musicbrainz'],
+  'spine_image_url': ['coverArtArchive', 'musicbrainz', 'discogs'],
+  'inner_sleeve_images': ['coverArtArchive', 'musicbrainz', 'discogs'],
+  'vinyl_label_images': ['coverArtArchive', 'musicbrainz', 'discogs'],
   
   // SERVICE-SPECIFIC ARTWORK
   'spotify_image_url': ['spotify'],
   'apple_music_artwork_url': ['appleMusic'],
   
   // CANONICAL CREDITS
-  'musicians': ['musicbrainz', 'allmusic'],
-  'producers': ['musicbrainz', 'allmusic'],
-  'engineers': ['musicbrainz', 'allmusic'],
+  'musicians': ['discogs', 'musicbrainz', 'allmusic'],
+  'producers': ['discogs', 'musicbrainz', 'allmusic'],
+  'engineers': ['discogs', 'musicbrainz', 'allmusic'],
   'songwriters': ['musicbrainz', 'allmusic', 'genius'],
   'composer': ['musicbrainz', 'appleMusic', 'allmusic'],
   'conductor': ['musicbrainz'],
@@ -238,6 +242,11 @@ export const FIELD_TO_SERVICES: Record<string, EnrichmentService[]> = {
   // SERVICE-SPECIFIC TRACKLISTS
   'spotify_tracks': ['spotify'],
   'apple_music_tracks': ['appleMusic'],
+
+  // SONIC DOMAIN
+  'is_cover': ['musicbrainz', 'discogs'],
+  'original_artist': ['musicbrainz', 'discogs'],
+  'original_year': ['musicbrainz', 'discogs'],
   
   // CANONICAL AUDIO ANALYSIS
   'tempo_bpm': ['acousticbrainz', 'musicbrainz', 'spotify'],
