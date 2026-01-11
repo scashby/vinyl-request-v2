@@ -58,10 +58,11 @@ const DATA_CATEGORY_CONFIG: Partial<Record<DataCategory, { label: string; desc: 
     services: ['spotify', 'appleMusic', 'discogs']
   },
   audio_analysis: {
-    label: 'Audio Analysis',
-    desc: 'Tempo (BPM), musical key, danceability, and energy metrics.',
+    label: 'Sonic Data (Audio & Covers)',
+    desc: 'BPM, Key, Cover Songs, and Original Artist data.',
     icon: '📊',
-    services: ['spotify']
+    // ADDED: musicbrainz, discogs
+    services: ['spotify', 'musicbrainz', 'discogs']
   },
   genres: {
     label: 'Genres & Styles',
@@ -743,6 +744,12 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
          if (match.tempo_bpm) patch.tempo_bpm = match.tempo_bpm;
          if (match.musical_key) patch.musical_key = match.musical_key;
          if (match.lyrics) patch.lyrics = match.lyrics;
+         
+         // NEW: Sonic Domain Fields
+         if (match.is_cover !== undefined) patch.is_cover = match.is_cover;
+         if (match.original_artist) patch.original_artist = match.original_artist;
+         if (match.original_year) patch.original_year = match.original_year;
+         if (match.mb_work_id) patch.mb_work_id = match.mb_work_id;
 
          if (Object.keys(patch).length > 0) {
             updates.push(Promise.resolve(supabase.from('tracks').update(patch).eq('id', t.id)));
