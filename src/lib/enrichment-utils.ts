@@ -86,19 +86,61 @@ interface MBRelation {
   attributes?: string[];
 }
 
+interface MBArtistCredit {
+  name: string;
+  artist?: { name: string };
+}
+
+interface MBWorkRelation {
+  type: string;
+  begin?: string; // Relation start date
+  end?: string;
+  attributes?: string[];
+  recording?: {
+    id: string;
+    title: string;
+    'first-release-date'?: string; // The golden nugget
+    'artist-credit'?: MBArtistCredit[];
+  };
+}
+
+interface MBRecordingRelation {
+  type: string; // Look for 'performance'
+  work?: {
+    id: string;
+    title: string;
+    relations?: MBWorkRelation[]; // Relationships on the Work itself (to find other recordings)
+  };
+}
+
+interface MBTrack {
+  position: string;
+  title: string;
+  recording?: {
+    id: string;
+    title: string;
+    relations?: MBRecordingRelation[];
+  };
+}
+
+interface MBMedia {
+  format?: string;
+  tracks?: MBTrack[];
+}
+
 interface MBRelease {
   id: string;
   status?: string;
   date?: string;
   country?: string;
   barcode?: string;
+  media?: MBMedia[]; // ADDED: Access to tracks
   'label-info'?: Array<{
     label?: { name: string };
     'catalog-number'?: string;
   }>;
   relations?: MBRelation[];
 }
-
 interface MBSearchResponse {
   releases: MBRelease[];
 }
@@ -202,6 +244,7 @@ const USER_AGENT = 'DeadwaxDialogues/1.0 (https://deadwaxdialogues.com)';
 // 1. MUSICBRAINZ (Dates, Labels, Country, Deep Credits)
 // ============================================================================
 const MB_BASE = 'https://musicbrainz.org/ws/2';
+const isValidDate = (d: string) => /^\d{4}/.test(d);
 
 async function mbSearch(artist: string, title: string): Promise<string | null> {
   try {
@@ -220,7 +263,7 @@ async function mbSearch(artist: string, title: string): Promise<string | null> {
 
 async function mbGetRelease(mbid: string): Promise<MBRelease | null> {
   try {
-    const url = `${MB_BASE}/release/${mbid}?inc=artists+labels+recordings+release-groups+artist-rels&fmt=json`;
+    const url = `${MB_BASE}/release/${mbid}?inc=artists+labels+recordings+release-groups+artist-rels+recording-level-rels+work-rels+work-level-rels&fmt=json`;
     const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } });
     return res.ok ? (await res.json() as MBRelease) : null;
   } catch { return null; }
@@ -238,7 +281,55 @@ export async function fetchMusicBrainzData(album: { artist: string, title: strin
       musicbrainz_id: mbid,
       original_release_date: release.date,
       country: release.country,
+      tracks: [] // Initialize array for per-track analysis
     };
+
+    // --- SONIC DOMAIN: Cover Song Analysis ---
+    if (release.media) {
+       release.media.forEach(medium => {
+          medium.tracks?.forEach(track => {
+             if (!track.recording?.relations) return;
+
+             // 1. Find link to a "Work"
+             const workRel = track.recording.relations.find(r => r.type === 'performance' && r.work);
+             if (!workRel || !workRel.work?.relations) return;
+
+             const work = workRel.work;
+             
+             // 2. Find earliest recording of this work
+             let earliestDate = release.date || '9999';
+             let originalArtist: string | undefined;
+             let isCover = false;
+
+             work.relations.forEach(rel => {
+                // We look for other recordings of this work
+                if (rel.type === 'performance' && rel.recording) {
+                   const recDate = rel.recording['first-release-date'] || rel.begin;
+                   
+                   // Strict check: Must have a date, and date must be before our album's release
+                   if (recDate && isValidDate(recDate) && recDate < earliestDate) {
+                      earliestDate = recDate;
+                      originalArtist = rel.recording['artist-credit']?.[0]?.name;
+                      isCover = true;
+                   }
+                }
+             });
+
+             // 3. Add to candidate track list
+             if (isCover && originalArtist) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                (candidate.tracks as any[]).push({
+                   position: track.position,
+                   title: track.title,
+                   is_cover: true,
+                   original_artist: originalArtist,
+                   original_year: parseInt(earliestDate.substring(0, 4)),
+                   mb_work_id: work.id
+                });
+             }
+          });
+       });
+    }
 
     if (release['label-info']?.[0]) {
       const info = release['label-info'][0];
