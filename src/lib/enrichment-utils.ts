@@ -702,7 +702,7 @@ export async function fetchLastFmData(album: { artist: string, title: string }):
 
     const candidate: CandidateData = {
       lastfm_url: data.album.url,
-      lastfm_tags: tags,
+      tags: tags, // RENAMED: Match generic bucket in CandidateData
       image_url: largeImg || undefined
     };
 
@@ -820,5 +820,52 @@ export async function fetchWikipediaData(album: { artist: string, title: string 
         };
     } catch (e) {
         return { success: false, source: 'wikipedia', error: (e as Error).message };
+    }
+}
+// ============================================================================
+// 9. WHOSAMPLED (Samples & Covers)
+// ============================================================================
+export async function fetchWhoSampledData(album: { artist: string, title: string }): Promise<EnrichmentResult> {
+    // Note: WhoSampled has no public API. This generates a search link for the UI.
+    const query = `${album.artist} ${album.title}`;
+    const searchUrl = `https://www.whosampled.com/search/?q=${encodeURIComponent(query)}`;
+    
+    return {
+        success: true,
+        source: 'whosampled',
+        data: {
+            notes: `Search WhoSampled: ${searchUrl}` 
+        }
+    };
+}
+
+// ============================================================================
+// 10. SECONDHANDSONGS (Originals & Adaptations)
+// ============================================================================
+export async function fetchSecondHandSongsData(album: { artist: string, title: string }): Promise<EnrichmentResult> {
+    // Requires API Key (SHS_API_KEY in .env)
+    const apiKey = process.env.SHS_API_KEY;
+    if (!apiKey) {
+        return { success: false, source: 'secondhandsongs', error: 'No API Key' };
+    }
+
+    try {
+        const url = `https://secondhandsongs.com/search/object?q=${encodeURIComponent(album.title)}&performer=${encodeURIComponent(album.artist)}`;
+        const res = await fetch(url, { headers: { 'Authorization': `Bearer ${apiKey}` } });
+        const data = await res.json();
+        
+        // Basic implementation: Return the first match URL
+        if (data.length > 0) {
+            return {
+                success: true,
+                source: 'secondhandsongs',
+                data: {
+                    notes: `SHS Link: https://secondhandsongs.com${data[0].uri}`
+                }
+            };
+        }
+        return { success: false, source: 'secondhandsongs', error: 'Not Found' };
+    } catch (e) {
+        return { success: false, source: 'secondhandsongs', error: (e as Error).message };
     }
 }
