@@ -55,18 +55,29 @@ export type CandidateData = {
   tracklist?: string;
   
   // Extra
-  lastfm_tags?: string[];
+  tags?: string[]; // Generic Bucket (renamed from lastfm_tags)
   lyrics?: string;
   lyrics_url?: string;
-  notes?: string; // ADDED: Field for Wikipedia summary
+  notes?: string; // Wikipedia/Discogs Notes
+  companies?: string[]; // Discogs Companies
+  
+  // Sonic Domain
+  is_cover?: boolean;
+  original_artist?: string;
+  original_year?: number;
+  samples?: string[];
+  sampled_by?: string[];
   
   // Per-Track Data
   tracks?: Array<{
     position: string;
     title: string;
+    duration?: string;
     tempo_bpm?: number;
     musical_key?: string;
     lyrics?: string;
+    is_cover?: boolean;
+    original_artist?: string;
   }>;
 };
 
@@ -78,6 +89,48 @@ export type EnrichmentResult = {
 };
 
 // --- TYPE DEFINITIONS FOR API RESPONSES ---
+
+interface MBArtistCredit {
+  name: string;
+  artist?: { name: string };
+}
+
+interface MBWorkRelation {
+  type: string;
+  begin?: string;
+  end?: string;
+  attributes?: string[];
+  recording?: {
+    id: string;
+    title: string;
+    'first-release-date'?: string;
+    'artist-credit'?: MBArtistCredit[];
+  };
+}
+
+interface MBRecordingRelation {
+  type: string;
+  work?: {
+    id: string;
+    title: string;
+    relations?: MBWorkRelation[];
+  };
+}
+
+interface MBTrack {
+  position: string;
+  title: string;
+  recording?: {
+    id: string;
+    title: string;
+    relations?: MBRecordingRelation[];
+  };
+}
+
+interface MBMedia {
+  format?: string;
+  tracks?: MBTrack[];
+}
 
 interface MBRelation {
   type: string;
