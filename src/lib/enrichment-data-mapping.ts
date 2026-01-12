@@ -33,7 +33,9 @@ export type EnrichmentService =
   | 'allmusic'
   | 'wikipedia'
   | 'discogs'
-  | 'genius';
+  | 'genius'
+  | 'whosampled'
+  | 'secondhandsongs';
 
 /**
  * Maps data categories to the services that can provide that data
@@ -42,9 +44,9 @@ export const DATA_TO_SERVICES: Record<DataCategory, EnrichmentService[]> = {
   artwork: ['coverArtArchive', 'musicbrainz', 'discogs', 'spotify', 'appleMusic', 'lastfm'],
   credits: ['musicbrainz', 'allmusic', 'appleMusic', 'discogs', 'genius'],
   tracklists: ['discogs', 'spotify', 'appleMusic', 'lastfm'],
-  audio_analysis: ['acousticbrainz', 'musicbrainz', 'spotify'],
-  genres: ['discogs', 'spotify', 'appleMusic', 'allmusic', 'lastfm'],
-  streaming_links: ['spotify', 'appleMusic', 'lastfm', 'musicbrainz', 'allmusic', 'wikipedia'],
+  audio_analysis: ['acousticbrainz', 'musicbrainz', 'spotify', 'whosampled', 'secondhandsongs'],
+  genres: ['discogs', 'spotify', 'appleMusic', 'allmusic', 'lastfm', 'musicbrainz'],
+  streaming_links: ['spotify', 'appleMusic', 'lastfm', 'musicbrainz', 'allmusic', 'wikipedia', 'whosampled', 'secondhandsongs'],
   reviews: ['allmusic', 'lastfm', 'spotify', 'appleMusic', 'wikipedia'],
   chart_data: ['wikipedia'],
   release_metadata: ['musicbrainz', 'discogs', 'spotify', 'appleMusic', 'wikipedia'],
@@ -60,8 +62,8 @@ export const DATA_CATEGORY_LABELS: Record<DataCategory, string> = {
   artwork: 'Album Artwork',
   credits: 'Album Credits',
   tracklists: 'Track Listings',
-  audio_analysis: 'Audio Analysis',
-  genres: 'Genres & Tags',
+  audio_analysis: 'Sonic Domain (Audio & Covers)',
+  genres: 'Genres, Styles & Tags',
   streaming_links: 'Streaming Links',
   reviews: 'Reviews & Ratings',
   chart_data: 'Chart Positions & Awards',
@@ -78,12 +80,12 @@ export const DATA_CATEGORY_DESCRIPTIONS: Record<DataCategory, string> = {
   artwork: 'Front cover, back cover, spine, inner sleeves, and vinyl label images',
   credits: 'Musicians, producers, engineers, songwriters, composers, and conductors',
   tracklists: 'Complete track listings with durations, ISRCs, and per-track artists',
-  audio_analysis: 'Tempo (BPM), musical key, time signature, danceability, energy, and mood analysis',
-  genres: 'Genre classifications, styles, moods, and tags from multiple sources',
-  streaming_links: 'Service IDs and links (Spotify, Apple Music, Last.fm, MusicBrainz, AllMusic, Wikipedia)',
+  audio_analysis: 'BPM, Key, Cover Songs, Original Artists, Samples, and Remix data',
+  genres: 'Genre classifications, styles, moods, and folksonomy tags',
+  streaming_links: 'Service IDs and links (Spotify, Apple, WhoSampled, SecondHandSongs, etc)',
   reviews: 'Professional reviews, ratings, playcounts, popularity scores, and editorial notes',
   chart_data: 'Chart positions, sales certifications (Gold/Platinum/Diamond), and awards',
-  release_metadata: 'Labels, catalog numbers, barcodes, countries, release dates, and recording studios',
+  release_metadata: 'Labels, catalog numbers, barcodes, countries, release dates, notes, and companies',
   lyrics: 'Song lyrics and Genius annotations with URLs',
   similar_albums: 'Algorithmically generated similar album recommendations',
   cultural_context: 'Historical significance, cultural impact, and recording locations from Wikipedia',
@@ -96,7 +98,7 @@ export const DATA_CATEGORY_ICONS: Record<DataCategory, string> = {
   artwork: '🖼️',
   credits: '👥',
   tracklists: '📝',
-  audio_analysis: '🎵',
+  audio_analysis: '🎹',
   genres: '🏷️',
   streaming_links: '🔗',
   reviews: '⭐',
@@ -143,18 +145,20 @@ export const DATA_CATEGORY_CHECK_FIELDS: Record<DataCategory, string[]> = {
     'mood_acoustic',
     'mood_happy',
     'mood_sad',
-    // Sonic Domain / Covers
+    // Sonic Domain
     'is_cover',
     'original_artist',
-    'original_year'
+    'original_year',
+    'samples',
+    'sampled_by'
   ],
   genres: [
-    'genres', // Canonical
-    'styles', // Canonical
+    'genres',
+    'styles',
+    'tags', // Generic Bucket
     'discogs_genres',
     'spotify_genres',
     'apple_music_genres',
-    'lastfm_tags',
     'allmusic_styles'
   ],
   streaming_links: [
@@ -163,7 +167,9 @@ export const DATA_CATEGORY_CHECK_FIELDS: Record<DataCategory, string[]> = {
     'lastfm_id',
     'musicbrainz_id',
     'allmusic_id',
-    'wikipedia_url'
+    'wikipedia_url',
+    'discogs_release_id',
+    'discogs_master_id'
   ],
   reviews: [
     'allmusic_rating',
@@ -187,10 +193,12 @@ export const DATA_CATEGORY_CHECK_FIELDS: Record<DataCategory, string[]> = {
     'recording_date',
     'original_release_date',
     'studio',
-    'recording_location'
+    'recording_location',
+    'companies',
+    'notes'
   ],
   lyrics: [
-    'tracks.lyrics_url', // Special case - checked in track array
+    'tracks.lyrics_url',
     'tracks.lyrics'
   ],
   similar_albums: [
@@ -200,7 +208,9 @@ export const DATA_CATEGORY_CHECK_FIELDS: Record<DataCategory, string[]> = {
   cultural_context: [
     'cultural_significance',
     'recording_location',
-    'critical_reception'
+    'critical_reception',
+    'notes', // Maps to Wikipedia Summaries
+    'wikipedia_url'
   ],
 };
 
@@ -209,141 +219,83 @@ export const DATA_CATEGORY_CHECK_FIELDS: Record<DataCategory, string[]> = {
  * Shows which services write to which database fields
  */
 export const FIELD_TO_SERVICES: Record<string, EnrichmentService[]> = {
-  // CANONICAL ARTWORK
+  // --- ARTWORK ---
   'image_url': ['coverArtArchive', 'musicbrainz', 'discogs', 'spotify', 'appleMusic', 'lastfm'],
   'back_image_url': ['coverArtArchive', 'musicbrainz', 'discogs'],
   'spine_image_url': ['coverArtArchive', 'musicbrainz', 'discogs'],
   'inner_sleeve_images': ['coverArtArchive', 'musicbrainz', 'discogs'],
   'vinyl_label_images': ['coverArtArchive', 'musicbrainz', 'discogs'],
   
-  // SERVICE-SPECIFIC ARTWORK
-  'spotify_image_url': ['spotify'],
-  'apple_music_artwork_url': ['appleMusic'],
-  
-  // CANONICAL CREDITS
-  'musicians': ['discogs', 'musicbrainz', 'allmusic'],
-  'producers': ['discogs', 'musicbrainz', 'allmusic'],
-  'engineers': ['discogs', 'musicbrainz', 'allmusic'],
-  'songwriters': ['musicbrainz', 'allmusic', 'genius'],
+  // --- CREDITS ---
+  'musicians': ['musicbrainz', 'discogs', 'allmusic'],
+  'producers': ['musicbrainz', 'discogs', 'allmusic'],
+  'engineers': ['musicbrainz', 'discogs', 'allmusic'],
+  'songwriters': ['musicbrainz', 'allmusic', 'genius', 'discogs'],
   'composer': ['musicbrainz', 'appleMusic', 'allmusic'],
   'conductor': ['musicbrainz'],
   'orchestra': ['musicbrainz'],
   'chorus': ['musicbrainz'],
   
-  // SERVICE-SPECIFIC CREDITS
-  'allmusic_credits': ['allmusic'],
-  'apple_music_composer': ['appleMusic'],
-  
-  // CANONICAL TRACKLISTS
-  'tracks': ['discogs', 'lastfm'],
-  'tracklists': ['discogs'],
+  // --- TRACKLISTS ---
+  'tracks': ['discogs', 'spotify', 'appleMusic', 'lastfm'],
+  'tracklists': ['discogs', 'spotify', 'appleMusic'],
   'disc_metadata': ['discogs'],
-  
-  // SERVICE-SPECIFIC TRACKLISTS
-  'spotify_tracks': ['spotify'],
-  'apple_music_tracks': ['appleMusic'],
 
-  // SONIC DOMAIN
-  'is_cover': ['musicbrainz', 'discogs'],
-  'original_artist': ['musicbrainz', 'discogs'],
-  'original_year': ['musicbrainz', 'discogs'],
+  // --- SONIC DOMAIN ---
+  'is_cover': ['musicbrainz', 'discogs', 'secondhandsongs'],
+  'original_artist': ['musicbrainz', 'discogs', 'secondhandsongs'],
+  'original_year': ['musicbrainz', 'discogs', 'secondhandsongs'],
+  'samples': ['whosampled'],
+  'sampled_by': ['whosampled'],
   
-  // CANONICAL AUDIO ANALYSIS
+  // --- AUDIO ANALYSIS ---
   'tempo_bpm': ['acousticbrainz', 'musicbrainz', 'spotify'],
-  'musical_key': ['acousticbrainz', 'musicbrainz'],
-  'time_signature': ['acousticbrainz', 'musicbrainz'],
+  'musical_key': ['acousticbrainz', 'musicbrainz', 'spotify'],
+  'time_signature': ['acousticbrainz', 'musicbrainz', 'spotify'],
   'danceability': ['acousticbrainz', 'musicbrainz', 'spotify'],
   'energy': ['acousticbrainz', 'musicbrainz', 'spotify'],
-  'mood_acoustic': ['acousticbrainz', 'musicbrainz'],
-  'mood_aggressive': ['acousticbrainz', 'musicbrainz'],
-  'mood_electronic': ['acousticbrainz', 'musicbrainz'],
-  'mood_happy': ['acousticbrainz', 'musicbrainz'],
-  'mood_party': ['acousticbrainz', 'musicbrainz'],
-  'mood_relaxed': ['acousticbrainz', 'musicbrainz'],
-  'mood_sad': ['acousticbrainz', 'musicbrainz'],
+  'mood_acoustic': ['acousticbrainz', 'musicbrainz', 'spotify'],
+  'mood_happy': ['acousticbrainz', 'musicbrainz', 'spotify'],
+  'mood_sad': ['acousticbrainz', 'musicbrainz', 'spotify'],
+  'mood_party': ['acousticbrainz', 'musicbrainz', 'spotify'],
+  'mood_relaxed': ['acousticbrainz', 'musicbrainz', 'spotify'],
+  'mood_aggressive': ['acousticbrainz', 'musicbrainz', 'spotify'],
+  'mood_electronic': ['acousticbrainz', 'musicbrainz', 'spotify'],
   
-  // SERVICE-SPECIFIC AUDIO ANALYSIS (Spotify)
-  'spotify_danceability': ['spotify'],
-  'spotify_energy': ['spotify'],
-  'spotify_valence': ['spotify'],
-  'spotify_tempo': ['spotify'],
-  'spotify_acousticness': ['spotify'],
-  'spotify_instrumentalness': ['spotify'],
-  'spotify_liveness': ['spotify'],
-  'spotify_speechiness': ['spotify'],
-  'spotify_loudness': ['spotify'],
+  // --- GENRES & TAGS ---
+  'genres': ['discogs', 'spotify', 'appleMusic', 'lastfm', 'allmusic'],
+  'styles': ['discogs', 'lastfm', 'allmusic'],
+  'tags': ['lastfm', 'discogs', 'musicbrainz'], // Generic bucket
   
-  // SERVICE-SPECIFIC GENRES (incompatible taxonomies)
-  'discogs_genres': ['discogs'],
-  'discogs_styles': ['discogs'],
-  'spotify_genres': ['spotify'],
-  'apple_music_genres': ['appleMusic'],
-  'apple_music_genre_names': ['appleMusic'],
-  'lastfm_tags': ['lastfm'],
-  'allmusic_moods': ['allmusic'],
-  'allmusic_themes': ['allmusic'],
-  'allmusic_styles': ['allmusic'],
-  
-  // STREAMING LINKS (service IDs)
-  'spotify_id': ['spotify'],
-  'spotify_url': ['spotify'],
-  'apple_music_id': ['appleMusic'],
-  'apple_music_url': ['appleMusic'],
-  'lastfm_id': ['lastfm'],
-  'lastfm_url': ['lastfm'],
-  'musicbrainz_id': ['musicbrainz'],
-  'musicbrainz_url': ['musicbrainz'],
-  'allmusic_id': ['allmusic'],
-  'allmusic_url': ['allmusic'],
-  'wikipedia_url': ['wikipedia'],
-  'dbpedia_uri': ['wikipedia'],
-  
-  // REVIEWS & RATINGS
-  'allmusic_rating': ['allmusic'],
-  'allmusic_review': ['allmusic'],
-  'lastfm_playcount': ['lastfm'],
-  'lastfm_listeners': ['lastfm'],
-  'spotify_popularity': ['spotify'],
-  'critical_reception': ['wikipedia'],
-  'apple_music_editorial_notes': ['appleMusic'],
-  
-  // CHART DATA
-  'chart_positions': ['wikipedia'],
-  'certifications': ['wikipedia'],
-  'awards': ['wikipedia'],
-  
-  // RELEASE METADATA
-  'discogs_release_id': ['discogs'],
-  'discogs_master_id': ['discogs'],
+  // --- METADATA ---
+  'original_release_date': ['musicbrainz', 'discogs', 'spotify', 'appleMusic'],
   'labels': ['musicbrainz', 'discogs', 'spotify', 'appleMusic'],
   'cat_no': ['musicbrainz', 'discogs'],
-  'barcode': ['discogs'],
+  'barcode': ['musicbrainz', 'discogs'],
   'country': ['musicbrainz', 'discogs'],
   'recording_date': ['musicbrainz'],
-  'original_release_date': ['musicbrainz'],
-  'spotify_release_date': ['spotify'],
-  'spotify_release_date_precision': ['spotify'],
-  'apple_music_release_date': ['appleMusic'],
   'master_release_date': ['discogs'],
-  'recording_location': ['wikipedia'],
   'studio': ['musicbrainz'],
-  'spotify_label': ['spotify'],
-  'apple_music_label': ['appleMusic'],
-  'apple_music_record_label': ['appleMusic'],
-  'spotify_available_markets': ['spotify'],
-  'apple_music_copyright': ['appleMusic'],
+  'companies': ['discogs'],
   
-  // LYRICS (track-level)
-  'tracks.lyrics': ['genius'],
-  'tracks.lyrics_url': ['genius'],
-  'tracks.lyrics_source': ['genius'],
-  
-  // SIMILAR ALBUMS
-  'lastfm_similar_albums': ['lastfm'],
-  'allmusic_similar_albums': ['allmusic'],
-  
-  // CULTURAL CONTEXT
+  // --- CONTEXT ---
+  'notes': ['wikipedia', 'discogs', 'appleMusic'],
+  'wikipedia_url': ['wikipedia'],
   'cultural_significance': ['wikipedia'],
+  'critical_reception': ['wikipedia'],
+  
+  // --- LINKS ---
+  'spotify_id': ['spotify'],
+  'apple_music_id': ['appleMusic'],
+  'lastfm_id': ['lastfm'],
+  'musicbrainz_id': ['musicbrainz'],
+  'discogs_release_id': ['discogs'],
+  'discogs_master_id': ['discogs'],
+  'genius_url': ['genius'],
+
+  // --- LYRICS ---
+  'tracks.lyrics': ['genius'],
+  'tracks.lyrics_url': ['genius']
 };
 
 /**
@@ -360,6 +312,8 @@ export const SERVICE_DISPLAY_NAMES: Record<EnrichmentService, string> = {
   wikipedia: 'Wikipedia',
   discogs: 'Discogs',
   genius: 'Genius',
+  whosampled: 'WhoSampled',
+  secondhandsongs: 'SecondHandSongs'
 };
 
 /**
@@ -376,6 +330,8 @@ export const SERVICE_ICONS: Record<EnrichmentService, string> = {
   wikipedia: '📖',
   discogs: '💿',
   genius: '📝',
+  whosampled: '✂️',
+  secondhandsongs: '♻️'
 };
 
 /**
@@ -397,6 +353,8 @@ export function dataCategoriesToServices(
     discogsMetadata: false,
     discogsTracklist: false,
     genius: false,
+    whosampled: false,
+    secondhandsongs: false
   };
 
   categories.forEach(category => {
@@ -404,37 +362,21 @@ export function dataCategoriesToServices(
     
     requiredServices.forEach(service => {
       switch (service) {
-        case 'musicbrainz':
-          services.musicbrainz = true;
-          break;
-        case 'coverArtArchive':
-          services.coverArtArchive = true;
-          break;
-        case 'acousticbrainz':
-          services.acousticbrainz = true;
-          break;
-        case 'lastfm':
-          services.lastfm = true;
-          break;
-        case 'spotify':
-          services.spotifyEnhanced = true;
-          break;
-        case 'appleMusic':
-          services.appleMusicEnhanced = true;
-          break;
-        case 'allmusic':
-          services.allmusic = true;
-          break;
-        case 'wikipedia':
-          services.wikipedia = true;
-          break;
-        case 'discogs':
+        case 'musicbrainz': services.musicbrainz = true; break;
+        case 'coverArtArchive': services.coverArtArchive = true; break;
+        case 'acousticbrainz': services.acousticbrainz = true; break;
+        case 'lastfm': services.lastfm = true; break;
+        case 'spotify': services.spotifyEnhanced = true; break;
+        case 'appleMusic': services.appleMusicEnhanced = true; break;
+        case 'allmusic': services.allmusic = true; break;
+        case 'wikipedia': services.wikipedia = true; break;
+        case 'discogs': 
           services.discogsMetadata = true;
           services.discogsTracklist = true;
           break;
-        case 'genius':
-          services.genius = true;
-          break;
+        case 'genius': services.genius = true; break;
+        case 'whosampled': services.whosampled = true; break;
+        case 'secondhandsongs': services.secondhandsongs = true; break;
       }
     });
   });
