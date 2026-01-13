@@ -216,6 +216,25 @@ interface SpotifyTrack {
   duration_ms: number;
 }
 
+interface SpotifyAlbum {
+  release_date: string;
+  images: SpotifyImage[];
+  label?: string;
+  genres?: string[];
+  artists: SpotifyArtist[];
+  tracks: {
+    items: SpotifyTrack[];
+  };
+  external_ids?: {
+    upc?: string;
+    ean?: string;
+  };
+  copyrights?: Array<{
+    text: string;
+    type?: string;
+  }>;
+}
+
 interface SpotifyAudioFeature {
   id: string; 
   tempo: number;
@@ -251,7 +270,26 @@ interface DiscogsArtist {
   role: string;
 }
 
+interface DiscogsCompany {
+  name: string;
+  entity_type_name?: string;
+}
 
+interface DiscogsRelease {
+  master_id?: number;
+  genres?: string[];
+  styles?: string[];
+  released?: string;
+  year?: string;
+  images?: DiscogsImage[];
+  labels?: DiscogsLabel[];
+  country?: string;
+  tracklist?: DiscogsTrack[];
+  identifiers?: DiscogsIdentifier[];
+  extraartists?: DiscogsArtist[];
+  notes?: string;
+  companies?: DiscogsCompany[];
+}
 
 interface LastFMImage {
   size: string;
@@ -448,7 +486,7 @@ export async function fetchSpotifyData(album: { artist: string, title: string, s
       labels: data.label ? [data.label] : undefined,
       genres: data.genres?.length ? data.genres : undefined,
       // NEW: Copyrights
-      companies: data.copyrights?.map((c: any) => c.text), 
+      companies: data.copyrights?.map((c: { text: string }) => c.text), 
       // NEW: External IDs
       barcode: data.external_ids?.upc || data.external_ids?.ean,
       tracklist: data.tracks?.items?.map((t: SpotifyTrack, i: number) => 
@@ -499,8 +537,7 @@ export async function fetchSpotifyData(album: { artist: string, title: string, s
                     candidate.musical_key = `${KEY_MAP[firstKey]} ${firstMode === 1 ? 'Major' : 'Minor'}`;
                 }
 
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                candidate.tracks = data.tracks.items.map((t: any, i: number) => {
+                candidate.tracks = data.tracks.items.map((t: SpotifyTrack, i: number) => {
                     const feat = features.find(f => f.id === t.id);
                     let keyStr = undefined;
                     if (feat && feat.key >= 0 && feat.key < KEY_MAP.length) {
@@ -604,7 +641,7 @@ export async function fetchDiscogsData(album: { artist: string, title: string, d
     const data = await releaseRes.json() as DiscogsRelease;
 
     // 2. Fetch Master Release (Definitive Original Date)
-    let masterData: any = null;
+    let masterData: { year?: number } | null = null;
     if (data.master_id) {
         const masterRes = await fetch(`https://api.discogs.com/masters/${data.master_id}?token=${DISCOGS_TOKEN}`, {
             headers: { 'User-Agent': USER_AGENT }
@@ -621,7 +658,7 @@ export async function fetchDiscogsData(album: { artist: string, title: string, d
     if (allImages.length > 0) primaryImage = allImages[0].uri;
     if (allImages.length > 1) backImage = allImages[1].uri;
     if (allImages.length > 2) {
-       galleryImages.push(...allImages.slice(2).map((i: any) => i.uri));
+       galleryImages.push(...allImages.slice(2).map((i: DiscogsImage) => i.uri));
     }
 
     const candidate: CandidateData = {
@@ -634,10 +671,10 @@ export async function fetchDiscogsData(album: { artist: string, title: string, d
       image_url: primaryImage,
       back_image_url: backImage,
       inner_sleeve_images: galleryImages.length > 0 ? galleryImages : undefined,
-      labels: data.labels?.map((l: any) => l.name),
+      labels: data.labels?.map((l: DiscogsLabel) => l.name),
       country: data.country,
       notes: data.notes, 
-      companies: data.companies?.map((c: any) => c.name),
+      companies: data.companies?.map((c: DiscogsCompany) => c.name),
       tracklist: data.tracklist?.map((t: DiscogsTrack) => `${t.position} - ${t.title} (${t.duration})`).join('\n')
     };
 
