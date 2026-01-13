@@ -216,17 +216,6 @@ interface SpotifyTrack {
   duration_ms: number;
 }
 
-interface SpotifyAlbum {
-  release_date: string;
-  images: SpotifyImage[];
-  label?: string;
-  genres?: string[];
-  artists: SpotifyArtist[];
-  tracks: {
-    items: SpotifyTrack[];
-  };
-}
-
 interface SpotifyAudioFeature {
   id: string; 
   tempo: number;
@@ -262,18 +251,7 @@ interface DiscogsArtist {
   role: string;
 }
 
-interface DiscogsRelease {
-  master_id?: number;
-  genres?: string[];
-  styles?: string[];
-  released?: string;
-  images?: DiscogsImage[];
-  labels?: DiscogsLabel[];
-  country?: string;
-  tracklist?: DiscogsTrack[];
-  identifiers?: DiscogsIdentifier[];
-  extraartists?: DiscogsArtist[];
-}
+
 
 interface LastFMImage {
   size: string;
@@ -456,17 +434,23 @@ export async function fetchSpotifyData(album: { artist: string, title: string, s
 
     if (!spId) return { success: false, source: 'spotify', error: 'Not found' };
 
-    const albumRes = await fetch(`https://api.spotify.com/v1/albums/${spId}`, {
+    // UPDATED: Added ?market=US to get copyrights/external_ids
+    const albumRes = await fetch(`https://api.spotify.com/v1/albums/${spId}?market=US`, {
       headers: { 'Authorization': `Bearer ${token}` }
     });
+
     const data = await albumRes.json() as SpotifyAlbum;
 
     const candidate: CandidateData = {
       spotify_id: spId,
       original_release_date: data.release_date,
       image_url: data.images?.[0]?.url,
-      labels: data.label ? [data.label] : undefined, // FIXED: labels
+      labels: data.label ? [data.label] : undefined,
       genres: data.genres?.length ? data.genres : undefined,
+      // NEW: Copyrights
+      companies: data.copyrights?.map((c: any) => c.text), 
+      // NEW: External IDs
+      barcode: data.external_ids?.upc || data.external_ids?.ean,
       tracklist: data.tracks?.items?.map((t: SpotifyTrack, i: number) => 
         `${i + 1}. ${t.name} (${Math.floor(t.duration_ms / 60000)}:${String(Math.floor((t.duration_ms % 60000) / 1000)).padStart(2, '0')})`
       ).join('\n')
@@ -515,7 +499,8 @@ export async function fetchSpotifyData(album: { artist: string, title: string, s
                     candidate.musical_key = `${KEY_MAP[firstKey]} ${firstMode === 1 ? 'Major' : 'Minor'}`;
                 }
 
-                candidate.tracks = data.tracks.items.map((t, i) => {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                candidate.tracks = data.tracks.items.map((t: any, i: number) => {
                     const feat = features.find(f => f.id === t.id);
                     let keyStr = undefined;
                     if (feat && feat.key >= 0 && feat.key < KEY_MAP.length) {
@@ -524,6 +509,7 @@ export async function fetchSpotifyData(album: { artist: string, title: string, s
                     return {
                         position: String(i + 1),
                         title: t.name,
+                        duration: t.duration_ms ? `${Math.floor(t.duration_ms / 1000)}s` : undefined,
                         tempo_bpm: feat ? Math.round(feat.tempo) : undefined,
                         musical_key: keyStr
                     };
@@ -559,7 +545,8 @@ export async function fetchAppleMusicData(album: { artist: string, title: string
 
     if (!amId) return { success: false, source: 'appleMusic', error: 'Not found' };
 
-    const albumRes = await fetch(`https://api.music.apple.com/v1/catalog/us/albums/${amId}`, {
+    // UPDATED: Added ?include=tracks,editorial-notes
+    const albumRes = await fetch(`https://api.music.apple.com/v1/catalog/us/albums/${amId}?include=tracks,editorial-notes`, {
         headers: { 'Authorization': `Bearer ${AM_TOKEN}` }
     });
     const data = await albumRes.json();
@@ -569,8 +556,18 @@ export async function fetchAppleMusicData(album: { artist: string, title: string
         apple_music_id: amId,
         image_url: attrs?.artwork?.url?.replace('{w}', '1000').replace('{h}', '1000'),
         genres: attrs?.genreNames,
-        labels: attrs?.recordLabel ? [attrs.recordLabel] : undefined, // FIXED: Changed label to labels
-        original_release_date: attrs?.releaseDate
+        labels: attrs?.recordLabel ? [attrs.recordLabel] : undefined,
+        original_release_date: attrs?.releaseDate,
+        // NEW: Notes and UPC
+        notes: attrs?.editorialNotes?.standard || attrs?.editorialNotes?.short,
+        barcode: attrs?.upc,
+        // NEW: Tracks
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        tracks: data.data?.[0]?.relationships?.tracks?.data?.map((t: any) => ({
+            position: String(t.attributes?.trackNumber),
+            title: t.attributes?.name,
+            duration: t.attributes?.durationInMillis ? `${Math.floor(t.attributes.durationInMillis / 1000)}s` : undefined
+        }))
     };
 
     return { success: true, source: 'appleMusic', data: candidate };
@@ -599,12 +596,23 @@ export async function fetchDiscogsData(album: { artist: string, title: string, d
 
     if (!releaseId) return { success: false, source: 'discogs', error: 'Not found' };
 
+    // 1. Fetch Specific Release
     const releaseRes = await fetch(`https://api.discogs.com/releases/${releaseId}?token=${DISCOGS_TOKEN}`, {
         headers: { 'User-Agent': USER_AGENT }
     });
+
     const data = await releaseRes.json() as DiscogsRelease;
 
-    // --- FIX: CAPTURE ALL IMAGES INTO GALLERY ---
+    // 2. Fetch Master Release (Definitive Original Date)
+    let masterData: any = null;
+    if (data.master_id) {
+        const masterRes = await fetch(`https://api.discogs.com/masters/${data.master_id}?token=${DISCOGS_TOKEN}`, {
+            headers: { 'User-Agent': USER_AGENT }
+        });
+        if (masterRes.ok) masterData = await masterRes.json();
+    }
+
+    // Capture all images
     const allImages = data.images || [];
     const galleryImages: string[] = [];
     let primaryImage: string | undefined = undefined;
@@ -613,8 +621,7 @@ export async function fetchDiscogsData(album: { artist: string, title: string, d
     if (allImages.length > 0) primaryImage = allImages[0].uri;
     if (allImages.length > 1) backImage = allImages[1].uri;
     if (allImages.length > 2) {
-       // Capture everything else for the gallery UI
-       galleryImages.push(...allImages.slice(2).map(i => i.uri));
+       galleryImages.push(...allImages.slice(2).map((i: any) => i.uri));
     }
 
     const candidate: CandidateData = {
@@ -622,12 +629,15 @@ export async function fetchDiscogsData(album: { artist: string, title: string, d
       discogs_master_id: data.master_id ? String(data.master_id) : undefined,
       genres: data.genres,
       styles: data.styles,
-      original_release_date: data.released,
+      // PRIORITY: Use Master Year if available, else Release Year
+      original_release_date: masterData?.year ? String(masterData.year) : (data.released || data.year),
       image_url: primaryImage,
       back_image_url: backImage,
       inner_sleeve_images: galleryImages.length > 0 ? galleryImages : undefined,
-      labels: data.labels?.[0]?.name ? [data.labels[0].name] : undefined, // FIXED: labels
+      labels: data.labels?.map((l: any) => l.name),
       country: data.country,
+      notes: data.notes, 
+      companies: data.companies?.map((c: any) => c.name),
       tracklist: data.tracklist?.map((t: DiscogsTrack) => `${t.position} - ${t.title} (${t.duration})`).join('\n')
     };
 
