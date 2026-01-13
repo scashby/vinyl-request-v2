@@ -62,7 +62,7 @@ export const DATA_CATEGORY_LABELS: Record<DataCategory, string> = {
   artwork: 'Album Artwork',
   credits: 'Album Credits',
   tracklists: 'Track Listings',
-  audio_analysis: 'Sonic Domain (Audio & Covers)',
+  sonic_domain: 'Sonic Domain (Audio & Covers)',
   genres: 'Genres, Styles & Tags',
   streaming_links: 'Streaming Links',
   reviews: 'Reviews & Ratings',
@@ -80,7 +80,7 @@ export const DATA_CATEGORY_DESCRIPTIONS: Record<DataCategory, string> = {
   artwork: 'Front cover, back cover, spine, inner sleeves, and vinyl label images',
   credits: 'Musicians, producers, engineers, songwriters, composers, and conductors',
   tracklists: 'Complete track listings with durations, ISRCs, and per-track artists',
-  audio_analysis: 'BPM, Key, Cover Songs, Original Artists, Samples, and Remix data',
+  sonic_domain: 'BPM, Key, Cover Songs, Original Artists, Samples, and Remix data',
   genres: 'Genre classifications, styles, moods, and folksonomy tags',
   streaming_links: 'Service IDs and links (Spotify, Apple, WhoSampled, SecondHandSongs, etc)',
   reviews: 'Professional reviews, ratings, playcounts, popularity scores, and editorial notes',
@@ -98,7 +98,7 @@ export const DATA_CATEGORY_ICONS: Record<DataCategory, string> = {
   artwork: '🖼️',
   credits: '👥',
   tracklists: '📝',
-  audio_analysis: '🎹',
+  sonic_domain: '🎹',
   genres: '🏷️',
   streaming_links: '🔗',
   reviews: '⭐',
@@ -136,7 +136,7 @@ export const DATA_CATEGORY_CHECK_FIELDS: Record<DataCategory, string[]> = {
     'tracklists',
     'disc_metadata'
   ],
-  audio_analysis: [
+  sonic_domain: [
     'tempo_bpm',
     'musical_key',
     'time_signature',
