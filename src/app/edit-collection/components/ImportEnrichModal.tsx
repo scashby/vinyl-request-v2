@@ -13,6 +13,7 @@ import EnrichmentReviewModal from './EnrichmentReviewModal';
 import { type FieldConflict } from 'lib/conflictDetection';
 import { 
   type DataCategory, 
+  type EnrichmentService,
   DATA_CATEGORY_CHECK_FIELDS, 
   FIELD_TO_SERVICES,
   SERVICE_ICONS,
@@ -963,7 +964,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   return (
     <div className={styles.importModalContainer}>
       <div className={styles.importModalContent}>
-        <div className={styles.importModalInner} style={{ width: '1200px', maxWidth: '95vw', height: '90vh', display: 'flex', flexDirection: 'column' }}>
+        <div className={styles.importModalInner} style={{ width: '1200px', maxWidth: '95vw', height: '90vh', display: 'flex', flexDirection: 'column', backgroundColor: 'transparent' }}>
         
         {/* HEADER */}
         <div className={styles.importModalHeader}>
@@ -1234,9 +1235,8 @@ function DataCategoryCard({
                                     disabled={disabled}
                                     style={{ display: 'none' }}
                                  />
-                                 {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                                 <span>{(SERVICE_ICONS as any)[srv]}</span>
-                                 <span>{srv}</span>
+                                 <span>{SERVICE_ICONS[srv as EnrichmentService]}</span>
+                                 <span style={{ marginLeft: '4px' }}>{srv}</span>
                               </label>
                            );
                         })}
