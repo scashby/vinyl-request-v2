@@ -13,7 +13,7 @@ export type DataCategory =
   | 'artwork'
   | 'credits'
   | 'tracklists'
-  | 'audio_analysis'
+  | 'sonic_domain'
   | 'genres'
   | 'streaming_links'
   | 'reviews'
@@ -44,7 +44,7 @@ export const DATA_TO_SERVICES: Record<DataCategory, EnrichmentService[]> = {
   artwork: ['coverArtArchive', 'musicbrainz', 'discogs', 'spotify', 'appleMusic', 'lastfm'],
   credits: ['musicbrainz', 'allmusic', 'appleMusic', 'discogs', 'genius'],
   tracklists: ['discogs', 'spotify', 'appleMusic', 'lastfm'],
-  audio_analysis: ['acousticbrainz', 'musicbrainz', 'spotify', 'whosampled', 'secondhandsongs'],
+  sonic_domain: ['acousticbrainz', 'musicbrainz', 'spotify', 'whosampled', 'secondhandsongs'],
   genres: ['discogs', 'spotify', 'appleMusic', 'allmusic', 'lastfm', 'musicbrainz'],
   streaming_links: ['spotify', 'appleMusic', 'lastfm', 'musicbrainz', 'allmusic', 'wikipedia', 'whosampled', 'secondhandsongs'],
   reviews: ['allmusic', 'lastfm', 'spotify', 'appleMusic', 'wikipedia'],

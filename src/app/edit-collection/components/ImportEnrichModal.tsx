@@ -15,7 +15,9 @@ import {
   type DataCategory, 
   DATA_CATEGORY_CHECK_FIELDS, 
   FIELD_TO_SERVICES,
-  SERVICE_ICONS
+  SERVICE_ICONS,
+  DATA_CATEGORY_LABELS,
+  DATA_CATEGORY_ICONS
 } from 'lib/enrichment-data-mapping';
 import styles from '../EditCollection.module.css';
 
@@ -33,59 +35,6 @@ const ALLOWED_COLUMNS = new Set([
   'danceability', 'energy', 'mood_acoustic', 'mood_happy', 'mood_sad',
   'mood_aggressive', 'mood_electronic', 'mood_party', 'mood_relaxed'
 ]);
-
-// MODEL INSTRUCTION: DO NOT COLLAPSE THIS OBJECT. KEEP EXPANDED.
-const DATA_CATEGORY_CONFIG: Partial<Record<DataCategory, { label: string; desc: string; icon: string; services: string[] }>> = {
-  artwork: {
-    label: 'Artwork & Images',
-    desc: 'Front covers, back covers, spine images, and inner sleeves.',
-    icon: '🖼️',
-    // ADDED: discogs
-    services: ['coverArt', 'spotify', 'appleMusic', 'discogs']
-  },
-  credits: {
-    label: 'Credits & Personnel',
-    desc: 'Musicians, producers, engineers, and songwriters.',
-    icon: '👥',
-    // ADDED: discogs, genius
-    services: ['musicbrainz', 'wikipedia', 'discogs', 'genius']
-  },
-  tracklists: {
-    label: 'Tracklists & Durations',
-    desc: 'Complete track listings, disk sides, and track durations.',
-    icon: '📝',
-    // ADDED: discogs
-    services: ['spotify', 'appleMusic', 'discogs']
-  },
-  audio_analysis: {
-    label: 'Sonic Data (Audio & Covers)',
-    desc: 'BPM, Key, Cover Songs, and Original Artist data.',
-    icon: '📊',
-    // ADDED: musicbrainz, discogs
-    services: ['spotify', 'musicbrainz', 'discogs']
-  },
-  genres: {
-    label: 'Genres & Styles',
-    desc: 'Primary genres and sub-styles.', // Fixed description
-    icon: '🏷️',
-    // ADDED: discogs
-    services: ['lastfm', 'spotify', 'discogs']
-  },
-  streaming_links: {
-    label: 'Streaming IDs & URLs',
-    desc: 'Links to Spotify, Apple Music, and Last.fm.',
-    icon: '🔗',
-    // ADDED: genius, wikipedia
-    services: ['spotify', 'appleMusic', 'lastfm', 'genius', 'wikipedia']
-  },
-  release_metadata: {
-    label: 'Release Metadata',
-    desc: 'Barcodes, record labels, and original release dates.',
-    icon: '💿',
-    // ADDED: discogs
-    services: ['musicbrainz', 'discogs']
-  }
-};
 
 // --- 2. TYPES ---
 interface ImportEnrichModalProps {
@@ -215,7 +164,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     if (isOpen) {
       const initialConfig: FieldConfigMap = {};
       // Default enabled categories
-      const defaultCats: DataCategory[] = ['artwork', 'credits', 'tracklists', 'genres', 'audio_analysis'];
+      const defaultCats: DataCategory[] = ['artwork', 'credits', 'tracklists', 'genres', 'sonic_domain'];
       
       defaultCats.forEach(cat => {
         const fields = DATA_CATEGORY_CHECK_FIELDS[cat] || [];
@@ -478,8 +427,16 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     const processedIds: number[] = [];
     const historyUpdates: { album_id: number; field_name: string; source: string; resolution: string; kept_value: unknown; resolved_at: string }[] = [];
     const trackSavePromises: Promise<unknown>[] = [];
-    const SOURCE_PRIORITY = ['musicbrainz', 'spotify', 'appleMusic', 'discogs', 'lastfm', 'coverArt', 'wikipedia', 'genius'];
     
+    // PRIORITY MATRICES
+    const GLOBAL_PRIORITY = ['discogs', 'musicbrainz', 'spotify', 'appleMusic', 'lastfm', 'coverArt', 'wikipedia', 'genius', 'whosampled', 'secondhandsongs'];
+    
+    // "Discogs Supremacy" for physical/static metadata
+    const STATIC_PRIORITY = ['discogs', 'musicbrainz', 'spotify', 'appleMusic'];
+    
+    // "Sonic" priority for audio features
+    const SONIC_PRIORITY = ['spotify', 'acousticbrainz', 'musicbrainz'];
+
     // NEW: Local summary collector to avoid setting state in loop
     const localBatchSummary: {album: string, field: string, action: string}[] = [];
 
@@ -513,7 +470,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
       const autoFilledFields: string[] = [];
       const fieldCandidates: Record<string, Record<string, unknown>> = {};
 
-      for (const source of SOURCE_PRIORITY) {
+      for (const source of GLOBAL_PRIORITY) {
          const sourceData = (candidates as Record<string, Record<string, unknown>>)[source];
          if (!sourceData) continue;
 
@@ -613,8 +570,17 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           } 
           // Strategy 2: Single Values -> Priority Winner
           else {
+             // Determine appropriate priority list based on field type
+             let priorityList = GLOBAL_PRIORITY;
+             
+             if (['original_release_date', 'year', 'tracklist', 'labels', 'cat_no', 'country', 'barcode'].includes(key)) {
+                priorityList = STATIC_PRIORITY;
+             } else if (['tempo_bpm', 'musical_key', 'energy', 'danceability'].includes(key)) {
+                priorityList = SONIC_PRIORITY;
+             }
+
              // Pick the value from the highest priority source available
-             const winnerSrc = SOURCE_PRIORITY.find(s => sources.includes(s)) || sources[0];
+             const winnerSrc = priorityList.find(s => sources.includes(s)) || sources[0];
              proposedValue = sourceValues[winnerSrc];
           }
 
@@ -641,9 +607,13 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
           else {
               // Check if the proposed value is actually different from DB
               if (!areValuesEqual(currentVal, proposedValue)) {
-                  // If it's a merge, the "source" is a composite key 'merge'
-                  // If it's a single value, we attribute it to the priority source
-                  const primarySource = isMerge ? 'merge' : (SOURCE_PRIORITY.find(s => sources.includes(s)) || sources[0]);
+                  // Re-calculate primary source for the conflict record using the same logic
+                  let priorityList = GLOBAL_PRIORITY;
+                  if (['original_release_date', 'year', 'tracklist', 'labels', 'cat_no', 'country', 'barcode'].includes(key)) {
+                     priorityList = STATIC_PRIORITY;
+                  }
+                  
+                  const primarySource = isMerge ? 'merge' : (priorityList.find(s => sources.includes(s)) || sources[0]);
                   
                   newConflicts.push({
                       album_id: album.id,
@@ -965,44 +935,35 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
     { category: 'artwork', count: stats.missingArtwork, subcounts: [
         { label: 'Back covers', count: stats.missingBackCover },
         { label: 'Spine', count: stats.missingSpine || 0 },
-        { label: 'Inner Sleeves', count: stats.missingInnerSleeve || 0 },
-        { label: 'Vinyl Labels', count: stats.missingVinylLabel || 0 }
     ]},
     { category: 'credits', count: stats.missingCredits, subcounts: [
         { label: 'Musicians', count: stats.missingMusicians },
         { label: 'Producers', count: stats.missingProducers },
-        { label: 'Engineers', count: stats.missingEngineers || 0 },
-        { label: 'Songwriters', count: stats.missingSongwriters || 0 }
     ]},
     { category: 'tracklists', count: stats.missingTracklists, subcounts: [
-        { label: 'Missing Durations', count: stats.missingDurations || 0 } // New Subcount
+        { label: 'Missing Durations', count: stats.missingDurations || 0 }
     ]},
-    { category: 'audio_analysis', count: stats.missingAudioAnalysis, subcounts: [
+    { category: 'sonic_domain', count: stats.missingAudioAnalysis, subcounts: [
         { label: 'Tempo', count: stats.missingTempo },
         { label: 'Key', count: stats.missingMusicalKey || 0 },
-        { label: 'Energy', count: stats.missingEnergy || 0 },
-        { label: 'Danceability', count: stats.missingDanceability || 0 }
     ]},
     { category: 'genres', count: stats.missingGenres, subcounts: [
         { label: 'Styles', count: stats.missingStyles || 0 }
     ]},
     { category: 'streaming_links', count: stats.missingStreamingLinks, subcounts: [
         { label: 'Spotify', count: stats.missingSpotify },
-        { label: 'Apple Music', count: stats.missingAppleMusic || 0 },
-        { label: 'Last.fm', count: stats.missingLastFM || 0 }
     ]},
     { category: 'release_metadata', count: stats.missingReleaseMetadata, subcounts: [
         { label: 'Barcodes', count: stats.missingBarcode || 0 },
         { label: 'Labels', count: stats.missingLabels || 0 },
-        { label: 'Dates', count: stats.missingOriginalDate || 0 },
-        { label: 'Cat #', count: stats.missingCatalogNumber }
     ]},
+    { category: 'cultural_context', count: 0, subcounts: [] }, // New category
   ] : [];
 
   return (
     <div className={styles.importModalContainer}>
-      <div className={styles.importModalContent} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.5)' }}>
-        <div style={{ backgroundColor: 'white', borderRadius: '8px', width: '1200px', maxWidth: '95vw', maxHeight: '95vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div className={styles.importModalContent}>
+        <div className={styles.importModalInner} style={{ width: '1200px', maxWidth: '95vw', height: '90vh', display: 'flex', flexDirection: 'column' }}>
         
         {/* HEADER */}
         <div className={styles.importModalHeader}>
@@ -1184,14 +1145,13 @@ function DataCategoryCard({
   disabled 
 }: { 
   category: DataCategory; 
-  stats: EnrichmentStats | null; // Use specific type
+  stats: EnrichmentStats | null;
   fieldConfig: FieldConfigMap;
   onToggleCategory: () => void;
   onToggleField: (f: string) => void;
   onToggleFieldSource: (f: string, s: string) => void;
   disabled: boolean; 
 }) {
-  // Use ALLOWED_COLUMNS to filter what we show
   const fields = DATA_CATEGORY_CHECK_FIELDS[category] || [];
   const validFields = fields.filter(f => ALLOWED_COLUMNS.has(f));
   
@@ -1201,13 +1161,10 @@ function DataCategoryCard({
   const isAllSelected = activeCount === validFields.length;
   const isIndeterminate = activeCount > 0 && !isAllSelected;
 
-  // Pretty print helper
   const formatLabel = (f: string) => f.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 
-  // Helper to get missing count from stats object (needs mapping)
   const getMissing = (field: string) => {
     if (!stats) return 0;
-    // Simple heuristic mapping - can be improved
     if (field === 'image_url') return stats.missingArtwork;
     if (field === 'back_image_url') return stats.missingBackCover;
     if (field.includes('musicians')) return stats.missingMusicians;
@@ -1216,11 +1173,12 @@ function DataCategoryCard({
   };
 
   return (
-    <div className={styles.importSelectionCard} style={{ cursor: 'default', opacity: disabled ? 0.6 : 1 }}>
+    // Removed hardcoded background/opacity styles to let CSS Modules handle theme
+    <div className={styles.importSelectionCard} data-disabled={disabled}>
       {/* HEADER */}
       <div 
         className={styles.cardHeader}
-        style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingBottom: '8px', borderBottom: '1px solid #e5e7eb', marginBottom: '8px' }}
+        style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingBottom: '8px', borderBottom: '1px solid var(--border-color)', marginBottom: '8px' }}
       >
          <input 
             type="checkbox" 
@@ -1230,8 +1188,8 @@ function DataCategoryCard({
             disabled={disabled}
             style={{ cursor: 'pointer' }}
          />
-         <span style={{ fontSize: '16px' }}>{DATA_CATEGORY_CONFIG[category]?.icon}</span>
-         <span style={{ fontWeight: '700', fontSize: '13px' }}>{DATA_CATEGORY_CONFIG[category]?.label}</span>
+         <span style={{ fontSize: '16px' }}>{DATA_CATEGORY_ICONS[category]}</span>
+         <span style={{ fontWeight: '700', fontSize: '13px' }}>{DATA_CATEGORY_LABELS[category]}</span>
       </div>
 
       {/* FIELD ROWS (Dashboard Style) */}
@@ -1243,18 +1201,10 @@ function DataCategoryCard({
             const missing = getMissing(field);
 
             return (
-               <div key={field} style={{ 
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  gap: '4px',
-                  padding: '6px',
-                  borderRadius: '4px',
-                  backgroundColor: isEnabled ? '#f9fafb' : 'transparent',
-                  border: isEnabled ? '1px solid #e5e7eb' : '1px solid transparent'
-               }}>
+               <div key={field} className={isEnabled ? styles.fieldRowActive : styles.fieldRow}>
                   {/* Row Top: Checkbox + Name + Stats */}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                     <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '500', cursor: 'pointer', color: isEnabled ? '#111827' : '#9ca3af' }}>
+                     <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '500', cursor: 'pointer' }}>
                         <input 
                            type="checkbox" 
                            checked={isEnabled} 
@@ -1263,40 +1213,29 @@ function DataCategoryCard({
                         />
                         {formatLabel(field)}
                      </label>
-                     {missing > 0 && <span style={{ fontSize: '10px', color: '#ef4444', backgroundColor: '#fee2e2', padding: '1px 4px', borderRadius: '4px' }}>{missing}</span>}
+                     {missing > 0 && <span className={styles.missingBadge}>{missing}</span>}
                   </div>
 
                   {/* Row Bottom: Source Toggles (Only if enabled) */}
                   {isEnabled && services.length > 0 && (
-                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginLeft: '20px', marginTop: '2px' }}>
+                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginLeft: '20px', marginTop: '4px' }}>
                         {services.map(srv => {
                            const isActive = activeSources.has(srv);
                            return (
                               <label 
                                 key={srv} 
                                 title={srv}
-                                style={{ 
-                                   display: 'flex', 
-                                   alignItems: 'center', 
-                                   gap: '3px', 
-                                   fontSize: '10px', 
-                                   padding: '2px 6px', 
-                                   borderRadius: '12px',
-                                   border: isActive ? '1px solid #3b82f6' : '1px solid #e5e7eb',
-                                   backgroundColor: isActive ? '#eff6ff' : 'white',
-                                   color: isActive ? '#1d4ed8' : '#6b7280',
-                                   cursor: 'pointer',
-                                   transition: 'all 0.2s'
-                                }}
+                                className={isActive ? styles.sourceTagActive : styles.sourceTag}
                               >
                                  <input 
                                     type="checkbox" 
                                     checked={isActive} 
                                     onChange={() => onToggleFieldSource(field, srv)}
                                     disabled={disabled}
-                                    style={{ display: 'none' }} // Hide native checkbox for cleaner look
+                                    style={{ display: 'none' }}
                                  />
-                                 <span>{SERVICE_ICONS[srv]}</span>
+                                 {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                                 <span>{(SERVICE_ICONS as any)[srv]}</span>
                                  <span>{srv}</span>
                               </label>
                            );
