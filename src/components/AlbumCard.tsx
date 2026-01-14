@@ -18,16 +18,16 @@ type Album = {
 };
 
 export default function AlbumCard({ album }: { album: Album }) {
-  const typeMap: Record<string, string> = {
-    vinyl: "vinyl",
-    cassettes: "cassette",
-    cd: "cd",
-    "45s": "fortyfive",
-    "8-track": "eighttrack",
+  const colorMap: Record<string, string> = {
+    vinyl: "bg-purple-600/75",
+    cassettes: "bg-green-600/75",
+    cd: "bg-teal-600/75",
+    "45s": "bg-red-600/75",
+    "8-track": "bg-orange-600/75",
   };
 
-  const typeClass =
-    typeMap[album.mediaType?.toLowerCase() || ""] || "vinyl";
+  const badgeColor =
+    colorMap[album.mediaType?.toLowerCase() || ""] || "bg-gray-600/75";
 
   // Build the album link, passing eventId as a query param if present
   const href =
@@ -36,28 +36,15 @@ export default function AlbumCard({ album }: { album: Album }) {
       : `/browse/album-detail/${album.id}`;
 
   return (
-    <div className="album-card">
+    <div className="group relative bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-transform duration-200 hover:scale-[1.02]">
       <Link href={href}>
-        <div style={{ position: 'relative' }}>
-          <span className={`badge ${typeClass}`}>{album.mediaType}</span>
+        <div className="relative">
+          <span className={`absolute top-1.5 left-1.5 text-[0.65rem] px-1.5 py-0.5 rounded font-semibold tracking-wide text-white ${badgeColor}`}>
+            {album.mediaType}
+          </span>
           {/* Just Added Badge */}
           {album.justAdded && (
-            <span 
-              className="badge"
-              style={{
-                position: 'absolute',
-                top: '6px',
-                right: '6px',
-                backgroundColor: '#059669',
-                color: 'white',
-                fontSize: '0.6rem',
-                padding: '3px 6px',
-                borderRadius: '4px',
-                fontWeight: '700',
-                letterSpacing: '0.5px',
-                zIndex: 10
-              }}
-            >
+            <span className="absolute top-1.5 right-1.5 bg-emerald-600 text-white text-[0.6rem] px-1.5 py-0.5 rounded font-bold tracking-wide z-10 shadow-sm">
               ✨ NEW
             </span>
           )}
@@ -66,15 +53,15 @@ export default function AlbumCard({ album }: { album: Album }) {
             alt={album.title}
             width={180}
             height={180}
-            style={{ borderRadius: 12, objectFit: "cover" }}
+            className="w-full aspect-square object-cover"
             unoptimized
           />
         </div>
       </Link>
 
-      <div className="info">
-        <p className="album-title text-blue-600 font-semibold">{album.title}</p>
-        <p className="album-artist">{album.artist} • {album.year}</p>
+      <div className="p-2">
+        <p className="font-bold text-blue-600 line-clamp-1" title={album.title}>{album.title}</p>
+        <p className="text-xs text-gray-900 uppercase leading-tight line-clamp-1">{album.artist} • {album.year}</p>
       </div>
     </div>
   );
