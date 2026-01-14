@@ -1,7 +1,5 @@
 import React from 'react';
-import 'styles/internal.css';
 import Footer from 'components/Footer';
-import "../styles/base.css";
 
 const InternalLayout = ({ title, children }) => {
   return (
