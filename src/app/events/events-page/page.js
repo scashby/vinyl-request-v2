@@ -10,8 +10,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { supabase } from "src/lib/supabaseClient";
 import { formatEventText } from "src/utils/textFormatter";
-import "styles/internal.css";
-import "styles/events.css";
+import { Container } from "components/ui/Container";
+import { Card } from "components/ui/Card";
 
 export default function Page() {
   const [events, setEvents] = useState([]);
@@ -130,50 +130,17 @@ export default function Page() {
 
   const DateBox = ({ date }) => {
     const d = compactDate(date);
-    const tba =
-      !date || date === "" || date === "9999-12-31";
+    const tba = !date || date === "" || date === "9999-12-31";
 
     return (
-      <div
-        style={{
-          background: "#000",
-          border: "2px solid #00c4ff",
-          borderRadius: 8,
-          padding: "10px 8px",
-          textAlign: "center",
-          minWidth: 84,
-        }}
-      >
-        <div
-          style={{
-            color: "#00c4ff",
-            fontSize: 11,
-            fontWeight: 800,
-            letterSpacing: ".8px",
-            marginBottom: 2,
-          }}
-        >
+      <div className="bg-black border-2 border-[#00c4ff] rounded-lg p-2 text-center min-w-[84px]">
+        <div className="text-[#00c4ff] text-[11px] font-extrabold tracking-widest mb-0.5">
           {tba ? "TBA" : d.wk}
         </div>
-        <div
-          style={{
-            color: "#fff",
-            fontSize: 26,
-            fontWeight: 800,
-            lineHeight: 1,
-          }}
-        >
+        <div className="text-white text-3xl font-extrabold leading-none">
           {tba ? "" : d.day}
         </div>
-        <div
-          style={{
-            color: "#00c4ff",
-            fontSize: 11,
-            fontWeight: 800,
-            letterSpacing: ".8px",
-            marginTop: 2,
-          }}
-        >
+        <div className="text-[#00c4ff] text-[11px] font-extrabold tracking-widest mt-0.5">
           {tba ? "" : d.mon}
         </div>
       </div>
@@ -181,55 +148,33 @@ export default function Page() {
   };
 
   const SectionTitle = ({ text }) => (
-    <div style={{ marginBottom: "1.5rem" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <div
-          style={{
-            width: 14,
-            height: 14,
-            borderRadius: 2,
-            background: "#00c4ff",
-            transform: "rotate(45deg)",
-          }}
-        />
-        <h2
-          style={{
-            color: "#fff",
-            fontSize: "2.6rem",
-            fontWeight: 900,
-            letterSpacing: "1px",
-            margin: 0,
-            textTransform: "uppercase",
-          }}
-        >
+    <div className="mb-6">
+      <div className="flex items-center gap-3">
+        <div className="w-3.5 h-3.5 rounded-sm bg-[#00c4ff] rotate-45" />
+        <h2 className="text-white text-4xl md:text-5xl font-black tracking-widest uppercase m-0">
           {text}
         </h2>
       </div>
-      <div
-        style={{
-          height: 6,
-          width: 180,
-          background: "#00c4ff",
-          borderRadius: 999,
-          marginTop: 10,
-        }}
-      />
+      <div className="h-1.5 w-44 bg-[#00c4ff] rounded-full mt-3" />
     </div>
   );
 
   return (
-    <div className="page-wrapper">
-      {/* Hero image is driven by CSS (event-hero class) */}
-      <header className="event-hero">
-        <div className="overlay">
-          <h1>Upcoming Vinyl Nights</h1>
+    <div className="bg-white min-h-screen">
+      {/* Hero Header */}
+      <header className="relative h-[300px] flex items-center justify-center bg-gray-900">
+        <div 
+          className="absolute inset-0 bg-cover bg-center opacity-50"
+          style={{ backgroundImage: "url('/images/event-header-still.jpg')" }}
+        />
+        <div className="relative z-10 px-8 py-4 bg-black/40 rounded-xl">
+          <h1 className="text-4xl md:text-5xl font-bold text-white font-serif-display text-center">
+            Upcoming Vinyl Nights
+          </h1>
         </div>
       </header>
 
-      <main
-        className="event-body"
-        style={{ padding: 0, background: "#000" }}
-      >
+      <main className="bg-black text-white pb-20">
         {loading ? (
           <div
             style={{
@@ -244,29 +189,11 @@ export default function Page() {
           <div data-secwrap="sections">
             {/* SECTION 1 — UP NEXT */}
             {upNext.length > 0 && (
-              <section
-                style={{
-                  background: "linear-gradient(180deg,#141414,#000)",
-                  padding: "2.75rem 1.25rem 3rem",
-                  borderBottom: "3px solid #00c4ff",
-                }}
-              >
-                <div
-                  style={{
-                    maxWidth: 1400,
-                    margin: "0 auto",
-                  }}
-                >
+              <section className="bg-gradient-to-b from-[#141414] to-black py-12 border-b-4 border-[#00c4ff]">
+                <Container size="xl">
                   <SectionTitle text="Up Next" />
 
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns:
-                        upNext.length === 1 ? "1fr" : "repeat(2, 1fr)",
-                      gap: "1.75rem",
-                    }}
-                  >
+                  <div className={`grid gap-7 ${upNext.length === 1 ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'}`}>
                     {upNext.map((ev) => {
                       const img =
                         ev.image_url || "/images/placeholder.png";
@@ -280,31 +207,9 @@ export default function Page() {
                         <Link
                           key={ev.id}
                           href={`/events/event-detail/${ev.id}`}
-                          style={{ textDecoration: "none" }}
+                          className="block group"
                         >
-                          <div
-                            style={{
-                              background: "#222",
-                              borderRadius: 12,
-                              overflow: "hidden",
-                              border: "3px solid #00c4ff",
-                              transition:
-                                "transform .25s ease, box-shadow .25s ease",
-                            }}
-                            onMouseOver={(e) => {
-                              const card = e.currentTarget;
-                              card.style.transform =
-                                "translateY(-6px)";
-                              card.style.boxShadow =
-                                "0 14px 36px rgba(0,196,255,.35)";
-                            }}
-                            onMouseOut={(e) => {
-                              const card = e.currentTarget;
-                              card.style.transform =
-                                "translateY(0)";
-                              card.style.boxShadow = "none";
-                            }}
-                          >
+                          <div className="bg-[#222] rounded-xl overflow-hidden border-[3px] border-[#00c4ff] transition-all duration-300 group-hover:-translate-y-2 group-hover:shadow-[0_14px_36px_rgba(0,196,255,0.35)]">
                             <div
                               style={{
                                 position: "relative",
@@ -367,108 +272,38 @@ export default function Page() {
 
             {/* SECTION 2 — FEATURED GRID */}
             {featuredGrid.length > 0 && (
-              <section
-                style={{
-                  background: "#000",
-                  padding: "2.75rem 1.25rem 3rem",
-                  borderBottom: "2px solid #1f1f1f",
-                }}
-              >
-                <div
-                  style={{
-                    maxWidth: 1400,
-                    margin: "0 auto",
-                  }}
-                >
+              <section className="bg-black py-12 border-b-2 border-[#1f1f1f]">
+                <Container size="xl">
                   <SectionTitle text="Featured" />
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns:
-                        "repeat(4, minmax(0, 1fr))",
-                      gap: "1.25rem",
-                    }}
-                  >
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
                     {featuredGrid.map((e) => {
-                      const img =
-                        e.image_url || "/images/placeholder.png";
+                      const img = e.image_url || "/images/placeholder.png";
                       const d = compactDate(e.date);
-                      const tba =
-                        !e.date ||
-                        e.date === "" ||
-                        e.date === "9999-12-31";
+                      const tba = !e.date || e.date === "" || e.date === "9999-12-31";
 
                       return (
                         <Link
                           key={e.id}
                           href={`/events/event-detail/${e.id}`}
-                          style={{ textDecoration: "none" }}
+                          className="block group"
                         >
-                          <div
-                            style={{
-                              background: "#1b1b1b",
-                              borderRadius: 8,
-                              overflow: "hidden",
-                              border: "2px solid #262626",
-                              display: "flex",
-                              flexDirection: "column",
-                              transition:
-                                "transform .2s ease, border-color .2s ease",
-                            }}
-                            onMouseOver={(evt) => {
-                              const card = evt.currentTarget;
-                              card.style.transform =
-                                "translateY(-4px)";
-                              card.style.borderColor = "#00c4ff";
-                            }}
-                            onMouseOut={(evt) => {
-                              const card = evt.currentTarget;
-                              card.style.transform =
-                                "translateY(0)";
-                              card.style.borderColor = "#262626";
-                            }}
-                          >
-                            <div
-                              style={{
-                                position: "relative",
-                                width: "100%",
-                                paddingTop: "100%",
-                              }}
-                            >
+                          <div className="bg-[#1b1b1b] rounded-lg overflow-hidden border-2 border-[#262626] flex flex-col transition-all duration-200 group-hover:-translate-y-1 group-hover:border-[#00c4ff]">
+                            <div className="relative w-full pt-[100%]">
                               <Image
                                 src={img}
                                 alt={e.title}
                                 fill
                                 sizes="280px"
-                                style={{ objectFit: "cover" }}
+                                className="object-cover"
                                 unoptimized
                               />
                             </div>
-                            <div
-                              style={{
-                                padding: "1rem 1rem 1.25rem",
-                              }}
-                            >
+                            <div className="p-4">
                               <h4
-                                style={{
-                                  color: "#fff",
-                                  fontSize: "1.1rem",
-                                  fontWeight: 800,
-                                  lineHeight: 1.3,
-                                  minHeight: "2.5rem",
-                                  margin: "0 0 .5rem",
-                                }}
-                                dangerouslySetInnerHTML={{
-                                  __html: formatEventText(e.title),
-                                }}
+                                className="text-white text-lg font-extrabold leading-tight min-h-[2.5rem] mb-2"
+                                dangerouslySetInnerHTML={{ __html: formatEventText(e.title) }}
                               />
-                              <div
-                                style={{
-                                  color: "#00d9ff",
-                                  fontWeight: 800,
-                                  fontSize: ".92rem",
-                                }}
-                              >
+                              <div className="text-[#00d9ff] font-extrabold text-sm">
                                 {tba ? "TBA" : `${d.mon} ${d.day}`}
                               </div>
                             </div>
@@ -477,34 +312,18 @@ export default function Page() {
                       );
                     })}
                   </div>
-                </div>
+                </Container>
               </section>
             )}
 
             {/* SECTION 3 — UPCOMING SHOWS + SIDEBAR */}
-            <section
-              style={{
-                background: "#0d0d0d",
-                padding: "3rem 1.25rem 4rem",
-              }}
-            >
-              <div
-                style={{
-                  maxWidth: 1400,
-                  margin: "0 auto",
-                }}
-              >
+            <section className="bg-[#0d0d0d] py-16">
+              <Container size="xl">
                 <SectionTitle text="Upcoming Shows" />
 
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 350px",
-                    gap: "2rem",
-                  }}
-                >
+                <div className="grid grid-cols-1 lg:grid-cols-[1fr_350px] gap-8">
                   {/* LEFT COLUMN: list of upcoming events */}
-                  <div>
+                  <div className="space-y-4">
                     {events.map((e) => {
                       const img =
                         e.image_url || "/images/placeholder.png";
@@ -513,96 +332,38 @@ export default function Page() {
                         <Link
                           key={e.id}
                           href={`/events/event-detail/${e.id}`}
-                          style={{
-                            textDecoration: "none",
-                            display: "block",
-                          }}
+                          className="block group"
                         >
-                          <div
-                            style={{
-                              display: "grid",
-                              gridTemplateColumns:
-                                "100px 150px 1fr auto",
-                              gap: "1rem",
-                              alignItems: "center",
-                              background: "#151515",
-                              padding: "1rem",
-                              borderBottom:
-                                "1px solid #262626",
-                              transition:
-                                "background .2s ease, border-left-color .2s ease",
-                            }}
-                            onMouseOver={(evt) => {
-                              const row = evt.currentTarget;
-                              row.style.background = "#1f1f1f";
-                              row.style.borderLeft =
-                                "4px solid #00c4ff";
-                            }}
-                            onMouseOut={(evt) => {
-                              const row = evt.currentTarget;
-                              row.style.background = "#151515";
-                              row.style.borderLeft = "none";
-                            }}
-                          >
+                          <div className="grid grid-cols-[100px_1fr] md:grid-cols-[100px_150px_1fr_auto] gap-4 items-center bg-[#151515] p-4 border-b border-[#262626] border-l-4 border-l-transparent hover:bg-[#1f1f1f] hover:border-l-[#00c4ff] transition-colors duration-200">
                             <DateBox date={e.date} />
-                            <div
-                              style={{
-                                position: "relative",
-                                width: 150,
-                                height: 150,
-                                borderRadius: 6,
-                                overflow: "hidden",
-                              }}
-                            >
+                            
+                            <div className="relative w-full h-[150px] rounded-md overflow-hidden hidden md:block">
                               <Image
                                 src={img}
                                 alt={e.title}
                                 fill
                                 sizes="150px"
-                                style={{ objectFit: "cover" }}
+                                className="object-cover"
                                 unoptimized
                               />
                             </div>
 
-                            <div style={{ minWidth: 0 }}>
+                            <div className="min-w-0 col-span-1 md:col-span-1">
                               <h3
-                                style={{
-                                  color: "#fff",
-                                  fontSize: "1.25rem",
-                                  fontWeight: 800,
-                                  margin: 0,
-                                  lineHeight: 1.25,
-                                }}
-                                dangerouslySetInnerHTML={{
-                                  __html: formatEventText(e.title),
-                                }}
+                                className="text-white text-xl font-extrabold leading-tight mb-1"
+                                dangerouslySetInnerHTML={{ __html: formatEventText(e.title) }}
                               />
-                              {e.location ? (
-                                <div
-                                  style={{
-                                    color: "#9aa3ad",
-                                    fontSize: ".9rem",
-                                    marginTop: ".35rem",
-                                  }}
-                                >
+                              {e.location && (
+                                <div className="text-[#9aa3ad] text-sm mt-1">
                                   📍 {e.location}
                                 </div>
-                              ) : null}
+                              )}
                             </div>
 
-                            <div
-                              style={{
-                                background: "#00c4ff",
-                                color: "#000",
-                                padding: ".55rem 1.1rem",
-                                borderRadius: 6,
-                                fontWeight: 900,
-                                fontSize: ".85rem",
-                                whiteSpace: "nowrap",
-                                textTransform: "uppercase",
-                              }}
-                            >
-                              More Info
+                            <div className="hidden md:block">
+                              <span className="bg-[#00c4ff] text-black px-4 py-2 rounded-md font-black text-sm uppercase whitespace-nowrap">
+                                More Info
+                              </span>
                             </div>
                           </div>
                         </Link>
