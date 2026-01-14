@@ -964,7 +964,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   return (
     <div className={styles.importModalContainer}>
       <div className={styles.importModalContent}>
-        <div className={styles.importModalInner} style={{ width: '1200px', maxWidth: '95vw', height: '90vh', display: 'flex', flexDirection: 'column', backgroundColor: 'transparent' }}>
+        <div className={styles.importModalInner} style={{ width: '1200px', maxWidth: '95vw', height: '90vh', display: 'flex', flexDirection: 'column' }}>
         
         {/* HEADER */}
         <div className={styles.importModalHeader}>
@@ -979,7 +979,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
             <>
               {/* 1. OVERVIEW STATS */}
               <div style={{ marginBottom: '24px' }}>
-                <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px', color: '#111827' }}>Collection Overview</h3>
+                <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px' }}>Collection Overview</h3>
                 <div className={styles.importPreviewStats} style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
                   <StatBox label="Total Albums" value={stats.total} color="#3b82f6" onClick={() => {}} disabled />
                   <StatBox label="Fully Enriched" value={stats.fullyEnriched} color="#10b981" onClick={() => showCategory('fully-enriched', 'Fully Enriched')} />
@@ -1016,7 +1016,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
               {/* 3. FILTERS */}
               <div className={styles.importEnrichCard} style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <label style={{ fontWeight: '600', fontSize: '14px', color: '#111827' }}>Folder:</label>
+                  <label style={{ fontWeight: '600', fontSize: '14px' }}>Folder:</label>
                   <select value={folderFilter} onChange={(e) => setFolderFilter(e.target.value)} disabled={enriching} style={{ padding: '6px', borderRadius: '4px', border: '1px solid #d1d5db', color: '#111827' }}>
                     <option value="">All Folders</option>
                     {folders.map(f => <option key={f} value={f}>{f}</option>)}
@@ -1190,7 +1190,7 @@ function DataCategoryCard({
             style={{ cursor: 'pointer' }}
          />
          <span style={{ fontSize: '16px' }}>{DATA_CATEGORY_ICONS[category]}</span>
-         <span style={{ fontWeight: '700', fontSize: '13px' }}>{DATA_CATEGORY_LABELS[category]}</span>
+         <span className={styles.cardHeaderText}>{DATA_CATEGORY_LABELS[category]}</span>
       </div>
 
       {/* FIELD ROWS (Dashboard Style) */}
