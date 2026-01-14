@@ -4,7 +4,6 @@
 
 import React, { useEffect, useState } from "react"
 import SocialEmbeds from "components/SocialEmbeds"
-import 'styles/about.css'
 
 export default function AboutPage() {
   const [mostWanted, setMostWanted] = useState([]);
@@ -41,14 +40,14 @@ export default function AboutPage() {
 
   if (loading) {
     return (
-      <div className="page-wrapper">
-        <header className="about-hero">
-          <div className="overlay">
-            <h1>About</h1>
+      <div className="bg-white min-h-screen">
+        <header className="relative w-full h-[300px] flex items-center justify-center bg-[url('/images/event-header-still.jpg')] bg-cover bg-center">
+          <div className="absolute inset-0 bg-black/40 flex items-center justify-center p-8">
+            <h1 className="font-serif-display text-4xl md:text-5xl font-bold text-white text-center m-0">About</h1>
           </div>
         </header>
-        <main className="event-body">
-          <div style={{ textAlign: 'center', padding: '3rem', fontSize: '1.2rem' }}>
+        <main className="container-responsive py-12">
+          <div className="text-center p-12 text-lg text-gray-600">
             Loading...
           </div>
         </main>
@@ -58,14 +57,14 @@ export default function AboutPage() {
 
   if (!aboutContent) {
     return (
-      <div className="page-wrapper">
-        <header className="about-hero">
-          <div className="overlay">
-            <h1>About</h1>
+      <div className="bg-white min-h-screen">
+        <header className="relative w-full h-[300px] flex items-center justify-center bg-[url('/images/event-header-still.jpg')] bg-cover bg-center">
+          <div className="absolute inset-0 bg-black/40 flex items-center justify-center p-8">
+            <h1 className="font-serif-display text-4xl md:text-5xl font-bold text-white text-center m-0">About</h1>
           </div>
         </header>
-        <main className="event-body">
-          <div style={{ textAlign: 'center', padding: '3rem', fontSize: '1.2rem' }}>
+        <main className="container-responsive py-12">
+          <div className="text-center p-12 text-lg text-gray-600">
             Content not available. Please contact the administrator.
           </div>
         </main>
@@ -74,77 +73,42 @@ export default function AboutPage() {
   }
 
   return (
-    <div className="page-wrapper">
-      <header className="about-hero">
-        <div className="overlay">
-          <h1>About</h1>
+    <div className="bg-white min-h-screen">
+      <header className="relative w-full h-[300px] flex items-center justify-center bg-[url('/images/event-header-still.jpg')] bg-cover bg-center">
+        <div className="absolute inset-0 bg-black/40 flex items-center justify-center p-8">
+          <h1 className="font-serif-display text-4xl md:text-5xl font-bold text-white text-center m-0">About</h1>
         </div>
       </header>
-      <main className="event-body">
-        <div className="about-body-row">
-          <div className="about-main-col">
-            <div className="about-body-container">
-              <h2 className="about-title">About Dead Wax Dialogues</h2>
-              {aboutContent.main_description && aboutContent.main_description.split('\n\n').map((paragraph, index) => (
-                <p key={index}>{paragraph}</p>
-              ))}
+      
+      <main className="container-responsive py-12">
+        <div className="flex flex-col lg:flex-row gap-12 items-start">
+          {/* Main Content Column */}
+          <div className="flex-1 lg:flex-[2] min-w-0">
+            <div className="pr-0 lg:pr-4">
+              <h2 className="text-3xl font-bold text-purple-900 mb-6">About Dead Wax Dialogues</h2>
+              <div className="prose max-w-none text-gray-800 mb-8 space-y-4">
+                {aboutContent.main_description && aboutContent.main_description.split('\n\n').map((paragraph, index) => (
+                  <p key={index} className="text-lg leading-relaxed">{paragraph}</p>
+                ))}
+              </div>
 
               {/* Booking Information Section */}
-              <div style={{
-                backgroundColor: '#f8f9fa',
-                border: '1px solid #e9ecef',
-                borderRadius: '12px',
-                padding: '2rem',
-                marginTop: '2rem',
-                marginBottom: '2rem'
-              }}>
-                <h3 style={{
-                  fontSize: '1.5rem',
-                  fontWeight: 'bold',
-                  color: '#333',
-                  marginBottom: '1rem',
-                  textAlign: 'center'
-                }}>
+              <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 md:p-8 my-8">
+                <h3 className="text-2xl font-bold text-gray-800 mb-4 text-center">
                   Book Dead Wax Dialogues
                 </h3>
                 
-                <p style={{
-                  fontSize: '1.1rem',
-                  color: '#666',
-                  textAlign: 'center',
-                  marginBottom: '2rem',
-                  lineHeight: '1.6'
-                }}>
+                <p className="text-lg text-gray-600 text-center mb-8 leading-relaxed max-w-3xl mx-auto">
                   {aboutContent.booking_description}
                 </p>
 
                 {/* Book Online Button */}
-                <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+                <div className="text-center mb-10">
                   <a 
                     href={aboutContent.calendly_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    style={{
-                      display: 'inline-block',
-                      backgroundColor: '#007bff',
-                      color: '#ffffff',
-                      padding: '0.75rem 2rem',
-                      borderRadius: '8px',
-                      textDecoration: 'none',
-                      fontSize: '1.2rem',
-                      fontWeight: '600',
-                      boxShadow: '0 4px 8px rgba(0, 123, 255, 0.2)',
-                      transition: 'all 0.2s ease',
-                      cursor: 'pointer'
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.backgroundColor = '#0056b3';
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.backgroundColor = '#007bff';
-                      e.currentTarget.style.transform = 'translateY(0)';
-                    }}
+                    className="inline-block bg-blue-600 hover:bg-blue-700 text-white py-3 px-8 rounded-lg text-lg font-semibold shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200"
                   >
                     📅 Schedule a Consultation
                   </a>
@@ -152,39 +116,16 @@ export default function AboutPage() {
 
                 {/* Services Grid */}
                 {aboutContent.services && aboutContent.services.length > 0 && (
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-                    gap: '1.5rem',
-                    marginBottom: '2rem'
-                  }}>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
                     {aboutContent.services.map((service, index) => (
-                      <div key={index} style={{
-                        backgroundColor: '#ffffff',
-                        border: '1px solid #dee2e6',
-                        borderRadius: '8px',
-                        padding: '1.5rem'
-                      }}>
-                        <h4 style={{
-                          fontSize: '1.2rem',
-                          fontWeight: 'bold',
-                          color: '#333',
-                          marginBottom: '0.5rem'
-                        }}>
+                      <div key={index} className="bg-white border border-gray-200 rounded-lg p-6">
+                        <h4 className="text-xl font-bold text-gray-800 mb-2">
                           {service.title}
                         </h4>
-                        <p style={{
-                          color: '#666',
-                          marginBottom: '1rem',
-                          lineHeight: '1.5'
-                        }}>
+                        <p className="text-gray-600 mb-4 leading-relaxed">
                           {service.description}
                         </p>
-                        <div style={{
-                          fontSize: '1.1rem',
-                          fontWeight: 'bold',
-                          color: '#007bff'
-                        }}>
+                        <div className="text-lg font-bold text-blue-600">
                           {service.price}
                         </div>
                       </div>
@@ -194,42 +135,17 @@ export default function AboutPage() {
 
                 {/* Testimonials */}
                 {aboutContent.testimonials && aboutContent.testimonials.length > 0 && (
-                  <div style={{ marginBottom: '2rem' }}>
-                    <h4 style={{
-                      fontSize: '1.3rem',
-                      fontWeight: 'bold',
-                      color: '#333',
-                      marginBottom: '1rem',
-                      textAlign: 'center'
-                    }}>
+                  <div className="mb-10">
+                    <h4 className="text-xl font-bold text-gray-800 mb-6 text-center">
                       What People Say
                     </h4>
-                    <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-                      gap: '1rem'
-                    }}>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       {aboutContent.testimonials.map((testimonial, index) => (
-                        <div key={index} style={{
-                          backgroundColor: '#ffffff',
-                          border: '1px solid #dee2e6',
-                          borderRadius: '8px',
-                          padding: '1.25rem',
-                          borderLeft: '4px solid #007bff'
-                        }}>
-                          <p style={{
-                            fontStyle: 'italic',
-                            color: '#555',
-                            marginBottom: '0.75rem',
-                            lineHeight: '1.5'
-                          }}>
+                        <div key={index} className="bg-white border border-gray-200 rounded-lg p-6 border-l-4 border-l-blue-600">
+                          <p className="italic text-gray-600 mb-3 leading-relaxed">
                             &ldquo;{testimonial.text}&rdquo;
                           </p>
-                          <div style={{
-                            fontSize: '0.9rem',
-                            fontWeight: '600',
-                            color: '#007bff'
-                          }}>
+                          <div className="text-sm font-bold text-blue-600">
                             — {testimonial.author}
                           </div>
                         </div>
@@ -239,53 +155,30 @@ export default function AboutPage() {
                 )}
 
                 {/* Contact Information */}
-                <div style={{
-                  backgroundColor: '#ffffff',
-                  border: '1px solid #dee2e6',
-                  borderRadius: '8px',
-                  padding: '1.5rem',
-                  textAlign: 'center'
-                }}>
-                  <h4 style={{
-                    fontSize: '1.2rem',
-                    fontWeight: 'bold',
-                    color: '#333',
-                    marginBottom: '1rem'
-                  }}>
+                <div className="bg-white border border-gray-200 rounded-lg p-6 text-center">
+                  <h4 className="text-xl font-bold text-gray-800 mb-4">
                     Contact Information
                   </h4>
                   
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                    gap: '1rem',
-                    marginBottom: '1rem'
-                  }}>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
                     <div>
-                      <strong>{aboutContent.contact_name}</strong><br />
-                      <span style={{ color: '#666' }}>{aboutContent.contact_company}</span>
+                      <strong className="block text-gray-900">{aboutContent.contact_name}</strong>
+                      <span className="text-gray-500">{aboutContent.contact_company}</span>
                     </div>
                     <div>
-                      <a href={`mailto:${aboutContent.contact_email}`} 
-                         style={{ color: '#007bff', textDecoration: 'none' }}>
+                      <a href={`mailto:${aboutContent.contact_email}`} className="text-blue-600 hover:underline">
                         {aboutContent.contact_email}
                       </a>
                     </div>
                     <div>
-                      <a href={`tel:${aboutContent.contact_phone}`} 
-                         style={{ color: '#007bff', textDecoration: 'none' }}>
+                      <a href={`tel:${aboutContent.contact_phone}`} className="text-blue-600 hover:underline">
                         {aboutContent.contact_phone}
                       </a>
                     </div>
                   </div>
 
                   {aboutContent.booking_notes && (
-                    <div style={{
-                      fontSize: '0.9rem',
-                      color: '#666',
-                      fontStyle: 'italic',
-                      lineHeight: '1.4'
-                    }}>
+                    <div className="text-sm text-gray-500 italic">
                       {aboutContent.booking_notes}
                     </div>
                   )}
@@ -294,37 +187,44 @@ export default function AboutPage() {
             </div>
           </div>
 
-          <aside className="about-sidebar">
-            <div className="about-sidebar-title">Top 10 Most Wanted</div>
-            <ol className="about-mostwanted">
-              {mostWanted.map((item) => (
-                <li key={item.id}>
-                  <a href={item.url} target="_blank" rel="noopener noreferrer">{item.title}</a>
-                </li>
-              ))}
-            </ol>
+          {/* Sidebar */}
+          <aside className="flex-1 min-w-[280px] w-full lg:w-auto pt-2">
+            <div className="mb-8">
+              <div className="font-bold text-lg text-orange-600 mb-3 border-b border-gray-200 pb-2">Top 10 Most Wanted</div>
+              <ol className="list-decimal pl-5 space-y-2 text-gray-800">
+                {mostWanted.map((item) => (
+                  <li key={item.id}>
+                    <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-blue-700 hover:underline font-medium">
+                      {item.title}
+                    </a>
+                  </li>
+                ))}
+              </ol>
+            </div>
             
-            <div className="about-wishlist">
-              <div className="about-sidebar-title">Wish List</div>
-              <a href={aboutContent.amazon_wishlist_url} target="_blank" rel="noopener noreferrer">
-                Full Amazon Wish List
-              </a>
-              <a href={aboutContent.discogs_wantlist_url} target="_blank" rel="noopener noreferrer">
-                Full Discogs Wantlist
-              </a>
+            <div className="mb-8">
+              <div className="font-bold text-lg text-orange-600 mb-3 border-b border-gray-200 pb-2">Wish List</div>
+              <div className="flex flex-col gap-2">
+                <a href={aboutContent.amazon_wishlist_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-2">
+                  <span>🛒</span> Full Amazon Wish List
+                </a>
+                <a href={aboutContent.discogs_wantlist_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-2">
+                  <span>💿</span> Full Discogs Wantlist
+                </a>
+              </div>
             </div>
 
-            {/* Social Feed - MOVED HERE */}
-            <div className="about-social-feed">
-              <div className="about-sidebar-title">Recent Social Posts</div>
-              <div className="social-widgets">
+            {/* Social Feed */}
+            <div className="mb-8">
+              <div className="font-bold text-lg text-orange-600 mb-3 border-b border-gray-200 pb-2">Recent Social Posts</div>
+              <div className="space-y-6">
                 <SocialEmbeds />
-                <div className="social-embed">
+                <div className="mt-6">
                   <a
                     href={aboutContent.linktree_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="linktree-button"
+                    className="block w-full text-center bg-black hover:bg-gray-800 text-white font-bold py-3 px-4 rounded-lg transition-colors"
                   >
                     Visit Our Linktree
                   </a>
