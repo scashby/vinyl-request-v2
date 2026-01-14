@@ -85,80 +85,43 @@ export default function StaffPicksPage() {
 
   if (loading) {
     return (
-      <div style={{
-        minHeight: '100vh',
-        background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        color: 'white'
-      }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 24, marginBottom: 16 }}>🎵 Loading Staff Picks...</div>
-          <div style={{ fontSize: 16, opacity: 0.8 }}>Discovering our team&apos;s favorite albums</div>
+      <div className="min-h-screen bg-gradient-to-br from-slate-800 to-slate-700 flex items-center justify-center text-white">
+        <div className="text-center">
+          <div className="text-2xl mb-4">🎵 Loading Staff Picks...</div>
+          <div className="text-base opacity-80">Discovering our team&apos;s favorite albums</div>
         </div>
       </div>
     );
   }
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
-      padding: 20
-    }}>
-      <div style={{ maxWidth: 1200, margin: '0 auto', color: 'white' }}>
+    <div className="min-h-screen bg-gradient-to-br from-slate-800 to-slate-700 p-5">
+      <div className="max-w-6xl mx-auto text-white">
         {/* Header */}
-        <div style={{
-          textAlign: 'center',
-          marginBottom: 40,
-          background: 'rgba(255, 255, 255, 0.1)',
-          borderRadius: 16,
-          padding: 40,
-          backdropFilter: 'blur(10px)'
-        }}>
-          <h1 style={{ fontSize: 48, margin: '0 0 16px 0', fontWeight: 'bold' }}>
+        <div className="text-center mb-10 bg-white/10 rounded-2xl p-10 backdrop-blur-md">
+          <h1 className="text-5xl font-bold mb-4">
             🎵 Staff Picks
           </h1>
-          <p style={{ fontSize: 20, margin: '0 0 20px 0', opacity: 0.9 }}>
+          <p className="text-xl mb-5 opacity-90">
             Discover the albums that inspire our Devils Purse team
           </p>
-          <p style={{ fontSize: 16, opacity: 0.7 }}>
+          <p className="text-base opacity-70">
             Each staff member shares their top 5 albums with personal stories and listening recommendations
           </p>
         </div>
 
         {/* Staff Navigation */}
         {staffNames.length > 1 && (
-          <div style={{
-            background: 'rgba(255, 255, 255, 0.1)',
-            borderRadius: 16,
-            padding: 24,
-            marginBottom: 40,
-            backdropFilter: 'blur(10px)'
-          }}>
-            <h3 style={{ fontSize: 18, margin: '0 0 16px 0', fontWeight: 'bold' }}>
+          <div className="bg-white/10 rounded-2xl p-6 mb-10 backdrop-blur-md">
+            <h3 className="text-lg font-bold mb-4">
               Meet Our Team
             </h3>
-            <div style={{
-              display: 'flex',
-              gap: 12,
-              flexWrap: 'wrap',
-              justifyContent: 'center'
-            }}>
+            <div className="flex gap-3 flex-wrap justify-center">
               <button
                 onClick={() => setSelectedStaff(null)}
-                style={{
-                  background: selectedStaff === null ? '#3b82f6' : 'rgba(255, 255, 255, 0.2)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: 8,
-                  padding: '8px 16px',
-                  cursor: 'pointer',
-                  fontWeight: 600,
-                  fontSize: 14,
-                  transition: 'all 0.2s ease'
-                }}
+                className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200 ${
+                  selectedStaff === null ? 'bg-blue-500 text-white' : 'bg-white/20 text-white hover:bg-white/30'
+                }`}
               >
                 All Staff
               </button>
@@ -166,17 +129,9 @@ export default function StaffPicksPage() {
                 <button
                   key={staffName}
                   onClick={() => setSelectedStaff(staffName)}
-                  style={{
-                    background: selectedStaff === staffName ? '#3b82f6' : 'rgba(255, 255, 255, 0.2)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: 8,
-                    padding: '8px 16px',
-                    cursor: 'pointer',
-                    fontWeight: 600,
-                    fontSize: 14,
-                    transition: 'all 0.2s ease'
-                  }}
+                  className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200 ${
+                    selectedStaff === staffName ? 'bg-blue-500 text-white' : 'bg-white/20 text-white hover:bg-white/30'
+                  }`}
                 >
                   {staffName}
                 </button>
@@ -186,79 +141,41 @@ export default function StaffPicksPage() {
         )}
 
         {/* Staff Picks Display */}
-        <div style={{ display: 'grid', gap: 40 }}>
+        <div className="grid gap-10">
           {Object.entries(staffGroups)
             .filter(([staffName]) => selectedStaff === null || selectedStaff === staffName)
             .map(([staffName, picks]) => {
               const staffInfo = picks[0];
               return (
-                <div key={staffName} style={{
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  borderRadius: 16,
-                  padding: 32,
-                  backdropFilter: 'blur(10px)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)'
-                }}>
+                <div key={staffName} className="bg-white/10 rounded-2xl p-8 backdrop-blur-md border border-white/20">
                   {/* Staff Header */}
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 20,
-                    marginBottom: 32,
-                    paddingBottom: 20,
-                    borderBottom: '1px solid rgba(255, 255, 255, 0.2)'
-                  }}>
+                  <div className="flex flex-col md:flex-row items-center gap-5 mb-8 pb-5 border-b border-white/20 text-center md:text-left">
                     {staffInfo.staff_photo_url ? (
                       <Image
                         src={staffInfo.staff_photo_url}
                         alt={staffName}
                         width={80}
                         height={80}
-                        style={{
-                          borderRadius: '50%',
-                          objectFit: 'cover',
-                          border: '3px solid rgba(255, 255, 255, 0.3)'
-                        }}
+                        className="rounded-full object-cover border-[3px] border-white/30 shrink-0"
                         unoptimized
                       />
                     ) : (
-                      <div style={{
-                        width: 80,
-                        height: 80,
-                        borderRadius: '50%',
-                        background: 'rgba(255, 255, 255, 0.2)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: 32,
-                        border: '3px solid rgba(255, 255, 255, 0.3)'
-                      }}>
+                      <div className="w-20 h-20 rounded-full bg-white/20 flex items-center justify-center text-3xl border-[3px] border-white/30 shrink-0">
                         👤
                       </div>
                     )}
 
                     <div>
-                      <h2 style={{ margin: 0, fontSize: 28, fontWeight: 'bold' }}>
+                      <h2 className="text-3xl font-bold m-0">
                         {staffName}
                       </h2>
                       {staffInfo.staff_title && (
-                        <div style={{
-                          fontSize: 16,
-                          color: '#fbbf24',
-                          fontWeight: 600,
-                          marginBottom: 8,
-                          marginTop: 4
-                        }}>
+                        <div className="text-base font-semibold text-amber-400 mt-1 mb-2">
                           {staffInfo.staff_title}
                         </div>
                       )}
                       {staffInfo.staff_bio && (
-                        <div style={{
-                          fontSize: 16,
-                          opacity: 0.9,
-                          lineHeight: 1.5,
-                          maxWidth: 600
-                        }}>
+                        <div className="text-base opacity-90 leading-relaxed max-w-xl">
                           {staffInfo.staff_bio}
                         </div>
                       )}
@@ -266,52 +183,24 @@ export default function StaffPicksPage() {
                   </div>
 
                   {/* Staff's Top 5 Albums */}
-                  <div style={{ display: 'grid', gap: 24 }}>
-                    <h3 style={{
-                      fontSize: 22,
-                      margin: 0,
-                      fontWeight: 'bold',
-                      textAlign: 'center',
-                      color: '#fbbf24'
-                    }}>
+                  <div className="grid gap-6">
+                    <h3 className="text-2xl font-bold text-center text-amber-400 m-0">
                       🏆 Top 5 Albums
                     </h3>
 
                     {picks.sort((a, b) => a.pick_order - b.pick_order).map(pick => (
-                      <div key={pick.id} style={{
-                        display: 'flex',
-                        gap: 20,
-                        padding: 20,
-                        background: 'rgba(255, 255, 255, 0.1)',
-                        borderRadius: 12,
-                        backdropFilter: 'blur(10px)',
-                        border: '1px solid rgba(255, 255, 255, 0.2)',
-                        transition: 'all 0.3s ease'
-                      }}>
+                      <div key={pick.id} className="flex flex-col md:flex-row gap-5 p-5 bg-white/10 rounded-xl backdrop-blur-md border border-white/20 transition-all duration-300 hover:bg-white/20 group">
                         {/* Rank Badge */}
-                        <div style={{
-                          background: pick.pick_order <= 3 ? 
-                            'linear-gradient(135deg, #fbbf24, #f59e0b)' :
-                            'linear-gradient(135deg, #6b7280, #4b5563)',
-                          color: 'white',
-                          width: 40,
-                          height: 40,
-                          borderRadius: '50%',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: 18,
-                          fontWeight: 'bold',
-                          flexShrink: 0,
-                          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
-                        }}>
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold shrink-0 shadow-lg ${
+                          pick.pick_order <= 3 ? 'bg-gradient-to-br from-amber-400 to-amber-500' : 'bg-gradient-to-br from-gray-500 to-slate-600'
+                        }`}>
                           {pick.pick_order}
                         </div>
 
                         {/* Album Cover */}
                         <Link
-                          href={`/browse/album/${pick.collection_id}`}
-                          style={{ textDecoration: 'none', flexShrink: 0 }}
+                          href={`/browse/album-detail/${pick.collection_id}`}
+                          className="shrink-0 group-hover:scale-105 transition-transform duration-200 ease-out mx-auto md:mx-0"
                         >
                           {pick.image_url ? (
                             <Image
@@ -319,63 +208,28 @@ export default function StaffPicksPage() {
                               alt={`${pick.artist} - ${pick.title}`}
                               width={100}
                               height={100}
-                              style={{
-                                borderRadius: 8,
-                                objectFit: 'cover',
-                                cursor: 'pointer',
-                                transition: 'transform 0.2s ease',
-                                border: '2px solid rgba(255, 255, 255, 0.3)'
-                              }}
-                              onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'}
-                              onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                              className="rounded-lg object-cover border-2 border-white/30"
                               unoptimized
                             />
                           ) : (
-                            <div style={{
-                              width: 100,
-                              height: 100,
-                              borderRadius: 8,
-                              background: 'rgba(255, 255, 255, 0.2)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontSize: 12,
-                              color: '#9ca3af',
-                              border: '2px solid rgba(255, 255, 255, 0.3)'
-                            }}>
+                            <div className="w-[100px] h-[100px] rounded-lg bg-white/20 flex items-center justify-center text-xs text-gray-400 border-2 border-white/30">
                               No Image
                             </div>
                           )}
                         </Link>
 
                         {/* Album Info & Story */}
-                        <div style={{ flex: 1, minWidth: 0 }}>
+                        <div className="flex-1 min-w-0">
                           <Link
-                            href={`/browse/album/${pick.collection_id}`}
-                            style={{ textDecoration: 'none', color: 'inherit' }}
+                            href={`/browse/album-detail/${pick.collection_id}`}
+                            className="no-underline text-inherit block"
                           >
-                            <div style={{
-                              fontSize: 20,
-                              fontWeight: 'bold',
-                              marginBottom: 6,
-                              cursor: 'pointer',
-                              transition: 'color 0.2s ease'
-                            }}
-                            onMouseEnter={e => e.currentTarget.style.color = '#fbbf24'}
-                            onMouseLeave={e => e.currentTarget.style.color = 'white'}
-                            >
+                            <div className="text-xl font-bold mb-1.5 transition-colors duration-200 hover:text-amber-400 text-center md:text-left">
                               {pick.artist} - {pick.title}
                             </div>
                           </Link>
                           
-                          <div style={{
-                            fontSize: 14,
-                            opacity: 0.8,
-                            marginBottom: 12,
-                            display: 'flex',
-                            gap: 16,
-                            flexWrap: 'wrap'
-                          }}>
+                          <div className="text-sm opacity-80 mb-3 flex gap-4 flex-wrap justify-center md:justify-start">
                             <span>🗓️ {pick.year}</span>
                             <span>💿 {pick.folder}</span>
                             {pick.favorite_track && (
@@ -383,36 +237,15 @@ export default function StaffPicksPage() {
                             )}
                           </div>
 
-                          <div style={{
-                            fontSize: 16,
-                            lineHeight: 1.6,
-                            marginBottom: 12,
-                            padding: 16,
-                            background: 'rgba(0, 0, 0, 0.2)',
-                            borderRadius: 8,
-                            border: '1px solid rgba(255, 255, 255, 0.1)'
-                          }}>
-                            <div style={{
-                              fontSize: 14,
-                              opacity: 0.7,
-                              marginBottom: 6,
-                              fontWeight: 600
-                            }}>
+                          <div className="text-base leading-relaxed mb-3 p-4 bg-black/20 rounded-lg border border-white/10">
+                            <div className="text-sm opacity-70 mb-1.5 font-semibold">
                               Why {staffName} chose this:
                             </div>
                             &ldquo;{pick.reason}&rdquo;
                           </div>
 
                           {pick.listening_context && (
-                            <div style={{
-                              fontSize: 14,
-                              opacity: 0.8,
-                              fontStyle: 'italic',
-                              padding: 12,
-                              background: 'rgba(251, 191, 36, 0.1)',
-                              borderRadius: 6,
-                              border: '1px solid rgba(251, 191, 36, 0.2)'
-                            }}>
+                            <div className="text-sm opacity-80 italic p-3 bg-amber-400/10 rounded-md border border-amber-400/20">
                               🎧 <strong>Best enjoyed:</strong> {pick.listening_context}
                             </div>
                           )}
@@ -427,18 +260,12 @@ export default function StaffPicksPage() {
 
         {/* No staff picks message */}
         {staffNames.length === 0 && (
-          <div style={{
-            textAlign: 'center',
-            padding: 80,
-            background: 'rgba(255, 255, 255, 0.1)',
-            borderRadius: 16,
-            backdropFilter: 'blur(10px)'
-          }}>
-            <div style={{ fontSize: 64, marginBottom: 20 }}>🎵</div>
-            <h3 style={{ fontSize: 24, marginBottom: 12 }}>
+          <div className="text-center p-20 bg-white/10 rounded-2xl backdrop-blur-md">
+            <div className="text-6xl mb-5">🎵</div>
+            <h3 className="text-2xl mb-3">
               Staff Picks Coming Soon!
             </h3>
-            <p style={{ fontSize: 16, opacity: 0.8 }}>
+            <p className="text-base opacity-80">
               Our team is currently selecting their favorite albums to share with you.
               Check back soon for personal recommendations and stories behind the music.
             </p>
@@ -446,48 +273,23 @@ export default function StaffPicksPage() {
         )}
 
         {/* Call to Action */}
-        <div style={{
-          background: 'rgba(255, 255, 255, 0.1)',
-          borderRadius: 16,
-          padding: 32,
-          marginTop: 40,
-          textAlign: 'center',
-          backdropFilter: 'blur(10px)'
-        }}>
-          <h3 style={{ fontSize: 24, margin: '0 0 16px 0', fontWeight: 'bold' }}>
+        <div className="bg-white/10 rounded-2xl p-8 mt-10 text-center backdrop-blur-md">
+          <h3 className="text-2xl font-bold mb-4">
             Explore More Music
           </h3>
-          <p style={{ fontSize: 16, margin: '0 0 24px 0', opacity: 0.9 }}>
+          <p className="text-base opacity-90 mb-6">
             Discover more albums from our collection and see what the community loves
           </p>
-          <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
+          <div className="flex gap-4 justify-center flex-wrap">
             <Link
               href="/browse/browse-albums"
-              style={{
-                background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
-                color: 'white',
-                padding: '12px 24px',
-                borderRadius: 8,
-                textDecoration: 'none',
-                fontWeight: 600,
-                fontSize: 16,
-                transition: 'all 0.2s ease'
-              }}
+              className="bg-gradient-to-br from-blue-500 to-blue-700 text-white px-6 py-3 rounded-lg font-semibold text-base hover:shadow-lg transition-all duration-200"
             >
               📚 Browse Full Collection
             </Link>
             <Link
               href="/inner-circle-voting"
-              style={{
-                background: 'linear-gradient(135deg, #7c3aed, #5b21b6)',
-                color: 'white',
-                padding: '12px 24px',
-                borderRadius: 8,
-                textDecoration: 'none',
-                fontWeight: 600,
-                fontSize: 16,
-                transition: 'all 0.2s ease'
-              }}
+              className="bg-gradient-to-br from-violet-600 to-violet-800 text-white px-6 py-3 rounded-lg font-semibold text-base hover:shadow-lg transition-all duration-200"
             >
               💎 Inner Circle Voting
             </Link>
@@ -495,13 +297,7 @@ export default function StaffPicksPage() {
         </div>
 
         {/* Footer Note */}
-        <div style={{
-          textAlign: 'center',
-          marginTop: 40,
-          padding: 20,
-          fontSize: 14,
-          opacity: 0.6
-        }}>
+        <div className="text-center mt-10 p-5 text-sm opacity-60">
           Staff picks are curated by the Devils Purse team • Updated regularly with new recommendations
         </div>
       </div>
