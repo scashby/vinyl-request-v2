@@ -278,7 +278,6 @@ function ConflictValue({
       </div>
       <div style={{ 
         fontSize: '13px', 
-        color: value ? '#111827' : '#9ca3af', 
         whiteSpace: 'pre-wrap', 
         wordBreak: 'break-word',
         fontStyle: value ? 'normal' : 'italic',
@@ -400,10 +399,9 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
   const totalChanges = Object.keys(groupedConflicts).length;
 
   return (
-    <div className={styles.importModalContainer} style={{ background: 'rgba(0,0,0,0.6)' }}>
-      <div className={styles.importModalContent} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ 
-        backgroundColor: 'white', 
+    <div className={styles.importModalContainer}>
+      <div className={styles.importModalContent}>
+      <div className={styles.importModalInner} style={{ 
         borderRadius: '12px', 
         width: '1000px', 
         maxWidth: '95vw', 
@@ -415,9 +413,9 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
       }}>
         
         {/* HEADER */}
-        <div className={styles.importModalHeader} style={{ backgroundColor: 'white', borderBottom: '1px solid #e5e7eb' }}>
+        <div className={styles.importModalHeader} style={{ borderBottom: '1px solid #e5e7eb' }}>
           <div>
-            <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '700', color: '#111827' }}>
+            <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '700' }}>
               Review Enrichment Data
             </h3>
             <div style={{ fontSize: '14px', color: '#6b7280', marginTop: '4px' }}>
@@ -461,8 +459,8 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
                 <div key={idx} className={styles.importEnrichCard} style={{ padding: 0, overflow: 'hidden' }}>
                   
                   {/* ALBUM CONTEXT HEADER */}
-                  <div style={{ padding: '12px 16px', backgroundColor: '#f3f4f6', borderBottom: '1px solid #e5e7eb', display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
-                    <div style={{ fontWeight: '700', fontSize: '15px', color: '#111827', marginRight: 'auto' }}>
+                  <div style={{ padding: '12px 16px', borderBottom: '1px solid #e5e7eb', display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <div style={{ fontWeight: '700', fontSize: '15px', marginRight: 'auto' }}>
                       {albumInfo.artist} - {albumInfo.title}
                     </div>
                     <div style={{ display: 'flex', gap: '8px', fontSize: '12px' }}>
@@ -615,7 +613,7 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
         </div>
 
         {/* FOOTER */}
-        <div className={styles.importButtonContainer} style={{ padding: '20px 24px', borderTop: '1px solid #e5e7eb', backgroundColor: 'white', justifyContent: 'flex-end' }}>
+        <div className={styles.importButtonContainer} style={{ padding: '20px 24px', borderTop: '1px solid #e5e7eb', justifyContent: 'flex-end' }}>
           <button onClick={onCancel} className={styles.importCancelButton}>Cancel</button>
           <button 
             onClick={() => onComplete(resolutions as Record<string, { value: unknown, source: string }>, finalizedFields)}
