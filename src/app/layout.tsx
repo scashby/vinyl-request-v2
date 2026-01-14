@@ -1,11 +1,10 @@
-import "styles/global.css";
-import { Inter } from "next/font/google";
+import "./globals.css"; // The ONLY global style file
+import { Inter, Playfair_Display } from "next/font/google";
 import Layout from "components/Layout";
-import "styles/internal.css";
-import "../styles/base.css";
 import { Analytics } from "@vercel/analytics/next"
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ["latin"], variable: '--font-inter' });
+const playfair = Playfair_Display({ subsets: ["latin"], variable: '--font-playfair' });
 
 export const metadata = {
   title: "Dead Wax Dialogues",
@@ -19,7 +18,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={`${inter.className} antialiased`}>
+      <body className={`${inter.variable} ${playfair.variable} font-sans antialiased bg-white text-black`}>
         <Layout>{children}</Layout>
         <Analytics />
       </body>
