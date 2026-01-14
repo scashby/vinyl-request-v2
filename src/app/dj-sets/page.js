@@ -76,15 +76,15 @@ export default function DJSetsPage() {
 
   if (loading) {
     return (
-      <div className="internal-wrapper">
-        <header className="event-hero">
-          <div className="overlay">
-            <h1>Live Sessions & DJ Sets</h1>
+      <div className="bg-white min-h-screen">
+        <header className="relative w-full h-[300px] flex items-center justify-center bg-[url('/images/event-header-still.jpg')] bg-cover bg-center">
+          <div className="absolute inset-0 bg-black/40 flex items-center justify-center p-8">
+            <h1 className="font-serif-display text-4xl md:text-5xl font-bold text-white text-center m-0">Live Sessions & DJ Sets</h1>
           </div>
         </header>
-        <main className="event-body">
-          <div style={{ padding: '2rem', textAlign: 'center' }}>
-            <h2>Loading Live Sessions & DJ Sets...</h2>
+        <main className="container-responsive py-12">
+          <div className="text-center p-8">
+            <h2 className="text-xl font-semibold text-gray-600">Loading Live Sessions & DJ Sets...</h2>
           </div>
         </main>
       </div>
@@ -92,46 +92,27 @@ export default function DJSetsPage() {
   }
 
   return (
-    <div className="internal-wrapper">
-      <header className="event-hero">
-        <div className="overlay">
-          <h1>DJ Sets</h1>
+    <div className="bg-white min-h-screen">
+      <header className="relative w-full h-[300px] flex items-center justify-center bg-[url('/images/event-header-still.jpg')] bg-cover bg-center">
+        <div className="absolute inset-0 bg-black/40 flex items-center justify-center p-8">
+          <h1 className="font-serif-display text-4xl md:text-5xl font-bold text-white text-center m-0">DJ Sets</h1>
         </div>
       </header>
-      <main className="event-body">
+      
+      <main className="container-responsive py-8">
         {/* Search and Filter */}
-        <div style={{
-          padding: '2rem',
-          display: 'flex',
-          gap: '1rem',
-          flexWrap: 'wrap',
-          justifyContent: 'center'
-        }}>
+        <div className="flex flex-col md:flex-row gap-4 mb-8 justify-center items-center px-4">
           <input
             type="text"
             placeholder="Search sets, events, tags..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            style={{
-              flex: 1,
-              minWidth: '300px',
-              maxWidth: '400px',
-              padding: '0.75rem 1rem',
-              borderRadius: '8px',
-              border: '1px solid #ccc',
-              fontSize: '1rem'
-            }}
+            className="w-full md:w-96 p-3 rounded-lg border border-gray-300 focus:border-blue-500 outline-none transition-colors"
           />
           <select
             value={filterBy}
             onChange={(e) => setFilterBy(e.target.value)}
-            style={{
-              padding: '0.75rem 1rem',
-              borderRadius: '8px',
-              border: '1px solid #ccc',
-              fontSize: '1rem',
-              minWidth: '150px'
-            }}
+            className="w-full md:w-48 p-3 rounded-lg border border-gray-300 bg-white outline-none cursor-pointer"
           >
             <option value="all">All Sets</option>
             <option value="events">Event Sets</option>
@@ -140,74 +121,34 @@ export default function DJSetsPage() {
         </div>
 
         {/* DJ Sets Grid */}
-        <div style={{ padding: '0 2rem 2rem' }}>
+        <div className="px-4">
           {filteredSets.length === 0 ? (
-            <div style={{
-              textAlign: 'center',
-              padding: '4rem 2rem',
-              color: '#666'
-            }}>
-              <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🎧</div>
-              <h2>No DJ sets found</h2>
+            <div className="text-center py-16 text-gray-500">
+              <div className="text-5xl mb-4">🎧</div>
+              <h2 className="text-2xl font-bold mb-2">No DJ sets found</h2>
               <p>Try adjusting your search or filter criteria</p>
             </div>
           ) : (
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
-              gap: '2rem',
-              maxWidth: '1200px',
-              margin: '0 auto'
-            }}>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
               {filteredSets.map((set) => (
                 <div
                   key={set.id}
-                  style={{
-                    background: '#fff',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '16px',
-                    padding: '2rem',
-                    boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-                    transition: 'all 0.3s ease'
-                  }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-4px)';
-                    e.currentTarget.style.boxShadow = '0 8px 25px rgba(0,0,0,0.15)';
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
-                  }}
+                  className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm hover:-translate-y-1 hover:shadow-lg transition-all duration-300 flex flex-col gap-4"
                 >
                   {/* Header */}
-                  <div style={{ marginBottom: '1.5rem' }}>
-                    <h3 style={{ 
-                      fontSize: '1.5rem', 
-                      fontWeight: 600, 
-                      marginBottom: '0.5rem',
-                      color: '#1f2937'
-                    }}>
+                  <div>
+                    <h3 className="text-2xl font-bold text-gray-900 mb-2 leading-tight">
                       {set.title}
                     </h3>
                     
                     {set.events && (
-                      <div style={{ 
-                        color: '#4285f4', 
-                        fontSize: '0.9rem',
-                        marginBottom: '0.5rem',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem'
-                      }}>
+                      <div className="text-blue-500 text-sm font-semibold mb-2 flex items-center gap-2">
                         📍 {set.events.title}
                         {set.events.location && ` • ${set.events.location}`}
                       </div>
                     )}
 
-                    <div style={{ 
-                      fontSize: '0.85rem', 
-                      color: '#6b7280'
-                    }}>
+                    <div className="text-xs text-gray-500 font-medium">
                       {formatDate(set.recorded_at || set.created_at)}
                       {set.download_count > 0 && ` • ${set.download_count} downloads`}
                     </div>
@@ -215,33 +156,18 @@ export default function DJSetsPage() {
 
                   {/* Description */}
                   {set.description && (
-                    <p style={{ 
-                      fontSize: '0.9rem', 
-                      lineHeight: 1.6, 
-                      marginBottom: '1.5rem',
-                      color: '#4b5563'
-                    }}>
+                    <p className="text-sm text-gray-600 leading-relaxed p-3 bg-gray-50 rounded-lg border-l-4 border-gray-200">
                       {set.description}
                     </p>
                   )}
 
                   {/* Tags */}
                   {set.tags && set.tags.length > 0 && (
-                    <div style={{ marginBottom: '1.5rem' }}>
+                    <div className="flex flex-wrap gap-2">
                       {set.tags.map((tag) => (
                         <span
                           key={tag}
-                          style={{
-                            display: 'inline-block',
-                            background: '#e0f2fe',
-                            color: '#0369a1',
-                            padding: '0.25rem 0.75rem',
-                            borderRadius: '1rem',
-                            fontSize: '0.75rem',
-                            fontWeight: 500,
-                            marginRight: '0.5rem',
-                            marginBottom: '0.25rem'
-                          }}
+                          className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-semibold"
                         >
                           #{tag}
                         </span>
@@ -250,46 +176,16 @@ export default function DJSetsPage() {
                   )}
 
                   {/* Play Controls */}
-                  <div style={{
-                    display: 'flex',
-                    gap: '1rem',
-                    alignItems: 'center',
-                    flexWrap: 'wrap'
-                  }}>
+                  <div className="mt-auto flex flex-col sm:flex-row gap-4">
                     {/* Large Play Button */}
                     <a
                       href={set.file_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      style={{
-                        background: 'linear-gradient(135deg, #4285f4 0%, #34a853 100%)',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '12px',
-                        padding: '1rem 2rem',
-                        fontSize: '1rem',
-                        fontWeight: 600,
-                        textDecoration: 'none',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.75rem',
-                        transition: 'all 0.2s ease',
-                        flex: 1,
-                        minWidth: '180px',
-                        justifyContent: 'center',
-                        boxShadow: '0 4px 12px rgba(66, 133, 244, 0.3)'
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.transform = 'translateY(-2px)';
-                        e.currentTarget.style.boxShadow = '0 6px 20px rgba(66, 133, 244, 0.4)';
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(66, 133, 244, 0.3)';
-                      }}
+                      className="flex-1 bg-gradient-to-br from-blue-500 to-green-500 hover:to-green-600 text-white rounded-xl py-3 px-6 font-semibold flex items-center justify-center gap-2 shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200"
                     >
-                      <span style={{ fontSize: '1.2rem' }}>▶</span>
-                      Play in Google Drive
+                      <span className="text-xl">▶</span>
+                      <span>Play</span>
                     </a>
 
                     {/* Download Button */}
@@ -298,60 +194,25 @@ export default function DJSetsPage() {
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={() => handleDownload(set.id, set.file_url, set.title)}
-                      style={{
-                        background: '#059669',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '8px',
-                        padding: '0.75rem 1.5rem',
-                        fontSize: '0.9rem',
-                        fontWeight: 600,
-                        textDecoration: 'none',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        transition: 'all 0.2s ease',
-                        whiteSpace: 'nowrap'
-                      }}
-                      onMouseOver={(e) => e.currentTarget.style.background = '#047857'}
-                      onMouseOut={(e) => e.currentTarget.style.background = '#059669'}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg py-3 px-4 font-semibold flex items-center justify-center gap-2 transition-colors duration-200"
                     >
-                      ⬇ Download
+                      ⬇ DL
                     </a>
                   </div>
 
                   {/* Track Listing */}
                   {set.track_listing && set.track_listing.length > 0 && (
-                    <details style={{ marginTop: '1.5rem' }}>
-                      <summary style={{
-                        cursor: 'pointer',
-                        fontWeight: 600,
-                        color: '#374151',
-                        fontSize: '0.9rem',
-                        padding: '0.5rem 0',
-                        borderBottom: '1px solid #e5e7eb'
-                      }}>
-                        🎵 Track Listing ({set.track_listing.length} tracks)
+                    <details className="mt-2 group">
+                      <summary className="cursor-pointer font-semibold text-gray-700 text-sm py-2 border-b border-gray-200 list-none flex items-center justify-between group-open:text-blue-600">
+                        <span>🎵 Track Listing ({set.track_listing.length})</span>
+                        <span className="text-xs text-gray-400 group-open:rotate-180 transition-transform">▼</span>
                       </summary>
-                      <div style={{
-                        background: '#f9fafb',
-                        border: '1px solid #e5e7eb',
-                        borderRadius: '8px',
-                        padding: '1rem',
-                        marginTop: '0.5rem',
-                        maxHeight: '200px',
-                        overflowY: 'auto'
-                      }}>
-                        <ol style={{ margin: 0, paddingLeft: '1.5rem' }}>
+                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mt-2 max-h-48 overflow-y-auto">
+                        <ol className="list-decimal list-inside space-y-1">
                           {set.track_listing.map((track, index) => (
                             <li
                               key={index}
-                              style={{
-                                fontSize: '0.8rem',
-                                color: '#4b5563',
-                                marginBottom: '0.25rem',
-                                fontFamily: 'monospace'
-                              }}
+                              className="text-xs text-gray-600 font-mono leading-tight"
                             >
                               {track}
                             </li>
