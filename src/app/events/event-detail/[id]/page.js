@@ -7,9 +7,11 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from 'src/lib/supabaseClient';
 import { formatEventText } from 'src/utils/textFormatter';
-import 'styles/internal.css';
-import 'styles/events.css';
+// Styles removed - replaced with Tailwind
 import Image from 'next/image';
+import { Container } from 'components/ui/Container';
+import { Card } from 'components/ui/Card';
+import { Button } from 'components/ui/Button';
 import QueueSection from 'components/QueueSection';
 import EventDJSets from 'components/EventDJSets';
 
@@ -101,113 +103,91 @@ export default function Page() {
   };
 
   return (
-    <div className="page-wrapper event-detail-body">
-      <header className="event-hero">
-        <div className="overlay">
-          <h1 dangerouslySetInnerHTML={{ __html: formatEventText(title) }} />
+    <div className="bg-white min-h-screen text-black pb-20">
+      <header className="relative h-[300px] flex items-center justify-center bg-gray-900">
+        <div 
+          className="absolute inset-0 bg-cover bg-center opacity-50"
+          style={{ backgroundImage: "url('/images/event-header-still.jpg')" }}
+        />
+        <div className="relative z-10 px-8 py-6 bg-black/40 rounded-xl backdrop-blur-sm">
+          <h1 
+            className="text-4xl md:text-5xl font-bold text-white font-serif-display text-center"
+            dangerouslySetInnerHTML={{ __html: formatEventText(title) }} 
+          />
         </div>
       </header>
 
       {/* Navigation buttons at top */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: '1rem 2rem',
-        maxWidth: '1200px',
-        margin: '0 auto'
-      }}>
-        <button
+      <Container className="py-6 flex justify-between items-center gap-4">
+        <Button
+          variant="primary"
           onClick={() => navigateToEvent(prevEventId)}
           disabled={!prevEventId}
-          style={{
-            padding: '0.5rem 1rem',
-            backgroundColor: prevEventId ? '#2563eb' : '#ccc',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: prevEventId ? 'pointer' : 'not-allowed',
-            fontSize: '1rem',
-            fontWeight: '500'
-          }}
         >
           ← Previous Event
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="secondary"
           onClick={() => router.push('/events/events-page')}
-          style={{
-            padding: '0.5rem 1rem',
-            backgroundColor: '#6b7280',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '1rem'
-          }}
         >
           All Events
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="primary"
           onClick={() => navigateToEvent(nextEventId)}
           disabled={!nextEventId}
-          style={{
-            padding: '0.5rem 1rem',
-            backgroundColor: nextEventId ? '#2563eb' : '#ccc',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: nextEventId ? 'pointer' : 'not-allowed',
-            fontSize: '1rem',
-            fontWeight: '500'
-          }}
         >
           Next Event →
-        </button>
-      </div>
+        </Button>
+      </Container>
 
-      <main className="event-body">
-        <div className="event-content-grid">
-          <aside className="event-sidebar">
-            <article className="event-card">
-              <Image
-                src={imageSrc}
-                alt={title}
-                className="card-square"
-                width={350}
-                height={350}
-                style={{ objectFit: "cover", borderRadius: 16 }}
-                unoptimized
-              />
-              <h2>{title}</h2>
-              {location && (
-                <p>
-                  <a
-                    href={`https://www.google.com/maps/search/${encodeURIComponent(location)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {location}
-                  </a>
-                </p>
-              )}
-              <p className="event-date">
-                {formatDate(date)}
-                <br />
-                {time && <span className="event-time">{time}</span>}
-              </p>
-            </article>
+      <Container>
+        <div className="grid grid-cols-1 lg:grid-cols-[350px_1fr] gap-12 items-start">
+          <aside className="w-full lg:sticky lg:top-8">
+            <Card className="text-center" noPadding>
+              <div className="relative aspect-square w-full">
+                <Image
+                  src={imageSrc}
+                  alt={title}
+                  fill
+                  className="object-cover"
+                  unoptimized
+                />
+              </div>
+              <div className="p-6">
+                <h2 className="text-2xl font-bold text-purple-700 mb-2">{title}</h2>
+                {location && (
+                  <div className="mb-4">
+                    <a
+                      href={`https://www.google.com/maps/search/$${encodeURIComponent(location)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline font-medium"
+                    >
+                      📍 {location}
+                    </a>
+                  </div>
+                )}
+                <div className="text-gray-600 font-medium border-t pt-4 mt-2">
+                  {formatDate(date)}
+                  <br />
+                  {time && <span className="text-gray-500 text-sm">{time}</span>}
+                </div>
+              </div>
+            </Card>
           </aside>
 
-          <section>
+          <section className="flex-1 min-w-0 space-y-8">
             {(info || info_url) && (
-              <div className="event-info-card event-section">
-                <h3>About This Event</h3>
-                {info && <p dangerouslySetInnerHTML={{ __html: formatEventText(info) }} />}
+              <div className="prose max-w-none">
+                <h3 className="text-2xl font-bold text-gray-900 mb-4">About This Event</h3>
+                {info && <div className="text-gray-700 leading-relaxed mb-4" dangerouslySetInnerHTML={{ __html: formatEventText(info) }} />}
                 {info_url && (
                   <a
                     href={info_url}
                     target="_blank"
                     rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline font-semibold"
                   >
                     View the event page
                   </a>
@@ -222,15 +202,7 @@ export default function Page() {
               <>
                 <QueueSection eventId={event.id} />
                 <button
-                  className="text-blue-600 underline mt-4 inline-block"
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "#2563eb",
-                    cursor: "pointer",
-                    fontWeight: 500,
-                    fontSize: "1rem"
-                  }}
+                  className="text-blue-600 underline mt-4 inline-block font-medium text-base hover:text-blue-800 transition-colors"
                   onClick={goToBrowse}
                 >
                   Browse the Collection
@@ -239,50 +211,25 @@ export default function Page() {
             )}
           </section>
         </div>
-      </main>
+      </Container>
 
       {/* Navigation buttons at bottom */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: '2rem',
-        maxWidth: '1200px',
-        margin: '0 auto'
-      }}>
-        <button
+      <Container className="py-8 flex justify-between items-center gap-4 border-t border-gray-200 mt-12">
+        <Button
+          variant="primary"
           onClick={() => navigateToEvent(prevEventId)}
           disabled={!prevEventId}
-          style={{
-            padding: '0.5rem 1rem',
-            backgroundColor: prevEventId ? '#2563eb' : '#ccc',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: prevEventId ? 'pointer' : 'not-allowed',
-            fontSize: '1rem',
-            fontWeight: '500'
-          }}
         >
           ← Previous Event
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="primary"
           onClick={() => navigateToEvent(nextEventId)}
           disabled={!nextEventId}
-          style={{
-            padding: '0.5rem 1rem',
-            backgroundColor: nextEventId ? '#2563eb' : '#ccc',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: nextEventId ? 'pointer' : 'not-allowed',
-            fontSize: '1rem',
-            fontWeight: '500'
-          }}
         >
           Next Event →
-        </button>
-      </div>
+        </Button>
+      </Container>
     </div>
   );
 }

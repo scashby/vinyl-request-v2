@@ -11,7 +11,6 @@ import Image from "next/image";
 import { supabase } from "src/lib/supabaseClient";
 import { formatEventText } from "src/utils/textFormatter";
 import { Container } from "components/ui/Container";
-import { Card } from "components/ui/Card";
 
 export default function Page() {
   const [events, setEvents] = useState([]);
@@ -266,7 +265,7 @@ export default function Page() {
                       );
                     })}
                   </div>
-                </div>
+                </Container>
               </section>
             )}
 
@@ -837,7 +836,7 @@ export default function Page() {
                     </div>
                   </aside>
                 </div>
-              </div>
+              </Container>
             </section>
           </div>
         )}
