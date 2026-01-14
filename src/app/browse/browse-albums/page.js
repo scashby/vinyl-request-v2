@@ -283,164 +283,101 @@ function BrowseAlbumsContent() {
       </header>
 
       <main className="browse-collection-body">
-        <div style={{
-          background: '#ffffff',
-          padding: '16px 20px',
-          marginBottom: '20px',
-          borderRadius: '8px',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-          border: '2px solid #e5e7eb'
-        }}>
-          <div style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '12px',
-            alignItems: 'center',
-            marginBottom: '12px'
-          }}>
-            <input
-              type="text"
-              placeholder="Search by artist or title"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              style={{
-                flex: '2 1 250px',
-                minWidth: '250px',
-                padding: '10px 12px',
-                border: '2px solid #374151',
-                borderRadius: '6px',
-                fontSize: '16px',
-                outline: 'none',
-                backgroundColor: '#ffffff',
-                color: '#1f2937',
-                fontFamily: 'system-ui, sans-serif'
-              }}
-            />
+        <div className="search-filter-bar">
+          <input
+            type="text"
+            placeholder="Search by artist or title"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
 
-            <select
-              value={mediaFilter}
-              onChange={(e) => setMediaFilter(e.target.value)}
-              style={{
-                flex: '1 1 150px',
-                minWidth: '150px',
-                padding: '10px 12px',
-                border: '2px solid #374151',
-                borderRadius: '6px',
-                fontSize: '16px',
-                backgroundColor: '#ffffff',
-                color: '#1f2937',
-                outline: 'none',
-                fontFamily: 'system-ui, sans-serif'
-              }}
-            >
-              <option value="" style={{ color: '#1f2937', backgroundColor: '#ffffff' }}>All Media Types</option>
-              {normalizedDropdown.map((format) => (
-                <option 
-                  key={format} 
-                  value={format.trim().toLowerCase()}
-                  style={{ color: '#1f2937', backgroundColor: '#ffffff' }}
-                >
-                  {format}
-                </option>
-              ))}
-            </select>
+          <select
+            value={mediaFilter}
+            onChange={(e) => setMediaFilter(e.target.value)}
+          >
+            <option value="">All Media Types</option>
+            {normalizedDropdown.map((format) => (
+              <option 
+                key={format} 
+                value={format.trim().toLowerCase()}
+              >
+                {format}
+              </option>
+            ))}
+          </select>
 
-            <select 
-              value={sortField} 
-              onChange={e => setSortField(e.target.value)}
-              style={{
-                flex: '1 1 130px',
-                minWidth: '130px',
-                padding: '10px 12px',
-                border: '2px solid #374151',
-                borderRadius: '6px',
-                fontSize: '16px',
-                backgroundColor: '#ffffff',
-                color: '#1f2937',
-                outline: 'none',
-                fontFamily: 'system-ui, sans-serif'
-              }}
-            >
-              <option value="artist" style={{ color: '#1f2937', backgroundColor: '#ffffff' }}>Artist</option>
-              <option value="date_added" style={{ color: '#1f2937', backgroundColor: '#ffffff' }}>Date Added</option>
-              <option value="title" style={{ color: '#1f2937', backgroundColor: '#ffffff' }}>Title</option>
-              <option value="year" style={{ color: '#1f2937', backgroundColor: '#ffffff' }}>Year</option>
-            </select>
+          <select 
+            value={sortField} 
+            onChange={e => setSortField(e.target.value)}
+          >
+            <option value="artist">Artist</option>
+            <option value="date_added">Date Added</option>
+            <option value="title">Title</option>
+            <option value="year">Year</option>
+          </select>
 
+          <button
+            onClick={() => setSortAsc(a => !a)}
+            className="button-secondary"
+          >
+            Sort: {sortAsc ? 'A→Z' : 'Z→A'}
+          </button>
+
+          {!hasNoResults && !showSuggestionBox && (
             <button
-              onClick={() => setSortAsc(a => !a)}
+              onClick={() => setShowSuggestionBox(true)}
               style={{
                 flex: '0 0 auto',
-                padding: '10px 16px',
-                background: '#f3f4f6',
-                border: '2px solid #374151',
+                background: '#3b82f6',
+                color: '#ffffff',
+                border: '2px solid #1d4ed8',
                 borderRadius: '6px',
-                fontSize: '16px',
+                padding: '10px 16px',
+                fontSize: '14px',
                 fontWeight: '600',
                 cursor: 'pointer',
-                color: '#1f2937',
                 whiteSpace: 'nowrap',
                 fontFamily: 'system-ui, sans-serif'
               }}
             >
-              Sort: {sortAsc ? 'A→Z' : 'Z→A'}
+              💡 Suggest Album
             </button>
+          )}
+        </div>
 
-            {!hasNoResults && !showSuggestionBox && (
-              <button
-                onClick={() => setShowSuggestionBox(true)}
-                style={{
-                  flex: '0 0 auto',
-                  background: '#3b82f6',
-                  color: '#ffffff',
-                  border: '2px solid #1d4ed8',
-                  borderRadius: '6px',
-                  padding: '10px 16px',
-                  fontSize: '16px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                  fontFamily: 'system-ui, sans-serif'
-                }}
-              >
-                💡 Suggest Album
-              </button>
-            )}
-          </div>
-
-          <div style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '8px',
-            alignItems: 'center'
-          }}>
-            <label style={{ 
+        <div style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '8px',
+          alignItems: 'center',
+          marginBottom: '20px',
+          width: '100%'
+        }}>
+          <label 
+            className={justAddedCount > 0 ? "just-added-filter" : ""}
+            style={justAddedCount === 0 ? {
               display: 'flex', 
               alignItems: 'center', 
               gap: '6px',
               fontSize: '14px',
               fontWeight: '600',
               color: '#1f2937',
-              cursor: justAddedCount > 0 ? 'pointer' : 'not-allowed',
-              background: justAddedCount > 0 ? '#dcfce7' : '#f3f4f6',
-              padding: '6px 10px',
+              cursor: 'not-allowed',
+              background: '#f3f4f6',
+              padding: '8px 12px',
               borderRadius: '6px',
-              border: `2px solid ${justAddedCount > 0 ? '#16a34a' : '#9ca3af'}`,
-              fontFamily: 'system-ui, sans-serif',
-              opacity: justAddedCount > 0 ? 1 : 0.6
-            }}>
-              <input
-                type="checkbox"
-                checked={showJustAdded}
-                onChange={(e) => setShowJustAdded(e.target.checked)}
-                disabled={justAddedCount === 0}
-                style={{ 
-                  accentColor: '#16a34a',
-                  transform: 'scale(1.2)'
-                }}
-              />
-              ✨ Just Added ({justAddedCount})
-            </label>
+              border: '1px solid #9ca3af',
+              opacity: 0.6
+            } : { cursor: 'pointer' }}
+          >
+            <input
+              type="checkbox"
+              checked={showJustAdded}
+              onChange={(e) => setShowJustAdded(e.target.checked)}
+              disabled={justAddedCount === 0}
+            />
+            {justAddedCount > 0 && <span className="just-added-sparkle">✨</span>} Just Added ({justAddedCount})
+          </label>
 
             <label style={{ 
               display: 'flex', 
@@ -526,7 +463,6 @@ function BrowseAlbumsContent() {
               ⭐ Inner Circle Preferred ({innerCirclePreferredCount})
             </label>
           </div>
-        </div>
 
         <div style={{ 
           fontSize: '14px', 
