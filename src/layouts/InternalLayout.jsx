@@ -5,7 +5,7 @@ import "../styles/base.css";
 
 const InternalLayout = ({ title, children }) => {
   return (
-    <div className="internal-wrapper">
+    <div className="w-full">
       <header className="event-hero">
         <div className="overlay">
           <h1>{title}</h1>

@@ -21,29 +21,7 @@ body {
   color-scheme: light;
 }
 
-/* FORCE DARK TEXT ON LIGHT BACKGROUNDS FOR ALL EDIT-COLLECTION MODALS */
-input,
-select,
-textarea,
-button,
-label,
-span,
-div,
-p,
-h1, h2, h3, h4, h5, h6 {
-  color: #111827 !important;
-}
-
-input::placeholder,
-textarea::placeholder {
-  color: #9ca3af !important;
-}
-
-input:focus,
-select:focus,
-textarea:focus {
-  color: #111827 !important;
-}
+/* FORCE DARK TEXT BLOCK REMOVED */
 
 /* White text only on dark backgrounds */
 [style*="background: #f97316"] *,

@@ -9,7 +9,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const isAdmin = pathname?.startsWith("/admin");
 
   return (
-    <div className="bg-black text-white min-h-screen flex flex-col">
+    <div className="bg-white text-black min-h-screen flex flex-col">
       {!isAdmin && <NavigationMenu />}
       <main className="flex-grow">{children}</main>
       {!isAdmin && <Footer />}

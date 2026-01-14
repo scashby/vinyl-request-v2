@@ -11,13 +11,7 @@ html, body {
   width: 100%;
 }
 
-.internal-wrapper {
-  margin: 0 !important;
-  padding: 0 !important;
-  width: 100% !important;
-  max-width: none !important;
-  background: white;
-}
+/* .internal-wrapper removed to allow global layout control */
 
 .page-wrapper {
   margin: 0;
