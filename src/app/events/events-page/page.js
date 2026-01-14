@@ -371,44 +371,14 @@ export default function Page() {
                   </div>
 
                   {/* RIGHT COLUMN: Just Announced + ads */}
-                  <aside
-                    style={{
-                      background: "#121212",
-                      border: "2px solid #262626",
-                      borderRadius: 12,
-                      padding: "1.25rem",
-                      alignSelf: "start",
-                    }}
-                  >
+                  <aside className="bg-[#121212] border-2 border-[#262626] rounded-xl p-5 self-start">
                     {/* Just Announced header */}
-                    <div
-                      style={{
-                        background:
-                          "linear-gradient(90deg,#00c4ff,#34dfff)",
-                        color: "#000",
-                        padding: ".65rem .75rem",
-                        borderRadius: 8,
-                        textAlign: "center",
-                        fontWeight: 900,
-                        letterSpacing: ".5px",
-                        textTransform: "uppercase",
-                        marginBottom: "1rem",
-                        boxShadow:
-                          "0 6px 20px rgba(0,196,255,.2)",
-                      }}
-                    >
+                    <div className="bg-gradient-to-r from-[#00c4ff] to-[#34dfff] text-black p-2.5 rounded-lg text-center font-black tracking-wide uppercase mb-4 shadow-[0_6px_20px_rgba(0,196,255,0.2)]">
                       Just Announced
                     </div>
 
                     {/* Just Announced list (up to 6) */}
-                    <div
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: ".9rem",
-                        marginBottom: "1.25rem",
-                      }}
-                    >
+                    <div className="flex flex-col gap-3.5 mb-5">
                       {events.slice(0, 6).map((e, idx) => {
                         const d = compactDate(e.date);
                         const tba =
@@ -467,47 +437,13 @@ export default function Page() {
                           <Link
                             key={e.id}
                             href={`/events/event-detail/${e.id}`}
-                            style={{ textDecoration: "none" }}
+                            className="block group"
                           >
-                            <div
-                              style={{
-                                position: "relative",
-                                background: p.bg,
-                                border: `1px solid ${p.border}`,
-                                borderRadius: 12,
-                                padding:
-                                  ".95rem .95rem .95rem 1rem",
-                                boxShadow:
-                                  "0 8px 28px rgba(0,0,0,.35)",
-                                overflow: "hidden",
-                                transition:
-                                  "transform .15s ease, box-shadow .15s ease",
-                              }}
-                              onMouseOver={(evt) => {
-                                const card = evt.currentTarget;
-                                card.style.transform =
-                                  "translateY(-2px)";
-                                card.style.boxShadow =
-                                  "0 16px 36px rgba(0,196,255,.22)";
-                              }}
-                              onMouseOut={(evt) => {
-                                const card = evt.currentTarget;
-                                card.style.transform =
-                                  "translateY(0)";
-                                card.style.boxShadow =
-                                  "0 8px 28px rgba(0,0,0,.35)";
-                              }}
+                            <div 
+                              className={`relative border rounded-xl p-4 overflow-hidden transition-all duration-150 group-hover:-translate-y-0.5 group-hover:shadow-[0_16px_36px_rgba(0,196,255,0.22)] shadow-[0_8px_28px_rgba(0,0,0,0.35)]`}
+                              style={{ background: p.bg, borderColor: p.border }}
                             >
-                              <div
-                                style={{
-                                  position: "absolute",
-                                  left: 0,
-                                  top: 0,
-                                  bottom: 0,
-                                  width: 6,
-                                  background: p.bar,
-                                }}
-                              />
+                              <div className="absolute left-0 top-0 bottom-0 w-1.5" style={{ background: p.bar }} />
                               <h4
                                 style={{
                                   color: "#fff",
@@ -567,19 +503,7 @@ export default function Page() {
                     </div>
 
                     {/* AD: Book DJ Gigs */}
-                    <div
-                      style={{
-                        position: "relative",
-                        background:
-                          "radial-gradient(circle at 30% 20%, #ffe8a3 0%, #ffd15e 40%, #ff9a3c 60%, #ff6b3d 100%)",
-                        borderRadius: 16,
-                        padding: "1.1rem",
-                        marginBottom: "1rem",
-                        boxShadow:
-                          "0 12px 28px rgba(0,0,0,.35)",
-                        overflow: "hidden",
-                      }}
-                    >
+                    <div className="relative bg-[radial-gradient(circle_at_30%_20%,#ffe8a3_0%,#ffd15e_40%,#ff9a3c_60%,#ff6b3d_100%)] rounded-2xl p-4 mb-4 shadow-[0_12px_28px_rgba(0,0,0,0.35)] overflow-hidden">
                       <div
                         style={{
                           position: "absolute",
@@ -821,15 +745,7 @@ export default function Page() {
                       </div>
                       <Link
                         href="/merch"
-                        style={{
-                          display: "inline-block",
-                          background: "#00e6ff",
-                          color: "#000",
-                          padding: ".6rem .9rem",
-                          borderRadius: 10,
-                          textDecoration: "none",
-                          fontWeight: 900,
-                        }}
+                        className="inline-block bg-[#00e6ff] text-black px-3.5 py-2.5 rounded-lg font-black text-sm hover:bg-[#34efff] transition-colors"
                       >
                         View Merch
                       </Link>
