@@ -7,8 +7,10 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { supabase } from 'lib/supabaseClient'
-import 'styles/admin-edit-queue.css';
 import { formatEventText } from 'src/utils/textFormatter';
+import { Button } from 'components/ui/Button';
+import { Card } from 'components/ui/Card';
+import { Container } from 'components/ui/Container';
 import type { DbEvent, DbRequest, Collection } from 'types/supabase';
 
 type Event = {
@@ -243,8 +245,8 @@ function EditQueueContent() {
 
   if (loading) {
     return (
-      <div className="admin-edit-queue-page">
-        <div className="loading-state">
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-gray-600 text-lg">
           Loading events...
         </div>
       </div>
@@ -254,116 +256,123 @@ function EditQueueContent() {
   const queueType = selectedEvent?.queue_type || 'side';
 
   return (
-    <div className="admin-edit-queue-page">
-      <div className="edit-queue-container">
-        <h1 className="edit-queue-title">
+    <div className="min-h-screen bg-white text-black">
+      <Container className="py-8">
+        <h1 className="text-4xl font-bold mb-8 text-gray-900 text-center">
           Edit Event Queue
         </h1>
 
         {!selectedEvent ? (
           <div>
-            <h2 className="edit-queue-subtitle">
+            <h2 className="text-2xl font-semibold mb-6 text-gray-900">
               Select an Event
             </h2>
             
             {events.length === 0 ? (
-              <div className="empty-state">
-                <div className="empty-state-icon">📅</div>
-                <h3 className="empty-state-title">No Events with Queues</h3>
-                <p className="empty-state-text">No events have been created with queue functionality enabled.</p>
+              <div className="text-center p-12 bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl">
+                <div className="text-5xl mb-4">📅</div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">No Events with Queues</h3>
+                <p className="text-gray-600">No events have been created with queue functionality enabled.</p>
               </div>
             ) : (
-              <div className="event-selection-grid">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {events.map((event) => (
-                  <div
+                  <Card
                     key={event.id}
-                    className="event-selection-card"
+                    variant="interactive"
                     onClick={() => setSelectedEvent(event)}
                   >
                     <h3 
-                      className="event-card-title"
+                      className="text-xl font-semibold mb-2 text-gray-900"
                       dangerouslySetInnerHTML={{ __html: formatEventText(event.title) }}
                     />
-                    <p className="event-card-date">
+                    <p className="text-sm text-gray-600 mb-4">
                       {formatDate(event.date)}
                     </p>
-                    <div className="event-card-badge">
+                    <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
                       {getQueueTypeLabel(event.queue_type || 'side')}
                     </div>
-                  </div>
+                  </Card>
                 ))}
               </div>
             )}
           </div>
         ) : (
           <div>
-            <div className="queue-management-header">
-              <div>
-                <h2 className="queue-management-title">
+            <div className="flex flex-col md:flex-row justify-between items-center mb-8 p-6 bg-gray-50 rounded-xl border-b-4 border-gray-200">
+              <div className="mb-4 md:mb-0 text-center md:text-left">
+                <h2 className="text-3xl font-bold text-gray-900">
                   <span dangerouslySetInnerHTML={{ __html: formatEventText(selectedEvent.title) }} /> - Queue
                 </h2>
-                <p className="queue-management-subtitle">
+                <p className="text-gray-600 mt-1">
                   {formatDate(selectedEvent.date)} • {requests.length} requests • {getQueueTypeLabel(queueType)}
                 </p>
               </div>
-              <button
-                className="back-button"
+              <Button
+                variant="primary"
                 onClick={() => {
                   setSelectedEvent(null);
                   setRequests([]);
                 }}
               >
                 ← Back to Events
-              </button>
+              </Button>
             </div>
 
             {requests.length === 0 ? (
-              <div className="empty-state">
-                <div className="empty-state-icon">🎵</div>
-                <h3 className="empty-state-title">Queue is Empty</h3>
-                <p className="empty-state-text">No requests have been added to this event&apos;s queue yet.</p>
+              <div className="text-center p-12 bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl">
+                <div className="text-5xl mb-4">🎵</div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Queue is Empty</h3>
+                <p className="text-gray-600">No requests have been added to this event&apos;s queue yet.</p>
               </div>
             ) : (
-              <div className="queue-table-container">
-                <div className="queue-table-header">
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                <div className="hidden md:grid grid-cols-[2fr_2fr_80px_100px_120px] gap-4 p-4 bg-gray-900 text-white font-bold text-sm uppercase tracking-wider">
                   <div>{queueType === 'track' ? 'Track' : 'Album'}</div>
                   <div>Artist</div>
                   {queueType === 'side' && <div>Side</div>}
                   {queueType === 'track' && <div>Track #</div>}
                   {queueType === 'track' && <div>Duration</div>}
-                  <div>Votes</div>
-                  <div>Action</div>
+                  <div className="text-center">Votes</div>
+                  <div className="text-center">Action</div>
                 </div>
 
                 {requests.map((req) => (
-                  <div key={req.id} className="queue-table-row">
-                    <div className="queue-album-title">
+                  <div key={req.id} className="grid grid-cols-1 md:grid-cols-[2fr_2fr_80px_100px_120px] gap-2 md:gap-4 p-4 items-center border-b border-gray-100 hover:bg-gray-50">
+                    <div className="font-semibold text-gray-900">
+                      <span className="md:hidden text-xs text-gray-500 block uppercase">Title</span>
                       {queueType === 'track' ? (req.track_name || req.title) : req.title}
                     </div>
-                    <div className="queue-artist-name">
+                    <div className="text-gray-600">
+                      <span className="md:hidden text-xs text-gray-500 block uppercase">Artist</span>
                       {req.artist}
                     </div>
                     {queueType === 'side' && (
-                      <div className="queue-side-indicator">
+                      <div className="text-center font-semibold text-gray-900">
+                        <span className="md:hidden text-xs text-gray-500 block uppercase">Side</span>
                         {req.side || '--'}
                       </div>
                     )}
                     {queueType === 'track' && (
                       <>
-                        <div style={{ textAlign: 'center', fontSize: '14px' }}>
+                        <div className="text-center text-sm text-gray-600">
+                          <span className="md:hidden text-xs text-gray-500 block uppercase">Track #</span>
                           {req.track_number || '--'}
                         </div>
-                        <div style={{ textAlign: 'center', fontSize: '14px' }}>
+                        <div className="text-center text-sm text-gray-600">
+                          <span className="md:hidden text-xs text-gray-500 block uppercase">Duration</span>
                           {req.track_duration || '--:--'}
                         </div>
                       </>
                     )}
-                    <div className={`queue-votes-count ${req.votes === 0 ? 'no-votes' : ''}`}>
+                    <div className={`text-center font-bold text-lg ${req.votes === 0 ? 'text-gray-300' : 'text-amber-500'}`}>
+                      <span className="md:hidden text-xs text-gray-500 block uppercase font-normal">Votes</span>
                       {req.votes}
                     </div>
-                    <div style={{ textAlign: 'center' }}>
-                      <button
-                        className="remove-button"
+                    <div className="text-center">
+                      <Button
+                        variant="danger"
+                        size="sm"
                         onClick={() => {
                           const itemDesc = queueType === 'track' 
                             ? `"${req.track_name || req.title}"` 
@@ -374,7 +383,7 @@ function EditQueueContent() {
                         }}
                       >
                         Remove
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 ))}
@@ -382,20 +391,13 @@ function EditQueueContent() {
             )}
 
             {requests.length > 0 && (
-              <div className="queue-summary">
+              <div className="mt-8 p-5 bg-blue-50 border-2 border-blue-500 rounded-xl text-sm text-blue-900 font-semibold">
                 <strong>Queue Summary:</strong> {requests.length} requests, {requests.reduce((sum, req) => sum + req.votes, 0)} total votes
               </div>
             )}
 
             {process.env.NODE_ENV === 'development' && (
-              <div style={{ 
-                marginTop: '2rem', 
-                padding: '1rem', 
-                background: '#fef3c7', 
-                borderRadius: '8px', 
-                fontSize: '12px',
-                fontFamily: 'monospace'
-              }}>
+              <div className="mt-8 p-4 bg-yellow-50 rounded-lg text-xs font-mono text-yellow-900 border border-yellow-200">
                 <strong>Debug Info:</strong><br />
                 Event ID: {selectedEvent.id}<br />
                 Queue Type: {queueType}<br />
@@ -406,7 +408,7 @@ function EditQueueContent() {
             )}
           </div>
         )}
-      </div>
+      </Container>
     </div>
   );
 }
