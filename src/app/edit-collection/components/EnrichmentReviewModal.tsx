@@ -94,6 +94,66 @@ function ImageGridSelector({
   );
 }
 
+// --- COMPONENT: Granular Array Selection (Phase 4) ---
+function ArrayChipSelector({
+  items,
+  selectedItems,
+  onToggle,
+  label,
+  color
+}: {
+  items: string[];
+  selectedItems: Set<string>;
+  onToggle: (item: string) => void;
+  label: string;
+  color: 'green' | 'blue';
+}) {
+  const labelColor = color === 'green' ? '#047857' : '#1d4ed8';
+  const bgColor = color === 'green' ? '#f0fdf4' : '#eff6ff';
+  const borderColor = color === 'green' ? '#10b981' : '#3b82f6';
+
+  return (
+    <div style={{ 
+      padding: '12px', 
+      borderRadius: '8px', 
+      border: `2px solid ${borderColor}`, 
+      backgroundColor: bgColor, 
+      flex: 1,
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '8px'
+    }}>
+      <div style={{ fontSize: '11px', fontWeight: '700', color: labelColor, textTransform: 'uppercase' }}>
+        {label}
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+        {items.map((item, idx) => {
+          const isSelected = selectedItems.has(item);
+          return (
+            <button
+              key={`${idx}-${item}`}
+              onClick={() => onToggle(item)}
+              style={{
+                padding: '4px 10px',
+                borderRadius: '16px',
+                fontSize: '12px',
+                cursor: 'pointer',
+                border: '1px solid',
+                borderColor: isSelected ? labelColor : '#d1d5db',
+                backgroundColor: isSelected ? labelColor : 'white',
+                color: isSelected ? 'white' : '#374151',
+                transition: 'all 0.1s'
+              }}
+            >
+              {isSelected ? '✓ ' : ''}{item}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // --- HELPER: Standard Value Component ---
 function ConflictValue({ 
   value, 
@@ -262,8 +322,16 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
     if (isMergeable) {
       setResolutions(prev => {
         const current = prev[key] || { value: [], source: 'merge', selectedSources: [] };
+        const currentItems = new Set(Array.isArray(current.value) ? current.value as string[] : []);
         
-        // Special Handling for Image Arrays (Gallery)
+        // 1. Toggle individual string/item (Phase 4 UX)
+        if (typeof value === 'string' && !isImageUrl(value)) {
+          if (currentItems.has(value)) currentItems.delete(value);
+          else currentItems.add(value);
+          return { ...prev, [key]: { value: Array.from(currentItems), source: 'custom', selectedSources: ['custom'] } };
+        }
+
+        // 2. Special Handling for Image Arrays (Gallery)
         if (isImageArray(conflict.current_value) || isImageArray(conflict.new_value)) {
            // For images, 'value' holds the actual selected URLs array
            const currentSelection = new Set(Array.isArray(current.value) ? current.value as string[] : []);
@@ -460,6 +528,14 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
                                     selectedImages={new Set(Array.isArray(selected.value) ? selected.value as string[] : [])}
                                     onToggle={(url) => handleResolve(conflict, url, 'current')}
                                   />
+                                ) : Array.isArray(conflict.current_value) ? (
+                                  <ArrayChipSelector
+                                    label="Current (DB)"
+                                    color="green"
+                                    items={conflict.current_value}
+                                    selectedItems={new Set(Array.isArray(selected.value) ? selected.value as string[] : [])}
+                                    onToggle={(val) => handleResolve(conflict, val, 'current')}
+                                  />
                                 ) : (
                                   <ConflictValue 
                                     label="Current (DB)"
@@ -484,6 +560,15 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
                                             images={val as string[]}
                                             selectedImages={new Set(Array.isArray(selected.value) ? selected.value as string[] : [])}
                                             onToggle={(url) => handleResolve(conflict, url, source)}
+                                          />
+                                        ) : Array.isArray(val) ? (
+                                          <ArrayChipSelector
+                                            key={source}
+                                            label={source}
+                                            color="blue"
+                                            items={val}
+                                            selectedItems={new Set(Array.isArray(selected.value) ? selected.value as string[] : [])}
+                                            onToggle={(item) => handleResolve(conflict, item, source)}
                                           />
                                         ) : (
                                           <ConflictValue 
