@@ -175,13 +175,7 @@ export default function Page() {
 
       <main className="bg-black text-white pb-20">
         {loading ? (
-          <div
-            style={{
-              padding: "3rem 1rem",
-              textAlign: "center",
-              color: "#fff",
-            }}
-          >
+          <div className="py-12 text-center text-white text-lg">
             Loading…
           </div>
         ) : (
@@ -209,52 +203,24 @@ export default function Page() {
                           className="block group"
                         >
                           <div className="bg-[#222] rounded-xl overflow-hidden border-[3px] border-[#00c4ff] transition-all duration-300 group-hover:-translate-y-2 group-hover:shadow-[0_14px_36px_rgba(0,196,255,0.35)]">
-                            <div
-                              style={{
-                                position: "relative",
-                                width: "100%",
-                                paddingTop: "56.25%",
-                              }}
-                            >
+                            <div className="relative w-full aspect-video">
                               <Image
                                 src={img}
                                 alt={ev.title}
                                 fill
                                 sizes="(max-width:900px) 100vw, 700px"
-                                style={{ objectFit: "cover" }}
+                                className="object-cover"
                                 unoptimized
                               />
                             </div>
-                            <div
-                              style={{
-                                padding: "1.5rem 1.25rem 1.75rem",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  background: tba
-                                    ? "#6b7280"
-                                    : "#00c4ff",
-                                  color: tba ? "#fff" : "#000",
-                                  padding: ".6rem .9rem",
-                                  borderRadius: 8,
-                                  display: "inline-block",
-                                  fontWeight: 900,
-                                  marginBottom: ".9rem",
-                                }}
-                              >
-                                {tba
-                                  ? "TBA"
-                                  : `${d.wk} ${d.mon} ${d.day}`}
+                            <div className="p-6 pb-7">
+                              <div className={`inline-block px-4 py-2.5 rounded-lg font-black mb-4 ${
+                                tba ? "bg-gray-500 text-white" : "bg-[#00c4ff] text-black"
+                              }`}>
+                                {tba ? "TBA" : `${d.wk} ${d.mon} ${d.day}`}
                               </div>
                               <h3
-                                style={{
-                                  color: "#fff",
-                                  fontSize: "1.9rem",
-                                  fontWeight: 900,
-                                  lineHeight: 1.2,
-                                  margin: 0,
-                                }}
+                                className="text-white text-3xl font-black leading-tight m-0"
                                 dangerouslySetInnerHTML={{
                                   __html: formatEventText(ev.title),
                                 }}
@@ -503,90 +469,26 @@ export default function Page() {
                     </div>
 
                     {/* AD: Book DJ Gigs */}
-                    <div className="relative bg-[radial-gradient(circle_at_30%_20%,#ffe8a3_0%,#ffd15e_40%,#ff9a3c_60%,#ff6b3d_100%)] rounded-2xl p-4 mb-4 shadow-[0_12px_28px_rgba(0,0,0,0.35)] overflow-hidden">
-                      <div
-                        style={{
-                          position: "absolute",
-                          inset: 0,
-                          background:
-                            "radial-gradient(circle at 70% 30%, rgba(255,255,255,.4), rgba(255,255,255,0) 35%)",
-                        }}
-                      />
-                      <div
-                        style={{
-                          position: "absolute",
-                          inset: 0,
-                          backgroundImage:
-                            "radial-gradient(#000 1px, transparent 1px)",
-                          backgroundSize: "6px 6px",
-                          opacity: 0.06,
-                        }}
-                      />
-                      <div
-                        style={{
-                          position: "absolute",
-                          top: -18,
-                          right: -32,
-                          transform: "rotate(15deg)",
-                          background: "#000",
-                          color: "#fff",
-                          padding: ".35rem .9rem",
-                          fontWeight: 900,
-                          letterSpacing: "1px",
-                          textTransform: "uppercase",
-                          boxShadow:
-                            "0 8px 20px rgba(0,0,0,.4)",
-                        }}
-                      >
+                    <div className="relative bg-[radial-gradient(circle_at_30%_20%,#ffe8a3_0%,#ffd15e_40%,#ff9a3c_60%,#ff6b3d_100%)] rounded-2xl p-4 mb-4 shadow-[0_12px_28px_rgba(0,0,0,0.35)] overflow-hidden group">
+                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_30%,rgba(255,255,255,0.4),rgba(255,255,255,0)_35%)]" />
+                      <div className="absolute inset-0 bg-[radial-gradient(#000_1px,transparent_1px)] [background-size:6px_6px] opacity-[0.06]" />
+                      <div className="absolute top-[-18px] right-[-32px] rotate-[15deg] bg-black text-white px-4 py-1.5 font-black tracking-widest uppercase shadow-[0_8px_20px_rgba(0,0,0,0.4)] text-sm">
                         Limited Dates
                       </div>
-                      <div style={{ position: "relative" }}>
-                        <div
-                          style={{
-                            fontSize: "1.4rem",
-                            fontWeight: 1000,
-                            textTransform: "uppercase",
-                            color: "#111",
-                            letterSpacing: "1.5px",
-                            textShadow:
-                              "0 1px 0 rgba(255,255,255,.6)",
-                          }}
-                        >
+                      <div className="relative">
+                        <div className="text-[1.4rem] font-black uppercase text-[#111] tracking-[1.5px] drop-shadow-[0_1px_0_rgba(255,255,255,0.6)]">
                           Book DJ Gigs
                         </div>
-                        <div
-                          style={{
-                            color: "#111",
-                            opacity: 0.85,
-                            margin: ".4rem 0 .9rem",
-                            fontWeight: 700,
-                          }}
-                        >
+                        <div className="text-[#111] opacity-85 my-2 font-bold">
                           Parties • Breweries • Pop-ups
                         </div>
                         <a
                           href="https://calendly.com/deadwaxdialogues"
                           target="_blank"
                           rel="noopener noreferrer"
-                          style={{
-                            display: "inline-block",
-                            background: "#111",
-                            color: "#ffd15e",
-                            padding: ".75rem 1rem",
-                            borderRadius: 6,
-                            fontWeight: 1000,
-                            textDecoration: "none",
-                            transform: "skewX(-12deg)",
-                            boxShadow:
-                              "0 8px 20px rgba(0,0,0,.35)",
-                          }}
+                          className="inline-block bg-[#111] text-[#ffd15e] px-4 py-3 rounded-md font-black -skew-x-12 shadow-[0_8px_20px_rgba(0,0,0,0.35)] hover:bg-black transition-colors"
                         >
-                          <span
-                            style={{
-                              display: "inline-block",
-                              transform: "skewX(12deg)",
-                            }}
-                          >
+                          <span className="inline-block skew-x-12">
                             Book Online
                           </span>
                         </a>
@@ -595,110 +497,38 @@ export default function Page() {
 
                     {/* AD: Latest DJ Sets */}
                     {latestSet && (
-                      <div
-                        style={{
-                          position: "relative",
-                          background:
-                            "radial-gradient(circle at 50% 0%, rgba(255,0,204,.35), rgba(0,0,0,0) 60%), radial-gradient(circle at 50% 120%, rgba(0,255,255,.25), rgba(0,0,0,0) 55%), #050510",
-                          borderRadius: 16,
-                          padding: "1.1rem",
-                          marginBottom: "1rem",
-                          boxShadow:
-                            "0 14px 34px rgba(0,0,0,.45)",
-                          overflow: "hidden",
-                        }}
-                      >
-                        <div
-                          style={{
-                            position: "absolute",
-                            left: -20,
-                            right: -20,
-                            bottom: 0,
-                            height: 110,
-                            backgroundImage:
-                              "linear-gradient(rgba(255,255,255,.12) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.12) 1px, transparent 1px)",
-                            backgroundSize: "22px 22px",
-                            transform:
-                              "perspective(300px) rotateX(60deg)",
-                            transformOrigin: "bottom",
-                          }}
-                        />
-                        <div
-                          style={{
-                            position: "absolute",
-                            top: 10,
-                            right: 12,
-                            fontSize: 26,
-                            filter:
-                              "drop-shadow(0 0 6px rgba(0,255,255,.6))",
-                          }}
-                        >
+                      <div className="relative bg-[#050510] rounded-2xl p-5 mb-4 shadow-[0_14px_34px_rgba(0,0,0,0.45)] overflow-hidden">
+                        {/* Background Gradients */}
+                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(255,0,204,0.35),transparent_60%)]" />
+                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(0,255,255,0.25),transparent_55%)]" />
+                        
+                        {/* Retro Grid Floor */}
+                        <div className="absolute left-[-20px] right-[-20px] bottom-0 h-[110px] [background-image:linear-gradient(rgba(255,255,255,0.12)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.12)_1px,transparent_1px)] [background-size:22px_22px] [transform:perspective(300px)_rotateX(60deg)] origin-bottom" />
+                        
+                        <div className="absolute top-2.5 right-3 text-2xl drop-shadow-[0_0_6px_rgba(0,255,255,0.6)]">
                           📼
                         </div>
-                        <div style={{ position: "relative" }}>
-                          <div
-                            style={{
-                              color: "#00ffff",
-                              fontWeight: 900,
-                              textTransform: "uppercase",
-                              letterSpacing: "1.2px",
-                              textShadow:
-                                "0 0 8px rgba(0,255,255,.8)",
-                            }}
-                          >
+                        <div className="relative">
+                          <div className="text-cyan-400 font-black uppercase tracking-wider drop-shadow-[0_0_8px_rgba(0,255,255,0.8)]">
                             Latest DJ Sets
                           </div>
-                          <div
-                            style={{
-                              color: "#e5e7eb",
-                              margin: ".35rem 0 .8rem",
-                            }}
-                          >
+                          <div className="text-gray-200 my-2 font-medium truncate">
                             {latestSet.title}
                           </div>
-                          <div
-                            style={{
-                              display: "flex",
-                              gap: ".65rem",
-                            }}
-                          >
+                          <div className="flex gap-2.5">
                             <a
                               href={latestSet.file_url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              style={{
-                                background:
-                                  "linear-gradient(90deg,#00ffff,#ff00ff)",
-                                color: "#000",
-                                padding:
-                                  ".55rem .9rem",
-                                borderRadius: 999,
-                                fontWeight: 1000,
-                                textDecoration: "none",
-                                boxShadow:
-                                  "0 0 20px rgba(0,255,255,.35)",
-                              }}
+                              className="bg-gradient-to-r from-cyan-400 to-fuchsia-500 text-black px-3.5 py-2 rounded-full font-black shadow-[0_0_20px_rgba(0,255,255,0.35)] hover:brightness-110 transition-all"
                             >
                               ▶ Play
                             </a>
                             <a
-                              href={
-                                latestSet.download_url ||
-                                latestSet.file_url
-                              }
+                              href={latestSet.download_url || latestSet.file_url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              style={{
-                                background: "#111",
-                                color: "#fff",
-                                padding:
-                                  ".55rem .9rem",
-                                borderRadius: 999,
-                                fontWeight: 900,
-                                textDecoration: "none",
-                                border:
-                                  "1px solid rgba(255,255,255,.25)",
-                              }}
+                              className="bg-[#111] text-white px-3.5 py-2 rounded-full font-black border border-white/25 hover:bg-[#222] transition-colors"
                             >
                               ⬇ Download
                             </a>
@@ -708,40 +538,12 @@ export default function Page() {
                     )}
 
                     {/* AD: Merch */}
-                    <div
-                      style={{
-                        background:
-                          "repeating-linear-gradient(-45deg,#022c35,#022c35 10px,#053a44 10px,#053a44 20px)",
-                        border: "2px solid #0a4a57",
-                        borderRadius: 14,
-                        padding: "1.1rem",
-                        boxShadow:
-                          "0 8px 26px rgba(0,196,255,.12)",
-                      }}
-                    >
-                      <div
-                        style={{
-                          color: "#00e6ff",
-                          fontSize: "1.35rem",
-                          fontWeight: 900,
-                          letterSpacing: "1px",
-                          textTransform: "uppercase",
-                          marginBottom: ".35rem",
-                          textShadow:
-                            "0 1px 0 rgba(0,0,0,.35)",
-                        }}
-                      >
+                    <div className="bg-[repeating-linear-gradient(-45deg,#022c35,#022c35_10px,#053a44_10px,#053a44_20px)] border-2 border-[#0a4a57] rounded-[14px] p-5 shadow-[0_8px_26px_rgba(0,196,255,0.12)]">
+                      <div className="text-[#00e6ff] text-[1.35rem] font-black tracking-widest uppercase mb-1.5 drop-shadow-[0_1px_0_rgba(0,0,0,0.35)]">
                         Merch
                       </div>
-                      <div
-                        style={{
-                          color: "#b9e6ee",
-                          fontSize: ".95rem",
-                          marginBottom: ".8rem",
-                        }}
-                      >
-                        New designs / styles — new deals. Check it
-                        out!
+                      <div className="text-[#b9e6ee] text-sm mb-3">
+                        New designs / styles — new deals. Check it out!
                       </div>
                       <Link
                         href="/merch"
