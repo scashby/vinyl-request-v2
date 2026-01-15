@@ -377,7 +377,7 @@ const CollectionTable = memo(function CollectionTable({
                 <div
                   key={col.id}
                   data-cell
-                  className="h-full px-2 py-1.5 border-b border-gray-200 border-r border-gray-200 text-gray-900 text-[13px] whitespace-nowrap overflow-hidden text-ellipsis flex items-center box-border"
+                  className="h-full px-2 py-1.5 border-b border-r border-gray-200 text-gray-900 text-[13px] whitespace-nowrap overflow-hidden text-ellipsis flex items-center box-border"
                   style={{
                     width: col.width,
                     minWidth: col.width,
