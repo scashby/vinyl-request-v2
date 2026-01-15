@@ -3,7 +3,6 @@
 
 import { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import type { Album } from 'types/album';
-import 'styles/tracks-tab.css';
 import {
   DndContext,
   closestCenter,
@@ -124,26 +123,26 @@ function SortableTrackRow({
       <div
         ref={setNodeRef}
         style={style}
-        className="track-row header-row"
+        className="grid grid-cols-[40px_40px_60px_1fr_200px_80px] py-2 items-center bg-gray-50 border-y border-gray-200 text-gray-500 font-semibold text-sm"
       >
-        <div className="track-checkbox">
+        <div className="flex justify-center">
           <input
             type="checkbox"
             checked={isSelected}
             onChange={() => onToggleSelect(track.id)}
+            className="cursor-pointer"
           />
         </div>
-        <div className="track-drag" {...attributes} {...listeners}>
-          <span className="drag-handle">≡</span>
+        <div className="flex justify-center cursor-grab active:cursor-grabbing text-gray-400" {...attributes} {...listeners}>
+          <span className="text-base">≡</span>
         </div>
-        <div className="track-position">
-          <span style={{ fontSize: '18px' }}>▬</span>
+        <div className="text-center text-gray-500">
+          <span className="text-lg">▬</span>
         </div>
-        <div className="track-title" style={{ fontStyle: 'italic', color: '#6b7280' }}>
+        <div className="italic text-gray-500 col-span-2 px-2">
           {track.title || 'Add tracks to this header'}
         </div>
-        <div className="track-artist"></div>
-        <div className="track-length"></div>
+        <div></div>
       </div>
     );
   }
@@ -153,55 +152,47 @@ function SortableTrackRow({
     <div
       ref={setNodeRef}
       style={style}
-      className="track-row"
+      className="grid grid-cols-[40px_40px_60px_1fr_200px_80px] py-2 border-b border-gray-100 items-center bg-white hover:bg-gray-50"
     >
-      <div className="track-checkbox">
+      <div className="flex justify-center">
         <input
           type="checkbox"
           checked={isSelected}
           onChange={() => onToggleSelect(track.id)}
+          className="cursor-pointer"
         />
       </div>
-      <div className="track-drag" {...attributes} {...listeners}>
-        <span className="drag-handle">≡</span>
+      <div className="flex justify-center cursor-grab active:cursor-grabbing text-gray-400" {...attributes} {...listeners}>
+        <span className="text-base">≡</span>
       </div>
-      <div className="track-position">
+      <div className="text-center text-gray-500 text-sm">
         {track.side ? `${track.side}${track.position}` : track.position}
       </div>
-      <div className="track-title">
+      <div className="px-1">
         <input
           type="text"
           value={track.title}
           onChange={(e) => onUpdate(track.id, 'title', e.target.value)}
           placeholder="Track title"
-          style={{
-            color: '#111827',
-            backgroundColor: 'white',
-          }}
+          className="w-full px-2 py-1 border border-gray-200 rounded text-sm text-gray-900 bg-white focus:outline-none focus:border-blue-500"
         />
       </div>
-      <div className="track-artist">
+      <div className="px-1">
         <input
           type="text"
           value={track.artist}
           onChange={(e) => onUpdate(track.id, 'artist', e.target.value)}
           placeholder="Artist"
-          style={{
-            color: '#111827',
-            backgroundColor: 'white',
-          }}
+          className="w-full px-2 py-1 border border-gray-200 rounded text-sm text-gray-900 bg-white focus:outline-none focus:border-blue-500"
         />
       </div>
-      <div className="track-length">
+      <div className="px-1">
         <input
           type="text"
           value={track.duration}
           onChange={(e) => onUpdate(track.id, 'duration', e.target.value)}
           placeholder="0:00"
-          style={{
-            color: '#111827',
-            backgroundColor: 'white',
-          }}
+          className="w-full px-2 py-1 border border-gray-200 rounded text-sm text-gray-900 bg-white focus:outline-none focus:border-blue-500"
         />
       </div>
     </div>
@@ -586,19 +577,23 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
   const currentDisc = discs.find(d => d.disc_number === activeDisc) || discs[0];
 
   return (
-    <div className="tracks-tab">
+    <div className="flex flex-col gap-4 p-5 bg-white text-gray-900">
       {/* Disc Tabs */}
-      <div className="disc-tabs">
+      <div className="flex gap-1 border-b border-gray-200 bg-white overflow-x-auto">
         {discs.map(disc => (
           <button
             key={disc.disc_number}
-            className={`disc-tab ${activeDisc === disc.disc_number ? 'active' : ''}`}
+            className={`px-4 py-2 text-sm flex items-center gap-2 border-t border-l border-r rounded-t transition-colors whitespace-nowrap ${
+              activeDisc === disc.disc_number
+                ? 'bg-white border-gray-200 border-b-white -mb-px font-medium text-gray-900'
+                : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+            }`}
             onClick={() => setActiveDisc(disc.disc_number)}
           >
             Disc #{disc.disc_number}
             {discs.length > 1 && (
               <span
-                className="disc-tab-close"
+                className="ml-1 text-gray-400 hover:text-red-500 text-lg leading-none rounded-full p-0.5 hover:bg-gray-200"
                 onClick={(e) => {
                   e.stopPropagation();
                   handleRemoveDisc(disc.disc_number);
@@ -609,30 +604,30 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
             )}
           </button>
         ))}
-        <button className="disc-tab add-disc" onClick={handleAddDisc}>
+        <button 
+          className="px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-t whitespace-nowrap" 
+          onClick={handleAddDisc}
+        >
           + Add Disc
         </button>
       </div>
 
       {/* Disc Metadata */}
-      <div className="disc-metadata">
-        <div className="disc-metadata-row">
-          <div className="disc-metadata-field">
-            <label>Disc Title</label>
+      <div className="bg-gray-50 p-4 rounded-md flex flex-col gap-3">
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="flex-1 flex flex-col gap-1">
+            <label className="text-xs font-medium text-gray-500">Disc Title</label>
             <input
               type="text"
               value={currentDisc.title}
               onChange={(e) => handleUpdateDisc(activeDisc, 'title', e.target.value)}
               placeholder="Disc #1"
-              style={{
-                color: '#111827',
-                backgroundColor: 'white',
-              }}
+              className="px-2 py-1.5 border border-gray-300 rounded text-sm text-gray-900 bg-white focus:outline-none focus:border-blue-500"
             />
           </div>
-          <div className="disc-metadata-field">
-            <label>Storage Device</label>
-            <div className="picker-input">
+          <div className="flex-1 flex flex-col gap-1">
+            <label className="text-xs font-medium text-gray-500">Storage Device</label>
+            <div className="flex gap-1">
               <select
                 value={currentDisc.storage_device}
                 onChange={(e) => {
@@ -642,10 +637,7 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
                     handleUpdateDisc(activeDisc, 'storage_device', e.target.value);
                   }
                 }}
-                style={{
-                  color: '#111827',
-                  backgroundColor: 'white',
-                }}
+                className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm text-gray-900 bg-white focus:outline-none focus:border-blue-500"
               >
                 <option value="">Select...</option>
                 {storageDevices.map(device => (
@@ -654,52 +646,43 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
                 <option value="__manage__">Manage Storage Devices...</option>
               </select>
               <button
-                className="picker-button"
+                className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded text-gray-700"
                 onClick={() => setShowStoragePicker(true)}
               >
                 ≡
               </button>
             </div>
           </div>
-          <div className="disc-metadata-field">
-            <label>Slot</label>
+          <div className="flex-1 flex flex-col gap-1">
+            <label className="text-xs font-medium text-gray-500">Slot</label>
             <input
               type="text"
               value={currentDisc.slot}
               onChange={(e) => handleUpdateDisc(activeDisc, 'slot', e.target.value)}
               placeholder="Slot"
-              style={{
-                color: '#111827',
-                backgroundColor: 'white',
-              }}
+              className="px-2 py-1.5 border border-gray-300 rounded text-sm text-gray-900 bg-white focus:outline-none focus:border-blue-500"
             />
           </div>
         </div>
-        <div className="disc-metadata-row">
-          <div className="disc-metadata-field">
-            <label>Matrix Nr Side A</label>
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="flex-1 flex flex-col gap-1">
+            <label className="text-xs font-medium text-gray-500">Matrix Nr Side A</label>
             <input
               type="text"
               value={currentDisc.matrix_side_a}
               onChange={(e) => handleUpdateDisc(activeDisc, 'matrix_side_a', e.target.value)}
               placeholder="Side A matrix"
-              style={{
-                color: '#111827',
-                backgroundColor: 'white',
-              }}
+              className="px-2 py-1.5 border border-gray-300 rounded text-sm text-gray-900 bg-white focus:outline-none focus:border-blue-500"
             />
           </div>
-          <div className="disc-metadata-field">
-            <label>Matrix Nr Side B</label>
+          <div className="flex-1 flex flex-col gap-1">
+            <label className="text-xs font-medium text-gray-500">Matrix Nr Side B</label>
             <input
               type="text"
               value={currentDisc.matrix_side_b}
               onChange={(e) => handleUpdateDisc(activeDisc, 'matrix_side_b', e.target.value)}
               placeholder="Side B matrix"
-              style={{
-                color: '#111827',
-                backgroundColor: 'white',
-              }}
+              className="px-2 py-1.5 border border-gray-300 rounded text-sm text-gray-900 bg-white focus:outline-none focus:border-blue-500"
             />
           </div>
         </div>
@@ -707,42 +690,45 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
 
       {/* Selection Toolbar (appears when tracks selected) */}
       {selectedTracks.size > 0 && (
-        <div className="selection-toolbar">
-          <button className="selection-cancel" onClick={handleCancelSelection}>
+        <div className="flex items-center gap-3 px-4 py-2 bg-blue-500 rounded text-white text-sm flex-wrap">
+          <button className="text-white hover:bg-blue-600 px-2 py-1 rounded font-medium" onClick={handleCancelSelection}>
             × Cancel
           </button>
-          <label className="selection-all">
+          <label className="flex items-center gap-1 cursor-pointer">
             <input
               type="checkbox"
               checked={selectedTracks.size === activeDiscTracks.length}
               onChange={handleSelectAll}
+              className="cursor-pointer"
             />
             All
           </label>
-          <span className="selection-count">
+          <span className="font-medium">
             {selectedTracks.size} of {activeDiscTracks.length}
           </span>
-          <button className="selection-action" onClick={handleAutoCapSelected}>
-            Aa Autocap
-          </button>
-          <button className="selection-action" onClick={handleMoveToOtherDisc}>
-            ↻ Move to other disc
-          </button>
-          <button className="selection-action delete" onClick={handleDeleteSelected}>
-            🗑 Remove
-          </button>
+          <div className="flex gap-2 ml-auto">
+            <button className="bg-white text-gray-700 px-3 py-1 rounded hover:bg-gray-100 border border-transparent text-xs font-medium" onClick={handleAutoCapSelected}>
+              Aa Autocap
+            </button>
+            <button className="bg-white text-gray-700 px-3 py-1 rounded hover:bg-gray-100 border border-transparent text-xs font-medium" onClick={handleMoveToOtherDisc}>
+              ↻ Move to other disc
+            </button>
+            <button className="bg-white text-gray-700 px-3 py-1 rounded hover:bg-red-50 hover:text-red-600 border border-transparent text-xs font-medium" onClick={handleDeleteSelected}>
+              🗑 Remove
+            </button>
+          </div>
         </div>
       )}
 
       {/* Tracks Table */}
-      <div className="tracks-section">
-        <div className="tracks-header-row">
-          <div className="track-checkbox"></div>
-          <div className="track-drag"></div>
-          <div className="track-position"></div>
-          <div className="track-title">Title</div>
-          <div className="track-artist">Artist</div>
-          <div className="track-length">Length</div>
+      <div className="flex flex-col bg-white border border-gray-200 rounded-md overflow-hidden">
+        <div className="grid grid-cols-[40px_40px_60px_1fr_200px_80px] py-2 bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+          <div className="text-center"></div>
+          <div className="text-center"></div>
+          <div className="text-center">#</div>
+          <div className="px-2">Title</div>
+          <div className="px-2">Artist</div>
+          <div className="px-2">Length</div>
         </div>
 
         <DndContext
@@ -767,17 +753,16 @@ export const TracksTab = forwardRef<TracksTabRef, TracksTabProps>(
         </DndContext>
 
         {/* Add Buttons */}
-        <div className="tracks-add-buttons">
-          <button className="add-header-button" onClick={handleAddHeader}>
+        <div className="flex gap-3 py-4 flex-wrap">
+          <button className="px-4 py-2 bg-gray-100 border border-gray-300 rounded text-gray-700 text-sm hover:bg-gray-200" onClick={handleAddHeader}>
             ▬ Add Header
           </button>
-          <button className="add-track-button" onClick={handleAddTrack}>
+          <button className="px-4 py-2 bg-blue-500 border border-blue-600 rounded text-white text-sm hover:bg-blue-600" onClick={handleAddTrack}>
             + Add Track
           </button>
           <button 
-            className="import-tracks-button" 
+            className="px-4 py-2 bg-emerald-600 border border-emerald-700 rounded text-white text-sm hover:bg-emerald-700 ml-auto font-medium" 
             onClick={() => setShowImportModal(true)}
-            style={{ marginLeft: 'auto' }}
           >
             📥 Import Tracks
           </button>

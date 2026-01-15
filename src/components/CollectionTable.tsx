@@ -81,11 +81,11 @@ const CollectionTable = memo(function CollectionTable({
 
     return {
       checkbox: () => null,
-      owned: () => <span style={{ color: '#22c55e', fontSize: '14px' }}>✓</span>,
-      for_sale_indicator: (album: Album) => album.for_sale ? <span style={{ color: '#f59e0b', fontSize: '14px' }}>$</span> : null,
+      owned: () => <span className="text-green-500 text-sm">✓</span>,
+      for_sale_indicator: (album: Album) => album.for_sale ? <span className="text-amber-500 text-sm">$</span> : null,
       menu: (album: Album) => (
         <span 
-          style={{ color: '#2196F3', fontSize: '14px', cursor: 'pointer' }}
+          className="text-blue-500 text-sm cursor-pointer"
           onClick={(e) => {
             e.stopPropagation();
             onEditAlbum(album.id);
@@ -97,9 +97,7 @@ const CollectionTable = memo(function CollectionTable({
       artist: (album: Album) => album.artist || '—',
       title: (album: Album) => (
         <span 
-          style={{ color: '#0066cc', textDecoration: 'none', cursor: 'pointer' }}
-          onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
-          onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
+          className="text-blue-700 no-underline cursor-pointer hover:underline"
         >
           {album.title || '—'}
         </span>
@@ -225,22 +223,13 @@ const CollectionTable = memo(function CollectionTable({
       <div
         key={col.id}
         onClick={() => handleHeaderClick(col.id, col.sortable)}
+        className={`px-2 py-2 font-semibold text-gray-800 border-b-2 border-gray-300 text-[13px] whitespace-nowrap select-none flex items-center gap-1 ${
+          col.sortable ? 'cursor-pointer hover:bg-gray-200' : 'cursor-default'
+        } ${isLastLocked ? 'border-r-2 border-r-gray-400' : 'border-r border-gray-300'}`}
         style={{
           width: col.width,
           minWidth: col.width,
           maxWidth: col.width,
-          padding: '8px',
-          fontWeight: 600,
-          color: '#212529',
-          borderBottom: '2px solid #d0d0d0',
-          borderRight: isLastLocked ? '2px solid #999' : '1px solid #d0d0d0',
-          whiteSpace: 'nowrap',
-          fontSize: '13px',
-          cursor: col.sortable ? 'pointer' : 'default',
-          userSelect: 'none',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '4px',
           ...(isLocked && {
             position: 'sticky',
             left: `${leftPosition}px`,
@@ -264,13 +253,9 @@ const CollectionTable = memo(function CollectionTable({
           />
         ) : (
           <>
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{col.label}</span>
+            <span className="truncate">{col.label}</span>
             {col.sortable && (
-              <span style={{ 
-                color: sortState.column === col.id ? '#2196F3' : '#999',
-                fontSize: '11px',
-                fontWeight: 'bold'
-              }}>
+              <span className={`text-[11px] font-bold ${sortState.column === col.id ? 'text-blue-500' : 'text-gray-400'}`}>
                 {getSortIndicator(col.id) || '⇅'}
               </span>
             )}
@@ -301,17 +286,9 @@ const CollectionTable = memo(function CollectionTable({
   const lockedWidth = locked.reduce((sum, col) => sum + parseInt(col.width), 0);
 
   return (
-    <div ref={scrollRef} style={{ width: '100%', height: '100%', overflow: 'auto', position: 'relative' }}>
+    <div ref={scrollRef} className="w-full h-full overflow-auto relative">
       {/* Header - Sticky */}
-      <div style={{
-        position: 'sticky',
-        top: 0,
-        zIndex: 2,
-        display: 'flex',
-        alignItems: 'stretch',
-        background: '#e8e8e8',
-        minWidth: 'fit-content'
-      }}>
+      <div className="sticky top-0 z-[2] flex items-stretch bg-[#e8e8e8] min-w-fit">
         {/* Locked Headers */}
         {locked.map((col, index) => {
           const leftPosition = locked.slice(0, index).reduce((sum, c) => sum + parseInt(c.width), 0);
@@ -323,12 +300,13 @@ const CollectionTable = memo(function CollectionTable({
       </div>
       
       {/* Body */}
-      <div style={{
-        height: `${virtualizer.getTotalSize()}px`,
-        width: `${unlockedWidth + lockedWidth}px`,
-        position: 'relative',
-        minWidth: 'fit-content'
-      }}>
+      <div 
+        className="relative min-w-fit"
+        style={{
+          height: `${virtualizer.getTotalSize()}px`,
+          width: `${unlockedWidth + lockedWidth}px`,
+        }}
+      >
         {virtualItems.map(virtualRow => {
           const album = albums[virtualRow.index];
           const albumId = String(album.id);
@@ -376,26 +354,17 @@ const CollectionTable = memo(function CollectionTable({
                   <div
                     key={col.id}
                     data-cell
+                    className={`h-full px-2 py-1.5 border-b border-gray-200 text-gray-900 text-[13px] whitespace-nowrap overflow-hidden text-ellipsis flex items-center box-border ${
+                      isLastLocked ? 'border-r-2 border-r-gray-400' : 'border-r border-gray-200'
+                    }`}
                     style={{
                       width: col.width,
                       minWidth: col.width,
                       maxWidth: col.width,
-                      height: '100%',
-                      padding: '6px 8px',
-                      borderBottom: '1px solid #e0e0e0',
-                      borderRight: isLastLocked ? '2px solid #999' : '1px solid #e0e0e0',
-                      color: '#212529',
-                      fontSize: '13px',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      display: 'flex',
-                      alignItems: 'center',
                       position: 'sticky',
                       left: `${leftPosition}px`,
                       zIndex: 1,
                       backgroundColor: rowBg,
-                      boxSizing: 'border-box',
                     }}
                   >
                     {renderCellContent(col, album, albumId, isSelected)}
@@ -408,23 +377,12 @@ const CollectionTable = memo(function CollectionTable({
                 <div
                   key={col.id}
                   data-cell
+                  className="h-full px-2 py-1.5 border-b border-gray-200 border-r border-gray-200 text-gray-900 text-[13px] whitespace-nowrap overflow-hidden text-ellipsis flex items-center box-border"
                   style={{
                     width: col.width,
                     minWidth: col.width,
                     maxWidth: col.width,
-                    height: '100%',
-                    padding: '6px 8px',
-                    borderBottom: '1px solid #e0e0e0',
-                    borderRight: '1px solid #e0e0e0',
-                    color: '#212529',
-                    fontSize: '13px',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    display: 'flex',
-                    alignItems: 'center',
                     backgroundColor: rowBg,
-                    boxSizing: 'border-box',
                   }}
                 >
                   {renderCellContent(col, album, albumId, isSelected)}
