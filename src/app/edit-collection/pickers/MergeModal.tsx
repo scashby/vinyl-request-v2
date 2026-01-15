@@ -71,222 +71,112 @@ export function MergeModal({
 
   return (
     <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 30004,
-      }}
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-[30004] p-4"
       onClick={handleCancel}
     >
       <div
-        style={{
-          backgroundColor: 'white',
-          borderRadius: '6px',
-          width: '550px',
-          maxHeight: '600px',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-        }}
+        className="bg-white rounded-lg w-full max-w-[550px] h-[600px] max-h-[90vh] flex flex-col overflow-hidden shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div
-          style={{
-            padding: '12px 16px',
-            borderBottom: '1px solid #e5e7eb',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
-        >
-          <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: '#111827' }}>
+        <div className="px-4 py-3 border-b border-gray-200 flex justify-between items-center bg-white">
+          <h3 className="m-0 text-base font-semibold text-gray-900">
             {title}
           </h3>
           <button
             onClick={handleCancel}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: '#6b7280',
-              fontSize: '20px',
-              cursor: 'pointer',
-              padding: '0 4px',
-              lineHeight: '1',
-            }}
+            className="bg-transparent border-none text-gray-500 text-xl cursor-pointer p-1 leading-none hover:text-gray-700"
           >
             ×
           </button>
         </div>
 
         {/* Info Banner */}
-        <div
-          style={{
-            padding: '12px 16px',
-            backgroundColor: '#fef3c7',
-            borderBottom: '1px solid #fbbf24',
-          }}
-        >
-          <div style={{ fontSize: '13px', color: '#92400e', fontWeight: '500', marginBottom: '4px' }}>
+        <div className="px-4 py-3 bg-amber-50 border-b border-amber-200">
+          <div className="text-[13px] font-medium text-amber-800 mb-1">
             Merging {items.length} {itemLabel.toLowerCase()}s
           </div>
-          <div style={{ fontSize: '12px', color: '#78350f' }}>
+          <div className="text-xs text-amber-700">
             Select which {itemLabel.toLowerCase()} should be kept. All albums from the other {itemLabel.toLowerCase()}s will be moved to it.
           </div>
         </div>
 
         {/* Items List */}
-        <div
-          style={{
-            flex: 1,
-            overflowY: 'auto',
-            padding: '16px',
-          }}
-        >
-          <div style={{ marginBottom: '10px', fontSize: '13px', fontWeight: '500', color: '#374151' }}>
+        <div className="flex-1 overflow-y-auto p-4">
+          <div className="mb-2.5 text-[13px] font-medium text-gray-700">
             Select Primary {itemLabel}:
           </div>
           
-          {sortedItems.map((item) => {
-            const isPrimary = primaryId === item.id;
+          <div className="flex flex-col gap-1">
+            {sortedItems.map((item) => {
+              const isPrimary = primaryId === item.id;
 
-            return (
-              <label
-                key={item.id}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '10px 12px',
-                  cursor: 'pointer',
-                  borderRadius: '4px',
-                  marginBottom: '4px',
-                  border: isPrimary ? '2px solid #3b82f6' : '2px solid transparent',
-                  backgroundColor: isPrimary ? '#eff6ff' : 'transparent',
-                }}
-                onMouseEnter={(e) => {
-                  if (!isPrimary) {
-                    e.currentTarget.style.backgroundColor = '#f9fafb';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isPrimary) {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                  }
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
-                  <input
-                    type="radio"
-                    name="primary"
-                    checked={isPrimary}
-                    onChange={() => setPrimaryId(item.id)}
-                    style={{
-                      width: '16px',
-                      height: '16px',
-                      cursor: 'pointer',
-                      margin: 0,
-                    }}
-                  />
-                  <span style={{ fontSize: '13px', color: '#111827', fontWeight: isPrimary ? '600' : '400' }}>
-                    {item.name}
-                  </span>
-                </div>
-                {item.count !== undefined && (
-                  <span
-                    style={{
-                      fontSize: '13px',
-                      color: '#6b7280',
-                      fontWeight: '400',
-                    }}
-                  >
-                    {item.count} album{item.count !== 1 ? 's' : ''}
-                  </span>
-                )}
-              </label>
-            );
-          })}
+              return (
+                <label
+                  key={item.id}
+                  className={`flex items-center justify-between p-2.5 cursor-pointer rounded border transition-colors ${
+                    isPrimary 
+                      ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500' 
+                      : 'border-transparent hover:bg-gray-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 flex-1">
+                    <input
+                      type="radio"
+                      name="primary"
+                      checked={isPrimary}
+                      onChange={() => setPrimaryId(item.id)}
+                      className="w-4 h-4 cursor-pointer m-0 accent-blue-600"
+                    />
+                    <span className={`text-[13px] text-gray-900 ${isPrimary ? 'font-semibold' : 'font-normal'}`}>
+                      {item.name}
+                    </span>
+                  </div>
+                  {item.count !== undefined && (
+                    <span className="text-[13px] text-gray-500 font-normal">
+                      {item.count} album{item.count !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                </label>
+              );
+            })}
+          </div>
         </div>
 
         {/* Preview Section */}
-        <div
-          style={{
-            padding: '12px 16px',
-            backgroundColor: '#f9fafb',
-            borderTop: '1px solid #e5e7eb',
-            borderBottom: '1px solid #e5e7eb',
-          }}
-        >
-          <div style={{ fontSize: '13px', fontWeight: '600', color: '#111827', marginBottom: '8px' }}>
+        <div className="px-4 py-3 bg-gray-50 border-t border-b border-gray-200">
+          <div className="text-[13px] font-semibold text-gray-900 mb-2">
             After Merge:
           </div>
-          <div
-            style={{
-              padding: '10px 12px',
-              backgroundColor: 'white',
-              borderRadius: '4px',
-              border: '1px solid #d1d5db',
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '13px', color: '#111827', fontWeight: '500' }}>
-                {primaryItem?.name || 'Select a primary item'}
-              </span>
-              <span style={{ fontSize: '13px', color: '#6b7280' }}>
-                {totalCount} album{totalCount !== 1 ? 's' : ''}
-              </span>
-            </div>
+          <div className="p-2.5 bg-white rounded border border-gray-300 flex justify-between items-center">
+            <span className="text-[13px] font-medium text-gray-900">
+              {primaryItem?.name || 'Select a primary item'}
+            </span>
+            <span className="text-[13px] text-gray-500">
+              {totalCount} album{totalCount !== 1 ? 's' : ''}
+            </span>
           </div>
-          <div style={{ marginTop: '6px', fontSize: '11px', color: '#6b7280' }}>
+          <div className="mt-1.5 text-[11px] text-gray-500">
             The other {items.length - 1} {itemLabel.toLowerCase()}{items.length - 1 !== 1 ? 's' : ''} will be deleted.
           </div>
         </div>
 
         {/* Footer */}
-        <div
-          style={{
-            padding: '12px 16px',
-            display: 'flex',
-            justifyContent: 'flex-end',
-            gap: '8px',
-          }}
-        >
+        <div className="px-4 py-3 flex justify-end gap-2 bg-white">
           <button
             onClick={handleCancel}
-            style={{
-              padding: '6px 16px',
-              background: '#e5e7eb',
-              color: '#374151',
-              border: 'none',
-              borderRadius: '4px',
-              fontSize: '13px',
-              fontWeight: '500',
-              cursor: 'pointer',
-            }}
+            className="px-4 py-1.5 bg-gray-200 text-gray-700 border-none rounded text-[13px] font-medium cursor-pointer hover:bg-gray-300"
           >
             Cancel
           </button>
           <button
             onClick={handleMerge}
             disabled={!primaryId}
-            style={{
-              padding: '6px 16px',
-              background: primaryId ? '#ef4444' : '#d1d5db',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              fontSize: '13px',
-              fontWeight: '600',
-              cursor: primaryId ? 'pointer' : 'not-allowed',
-            }}
+            className={`px-4 py-1.5 border-none rounded text-[13px] font-semibold text-white ${
+              primaryId 
+                ? 'bg-red-500 cursor-pointer hover:bg-red-600' 
+                : 'bg-gray-300 cursor-not-allowed'
+            }`}
           >
             Merge {itemLabel}s
           </button>

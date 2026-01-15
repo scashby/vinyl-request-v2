@@ -101,74 +101,30 @@ export function EditModal({
 
   return (
     <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 30003,
-      }}
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-[30003] p-4"
       onClick={handleCancel}
     >
       <div
-        style={{
-          backgroundColor: 'white',
-          borderRadius: '6px',
-          width: '450px',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-        }}
+        className="bg-white rounded-lg w-full max-w-[450px] flex flex-col overflow-hidden shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div
-          style={{
-            padding: '12px 16px',
-            borderBottom: '1px solid #e5e7eb',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            backgroundColor: '#f97316', // Matched orange style
-          }}
-        >
-          <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: 'white' }}>
+        <div className="px-4 py-3 border-b border-gray-200 flex justify-between items-center bg-orange-500">
+          <h3 className="m-0 text-base font-semibold text-white">
             {title}
           </h3>
           <button
             onClick={handleCancel}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: 'white',
-              fontSize: '20px',
-              cursor: 'pointer',
-              padding: '0 4px',
-              lineHeight: '1',
-            }}
+            className="bg-transparent border-none text-white text-xl cursor-pointer p-1 leading-none hover:text-white/80"
           >
             ×
           </button>
         </div>
 
         {/* Content */}
-        <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div className="p-4 flex flex-col gap-3">
           <div>
-            <label
-              style={{
-                display: 'block',
-                marginBottom: '6px',
-                fontSize: '13px',
-                fontWeight: '500',
-                color: '#374151',
-              }}
-            >
+            <label className="block mb-1.5 text-[13px] font-medium text-gray-700">
               {itemLabel} Name
             </label>
             <input
@@ -177,31 +133,16 @@ export function EditModal({
               value={localName}
               onChange={handleNameChange}
               onKeyDown={handleKeyDown}
-              style={{
-                width: '100%',
-                padding: '8px 10px',
-                border: error ? '1px solid #ef4444' : '1px solid #d1d5db',
-                borderRadius: '4px',
-                fontSize: '13px',
-                outline: 'none',
-                boxSizing: 'border-box',
-                color: '#111827'
-              }}
+              className={`w-full px-2.5 py-2 border rounded text-[13px] outline-none text-gray-900 ${
+                error ? 'border-red-500 focus:ring-1 focus:ring-red-500' : 'border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500'
+              }`}
               placeholder={`Enter ${itemLabel.toLowerCase()} name`}
             />
           </div>
 
           {showSortName && (
             <div>
-              <label
-                style={{
-                  display: 'block',
-                  marginBottom: '6px',
-                  fontSize: '13px',
-                  fontWeight: '500',
-                  color: '#374151',
-                }}
-              >
+              <label className="block mb-1.5 text-[13px] font-medium text-gray-700">
                 Sort Name
               </label>
               <input
@@ -209,72 +150,30 @@ export function EditModal({
                 value={localSortName}
                 onChange={(e) => setLocalSortName(e.target.value)}
                 onKeyDown={handleKeyDown}
-                style={{
-                  width: '100%',
-                  padding: '8px 10px',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '4px',
-                  fontSize: '13px',
-                  outline: 'none',
-                  boxSizing: 'border-box',
-                  color: '#111827'
-                }}
+                className="w-full px-2.5 py-2 border border-gray-300 rounded text-[13px] outline-none text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                 placeholder="Sort name (optional)"
               />
             </div>
           )}
 
           {error && (
-            <div
-              style={{
-                marginTop: '6px',
-                color: '#ef4444',
-                fontSize: '12px',
-              }}
-            >
+            <div className="mt-1 text-xs text-red-500">
               {error}
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div
-          style={{
-            padding: '12px 16px',
-            borderTop: '1px solid #e5e7eb',
-            display: 'flex',
-            justifyContent: 'flex-end',
-            gap: '8px',
-            backgroundColor: 'white',
-          }}
-        >
+        <div className="px-4 py-3 border-t border-gray-200 flex justify-end gap-2 bg-white">
           <button
             onClick={handleCancel}
-            style={{
-              padding: '6px 16px',
-              background: '#e5e7eb',
-              color: '#374151',
-              border: 'none',
-              borderRadius: '4px',
-              fontSize: '13px',
-              fontWeight: '500',
-              cursor: 'pointer',
-            }}
+            className="px-4 py-1.5 bg-gray-200 text-gray-700 border-none rounded text-[13px] font-medium cursor-pointer hover:bg-gray-300"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
-            style={{
-              padding: '6px 16px',
-              background: '#3b82f6',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              fontSize: '13px',
-              fontWeight: '600',
-              cursor: 'pointer',
-            }}
+            className="px-4 py-1.5 bg-blue-500 text-white border-none rounded text-[13px] font-semibold cursor-pointer hover:bg-blue-600"
           >
             Save
           </button>

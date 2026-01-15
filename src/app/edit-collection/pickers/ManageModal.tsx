@@ -94,106 +94,49 @@ export function ManageModal({
 
   return (
     <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 30002,
-      }}
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-[30002] p-4"
       onClick={onClose}
     >
       <div
-        style={{
-          backgroundColor: 'white',
-          borderRadius: '6px',
-          width: mergeMode ? '900px' : '600px',
-          maxHeight: '600px',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-        }}
+        className={`bg-white rounded-lg max-h-[90vh] flex flex-col overflow-hidden shadow-xl transition-all duration-300 ${
+          mergeMode ? 'w-full max-w-[900px]' : 'w-full max-w-[600px]'
+        }`}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header - WHITE in normal mode, ORANGE in merge mode */}
-        <div
-          style={{
-            padding: '12px 16px',
-            borderBottom: '1px solid #e5e7eb',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            backgroundColor: mergeMode ? '#f59e0b' : 'white',
-          }}
+        {/* Header */}
+        <div 
+          className={`px-4 py-3 border-b border-gray-200 flex justify-between items-center ${
+            mergeMode ? 'bg-amber-500 text-white' : 'bg-white text-gray-900'
+          }`}
         >
-          <h3 style={{ 
-            margin: 0, 
-            fontSize: '16px', 
-            fontWeight: '600', 
-            color: mergeMode ? 'white' : '#111827' 
-          }}>
+          <h3 className="m-0 text-base font-semibold">
             {title}
           </h3>
           <button
             onClick={onClose}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: mergeMode ? 'white' : '#6b7280',
-              fontSize: '20px',
-              cursor: 'pointer',
-              padding: '0 4px',
-              lineHeight: '1',
-            }}
+            className={`bg-transparent border-none text-xl cursor-pointer p-1 leading-none ${
+              mergeMode ? 'text-white hover:text-white/80' : 'text-gray-500 hover:text-gray-700'
+            }`}
           >
             ×
           </button>
         </div>
 
         {/* Search + Merge Mode Toggle */}
-        <div
-          style={{
-            padding: '12px 16px',
-            borderBottom: '1px solid #e5e7eb',
-            display: 'flex',
-            gap: '8px',
-            alignItems: 'center',
-          }}
-        >
+        <div className="px-4 py-3 border-b border-gray-200 flex gap-2 items-center bg-white">
           <input
             type="text"
             placeholder={`Search ${itemLabel}s...`}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            style={{
-              flex: 1,
-              padding: '6px 10px',
-              border: '1px solid #d1d5db',
-              borderRadius: '4px',
-              fontSize: '13px',
-              outline: 'none',
-            }}
+            className="flex-1 px-2.5 py-1.5 border border-gray-300 rounded text-[13px] outline-none text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
           />
           {allowMerge && (
             <button
               onClick={handleMergeToggle}
-              style={{
-                padding: '6px 12px',
-                background: mergeMode ? '#ef4444' : '#6b7280',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                fontSize: '13px',
-                fontWeight: '500',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-              }}
+              className={`px-3 py-1.5 border-none rounded text-[13px] font-medium cursor-pointer whitespace-nowrap text-white ${
+                mergeMode ? 'bg-red-500 hover:bg-red-600' : 'bg-gray-500 hover:bg-gray-600'
+              }`}
             >
               {mergeMode ? 'Cancel Merge' : 'Merge Mode'}
             </button>
@@ -202,17 +145,8 @@ export function ManageModal({
 
         {/* Yellow Banner in Merge Mode */}
         {mergeMode && (
-          <div
-            style={{
-              padding: '10px 16px',
-              backgroundColor: '#fef3c7',
-              borderBottom: '1px solid #fbbf24',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-            }}
-          >
-            <span style={{ fontSize: '13px', color: '#92400e', fontWeight: '500' }}>
+          <div className="px-4 py-2.5 bg-amber-50 border-b border-amber-300 flex justify-between items-center">
+            <span className="text-[13px] font-medium text-amber-800">
               {selectedForMerge.length === 0
                 ? `Select 2 or more ${itemLabel.toLowerCase()}s to merge`
                 : `${selectedForMerge.length} ${itemLabel.toLowerCase()}${selectedForMerge.length === 1 ? '' : 's'} selected`}
@@ -220,16 +154,7 @@ export function ManageModal({
             {selectedForMerge.length >= 2 && (
               <button
                 onClick={handleMergeConfirm}
-                style={{
-                  padding: '5px 14px',
-                  background: '#3b82f6',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  fontSize: '13px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                }}
+                className="px-3.5 py-1.5 bg-blue-500 text-white border-none rounded text-[13px] font-semibold cursor-pointer hover:bg-blue-600"
               >
                 Merge Selected
               </button>
@@ -238,29 +163,11 @@ export function ManageModal({
         )}
 
         {/* Content Area */}
-        <div style={{ 
-          flex: 1, 
-          display: 'flex', 
-          overflow: 'hidden' 
-        }}>
+        <div className="flex-1 flex overflow-hidden">
           {/* Items List */}
-          <div
-            style={{
-              flex: mergeMode ? '0 0 60%' : '1',
-              overflowY: 'auto',
-              padding: '8px 16px',
-              borderRight: mergeMode ? '1px solid #e5e7eb' : 'none',
-            }}
-          >
+          <div className={`overflow-y-auto p-4 ${mergeMode ? 'flex-[0_0_60%] border-r border-gray-200' : 'flex-1'}`}>
             {sortedItems.length === 0 ? (
-              <div
-                style={{
-                  padding: '40px 20px',
-                  textAlign: 'center',
-                  color: '#9ca3af',
-                  fontSize: '13px',
-                }}
-              >
+              <div className="py-10 text-center text-gray-400 text-[13px]">
                 {searchQuery ? 'No items match your search' : 'No items available'}
               </div>
             ) : (
@@ -271,78 +178,42 @@ export function ManageModal({
                 return (
                   <div
                     key={item.id}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '6px 8px',
-                      borderRadius: '3px',
-                      backgroundColor: isSelectedForMerge ? '#eff6ff' : 'transparent',
-                      marginBottom: '1px',
-                    }}
+                    className={`flex items-center justify-between px-2 py-1.5 rounded-sm mb-px transition-colors ${
+                      isSelectedForMerge ? 'bg-blue-50' : 'bg-transparent hover:bg-gray-50'
+                    }`}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
+                    <div className="flex items-center gap-2.5 flex-1 min-w-0">
                       {mergeMode && (
                         <input
                           type="checkbox"
                           checked={isSelectedForMerge}
                           onChange={() => handleMergeSelection(item.id)}
-                          style={{
-                            width: '16px',
-                            height: '16px',
-                            cursor: 'pointer',
-                            margin: 0,
-                          }}
+                          className="w-4 h-4 cursor-pointer m-0 accent-blue-600"
                         />
                       )}
-                      <span style={{ fontSize: '13px', color: '#111827', flex: 1 }}>
+                      <span className="text-[13px] text-gray-900 flex-1 truncate">
                         {item.name}
                       </span>
                       {item.count !== undefined && (
-                        <span
-                          style={{
-                            fontSize: '13px',
-                            color: '#6b7280',
-                            fontWeight: '400',
-                            marginRight: '8px',
-                          }}
-                        >
+                        <span className="text-[13px] text-gray-500 font-normal mr-2">
                           {item.count}
                         </span>
                       )}
                     </div>
 
                     {!mergeMode && (
-                      <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                      <div className="flex gap-1 items-center">
                         {isDeleteConfirming ? (
                           <>
                             <button
                               onClick={() => handleDeleteConfirm(item.id)}
-                              style={{
-                                padding: '4px 10px',
-                                background: '#ef4444',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '3px',
-                                fontSize: '12px',
-                                fontWeight: '500',
-                                cursor: 'pointer',
-                              }}
+                              className="px-2.5 py-1 bg-red-500 text-white border-none rounded text-xs font-medium cursor-pointer hover:bg-red-600"
                             >
                               Confirm
                             </button>
                             <button
                               onClick={handleDeleteCancel}
-                              style={{
-                                padding: '4px 10px',
-                                background: '#e5e7eb',
-                                color: '#374151',
-                                border: 'none',
-                                borderRadius: '3px',
-                                fontSize: '12px',
-                                fontWeight: '500',
-                                cursor: 'pointer',
-                              }}
+                              className="px-2.5 py-1 bg-gray-200 text-gray-700 border-none rounded text-xs font-medium cursor-pointer hover:bg-gray-300"
                             >
                               Cancel
                             </button>
@@ -352,15 +223,7 @@ export function ManageModal({
                             {/* Pencil Icon */}
                             <button
                               onClick={() => onEdit(item.id)}
-                              style={{
-                                background: 'transparent',
-                                border: 'none',
-                                cursor: 'pointer',
-                                padding: '4px',
-                                color: '#6b7280',
-                                display: 'flex',
-                                alignItems: 'center',
-                              }}
+                              className="bg-transparent border-none cursor-pointer p-1 text-gray-400 hover:text-blue-500 flex items-center"
                               title="Edit"
                             >
                               <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
@@ -370,17 +233,7 @@ export function ManageModal({
                             {/* X Icon */}
                             <button
                               onClick={() => handleDeleteClick(item.id)}
-                              style={{
-                                background: 'transparent',
-                                border: 'none',
-                                cursor: 'pointer',
-                                padding: '4px',
-                                color: '#6b7280',
-                                display: 'flex',
-                                alignItems: 'center',
-                                fontSize: '16px',
-                                lineHeight: '1',
-                              }}
+                              className="bg-transparent border-none cursor-pointer p-1 text-gray-400 hover:text-red-500 flex items-center text-base leading-none"
                               title="Delete"
                             >
                               ×
@@ -397,47 +250,28 @@ export function ManageModal({
 
           {/* Right Panel in Merge Mode */}
           {mergeMode && selectedForMerge.length > 0 && (
-            <div style={{ 
-              flex: '0 0 40%', 
-              padding: '16px',
-              backgroundColor: '#f9fafb',
-              overflowY: 'auto',
-            }}>
-              <div style={{ fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '12px' }}>
+            <div className="flex-[0_0_40%] p-4 bg-gray-50 overflow-y-auto">
+              <div className="text-[13px] font-semibold text-gray-700 mb-3">
                 Checkbox the {itemLabel}s you want to merge:
               </div>
-              {selectedForMerge.map(id => {
-                const item = items.find(i => i.id === id);
-                if (!item) return null;
-                return (
-                  <div key={id} style={{
-                    padding: '6px 8px',
-                    backgroundColor: 'white',
-                    borderRadius: '3px',
-                    marginBottom: '4px',
-                    fontSize: '13px',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                  }}>
-                    <span>{item.name}</span>
-                    <span style={{ color: '#6b7280' }}>{item.count}</span>
-                  </div>
-                );
-              })}
+              <div className="flex flex-col gap-1">
+                {selectedForMerge.map(id => {
+                  const item = items.find(i => i.id === id);
+                  if (!item) return null;
+                  return (
+                    <div key={id} className="px-2 py-1.5 bg-white rounded shadow-sm text-[13px] flex justify-between">
+                      <span className="truncate mr-2">{item.name}</span>
+                      <span className="text-gray-500">{item.count}</span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div
-          style={{
-            padding: '12px 16px',
-            borderTop: '1px solid #e5e7eb',
-            display: 'flex',
-            justifyContent: mergeMode ? 'space-between' : 'center',
-            gap: '8px',
-          }}
-        >
+        <div className={`px-4 py-3 border-t border-gray-200 flex gap-2 ${mergeMode ? 'justify-between' : 'justify-center'}`}>
           {mergeMode ? (
             <>
               <button
@@ -445,32 +279,18 @@ export function ManageModal({
                   setMergeMode(false);
                   setSelectedForMerge([]);
                 }}
-                style={{
-                  padding: '6px 16px',
-                  background: '#e5e7eb',
-                  color: '#374151',
-                  border: 'none',
-                  borderRadius: '4px',
-                  fontSize: '13px',
-                  fontWeight: '500',
-                  cursor: 'pointer',
-                }}
+                className="px-4 py-1.5 bg-gray-200 text-gray-700 border-none rounded text-[13px] font-medium cursor-pointer hover:bg-gray-300"
               >
                 Cancel
               </button>
               <button
                 onClick={handleMergeConfirm}
                 disabled={selectedForMerge.length < 2}
-                style={{
-                  padding: '6px 16px',
-                  background: selectedForMerge.length >= 2 ? '#3b82f6' : '#d1d5db',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  fontSize: '13px',
-                  fontWeight: '600',
-                  cursor: selectedForMerge.length >= 2 ? 'pointer' : 'not-allowed',
-                }}
+                className={`px-4 py-1.5 border-none rounded text-[13px] font-semibold text-white ${
+                  selectedForMerge.length >= 2 
+                    ? 'bg-blue-500 cursor-pointer hover:bg-blue-600' 
+                    : 'bg-gray-300 cursor-not-allowed'
+                }`}
               >
                 Merge to
               </button>
@@ -478,16 +298,7 @@ export function ManageModal({
           ) : (
             <button
               onClick={onClose}
-              style={{
-                padding: '6px 20px',
-                background: '#e5e7eb',
-                color: '#374151',
-                border: 'none',
-                borderRadius: '4px',
-                fontSize: '13px',
-                fontWeight: '500',
-                cursor: 'pointer',
-              }}
+              className="px-6 py-1.5 bg-gray-200 text-gray-700 border-none rounded text-[13px] font-medium cursor-pointer hover:bg-gray-300"
             >
               Close
             </button>

@@ -112,152 +112,73 @@ export function PickerModal({
 
   return (
     <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 30001,
-      }}
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-[30001] p-4"
       onClick={handleCancel}
     >
       <div
-        style={{
-          backgroundColor: 'white',
-          borderRadius: '6px',
-          width: '500px',
-          height: '600px',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-        }}
+        className="bg-white rounded-lg w-full max-w-[500px] h-[600px] max-h-[90vh] flex flex-col overflow-hidden shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div
-          style={{
-            padding: '12px 16px',
-            borderBottom: '1px solid #e5e7eb',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            backgroundColor: '#f97316',
-          }}
-        >
-          <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: 'white' }}>
+        <div className="px-4 py-3 border-b border-gray-200 flex justify-between items-center bg-orange-500">
+          <h3 className="m-0 text-base font-semibold text-white">
             {title}
           </h3>
           <button
             onClick={handleCancel}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: 'white',
-              fontSize: '20px',
-              cursor: 'pointer',
-              padding: '0 4px',
-              lineHeight: '1',
-            }}
+            className="bg-transparent border-none text-white text-xl cursor-pointer p-1 leading-none hover:text-white/80"
           >
             ×
           </button>
         </div>
 
-        <div
-          style={{
-            padding: '12px 16px',
-            borderBottom: '1px solid #e5e7eb',
-            display: 'flex',
-            gap: '8px',
-            alignItems: 'center',
-            backgroundColor: 'white',
-          }}
-        >
+        <div className="px-4 py-3 border-b border-gray-200 flex gap-2 items-center bg-white">
           <input
             type="text"
             placeholder={searchPlaceholder}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            style={{
-              flex: 1,
-              padding: '6px 10px',
-              border: '1px solid #d1d5db',
-              borderRadius: '4px',
-              fontSize: '13px',
-              outline: 'none',
-              color: '#111827'
-            }}
+            className="flex-1 px-2.5 py-1.5 border border-gray-300 rounded text-[13px] outline-none text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
           />
           <button
             onClick={onNew}
-            style={{
-              padding: '6px 12px',
-              background: '#3b82f6',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              fontSize: '13px',
-              fontWeight: '500',
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-            }}
+            className="px-3 py-1.5 bg-blue-500 text-white border-none rounded text-[13px] font-medium cursor-pointer whitespace-nowrap hover:bg-blue-600"
           >
             New {itemLabel}
           </button>
           <button
             onClick={onManage}
-            style={{
-              padding: '6px 12px',
-              background: '#6b7280',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              fontSize: '13px',
-              fontWeight: '500',
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-            }}
+            className="px-3 py-1.5 bg-gray-500 text-white border-none rounded text-[13px] font-medium cursor-pointer whitespace-nowrap hover:bg-gray-600"
           >
             Manage {itemLabel}s
           </button>
         </div>
 
-        <div style={{ flex: 1, overflowY: 'auto', backgroundColor: 'white' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+        <div className="flex-1 overflow-y-auto bg-white">
+          <table className="w-full border-collapse table-fixed">
             <thead>
-              <tr style={{ borderBottom: '1px solid #e5e7eb', backgroundColor: 'white', position: 'sticky', top: 0, zIndex: 10 }}>
-                <th style={{ width: '40px', padding: '8px' }}></th>
+              <tr className="border-b border-gray-200 bg-white sticky top-0 z-10">
+                <th className="w-10 p-2"></th>
                 <th 
-                  style={{ 
-                    padding: '8px 12px', 
-                    textAlign: 'left', 
-                    cursor: showSortName ? 'pointer' : 'default',
-                    verticalAlign: 'top'
-                  }}
+                  className={`px-3 py-2 text-left align-top ${showSortName ? 'cursor-pointer hover:bg-gray-50' : 'cursor-default'}`}
                   onClick={showSortName ? handleSortToggle : undefined}
                 >
                   {showSortName ? (
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: '600' }}>Name</span>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '1px' }}>
-                        <span style={{ fontSize: '11px', color: '#9ca3af', fontWeight: '400' }}>Sort Name</span>
+                    <div className="flex flex-col">
+                      <span className="text-xs font-semibold text-gray-500">Name</span>
+                      <div className="flex items-center gap-1 mt-px">
+                        <span className="text-[11px] font-normal text-gray-400">Sort Name</span>
                         {sortBy === 'sortName' && (
-                          <span style={{ fontSize: '10px', color: '#9ca3af' }}>
+                          <span className="text-[10px] text-gray-400">
                             {sortDirection === 'asc' ? '▼' : '▲'}
                           </span>
                         )}
                       </div>
                     </div>
                   ) : (
-                    <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: '600' }}>Name</span>
+                    <span className="text-xs font-semibold text-gray-500">Name</span>
                   )}
                 </th>
-                <th style={{ width: '60px', padding: '8px 12px', textAlign: 'center', verticalAlign: 'middle', fontSize: '12px', color: '#6b7280', fontWeight: '600' }}>
+                <th className="w-[60px] px-3 py-2 text-center align-middle text-xs font-semibold text-gray-500">
                   Count
                 </th>
               </tr>
@@ -265,7 +186,7 @@ export function PickerModal({
             <tbody>
               {filteredItems.length === 0 ? (
                 <tr>
-                  <td colSpan={3} style={{ padding: '40px 20px', textAlign: 'center', color: '#9ca3af', fontSize: '13px' }}>
+                  <td colSpan={3} className="py-10 text-center text-gray-400 text-[13px]">
                     {searchQuery ? 'No items match your search' : 'No items available'}
                   </td>
                 </tr>
@@ -282,43 +203,36 @@ export function PickerModal({
                     <tr
                       key={item.id}
                       onClick={() => handleSelectionChange(item.id)}
-                      style={{
-                        backgroundColor: isSelected ? '#eff6ff' : (index % 2 === 0 ? 'white' : '#f9fafb'),
-                        borderBottom: '1px solid #f3f4f6',
-                        cursor: 'pointer'
-                      }}
+                      className={`border-b border-gray-50 cursor-pointer ${
+                        isSelected ? 'bg-blue-50' : index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                      }`}
                     >
-                      <td style={{ padding: '8px', textAlign: 'center', verticalAlign: 'middle' }}>
+                      <td className="p-2 text-center align-middle">
                         <input
                           type={mode === 'single' ? 'radio' : 'checkbox'}
                           checked={isSelected}
                           onChange={() => handleSelectionChange(item.id)}
-                          style={{
-                            width: '16px',
-                            height: '16px',
-                            cursor: 'pointer',
-                            margin: 0,
-                          }}
+                          className="w-4 h-4 cursor-pointer m-0 align-middle"
                           onClick={(e) => e.stopPropagation()} 
                         />
                       </td>
-                      <td style={{ padding: '8px 12px', verticalAlign: 'middle' }}>
+                      <td className="px-3 py-2 align-middle">
                         {showSortName ? (
-                          <div style={{ display: 'flex', flexDirection: 'column' }}>
-                            <span style={{ fontSize: '13px', color: '#111827', fontWeight: '500' }}>
+                          <div className="flex flex-col">
+                            <span className="text-[13px] font-medium text-gray-900">
                               {item.name}
                             </span>
-                            <span style={{ fontSize: '11px', color: '#9ca3af', marginTop: '1px' }}>
+                            <span className="text-[11px] text-gray-400 mt-px">
                               {sortName}
                             </span>
                           </div>
                         ) : (
-                          <span style={{ fontSize: '13px', color: '#111827', fontWeight: '500' }}>
+                          <span className="text-[13px] font-medium text-gray-900">
                             {item.name}
                           </span>
                         )}
                       </td>
-                      <td style={{ padding: '8px 12px', textAlign: 'center', verticalAlign: 'middle', fontSize: '13px', color: '#4b5563' }}>
+                      <td className="px-3 py-2 text-center align-middle text-[13px] text-gray-600">
                         {item.count}
                       </td>
                     </tr>
