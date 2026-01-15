@@ -457,67 +457,25 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
   }
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 30000,
-    }}>
-      <div style={{
-        backgroundColor: 'white',
-        borderRadius: '8px',
-        width: '600px',
-        maxHeight: '90vh',
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-      }}>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[30000]">
+      <div className="bg-white rounded-lg w-[600px] max-h-[90vh] flex flex-col overflow-hidden">
         {/* Header */}
-        <div style={{
-          padding: '16px 20px',
-          borderBottom: '1px solid #e5e7eb',
-          backgroundColor: '#f97316',
-          color: 'white',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}>
-          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '600' }}>
+        <div className="px-5 py-4 border-b border-gray-200 bg-orange-500 text-white flex justify-between items-center">
+          <h2 className="m-0 text-lg font-semibold">
             Import from CLZ Music Web
           </h2>
           <button
             onClick={handleClose}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'white',
-              fontSize: '24px',
-              cursor: 'pointer',
-              padding: 0,
-            }}
+            className="bg-none border-none text-white text-2xl cursor-pointer p-0 hover:text-white/80"
           >
             ×
           </button>
         </div>
 
         {/* Content */}
-        <div style={{ flex: 1, overflow: 'auto', padding: '20px' }}>
+        <div className="flex-1 overflow-auto p-5">
           {error && (
-            <div style={{
-              padding: '12px',
-              backgroundColor: '#fee2e2',
-              border: '1px solid #fca5a5',
-              borderRadius: '4px',
-              marginBottom: '16px',
-              color: '#991b1b',
-              fontSize: '14px',
-            }}>
+            <div className="p-3 bg-red-100 border border-red-300 rounded mb-4 text-red-800 text-sm">
               {error}
             </div>
           )}
@@ -526,30 +484,17 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
           {stage === 'upload' && (
             <>
               <div>
-                <label style={{
-                  display: 'block',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  color: '#374151',
-                  marginBottom: '8px',
-                }}>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
                   CLZ Music Web XML Export
                 </label>
                 <input
                   type="file"
                   accept=".xml"
                   onChange={handleFileChange}
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    padding: '8px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '4px',
-                    fontSize: '14px',
-                  }}
+                  className="block w-full p-2 border border-gray-300 rounded text-sm"
                 />
                 {file && (
-                  <div style={{ marginTop: '8px', fontSize: '13px', color: '#6b7280' }}>
+                  <div className="mt-2 text-xs text-gray-500">
                     Selected: {file.name} ({(file.size / 1024).toFixed(1)} KB)
                   </div>
                 )}
@@ -561,94 +506,70 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
           {stage === 'preview' && (
             <>
               {/* Summary Stats */}
-              <div style={{
-                padding: '16px',
-                backgroundColor: '#f9fafb',
-                borderRadius: '6px',
-                marginBottom: '16px',
-              }}>
-                <h3 style={{ margin: '0 0 12px 0', fontSize: '15px', fontWeight: '600', color: '#111827' }}>
+              <div className="p-4 bg-gray-50 rounded-md mb-4">
+                <h3 className="m-0 mb-3 text-[15px] font-semibold text-gray-900">
                   Import Summary
                 </h3>
-                <div style={{ fontSize: '14px', color: '#6b7280', marginBottom: '12px' }}>
+                <div className="text-sm text-gray-500 mb-3">
                   <strong>{comparedAlbums.length}</strong> albums found in XML
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '14px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#059669', fontWeight: '600' }}>Matched albums:</span>
-                    <span style={{ color: '#111827', fontWeight: '600' }}>{matchedCount}</span>
+                <div className="flex flex-col gap-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-emerald-600 font-semibold">Matched albums:</span>
+                    <span className="text-gray-900 font-semibold">{matchedCount}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#dc2626', fontWeight: '600' }}>No match found:</span>
-                    <span style={{ color: '#111827', fontWeight: '600' }}>{noMatchCount}</span>
+                  <div className="flex justify-between">
+                    <span className="text-red-600 font-semibold">No match found:</span>
+                    <span className="text-gray-900 font-semibold">{noMatchCount}</span>
                   </div>
                 </div>
               </div>
 
-              <div style={{
-                padding: '12px',
-                backgroundColor: '#fef3c7',
-                border: '1px solid #fbbf24',
-                borderRadius: '4px',
-                fontSize: '13px',
-                color: '#92400e',
-                marginBottom: '16px',
-              }}>
+              <div className="p-3 bg-amber-50 border border-amber-300 rounded text-[13px] text-amber-800 mb-4">
                 <strong>Safe Import Mode</strong>
                 <br />
                 Will process all {matchedCount} matched albums. Identifying fields (artist, title, format, barcode, etc.) are locked. Other fields will be updated if empty, or queued for conflict resolution if both sources have data.
               </div>
 
               {/* Preview Table */}
-              <div style={{
-                border: '1px solid #e5e7eb',
-                borderRadius: '6px',
-                overflow: 'hidden',
-              }}>
-                <div style={{
-                  padding: '10px 12px',
-                  backgroundColor: '#f9fafb',
-                  borderBottom: '1px solid #e5e7eb',
-                  fontWeight: '600',
-                  fontSize: '13px',
-                  color: '#6b7280',
-                }}>
+              <div className="border border-gray-200 rounded-md overflow-hidden">
+                <div className="px-3 py-2.5 bg-gray-50 border-b border-gray-200 font-semibold text-[13px] text-gray-500">
                   Preview (first 10 albums)
                 </div>
-                <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                  <table style={{ width: '100%', fontSize: '13px', borderCollapse: 'collapse' }}>
-                    <thead style={{ position: 'sticky', top: 0, backgroundColor: '#f9fafb', zIndex: 1 }}>
-                      <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
-                        <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: '#6b7280' }}>Artist</th>
-                        <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: '#6b7280' }}>Title</th>
-                        <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: '#6b7280' }}>Status</th>
-                        <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: '#6b7280' }}>Action</th>
+                <div className="max-h-[300px] overflow-y-auto">
+                  <table className="w-full text-[13px] border-collapse">
+                    <thead className="sticky top-0 bg-gray-50 z-[1]">
+                      <tr className="border-b border-gray-200">
+                        <th className="px-3 py-2 text-left font-semibold text-gray-500">Artist</th>
+                        <th className="px-3 py-2 text-left font-semibold text-gray-500">Title</th>
+                        <th className="px-3 py-2 text-left font-semibold text-gray-500">Status</th>
+                        <th className="px-3 py-2 text-left font-semibold text-gray-500">Action</th>
                       </tr>
                     </thead>
                     <tbody>
                       {comparedAlbums.slice(0, 10).map((album, idx) => {
-                        let statusColor = '#6b7280';
+                        let statusColor = 'text-gray-500';
                         let statusDisplay = album.status;
                         let actionText = 'No action';
 
                         if (album.status === 'MATCHED') {
-                          statusColor = '#059669';
+                          statusColor = 'text-emerald-600';
                           statusDisplay = 'MATCHED';
                           actionText = 'Process for updates/conflicts';
                         } else {
-                          statusColor = '#dc2626';
+                          statusColor = 'text-red-600';
                           statusDisplay = 'NO_MATCH';
                           actionText = 'Skip (not in DB)';
                         }
 
                         return (
-                          <tr key={idx} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                            <td style={{ padding: '8px 12px', color: '#111827' }}>{album.artist}</td>
-                            <td style={{ padding: '8px 12px', color: '#111827' }}>{album.title}</td>
-                            <td style={{ padding: '8px 12px', color: statusColor, fontWeight: '600' }}>
+                          <tr key={idx} className="border-b border-gray-100 last:border-none">
+                            <td className="px-3 py-2 text-gray-900">{album.artist}</td>
+                            <td className="px-3 py-2 text-gray-900">{album.title}</td>
+                            <td className={`px-3 py-2 font-semibold ${statusColor}`}>
                               {statusDisplay}
                             </td>
-                            <td style={{ padding: '8px 12px', color: '#6b7280', fontSize: '12px' }}>
+                            <td className="px-3 py-2 text-gray-500 text-xs">
                               {actionText}
                             </td>
                           </tr>
@@ -663,26 +584,17 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
 
           {/* IMPORTING STAGE */}
           {stage === 'importing' && (
-            <div style={{ textAlign: 'center', padding: '40px 20px' }}>
-              <div style={{
-                width: '100%',
-                height: '8px',
-                backgroundColor: '#e5e7eb',
-                borderRadius: '4px',
-                overflow: 'hidden',
-                marginBottom: '12px',
-              }}>
-                <div style={{
-                  width: `${(progress.current / progress.total) * 100}%`,
-                  height: '100%',
-                  backgroundColor: '#f97316',
-                  transition: 'width 0.3s',
-                }} />
+            <div className="text-center py-10 px-5">
+              <div className="w-full h-2 bg-gray-200 rounded overflow-hidden mb-3">
+                <div 
+                  className="h-full bg-orange-500 transition-all duration-300"
+                  style={{ width: `${(progress.current / progress.total) * 100}%` }}
+                />
               </div>
-              <div style={{ fontSize: '14px', color: '#6b7280', marginBottom: '8px' }}>
+              <div className="text-sm text-gray-500 mb-2">
                 {progress.current} / {progress.total}
               </div>
-              <div style={{ fontSize: '13px', color: '#9ca3af' }}>
+              <div className="text-[13px] text-gray-400">
                 {progress.status}
               </div>
             </div>
@@ -690,18 +602,12 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
 
           {/* COMPLETE STAGE */}
           {stage === 'complete' && (
-            <div style={{
-              padding: '20px',
-              backgroundColor: '#f0fdf4',
-              border: '1px solid #86efac',
-              borderRadius: '6px',
-              textAlign: 'center',
-            }}>
-              <div style={{ fontSize: '48px', marginBottom: '12px' }}>✓</div>
-              <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: '600', color: '#15803d' }}>
+            <div className="p-5 bg-green-50 border border-green-200 rounded-md text-center">
+              <div className="text-5xl mb-3">✓</div>
+              <h3 className="m-0 mb-4 text-lg font-semibold text-green-700">
                 Import Complete
               </h3>
-              <div style={{ fontSize: '14px', color: '#6b7280' }}>
+              <div className="text-sm text-gray-500">
                 <div><strong>{results.updated}</strong> albums updated</div>
                 <div><strong>{results.skipped}</strong> albums skipped</div>
                 <div><strong>{results.noMatch}</strong> albums not found in database</div>
@@ -709,7 +615,7 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
                   <div><strong>{results.conflicts}</strong> conflicts resolved</div>
                 )}
                 {results.errors > 0 && (
-                  <div style={{ color: '#dc2626', marginTop: '8px' }}>
+                  <div className="text-red-600 mt-2">
                     <strong>{results.errors}</strong> errors occurred
                   </div>
                 )}
@@ -719,43 +625,21 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
         </div>
 
         {/* Footer */}
-        <div style={{
-          padding: '16px 20px',
-          borderTop: '1px solid #e5e7eb',
-          display: 'flex',
-          justifyContent: 'flex-end',
-          gap: '12px',
-        }}>
+        <div className="px-5 py-4 border-t border-gray-200 flex justify-end gap-3">
           {stage === 'upload' && (
             <>
               <button
                 onClick={handleClose}
-                style={{
-                  padding: '8px 16px',
-                  backgroundColor: '#f3f4f6',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '4px',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  cursor: 'pointer',
-                  color: '#374151',
-                }}
+                className="px-4 py-2 bg-gray-100 border border-gray-300 rounded text-sm font-medium cursor-pointer text-gray-700 hover:bg-gray-200"
               >
                 Cancel
               </button>
               <button
                 onClick={handleParseXML}
                 disabled={!file}
-                style={{
-                  padding: '8px 16px',
-                  backgroundColor: file ? '#f97316' : '#d1d5db',
-                  border: 'none',
-                  borderRadius: '4px',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  cursor: file ? 'pointer' : 'not-allowed',
-                  color: 'white',
-                }}
+                className={`px-4 py-2 border-none rounded text-sm font-semibold text-white ${
+                  file ? 'bg-orange-500 cursor-pointer hover:bg-orange-600' : 'bg-gray-300 cursor-not-allowed'
+                }`}
               >
                 Continue
               </button>
@@ -766,31 +650,13 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
             <>
               <button
                 onClick={() => setStage('upload')}
-                style={{
-                  padding: '8px 16px',
-                  backgroundColor: '#f3f4f6',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '4px',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  cursor: 'pointer',
-                  color: '#374151',
-                }}
+                className="px-4 py-2 bg-gray-100 border border-gray-300 rounded text-sm font-medium cursor-pointer text-gray-700 hover:bg-gray-200"
               >
                 Back
               </button>
               <button
                 onClick={handleStartImport}
-                style={{
-                  padding: '8px 16px',
-                  backgroundColor: '#f97316',
-                  border: 'none',
-                  borderRadius: '4px',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  color: 'white',
-                }}
+                className="px-4 py-2 bg-orange-500 border-none rounded text-sm font-semibold cursor-pointer text-white hover:bg-orange-600"
               >
                 Start Import
               </button>
@@ -800,16 +666,7 @@ export default function ImportCLZModal({ isOpen, onClose, onImportComplete }: Im
           {stage === 'complete' && (
             <button
               onClick={handleClose}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: '#f97316',
-                border: 'none',
-                borderRadius: '4px',
-                fontSize: '14px',
-                fontWeight: '600',
-                cursor: 'pointer',
-                color: 'white',
-              }}
+              className="px-4 py-2 bg-orange-500 border-none rounded text-sm font-semibold cursor-pointer text-white hover:bg-orange-600"
             >
               Close
             </button>

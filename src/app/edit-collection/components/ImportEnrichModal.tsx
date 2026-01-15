@@ -20,7 +20,6 @@ import {
   DATA_CATEGORY_LABELS,
   DATA_CATEGORY_ICONS
 } from 'lib/enrichment-data-mapping';
-import styles from '../EditCollection.module.css';
 
 const ALLOWED_COLUMNS = new Set([
   'artist', 'title', 'year', 'format', 'country', 'barcode', 'labels', 'cat_no',
@@ -877,33 +876,30 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
   if (batchSummary) {
     return (
-      <div className={styles.importModalContainer} style={{ background: 'rgba(0,0,0,0.8)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 10000 }}>
-        <div style={{ background: 'white', padding: '30px', borderRadius: '12px', width: '500px', color: '#111827' }}>
-          <h3 style={{ marginBottom: '15px', fontWeight: '700' }}>Batch Review Summary</h3>
-          <div style={{ maxHeight: '300px', overflowY: 'auto', border: '1px solid #eee', marginBottom: '20px', borderRadius: '6px' }}>
-            <table style={{ width: '100%', fontSize: '12px', textAlign: 'left', borderCollapse: 'collapse' }}>
-              <thead style={{ background: '#f9fafb', position: 'sticky', top: 0 }}>
+      <div className="fixed inset-0 bg-black/80 flex justify-center items-center z-[10000]">
+        <div className="bg-white p-8 rounded-xl w-[500px] text-gray-900">
+          <h3 className="mb-4 font-bold text-lg">Batch Review Summary</h3>
+          <div className="max-h-[300px] overflow-y-auto border border-gray-200 mb-5 rounded-md">
+            <table className="w-full text-xs text-left border-collapse">
+              <thead className="bg-gray-50 sticky top-0">
                 <tr>
-                  <th style={{ padding: '10px', borderBottom: '1px solid #eee' }}>Album / Field</th>
-                  <th style={{ padding: '10px', borderBottom: '1px solid #eee' }}>Action</th>
+                  <th className="p-2.5 border-b border-gray-200">Album / Field</th>
+                  <th className="p-2.5 border-b border-gray-200">Action</th>
                 </tr>
               </thead>
               <tbody>
                 {batchSummary.map((s, i) => (
-                  <tr key={i} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                    <td style={{ padding: '10px' }}>
-                      <div style={{ fontWeight: '600', color: '#111827' }}>{s.album}</div>
-                      <div style={{ color: '#6b7280', fontSize: '11px' }}>{s.field.replace(/_/g, ' ').toUpperCase()}</div>
+                  <tr key={i} className="border-b border-gray-100 last:border-none">
+                    <td className="p-2.5">
+                      <div className="font-semibold text-gray-900">{s.album}</div>
+                      <div className="text-gray-500 text-[11px]">{s.field.replace(/_/g, ' ').toUpperCase()}</div>
                     </td>
-                    <td style={{ padding: '10px' }}>
-                      <span style={{ 
-                        padding: '2px 6px', 
-                        borderRadius: '4px', 
-                        fontSize: '11px', 
-                        fontWeight: '700',
-                        backgroundColor: s.action.includes('Auto') ? '#ecfdf5' : (s.action.includes('No') ? '#fef2f2' : '#eff6ff'),
-                        color: s.action.includes('Auto') ? '#047857' : (s.action.includes('No') ? '#991b1b' : '#1d4ed8')
-                      }}>
+                    <td className="p-2.5">
+                      <span className={`px-1.5 py-0.5 rounded font-bold text-[11px] ${
+                        s.action.includes('Auto') ? 'bg-emerald-50 text-emerald-700' : 
+                        s.action.includes('No') ? 'bg-red-50 text-red-800' : 
+                        'bg-blue-50 text-blue-700'
+                      }`}>
                         {s.action}
                       </span>
                     </td>
@@ -922,8 +918,7 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
                 if (onImportComplete) onImportComplete();
               }
             }} 
-            className={styles.importConfirmButton}
-            style={{ width: '100%', padding: '12px' }}
+            className="w-full bg-[#4FC3F7] text-white border-none py-3 rounded-md text-[15px] font-medium cursor-pointer shadow hover:bg-[#29B6F6] hover:shadow-md transition-all"
           >
             Continue to Next Batch
           </button>
@@ -962,31 +957,31 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
   ] : [];
 
   return (
-    <div className={styles.importModalContainer}>
-      <div className={styles.importModalContent}>
-        <div className={styles.importModalInner} style={{ width: '1200px', maxWidth: '95vw', height: '90vh', display: 'flex', flexDirection: 'column' }}>
+    <div className="fixed inset-0 bg-white z-[10000] flex flex-col overflow-hidden">
+      <div className="flex-1 overflow-auto bg-white p-6">
+        <div className="w-[1200px] max-w-[95vw] h-[90vh] mx-auto flex flex-col overflow-hidden bg-white border border-gray-200 rounded-lg shadow-xl">
         
         {/* HEADER */}
-        <div className={styles.importModalHeader}>
-          <h2 className={styles.importModalTitle}>⚡ Collection Data Enrichment</h2>
-          <button onClick={onClose} disabled={enriching} className={styles.importModalCloseButton}>×</button>
+        <div className="bg-[#2A2A2A] text-white px-6 py-3.5 flex items-center justify-between shrink-0">
+          <h2 className="text-base font-medium text-white">⚡ Collection Data Enrichment</h2>
+          <button onClick={onClose} disabled={enriching} className="bg-transparent border-none text-white text-[28px] cursor-pointer leading-none p-0 hover:text-gray-300">×</button>
         </div>
 
-        <div style={{ flex: 1, overflow: 'auto', padding: '20px' }}>
+        <div className="flex-1 overflow-auto p-5">
           {loading ? (
-            <div style={{ textAlign: 'center', padding: '40px' }}>Loading statistics...</div>
+            <div className="text-center p-10">Loading statistics...</div>
           ) : stats ? (
             <>
               {/* 1. OVERVIEW STATS */}
-              <div style={{ marginBottom: '24px' }}>
-                <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px' }}>Collection Overview</h3>
-                <div className={styles.importPreviewStats} style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+              <div className="mb-6">
+                <h3 className="text-base font-semibold mb-3">Collection Overview</h3>
+                <div className="grid grid-cols-3 gap-3">
                   <StatBox label="Total Albums" value={stats.total} color="#3b82f6" onClick={() => {}} disabled />
                   <StatBox label="Fully Enriched" value={stats.fullyEnriched} color="#10b981" onClick={() => showCategory('fully-enriched', 'Fully Enriched')} />
-                  <div style={{ position: 'relative' }}>
+                  <div className="relative">
                     <StatBox label="Needs Enrichment" value={stats.needsEnrichment} color="#f59e0b" onClick={() => showCategory('needs-enrichment', 'Needs Enrichment')} />
                     {/* RESTORED: Snooze Badge */}
-                    <div style={{ position: 'absolute', top: '-10px', right: '10px', backgroundColor: '#f3f4f6', padding: '2px 8px', borderRadius: '12px', fontSize: '10px', color: '#6b7280', border: '1px solid #e5e7eb', fontWeight: '600' }}>
+                    <div className="absolute -top-2.5 right-2.5 bg-gray-100 px-2 py-0.5 rounded-xl text-[10px] text-gray-500 border border-gray-200 font-semibold">
                       Auto-Snooze Active
                     </div>
                   </div>
@@ -994,9 +989,9 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
               </div>
 
               {/* 2. DATA CATEGORY SELECTION */}
-              <div className={styles.importEnrichCard}>
-                <h3 className={styles.importEnrichHeader}>Select Data to Enrich</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '12px' }}>
+              <div className="bg-white border-2 border-[#D8D8D8] rounded-md p-5 mb-6">
+                <h3 className="flex items-center gap-2 text-[15px] font-semibold text-green-700 mb-2">Select Data to Enrich</h3>
+                <div className="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-3">
                   {/* Note: dataCategoriesConfig is used for sorting/structure, but props are new */}
                   {dataCategoriesConfig.map(({ category }) => (
                     <DataCategoryCard
@@ -1014,17 +1009,17 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
               </div>
 
               {/* 3. FILTERS */}
-              <div className={styles.importEnrichCard} style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <label style={{ fontWeight: '600', fontSize: '14px' }}>Folder:</label>
-                  <select value={folderFilter} onChange={(e) => setFolderFilter(e.target.value)} disabled={enriching} style={{ padding: '6px', borderRadius: '4px', border: '1px solid #d1d5db', color: '#111827' }}>
+              <div className="bg-white border-2 border-[#D8D8D8] rounded-md p-5 mb-6 flex gap-4 flex-wrap items-center">
+                <div className="flex items-center gap-2">
+                  <label className="font-semibold text-sm">Folder:</label>
+                  <select value={folderFilter} onChange={(e) => setFolderFilter(e.target.value)} disabled={enriching} className="p-1.5 rounded border border-gray-300 text-gray-900">
                     <option value="">All Folders</option>
                     {folders.map(f => <option key={f} value={f}>{f}</option>)}
                   </select>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <label style={{ fontWeight: '600', fontSize: '14px', color: '#111827' }}>Batch Size:</label>
-                  <select value={batchSize} onChange={(e) => setBatchSize(e.target.value)} disabled={enriching} style={{ padding: '6px', borderRadius: '4px', border: '1px solid #d1d5db', color: '#111827' }}>
+                <div className="flex items-center gap-2">
+                  <label className="font-semibold text-sm text-gray-900">Batch Size:</label>
+                  <select value={batchSize} onChange={(e) => setBatchSize(e.target.value)} disabled={enriching} className="p-1.5 rounded border border-gray-300 text-gray-900">
                     <option value="25">25 (Recommended)</option>
                     <option value="50">50</option>
                   </select>
@@ -1033,18 +1028,18 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
               {/* 4. SESSION LOG */}
               {sessionLog.length > 0 && (
-                <div style={{ marginBottom: '16px', border: '1px solid #e5e7eb', borderRadius: '6px', overflow: 'hidden' }}>
-                  <div style={{ padding: '8px 12px', backgroundColor: '#f3f4f6', borderBottom: '1px solid #e5e7eb', fontSize: '12px', fontWeight: '600', color: '#374151' }}>
+                <div className="mb-4 border border-gray-200 rounded-md overflow-hidden">
+                  <div className="px-3 py-2 bg-gray-100 border-b border-gray-200 text-xs font-semibold text-gray-700">
                     Session Activity ({sessionLog.length})
                   </div>
-                  <div style={{ maxHeight: '150px', overflowY: 'auto', padding: '8px', backgroundColor: 'white' }}>
+                  <div className="max-h-[150px] overflow-y-auto p-2 bg-white">
                     {sessionLog.map(log => (
-                      <div key={log.id} style={{ fontSize: '12px', marginBottom: '4px', display: 'flex', gap: '8px' }}>
-                        <span style={{ color: '#9ca3af' }}>{log.timestamp.toLocaleTimeString()}</span>
-                        <span style={{ fontWeight: '600', color: log.action === 'auto-fill' ? '#10b981' : '#f59e0b' }}>
+                      <div key={log.id} className="text-xs mb-1 flex gap-2">
+                        <span className="text-gray-400">{log.timestamp.toLocaleTimeString()}</span>
+                        <span className={`font-semibold ${log.action === 'auto-fill' ? 'text-emerald-500' : 'text-amber-500'}`}>
                           {log.action === 'auto-fill' ? '✅' : '✏️'}
                         </span>
-                        <span style={{ flex: 1, color: '#111827' }}>
+                        <span className="flex-1 text-gray-900">
                           <b>{log.album}:</b> {log.details}
                         </span>
                       </div>
@@ -1056,24 +1051,33 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
               {/* STATUS */}
               {status && (
-                <div style={{ padding: '12px', borderRadius: '6px', marginBottom: '16px', backgroundColor: '#dcfce7', color: '#166534', fontWeight: '500' }}>
+                <div className="p-3 rounded-md mb-4 bg-emerald-100 text-emerald-800 font-medium">
                   {status}
                 </div>
               )}
             </>
           ) : (
-            <div className={styles.importError}>Failed to load statistics.</div>
+            <div className="bg-red-50 border-2 border-red-400 rounded-md p-4 text-red-700 text-sm mt-6">Failed to load statistics.</div>
           )}
         </div>
 
         {/* FOOTER */}
-        <div className={styles.importButtonContainer} style={{ padding: '16px 20px', borderTop: '1px solid #e5e7eb' }}>
-          <button onClick={onClose} disabled={enriching} className={styles.importCancelButton}>Close</button>
+        <div className="p-4 border-t border-gray-200 flex justify-center gap-3">
+          <button 
+            onClick={onClose} 
+            disabled={enriching} 
+            className="bg-white text-gray-900 border-2 border-[#D8D8D8] px-8 py-3 rounded-md text-[15px] font-medium cursor-pointer transition-all hover:border-[#4FC3F7] hover:bg-[#F0F9FF]"
+          >
+            Close
+          </button>
           <button 
             onClick={() => startEnrichment()} 
             disabled={enriching || !stats || Object.keys(fieldConfig).length === 0} 
-            className={styles.importConfirmButton}
-            style={{ backgroundColor: enriching ? '#d1d5db' : undefined, cursor: enriching ? 'not-allowed' : undefined }}
+            className={`text-white border-none px-8 py-3 rounded-md text-[15px] font-medium cursor-pointer shadow transition-all ${
+              enriching 
+                ? 'bg-gray-300 cursor-not-allowed' 
+                : 'bg-[#4FC3F7] hover:bg-[#29B6F6] hover:shadow-md'
+            }`}
           >
             {enriching ? 'Scanning...' : '⚡ Start Scan & Review'}
           </button>
@@ -1083,34 +1087,33 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
       {/* DRILL DOWN MODAL */}
       {showCategoryModal && (
-        <div className={styles.importModalContainer} style={{ background: 'rgba(0,0,0,0.7)' }}>
-           <div className={styles.importModalContent} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ backgroundColor: 'white', borderRadius: '8px', width: '1000px', maxWidth: '90vw', maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', color: '#111827' }}>
-            <div className={styles.importModalHeader}>
-              <h3 className={styles.importModalTitle}>{categoryTitle}</h3>
-              <button onClick={() => setShowCategoryModal(false)} className={styles.importModalCloseButton}>×</button>
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[10000]">
+           <div className="flex items-center justify-center p-6 w-full h-full">
+            <div className="bg-white rounded-lg w-[1000px] max-w-[90vw] max-h-[90vh] flex flex-col overflow-hidden text-gray-900">
+            <div className="bg-[#2A2A2A] text-white px-6 py-3.5 flex items-center justify-between shrink-0">
+              <h3 className="text-base font-medium">{categoryTitle}</h3>
+              <button onClick={() => setShowCategoryModal(false)} className="bg-transparent border-none text-white text-[28px] cursor-pointer leading-none p-0 hover:text-gray-300">×</button>
             </div>
-            <div style={{ flex: 1, overflow: 'auto', padding: '20px' }}>
+            <div className="flex-1 overflow-auto p-5">
               {loadingCategory ? (
-                <div style={{ textAlign: 'center', padding: '40px' }}>Loading...</div>
+                <div className="text-center p-10">Loading...</div>
               ) : (
                 <>
                   <button 
                      onClick={() => startEnrichment(categoryAlbums.map(a => a.id))}
                      disabled={enriching || categoryAlbums.length === 0}
-                     className={styles.importConfirmButton}
-                     style={{ width: '100%', marginBottom: '16px' }}
+                     className="w-full bg-[#4FC3F7] text-white border-none py-3 rounded-md text-[15px] font-medium cursor-pointer shadow hover:bg-[#29B6F6] hover:shadow-md transition-all mb-4 disabled:bg-gray-300 disabled:cursor-not-allowed"
                   >
                     Scan These {categoryAlbums.length} Albums
                   </button>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '12px' }}>
+                  <div className="grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-3">
                     {categoryAlbums.map(album => (
-                      <div key={album.id} style={{ border: '1px solid #e5e7eb', borderRadius: '6px', padding: '8px' }}>
-                        <div style={{ position: 'relative', width: '100%', aspectRatio: '1', marginBottom: '6px', backgroundColor: '#eee' }}>
+                      <div key={album.id} className="border border-gray-200 rounded-md p-2">
+                        <div className="relative w-full aspect-square mb-1.5 bg-gray-100">
                            {album.image_url && <Image src={album.image_url} alt="" fill style={{ objectFit: 'cover' }} unoptimized />}
                         </div>
-                        <div style={{ fontWeight: '600', fontSize: '11px', whiteSpace: 'nowrap', overflow: 'hidden', color: '#111827' }}>{album.title}</div>
-                        <div style={{ color: '#6b7280', fontSize: '11px', whiteSpace: 'nowrap', overflow: 'hidden' }}>{album.artist}</div>
+                        <div className="font-semibold text-[11px] whitespace-nowrap overflow-hidden text-gray-900">{album.title}</div>
+                        <div className="text-gray-500 text-[11px] whitespace-nowrap overflow-hidden">{album.artist}</div>
                       </div>
                     ))}
                   </div>
@@ -1129,9 +1132,9 @@ export default function ImportEnrichModal({ isOpen, onClose, onImportComplete }:
 
 function StatBox({ label, value, color, onClick, disabled }: { label: string; value: number; color: string; onClick: () => void; disabled?: boolean }) {
   return (
-    <div onClick={disabled ? undefined : onClick} className={styles.importPreviewStat} style={{ border: `2px solid ${color}`, cursor: disabled ? 'default' : 'pointer' }}>
-      <div className={styles.importPreviewStatValue} style={{ color }}>{value.toLocaleString()}</div>
-      <div className={styles.importPreviewStatLabel}>{label}</div>
+    <div onClick={disabled ? undefined : onClick} className="bg-white rounded-md p-5 text-center" style={{ border: `2px solid ${color}`, cursor: disabled ? 'default' : 'pointer' }}>
+      <div className="text-3xl font-bold mb-1" style={{ color }}>{value.toLocaleString()}</div>
+      <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{label}</div>
     </div>
   );
 }
@@ -1175,11 +1178,10 @@ function DataCategoryCard({
 
   return (
     // Removed hardcoded background/opacity styles to let CSS Modules handle theme
-    <div className={styles.importSelectionCard} data-disabled={disabled}>
+    <div className={`w-full text-left bg-white border-2 border-[#D8D8D8] rounded-md p-5 transition-all duration-200 ${disabled ? 'opacity-50 pointer-events-none' : 'hover:border-[#4FC3F7] hover:bg-[#F0F9FF]'}`}>
       {/* HEADER */}
       <div 
-        className={styles.cardHeader}
-        style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingBottom: '8px', borderBottom: '1px solid var(--border-color)', marginBottom: '8px' }}
+        className="flex items-center gap-2 pb-2 border-b border-gray-200 mb-2"
       >
          <input 
             type="checkbox" 
@@ -1187,14 +1189,14 @@ function DataCategoryCard({
             ref={el => { if(el) el.indeterminate = isIndeterminate; }}
             onChange={onToggleCategory}
             disabled={disabled}
-            style={{ cursor: 'pointer' }}
+            className="cursor-pointer"
          />
-         <span style={{ fontSize: '16px' }}>{DATA_CATEGORY_ICONS[category]}</span>
-         <span className={styles.cardHeaderText}>{DATA_CATEGORY_LABELS[category]}</span>
+         <span className="text-base">{DATA_CATEGORY_ICONS[category]}</span>
+         <span className="text-base font-semibold text-[#1a1a1a]">{DATA_CATEGORY_LABELS[category]}</span>
       </div>
 
       {/* FIELD ROWS (Dashboard Style) */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      <div className="flex flex-col gap-2">
          {validFields.map(field => {
             const isEnabled = !!fieldConfig[field];
             const activeSources = fieldConfig[field] || new Set();
@@ -1202,10 +1204,10 @@ function DataCategoryCard({
             const missing = getMissing(field);
 
             return (
-               <div key={field} className={isEnabled ? styles.fieldRowActive : styles.fieldRow}>
+               <div key={field} className={isEnabled ? "p-2 bg-blue-50 border border-blue-200 rounded" : "p-2 border border-transparent"}>
                   {/* Row Top: Checkbox + Name + Stats */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                     <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '500', cursor: 'pointer' }}>
+                  <div className="flex items-center justify-between">
+                     <label className="flex items-center gap-1.5 text-xs font-medium cursor-pointer">
                         <input 
                            type="checkbox" 
                            checked={isEnabled} 
@@ -1214,29 +1216,33 @@ function DataCategoryCard({
                         />
                         {formatLabel(field)}
                      </label>
-                     {missing > 0 && <span className={styles.missingBadge}>{missing}</span>}
+                     {missing > 0 && <span className="bg-red-100 text-red-700 text-[10px] px-1.5 py-0.5 rounded-full font-semibold">{missing}</span>}
                   </div>
 
                   {/* Row Bottom: Source Toggles (Only if enabled) */}
                   {isEnabled && services.length > 0 && (
-                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginLeft: '20px', marginTop: '4px' }}>
+                     <div className="flex flex-wrap gap-1.5 ml-5 mt-1">
                         {services.map(srv => {
                            const isActive = activeSources.has(srv);
                            return (
                               <label 
                                 key={srv} 
                                 title={srv}
-                                className={isActive ? styles.sourceTagActive : styles.sourceTag}
+                                className={`flex items-center px-1.5 py-0.5 rounded border text-[10px] cursor-pointer select-none transition-colors ${
+                                  isActive 
+                                    ? "bg-white border-blue-400 text-blue-700 shadow-sm" 
+                                    : "bg-gray-100 border-gray-200 text-gray-500 opacity-60 hover:opacity-100"
+                                }`}
                               >
                                  <input 
                                     type="checkbox" 
                                     checked={isActive} 
                                     onChange={() => onToggleFieldSource(field, srv)}
                                     disabled={disabled}
-                                    style={{ display: 'none' }}
+                                    className="hidden"
                                  />
                                  <span>{SERVICE_ICONS[srv as EnrichmentService]}</span>
-                                 <span style={{ marginLeft: '4px' }}>{srv}</span>
+                                 <span className="ml-1">{srv}</span>
                               </label>
                            );
                         })}
