@@ -17,7 +17,6 @@ import Header from './Header';
 import type { Crate } from '../../types/crate';
 import { albumMatchesSmartCrate } from '../../lib/crateUtils';
 import { BoxIcon } from '../../components/BoxIcon';
-import styles from './EditCollection.module.css';
 
 // ... (Sort Options remain unchanged)
 type SortOption = 
@@ -143,14 +142,14 @@ const AlbumInfoPanel = memo(function AlbumInfoPanel({ album }: { album: Album | 
   const totalRuntime = getTotalRuntime();
 
   return (
-    <div className={styles.infoPanel}>
-      <div className={styles.infoArtist}>{album.artist}</div>
-      <div className={styles.infoTitleRow}>
-        <h4 className={styles.infoTitle}>{album.title}</h4>
-        <div className={styles.infoCheck} title="Album owned">✓</div>
+    <div className="p-4 flex-1 overflow-y-auto bg-gradient-to-br from-[#f5f7fa] to-[#c3cfe2]">
+      <div className="text-sm text-[#333] mb-1 font-normal">{album.artist}</div>
+      <div className="flex items-center gap-2 mb-4">
+        <h4 className="text-[#2196F3] m-0 text-lg font-normal">{album.title}</h4>
+        <div className="bg-[#2196F3] text-white rounded px-2 py-1 text-base flex items-center justify-center" title="Album owned">✓</div>
       </div>
 
-      <div className={styles.infoImage}>
+      <div className="relative mb-3">
         {(imageIndex === 0 ? album.image_url : album.back_image_url) ? (
           <Image 
             src={(imageIndex === 0 ? album.image_url : album.back_image_url) || ''} 
@@ -161,43 +160,43 @@ const AlbumInfoPanel = memo(function AlbumInfoPanel({ album }: { album: Album | 
             unoptimized
           />
         ) : (
-          <div className={styles.infoImagePlaceholder}>🎵</div>
+          <div className="w-full aspect-square bg-white flex items-center justify-center text-[#999] text-5xl border border-[#ddd]">🎵</div>
         )}
         
         {album.back_image_url && (
-          <div className={styles.infoDots}>
-            <div className={imageIndex === 0 ? styles.infoDotActive : styles.infoDot} onClick={() => setImageIndex(0)} />
-            <div className={imageIndex === 1 ? styles.infoDotActive : styles.infoDot} onClick={() => setImageIndex(1)} />
+          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
+            <div className={`w-2 h-2 rounded-full cursor-pointer ${imageIndex === 0 ? 'bg-[#333]' : 'bg-[#999]'}`} onClick={() => setImageIndex(0)} />
+            <div className={`w-2 h-2 rounded-full cursor-pointer ${imageIndex === 1 ? 'bg-[#333]' : 'bg-[#999]'}`} onClick={() => setImageIndex(1)} />
           </div>
         )}
       </div>
 
-      <div className={styles.infoLabel}>
+      <div className="text-sm font-normal text-[#333] mb-2">
         {(album.labels && album.labels.length > 0 ? album.labels.join(', ') : (album.spotify_label || album.apple_music_label)) || 'Unknown Label'} 
         {album.year && ` (${album.year})`}
       </div>
 
       {/* FIXED: Check canonical genres/styles */}
       {(album.genres || album.styles || album.spotify_genres) && (
-        <div className={styles.infoGenres}>
+        <div className="text-[13px] text-[#666] mb-3 font-normal">
           {toSafeStringArray(album.genres || album.styles || album.spotify_genres).join(' | ')}
         </div>
       )}
 
-      <div className={styles.infoBarcode}>||||| {album.barcode || '—'}</div>
-      <div className={styles.infoCountry}>{album.country || '—'}</div>
-      <div className={styles.infoFormat}>
+      <div className="text-xs text-[#333] mb-2 font-mono font-normal">||||| {album.barcode || '—'}</div>
+      <div className="text-[13px] text-[#333] mb-2 font-normal">{album.country || '—'}</div>
+      <div className="text-[13px] text-[#333] mb-3 font-normal">
         {album.format || '—'}
         {' | '}{album.discs ? `${album.discs} Disc${album.discs > 1 ? 's' : ''}` : '—'}
         {' | '}{totalTracks > 0 ? `${totalTracks} Tracks` : '—'}
         {' | '}{totalRuntime}
       </div>
 
-      <div className={styles.infoCatNo}>
+      <div className="text-[13px] text-[#666] mb-3 font-normal">
         <span style={{ fontWeight: 600 }}>CAT NO</span> {album.cat_no || '—'}
       </div>
 
-      <a href={getEbayUrl()} target="_blank" rel="noopener noreferrer" className={styles.infoLink}>
+      <a href={getEbayUrl()} target="_blank" rel="noopener noreferrer" className="text-[13px] text-[#2196F3] mb-4 block no-underline font-normal hover:underline">
         Find solid listings on eBay
       </a>
 
@@ -226,26 +225,26 @@ const AlbumInfoPanel = memo(function AlbumInfoPanel({ album }: { album: Album | 
               const runtime = getDiscRuntime(discNumber);
 
               return (
-                <div key={discNumber} className={styles.trackDisc}>
-                  <div className={styles.trackDiscHeader}>
+                <div key={discNumber} className="mb-4">
+                  <div className="text-sm font-bold text-white mb-2 p-2 px-3 bg-[#2196F3] rounded flex justify-between items-center">
                     <span>{discTitle}</span>
                     {runtime && <span>{runtime}</span>}
                   </div>
-                  <div className={styles.trackList}>
+                  <div className="flex flex-col gap-px">
                     {tracks.map((track, idx) => {
                       if (track.type === 'header') {
                         return (
-                          <div key={idx} className={idx > 0 ? styles.trackHeader : styles.trackHeaderFirst}>
+                          <div key={idx} className={`text-[11px] font-semibold text-gray-500 px-2 py-1.5 bg-gray-100 ${idx > 0 ? 'mt-1' : ''}`}>
                             {track.title}
                           </div>
                         );
                       }
 
                       return (
-                        <div key={idx} className={idx % 2 === 0 ? styles.trackRow : styles.trackRowAlt}>
-                          <div className={styles.trackPos}>{track.position}</div>
-                          <div className={styles.trackTitle}>{track.title}</div>
-                          {track.duration && <div className={styles.trackDuration}>{track.duration}</div>}
+                        <div key={idx} className={`flex items-center px-2 py-1.5 text-[13px] font-normal ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                          <div className="min-w-[28px] text-gray-500 text-[13px]">{track.position}</div>
+                          <div className="flex-1 text-gray-800 overflow-hidden text-ellipsis whitespace-nowrap pr-2">{track.title}</div>
+                          {track.duration && <div className="text-gray-500 text-[13px] min-w-[40px] text-right">{track.duration}</div>}
                         </div>
                       );
                     })}
@@ -257,64 +256,64 @@ const AlbumInfoPanel = memo(function AlbumInfoPanel({ album }: { album: Album | 
         );
       })()}
 
-      <div className={styles.infoSection}>
-        <div className={styles.infoSectionTitle}>Details</div>
-        <div className={styles.infoSectionContent}>
-          <div className={styles.infoField}>
-            <span className={styles.infoFieldLabelWide}>Release Date</span>
+      <div className="mb-4">
+        <div className="text-base font-bold text-[#2196F3] mb-3">Details</div>
+        <div className="bg-white p-3 rounded">
+          <div className="text-[13px] text-gray-800 mb-2 flex font-normal">
+            <span className="font-semibold min-w-[180px]">Release Date</span>
             <span>{album.year || '—'}</span>
           </div>
-          <div className={styles.infoField}>
-            <span className={styles.infoFieldLabelWide}>Original Release Date</span>
+          <div className="text-[13px] text-gray-800 mb-2 flex font-normal">
+            <span className="font-semibold min-w-[180px]">Original Release Date</span>
             <span>{album.original_release_date ? formatDate(album.original_release_date) : '—'}</span>
           </div>
-          <div className={styles.infoField}>
-            <span className={styles.infoFieldLabelWide}>Package/Sleeve Condition</span>
+          <div className="text-[13px] text-gray-800 mb-2 flex font-normal">
+            <span className="font-semibold min-w-[180px]">Package/Sleeve Condition</span>
             <span>{album.package_sleeve_condition || '—'}</span>
           </div>
-          <div className={styles.infoField}>
-            <span className={styles.infoFieldLabelWide}>Media Condition</span>
+          <div className="text-[13px] text-gray-800 mb-2 flex font-normal">
+            <span className="font-semibold min-w-[180px]">Media Condition</span>
             <span>{album.media_condition || '—'}</span>
           </div>
         </div>
       </div>
 
-      <div className={styles.infoSection}>
-        <div className={styles.infoSectionTitle}>Personal</div>
-        <div className={styles.infoSectionContent}>
-          <div className={styles.infoField}>
-            <span className={styles.infoFieldLabel}>Quantity</span>
+      <div className="mb-4">
+        <div className="text-base font-bold text-[#2196F3] mb-3">Personal</div>
+        <div className="bg-white p-3 rounded">
+          <div className="text-[13px] text-gray-800 mb-2 flex font-normal">
+            <span className="font-semibold min-w-[140px]">Quantity</span>
             <span>1</span>
           </div>
-          <div className={styles.infoField}>
-            <span className={styles.infoFieldLabel}>Index</span>
+          <div className="text-[13px] text-gray-800 mb-2 flex font-normal">
+            <span className="font-semibold min-w-[140px]">Index</span>
             <span>{album.index_number || '—'}</span>
           </div>
-          <div className={styles.infoField}>
-            <span className={styles.infoFieldLabel}>Purchase Date</span>
+          <div className="text-[13px] text-gray-800 mb-2 flex font-normal">
+            <span className="font-semibold min-w-[140px]">Purchase Date</span>
             <span>{album.purchase_date ? formatDate(album.purchase_date) : '—'}</span>
           </div>
-          <div className={styles.infoField}>
-            <span className={styles.infoFieldLabel}>Purchase Store</span>
+          <div className="text-[13px] text-gray-800 mb-2 flex font-normal">
+            <span className="font-semibold min-w-[140px]">Purchase Store</span>
             <span>{album.purchase_store || '—'}</span>
           </div>
-          <div className={styles.infoField}>
-            <span className={styles.infoFieldLabel}>Purchase Price</span>
+          <div className="text-[13px] text-gray-800 mb-2 flex font-normal">
+            <span className="font-semibold min-w-[140px]">Purchase Price</span>
             <span>{album.purchase_price ? `$${album.purchase_price.toFixed(2)}` : '—'}</span>
           </div>
-          <div className={styles.infoField}>
-            <span className={styles.infoFieldLabel}>Current Value</span>
+          <div className="text-[13px] text-gray-800 mb-2 flex font-normal">
+            <span className="font-semibold min-w-[140px]">Current Value</span>
             <span>{album.current_value ? `$${album.current_value.toFixed(2)}` : '—'}</span>
           </div>
-          <div className={styles.infoField}>
-            <span className={styles.infoFieldLabel}>Owner</span>
+          <div className="text-[13px] text-gray-800 mb-2 flex font-normal">
+            <span className="font-semibold min-w-[140px]">Owner</span>
             <span>{album.owner || '—'}</span>
           </div>
-          <div className={styles.infoField}>
-            <span className={styles.infoFieldLabel}>My Rating</span>
+          <div className="text-[13px] text-gray-800 mb-2 flex font-normal">
+            <span className="font-semibold min-w-[140px]">My Rating</span>
             <span>
               {album.my_rating ? (
-                <span className={styles.infoStars}>
+                <span className="flex gap-0.5">
                   {Array.from({ length: album.my_rating }).map((_, i) => (
                     <span key={i} style={{ color: '#fbbf24', fontSize: '14px' }}>★</span>
                   ))}
@@ -325,44 +324,44 @@ const AlbumInfoPanel = memo(function AlbumInfoPanel({ album }: { album: Album | 
               ) : '—'}
             </span>
           </div>
-          <div className={styles.infoField}>
-            <span className={styles.infoFieldLabel}>Last Cleaned</span>
+          <div className="text-[13px] text-gray-800 mb-2 flex font-normal">
+            <span className="font-semibold min-w-[140px]">Last Cleaned</span>
             <span>{album.last_cleaned_date ? formatDate(album.last_cleaned_date) : '—'}</span>
           </div>
-          <div className={styles.infoField}>
-            <span className={styles.infoFieldLabel}>Signed By</span>
+          <div className="text-[13px] text-gray-800 mb-2 flex font-normal">
+            <span className="font-semibold min-w-[140px]">Signed By</span>
             <span>
               {album.signed_by && Array.isArray(album.signed_by) && album.signed_by.length > 0 
                 ? album.signed_by.join(', ') 
                 : '—'}
             </span>
           </div>
-          <div className={styles.infoField}>
-            <span className={styles.infoFieldLabel}>Added Date</span>
+          <div className="text-[13px] text-gray-800 mb-2 flex font-normal">
+            <span className="font-semibold min-w-[140px]">Added Date</span>
             <span>{album.date_added ? formatDateTime(album.date_added) : '—'}</span>
           </div>
-          <div className={styles.infoField}>
-            <span className={styles.infoFieldLabel}>Modified Date</span>
+          <div className="text-[13px] text-gray-800 mb-2 flex font-normal">
+            <span className="font-semibold min-w-[140px]">Modified Date</span>
             <span>{album.modified_date ? formatDateTime(album.modified_date) : '—'}</span>
           </div>
         </div>
       </div>
 
-      <div className={styles.infoSection}>
-        <div className={styles.infoSectionTitle}>Notes</div>
-        <div className={styles.infoNotes}>{album.notes || '—'}</div>
+      <div className="mb-4">
+        <div className="text-base font-bold text-[#2196F3] mb-3">Notes</div>
+        <div className="text-[13px] text-gray-800 leading-relaxed bg-white p-3 rounded font-normal min-h-[40px]">{album.notes || '—'}</div>
       </div>
 
       <div>
-        <div className={styles.infoSectionTitle}>Tags</div>
+        <div className="text-base font-bold text-[#2196F3] mb-3">Tags</div>
         {album.custom_tags && album.custom_tags.length > 0 ? (
-          <div className={styles.infoTags}>
+          <div className="flex flex-wrap gap-2">
             {toSafeStringArray(album.custom_tags).map(tag => (
-              <span key={tag} className={styles.infoTag}>{tag}</span>
+              <span key={tag} className="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-full text-[13px] font-normal">{tag}</span>
             ))}
           </div>
         ) : (
-          <div className={styles.infoNoTags}>No tags</div>
+          <div className="text-[13px] text-gray-400 font-normal">No tags</div>
         )}
       </div>
     </div>
@@ -755,7 +754,7 @@ function CollectionBrowserPage() {
         }
       `}</style>
 
-      <div className={styles.container}>
+      <div className="fixed inset-0 flex flex-col overflow-hidden z-[9999] font-sans">
         <Header 
           albums={albums} 
           loadAlbums={loadAlbums} 
@@ -764,15 +763,15 @@ function CollectionBrowserPage() {
           selectedAlbumIds={selectedAlbumIds}
         />
 
-        <div className={styles.toolbar}>
-          <div className={styles.toolbarLeft}>
-            <button title="Add new albums to collection" className={styles.addButton}>
+        <div className="bg-[#3A3A3A] text-white px-4 py-2 flex items-center justify-between gap-5 h-[48px] shrink-0">
+          <div className="flex gap-2 items-center shrink-0">
+            <button title="Add new albums to collection" className="bg-[#368CF8] text-white border-none px-3 py-1.5 rounded cursor-pointer text-[13px] font-medium flex items-center gap-1 whitespace-nowrap">
               <span style={{ fontSize: '16px' }}>+</span>
               <span>Add Albums</span>
             </button>
 
             <div style={{ position: 'relative' }}>
-              <button onClick={() => setShowCollectionDropdown(!showCollectionDropdown)} title="Filter by collection status" className={styles.collectionButton}>
+              <button onClick={() => setShowCollectionDropdown(!showCollectionDropdown)} title="Filter by collection status" className="bg-[#2a2a2a] text-white border border-[#555] px-3 py-1.5 rounded cursor-pointer text-[13px] flex items-center gap-1.5">
                 <span>📚</span>
                 <span>{collectionFilter}</span>
                 <span style={{ fontSize: '10px' }}>▼</span>
@@ -780,44 +779,44 @@ function CollectionBrowserPage() {
             </div>
           </div>
 
-          <div className={styles.toolbarCenter}>
-            <button onClick={() => setSelectedLetter('All')} title="Show all albums" className={selectedLetter === 'All' ? styles.letterButtonActive : styles.letterButton}>All</button>
-            <button onClick={() => setSelectedLetter('0-9')} title="Filter by numbers" className={selectedLetter === '0-9' ? styles.letterButtonActive : styles.letterButton}>0-9</button>
+          <div className="flex gap-0.5 items-center flex-1 justify-center">
+            <button onClick={() => setSelectedLetter('All')} title="Show all albums" className={`bg-transparent text-white border-none px-2 py-1 cursor-pointer text-xs rounded-sm ${selectedLetter === 'All' ? 'bg-[#5A9BD5]' : ''}`}>All</button>
+            <button onClick={() => setSelectedLetter('0-9')} title="Filter by numbers" className={`bg-transparent text-white border-none px-2 py-1 cursor-pointer text-xs rounded-sm ${selectedLetter === '0-9' ? 'bg-[#5A9BD5]' : ''}`}>0-9</button>
             {alphabet.map(letter => (
-              <button key={letter} onClick={() => setSelectedLetter(letter)} title={`Filter by letter ${letter}`} className={selectedLetter === letter ? styles.letterButtonActive : styles.letterButton}>{letter}</button>
+              <button key={letter} onClick={() => setSelectedLetter(letter)} title={`Filter by letter ${letter}`} className={`bg-transparent text-white border-none px-2 py-1 cursor-pointer text-xs rounded-sm ${selectedLetter === letter ? 'bg-[#5A9BD5]' : ''}`}>{letter}</button>
             ))}
           </div>
 
-          <div className={styles.toolbarRight}>
+          <div className="flex items-center shrink-0">
             <div style={{ position: 'relative' }}>
-              <button onClick={() => setShowSearchTypeDropdown(!showSearchTypeDropdown)} title="Search type" className={styles.searchButton}>
+              <button onClick={() => setShowSearchTypeDropdown(!showSearchTypeDropdown)} title="Search type" className="bg-[#2a2a2a] text-white border border-[#555] border-r-0 px-2.5 py-1.5 cursor-pointer text-[13px] rounded-l flex items-center gap-1 h-8">
                 <span>🔍</span>
                 <span style={{ fontSize: '10px' }}>▼</span>
               </button>
             </div>
-            <input type="text" placeholder="Search albums..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} title="Search your collection" className={styles.searchInput} />
+            <input type="text" placeholder="Search albums..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} title="Search your collection" className="bg-[#2a2a2a] text-white border border-[#555] border-l-0 px-3 py-1.5 rounded-r text-[13px] w-[220px] h-8 outline-none" />
           </div>
         </div>
 
         {selectedAlbumIds.size > 0 && (
-          <div className={styles.selectionBar}>
-            <button onClick={() => setSelectedAlbumIds(new Set())} title="Clear selection" className={styles.selectionButton}>✕ Cancel</button>
-            <button title="Select all albums" className={styles.selectionButton}>☑ All</button>
-            <button title="Edit selected albums" className={styles.selectionButton}>✏️ Edit</button>
-            <button title="Remove selected albums" className={styles.selectionButton}>🗑 Remove</button>
-            <button onClick={() => setShowAddToCrateModal(true)} title="Add selected albums to a crate" className={styles.selectionButton}>📦 Add to Crate</button>
-            <button title="Export selected to PDF" className={styles.selectionButton}>🖨 Print to PDF</button>
-            <button title="More actions" className={styles.selectionButton}>⋮</button>
+          <div className="bg-[#5BA3D0] text-white px-4 py-2 flex items-center gap-2 h-10 shrink-0">
+            <button onClick={() => setSelectedAlbumIds(new Set())} title="Clear selection" className="bg-white/20 border-none text-white px-2.5 py-1 rounded cursor-pointer text-xs">✕ Cancel</button>
+            <button title="Select all albums" className="bg-white/20 border-none text-white px-2.5 py-1 rounded cursor-pointer text-xs">☑ All</button>
+            <button title="Edit selected albums" className="bg-white/20 border-none text-white px-2.5 py-1 rounded cursor-pointer text-xs">✏️ Edit</button>
+            <button title="Remove selected albums" className="bg-white/20 border-none text-white px-2.5 py-1 rounded cursor-pointer text-xs">🗑 Remove</button>
+            <button onClick={() => setShowAddToCrateModal(true)} title="Add selected albums to a crate" className="bg-white/20 border-none text-white px-2.5 py-1 rounded cursor-pointer text-xs">📦 Add to Crate</button>
+            <button title="Export selected to PDF" className="bg-white/20 border-none text-white px-2.5 py-1 rounded cursor-pointer text-xs">🖨 Print to PDF</button>
+            <button title="More actions" className="bg-white/20 border-none text-white px-2.5 py-1 rounded cursor-pointer text-xs">⋮</button>
             <div style={{ flex: 1 }} />
-            <span className={styles.selectionCount}>{selectedAlbumIds.size} of {filteredAndSortedAlbums.length} selected</span>
+            <span className="text-xs font-medium">{selectedAlbumIds.size} of {filteredAndSortedAlbums.length} selected</span>
           </div>
         )}
 
-        <div className={styles.mainContent}>
-          <div className={styles.leftPanel}>
-            <div className={styles.leftPanelHeader}>
+        <div className="flex flex-1 overflow-hidden min-h-0">
+          <div className="w-[220px] bg-[#2C2C2C] text-white flex flex-col overflow-hidden border-r border-[#1a1a1a] shrink-0">
+            <div className="p-2.5 border-b border-[#1a1a1a] flex justify-between items-center shrink-0">
               <div style={{ position: 'relative' }}>
-                <button onClick={() => setShowFolderModeDropdown(!showFolderModeDropdown)} title="Change view mode" className={styles.folderButton}>
+                <button onClick={() => setShowFolderModeDropdown(!showFolderModeDropdown)} title="Change view mode" className="bg-[#3a3a3a] text-white border border-[#555] px-2.5 py-1.5 rounded cursor-pointer text-xs flex items-center gap-1.5">
                   <span>{folderMode === 'crates' ? '📦' : '📁'}</span>
                   <span>{folderMode === 'crates' ? 'Crates' : 'Format'}</span>
                   <span style={{ fontSize: '10px' }}>▼</span>
@@ -825,16 +824,16 @@ function CollectionBrowserPage() {
 
                 {showFolderModeDropdown && (
                   <>
-                    <div onClick={() => setShowFolderModeDropdown(false)} className={styles.dropdownOverlay} />
-                    <div className={styles.folderDropdown}>
-                      <div className={styles.dropdownCategory}>Favorites</div>
-                      <button onClick={() => handleFolderModeChange('format')} className={folderMode === 'format' ? styles.dropdownItemActive : styles.dropdownItem} onMouseEnter={(e) => { if (folderMode !== 'format') { e.currentTarget.style.background = '#3a3a3a'; }}} onMouseLeave={(e) => { if (folderMode !== 'format') { e.currentTarget.style.background = 'transparent'; }}}>
+                    <div onClick={() => setShowFolderModeDropdown(false)} className="fixed inset-0 z-[99]" />
+                    <div className="absolute top-full left-0 mt-1 bg-[#2a2a2a] border border-[#555] rounded z-[100] min-w-[180px] shadow-lg">
+                      <div className="px-3 py-2 text-[10px] font-semibold text-[#999] uppercase tracking-wider">Favorites</div>
+                      <button onClick={() => handleFolderModeChange('format')} className={`w-full px-4 py-2 bg-transparent border-none text-left cursor-pointer text-[13px] text-white flex items-center gap-2 hover:bg-[#3a3a3a] ${folderMode === 'format' ? 'bg-[#5A9BD5]' : ''}`}>
                         <span>📁</span>
                         <span>Format</span>
                       </button>
 
-                      <div className={styles.dropdownCategoryBorder}>Crates</div>
-                      <button onClick={() => handleFolderModeChange('crates')} className={folderMode === 'crates' ? styles.dropdownItemActive : styles.dropdownItem} onMouseEnter={(e) => { if (folderMode !== 'crates') { e.currentTarget.style.background = '#3a3a3a'; }}} onMouseLeave={(e) => { if (folderMode !== 'crates') { e.currentTarget.style.background = 'transparent'; }}}>
+                      <div className="px-3 py-2 text-[10px] font-semibold text-[#999] uppercase tracking-wider mt-1 border-t border-[#444]">Crates</div>
+                      <button onClick={() => handleFolderModeChange('crates')} className={`w-full px-4 py-2 bg-transparent border-none text-left cursor-pointer text-[13px] text-white flex items-center gap-2 hover:bg-[#3a3a3a] ${folderMode === 'crates' ? 'bg-[#5A9BD5]' : ''}`}>
                         <span>📦</span>
                         <span>Crates</span>
                       </button>
@@ -842,43 +841,43 @@ function CollectionBrowserPage() {
                   </>
                 )}
               </div>
-              <button title="View options" className={styles.menuButton}>☰</button>
+              <button title="View options" className="bg-transparent text-white border-none cursor-pointer text-base p-1">☰</button>
             </div>
 
-            <div className={styles.leftPanelSearch}>
-              <input type="text" placeholder={folderMode === 'crates' ? 'Search crates...' : 'Search format...'} value={folderSearch} onChange={(e) => setFolderSearch(e.target.value)} title={folderMode === 'crates' ? 'Filter crates' : 'Filter formats'} className={styles.searchInput2} />
-              <div className={styles.searchControls}>
-                <button onClick={() => setFolderSortByCount(!folderSortByCount)} title={folderSortByCount ? "Sort alphabetically" : "Sort by count"} className={styles.sortButton}>{folderSortByCount ? '🔢' : '🔤'}</button>
+            <div className="p-2.5 border-b border-[#1a1a1a] shrink-0">
+              <input type="text" placeholder={folderMode === 'crates' ? 'Search crates...' : 'Search format...'} value={folderSearch} onChange={(e) => setFolderSearch(e.target.value)} title={folderMode === 'crates' ? 'Filter crates' : 'Filter formats'} className="w-full px-2 py-1.5 bg-[#3a3a3a] text-white border border-[#555] rounded text-xs outline-none" />
+              <div className="mt-2 flex gap-1.5">
+                <button onClick={() => setFolderSortByCount(!folderSortByCount)} title={folderSortByCount ? "Sort alphabetically" : "Sort by count"} className="bg-[#3a3a3a] text-white border border-[#555] px-2 py-1 rounded cursor-pointer text-xs">{folderSortByCount ? '🔢' : '🔤'}</button>
               </div>
             </div>
 
-            <div className={styles.leftPanelList}>
+            <div className="flex-1 overflow-y-auto p-1.5 min-h-0">
               {folderMode === 'format' ? (
                 <>
-                  <button onClick={() => setSelectedFolderValue(null)} title="Show all albums" className={!selectedFolderValue ? styles.allAlbumsButtonActive : styles.allAlbumsButton}>
+                  <button onClick={() => setSelectedFolderValue(null)} title="Show all albums" className={`w-full flex justify-between items-center px-2 py-1.5 bg-transparent border-none rounded cursor-pointer mb-0.5 text-xs text-white text-left ${!selectedFolderValue ? 'bg-[#5A9BD5]' : ''}`}>
                     <span>[All Albums]</span>
-                    <span className={!selectedFolderValue ? styles.folderCountActive : styles.folderCount}>{albums.length}</span>
+                    <span className={`text-white px-1.5 py-0.5 rounded-[10px] text-[11px] font-semibold ${!selectedFolderValue ? 'bg-[#3578b3]' : 'bg-[#555]'}`}>{albums.length}</span>
                   </button>
 
                   {sortedFolderItems.map(([format, count]) => (
-                    <button key={format} onClick={() => setSelectedFolderValue(format)} title={`Filter by ${format}`} className={selectedFolderValue === format ? styles.allAlbumsButtonActive : styles.allAlbumsButton}>
+                    <button key={format} onClick={() => setSelectedFolderValue(format)} title={`Filter by ${format}`} className={`w-full flex justify-between items-center px-2 py-1.5 bg-transparent border-none rounded cursor-pointer mb-0.5 text-xs text-white text-left ${selectedFolderValue === format ? 'bg-[#5A9BD5]' : ''}`}>
                       <span>{format}</span>
-                      <span className={selectedFolderValue === format ? styles.folderCountActive : styles.folderCount}>{count}</span>
+                      <span className={`text-white px-1.5 py-0.5 rounded-[10px] text-[11px] font-semibold ${selectedFolderValue === format ? 'bg-[#3578b3]' : 'bg-[#555]'}`}>{count}</span>
                     </button>
                   ))}
                 </>
               ) : (
                 <>
-                  <button onClick={() => setSelectedCrateId(null)} title="Show all albums" className={selectedCrateId === null ? styles.allAlbumsButtonActive : styles.allAlbumsButton}>
+                  <button onClick={() => setSelectedCrateId(null)} title="Show all albums" className={`w-full flex justify-between items-center px-2 py-1.5 bg-transparent border-none rounded cursor-pointer mb-0.5 text-xs text-white text-left ${selectedCrateId === null ? 'bg-[#5A9BD5]' : ''}`}>
                     <span>📚 [All Albums]</span>
-                    <span className={selectedCrateId === null ? styles.folderCountActive : styles.folderCount}>{albums.length}</span>
+                    <span className={`text-white px-1.5 py-0.5 rounded-[10px] text-[11px] font-semibold ${selectedCrateId === null ? 'bg-[#3578b3]' : 'bg-[#555]'}`}>{albums.length}</span>
                   </button>
 
                   {cratesWithCounts
                     .filter(crate => !folderSearch || crate.name.toLowerCase().includes(folderSearch.toLowerCase()))
                     .map(crate => (
-                    <button key={crate.id} onClick={() => setSelectedCrateId(crate.id)} title={`Filter by ${crate.name}`} className={selectedCrateId === crate.id ? styles.allAlbumsButtonActive : styles.allAlbumsButton}>
-                      <span className={styles.crateIcon}>
+                    <button key={crate.id} onClick={() => setSelectedCrateId(crate.id)} title={`Filter by ${crate.name}`} className={`w-full flex justify-between items-center px-2 py-1.5 bg-transparent border-none rounded cursor-pointer mb-0.5 text-xs text-white text-left ${selectedCrateId === crate.id ? 'bg-[#5A9BD5]' : ''}`}>
+                      <span className="flex items-center gap-1.5">
                         {crate.is_smart ? (
                           <BoxIcon color={crate.icon} size={16} />
                         ) : (
@@ -886,7 +885,7 @@ function CollectionBrowserPage() {
                         )}
                         <span>{crate.name}</span>
                       </span>
-                      <span className={selectedCrateId === crate.id ? styles.folderCountActive : styles.folderCount}>{crate.album_count || 0}</span>
+                      <span className={`text-white px-1.5 py-0.5 rounded-[10px] text-[11px] font-semibold ${selectedCrateId === crate.id ? 'bg-[#3578b3]' : 'bg-[#555]'}`}>{crate.album_count || 0}</span>
                     </button>
                   ))}
                 </>
@@ -894,29 +893,29 @@ function CollectionBrowserPage() {
             </div>
           </div>
 
-          <div className={styles.centerPanel}>
-            <div className={styles.centerToolbar}>
-              <div className={styles.centerToolbarLeft}>
-                <button title="Change view mode" className={styles.iconButton}>
+          <div className="flex-1 flex flex-col overflow-hidden bg-white min-w-0">
+            <div className="px-3 py-1.5 border-b border-[#555] flex items-center justify-between bg-[#4a4a4a] h-10 shrink-0">
+              <div className="flex gap-1.5 items-center">
+                <button title="Change view mode" className="bg-[#3a3a3a] border border-[#555] px-2 py-1 rounded cursor-pointer text-xs text-white flex items-center gap-1">
                   <span>☰</span>
                   <span style={{ fontSize: '9px' }}>▼</span>
                 </button>
                 
                 <div style={{ position: 'relative' }}>
-                  <button onClick={() => setShowSortDropdown(!showSortDropdown)} title="Change sort order" className={styles.iconButton}>
+                  <button onClick={() => setShowSortDropdown(!showSortDropdown)} title="Change sort order" className="bg-[#3a3a3a] border border-[#555] px-2 py-1 rounded cursor-pointer text-xs text-white flex items-center gap-1">
                     <span>↕️</span>
                     <span style={{ fontSize: '9px' }}>▼</span>
                   </button>
                   
                   {showSortDropdown && (
                     <>
-                      <div onClick={() => setShowSortDropdown(false)} className={styles.dropdownOverlay} />
-                      <div className={styles.sortDropdown}>
+                      <div onClick={() => setShowSortDropdown(false)} className="fixed inset-0 z-[99]" />
+                      <div className="absolute top-full left-0 mt-1 bg-white border border-[#ddd] rounded shadow-lg z-[100] min-w-[240px] max-h-[400px] overflow-y-auto">
                         {Object.entries(sortOptionsByCategory).map(([category, options]) => (
                           <div key={category}>
-                            <div className={styles.sortCategory}>{category}</div>
+                            <div className="px-3 py-2 text-[11px] font-semibold text-[#999] uppercase tracking-wider bg-[#f8f8f8] border-b border-[#e8e8e8]">{category}</div>
                             {options.map(opt => (
-                              <button key={opt.value} onClick={() => handleSortChange(opt.value)} className={sortBy === opt.value ? styles.sortItemActive : styles.sortItem} onMouseEnter={(e) => { if (sortBy !== opt.value) { e.currentTarget.style.background = '#f5f5f5'; }}} onMouseLeave={(e) => { if (sortBy !== opt.value) { e.currentTarget.style.background = 'transparent'; }}}>
+                              <button key={opt.value} onClick={() => handleSortChange(opt.value)} className={`w-full px-4 py-2.5 bg-transparent border-none text-left cursor-pointer text-[13px] text-[#333] flex items-center justify-between hover:bg-[#f5f5f5] ${sortBy === opt.value ? 'bg-[#e3f2fd]' : ''}`}>
                                 <span>{opt.label}</span>
                                 {sortBy === opt.value && <span style={{ color: '#2196F3' }}>✓</span>}
                               </button>
@@ -928,33 +927,33 @@ function CollectionBrowserPage() {
                   )}
                 </div>
                 
-                <button onClick={() => setShowColumnSelector(true)} title="Select visible columns" className={styles.iconButton}>
+                <button onClick={() => setShowColumnSelector(true)} title="Select visible columns" className="bg-[#3a3a3a] border border-[#555] px-2 py-1 rounded cursor-pointer text-xs text-white flex items-center gap-1">
                   <span>⊞</span>
                   <span style={{ fontSize: '9px' }}>▼</span>
                 </button>
               </div>
-              <div className={styles.albumCount}>{loading ? 'Loading...' : `${filteredAndSortedAlbums.length} albums`}</div>
+              <div className="text-xs text-[#ddd] font-semibold">{loading ? 'Loading...' : `${filteredAndSortedAlbums.length} albums`}</div>
             </div>
 
-            <div className={styles.centerContent}>
+            <div className="flex-1 overflow-hidden bg-white min-h-0">
               {loading ? (
-                <div className={styles.loading}>Loading albums...</div>
+                <div className="p-10 text-center text-[#666]">Loading albums...</div>
               ) : (
                 <CollectionTable albums={filteredAndSortedAlbums} visibleColumns={visibleColumns} lockedColumns={lockedColumns} onAlbumClick={handleAlbumClick} selectedAlbums={selectedAlbumsAsStrings} onSelectionChange={handleSelectionChange} sortState={tableSortState} onSortChange={handleTableSortChange} onEditAlbum={handleEditAlbum} />
               )}
             </div>
           </div>
 
-          <div className={styles.rightPanel}>
-            <div className={styles.rightToolbar}>
-              <div className={styles.rightToolbarLeft}>
-                <button onClick={() => selectedAlbumId && handleEditAlbum(selectedAlbumId)} title="Edit album details" className={styles.rightButton}>✏️</button>
-                <button title="Share album" className={styles.rightButton}>↗️</button>
-                <button title="Search on eBay" className={styles.rightButtonText}>eBay</button>
-                <button title="More actions" className={styles.rightButton}>⋮</button>
+          <div className="w-[380px] bg-white border-l border-[#ddd] overflow-auto flex flex-col shrink-0">
+            <div className="px-3 py-1.5 border-b border-[#555] flex items-center justify-between bg-[#4a4a4a] h-10 shrink-0">
+              <div className="flex gap-1.5 items-center">
+                <button onClick={() => selectedAlbumId && handleEditAlbum(selectedAlbumId)} title="Edit album details" className="bg-[#3a3a3a] border border-[#555] px-2.5 py-1.5 rounded cursor-pointer text-sm text-white">✏️</button>
+                <button title="Share album" className="bg-[#3a3a3a] border border-[#555] px-2.5 py-1.5 rounded cursor-pointer text-sm text-white">↗️</button>
+                <button title="Search on eBay" className="bg-[#3a3a3a] border border-[#555] px-2.5 py-1.5 rounded cursor-pointer text-xs text-white font-semibold">eBay</button>
+                <button title="More actions" className="bg-[#3a3a3a] border border-[#555] px-2.5 py-1.5 rounded cursor-pointer text-sm text-white">⋮</button>
               </div>
               
-              <button title="Select visible fields" className={styles.iconButton}>
+              <button title="Select visible fields" className="bg-[#3a3a3a] border border-[#555] px-2 py-1 rounded cursor-pointer text-xs text-white flex items-center gap-1">
                 <span>⊞</span>
                 <span style={{ fontSize: '9px' }}>▼</span>
               </button>

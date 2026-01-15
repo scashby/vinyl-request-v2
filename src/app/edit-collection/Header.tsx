@@ -17,7 +17,6 @@ import ImportEnrichModal from './components/ImportEnrichModal';
 import FindDuplicatesModal from './FindDuplicatesModal';
 import type { Album } from '../../types/album';
 import type { Crate } from '../../types/crate';
-import styles from './EditCollection.module.css';
 
 interface HeaderProps {
   albums?: Album[];
@@ -54,43 +53,43 @@ export default function Header({
     <>
       {sidebarOpen && (
         <>
-          <div className={styles.sidebarOverlay} onClick={() => setSidebarOpen(false)} />
-          <div className={`clz-sidebar ${styles.sidebar}`}>
-            <div className={styles.sidebarHeader}>
+          <div className="fixed inset-0 bg-black/50 z-[19999]" onClick={() => setSidebarOpen(false)} />
+          <div className="fixed top-0 left-0 bottom-0 w-[280px] bg-[#2C2C2C] text-white z-[20000] overflow-y-auto p-5 clz-sidebar">
+            <div className="flex justify-between items-center mb-6 text-lg font-semibold">
               <div>DWD COLLECTION</div>
-              <button onClick={() => setSidebarOpen(false)} title="Close menu" className={styles.sidebarCloseButton}>×</button>
+              <button onClick={() => setSidebarOpen(false)} title="Close menu" className="bg-none border-none text-white text-2xl cursor-pointer">×</button>
             </div>
 
-            <div className={styles.sidebarSection}>
-              <div className={styles.sidebarSectionTitle}>Collection</div>
-              <button onClick={() => { setSidebarOpen(false); setShowManagePickListsModal(true); }} title="Create and manage pick lists" className={styles.sidebarButton}>
+            <div className="mb-5">
+              <div className="text-[11px] font-semibold text-[#999] mb-2.5 uppercase tracking-wider">Collection</div>
+              <button onClick={() => { setSidebarOpen(false); setShowManagePickListsModal(true); }} title="Create and manage pick lists" className="w-full p-2.5 bg-transparent border-none text-white text-left cursor-pointer mb-1 text-sm hover:bg-white/5 rounded">
                 <span style={{ marginRight: '10px' }}>📋</span> Manage Pick Lists
               </button>
-              <button onClick={() => { setSidebarOpen(false); setShowManageCratesModal(true); }} title="Manage crates (DJ workflow organization)" className={styles.sidebarButton}>
+              <button onClick={() => { setSidebarOpen(false); setShowManageCratesModal(true); }} title="Manage crates (DJ workflow organization)" className="w-full p-2.5 bg-transparent border-none text-white text-left cursor-pointer mb-1 text-sm hover:bg-white/5 rounded">
                 <span style={{ marginRight: '10px' }}>📦</span> Manage Crates
               </button>
             </div>
 
-            <hr className={styles.sidebarHr} />
+            <hr className="border-[#444] my-5" />
 
-            <div className={styles.sidebarSection}>
-              <div className={styles.sidebarSectionTitle}>Tools</div>
-              <button onClick={() => { setSidebarOpen(false); setShowPrintToPDF(true); }} title="Export collection to PDF" className={styles.sidebarButton}>
+            <div className="mb-5">
+              <div className="text-[11px] font-semibold text-[#999] mb-2.5 uppercase tracking-wider">Tools</div>
+              <button onClick={() => { setSidebarOpen(false); setShowPrintToPDF(true); }} title="Export collection to PDF" className="w-full p-2.5 bg-transparent border-none text-white text-left cursor-pointer mb-1 text-sm hover:bg-white/5 rounded">
                 <span style={{ marginRight: '10px' }}>🖨️</span> Print to PDF
               </button>
-              <button onClick={() => { setSidebarOpen(false); setShowStatistics(true); }} title="View collection statistics" className={styles.sidebarButton}>
+              <button onClick={() => { setSidebarOpen(false); setShowStatistics(true); }} title="View collection statistics" className="w-full p-2.5 bg-transparent border-none text-white text-left cursor-pointer mb-1 text-sm hover:bg-white/5 rounded">
                 <span style={{ marginRight: '10px' }}>📊</span> Statistics
               </button>
-              <button onClick={() => { setSidebarOpen(false); setShowImportModal(true); }} title="Import album data from various sources" className={styles.sidebarButton}>
+              <button onClick={() => { setSidebarOpen(false); setShowImportModal(true); }} title="Import album data from various sources" className="w-full p-2.5 bg-transparent border-none text-white text-left cursor-pointer mb-1 text-sm hover:bg-white/5 rounded">
                 <span style={{ marginRight: '10px' }}>📥</span> Import Data
               </button>
-              <button onClick={() => { setSidebarOpen(false); setShowFindDuplicates(true); }} title="Find duplicate albums" className={styles.sidebarButton}>
+              <button onClick={() => { setSidebarOpen(false); setShowFindDuplicates(true); }} title="Find duplicate albums" className="w-full p-2.5 bg-transparent border-none text-white text-left cursor-pointer mb-1 text-sm hover:bg-white/5 rounded">
                 <span style={{ marginRight: '10px' }}>🔍</span> Find Duplicates
               </button>
-              <button title="Track loaned albums" className={styles.sidebarButton}>
+              <button title="Track loaned albums" className="w-full p-2.5 bg-transparent border-none text-white text-left cursor-pointer mb-1 text-sm hover:bg-white/5 rounded">
                 <span style={{ marginRight: '10px' }}>📚</span> Loan Manager
               </button>
-              <button onClick={() => { setSidebarOpen(false); setShowSettings(true); }} title="Application settings" className={styles.sidebarButton}>
+              <button onClick={() => { setSidebarOpen(false); setShowSettings(true); }} title="Application settings" className="w-full p-2.5 bg-transparent border-none text-white text-left cursor-pointer mb-1 text-sm hover:bg-white/5 rounded">
                 <span style={{ marginRight: '10px' }}>⚙️</span> Settings
               </button>
             </div>
@@ -98,17 +97,17 @@ export default function Header({
         </>
       )}
 
-      <div className={`clz-header ${styles.header}`}>
-        <div className={styles.headerLeft}>
-          <button onClick={() => setSidebarOpen(true)} title="Open menu" className={styles.headerMenuButton}>☰</button>
-          <div className={styles.headerTitle}>
+      <div className="bg-gradient-to-r from-[#8809AC] to-[#A855F7] text-white px-4 py-2 flex items-center justify-between h-[50px] shrink-0 clz-header">
+        <div className="flex items-center gap-4">
+          <button onClick={() => setSidebarOpen(true)} title="Open menu" className="bg-none border-none text-white cursor-pointer text-xl p-1 hover:bg-white/10 rounded">☰</button>
+          <div className="flex items-center gap-2">
             <span style={{ fontSize: '18px' }}>♪</span>
             <span style={{ fontSize: '15px', fontWeight: 600, letterSpacing: '0.5px' }}>DWD Collection Management System</span>
           </div>
         </div>
-        <div className={styles.headerRight}>
-          <button title="Grid view" className={styles.headerButton}>⊞</button>
-          <button title="User account" className={styles.headerButton}>👤</button>
+        <div className="flex gap-3 items-center">
+          <button title="Grid view" className="bg-none border-none text-white cursor-pointer text-lg p-1 hover:bg-white/10 rounded">⊞</button>
+          <button title="User account" className="bg-none border-none text-white cursor-pointer text-lg p-1 hover:bg-white/10 rounded">👤</button>
         </div>
       </div>
 
