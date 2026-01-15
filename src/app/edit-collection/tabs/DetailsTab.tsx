@@ -379,41 +379,7 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
     setEditingItemId(null);
   };
 
-  const labelStyle: React.CSSProperties = {
-    display: 'block',
-    fontSize: '13px',
-    fontWeight: '600',
-    color: '#6b7280',
-    marginBottom: '6px',
-    fontFamily: 'system-ui, -apple-system, sans-serif',
-  };
-
-  const inputStyle: React.CSSProperties = {
-    width: '100%',
-    padding: '8px 10px',
-    border: '1px solid #d1d5db',
-    borderRadius: '4px',
-    fontSize: '14px',
-    fontFamily: 'system-ui, -apple-system, sans-serif',
-    backgroundColor: 'white',
-    color: '#111827',
-  };
-
-  const selectStyle: React.CSSProperties = {
-    width: '100%',
-    padding: '8px 10px',
-    border: '1px solid #d1d5db',
-    borderRadius: '4px',
-    fontSize: '14px',
-    fontFamily: 'system-ui, -apple-system, sans-serif',
-    backgroundColor: 'white',
-    color: '#111827',
-    appearance: 'none',
-    backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'10\' height=\'6\' viewBox=\'0 0 10 6\'%3E%3Cpath fill=\'%23666\' d=\'M0 0l5 6 5-6z\'/%3E%3C/svg%3E")',
-    backgroundRepeat: 'no-repeat',
-    backgroundPosition: 'right 12px center',
-    paddingRight: '32px',
-  };
+  // Styles replaced by Tailwind classes
 
   const fieldConfig = getFieldConfig();
   const currentItems = getCurrentItems();
@@ -421,39 +387,21 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
 
   return (
     <>
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: '1fr 1fr', 
-        gap: '20px',
-        maxWidth: '100%',
-      }}>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 w-full">
         {/* LEFT COLUMN - PACKAGING */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div style={{ 
-            fontSize: '15px', 
-            fontWeight: '700', 
-            color: '#374151', 
-            marginBottom: '4px', 
-            paddingBottom: '8px', 
-            borderBottom: '2px solid #e5e7eb' 
-          }}>
+        <div className="flex flex-col gap-4">
+          <div className="text-[15px] font-bold text-gray-700 mb-1 pb-2 border-b-2 border-gray-200">
             Packaging
           </div>
 
           {/* Packaging */}
           <div>
-            <label style={labelStyle}>Packaging</label>
-            <div style={{ display: 'flex', gap: '0', alignItems: 'stretch' }}>
+            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Packaging</label>
+            <div className="flex items-stretch">
               <select 
                 value={album.packaging || ''}
                 onChange={(e) => onChange('packaging', e.target.value)}
-                style={{ 
-                  ...selectStyle, 
-                  flex: 1, 
-                  height: '36px',
-                  borderRadius: '4px 0 0 4px',
-                  borderRight: 'none'
-                }}
+                className="flex-1 px-2.5 py-2 border border-gray-300 rounded-l text-sm bg-white text-gray-900 outline-none focus:border-blue-500 border-r-0"
               >
                 <option value="">Select...</option>
                 {packaging.map(item => (
@@ -463,20 +411,7 @@ export function DetailsTab({ album, onChange }: DetailsTabProps) {
               <button 
                 onClick={() => handleOpenPicker('packaging')}
                 disabled={dataLoading}
-                style={{
-                  width: '36px',
-                  height: '36px',
-                  padding: 0,
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0 4px 4px 0',
-                  backgroundColor: 'white',
-                  cursor: dataLoading ? 'wait' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#6b7280',
-                  flexShrink: 0,
-                }}
+                className="w-9 h-[38px] flex items-center justify-center border border-gray-300 rounded-r bg-white text-gray-500 hover:bg-gray-50 disabled:cursor-wait"
               >
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
                   <circle cx="1.5" cy="2.5" r="1"/>

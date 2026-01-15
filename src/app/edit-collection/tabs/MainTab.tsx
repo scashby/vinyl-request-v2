@@ -283,52 +283,7 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
     localStorage.setItem('autoCapExceptions', JSON.stringify(exceptions));
   };
 
-  const labelStyle: React.CSSProperties = {
-    display: 'block',
-    fontSize: '13px',
-    fontWeight: '600',
-    color: '#6b7280',
-    marginBottom: '6px',
-    fontFamily: 'system-ui, -apple-system, sans-serif',
-  };
-
-  const inputStyle: React.CSSProperties = {
-    width: '100%',
-    padding: '8px 10px',
-    border: '1px solid #d1d5db',
-    borderRadius: '4px',
-    fontSize: '14px',
-    fontFamily: 'system-ui, -apple-system, sans-serif',
-    backgroundColor: 'white',
-    color: '#111827',
-  };
-
-  const selectStyle: React.CSSProperties = {
-    width: '100%',
-    padding: '8px 10px',
-    border: '1px solid #d1d5db',
-    borderRadius: '4px',
-    fontSize: '14px',
-    fontFamily: 'system-ui, -apple-system, sans-serif',
-    backgroundColor: 'white',
-    color: '#111827',
-    appearance: 'none',
-    backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'10\' height=\'6\' viewBox=\'0 0 10 6\'%3E%3Cpath fill=\'%23666\' d=\'M0 0l5 6 5-6z\'/%3E%3C/svg%3E")',
-    backgroundRepeat: 'no-repeat',
-    backgroundPosition: 'right 12px center',
-    paddingRight: '32px',
-  };
-
-  const dateInputStyle: React.CSSProperties = {
-    padding: '8px 8px',
-    border: '1px solid #d1d5db',
-    borderRadius: '4px',
-    fontSize: '14px',
-    textAlign: 'center',
-    fontFamily: 'system-ui, -apple-system, sans-serif',
-    backgroundColor: 'white',
-    color: '#111827',
-  };
+  // Styles removed in favor of Tailwind classes
 
   const fieldConfig = getFieldConfig();
   const currentItems = getCurrentItems();
@@ -347,35 +302,20 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
 
   return (
     <>
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: '1fr 1fr', 
-        gap: '20px',
-        maxWidth: '100%',
-      }}>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 w-full">
         {/* LEFT COLUMN */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div className="flex flex-col gap-4">
           {/* Title with Aa */}
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-              <label style={{ ...labelStyle, marginBottom: '0' }}>Title</label>
+            <div className="flex justify-between items-center mb-1.5">
+              <label className="block text-[13px] font-semibold text-gray-500">Title</label>
               <span 
                 onClick={handleApplyAutoCap}
                 onContextMenu={(e) => {
                   e.preventDefault();
                   setShowAutoCapSettings(true);
                 }}
-                style={{ 
-                  color: '#9ca3af',
-                  fontSize: '13px', 
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  userSelect: 'none',
-                  padding: '2px 6px',
-                  borderRadius: '3px',
-                  backgroundColor: '#f3f4f6',
-                  border: '1px solid #d1d5db',
-                }}
+                className="text-gray-400 text-[13px] font-semibold cursor-pointer select-none px-1.5 py-0.5 rounded bg-gray-100 border border-gray-300 hover:text-gray-600 hover:border-gray-400"
                 title="Click to capitalize title - Right-click for settings"
               >
                 Aa
@@ -385,68 +325,48 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
               type="text"
               value={album.title}
               onChange={(e) => onChange('title', e.target.value)}
-              style={inputStyle}
+              className="w-full px-2.5 py-2 border border-gray-300 rounded text-sm bg-white text-gray-900 focus:outline-none focus:border-blue-500"
             />
           </div>
 
           {/* Sort Title */}
           <div>
-            <label style={labelStyle}>Sort Title</label>
+            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Sort Title</label>
             <input
               type="text"
               value={album.sort_title || ''}
               onChange={(e) => onChange('sort_title', e.target.value)}
-              style={inputStyle}
+              className="w-full px-2.5 py-2 border border-gray-300 rounded text-sm bg-white text-gray-900 focus:outline-none focus:border-blue-500"
             />
           </div>
 
           {/* Subtitle */}
           <div>
-            <label style={labelStyle}>Subtitle</label>
+            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Subtitle</label>
             <input
               type="text"
               value={album.subtitle || ''}
               onChange={(e) => onChange('subtitle', e.target.value)}
-              style={inputStyle}
+              className="w-full px-2.5 py-2 border border-gray-300 rounded text-sm bg-white text-gray-900 focus:outline-none focus:border-blue-500"
             />
           </div>
 
           {/* Artist */}
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-              <label style={{ ...labelStyle, marginBottom: '0' }}>Artist</label>
+            <div className="flex justify-between items-center mb-1.5">
+              <label className="block text-[13px] font-semibold text-gray-500">Artist</label>
               <span 
                 onClick={() => handleOpenPicker('artist')}
-                style={{ color: '#9ca3af', fontSize: '20px', fontWeight: '300', cursor: 'pointer' }}
+                className="text-gray-400 text-xl font-light cursor-pointer hover:text-blue-500"
               >
                 +
               </span>
             </div>
-            <div style={{ 
-              flex: 1,
-              padding: '8px 10px',
-              border: '1px solid #d1d5db',
-              borderRadius: '4px',
-              fontSize: '14px',
-              backgroundColor: 'white',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              color: '#111827',
-            }}>
+            <div className="flex flex-1 items-center justify-between px-2.5 py-2 border border-gray-300 rounded bg-white text-sm text-gray-900">
               <span>{album.artist}</span>
               <button
                 onClick={() => onChange('artist', '')}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: '#9ca3af',
-                  cursor: 'pointer',
-                  padding: 0,
-                  fontSize: '18px',
-                  lineHeight: '1',
-                  fontWeight: '300',
-                }}
+                className="bg-transparent border-none text-gray-400 cursor-pointer p-0 text-lg leading-none font-light hover:text-red-500"
               >
                 ×
               </button>
@@ -455,15 +375,15 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
         </div>
 
         {/* RIGHT COLUMN */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div className="flex flex-col gap-4">
           {/* Row 1: Release Date | Original Release Date */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                <label style={{ ...labelStyle, marginBottom: '0' }}>Release Date</label>
+              <div className="flex justify-between items-center mb-1.5">
+                <label className="block text-[13px] font-semibold text-gray-500">Release Date</label>
                 <div 
                   onClick={(e) => handleOpenDatePicker('release', e)}
-                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#6b7280' }}
+                  className="cursor-pointer flex items-center text-gray-500 hover:text-blue-500"
                 >
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                     <rect x="2" y="3" width="12" height="11" rx="1" stroke="currentColor" strokeWidth="1.5"/>
@@ -472,34 +392,34 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
                   </svg>
                 </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'space-between' }}>
+              <div className="flex items-center justify-between w-full">
                 <input
                   type="text"
                   value={album.year || ''}
                   onChange={(e) => onChange('year', e.target.value)}
                   placeholder="YYYY"
-                  style={{ ...dateInputStyle, width: '92px', borderRadius: '4px' }}
+                  className="w-[92px] px-2 py-2 border border-gray-300 rounded text-sm text-center bg-white text-gray-900 focus:outline-none focus:border-blue-500"
                 />
-                <div style={{ width: '10px', height: '1px', backgroundColor: '#d1d5db' }} />
+                <div className="w-[10px] h-px bg-gray-300" />
                 <input
                   type="text"
                   placeholder="MM"
-                  style={{ ...dateInputStyle, width: '56px', borderRadius: '4px' }}
+                  className="w-[56px] px-2 py-2 border border-gray-300 rounded text-sm text-center bg-white text-gray-900 focus:outline-none focus:border-blue-500"
                 />
-                <div style={{ width: '10px', height: '1px', backgroundColor: '#d1d5db' }} />
+                <div className="w-[10px] h-px bg-gray-300" />
                 <input
                   type="text"
                   placeholder="DD"
-                  style={{ ...dateInputStyle, width: '56px', borderRadius: '4px' }}
+                  className="w-[56px] px-2 py-2 border border-gray-300 rounded text-sm text-center bg-white text-gray-900 focus:outline-none focus:border-blue-500"
                 />
               </div>
             </div>
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                <label style={{ ...labelStyle, marginBottom: '0' }}>Original Release Date</label>
+              <div className="flex justify-between items-center mb-1.5">
+                <label className="block text-[13px] font-semibold text-gray-500">Original Release Date</label>
                 <div 
                   onClick={(e) => handleOpenDatePicker('original', e)}
-                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#6b7280' }}
+                  className="cursor-pointer flex items-center text-gray-500 hover:text-blue-500"
                 >
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                     <rect x="2" y="3" width="12" height="11" rx="1" stroke="currentColor" strokeWidth="1.5"/>
@@ -508,35 +428,35 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
                   </svg>
                 </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'space-between' }}>
+              <div className="flex items-center justify-between w-full">
                 <input
                   type="text"
                   value={album.master_release_date || ''}
                   onChange={(e) => onChange('master_release_date', e.target.value)}
                   placeholder="YYYY"
-                  style={{ ...dateInputStyle, width: '92px', borderRadius: '4px' }}
+                  className="w-[92px] px-2 py-2 border border-gray-300 rounded text-sm text-center bg-white text-gray-900 focus:outline-none focus:border-blue-500"
                 />
-                <div style={{ width: '10px', height: '1px', backgroundColor: '#d1d5db' }} />
+                <div className="w-[10px] h-px bg-gray-300" />
                 <input
                   type="text"
                   placeholder="MM"
-                  style={{ ...dateInputStyle, width: '56px', borderRadius: '4px' }}
+                  className="w-[56px] px-2 py-2 border border-gray-300 rounded text-sm text-center bg-white text-gray-900 focus:outline-none focus:border-blue-500"
                 />
-                <div style={{ width: '10px', height: '1px', backgroundColor: '#d1d5db' }} />
+                <div className="w-[10px] h-px bg-gray-300" />
                 <input
                   type="text"
                   placeholder="DD"
-                  style={{ ...dateInputStyle, width: '56px', borderRadius: '4px' }}
+                  className="w-[56px] px-2 py-2 border border-gray-300 rounded text-sm text-center bg-white text-gray-900 focus:outline-none focus:border-blue-500"
                 />
               </div>
             </div>
           </div>
 
           {/* Row 2: Label | Recording Date */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label style={labelStyle}>Label</label>
-              <div style={{ display: 'flex', gap: '0', alignItems: 'stretch' }}>
+              <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Label</label>
+              <div className="flex items-stretch">
                 <select 
                   value={
                     album.labels && album.labels.length > 0 
@@ -548,13 +468,7 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
                     onChange('apple_music_label', e.target.value);
                     onChange('labels', e.target.value ? [e.target.value] : null);
                   }}
-                  style={{ 
-                    ...selectStyle, 
-                    flex: 1, 
-                    height: '36px',
-                    borderRadius: '4px 0 0 4px',
-                    borderRight: 'none'
-                  }}
+                  className="flex-1 px-2.5 py-2 border border-gray-300 rounded-l text-sm bg-white text-gray-900 outline-none focus:border-blue-500 border-r-0"
                 >
                   <option>
                     {album.labels && album.labels.length > 0 
@@ -565,20 +479,7 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
                 <button 
                   onClick={() => handleOpenPicker('spotify_label')}
                   disabled={dataLoading}
-                  style={{
-                    width: '36px',
-                    height: '36px',
-                    padding: 0,
-                    border: '1px solid #d1d5db',
-                    borderRadius: '0 4px 4px 0',
-                    backgroundColor: 'white',
-                    cursor: dataLoading ? 'wait' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#6b7280',
-                    flexShrink: 0,
-                  }}
+                  className="w-9 h-[38px] flex items-center justify-center border border-gray-300 rounded-r bg-white text-gray-500 hover:bg-gray-50 disabled:cursor-wait"
                 >
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
                     <circle cx="1.5" cy="2.5" r="1"/>
@@ -592,11 +493,11 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
               </div>
             </div>
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                <label style={{ ...labelStyle, marginBottom: '0' }}>Recording Date</label>
+              <div className="flex justify-between items-center mb-1.5">
+                <label className="block text-[13px] font-semibold text-gray-500">Recording Date</label>
                 <div 
                   onClick={(e) => handleOpenDatePicker('recording', e)}
-                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#6b7280' }}
+                  className="cursor-pointer flex items-center text-gray-500 hover:text-blue-500"
                 >
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                     <rect x="2" y="3" width="12" height="11" rx="1" stroke="currentColor" strokeWidth="1.5"/>
@@ -605,63 +506,44 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
                   </svg>
                 </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'space-between' }}>
+              <div className="flex items-center justify-between w-full">
                 <input
                   type="text"
                   placeholder="YYYY"
-                  style={{ ...dateInputStyle, width: '92px', borderRadius: '4px' }}
+                  className="w-[92px] px-2 py-2 border border-gray-300 rounded text-sm text-center bg-white text-gray-900 focus:outline-none focus:border-blue-500"
                 />
-                <div style={{ width: '10px', height: '1px', backgroundColor: '#d1d5db' }} />
+                <div className="w-[10px] h-px bg-gray-300" />
                 <input
                   type="text"
                   placeholder="MM"
-                  style={{ ...dateInputStyle, width: '56px', borderRadius: '4px' }}
+                  className="w-[56px] px-2 py-2 border border-gray-300 rounded text-sm text-center bg-white text-gray-900 focus:outline-none focus:border-blue-500"
                 />
-                <div style={{ width: '10px', height: '1px', backgroundColor: '#d1d5db' }} />
+                <div className="w-[10px] h-px bg-gray-300" />
                 <input
                   type="text"
                   placeholder="DD"
-                  style={{ ...dateInputStyle, width: '56px', borderRadius: '4px' }}
+                  className="w-[56px] px-2 py-2 border border-gray-300 rounded text-sm text-center bg-white text-gray-900 focus:outline-none focus:border-blue-500"
                 />
               </div>
             </div>
           </div>
 
           {/* Row 3: Format | Barcode */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label style={labelStyle}>Format</label>
-              <div style={{ display: 'flex', gap: '0', alignItems: 'stretch' }}>
+              <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Format</label>
+              <div className="flex items-stretch">
                 <select 
                   value={album.format}
                   onChange={(e) => onChange('format', e.target.value)}
-                  style={{ 
-                    ...selectStyle, 
-                    flex: 1, 
-                    height: '36px',
-                    borderRadius: '4px 0 0 4px',
-                    borderRight: 'none'
-                  }}
+                  className="flex-1 px-2.5 py-2 border border-gray-300 rounded-l text-sm bg-white text-gray-900 outline-none focus:border-blue-500 border-r-0"
                 >
                   <option>{album.format}</option>
                 </select>
                 <button 
                   onClick={() => handleOpenPicker('format')}
                   disabled={dataLoading}
-                  style={{
-                    width: '36px',
-                    height: '36px',
-                    padding: 0,
-                    border: '1px solid #d1d5db',
-                    borderRadius: '0 4px 4px 0',
-                    backgroundColor: 'white',
-                    cursor: dataLoading ? 'wait' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#6b7280',
-                    flexShrink: 0,
-                  }}
+                  className="w-9 h-[38px] flex items-center justify-center border border-gray-300 rounded-r bg-white text-gray-500 hover:bg-gray-50 disabled:cursor-wait"
                 >
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
                     <circle cx="1.5" cy="2.5" r="1"/>
@@ -675,74 +557,43 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
               </div>
             </div>
             <div>
-              <label style={labelStyle}>Barcode</label>
+              <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Barcode</label>
               <input
                 type="text"
                 value={album.barcode || ''}
                 onChange={(e) => onChange('barcode', e.target.value)}
-                style={inputStyle}
+                className="w-full px-2.5 py-2 border border-gray-300 rounded text-sm bg-white text-gray-900 focus:outline-none focus:border-blue-500"
               />
             </div>
           </div>
 
           {/* Row 4: Cat No */}
           <div>
-            <label style={labelStyle}>Cat No</label>
+            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Cat No</label>
             <input
               type="text"
               value={album.cat_no || ''}
               onChange={(e) => onChange('cat_no', e.target.value)}
-              style={inputStyle}
+              className="w-full px-2.5 py-2 border border-gray-300 rounded text-sm bg-white text-gray-900 focus:outline-none focus:border-blue-500"
             />
           </div>
 
           {/* Row 5: Genre */}
           <div>
-            <label style={labelStyle}>Genre</label>
-            <div style={{ display: 'flex', gap: '0', alignItems: 'flex-start' }}>
-              <div style={{
-                flex: 1,
-                padding: '6px 10px',
-                border: '1px solid #d1d5db',
-                borderRadius: '4px 0 0 4px',
-                borderRight: 'none',
-                minHeight: '36px',
-                display: 'flex',
-                gap: '6px',
-                flexWrap: 'wrap',
-                alignItems: 'center',
-                backgroundColor: 'white',
-                boxSizing: 'border-box',
-              }}>
+            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Genre</label>
+            <div className="flex items-start">
+              <div className="flex-1 min-h-[38px] p-1.5 border border-gray-300 rounded-l border-r-0 bg-white flex flex-wrap gap-1.5 items-center">
                 {/* FIXED: Iterate over canonical 'genres' */}
                 {album.genres && album.genres.length > 0 ? (
                   <>
                     {album.genres.map((genre, idx) => (
                       <span
                         key={idx}
-                        style={{
-                          backgroundColor: '#e5e7eb',
-                          padding: '4px 10px',
-                          borderRadius: '4px',
-                          fontSize: '13px',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          color: '#374151',
-                        }}
+                        className="bg-gray-200 px-2 py-1 rounded text-xs flex items-center gap-1.5 text-gray-700"
                       >
                         {genre}
                         <button
-                          style={{
-                            background: 'transparent',
-                            border: 'none',
-                            color: '#6b7280',
-                            cursor: 'pointer',
-                            padding: 0,
-                            fontSize: '16px',
-                            lineHeight: '1',
-                            fontWeight: '300',
-                          }}
+                          className="bg-transparent border-none text-gray-500 cursor-pointer p-0 text-base leading-none font-light hover:text-red-500"
                         >
                           ×
                         </button>
@@ -754,21 +605,7 @@ export const MainTab = forwardRef<MainTabRef, MainTabProps>(function MainTab({ a
               <button 
                 onClick={() => handleOpenPicker('genre')}
                 disabled={dataLoading}
-                style={{
-                  width: '36px',
-                  minHeight: '40px',
-                  padding: 0,
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0 4px 4px 0',
-                  backgroundColor: 'white',
-                  cursor: dataLoading ? 'wait' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#6b7280',
-                  flexShrink: 0,
-                  boxSizing: 'border-box',
-                }}
+                className="w-9 min-h-[38px] flex items-center justify-center border border-gray-300 rounded-r bg-white text-gray-500 hover:bg-gray-50 disabled:cursor-wait"
               >
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
                   <circle cx="1.5" cy="2.5" r="1"/>

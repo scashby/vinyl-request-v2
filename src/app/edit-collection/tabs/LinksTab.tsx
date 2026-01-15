@@ -76,123 +76,71 @@ export function LinksTab({ album, onChange }: LinksTabProps) {
   };
 
   return (
-    <div style={{ padding: '20px' }}>
+    <div className="p-5">
       {/* Table Header */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: '40px 40px 1fr 1fr',
-        gap: '8px',
-        padding: '8px',
-        borderBottom: '2px solid #e5e7eb',
-        fontSize: '13px',
-        fontWeight: '600',
-        color: '#6b7280',
-        marginBottom: '4px',
-        fontFamily: 'system-ui, -apple-system, sans-serif',
-      }}>
+      <div className="grid grid-cols-[40px_40px_1fr_1fr] gap-2 px-2 py-2 border-b-2 border-gray-200 text-[13px] font-semibold text-gray-500 mb-1">
         <div></div>
         <div></div>
         <div>URL</div>
         <div>Description</div>
       </div>
 
-      {/* Links Table - Always show at least one row */}
-      {links.map((link, index) => (
-        <div
-          key={link.id}
-          draggable
-          onDragStart={() => handleDragStart(index)}
-          onDragOver={handleDragOver}
-          onDrop={() => handleDrop(index)}
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '40px 40px 1fr 1fr',
-            gap: '8px',
-            padding: '8px',
-            borderBottom: '1px solid #e5e7eb',
-            alignItems: 'center',
-            backgroundColor: draggedIndex === index ? '#f3f4f6' : 'white',
-          }}
-        >
-          {/* Drag Handle */}
-          <div style={{
-            display: 'flex',
-            justifyContent: 'center',
-            color: '#9ca3af',
-            fontSize: '18px',
-            cursor: 'grab',
-          }}>
-            ≡
-          </div>
+      {/* Links Table */}
+      <div className="flex flex-col">
+        {links.map((link, index) => (
+          <div
+            key={link.id}
+            draggable
+            onDragStart={() => handleDragStart(index)}
+            onDragOver={handleDragOver}
+            onDrop={() => handleDrop(index)}
+            className={`grid grid-cols-[40px_40px_1fr_1fr] gap-2 px-2 py-2 border-b border-gray-200 items-center ${
+              draggedIndex === index ? 'bg-gray-100' : 'bg-white hover:bg-gray-50'
+            }`}
+          >
+            {/* Drag Handle */}
+            <div className="flex justify-center text-gray-400 text-lg cursor-grab active:cursor-grabbing">
+              ≡
+            </div>
 
-          {/* Checkbox */}
-          <div style={{
-            display: 'flex',
-            justifyContent: 'center',
-          }}>
-            <input
-              type="checkbox"
-              style={{ cursor: 'pointer' }}
-            />
-          </div>
+            {/* Checkbox */}
+            <div className="flex justify-center">
+              <input
+                type="checkbox"
+                className="cursor-pointer"
+              />
+            </div>
 
-          {/* URL Input */}
-          <div>
-            <input
-              type="text"
-              value={link.url}
-              onChange={(e) => handleUpdateLink(index, 'url', e.target.value)}
-              placeholder="https://"
-              style={{
-                width: '100%',
-                padding: '6px 8px',
-                border: '1px solid #d1d5db',
-                borderRadius: '4px',
-                fontSize: '13px',
-                color: '#111827',
-                backgroundColor: 'white',
-                fontFamily: 'system-ui, -apple-system, sans-serif',
-              }}
-            />
-          </div>
+            {/* URL Input */}
+            <div>
+              <input
+                type="text"
+                value={link.url}
+                onChange={(e) => handleUpdateLink(index, 'url', e.target.value)}
+                placeholder="https://"
+                className="w-full px-2 py-1.5 border border-gray-300 rounded text-[13px] text-gray-900 bg-white focus:outline-none focus:border-blue-500"
+              />
+            </div>
 
-          {/* Description Input */}
-          <div>
-            <input
-              type="text"
-              value={link.description || ''}
-              onChange={(e) => handleUpdateLink(index, 'description', e.target.value)}
-              placeholder="Description"
-              style={{
-                width: '100%',
-                padding: '6px 8px',
-                border: '1px solid #d1d5db',
-                borderRadius: '4px',
-                fontSize: '13px',
-                color: '#111827',
-                backgroundColor: 'white',
-                fontFamily: 'system-ui, -apple-system, sans-serif',
-              }}
-            />
+            {/* Description Input */}
+            <div>
+              <input
+                type="text"
+                value={link.description || ''}
+                onChange={(e) => handleUpdateLink(index, 'description', e.target.value)}
+                placeholder="Description"
+                className="w-full px-2 py-1.5 border border-gray-300 rounded text-[13px] text-gray-900 bg-white focus:outline-none focus:border-blue-500"
+              />
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
 
       {/* New Link Button */}
-      <div style={{ marginTop: '16px' }}>
+      <div className="mt-4">
         <button
           onClick={handleAddLink}
-          style={{
-            padding: '8px 16px',
-            background: '#f3f4f6',
-            color: '#374151',
-            border: '1px solid #d1d5db',
-            borderRadius: '4px',
-            fontSize: '13px',
-            cursor: 'pointer',
-            fontWeight: '500',
-            fontFamily: 'system-ui, -apple-system, sans-serif',
-          }}
+          className="px-4 py-2 bg-gray-100 text-gray-700 border border-gray-300 rounded text-[13px] font-medium cursor-pointer hover:bg-gray-200"
         >
           + New Link
         </button>

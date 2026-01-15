@@ -79,40 +79,23 @@ export function PeopleTab({ album, onChange }: PeopleTabProps) {
     const displayText = values.length > 0 ? values.join(', ') : '';
     
     return (
-      <div style={{ marginBottom: '16px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-          <label style={{
-            fontSize: '13px',
-            fontWeight: '600',
-            color: '#6b7280',
-            fontFamily: 'system-ui, -apple-system, sans-serif',
-          }}>
+      <div className="mb-4">
+        <div className="flex justify-between items-center mb-1.5">
+          <label className="text-[13px] font-semibold text-gray-500">
             {label}
           </label>
           <span 
             onClick={() => handleOpenPicker(field)}
-            style={{ 
-              color: '#9ca3af',
-              fontSize: '20px', 
-              fontWeight: '300',
-              cursor: 'pointer',
-              userSelect: 'none',
-            }}
+            className="text-gray-400 text-xl font-light cursor-pointer select-none hover:text-blue-500"
           >
             +
           </span>
         </div>
-        <div style={{ 
-          padding: '8px 10px',
-          border: '1px solid #d1d5db',
-          borderRadius: '4px',
-          fontSize: '14px',
-          backgroundColor: 'white',
-          color: '#111827',
-          minHeight: '36px',
-          cursor: values.length === 0 ? 'pointer' : 'default',
-        }}
-        onClick={() => values.length === 0 && handleOpenPicker(field)}
+        <div 
+          className={`px-2.5 py-2 border border-gray-300 rounded text-sm bg-white text-gray-900 min-h-[38px] ${
+            values.length === 0 ? 'cursor-pointer hover:border-blue-400' : 'cursor-default'
+          }`}
+          onClick={() => values.length === 0 && handleOpenPicker(field)}
         >
           {displayText}
         </div>
@@ -123,28 +106,11 @@ export function PeopleTab({ album, onChange }: PeopleTabProps) {
   const fieldConfig = getFieldConfig();
 
   return (
-    <div style={{ padding: '20px' }}>
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: '1fr 1fr',
-        gap: '40px',
-        maxWidth: '900px'
-      }}>
+    <div className="p-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-10 max-w-[900px]">
         {/* LEFT COLUMN - Credits */}
-        <div style={{
-          border: '1px solid #e5e7eb',
-          borderRadius: '6px',
-          padding: '16px',
-          backgroundColor: '#fafafa',
-        }}>
-          <h3 style={{
-            fontSize: '14px',
-            fontWeight: '600',
-            color: '#6b7280',
-            marginBottom: '16px',
-            marginTop: '0',
-            fontFamily: 'system-ui, -apple-system, sans-serif',
-          }}>
+        <div className="border border-gray-200 rounded-md p-4 bg-gray-50">
+          <h3 className="text-sm font-semibold text-gray-500 mb-4 mt-0">
             Credits
           </h3>
           {renderField('Songwriter', 'songwriters')}
@@ -153,20 +119,8 @@ export function PeopleTab({ album, onChange }: PeopleTabProps) {
         </div>
 
         {/* RIGHT COLUMN - Musicians */}
-        <div style={{
-          border: '1px solid #e5e7eb',
-          borderRadius: '6px',
-          padding: '16px',
-          backgroundColor: '#fafafa',
-        }}>
-          <h3 style={{
-            fontSize: '14px',
-            fontWeight: '600',
-            color: '#6b7280',
-            marginBottom: '16px',
-            marginTop: '0',
-            fontFamily: 'system-ui, -apple-system, sans-serif',
-          }}>
+        <div className="border border-gray-200 rounded-md p-4 bg-gray-50">
+          <h3 className="text-sm font-semibold text-gray-500 mb-4 mt-0">
             Musicians
           </h3>
           {renderField('Musician', 'musicians')}

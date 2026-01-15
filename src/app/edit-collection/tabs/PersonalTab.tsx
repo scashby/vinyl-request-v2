@@ -155,61 +155,20 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
     onChange('signed_by', updated.length > 0 ? updated : null);
   };
 
-  // Styles
-  const labelStyle: React.CSSProperties = {
-    display: 'block',
-    fontSize: '13px',
-    fontWeight: '600',
-    color: '#6b7280',
-    marginBottom: '6px',
-    fontFamily: 'system-ui, -apple-system, sans-serif',
-  };
-
-  const inputStyle: React.CSSProperties = {
-    width: '100%',
-    padding: '8px 10px',
-    border: '1px solid #d1d5db',
-    borderRadius: '4px',
-    fontSize: '14px',
-    fontFamily: 'system-ui, -apple-system, sans-serif',
-    backgroundColor: 'white',
-    color: '#111827',
-  };
-
-  const selectStyle: React.CSSProperties = {
-    width: '100%',
-    padding: '8px 10px',
-    border: '1px solid #d1d5db',
-    borderRadius: '4px',
-    fontSize: '14px',
-    fontFamily: 'system-ui, -apple-system, sans-serif',
-    backgroundColor: 'white',
-    color: '#111827',
-  };
-
-  const dateInputStyle: React.CSSProperties = {
-    padding: '8px 8px',
-    border: '1px solid #d1d5db',
-    borderRadius: '4px',
-    fontSize: '14px',
-    textAlign: 'center',
-    fontFamily: 'system-ui, -apple-system, sans-serif',
-    backgroundColor: 'white',
-    color: '#111827',
-  };
+  // Styles removed in favor of Tailwind classes
 
   return (
     <>
-      <div style={{ maxWidth: '100%' }}>
-        {/* ROW 1: [25%] [25%] [50%] - Purchase Date | Purchase Store | Owner */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr', gap: '12px', marginBottom: '10px' }}>
+      <div className="w-full">
+        {/* ROW 1: Purchase Date | Purchase Store | Owner */}
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_2fr] gap-3 mb-3">
           {/* Purchase Date */}
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-              <label style={{ ...labelStyle, marginBottom: '0' }}>Purchase Date</label>
+            <div className="flex justify-between items-center mb-1.5">
+              <label className="block text-[13px] font-semibold text-gray-500">Purchase Date</label>
               <div 
                 onClick={handleOpenPurchaseDatePicker}
-                style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#6b7280' }}
+                className="cursor-pointer flex items-center text-gray-500 hover:text-blue-500"
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                   <rect x="2" y="3" width="12" height="11" rx="1" stroke="currentColor" strokeWidth="1.5"/>
@@ -218,74 +177,50 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
                 </svg>
               </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'space-between' }}>
+            <div className="flex items-center justify-between w-full">
               <input
                 type="text"
                 value={purchaseDate.year || ''}
                 placeholder="YYYY"
                 readOnly
                 onClick={handleOpenPurchaseDatePicker}
-                style={{ ...dateInputStyle, width: '92px', borderRadius: '4px', cursor: 'pointer' }}
+                className="w-[92px] px-2 py-2 border border-gray-300 rounded text-sm text-center bg-white text-gray-900 focus:outline-none focus:border-blue-500 cursor-pointer"
               />
-              <div style={{ width: '10px', height: '1px', backgroundColor: '#d1d5db' }} />
+              <div className="w-[10px] h-px bg-gray-300" />
               <input
                 type="text"
                 value={purchaseDate.month || ''}
                 placeholder="MM"
                 readOnly
                 onClick={handleOpenPurchaseDatePicker}
-                style={{ ...dateInputStyle, width: '56px', borderRadius: '4px', cursor: 'pointer' }}
+                className="w-[56px] px-2 py-2 border border-gray-300 rounded text-sm text-center bg-white text-gray-900 focus:outline-none focus:border-blue-500 cursor-pointer"
               />
-              <div style={{ width: '10px', height: '1px', backgroundColor: '#d1d5db' }} />
+              <div className="w-[10px] h-px bg-gray-300" />
               <input
                 type="text"
                 value={purchaseDate.day || ''}
                 placeholder="DD"
                 readOnly
                 onClick={handleOpenPurchaseDatePicker}
-                style={{ ...dateInputStyle, width: '56px', borderRadius: '4px', cursor: 'pointer' }}
+                className="w-[56px] px-2 py-2 border border-gray-300 rounded text-sm text-center bg-white text-gray-900 focus:outline-none focus:border-blue-500 cursor-pointer"
               />
             </div>
           </div>
 
           {/* Purchase Store */}
           <div>
-            <label style={labelStyle}>Purchase Store</label>
-            <div style={{ display: 'flex', gap: '0', alignItems: 'stretch' }}>
+            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Purchase Store</label>
+            <div className="flex items-stretch">
               <select 
                 value={album.purchase_store || ''}
                 onChange={(e) => onChange('purchase_store', e.target.value)}
-                style={{ 
-                  ...selectStyle, 
-                  flex: 1, 
-                  height: '36px',
-                  borderRadius: '4px 0 0 4px',
-                  borderRight: 'none',
-                  appearance: 'none',
-                  backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'10\' height=\'6\' viewBox=\'0 0 10 6\'%3E%3Cpath fill=\'%23666\' d=\'M0 0l5 6 5-6z\'/%3E%3C/svg%3E")',
-                  backgroundRepeat: 'no-repeat',
-                  backgroundPosition: 'right 12px center',
-                  paddingRight: '32px',
-                }}
+                className="flex-1 px-2.5 py-2 border border-gray-300 rounded-l text-sm bg-white text-gray-900 outline-none focus:border-blue-500 border-r-0"
               >
                 <option value="">Select</option>
               </select>
               <button 
                 onClick={() => setShowPurchaseStorePicker(true)}
-                style={{
-                  width: '36px',
-                  height: '36px',
-                  padding: 0,
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0 4px 4px 0',
-                  backgroundColor: 'white',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#6b7280',
-                  flexShrink: 0,
-                }}
+                className="w-9 h-[38px] flex items-center justify-center border border-gray-300 rounded-r bg-white text-gray-500 hover:bg-gray-50"
               >
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
                   <circle cx="1.5" cy="2.5" r="1"/>
@@ -301,42 +236,18 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
 
           {/* Owner */}
           <div>
-            <label style={labelStyle}>Owner</label>
-            <div style={{ display: 'flex', gap: '0', alignItems: 'stretch' }}>
+            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Owner</label>
+            <div className="flex items-stretch">
               <select 
                 value={album.owner || ''}
                 onChange={(e) => onChange('owner', e.target.value)}
-                style={{ 
-                  ...selectStyle, 
-                  flex: 1, 
-                  height: '36px',
-                  borderRadius: '4px 0 0 4px',
-                  borderRight: 'none',
-                  appearance: 'none',
-                  backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'10\' height=\'6\' viewBox=\'0 0 10 6\'%3E%3Cpath fill=\'%23666\' d=\'M0 0l5 6 5-6z\'/%3E%3C/svg%3E")',
-                  backgroundRepeat: 'no-repeat',
-                  backgroundPosition: 'right 12px center',
-                  paddingRight: '32px',
-                }}
+                className="flex-1 px-2.5 py-2 border border-gray-300 rounded-l text-sm bg-white text-gray-900 outline-none focus:border-blue-500 border-r-0"
               >
                 <option value="">Select</option>
               </select>
               <button 
                 onClick={() => setShowOwnerPicker(true)}
-                style={{
-                  width: '36px',
-                  height: '36px',
-                  padding: 0,
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0 4px 4px 0',
-                  backgroundColor: 'white',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#6b7280',
-                  flexShrink: 0,
-                }}
+                className="w-9 h-[38px] flex items-center justify-center border border-gray-300 rounded-r bg-white text-gray-500 hover:bg-gray-50"
               >
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
                   <circle cx="1.5" cy="2.5" r="1"/>
@@ -351,55 +262,51 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
           </div>
         </div>
 
-        {/* ROW 2: [25%] [25%] [50%] - Purchase Price | Current Value | My Rating */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr', gap: '12px', marginBottom: '10px' }}>
+        {/* ROW 2: Purchase Price | Current Value | My Rating */}
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_2fr] gap-3 mb-3">
           {/* Purchase Price */}
           <div>
-            <label style={labelStyle}>Purchase Price</label>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <span style={{ fontSize: '14px', color: '#6b7280' }}>$</span>
+            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Purchase Price</label>
+            <div className="flex items-center gap-1">
+              <span className="text-sm text-gray-500">$</span>
               <input
                 type="number"
                 step="0.01"
                 value={album.purchase_price || ''}
                 onChange={(e) => onChange('purchase_price', e.target.value ? parseFloat(e.target.value) : null)}
-                style={{ ...inputStyle, flex: 1, height: '36px' }}
+                className="flex-1 px-2.5 py-2 border border-gray-300 rounded text-sm bg-white text-gray-900 outline-none focus:border-blue-500"
               />
             </div>
           </div>
 
           {/* Current Value */}
           <div>
-            <label style={labelStyle}>Current Value</label>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <span style={{ fontSize: '14px', color: '#6b7280' }}>$</span>
+            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Current Value</label>
+            <div className="flex items-center gap-1">
+              <span className="text-sm text-gray-500">$</span>
               <input
                 type="number"
                 step="0.01"
                 value={album.current_value || ''}
                 onChange={(e) => onChange('current_value', e.target.value ? parseFloat(e.target.value) : null)}
-                style={{ ...inputStyle, flex: 1, height: '36px' }}
+                className="flex-1 px-2.5 py-2 border border-gray-300 rounded text-sm bg-white text-gray-900 outline-none focus:border-blue-500"
               />
             </div>
           </div>
 
           {/* My Rating */}
           <div>
-            <label style={labelStyle}>My Rating {currentRating > 0 ? `(${currentRating} / 10)` : ''}</label>
-            <div style={{ display: 'flex', gap: '2px' }}>
+            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">
+              My Rating {currentRating > 0 ? `(${currentRating} / 10)` : ''}
+            </label>
+            <div className="flex gap-0.5 items-center h-[38px]">
               {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((star) => (
                 <button
                   key={star}
                   onClick={() => handleRatingChange(star)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontSize: '22px',
-                    padding: 0,
-                    color: star <= currentRating ? '#fbbf24' : '#d1d5db',
-                    lineHeight: '1'
-                  }}
+                  className={`bg-transparent border-none cursor-pointer text-2xl p-0 leading-none ${
+                    star <= currentRating ? 'text-yellow-400' : 'text-gray-300 hover:text-gray-400'
+                  }`}
                 >
                   ★
                 </button>
@@ -408,53 +315,22 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
           </div>
         </div>
 
-        {/* ROW 3: [50%] [50%] - Tags | Notes */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '10px' }}>
+        {/* ROW 3: Tags | Notes */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
           {/* Tags */}
           <div>
-            <label style={labelStyle}>Tags</label>
-            <div style={{ display: 'flex', gap: '0', alignItems: 'flex-start' }}>
-              <div style={{
-                flex: 1,
-                padding: '6px 10px',
-                border: '1px solid #d1d5db',
-                borderRadius: '4px 0 0 4px',
-                borderRight: 'none',
-                minHeight: '36px',
-                display: 'flex',
-                gap: '6px',
-                flexWrap: 'wrap',
-                alignItems: 'center',
-                backgroundColor: 'white',
-                boxSizing: 'border-box',
-              }}>
+            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Tags</label>
+            <div className="flex items-start">
+              <div className="flex-1 min-h-[38px] p-1.5 border border-gray-300 rounded-l border-r-0 bg-white flex flex-wrap gap-1.5 items-center">
                 {Array.isArray(album.custom_tags) && album.custom_tags.map((tag) => (
                   <span
                     key={tag}
-                    style={{
-                      backgroundColor: '#e5e7eb',
-                      padding: '4px 10px',
-                      borderRadius: '4px',
-                      fontSize: '13px',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      color: '#374151',
-                    }}
+                    className="bg-gray-200 px-2 py-1 rounded text-xs flex items-center gap-1.5 text-gray-700"
                   >
                     {tag}
                     <button
                       onClick={() => handleRemoveTag(tag)}
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: '#6b7280',
-                        cursor: 'pointer',
-                        padding: 0,
-                        fontSize: '16px',
-                        lineHeight: '1',
-                        fontWeight: '300',
-                      }}
+                      className="bg-transparent border-none text-gray-500 cursor-pointer p-0 text-base leading-none font-light hover:text-red-500"
                     >
                       ×
                     </button>
@@ -463,21 +339,7 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
               </div>
               <button 
                 onClick={() => setShowTagsPicker(true)}
-                style={{
-                  width: '36px',
-                  minHeight: '40px',
-                  padding: 0,
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0 4px 4px 0',
-                  backgroundColor: 'white',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#6b7280',
-                  flexShrink: 0,
-                  boxSizing: 'border-box',
-                }}
+                className="w-9 min-h-[38px] flex items-center justify-center border border-gray-300 rounded-r bg-white text-gray-500 hover:bg-gray-50"
               >
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
                   <circle cx="1.5" cy="2.5" r="1"/>
@@ -493,29 +355,25 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
 
           {/* Notes */}
           <div>
-            <label style={labelStyle}>Notes</label>
+            <label className="block text-[13px] font-semibold text-gray-500 mb-1.5">Notes</label>
             <textarea
               value={album.notes || ''}
               onChange={(e) => onChange('notes', e.target.value)}
               rows={3}
-              style={{
-                ...inputStyle,
-                resize: 'vertical',
-                minHeight: '40px',
-              }}
+              className="w-full px-2.5 py-2 border border-gray-300 rounded text-sm bg-white text-gray-900 outline-none focus:border-blue-500 min-h-[40px] resize-y"
             />
           </div>
         </div>
 
-        {/* ROW 4: [25%] [25%] [50%] - Last Cleaned Date | Played History | Signed by */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr', gap: '12px' }}>
+        {/* ROW 4: Last Cleaned | Played History | Signed */}
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_2fr] gap-3">
           {/* Last Cleaned Date */}
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-              <label style={{ ...labelStyle, marginBottom: '0' }}>Last Cleaned Date</label>
+            <div className="flex justify-between items-center mb-1.5">
+              <label className="block text-[13px] font-semibold text-gray-500">Last Cleaned Date</label>
               <div 
                 onClick={handleOpenCleanedDatePicker}
-                style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#6b7280' }}
+                className="cursor-pointer flex items-center text-gray-500 hover:text-blue-500"
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                   <rect x="2" y="3" width="12" height="11" rx="1" stroke="currentColor" strokeWidth="1.5"/>
@@ -524,43 +382,43 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
                 </svg>
               </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'space-between' }}>
+            <div className="flex items-center justify-between w-full">
               <input
                 type="text"
                 value={cleanedDate.year || ''}
                 placeholder="YYYY"
                 readOnly
                 onClick={handleOpenCleanedDatePicker}
-                style={{ ...dateInputStyle, width: '92px', borderRadius: '4px', cursor: 'pointer' }}
+                className="w-[92px] px-2 py-2 border border-gray-300 rounded text-sm text-center bg-white text-gray-900 focus:outline-none focus:border-blue-500 cursor-pointer"
               />
-              <div style={{ width: '10px', height: '1px', backgroundColor: '#d1d5db' }} />
+              <div className="w-[10px] h-px bg-gray-300" />
               <input
                 type="text"
                 value={cleanedDate.month || ''}
                 placeholder="MM"
                 readOnly
                 onClick={handleOpenCleanedDatePicker}
-                style={{ ...dateInputStyle, width: '56px', borderRadius: '4px', cursor: 'pointer' }}
+                className="w-[56px] px-2 py-2 border border-gray-300 rounded text-sm text-center bg-white text-gray-900 focus:outline-none focus:border-blue-500 cursor-pointer"
               />
-              <div style={{ width: '10px', height: '1px', backgroundColor: '#d1d5db' }} />
+              <div className="w-[10px] h-px bg-gray-300" />
               <input
                 type="text"
                 value={cleanedDate.day || ''}
                 placeholder="DD"
                 readOnly
                 onClick={handleOpenCleanedDatePicker}
-                style={{ ...dateInputStyle, width: '56px', borderRadius: '4px', cursor: 'pointer' }}
+                className="w-[56px] px-2 py-2 border border-gray-300 rounded text-sm text-center bg-white text-gray-900 focus:outline-none focus:border-blue-500 cursor-pointer"
               />
             </div>
           </div>
 
-          {/* Played History - DATE PICKER ONLY */}
+          {/* Played History */}
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-              <label style={{ ...labelStyle, marginBottom: '0' }}>Played History (total plays: {totalPlays})</label>
+            <div className="flex justify-between items-center mb-1.5">
+              <label className="block text-[13px] font-semibold text-gray-500">Played History (total plays: {totalPlays})</label>
               <div 
                 onClick={handleOpenPlayedDatePicker}
-                style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#6b7280' }}
+                className="cursor-pointer flex items-center text-gray-500 hover:text-blue-500"
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                   <rect x="2" y="3" width="12" height="11" rx="1" stroke="currentColor" strokeWidth="1.5"/>
@@ -569,97 +427,51 @@ export function PersonalTab({ album, onChange }: PersonalTabProps) {
                 </svg>
               </div>
             </div>
-            <div style={{ 
-              flex: 1,
-              padding: '8px 10px',
-              border: '1px solid #d1d5db',
-              borderRadius: '4px',
-              fontSize: '14px',
-              backgroundColor: 'white',
-              minHeight: '36px',
-              color: '#111827',
-            }}>
+            <div className="flex-1 px-2.5 py-2 border border-gray-300 rounded text-sm bg-white min-h-[38px] text-gray-900 max-h-[120px] overflow-y-auto">
               {playedHistory.length > 0 ? (
                 playedHistory.map((entry, idx) => (
-                  <div key={idx} style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'space-between',
-                    marginBottom: idx < playedHistory.length - 1 ? '4px' : '0'
-                  }}>
+                  <div key={idx} className="flex items-center justify-between mb-1 last:mb-0 text-xs">
                     <span>{entry.year}  {String(entry.month).padStart(2, '0')}  {String(entry.day).padStart(2, '0')}</span>
                     <button
                       onClick={() => handleDeletePlayedHistory(idx)}
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: '#9ca3af',
-                        cursor: 'pointer',
-                        padding: 0,
-                        fontSize: '18px',
-                        lineHeight: '1',
-                        fontWeight: '300',
-                      }}
+                      className="bg-transparent border-none text-gray-400 cursor-pointer p-0 text-base leading-none font-light hover:text-red-500"
                     >
                       ×
                     </button>
                   </div>
                 ))
               ) : (
-                <span style={{ color: '#9ca3af' }}></span>
+                <span className="text-gray-400 italic">No history</span>
               )}
             </div>
           </div>
 
           {/* Signed by */}
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-              <label style={{ ...labelStyle, marginBottom: '0' }}>Signed by</label>
+            <div className="flex justify-between items-center mb-1.5">
+              <label className="block text-[13px] font-semibold text-gray-500">Signed by</label>
               <span 
                 onClick={() => setShowSigneesPicker(true)}
-                style={{ color: '#9ca3af', fontSize: '20px', fontWeight: '300', cursor: 'pointer' }}
+                className="text-gray-400 text-xl font-light cursor-pointer hover:text-blue-500"
               >
                 +
               </span>
             </div>
-            <div style={{ 
-              flex: 1,
-              padding: '8px 10px',
-              border: '1px solid #d1d5db',
-              borderRadius: '4px',
-              fontSize: '14px',
-              backgroundColor: 'white',
-              minHeight: '36px',
-              color: '#111827',
-            }}>
+            <div className="flex-1 px-2.5 py-2 border border-gray-300 rounded text-sm bg-white min-h-[38px] text-gray-900">
               {Array.isArray(album.signed_by) && album.signed_by.length > 0 ? (
                 album.signed_by.map((signee, idx) => (
-                  <div key={idx} style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'space-between',
-                    marginBottom: idx < album.signed_by!.length - 1 ? '4px' : '0'
-                  }}>
+                  <div key={idx} className="flex items-center justify-between mb-1 last:mb-0">
                     <span>{signee}</span>
                     <button
                       onClick={() => handleRemoveSignee(signee)}
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: '#9ca3af',
-                        cursor: 'pointer',
-                        padding: 0,
-                        fontSize: '18px',
-                        lineHeight: '1',
-                        fontWeight: '300',
-                      }}
+                      className="bg-transparent border-none text-gray-400 cursor-pointer p-0 text-base leading-none font-light hover:text-red-500"
                     >
                       ×
                     </button>
                   </div>
                 ))
               ) : (
-                <span style={{ color: '#9ca3af' }}></span>
+                <span className="text-gray-400 italic">Unsigned</span>
               )}
             </div>
           </div>
