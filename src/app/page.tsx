@@ -4,37 +4,44 @@
 
 import Link from "next/link";
 import { useSession } from "src/components/AuthProvider";
-import "styles/landing.css";
 
 export default function Page() {
   const { session } = useSession();
 
   return (
-    <div className="landing-page dark">
-      <header className="hero">
-        <video autoPlay muted loop playsInline className="hero-video">
+    <div className="min-h-screen font-sans">
+      <header className="relative h-screen flex items-center justify-center text-center overflow-hidden">
+        <video autoPlay muted loop playsInline className="absolute inset-0 w-full h-full object-cover -z-10 brightness-[0.4]">
           <source src="/videos/header-video.mp4" type="video/mp4" />
           Your browser does not support the video tag.
         </video>
 
-        <div className="hero-content">
-          <h1>Dead Wax Dialogues</h1>
-          <p>A vinyl-focused listening lounge, jukebox, and community.</p>
+        <div className="relative z-10 p-8 max-w-4xl mx-auto">
+          <h1 className="font-serif-display text-5xl md:text-7xl text-white mb-4 drop-shadow-lg">
+            Dead Wax Dialogues
+          </h1>
+          <p className="text-xl md:text-2xl font-light text-gray-200 mb-8 drop-shadow-md">
+            A vinyl-focused listening lounge, jukebox, and community.
+          </p>
 
-          <nav className="hero-nav">
-            <a href="/browse/browse-queue">Browse Queue</a>
-            <a href="/browse/browse-albums">Browse Albums</a>
-            <a href="/events/events-page">Events</a>
-            <a href="/dialogues">Dialogues</a>
+          <nav className="flex gap-4 justify-center flex-wrap mt-8">
+            <Link href="/browse/browse-queue" className="px-6 py-3 bg-neutral-900/90 text-white rounded-full font-medium hover:bg-neutral-800 transition-colors backdrop-blur-sm border border-white/10">
+              Browse Queue
+            </Link>
+            <Link href="/browse/browse-albums" className="px-6 py-3 bg-neutral-900/90 text-white rounded-full font-medium hover:bg-neutral-800 transition-colors backdrop-blur-sm border border-white/10">
+              Browse Albums
+            </Link>
+            <Link href="/events/events-page" className="px-6 py-3 bg-neutral-900/90 text-white rounded-full font-medium hover:bg-neutral-800 transition-colors backdrop-blur-sm border border-white/10">
+              Events
+            </Link>
+            <Link href="/dialogues" className="px-6 py-3 bg-neutral-900/90 text-white rounded-full font-medium hover:bg-neutral-800 transition-colors backdrop-blur-sm border border-white/10">
+              Dialogues
+            </Link>
 
             {session && (
               <Link
                 href="/admin/admin-dashboard"
-                style={{
-                  backgroundColor: "rgba(37, 99, 235, 0.8)",
-                  padding: "0.5rem 1rem",
-                  borderRadius: "4px",
-                }}
+                className="px-6 py-3 bg-blue-600/90 text-white rounded-full font-medium hover:bg-blue-700 transition-colors backdrop-blur-sm shadow-lg shadow-blue-900/20"
               >
                 Admin
               </Link>

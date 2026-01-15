@@ -2,25 +2,14 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import 'styles/navigation-menu.css';
 
 function NavigationMenu() {
   const [open, setOpen] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
 
   useEffect(() => {
-    const button = document.querySelector('.menu-toggle');
-    if (button) {
-      button.classList.add('light'); // force default to white
-    }
-
     const handleScroll = () => {
-      if (window.scrollY > 100) {
-        button?.classList.remove('light');
-        button?.classList.add('dark');
-      } else {
-        button?.classList.remove('dark');
-        button?.classList.add('light');
-      }
+      setIsScrolled(window.scrollY > 100);
     };
 
     window.addEventListener('scroll', handleScroll);
@@ -28,35 +17,37 @@ function NavigationMenu() {
   }, []);
 
   return (
-    <div style={{ position: 'fixed', top: '0.5rem', left: '0.5rem', zIndex: 1000 }}>
+    <div className="fixed top-2 left-2 z-[1000]">
       <button
-        className="menu-toggle"
         onClick={() => setOpen(!open)}
         aria-label="Toggle navigation menu"
+        className={`bg-transparent border border-gray-400 text-3xl cursor-pointer p-1 leading-none rounded transition-colors duration-200 ${
+          isScrolled ? 'text-black border-gray-600' : 'text-white border-gray-400'
+        }`}
       >
         &#9776;
       </button>
 
       {open && (
-        <div className="menu-panel">
-          <ul>
+        <div className="absolute top-0 left-[3.5rem] bg-white shadow-lg rounded-lg p-2 w-[160px]">
+          <ul className="list-none m-0 p-0 space-y-1">
             <li>
-              <Link href="/" onClick={() => setOpen(false)}>Home</Link>
+              <Link href="/" onClick={() => setOpen(false)} className="block px-2 py-1.5 text-sm text-gray-900 hover:text-blue-600 hover:bg-gray-50 rounded transition-colors">Home</Link>
             </li>
             <li>
-              <Link href="/events/events-page" onClick={() => setOpen(false)}>Events</Link>
+              <Link href="/events/events-page" onClick={() => setOpen(false)} className="block px-2 py-1.5 text-sm text-gray-900 hover:text-blue-600 hover:bg-gray-50 rounded transition-colors">Events</Link>
             </li>
             <li>
-              <Link href="/dj-sets" onClick={() => setOpen(false)}>DJ Sets</Link>
+              <Link href="/dj-sets" onClick={() => setOpen(false)} className="block px-2 py-1.5 text-sm text-gray-900 hover:text-blue-600 hover:bg-gray-50 rounded transition-colors">DJ Sets</Link>
             </li>
             <li>
-              <Link href="/browse/browse-albums" onClick={() => setOpen(false)}>Browse Albums</Link>
+              <Link href="/browse/browse-albums" onClick={() => setOpen(false)} className="block px-2 py-1.5 text-sm text-gray-900 hover:text-blue-600 hover:bg-gray-50 rounded transition-colors">Browse Albums</Link>
             </li>
             <li>
-              <Link href="/dialogues" onClick={() => setOpen(false)}>Dialogues</Link>
+              <Link href="/dialogues" onClick={() => setOpen(false)} className="block px-2 py-1.5 text-sm text-gray-900 hover:text-blue-600 hover:bg-gray-50 rounded transition-colors">Dialogues</Link>
             </li>
             <li>
-              <Link href="/about" onClick={() => setOpen(false)}>About</Link>
+              <Link href="/about" onClick={() => setOpen(false)} className="block px-2 py-1.5 text-sm text-gray-900 hover:text-blue-600 hover:bg-gray-50 rounded transition-colors">About</Link>
             </li>
             <li>
               <a 
@@ -64,6 +55,7 @@ function NavigationMenu() {
                 target="_blank" 
                 rel="noopener noreferrer"
                 onClick={() => setOpen(false)}
+                className="block px-2 py-1.5 text-sm text-gray-900 hover:text-blue-600 hover:bg-gray-50 rounded transition-colors"
               >
                 Merch
               </a>
