@@ -12,66 +12,48 @@ export default function SpecializedSearchesPage() {
   const [activeTab, setActiveTab] = useState<TabType>('cd-only');
 
   return (
-    <div style={{ padding: '16px 12px', background: '#f8fafc', minHeight: '100vh', maxWidth: 1400, margin: '0 auto' }}>
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 'clamp(24px, 5vw, 32px)', fontWeight: 'bold', color: '#1f2937', margin: '0 0 8px 0' }}>
+    <div className="p-4 md:p-6 bg-slate-50 min-h-screen max-w-7xl mx-auto font-sans">
+      <div className="mb-6">
+        <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">
           🔎 Specialized Searches
         </h1>
-        <p style={{ color: '#6b7280', fontSize: 'clamp(14px, 3vw, 16px)', margin: 0 }}>
+        <p className="text-sm md:text-base text-gray-500">
           Advanced tools for managing your collection
         </p>
       </div>
 
-      <div style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: 12, boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)', overflow: 'hidden', marginBottom: 24 }}>
-        <div style={{ display: 'flex', flexDirection: 'row', borderBottom: '1px solid #e5e7eb', overflowX: 'auto' }}>
+      <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden mb-6">
+        <div className="flex flex-row border-b border-gray-200 overflow-x-auto no-scrollbar">
           <button 
             onClick={() => setActiveTab('cd-only')} 
-            style={{ 
-              flex: '1 0 auto',
-              minWidth: '140px',
-              padding: '12px 16px', 
-              background: activeTab === 'cd-only' ? '#8b5cf6' : 'white', 
-              color: activeTab === 'cd-only' ? 'white' : '#6b7280', 
-              border: 'none', 
-              fontSize: 'clamp(14px, 3vw, 16px)', 
-              fontWeight: 600, 
-              cursor: 'pointer', 
-              transition: 'all 0.2s', 
-              borderBottom: activeTab === 'cd-only' ? '3px solid #7c3aed' : 'none',
-              whiteSpace: 'nowrap'
-            }}
+            className={`flex-1 min-w-[140px] py-3 px-4 text-sm md:text-base font-semibold transition-all border-b-4 whitespace-nowrap ${
+              activeTab === 'cd-only' 
+                ? 'bg-violet-100 text-violet-700 border-violet-600' 
+                : 'bg-white text-gray-500 border-transparent hover:text-gray-700'
+            }`}
           >
             💿 CD-Only
           </button>
           <button 
             onClick={() => setActiveTab('1001-albums')} 
-            style={{ 
-              flex: '1 0 auto',
-              minWidth: '140px',
-              padding: '12px 16px', 
-              background: activeTab === '1001-albums' ? '#8b5cf6' : 'white', 
-              color: activeTab === '1001-albums' ? 'white' : '#6b7280', 
-              border: 'none', 
-              fontSize: 'clamp(14px, 3vw, 16px)', 
-              fontWeight: 600, 
-              cursor: 'pointer', 
-              transition: 'all 0.2s', 
-              borderBottom: activeTab === '1001-albums' ? '3px solid #7c3aed' : 'none',
-              whiteSpace: 'nowrap'
-            }}
+            className={`flex-1 min-w-[140px] py-3 px-4 text-sm md:text-base font-semibold transition-all border-b-4 whitespace-nowrap ${
+              activeTab === '1001-albums' 
+                ? 'bg-violet-100 text-violet-700 border-violet-600' 
+                : 'bg-white text-gray-500 border-transparent hover:text-gray-700'
+            }`}
           >
             📖 1001 Albums
           </button>
         </div>
 
-        <div style={{ padding: 'clamp(16px, 4vw, 32px)' }}>
+        <div className="p-4 md:p-8">
           {activeTab === 'cd-only' && <CDOnlyTab />}
           {activeTab === '1001-albums' && <Thousand1AlbumsTab />}
         </div>
       </div>
 
-      <div style={{ textAlign: 'center' }}>
-        <Link href="/admin/admin-dashboard" style={{ display: 'inline-block', padding: '12px 24px', background: '#6b7280', color: 'white', borderRadius: 8, textDecoration: 'none', fontWeight: 600, fontSize: 14 }}>
+      <div className="text-center">
+        <Link href="/admin/admin-dashboard" className="inline-block py-3 px-6 bg-slate-500 hover:bg-slate-600 text-white rounded-lg font-semibold text-sm transition-colors">
           ← Back to Dashboard
         </Link>
       </div>
@@ -376,36 +358,36 @@ function CDOnlyTab() {
   };
 
   return (
-    <div>
+    <div className="space-y-6">
       {view === 'scanner' && (
-        <>
-          <div style={{ textAlign: 'center', marginBottom: 32 }}>
-            <div style={{ fontSize: 64, marginBottom: 16 }}>💿</div>
-            <h2 style={{ fontSize: 'clamp(20px, 4vw, 24px)', fontWeight: 600, color: '#1f2937', marginBottom: 12 }}>CD-Only Release Finder</h2>
-            <p style={{ color: '#6b7280', fontSize: 'clamp(14px, 3vw, 16px)', maxWidth: 600, margin: '0 auto 24px' }}>
+        <div className="animate-fade-in">
+          <div className="text-center mb-8">
+            <div className="text-6xl mb-4">💿</div>
+            <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-3">CD-Only Release Finder</h2>
+            <p className="text-sm md:text-base text-gray-500 max-w-xl mx-auto mb-6">
               Finds albums with no vinyl, no US vinyl releases, or only 1 limited vinyl pressing
             </p>
           </div>
 
           {!scanning && results.length === 0 && (
-            <div style={{ textAlign: 'center' }}>
-              <button onClick={runCDOnlyCheck} style={{ padding: '16px 32px', background: '#8b5cf6', color: 'white', border: 'none', borderRadius: 8, fontSize: 16, fontWeight: 600, cursor: 'pointer' }}>
+            <div className="text-center">
+              <button onClick={runCDOnlyCheck} className="py-4 px-8 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold text-lg shadow-lg shadow-violet-200 transition-all active:scale-95">
                 🚀 Start Comprehensive Scan
               </button>
             </div>
           )}
 
           {scanning && (
-            <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: 8, padding: 20, marginBottom: 24 }}>
-              <div style={{ fontSize: 48, marginBottom: 12, textAlign: 'center' }}>🔍</div>
-              <div style={{ fontSize: 16, fontWeight: 600, color: '#92400e', marginBottom: 8, textAlign: 'center', wordWrap: 'break-word' }}>{status}</div>
-              <div style={{ width: '100%', height: 8, background: '#e9ecef', borderRadius: 4, overflow: 'hidden', marginBottom: 8 }}>
-                <div style={{ width: `${progress}%`, height: '100%', background: '#8b5cf6', transition: 'width 0.3s' }} />
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 shadow-sm">
+              <div className="text-5xl mb-3 text-center">🔍</div>
+              <div className="text-base font-bold text-amber-900 mb-4 text-center break-words">{status}</div>
+              <div className="w-full h-3 bg-amber-200/50 rounded-full overflow-hidden mb-2">
+                <div className="h-full bg-violet-600 transition-all duration-300" style={{ width: `${progress}%` }} />
               </div>
-              <p style={{ color: '#78350f', fontSize: 14, margin: 0, textAlign: 'center' }}>{Math.round(progress)}% complete</p>
+              <p className="text-sm text-amber-800 text-center font-bold">{Math.round(progress)}% complete</p>
             </div>
           )}
-        </>
+        </div>
       )}
 
       {view === 'results' && (
@@ -1131,48 +1113,26 @@ function Thousand1AlbumsTab() {
         ))}
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+      <div className="flex gap-2 mb-6 flex-wrap">
         {[
-          { value: "unmatched", label: "Need Attention", count: counts.unmatched, color: "#ef4444", bg: "#fef2f2" },
-          { value: "pending", label: "Pending", count: counts.pending, color: "#f59e0b", bg: "#fffbeb" },
-          { value: "confirmed", label: "Confirmed", count: counts.confirmed, color: "#10b981", bg: "#f0fdf4" },
-          { value: "all", label: "All", count: rows.length, color: "#6b7280", bg: "#f9fafb" },
+          { value: "unmatched", label: "Need Attention", count: counts.unmatched, color: "text-red-600", bg: "bg-red-50", border: "border-red-200" },
+          { value: "pending", label: "Pending", count: counts.pending, color: "text-amber-600", bg: "bg-amber-50", border: "border-amber-200" },
+          { value: "confirmed", label: "Confirmed", count: counts.confirmed, color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-200" },
+          { value: "all", label: "All", count: rows.length, color: "text-gray-500", bg: "bg-gray-50", border: "border-gray-200" },
         ].map((tab) => {
           const isActive = statusFilter === tab.value;
           return (
             <button
               key={tab.value}
               onClick={() => setStatusFilter(tab.value as StatusFilter)}
-              style={{
-                flex: "1 1 auto",
-                minWidth: '90px',
-                padding: "8px 12px",
-                border: isActive ? `2px solid ${tab.color}` : "2px solid #e5e7eb",
-                borderRadius: 8,
-                background: isActive ? tab.bg : "#ffffff",
-                color: isActive ? tab.color : "#6b7280",
-                fontWeight: 700,
-                fontSize: 'clamp(11px, 2.5vw, 13px)',
-                cursor: "pointer",
-                transition: "all 0.2s",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 6,
-              }}
+              className={`flex-1 min-w-[100px] py-2.5 px-3 rounded-lg border-2 font-bold text-xs md:text-sm transition-all flex items-center justify-center gap-2 ${
+                isActive 
+                  ? `${tab.bg} ${tab.color} ${tab.border.replace('200', '500')}` 
+                  : 'bg-white text-gray-500 border-gray-100 hover:border-gray-300'
+              }`}
             >
-              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tab.label}</span>
-              <span
-                style={{
-                  background: isActive ? tab.color : "#d1d5db",
-                  color: "#ffffff",
-                  borderRadius: 999,
-                  padding: "2px 6px",
-                  fontSize: 10,
-                  fontWeight: 800,
-                  flexShrink: 0,
-                }}
-              >
+              <span className="truncate">{tab.label}</span>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-black text-white ${isActive ? tab.color.replace('text', 'bg') : 'bg-gray-300'}`}>
                 {tab.count}
               </span>
             </button>

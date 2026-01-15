@@ -7,24 +7,6 @@ import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { supabase } from 'src/lib/supabaseClient';
-import 'styles/internal.css';
-import 'styles/album-detail.css';
-
-// tiny inline style object for the 1001 badge
-const badge1001 = {
-  display: "inline-flex",
-  alignItems: "center",
-  borderRadius: 999,
-  padding: "2px 6px",
-  fontSize: 10,
-  fontWeight: 700,
-  lineHeight: 1,
-  border: "1px solid rgba(0,0,0,0.2)",
-  background: "rgba(0,0,0,0.75)",
-  color: "#fff",
-  marginLeft: 8,
-  whiteSpace: "nowrap",
-};
 
 function AlbumDetailContent() {
   const params = useParams();
@@ -361,30 +343,24 @@ function AlbumDetailContent() {
 
   if (loading) {
     return (
-      <div className="page-wrapper">
-        <div style={{ padding: 40, textAlign: 'center' }}>
-          <p>Loading album...</p>
-        </div>
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center text-white">
+        <p className="text-xl animate-pulse">Loading album...</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="page-wrapper">
-        <div style={{ padding: 40, textAlign: 'center', color: 'red' }}>
-          <p>Error: {error}</p>
-        </div>
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center text-red-400">
+        <p className="text-xl">Error: {error}</p>
       </div>
     );
   }
 
   if (!album) {
     return (
-      <div className="page-wrapper">
-        <div style={{ padding: 40, textAlign: 'center' }}>
-          <p>Album not found</p>
-        </div>
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center text-white">
+        <p className="text-xl">Album not found</p>
       </div>
     );
   }
@@ -398,170 +374,111 @@ function AlbumDetailContent() {
   const queueTypesArray = Array.isArray(queueTypes) ? queueTypes : [queueTypes];
 
   return (
-    <div className="album-detail">
+    <div className="min-h-screen bg-gray-900 text-white relative overflow-hidden font-sans">
+      {/* Background Blur */}
       <div 
-        className="background-blur"
+        className="absolute inset-0 bg-cover bg-center blur-3xl opacity-30 scale-110 pointer-events-none"
         style={{ backgroundImage: `url(${imageUrl})` }}
       />
 
+      {/* Top Navigation Bar */}
       {eventId && (
-        <div style={{
-          position: 'relative',
-          zIndex: 10,
-          background: 'rgba(0, 0, 0, 0.8)',
-          padding: '12px 24px',
-          paddingLeft: '60px',
-          display: 'flex',
-          gap: '16px',
-          alignItems: 'center',
-          flexWrap: 'wrap'
-        }}>
+        <div className="relative z-20 bg-black/80 backdrop-blur-md border-b border-white/10 p-3 pl-16 flex gap-4 items-center flex-wrap shadow-lg">
           <button
             onClick={goToBrowse}
-            style={{
-              background: '#059669',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              padding: '8px 16px',
-              fontSize: '14px',
-              fontWeight: '600',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-4 py-2 text-sm font-bold flex items-center gap-2 transition-all shadow-md active:scale-95"
           >
             ← Browse Collection
           </button>
           
           <button
             onClick={goToQueue}
-            style={{
-              background: '#3b82f6',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              padding: '8px 16px',
-              fontSize: '14px',
-              fontWeight: '600',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
+            className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-2 text-sm font-bold flex items-center gap-2 transition-all shadow-md active:scale-95"
           >
             🎵 View Queue
           </button>
 
           <button
             onClick={goToEvent}
-            style={{
-              background: '#9333ea',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              padding: '8px 16px',
-              fontSize: '14px',
-              fontWeight: '600',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
+            className="bg-purple-600 hover:bg-purple-700 text-white rounded-lg px-4 py-2 text-sm font-bold flex items-center gap-2 transition-all shadow-md active:scale-95"
           >
             📅 Event Details
           </button>
 
           {eventData && (
-            <span style={{
-              color: '#fff',
-              fontSize: '14px',
-              marginLeft: 'auto',
-              opacity: 0.9
-            }}>
-              Event: {eventData.title}
+            <span className="text-gray-300 text-sm ml-auto font-medium hidden md:block">
+              Event: <span className="text-white">{eventData.title}</span>
             </span>
           )}
         </div>
       )}
 
-      <div className="album-header">
-        <Image
-          src={imageUrl}
-          alt={`${album.artist} - ${album.title}`}
-          width={200}
-          height={200}
-          className="album-art"
-          unoptimized
-        />
+      {/* Album Header */}
+      <div className="relative z-10 container mx-auto px-4 py-12 flex flex-col md:flex-row gap-8 md:gap-12 items-start">
+        <div className="relative group shrink-0 mx-auto md:mx-0">
+          <Image
+            src={imageUrl}
+            alt={`${album.artist} - ${album.title}`}
+            width={300}
+            height={300}
+            className="rounded-xl shadow-2xl w-[250px] h-[250px] md:w-[350px] md:h-[350px] object-cover ring-1 ring-white/20"
+            unoptimized
+          />
+        </div>
         
-        <div className="album-info">
-          <h1 className="title">
+        <div className="flex-1 flex flex-col justify-center w-full">
+          <h1 className="text-4xl md:text-6xl font-black mb-2 leading-tight tracking-tight drop-shadow-lg">
             {album.title}
             {album.is_1001 ? (
-              <span title="On the 1001 Albums list" style={badge1001}>
+              <span 
+                title="On the 1001 Albums list" 
+                className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold leading-none border border-white/30 bg-black/60 text-white ml-3 align-middle -translate-y-2"
+              >
                 1001
               </span>
             ) : null}
           </h1>
-          <h2 className="artist">{album.artist}</h2>
+          <h2 className="text-2xl md:text-3xl text-gray-300 font-bold mb-4 drop-shadow-md">{album.artist}</h2>
           
-          <div className="meta">
-            {album.year && <span>Year: {album.year} • </span>}
-            {album.format && <span>Format: {album.format} • </span>}
-            {album.folder && <span>Category: {album.folder}</span>}
+          <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-gray-400 font-medium uppercase tracking-widest mb-6">
+            {album.year && <span>Year: <span className="text-gray-200">{album.year}</span></span>}
+            {album.year && album.format && <span className="text-gray-600">•</span>}
+            {album.format && <span>Format: <span className="text-gray-200">{album.format}</span></span>}
+            {album.format && album.folder && <span className="text-gray-600">•</span>}
+            {album.folder && <span>Category: <span className="text-gray-200">{album.folder}</span></span>}
           </div>
           
           {album.media_condition && (
-            <div className="meta" style={{ marginTop: '8px' }}>
-              Condition: {album.media_condition}
+            <div className="inline-block bg-white/5 border border-white/10 rounded px-3 py-1 text-sm text-gray-300 mb-4 self-start">
+              Condition: <span className="text-white font-semibold">{album.media_condition}</span>
             </div>
           )}
           
-          {album.folder && (
-            <span className="badge">{album.folder}</span>
-          )}
-          
           {album.notes && (
-            <div style={{ 
-              marginTop: '16px',
-              padding: '12px',
-              background: 'rgba(255, 255, 255, 0.1)',
-              borderRadius: '6px',
-              backdropFilter: 'blur(10px)'
-            }}>
-              <strong>Notes:</strong> {album.notes}
+            <div className="p-4 bg-white/5 rounded-xl backdrop-blur-md border border-white/10 max-w-2xl">
+              <strong className="block text-gray-400 text-xs uppercase tracking-wider mb-1">Notes</strong>
+              <p className="text-gray-200 leading-relaxed">{album.notes}</p>
             </div>
           )}
 
           {/* Queue Actions - Adaptive based on queue types */}
           {eventId && eventData?.has_queue && (
-            <div style={{ marginTop: '20px' }}>
+            <div className="mt-8 pt-8 border-t border-white/10">
               {queueTypesArray.includes('side') && (
                 <>
-                  <h3 style={{ color: '#fff', marginBottom: '12px', fontSize: '18px' }}>
-                    Add to Event Queue (By Side):
+                  <h3 className="text-white mb-4 text-lg font-bold flex items-center gap-2">
+                    <span className="text-blue-400">●</span> Add Side to Queue
                   </h3>
-                  <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
+                  <div className="flex flex-wrap gap-3 mb-6">
                     {getAvailableSides().map((side, index) => (
                       <button
                         key={side}
                         onClick={() => handleAddToQueue(side)}
                         disabled={submittingRequest}
-                        style={{
-                          background: index % 4 === 0 ? '#3b82f6' : 
-                                     index % 4 === 1 ? '#10b981' : 
-                                     index % 4 === 2 ? '#f59e0b' : '#ef4444',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: 6,
-                          padding: '12px 24px',
-                          cursor: submittingRequest ? 'not-allowed' : 'pointer',
-                          fontSize: 16,
-                          fontWeight: 'bold',
-                          opacity: submittingRequest ? 0.7 : 1
-                        }}
+                        className={`px-6 py-3 rounded-lg font-bold text-white shadow-lg transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed
+                          ${index % 4 === 0 ? 'bg-blue-600 hover:bg-blue-500' : 
+                            index % 4 === 1 ? 'bg-emerald-600 hover:bg-emerald-500' : 
+                            index % 4 === 2 ? 'bg-amber-600 hover:bg-amber-500' : 'bg-red-600 hover:bg-red-500'}`}
                       >
                         Side {side}
                       </button>
@@ -572,40 +489,27 @@ function AlbumDetailContent() {
 
               {queueTypesArray.includes('album') && (
                 <>
-                  <h3 style={{ color: '#fff', marginBottom: '12px', fontSize: '18px' }}>
-                    Add Full Album to Queue:
+                  <h3 className="text-white mb-4 text-lg font-bold flex items-center gap-2">
+                    <span className="text-purple-400">●</span> Add Album to Queue
                   </h3>
                   <button
                     onClick={handleAddAlbumToQueue}
                     disabled={submittingRequest}
-                    style={{
-                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: 8,
-                      padding: '16px 32px',
-                      cursor: submittingRequest ? 'not-allowed' : 'pointer',
-                      fontSize: 18,
-                      fontWeight: 'bold',
-                      opacity: submittingRequest ? 0.7 : 1,
-                      boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)',
-                      marginBottom: '16px'
-                    }}
+                    className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-xl px-8 py-4 font-bold text-lg shadow-xl shadow-purple-900/30 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed mb-6 flex items-center gap-3"
                   >
-                    💿 Add Full Album to Queue
+                    💿 Request Full Album
                   </button>
                 </>
               )}
               
               {requestStatus && (
-                <p style={{ 
-                  color: requestStatus.includes('Error') || requestStatus.includes('Failed') ? '#ef4444' : '#10b981',
-                  fontWeight: 'bold',
-                  fontSize: '14px',
-                  marginTop: '12px'
-                }}>
+                <div className={`inline-block px-4 py-2 rounded-lg font-bold text-sm ${
+                  requestStatus.includes('Error') || requestStatus.includes('Failed') 
+                    ? 'bg-red-500/20 text-red-200 border border-red-500/30' 
+                    : 'bg-emerald-500/20 text-emerald-200 border border-emerald-500/30'
+                }`}>
                   {requestStatus}
-                </p>
+                </div>
               )}
             </div>
           )}
@@ -614,225 +518,151 @@ function AlbumDetailContent() {
 
       {/* Track Listings */}
       {album?.tracklists && (
-        <div className="tracklist">
-          <h3 style={{ 
-            color: '#fff', 
-            marginBottom: '20px', 
-            fontSize: '20px',
-            fontWeight: 'bold'
-          }}>
+        <div className="relative z-10 container mx-auto px-4 pb-24 max-w-4xl">
+          <h3 className="text-2xl font-bold mb-6 text-white flex items-center gap-3">
             Track Listing
             {queueTypesArray.includes('track') && eventId && eventData?.has_queue && (
-              <span style={{ fontSize: '14px', marginLeft: '12px', opacity: 0.8 }}>
-                (Click any track to add to queue)
+              <span className="text-sm font-normal text-gray-400 bg-white/5 px-2 py-1 rounded">
+                Click + to add individual tracks
               </span>
             )}
           </h3>
           
-          <div className="tracklist-header">
-            <div>#</div>
+          <div className="grid grid-cols-[auto_1fr_1fr_auto_auto] gap-4 px-4 py-3 border-b border-white/20 text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+            <div className="text-center w-8">#</div>
             <div>Title</div>
-            <div>Artist</div>
-            <div>Duration</div>
+            <div className="hidden md:block">Artist</div>
+            <div className="text-right">Time</div>
             {queueTypesArray.includes('track') && eventId && eventData?.has_queue && (
-              <div>Add</div>
+              <div className="text-center w-16">Add</div>
             )}
           </div>
           
-          {(() => {
-            const tracks = getTracksList();
-            const blockedTracks = album.blocked_tracks || [];
-            
-            return tracks.map((track, index) => {
-              const blockedInfo = blockedTracks.find(bt => bt.position === track.position);
-              const isBlocked = !!blockedInfo;
+          <div className="space-y-1">
+            {(() => {
+              const tracks = getTracksList();
+              const blockedTracks = album.blocked_tracks || [];
               
-              return (
-                <div 
-                  key={index} 
-                  className="track"
-                  style={{
-                    cursor: queueTypesArray.includes('track') && eventId && eventData?.has_queue ? 'pointer' : 'default',
-                    transition: 'background-color 0.2s',
-                    opacity: isBlocked ? 0.6 : 1,
-                    position: 'relative'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    {track.position || index + 1}
-                    {isBlocked && (
-                      <span 
-                        title={blockedInfo.reason || 'Track blocked'}
-                        style={{
-                          display: 'inline-block',
-                          width: '16px',
-                          height: '16px',
-                          borderRadius: '50%',
-                          background: '#ef4444',
-                          color: 'white',
-                          fontSize: '10px',
-                          fontWeight: 'bold',
-                          textAlign: 'center',
-                          lineHeight: '16px',
-                          cursor: 'help'
-                        }}
-                      >
-                        !
-                      </span>
-                    )}
-                  </div>
-                  <div style={{ color: '#fff', fontWeight: '500' }}>
-                    {track.title || track.name || 'Unknown Track'}
-                    {isBlocked && (
-                      <span style={{
-                        marginLeft: '8px',
-                        fontSize: '11px',
-                        color: '#fca5a5',
-                        fontStyle: 'italic'
-                      }}>
-                        ({blockedInfo.reason || 'Blocked'})
-                      </span>
-                    )}
-                  </div>
-                  <div style={{ color: '#ccc' }}>
-                    {track.artist || album.artist}
-                  </div>
-                  <div style={{ color: '#aaa', fontSize: '14px' }}>
-                    {track.duration || '--:--'}
-                  </div>
-                  {queueTypesArray.includes('track') && eventId && eventData?.has_queue && (
-                    <div>
-                      <button
-                        onClick={() => handleAddTrackToQueue(track)}
-                        disabled={submittingRequest || isBlocked}
-                        style={{
-                          background: isBlocked ? '#9ca3af' : '#3b82f6',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '6px',
-                          padding: '6px 12px',
-                          fontSize: '14px',
-                          fontWeight: '600',
-                          cursor: submittingRequest || isBlocked ? 'not-allowed' : 'pointer',
-                          opacity: submittingRequest || isBlocked ? 0.7 : 1
-                        }}
-                        title={isBlocked ? blockedInfo.reason || 'Track blocked' : 'Add to queue'}
-                      >
-                        {isBlocked ? '🚫' : '+ Add'}
-                      </button>
+              return tracks.map((track, index) => {
+                const blockedInfo = blockedTracks.find(bt => bt.position === track.position);
+                const isBlocked = !!blockedInfo;
+                
+                return (
+                  <div 
+                    key={index} 
+                    className={`grid grid-cols-[auto_1fr_1fr_auto_auto] gap-4 px-4 py-3 rounded-lg items-center group transition-colors ${
+                      isBlocked ? 'opacity-50 grayscale' : 'hover:bg-white/5 bg-white/[0.02]'
+                    }`}
+                  >
+                    <div className="text-center w-8 text-gray-500 font-mono text-sm flex justify-center items-center gap-1">
+                      {track.position || index + 1}
+                      {isBlocked && (
+                        <span 
+                          title={blockedInfo.reason || 'Track blocked'}
+                          className="w-4 h-4 rounded-full bg-red-600 text-white text-[10px] font-bold flex items-center justify-center cursor-help"
+                        >
+                          !
+                        </span>
+                      )}
                     </div>
-                  )}
-                </div>
-              );
-            });
-          })()}
+                    <div className="font-medium text-white group-hover:text-blue-400 transition-colors">
+                      {track.title || track.name || 'Unknown Track'}
+                      {isBlocked && (
+                        <span className="ml-2 text-xs text-red-300 italic">
+                          ({blockedInfo.reason || 'Blocked'})
+                        </span>
+                      )}
+                    </div>
+                    <div className="hidden md:block text-gray-400 text-sm">
+                      {track.artist || album.artist}
+                    </div>
+                    <div className="text-right text-gray-500 text-sm font-mono">
+                      {track.duration || '--:--'}
+                    </div>
+                    {queueTypesArray.includes('track') && eventId && eventData?.has_queue && (
+                      <div className="text-center w-16 flex justify-center">
+                        <button
+                          onClick={() => handleAddTrackToQueue(track)}
+                          disabled={submittingRequest || isBlocked}
+                          className={`w-8 h-8 rounded flex items-center justify-center transition-all ${
+                            isBlocked 
+                              ? 'bg-gray-700 text-gray-500 cursor-not-allowed' 
+                              : 'bg-blue-600 hover:bg-blue-500 text-white shadow-md active:scale-95'
+                          }`}
+                          title={isBlocked ? blockedInfo.reason || 'Track blocked' : 'Add to queue'}
+                        >
+                          {isBlocked ? '✕' : '+'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              });
+            })()}
+          </div>
         </div>
       )}
 
       {!album?.tracklists && album?.sides && (
-        <div className="tracklist">
-          <h3 style={{ 
-            color: '#fff', 
-            marginBottom: '20px', 
-            fontSize: '20px',
-            fontWeight: 'bold'
-          }}>
-            Album Sides
-          </h3>
+        <div className="relative z-10 container mx-auto px-4 pb-24 max-w-4xl">
+          <h3 className="text-2xl font-bold mb-8 text-white">Album Sides</h3>
           
           {Object.entries(album.sides).map(([sideName, tracks]) => {
             const blockedTracks = album.blocked_tracks || [];
             
             return (
-              <div key={sideName} style={{ marginBottom: '24px' }}>
-                <h4 style={{ 
-                  color: '#fff', 
-                  fontSize: '16px', 
-                  marginBottom: '12px',
-                  textTransform: 'uppercase',
-                  letterSpacing: '1px'
-                }}>
-                  Side {sideName}
-                </h4>
-                
-                <div className="tracklist-header">
-                  <div>#</div>
-                  <div>Title</div>
-                  <div>Artist</div>
-                  <div>Duration</div>
+              <div key={sideName} className="mb-8">
+                <div className="flex items-center gap-4 mb-4">
+                  <h4 className="text-xl font-bold text-gray-200">Side {sideName}</h4>
+                  <div className="h-px flex-1 bg-white/10"></div>
                 </div>
                 
-                {Array.isArray(tracks) ? tracks.map((track, index) => {
-                  const trackPosition = `${sideName}${index + 1}`;
-                  const blockedInfo = blockedTracks.find(bt => bt.position === trackPosition);
-                  const isBlocked = !!blockedInfo;
-                  
-                  return (
-                    <div 
-                      key={index} 
-                      className="track"
-                      style={{
-                        opacity: isBlocked ? 0.6 : 1
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        {index + 1}
-                        {isBlocked && (
-                          <span 
-                            title={blockedInfo.reason || 'Track blocked'}
-                            style={{
-                              display: 'inline-block',
-                              width: '16px',
-                              height: '16px',
-                              borderRadius: '50%',
-                              background: '#ef4444',
-                              color: 'white',
-                              fontSize: '10px',
-                              fontWeight: 'bold',
-                              textAlign: 'center',
-                              lineHeight: '16px',
-                              cursor: 'help'
-                            }}
-                          >
-                            !
-                          </span>
-                        )}
+                <div className="grid grid-cols-[auto_1fr_1fr_auto] gap-4 px-4 py-2 text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">
+                  <div className="w-8 text-center">#</div>
+                  <div>Title</div>
+                  <div>Artist</div>
+                  <div className="text-right">Time</div>
+                </div>
+                
+                <div className="space-y-1">
+                  {Array.isArray(tracks) ? tracks.map((track, index) => {
+                    const trackPosition = `${sideName}${index + 1}`;
+                    const blockedInfo = blockedTracks.find(bt => bt.position === trackPosition);
+                    const isBlocked = !!blockedInfo;
+                    
+                    return (
+                      <div 
+                        key={index} 
+                        className={`grid grid-cols-[auto_1fr_1fr_auto] gap-4 px-4 py-3 rounded-lg items-center ${
+                          isBlocked ? 'opacity-50' : 'bg-white/[0.02]'
+                        }`}
+                      >
+                        <div className="w-8 text-center text-gray-500 font-mono text-sm flex justify-center gap-1">
+                          {index + 1}
+                          {isBlocked && <span className="text-red-500 text-xs">!</span>}
+                        </div>
+                        <div className="font-medium text-white">
+                          {typeof track === 'string' ? track : track.title || track.name || 'Unknown Track'}
+                        </div>
+                        <div className="text-gray-400 text-sm">
+                          {typeof track === 'object' && track.artist ? track.artist : album.artist}
+                        </div>
+                        <div className="text-right text-gray-500 text-sm font-mono">
+                          {typeof track === 'object' && track.duration ? track.duration : '--:--'}
+                        </div>
                       </div>
-                      <div style={{ color: '#fff', fontWeight: '500' }}>
-                        {typeof track === 'string' ? track : track.title || track.name || 'Unknown Track'}
-                        {isBlocked && (
-                          <span style={{
-                            marginLeft: '8px',
-                            fontSize: '11px',
-                            color: '#fca5a5',
-                            fontStyle: 'italic'
-                          }}>
-                            ({blockedInfo.reason || 'Blocked'})
-                          </span>
-                        )}
+                    );
+                  }) : (
+                    <div className="grid grid-cols-[auto_1fr_1fr_auto] gap-4 px-4 py-3 rounded-lg items-center bg-white/[0.02]">
+                      <div className="w-8 text-center text-gray-500">1</div>
+                      <div className="font-medium text-white italic">
+                        {typeof tracks === 'string' ? tracks : 'No track information'}
                       </div>
-                      <div style={{ color: '#ccc' }}>
-                        {typeof track === 'object' && track.artist ? track.artist : album.artist}
-                      </div>
-                      <div style={{ color: '#aaa', fontSize: '14px' }}>
-                        {typeof track === 'object' && track.duration ? track.duration : '--:--'}
-                      </div>
+                      <div className="text-gray-400">{album.artist}</div>
+                      <div className="text-right text-gray-500">--:--</div>
                     </div>
-                  );
-                }) : (
-                  <div className="track">
-                    <div>1</div>
-                    <div style={{ color: '#fff', fontWeight: '500' }}>
-                      {typeof tracks === 'string' ? tracks : 'No track information'}
-                    </div>
-                    <div style={{ color: '#ccc' }}>
-                      {album.artist}
-                    </div>
-                    <div style={{ color: '#aaa', fontSize: '14px' }}>
-                      --:--
-                    </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             );
           })}

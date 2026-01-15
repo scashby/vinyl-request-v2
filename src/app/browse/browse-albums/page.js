@@ -8,8 +8,6 @@ import { Suspense } from 'react';
 import { useEffect, useState, useMemo } from 'react';
 import AlbumCard from 'components/AlbumCard';
 import AlbumSuggestionBox from 'components/AlbumSuggestionBox';
-import 'styles/album-browse.css';
-import 'styles/internal.css';
 import { supabase } from 'src/lib/supabaseClient';
 import { useSearchParams } from 'next/navigation';
 import { formatEventText } from 'src/utils/textFormatter';
@@ -243,36 +241,26 @@ function BrowseAlbumsContent() {
 
   if (loading) {
     return (
-      <div className="page-wrapper">
-        <header className="event-hero">
-          <div className="overlay">
-            <h1>Loading Collection...</h1>
-          </div>
-        </header>
-        <main className="browse-collection-body" style={{ 
-          display: 'flex', 
-          justifyContent: 'center', 
-          alignItems: 'center', 
-          minHeight: '400px',
-          fontSize: '18px',
-          color: '#666'
-        }}>
-          Loading albums...
-        </main>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-xl text-gray-600 font-semibold animate-pulse">Loading albums...</div>
       </div>
     );
   }
 
   return (
-    <div className="page-wrapper">
-      <header className="event-hero">
-        <div className="overlay">
-          <h1>
+    <div className="min-h-screen bg-gray-50 pb-12">
+      <header className="relative w-full h-[300px] flex items-center justify-center bg-gray-900 overflow-hidden">
+        <div 
+          className="absolute inset-0 bg-cover bg-center opacity-50"
+          style={{ backgroundImage: "url('/images/event-header-still.jpg')" }}
+        />
+        <div className="relative z-10 px-8 py-6 bg-black/40 rounded-xl backdrop-blur-sm text-center">
+          <h1 className="text-4xl md:text-5xl font-bold text-white font-serif-display drop-shadow-lg">
             Browse the Collection{eventTitle ? (
-              <span>
+              <span className="block text-2xl md:text-3xl mt-2 font-normal">
                 {' '}for <span dangerouslySetInnerHTML={{ __html: formatEventText(eventTitle) }} />
                 {eventDate && eventDate !== '9999-12-31' && (
-                  <span style={{ display: 'block', fontSize: '0.6em', fontWeight: '400', marginTop: '0.5rem', opacity: 0.9 }}>
+                  <span className="block text-lg mt-2 opacity-90 font-sans">
                     {formatDate(eventDate)}
                   </span>
                 )}
@@ -282,25 +270,25 @@ function BrowseAlbumsContent() {
         </div>
       </header>
 
-      <main className="browse-collection-body">
-        <div className="search-filter-bar">
+      <main className="container mx-auto px-4 py-8">
+        {/* Search & Filter Bar */}
+        <div className="flex flex-col md:flex-row gap-4 items-center bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6">
           <input
             type="text"
             placeholder="Search by artist or title"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full md:flex-[2] p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
           />
 
           <select
             value={mediaFilter}
             onChange={(e) => setMediaFilter(e.target.value)}
+            className="w-full md:flex-1 p-2.5 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 outline-none"
           >
             <option value="">All Media Types</option>
             {normalizedDropdown.map((format) => (
-              <option 
-                key={format} 
-                value={format.trim().toLowerCase()}
-              >
+              <option key={format} value={format.trim().toLowerCase()}>
                 {format}
               </option>
             ))}
@@ -309,6 +297,7 @@ function BrowseAlbumsContent() {
           <select 
             value={sortField} 
             onChange={e => setSortField(e.target.value)}
+            className="w-full md:w-40 p-2.5 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 outline-none"
           >
             <option value="artist">Artist</option>
             <option value="date_added">Date Added</option>
@@ -318,7 +307,7 @@ function BrowseAlbumsContent() {
 
           <button
             onClick={() => setSortAsc(a => !a)}
-            className="button-secondary"
+            className="w-full md:w-auto px-4 py-2.5 bg-gray-100 text-blue-600 font-semibold rounded-lg hover:bg-gray-200 border border-gray-200 transition-colors whitespace-nowrap"
           >
             Sort: {sortAsc ? 'A→Z' : 'Z→A'}
           </button>
@@ -326,150 +315,77 @@ function BrowseAlbumsContent() {
           {!hasNoResults && !showSuggestionBox && (
             <button
               onClick={() => setShowSuggestionBox(true)}
-              style={{
-                flex: '0 0 auto',
-                background: '#3b82f6',
-                color: '#ffffff',
-                border: '2px solid #1d4ed8',
-                borderRadius: '6px',
-                padding: '10px 16px',
-                fontSize: '14px',
-                fontWeight: '600',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                fontFamily: 'system-ui, sans-serif'
-              }}
+              className="w-full md:w-auto px-4 py-2.5 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap shadow-sm"
             >
               💡 Suggest Album
             </button>
           )}
         </div>
 
-        <div style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '8px',
-          alignItems: 'center',
-          marginBottom: '20px',
-          width: '100%'
-        }}>
-          <label 
-            className={justAddedCount > 0 ? "just-added-filter" : ""}
-            style={justAddedCount === 0 ? {
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '6px',
-              fontSize: '14px',
-              fontWeight: '600',
-              color: '#1f2937',
-              cursor: 'not-allowed',
-              background: '#f3f4f6',
-              padding: '8px 12px',
-              borderRadius: '6px',
-              border: '1px solid #9ca3af',
-              opacity: 0.6
-            } : { cursor: 'pointer' }}
-          >
+        {/* Filters */}
+        <div className="flex flex-wrap gap-3 items-center mb-6 w-full">
+          <label className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-bold cursor-pointer transition-all ${
+            justAddedCount > 0 
+              ? "bg-green-50 border-green-500 text-green-700 hover:bg-green-100" 
+              : "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed opacity-60"
+          }`}>
             <input
               type="checkbox"
               checked={showJustAdded}
               onChange={(e) => setShowJustAdded(e.target.checked)}
               disabled={justAddedCount === 0}
+              className="accent-green-600 w-4 h-4"
             />
-            {justAddedCount > 0 && <span className="just-added-sparkle">✨</span>} Just Added ({justAddedCount})
+            {justAddedCount > 0 && <span className="animate-pulse">✨</span>} Just Added ({justAddedCount})
           </label>
 
-            <label style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '6px',
-              fontSize: '14px',
-              fontWeight: '600',
-              color: '#1f2937',
-              cursor: stevesTop200Count > 0 ? 'pointer' : 'not-allowed',
-              background: stevesTop200Count > 0 ? '#fecaca' : '#f3f4f6',
-              padding: '6px 10px',
-              borderRadius: '6px',
-              border: `2px solid ${stevesTop200Count > 0 ? '#dc2626' : '#9ca3af'}`,
-              fontFamily: 'system-ui, sans-serif',
-              opacity: stevesTop200Count > 0 ? 1 : 0.6
-            }}>
-              <input
-                type="checkbox"
-                checked={showStevesTop200}
-                onChange={(e) => setShowStevesTop200(e.target.checked)}
-                disabled={stevesTop200Count === 0}
-                style={{ 
-                  accentColor: '#dc2626',
-                  transform: 'scale(1.2)'
-                }}
-              />
-              🏆 Steve&apos;s Top 200 ({stevesTop200Count})
-            </label>
+          <label className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-bold cursor-pointer transition-all ${
+            stevesTop200Count > 0 
+              ? "bg-red-50 border-red-500 text-red-700 hover:bg-red-100" 
+              : "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed opacity-60"
+          }`}>
+            <input
+              type="checkbox"
+              checked={showStevesTop200}
+              onChange={(e) => setShowStevesTop200(e.target.checked)}
+              disabled={stevesTop200Count === 0}
+              className="accent-red-600 w-4 h-4"
+            />
+            🏆 Steve&apos;s Top 200 ({stevesTop200Count})
+          </label>
 
-            <label style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '6px',
-              fontSize: '14px',
-              fontWeight: '600',
-              color: '#1f2937',
-              cursor: thisWeeksTop10Count > 0 ? 'pointer' : 'not-allowed',
-              background: thisWeeksTop10Count > 0 ? '#e9d5ff' : '#f3f4f6',
-              padding: '6px 10px',
-              borderRadius: '6px',
-              border: `2px solid ${thisWeeksTop10Count > 0 ? '#7c3aed' : '#9ca3af'}`,
-              fontFamily: 'system-ui, sans-serif',
-              opacity: thisWeeksTop10Count > 0 ? 1 : 0.6
-            }}>
-              <input
-                type="checkbox"
-                checked={showThisWeeksTop10}
-                onChange={(e) => setShowThisWeeksTop10(e.target.checked)}
-                disabled={thisWeeksTop10Count === 0}
-                style={{ 
-                  accentColor: '#7c3aed',
-                  transform: 'scale(1.2)'
-                }}
-              />
-              📈 This Week&apos;s Top 10 ({thisWeeksTop10Count})
-            </label>
+          <label className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-bold cursor-pointer transition-all ${
+            thisWeeksTop10Count > 0 
+              ? "bg-purple-50 border-purple-500 text-purple-700 hover:bg-purple-100" 
+              : "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed opacity-60"
+          }`}>
+            <input
+              type="checkbox"
+              checked={showThisWeeksTop10}
+              onChange={(e) => setShowThisWeeksTop10(e.target.checked)}
+              disabled={thisWeeksTop10Count === 0}
+              className="accent-purple-600 w-4 h-4"
+            />
+            📈 This Week&apos;s Top 10 ({thisWeeksTop10Count})
+          </label>
 
-            <label style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '6px',
-              fontSize: '14px',
-              fontWeight: '600',
-              color: '#1f2937',
-              cursor: innerCirclePreferredCount > 0 ? 'pointer' : 'not-allowed',
-              background: innerCirclePreferredCount > 0 ? '#fed7aa' : '#f3f4f6',
-              padding: '6px 10px',
-              borderRadius: '6px',
-              border: `2px solid ${innerCirclePreferredCount > 0 ? '#ea580c' : '#9ca3af'}`,
-              fontFamily: 'system-ui, sans-serif',
-              opacity: innerCirclePreferredCount > 0 ? 1 : 0.6
-            }}>
-              <input
-                type="checkbox"
-                checked={showInnerCirclePreferred}
-                onChange={(e) => setShowInnerCirclePreferred(e.target.checked)}
-                disabled={innerCirclePreferredCount === 0}
-                style={{ 
-                  accentColor: '#ea580c',
-                  transform: 'scale(1.2)'
-                }}
-              />
-              ⭐ Inner Circle Preferred ({innerCirclePreferredCount})
-            </label>
-          </div>
+          <label className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-bold cursor-pointer transition-all ${
+            innerCirclePreferredCount > 0 
+              ? "bg-orange-50 border-orange-500 text-orange-700 hover:bg-orange-100" 
+              : "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed opacity-60"
+          }`}>
+            <input
+              type="checkbox"
+              checked={showInnerCirclePreferred}
+              onChange={(e) => setShowInnerCirclePreferred(e.target.checked)}
+              disabled={innerCirclePreferredCount === 0}
+              className="accent-orange-600 w-4 h-4"
+            />
+            ⭐ Inner Circle Preferred ({innerCirclePreferredCount})
+          </label>
+        </div>
 
-        <div style={{ 
-          fontSize: '14px', 
-          color: '#666',
-          marginBottom: '20px',
-          padding: '0 8px'
-        }}>
+        <div className="text-gray-500 text-sm mb-6 px-1">
           {hasSearchQuery ? (
             <>Showing {filteredAlbums.length} results for &ldquo;{searchTerm}&rdquo;</>
           ) : (
@@ -478,7 +394,7 @@ function BrowseAlbumsContent() {
         </div>
 
         {(hasNoResults || showSuggestionBox) && (
-          <div style={{ marginBottom: '30px' }}>
+          <div className="mb-8">
             <AlbumSuggestionBox 
               context={hasNoResults ? "search" : "general"}
               searchQuery={hasNoResults ? searchTerm : ''}
@@ -489,7 +405,7 @@ function BrowseAlbumsContent() {
           </div>
         )}
 
-        <section className="album-grid">
+        <section className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
           {filteredAlbums.map((album) => (
             <AlbumCard
               key={album.id}
@@ -503,39 +419,21 @@ function BrowseAlbumsContent() {
         </section>
 
         {filteredAlbums.length === 0 && !hasSearchQuery && (
-          <div style={{
-            textAlign: 'center',
-            padding: '40px',
-            color: '#6b7280',
-            fontSize: '16px'
-          }}>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎵</div>
-            <p>No albums match your current filters.</p>
-            <p style={{ fontSize: '14px' }}>
-              Try adjusting your filters or suggest new albums!
-            </p>
+          <div className="text-center py-16 text-gray-500">
+            <div className="text-5xl mb-4">🎵</div>
+            <p className="text-lg">No albums match your current filters.</p>
+            <p className="text-sm mt-2">Try adjusting your filters or suggest new albums!</p>
           </div>
         )}
 
         {hasNoResults && (
-          <div style={{
-            textAlign: 'center',
-            padding: '40px',
-            color: '#6b7280',
-            fontSize: '16px',
-            background: '#f9fafb',
-            borderRadius: '12px',
-            border: '2px dashed #d1d5db',
-            margin: '20px 0'
-          }}>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔍</div>
-            <h3 style={{ fontSize: '24px', marginBottom: '12px', color: '#374151' }}>
-              No albums found
-            </h3>
-            <p style={{ marginBottom: '16px' }}>
+          <div className="text-center py-12 px-6 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-300 my-8">
+            <div className="text-5xl mb-4">🔍</div>
+            <h3 className="text-xl font-bold text-gray-800 mb-2">No albums found</h3>
+            <p className="text-gray-600 mb-4">
               No albums match your search for &ldquo;<strong>{searchTerm}</strong>&rdquo;
             </p>
-            <p style={{ fontSize: '14px' }}>
+            <p className="text-sm text-gray-500">
               The album suggestion form above can help you request this album for the collection.
             </p>
           </div>

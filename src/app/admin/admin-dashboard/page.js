@@ -5,8 +5,6 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { supabase } from 'src/lib/supabaseClient';
 
-import 'styles/internal.css';
-
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState({
     totalAlbums: 0,
@@ -115,42 +113,20 @@ export default function AdminDashboardPage() {
 
   if (loading) {
     return (
-      <div style={{
-        padding: 24,
-        background: '#f8fafc',
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center'
-      }}>
-        <div style={{ fontSize: 18, color: '#6b7280' }}>Loading dashboard...</div>
+      <div className="p-6 bg-slate-50 min-h-screen flex items-center justify-center">
+        <div className="text-lg text-gray-500 animate-pulse font-medium">Loading dashboard...</div>
       </div>
     );
   }
 
   return (
-    <div style={{
-      padding: 24,
-      background: '#f8fafc',
-      minHeight: '100vh',
-      maxWidth: 1400,
-      margin: '0 auto'
-    }}>
+    <div className="p-6 bg-slate-50 min-h-screen max-w-7xl mx-auto font-sans">
       {/* Header */}
-      <div style={{ marginBottom: 32 }}>
-        <h1 style={{
-          fontSize: 32,
-          fontWeight: 'bold',
-          color: '#1f2937',
-          margin: '0 0 8px 0'
-        }}>
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">
           Admin Dashboard
         </h1>
-        <p style={{
-          color: '#6b7280',
-          fontSize: 16,
-          margin: 0
-        }}>
+        <p className="text-base text-gray-500">
           Welcome back! Here&apos;s what&apos;s happening with Dead Wax Dialogues.
         </p>
       </div>

@@ -246,17 +246,10 @@ export default function InnerCircleVotingPage() {
 
   if (loading) {
     return (
-      <div style={{
-        minHeight: '100vh',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        color: 'white'
-      }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 24, marginBottom: 16 }}>🎵 Loading Collection...</div>
-          <div style={{ fontSize: 16, opacity: 0.8 }}>Preparing your voting experience</div>
+      <div className="min-h-screen bg-gradient-to-br from-indigo-500 to-purple-700 flex items-center justify-center text-white p-6">
+        <div className="text-center">
+          <div className="text-3xl font-bold mb-4">🎵 Loading Collection...</div>
+          <div className="text-lg opacity-80 animate-pulse font-medium">Preparing your voting experience</div>
         </div>
       </div>
     );

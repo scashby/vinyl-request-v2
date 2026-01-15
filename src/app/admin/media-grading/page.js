@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useMemo, useCallback } from "react";
-import "styles/media-grading.css";
 
 /**
  * Systematic Media Grading Tool — Admin
@@ -658,42 +657,52 @@ export default function MediaGradingPage() {
   }
 
   const typeTabs = (
-    <div className="mg-type-tabs" role="tablist" aria-label="Media type">
+    <div className="flex gap-2 flex-wrap mb-4" role="tablist" aria-label="Media type">
       {MEDIA_TYPES.map((t) => (
         <button
           key={t.key}
           role="tab"
           aria-selected={mediaType === t.key}
-          className={`pill ${mediaType === t.key ? "selected" : ""}`}
+          className={`flex items-center px-4 py-2 rounded-full font-semibold border-2 transition-colors ${
+            mediaType === t.key 
+              ? "bg-red-500 border-red-500 text-white shadow-md" 
+              : "bg-transparent border-slate-300 text-slate-100 hover:border-slate-400"
+          }`}
           onClick={() => onSelectType(t.key)}
           type="button"
         >
-          <span className="icon">{t.icon}</span> {t.label}
+          <span className="mr-2 opacity-90">{t.icon}</span> {t.label}
         </button>
       ))}
     </div>
   );
 
   const sealedBanner = (
-    <div className="mg-sealed">
-      <div className="sealed-row">
-        <label htmlFor="sealedToggle" className="checkbox-row">
+    <div className="bg-slate-100 border border-slate-300 rounded-xl p-4 text-slate-900 shadow-sm">
+      <div className="flex items-center justify-between gap-4 flex-wrap mb-3">
+        <label htmlFor="sealedToggle" className="flex items-center gap-2 cursor-pointer font-bold select-none text-slate-800">
           <input
             id="sealedToggle"
             type="checkbox"
             checked={sealed}
             onChange={(e) => setSealed(e.target.checked)}
+            className="w-5 h-5 accent-blue-600 cursor-pointer"
           />
           <span>Sealed (factory shrink intact)</span>
         </label>
 
         {/* Reset/clear action */}
-        <button type="button" className="btn reset" onClick={resetForNextAlbum} aria-label="Start next album">
+        <button 
+          type="button" 
+          className="bg-slate-600 text-white hover:bg-slate-700 px-4 py-2 rounded-lg font-bold text-sm transition-colors shadow-sm" 
+          onClick={resetForNextAlbum} 
+          aria-label="Start next album"
+        >
           Start Next Album (Reset)
         </button>
       </div>
 
-      <p className="help">
+      <p className="text-sm text-slate-600 leading-relaxed">
         When <strong>Sealed</strong> is on:
         <br />• <strong>Vinyl</strong>: only evaluate <em>Warping present</em> for the record; all other record criteria are assumed perfect.
         <br />• <strong>Cassettes/CDs</strong>: media condition is assumed perfect (hidden) unless visibly defective through the case.
@@ -703,9 +712,9 @@ export default function MediaGradingPage() {
   );
 
   const Header = (
-    <header className="mg-header">
-      <h1>🔍 Systematic Media Grading Tool</h1>
-      <p className="subtitle">Detailed condition assessment with automatic grading calculation</p>
+    <header className="bg-slate-800 text-white rounded-2xl p-6 mb-6 shadow-md border border-slate-700">
+      <h1 className="text-2xl font-bold mb-1">🔍 Systematic Media Grading Tool</h1>
+      <p className="text-slate-300 text-sm mb-6">Detailed condition assessment with automatic grading calculation</p>
       {typeTabs}
       {sealedBanner}
     </header>
@@ -731,7 +740,6 @@ export default function MediaGradingPage() {
     const sectionBlock = (title, keyName, arr) => {
       // Sealed media gating
       if (sealed && mediaType !== "vinyl") {
-        // Cassette/CD: hide ALL media details when sealed
         return null;
       }
 
@@ -739,7 +747,6 @@ export default function MediaGradingPage() {
 
       if (sealed && mediaType === "vinyl") {
         if (title.toLowerCase().includes("visual")) {
-          // Vinyl sealed: only Warping in Visual Appearance
           filtered = arr.filter((row) => row.key === "warping");
         } else if (
           title.toLowerCase().includes("audio") ||
@@ -747,7 +754,6 @@ export default function MediaGradingPage() {
           title.toLowerCase().includes("label") ||
           title.toLowerCase().includes("center")
         ) {
-          // Hide Audio & Label/Center entirely when sealed (vinyl)
           return null;
         }
       }
@@ -755,37 +761,39 @@ export default function MediaGradingPage() {
       if (filtered.length === 0) return null;
 
       return (
-        <fieldset className="mg-fieldset">
-          <legend>{title}</legend>
+        <fieldset className="border border-slate-200 rounded-lg p-3 mb-4 bg-slate-50">
+          <legend className="px-2 font-bold text-slate-700">{title}</legend>
           {filtered.map((entry) => {
             const id = `${keyName}-${entry.key}-${index}`;
             const onToggle = (checked) => setEntry(keyName, entry.key, { checked });
 
             return (
-              <div key={entry.key} className={`row ${entry.checked ? "active" : ""}`}>
-                <label htmlFor={id} className="checkbox-row">
+              <div key={entry.key} className={`border border-transparent rounded-lg p-2 transition-colors ${entry.checked ? "bg-white border-slate-200 shadow-sm" : ""}`}>
+                <label htmlFor={id} className="flex items-center gap-2 cursor-pointer select-none text-sm text-slate-800 font-medium">
                   <input
                     id={id}
                     type="checkbox"
                     checked={entry.checked}
                     onChange={(e) => onToggle(e.target.checked)}
+                    className="w-4 h-4 accent-blue-600 rounded"
                   />
                   <span>{entry.label}</span>
                 </label>
 
                 {/* Sub-severity radios */}
                 {entry.checked && Array.isArray(entry.subOptions) && (
-                  <div className="subradios" role="group" aria-label={`${entry.label} severity`}>
+                  <div className="flex gap-4 flex-wrap mt-2 ml-6" role="group" aria-label={`${entry.label} severity`}>
                     {entry.subOptions.map((slabel, i) => {
                       const rid = `${id}-sub-${i}`;
                       return (
-                        <label key={rid} htmlFor={rid} className="radio-row">
+                        <label key={rid} htmlFor={rid} className="flex items-center gap-2 cursor-pointer text-sm text-slate-700">
                           <input
                             id={rid}
                             type="radio"
                             name={`${id}-sub`}
                             checked={entry.subIndex === i}
                             onChange={() => setEntry(keyName, entry.key, { subIndex: i })}
+                            className="accent-blue-600"
                           />
                           <span>{slabel}</span>
                         </label>
@@ -796,15 +804,15 @@ export default function MediaGradingPage() {
 
                 {/* Side selectors */}
                 {entry.checked && entry.sides && (
-                  <div className="sides" role="group" aria-label="Which side(s) affected">
-                    <span className="sides-label">Which side(s) affected</span>
+                  <div className="flex flex-wrap gap-4 mt-2 ml-6 items-center" role="group" aria-label="Which side(s) affected">
+                    <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">Affected Sides:</span>
                     {[
                       { key: "S1", label: L1 },
                       { key: "S2", label: L2 },
                     ].map((s) => {
                       const sid = `${id}-side-${s.key}`;
                       return (
-                        <label key={sid} htmlFor={sid} className="checkbox-row side">
+                        <label key={sid} htmlFor={sid} className="flex items-center gap-1.5 cursor-pointer text-sm text-slate-700">
                           <input
                             id={sid}
                             type="checkbox"
@@ -814,6 +822,7 @@ export default function MediaGradingPage() {
                                 sides: { ...entry.sides, [s.key]: e.target.checked },
                               })
                             }
+                            className="w-4 h-4 rounded accent-blue-600"
                           />
                           <span>Side {s.label}</span>
                         </label>
@@ -824,46 +833,49 @@ export default function MediaGradingPage() {
 
                 {/* Tracks affected */}
                 {entry.checked && entry.tracks !== null && (
-                  <div className="tracks">
+                  <div className="flex items-center gap-3 flex-wrap mt-2 ml-6 text-sm">
                     {labels.sideable && typeof entry.tracks === "object" ? (
                       <>
-                        <label htmlFor={`${id}-tracks-S1`}>Tracks affected — Side {L1}</label>
-                        <input
-                          id={`${id}-tracks-S1`}
-                          type="number"
-                          min="0"
-                          value={entry.tracks.S1}
-                          onChange={(e) =>
-                            setEntry(keyName, entry.key, {
-                              tracks: {
-                                ...entry.tracks,
-                                S1: Math.max(0, parseInt(e.target.value || "0", 10)),
-                              },
-                            })
-                          }
-                        />
-                        <label htmlFor={`${id}-tracks-S2`}>Side {L2}</label>
-                        <input
-                          id={`${id}-tracks-S2`}
-                          type="number"
-                          min="0"
-                          value={entry.tracks.S2}
-                          onChange={(e) =>
-                            setEntry(keyName, entry.key, {
-                              tracks: {
-                                ...entry.tracks,
-                                S2: Math.max(0, parseInt(e.target.value || "0", 10)),
-                              },
-                            })
-                          }
-                        />
-                        <span className="hint">
-                          −1 per track applies only to <em>audio</em> defects; for visual, track counts are informational.
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <label htmlFor={`${id}-tracks-S1`} className="text-slate-600">Tracks Side {L1}:</label>
+                          <input
+                            id={`${id}-tracks-S1`}
+                            type="number"
+                            min="0"
+                            value={entry.tracks.S1}
+                            onChange={(e) =>
+                              setEntry(keyName, entry.key, {
+                                tracks: {
+                                  ...entry.tracks,
+                                  S1: Math.max(0, parseInt(e.target.value || "0", 10)),
+                                },
+                              })
+                            }
+                            className="w-16 p-1 border border-slate-300 rounded text-center"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <label htmlFor={`${id}-tracks-S2`} className="text-slate-600">Side {L2}:</label>
+                          <input
+                            id={`${id}-tracks-S2`}
+                            type="number"
+                            min="0"
+                            value={entry.tracks.S2}
+                            onChange={(e) =>
+                              setEntry(keyName, entry.key, {
+                                tracks: {
+                                  ...entry.tracks,
+                                  S2: Math.max(0, parseInt(e.target.value || "0", 10)),
+                                },
+                              })
+                            }
+                            className="w-16 p-1 border border-slate-300 rounded text-center"
+                          />
+                        </div>
                       </>
                     ) : (
-                      <>
-                        <label htmlFor={`${id}-tracks`}>Tracks affected</label>
+                      <div className="flex items-center gap-2">
+                        <label htmlFor={`${id}-tracks`} className="text-slate-600">Tracks affected:</label>
                         <input
                           id={`${id}-tracks`}
                           type="number"
@@ -874,10 +886,13 @@ export default function MediaGradingPage() {
                               tracks: Math.max(0, parseInt(e.target.value || "0", 10)),
                             })
                           }
+                          className="w-16 p-1 border border-slate-300 rounded text-center"
                         />
-                        <span className="hint">−1 per track applies only to audio defects.</span>
-                      </>
+                      </div>
                     )}
+                    <span className="text-xs text-slate-400 italic ml-2">
+                      (Tracks count only subtracts points for audio defects)
+                    </span>
                   </div>
                 )}
               </div>
@@ -888,26 +903,27 @@ export default function MediaGradingPage() {
     };
 
     return (
-      <section className="panel">
-        <div className="panel-title">
-          <h3>{idxLabel}</h3>
-          <div className="title-actions">
-            <label htmlFor={`missing-${index}`} className="checkbox-row">
+      <section className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm mb-6">
+        <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
+          <h3 className="text-lg font-bold text-slate-800">{idxLabel}</h3>
+          <div className="flex gap-4 items-center">
+            <label htmlFor={`missing-${index}`} className="flex items-center gap-2 cursor-pointer text-sm font-medium text-slate-600">
               <input
                 id={`missing-${index}`}
                 type="checkbox"
                 checked={item.missing}
                 onChange={(e) => setMissing(e.target.checked)}
+                className="w-4 h-4 accent-red-600"
               />
-              <span>Mark this media as Missing (auto P)</span>
+              <span>Missing (Auto P)</span>
             </label>
             <button
               type="button"
-              className="btn danger"
+              className="bg-red-100 text-red-700 hover:bg-red-200 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
               onClick={() => removeItem(index)}
               aria-label={`Remove ${labels.itemWord}`}
             >
-              Remove {labels.itemWord}
+              Remove
             </button>
           </div>
         </div>
@@ -941,27 +957,26 @@ export default function MediaGradingPage() {
   const filterAllowed = (arr) => (isSealedVinyl ? arr.filter((x) => vinylAllowedKeys.has(x.key)) : arr);
 
   const PackagingPanel = (
-    <section className="panel">
-      <div className="panel-title">
-        <h3>{pkgLabels.title}</h3>
-        <div className="title-actions">
-          <label htmlFor="pkg-missing" className="checkbox-row">
-            <input
-              id="pkg-missing"
-              type="checkbox"
-              checked={packagingMissing}
-              onChange={(e) => setPackagingMissing(e.target.checked)}
-            />
-            <span>Mark packaging as Missing (auto P)</span>
-          </label>
-        </div>
+    <section className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+      <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
+        <h3 className="text-lg font-bold text-slate-800">{pkgLabels.title}</h3>
+        <label htmlFor="pkg-missing" className="flex items-center gap-2 cursor-pointer text-sm font-medium text-slate-600">
+          <input
+            id="pkg-missing"
+            type="checkbox"
+            checked={packagingMissing}
+            onChange={(e) => setPackagingMissing(e.target.checked)}
+            className="w-4 h-4 accent-red-600"
+          />
+          <span>Mark packaging as Missing (Auto P)</span>
+        </label>
       </div>
 
       {/* CD: single Insert/Booklet section */}
       {mediaType === "cd" ? (
         <>
-          <fieldset className="mg-fieldset">
-            <legend>Insert / Booklet Condition</legend>
+          <fieldset className="border border-slate-200 rounded-lg p-3 mb-4 bg-slate-50">
+            <legend className="px-2 font-bold text-slate-700">Insert / Booklet Condition</legend>
             {(pkgLabels.insert || []).map((cfg) => {
               const id = `pkg-${cfg.key}`;
               const checked = !!packagingChecks[cfg.key];
@@ -973,23 +988,24 @@ export default function MediaGradingPage() {
               const disabled = !allowKey(cfg.key);
 
               return (
-                <div key={cfg.key} className={`row ${checked ? "active" : ""}`}>
-                  <label htmlFor={id} className="checkbox-row">
+                <div key={cfg.key} className={`border border-transparent rounded-lg p-2 transition-colors ${checked ? "bg-white border-slate-200 shadow-sm" : ""}`}>
+                  <label htmlFor={id} className={`flex items-center gap-2 cursor-pointer select-none text-sm font-medium ${disabled ? 'opacity-50 cursor-not-allowed' : 'text-slate-800'}`}>
                     <input
                       id={id}
                       type="checkbox"
                       checked={checked}
                       onChange={() => togglePackaging(cfg.key)}
                       disabled={disabled}
+                      className="w-4 h-4 accent-blue-600 rounded"
                     />
                     <span>{cfg.label}</span>
                   </label>
                   {checked && Array.isArray(cfg.sub) && (
-                    <div className="subradios">
+                    <div className="flex gap-4 flex-wrap mt-2 ml-6">
                       {cfg.sub.map((txt, i) => {
                         const rid = `${id}-sub-${i}`;
                         return (
-                          <label key={rid} htmlFor={rid} className="radio-row">
+                          <label key={rid} htmlFor={rid} className="flex items-center gap-2 cursor-pointer text-sm text-slate-700">
                             <input
                               id={rid}
                               type="radio"
@@ -997,6 +1013,7 @@ export default function MediaGradingPage() {
                               checked={packagingSubs[cfg.key] === i}
                               onChange={() => setPackagingSub(cfg.key, i)}
                               disabled={disabled}
+                              className="accent-blue-600"
                             />
                             <span>{txt}</span>
                           </label>
@@ -1007,26 +1024,27 @@ export default function MediaGradingPage() {
                 </div>
               );
             })}
-            <p className="help">
+            <p className="text-xs text-slate-500 mt-2 italic">
               Standard plastic cases are <strong>not graded</strong>; evaluate the <strong>insert/booklet</strong> only.
               Use Additional Notes for replaceable case or tray issues.
             </p>
             {sealed && (
-              <p className="help">Sealed adds +5 (cap 100). <strong>M</strong> only if sealed &amp; flawless.</p>
+              <p className="text-xs text-green-600 mt-1 font-semibold">Sealed adds +5 (cap 100). <strong>M</strong> only if sealed &amp; flawless.</p>
             )}
           </fieldset>
 
           {/* Additional notes */}
-          <fieldset className="mg-fieldset">
-            <legend>Additional notes (don’t affect score)</legend>
-            <div className="notes-grid">
+          <fieldset className="border border-slate-200 rounded-lg p-3 mb-4 bg-slate-50">
+            <legend className="px-2 font-bold text-slate-700">Additional notes (don’t affect score)</legend>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
               {pkgLabels.notes.map((n) => (
-                <label key={n.key} htmlFor={`note-${n.key}`} className="checkbox-row note">
+                <label key={n.key} htmlFor={`note-${n.key}`} className="flex items-center gap-2 cursor-pointer select-none text-sm text-slate-700">
                   <input
                     id={`note-${n.key}`}
                     type="checkbox"
                     checked={!!additionalNotes[n.key]}
                     onChange={() => toggleNote(n.key)}
+                    className="w-4 h-4 accent-indigo-600 rounded"
                   />
                   <span>{n.label}</span>
                 </label>
@@ -1037,31 +1055,32 @@ export default function MediaGradingPage() {
       ) : (
         <>
           {/* Non-CD (Vinyl/Cassette): original three blocks */}
-          <fieldset className="mg-fieldset">
-            <legend>Overall Appearance</legend>
+          <fieldset className="border border-slate-200 rounded-lg p-3 mb-4 bg-slate-50">
+            <legend className="px-2 font-bold text-slate-700">Overall Appearance</legend>
             {filterAllowed(pkgLabels.overall).map((cfg) => {
               const id = `pkg-${cfg.key}`;
               const checked = !!packagingChecks[cfg.key];
               const disabled =
                 sealed && mediaType !== "vinyl" && !["minorShelfWear", "cornerWear", "creases"].includes(cfg.key);
               return (
-                <div key={cfg.key} className={`row ${checked ? "active" : ""}`}>
-                  <label htmlFor={id} className="checkbox-row">
+                <div key={cfg.key} className={`border border-transparent rounded-lg p-2 transition-colors ${checked ? "bg-white border-slate-200 shadow-sm" : ""}`}>
+                  <label htmlFor={id} className={`flex items-center gap-2 cursor-pointer select-none text-sm font-medium ${disabled ? 'opacity-50 cursor-not-allowed' : 'text-slate-800'}`}>
                     <input
                       id={id}
                       type="checkbox"
                       checked={checked}
                       onChange={() => togglePackaging(cfg.key)}
                       disabled={disabled}
+                      className="w-4 h-4 accent-blue-600 rounded"
                     />
                     <span>{cfg.label}</span>
                   </label>
                   {checked && Array.isArray(cfg.sub) && (
-                    <div className="subradios">
+                    <div className="flex gap-4 flex-wrap mt-2 ml-6">
                       {cfg.sub.map((txt, i) => {
                         const rid = `${id}-sub-${i}`;
                         return (
-                          <label key={rid} htmlFor={rid} className="radio-row">
+                          <label key={rid} htmlFor={rid} className="flex items-center gap-2 cursor-pointer text-sm text-slate-700">
                             <input
                               id={rid}
                               type="radio"
@@ -1069,6 +1088,7 @@ export default function MediaGradingPage() {
                               checked={packagingSubs[cfg.key] === i}
                               onChange={() => setPackagingSub(cfg.key, i)}
                               disabled={disabled}
+                              className="accent-blue-600"
                             />
                             <span>{txt}</span>
                           </label>
@@ -1080,13 +1100,13 @@ export default function MediaGradingPage() {
               );
             })}
             {mediaType === "cassette" && (
-              <p className="help">
+              <p className="text-xs text-slate-500 mt-2 italic">
                 Standard plastic cases are <strong>not graded</strong>; evaluate the J-card only. Use Additional Notes
                 for replaceable case issues.
               </p>
             )}
             {sealed && (
-              <p className="help">
+              <p className="text-xs text-green-600 mt-1 font-semibold">
                 Sealed adds +5 (cap 100). <strong>M</strong> only if sealed &amp; flawless (no allowed deductions).
               </p>
             )}
@@ -1094,8 +1114,8 @@ export default function MediaGradingPage() {
 
           {/* Structure — hidden entirely when sealed+vinyl */}
           {!isSealedVinyl && (
-            <fieldset className="mg-fieldset">
-              <legend>
+            <fieldset className="border border-slate-200 rounded-lg p-3 mb-4 bg-slate-50">
+              <legend className="px-2 font-bold text-slate-700">
                 {mediaType === "vinyl"
                   ? "Seams & Structure"
                   : mediaType === "cassette"
@@ -1107,23 +1127,24 @@ export default function MediaGradingPage() {
                 const checked = !!packagingChecks[cfg.key];
                 const disabled = sealed && cfg.key !== "allSeamsIntact" && cfg.key !== "allIntact";
                 return (
-                  <div key={cfg.key} className={`row ${checked ? "active" : ""}`}>
-                    <label htmlFor={id} className="checkbox-row">
+                  <div key={cfg.key} className={`border border-transparent rounded-lg p-2 transition-colors ${checked ? "bg-white border-slate-200 shadow-sm" : ""}`}>
+                    <label htmlFor={id} className={`flex items-center gap-2 cursor-pointer select-none text-sm font-medium ${disabled ? 'opacity-50 cursor-not-allowed' : 'text-slate-800'}`}>
                       <input
                         id={id}
                         type="checkbox"
                         checked={checked}
                         onChange={() => togglePackaging(cfg.key)}
                         disabled={disabled}
+                        className="w-4 h-4 accent-blue-600 rounded"
                       />
                       <span>{cfg.label}</span>
                     </label>
                     {checked && Array.isArray(cfg.sub) && (
-                      <div className="subradios">
+                      <div className="flex gap-4 flex-wrap mt-2 ml-6">
                         {cfg.sub.map((txt, i) => {
                           const rid = `${id}-sub-${i}`;
                           return (
-                            <label key={rid} htmlFor={rid} className="radio-row">
+                            <label key={rid} htmlFor={rid} className="flex items-center gap-2 cursor-pointer text-sm text-slate-700">
                               <input
                                 id={rid}
                                 type="radio"
@@ -1131,6 +1152,7 @@ export default function MediaGradingPage() {
                                 checked={packagingSubs[cfg.key] === i}
                                 onChange={() => setPackagingSub(cfg.key, i)}
                                 disabled={disabled}
+                                className="accent-blue-600"
                               />
                               <span>{txt}</span>
                             </label>
@@ -1145,30 +1167,31 @@ export default function MediaGradingPage() {
           )}
 
           {/* Damage & Markings (filtered for sealed+vinyl) */}
-          <fieldset className="mg-fieldset">
-            <legend>Damage &amp; Markings</legend>
+          <fieldset className="border border-slate-200 rounded-lg p-3 mb-4 bg-slate-50">
+            <legend className="px-2 font-bold text-slate-700">Damage &amp; Markings</legend>
             {filterAllowed(pkgLabels.damage).map((cfg) => {
               const id = `pkg-${cfg.key}`;
               const checked = !!packagingChecks[cfg.key];
               const disabled = sealed && mediaType !== "vinyl" && cfg.key !== "creases";
               return (
-                <div key={cfg.key} className={`row ${checked ? "active" : ""}`}>
-                  <label htmlFor={id} className="checkbox-row">
+                <div key={cfg.key} className={`border border-transparent rounded-lg p-2 transition-colors ${checked ? "bg-white border-slate-200 shadow-sm" : ""}`}>
+                  <label htmlFor={id} className={`flex items-center gap-2 cursor-pointer select-none text-sm font-medium ${disabled ? 'opacity-50 cursor-not-allowed' : 'text-slate-800'}`}>
                     <input
                       id={id}
                       type="checkbox"
                       checked={checked}
                       onChange={() => togglePackaging(cfg.key)}
                       disabled={disabled}
+                      className="w-4 h-4 accent-blue-600 rounded"
                     />
                     <span>{cfg.label}</span>
                   </label>
                   {checked && Array.isArray(cfg.sub) && (
-                    <div className="subradios">
+                    <div className="flex gap-4 flex-wrap mt-2 ml-6">
                       {cfg.sub.map((txt, i) => {
                         const rid = `${id}-sub-${i}`;
                         return (
-                          <label key={rid} htmlFor={rid} className="radio-row">
+                          <label key={rid} htmlFor={rid} className="flex items-center gap-2 cursor-pointer text-sm text-slate-700">
                             <input
                               id={rid}
                               type="radio"
@@ -1176,6 +1199,7 @@ export default function MediaGradingPage() {
                               checked={packagingSubs[cfg.key] === i}
                               onChange={() => setPackagingSub(cfg.key, i)}
                               disabled={disabled}
+                              className="accent-blue-600"
                             />
                             <span>{txt}</span>
                           </label>
@@ -1190,26 +1214,27 @@ export default function MediaGradingPage() {
 
           {/* Sleeve Appearance nudge — Vinyl only */}
           {mediaType === "vinyl" && pkgLabels.appearance && (
-            <fieldset className="mg-fieldset">
-              <legend>{pkgLabels.appearance.label}</legend>
-              <div className="subradios">
+            <fieldset className="border border-slate-200 rounded-lg p-3 mb-4 bg-slate-50">
+              <legend className="px-2 font-bold text-slate-700">{pkgLabels.appearance.label}</legend>
+              <div className="flex gap-4 flex-wrap mt-2">
                 {pkgLabels.appearance.options.map((opt) => {
                   const id = `pkg-appearance-${opt.key}`;
                   return (
-                    <label key={id} htmlFor={id} className="radio-row">
+                    <label key={id} htmlFor={id} className="flex items-center gap-2 cursor-pointer text-sm text-slate-700">
                       <input
                         id={id}
                         type="radio"
                         name="pkg-appearance"
                         checked={packagingAppearance === opt.key}
                         onChange={() => setPackagingAppearance(opt.key)}
+                        className="accent-purple-600"
                       />
                       <span>{opt.label}</span>
                     </label>
                   );
                 })}
               </div>
-              <p className="help">
+              <p className="text-xs text-slate-500 mt-2 italic">
                 This adjusts the <strong>sleeve/cover</strong> score slightly (±2) <em>only</em> when it’s on the cusp of a grade boundary.
               </p>
             </fieldset>
@@ -1217,16 +1242,17 @@ export default function MediaGradingPage() {
 
           {/* Additional notes — hidden in sealed+vinyl mode per earlier rules */}
           {!isSealedVinyl && (
-            <fieldset className="mg-fieldset">
-              <legend>Additional notes (don’t affect score)</legend>
-              <div className="notes-grid">
+            <fieldset className="border border-slate-200 rounded-lg p-3 mb-4 bg-slate-50">
+              <legend className="px-2 font-bold text-slate-700">Additional notes (don’t affect score)</legend>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
                 {pkgLabels.notes.map((n) => (
-                  <label key={n.key} htmlFor={`note-${n.key}`} className="checkbox-row note">
+                  <label key={n.key} htmlFor={`note-${n.key}`} className="flex items-center gap-2 cursor-pointer select-none text-sm text-slate-700">
                     <input
                       id={`note-${n.key}`}
                       type="checkbox"
                       checked={!!additionalNotes[n.key]}
                       onChange={() => toggleNote(n.key)}
+                      className="w-4 h-4 accent-indigo-600 rounded"
                     />
                     <span>{n.label}</span>
                   </label>
@@ -1239,80 +1265,100 @@ export default function MediaGradingPage() {
     </section>
   );
 
+  const getGradeColorClass = (grade) => {
+    switch(grade) {
+      case 'M': return 'text-emerald-600';
+      case 'NM': return 'text-green-600';
+      case 'VG+': return 'text-blue-600';
+      case 'VG': return 'text-sky-500';
+      case 'G+': return 'text-amber-600';
+      case 'G': return 'text-orange-600';
+      default: return 'text-red-600';
+    }
+  };
+
   return (
-    <main id="media-grading">
-      <a className="back-link" href="/admin">← Back to Dashboard</a>
-      {Header}
+    <main className="bg-slate-50 min-h-screen p-4 pb-24 text-slate-900 font-sans">
+      <div className="max-w-7xl mx-auto">
+        <a className="inline-block mb-4 text-slate-600 hover:text-slate-900 hover:underline font-medium" href="/admin">← Back to Dashboard</a>
+        {Header}
 
-      <div className="mg-grid">
-        <div className="col">
-          <h2 className="col-title">
-            {mediaType === "vinyl" ? "🎶 Vinyl Record" : mediaType === "cassette" ? "📼 Cassette" : "💿 Compact Disc"}{" "}
-            Condition Assessment
-          </h2>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div>
+            <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
+              {mediaType === "vinyl" ? "🎶 Vinyl Record" : mediaType === "cassette" ? "📼 Cassette" : "💿 Compact Disc"}{" "}
+              Condition Assessment
+            </h2>
 
-          {items.map((item, i) => (
-            <MediaItemCard key={i} item={item} index={i} />
-          ))}
+            {items.map((item, i) => (
+              <MediaItemCard key={i} item={item} index={i} />
+            ))}
 
-          <div className="add-row">
-            <button type="button" className="btn add" onClick={addAnotherItem} disabled={items.length >= MAX_ITEMS}>
-              Add Another {labels.itemWord}
-            </button>
+            <div className="mt-4">
+              <button 
+                type="button" 
+                className="bg-sky-500 text-white hover:bg-sky-600 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 rounded-lg font-bold shadow-sm transition-colors" 
+                onClick={addAnotherItem} 
+                disabled={items.length >= MAX_ITEMS}
+              >
+                Add Another {labels.itemWord}
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
+              {mediaType === "vinyl" ? "📦 Jacket & Packaging" : mediaType === "cassette" ? "📦 J-Card & Packaging" : "📦 Insert/Booklet & Packaging"}{" "}
+              Condition Assessment
+            </h2>
+            {PackagingPanel}
           </div>
         </div>
 
-        <div className="col">
-          <h2 className="col-title">
-            {mediaType === "vinyl" ? "📦 Jacket & Packaging" : mediaType === "cassette" ? "📦 J-Card & Packaging" : "📦 Insert/Booklet & Packaging"}{" "}
-            Condition Assessment
-          </h2>
-          {PackagingPanel}
-        </div>
+        <section className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm mt-8">
+          <h3 className="text-lg font-bold text-slate-800 mb-3">📝 Custom Condition Notes</h3>
+          <textarea
+            rows={4}
+            value={customNotes}
+            onChange={(e) => setCustomNotes(e.target.value)}
+            aria-label="Custom condition notes"
+            className="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+          />
+        </section>
+
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+          <div className="bg-white border border-slate-200 rounded-xl p-6 text-center shadow-md">
+            <div className="text-xs text-slate-500 uppercase tracking-wider font-bold mb-2">
+              {mediaType === "vinyl" ? "Record Grade" : mediaType === "cassette" ? "Tape Grade" : "Disc Grade"}
+            </div>
+            <div className={`text-5xl font-black ${getGradeColorClass(overall.mediaGrade)}`}>{overall.mediaGrade}</div>
+            <div className="text-sm text-slate-400 mt-1 font-mono">{Math.round(overall.mediaScore)}/100</div>
+          </div>
+
+          <div className="bg-white border border-slate-200 rounded-xl p-6 text-center shadow-md">
+            <div className="text-xs text-slate-500 uppercase tracking-wider font-bold mb-2">Sleeve/Packaging Grade</div>
+            <div className={`text-5xl font-black ${getGradeColorClass(overall.pkgGrade)}`}>{overall.pkgGrade}</div>
+            <div className="text-sm text-slate-400 mt-1 font-mono">{Math.round(overall.pkgScore)}/100</div>
+          </div>
+
+          <div className="bg-white border border-slate-200 rounded-xl p-6 text-center shadow-md ring-2 ring-blue-500/20">
+            <div className="text-xs text-slate-500 uppercase tracking-wider font-bold mb-2">Overall Grade</div>
+            <div className={`text-5xl font-black ${getGradeColorClass(overall.overallGrade)}`}>{overall.overallGrade}</div>
+            <div className="text-sm text-slate-400 mt-1 font-mono">{Math.round(overall.overallScore)}/100</div>
+          </div>
+        </section>
+
+        <section className="bg-blue-50 border border-blue-200 rounded-xl p-6 mt-8">
+          <h3 className="text-lg font-bold text-blue-900 mb-2">Grading Explanation</h3>
+          <p className="text-blue-800 leading-relaxed">{overall.explanation}</p>
+          {customNotes.trim() && (
+            <>
+              <h4 className="text-sm font-bold text-blue-900 mt-4 mb-1 uppercase tracking-wide">Additional Notes</h4>
+              <p className="text-blue-800 italic">{customNotes}</p>
+            </>
+          )}
+        </section>
       </div>
-
-      <section className="panel">
-        <h3>📝 Custom Condition Notes</h3>
-        <textarea
-          rows={4}
-          value={customNotes}
-          onChange={(e) => setCustomNotes(e.target.value)}
-          aria-label="Custom condition notes"
-        />
-      </section>
-
-      <section className="results">
-        <div className={`card grade ${overall.mediaGrade}`}>
-          <div className="label">
-            {mediaType === "vinyl" ? "Record Grade" : mediaType === "cassette" ? "Tape Grade" : "Disc Grade"}
-          </div>
-          <div className="value">{overall.mediaGrade}</div>
-          <div className="score">{Math.round(overall.mediaScore)}/100</div>
-        </div>
-
-        <div className={`card grade ${overall.pkgGrade}`}>
-          <div className="label">Sleeve/Packaging Grade</div>
-          <div className="value">{overall.pkgGrade}</div>
-          <div className="score">{Math.round(overall.pkgScore)}/100</div>
-        </div>
-
-        <div className={`card grade ${overall.overallGrade}`}>
-          <div className="label">Overall Grade</div>
-          <div className="value">{overall.overallGrade}</div>
-          <div className="score">{Math.round(overall.overallScore)}/100</div>
-        </div>
-      </section>
-
-      <section className="panel explanation">
-        <h3>Grading Explanation</h3>
-        <p>{overall.explanation}</p>
-        {customNotes.trim() && (
-          <>
-            <h4>Additional Notes</h4>
-            <p>{customNotes}</p>
-          </>
-        )}
-      </section>
     </main>
   );
 }
