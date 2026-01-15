@@ -4,7 +4,6 @@
 import { useState, useMemo } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { Album } from '../../types/album';
-import styles from './EditCollection.module.css';
 import { ManageColumnFavoritesModal, ColumnFavorite } from './ManageColumnFavoritesModal';
 import Header from './Header';
 
@@ -273,34 +272,34 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
 
   return (
     <>
-      <div className={styles.duplicatesWrapper}>
+      <div className="fixed inset-0 bg-white z-[30000] flex flex-col overflow-hidden">
         <Header />
         
-        <div className={styles.duplicatesNav}>
-          <button onClick={onClose} className={styles.duplicatesBackButton}>
+        <div className="bg-[#2C2C2C] h-[50px] px-5 flex items-center gap-4 shrink-0">
+          <button onClick={onClose} className="bg-transparent border-none text-white text-sm cursor-pointer p-2 flex items-center hover:opacity-80">
             ← Back
           </button>
-          <span className={styles.duplicatesTitle}>🔍 Find Duplicates</span>
+          <span className="text-base font-semibold text-white leading-none m-0 p-0">🔍 Find Duplicates</span>
         </div>
 
-        <div className={styles.duplicatesToolbar}>
+        <div className="bg-[#2C2C2C] text-white h-[56px] px-5 flex items-center gap-3 shrink-0 border-b border-[#444]">
           {/* ... (rest of the render remains the same) ... */}
-          <span className={styles.duplicatesToolbarLabel}>Find duplicates based on</span>
-          <div className={styles.duplicatesDropdownWrapper}>
-            <button onClick={() => setShowMethodDropdown(!showMethodDropdown)} className={styles.duplicatesDropdownButton}>
+          <span className="text-sm text-white whitespace-nowrap">Find duplicates based on</span>
+          <div className="relative">
+            <button onClick={() => setShowMethodDropdown(!showMethodDropdown)} className="bg-white border border-[#ddd] px-3 py-1.5 text-sm cursor-pointer flex items-center gap-2 rounded text-black">
               <span>{selectedMethodLabel}</span>
-              <span className={styles.duplicatesDropdownArrow}>▼</span>
+              <span className="text-[10px] text-[#666]">▼</span>
             </button>
 
             {showMethodDropdown && (
               <>
-                <div onClick={() => setShowMethodDropdown(false)} className={styles.dropdownOverlay} />
-                <div className={styles.duplicatesDropdownMenu}>
+                <div onClick={() => setShowMethodDropdown(false)} className="fixed inset-0 z-[99]" />
+                <div className="absolute top-full left-0 mt-1 bg-white border border-[#ddd] rounded shadow-lg z-[100] min-w-[180px]">
                   {detectionMethods.map(method => (
                     <button key={method.value} onClick={() => {
                       setDetectionMethod(method.value);
                       setShowMethodDropdown(false);
-                    }} className={detectionMethod === method.value ? styles.duplicatesDropdownItemActive : styles.duplicatesDropdownItem}>
+                    }} className={`w-full px-3 py-2.5 border-none cursor-pointer text-sm text-left hover:bg-gray-100 ${detectionMethod === method.value ? 'bg-[#E3F2FD] text-black' : 'bg-white text-black'}`}>
                       {method.label}
                     </button>
                   ))}
@@ -308,45 +307,45 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
               </>
             )}
           </div>
-          <button onClick={handleFindDuplicates} disabled={loading} className={styles.duplicatesFindButton}>
+          <button onClick={handleFindDuplicates} disabled={loading} className="bg-[#4FC3F7] text-white border-none px-4 py-1.5 text-sm font-medium cursor-pointer rounded hover:bg-[#29B6F6] disabled:opacity-60 disabled:cursor-not-allowed">
             Find Duplicates
           </button>
           {searched && duplicateGroups.length > 0 && (
-            <span className={styles.duplicatesCount}>
+            <span className="text-white text-sm ml-5">
               {duplicateGroups.length} duplicates found:
             </span>
           )}
-          <div className={styles.duplicatesToolbarSpacer} />
-          <button onClick={() => setShowColumnFavoritesModal(true)} className={styles.duplicatesColumnButton} title="Manage Column Favorites">
+          <div className="flex-1" />
+          <button onClick={() => setShowColumnFavoritesModal(true)} className="bg-transparent border border-[#666] text-white text-base cursor-pointer px-3 py-1 rounded hover:bg-[#444]" title="Manage Column Favorites">
             ⊞
           </button>
         </div>
 
-        <div className={styles.duplicatesContent}>
+        <div className="flex-1 overflow-y-auto bg-white relative min-h-[400px]">
           {searched && duplicateGroups.length > 0 && (
             <>
-              <div className={styles.duplicatesTableWrapper}>
-                <table className={styles.duplicatesTable}>
+              <div className="p-0">
+                <table className="w-full border-collapse text-[13px]">
                   <thead>
-                    <tr className={styles.duplicatesTableHeaderRow}>
+                    <tr className="bg-[#f3f4f6] sticky top-0 z-10">
                       {displayColumns.map(col => (
-                        <th key={col} className={styles.duplicatesTableHeaderCell}>{col}</th>
+                        <th key={col} className="px-3 py-2.5 text-left font-bold text-black border-x border-l-black border-r-black border-b border-b-gray-200">{col}</th>
                       ))}
-                      <th className={styles.duplicatesTableHeaderCell}>Action</th>
+                      <th className="px-3 py-2.5 text-left font-bold text-black border-x border-l-black border-r-black border-b border-b-gray-200">Action</th>
                     </tr>
                   </thead>
                   <tbody>
                     {duplicateGroups.map((group, groupIdx) => (
                       <>
-                        <tr key={`group-${groupIdx}`} className={styles.duplicatesGroupRow}>
-                          <td colSpan={displayColumns.length + 1} className={styles.duplicatesGroupCell}>
-                            <div className={styles.duplicatesGroupHeader}>
-                              <button onClick={() => toggleGroupCollapse(groupIdx)} className={styles.duplicatesCollapseButton}>
+                        <tr key={`group-${groupIdx}`} className="bg-[#e5e7eb]">
+                          <td colSpan={displayColumns.length + 1} className="p-0">
+                            <div className="flex items-center justify-between px-3 py-2.5">
+                              <button onClick={() => toggleGroupCollapse(groupIdx)} className="bg-transparent border-none text-[#666] text-xs cursor-pointer p-1 flex items-center justify-center w-5 h-5 shrink-0 hover:text-black">
                                 {collapsedGroups.has(groupIdx) ? '▶' : '▼'}
                               </button>
-                              <span className={styles.duplicatesGroupName}>{group.displayName}</span>
-                              <div className={styles.duplicatesGroupActions}>
-                                <button className={styles.duplicatesKeepButton}>
+                              <span className="font-bold text-black flex-1 ml-1">{group.displayName}</span>
+                              <div className="flex items-center gap-2">
+                                <button className="bg-[#4FC3F7] text-white border-none px-3 py-1.5 text-[13px] font-medium cursor-pointer rounded">
                                   Keep {group.keepCount}
                                 </button>
                               </div>
@@ -354,19 +353,19 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
                           </td>
                         </tr>
                         {!collapsedGroups.has(groupIdx) && group.albums.map((album) => (
-                          <tr key={`album-${album.id}`} className={styles.duplicatesAlbumRow}>
+                          <tr key={`album-${album.id}`} className="bg-white">
                             {displayColumns.map(col => (
-                              <td key={col} className={styles.duplicatesTableCell}>{getColumnValue(album, col)}</td>
+                              <td key={col} className="px-3 py-2 border border-black text-black bg-white">{getColumnValue(album, col)}</td>
                             ))}
-                            <td className={styles.duplicatesTableCell}>
-                              <button onClick={() => handleRemoveAlbum(groupIdx, album.id)} className={styles.duplicatesRemoveButton}>
+                            <td className="px-3 py-2 border border-black text-black bg-white">
+                              <button onClick={() => handleRemoveAlbum(groupIdx, album.id)} className="bg-red-500 text-white border-none px-3 py-1 text-xs font-medium cursor-pointer rounded hover:bg-red-600">
                                 Remove
                               </button>
                             </td>
                           </tr>
                         ))}
                         {groupIdx < duplicateGroups.length - 1 && (
-                          <tr key={`separator-${groupIdx}`} className={styles.duplicatesSeparator}>
+                          <tr key={`separator-${groupIdx}`} className="h-2 bg-[#f3f4f6]">
                             <td colSpan={displayColumns.length + 1}></td>
                           </tr>
                         )}
@@ -376,8 +375,8 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
                 </table>
               </div>
 
-              <div className={styles.duplicatesFooterActions}>
-                <button onClick={handleRemoveAllAutomatically} disabled={loading || totalToRemove === 0} className={styles.duplicatesRemoveAllButton}>
+              <div className="p-5 flex justify-end border-t border-gray-200 bg-white">
+                <button onClick={handleRemoveAllAutomatically} disabled={loading || totalToRemove === 0} className="bg-[#4FC3F7] text-white border-none px-5 py-2.5 text-sm font-medium cursor-pointer rounded hover:bg-[#29B6F6] disabled:opacity-60 disabled:cursor-not-allowed">
                   Remove all duplicates automatically
                 </button>
               </div>
@@ -385,9 +384,9 @@ export default function FindDuplicatesModal({ isOpen, onClose, onDuplicatesRemov
           )}
 
           {loading && (
-            <div className={styles.duplicatesLoadingInterstitial}>
-              <div className={styles.duplicatesLoadingContent}>
-                <div className={styles.duplicatesLoadingSpinner} />
+            <div className="absolute inset-0 bg-white/95 flex items-center justify-center z-[100]">
+              <div className="flex flex-col items-center gap-3 text-[#666]">
+                <div className="w-10 h-10 border-4 border-gray-100 border-t-[#4FC3F7] rounded-full animate-spin" />
                 <div>Loading...</div>
                 <div>Please wait</div>
               </div>

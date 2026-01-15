@@ -15,121 +15,46 @@ export default function ImportSelectionModal({
   onCancel,
 }: ImportSelectionModalProps) {
   return (
-    <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: 'white',
-        zIndex: 10000,
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-      }}
-    >
+    <div className="fixed inset-0 bg-white z-[10000] flex flex-col overflow-hidden">
       {/* Black Header Bar */}
-      <div
-        style={{
-          background: '#2A2A2A',
-          color: 'white',
-          padding: '14px 24px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexShrink: 0,
-        }}
-      >
+      <div className="bg-[#2A2A2A] text-white px-6 py-3.5 flex items-center justify-between shrink-0">
         <button
           onClick={onCancel}
-          style={{
-            background: 'transparent',
-            border: 'none',
-            color: 'white',
-            cursor: 'pointer',
-            fontSize: '15px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: 0,
-          }}
+          className="bg-transparent border-none text-white cursor-pointer text-[15px] flex items-center gap-2 p-0 hover:text-gray-300"
         >
           ◀ Back
         </button>
-        <div style={{ fontSize: '16px', fontWeight: 500, color: 'white' }}>Import Data</div>
+        <div className="text-base font-medium text-white">Import Data</div>
         <button
           onClick={onCancel}
-          style={{
-            background: 'transparent',
-            border: 'none',
-            color: 'white',
-            fontSize: '28px',
-            cursor: 'pointer',
-            lineHeight: '1',
-            padding: 0,
-          }}
+          className="bg-transparent border-none text-white text-[28px] cursor-pointer leading-none p-0 hover:text-gray-300"
         >
           ×
         </button>
       </div>
 
       {/* Content */}
-      <div
-        style={{
-          flex: 1,
-          overflowY: 'auto',
-          background: 'white',
-          padding: '24px',
-        }}
-      >
-        <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
-          <p style={{ fontSize: '15px', color: '#666', marginBottom: '24px' }}>
+      <div className="flex-1 overflow-y-auto bg-white p-6">
+        <div className="max-w-[1000px] mx-auto">
+          <p className="text-[15px] text-[#666] mb-6">
             Select the type of data you want to import or enrich:
           </p>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div className="flex flex-col gap-3">
             {/* CSV Import */}
             <button
               onClick={() => onSelectImportType('csv')}
-              style={{
-                width: '100%',
-                textAlign: 'left',
-                background: 'white',
-                border: '2px solid #D8D8D8',
-                borderRadius: '6px',
-                padding: '20px',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = '#4FC3F7';
-                e.currentTarget.style.background = '#F0F9FF';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = '#D8D8D8';
-                e.currentTarget.style.background = 'white';
-              }}
+              className="w-full text-left bg-white border-2 border-[#D8D8D8] rounded-md p-5 cursor-pointer transition-all duration-200 hover:border-[#4FC3F7] hover:bg-[#F0F9FF] group"
             >
-              <div style={{ display: 'flex', alignItems: 'start' }}>
-                <div style={{ 
-                  flexShrink: 0, 
-                  width: '48px', 
-                  height: '48px', 
-                  background: '#E8F5E9', 
-                  borderRadius: '8px', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center', 
-                  marginRight: '16px' 
-                }}>
-                  <span style={{ fontSize: '24px' }}>📄</span>
+              <div className="flex items-start">
+                <div className="shrink-0 w-12 h-12 bg-[#E8F5E9] rounded-lg flex items-center justify-center mr-4">
+                  <span className="text-2xl">📄</span>
                 </div>
-                <div style={{ flex: 1 }}>
-                  <h3 style={{ margin: '0 0 6px 0', fontSize: '16px', fontWeight: 600, color: '#1a1a1a' }}>
+                <div className="flex-1">
+                  <h3 className="m-0 mb-1.5 text-base font-semibold text-[#1a1a1a]">
                     CSV Import
                   </h3>
-                  <p style={{ margin: 0, fontSize: '14px', color: '#666' }}>
+                  <p className="m-0 text-sm text-[#666]">
                     Import album data from a CSV file with format parsing
                   </p>
                 </div>
@@ -139,44 +64,17 @@ export default function ImportSelectionModal({
             {/* Discogs Import */}
             <button
               onClick={() => onSelectImportType('discogs')}
-              style={{
-                width: '100%',
-                textAlign: 'left',
-                background: 'white',
-                border: '2px solid #D8D8D8',
-                borderRadius: '6px',
-                padding: '20px',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = '#4FC3F7';
-                e.currentTarget.style.background = '#F0F9FF';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = '#D8D8D8';
-                e.currentTarget.style.background = 'white';
-              }}
+              className="w-full text-left bg-white border-2 border-[#D8D8D8] rounded-md p-5 cursor-pointer transition-all duration-200 hover:border-[#4FC3F7] hover:bg-[#F0F9FF] group"
             >
-              <div style={{ display: 'flex', alignItems: 'start' }}>
-                <div style={{ 
-                  flexShrink: 0, 
-                  width: '48px', 
-                  height: '48px', 
-                  background: '#E3F2FD', 
-                  borderRadius: '8px', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center', 
-                  marginRight: '16px' 
-                }}>
-                  <span style={{ fontSize: '24px' }}>💿</span>
+              <div className="flex items-start">
+                <div className="shrink-0 w-12 h-12 bg-[#E3F2FD] rounded-lg flex items-center justify-center mr-4">
+                  <span className="text-2xl">💿</span>
                 </div>
-                <div style={{ flex: 1 }}>
-                  <h3 style={{ margin: '0 0 6px 0', fontSize: '16px', fontWeight: 600, color: '#1a1a1a' }}>
+                <div className="flex-1">
+                  <h3 className="m-0 mb-1.5 text-base font-semibold text-[#1a1a1a]">
                     Discogs CSV Import
                   </h3>
-                  <p style={{ margin: 0, fontSize: '14px', color: '#666' }}>
+                  <p className="m-0 text-sm text-[#666]">
                     Import your collection from a Discogs CSV export
                   </p>
                 </div>
@@ -186,44 +84,17 @@ export default function ImportSelectionModal({
             {/* CLZ Import */}
             <button
               onClick={() => onSelectImportType('clz')}
-              style={{
-                width: '100%',
-                textAlign: 'left',
-                background: 'white',
-                border: '2px solid #D8D8D8',
-                borderRadius: '6px',
-                padding: '20px',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = '#4FC3F7';
-                e.currentTarget.style.background = '#F0F9FF';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = '#D8D8D8';
-                e.currentTarget.style.background = 'white';
-              }}
+              className="w-full text-left bg-white border-2 border-[#D8D8D8] rounded-md p-5 cursor-pointer transition-all duration-200 hover:border-[#4FC3F7] hover:bg-[#F0F9FF] group"
             >
-              <div style={{ display: 'flex', alignItems: 'start' }}>
-                <div style={{ 
-                  flexShrink: 0, 
-                  width: '48px', 
-                  height: '48px', 
-                  background: '#F3E5F5', 
-                  borderRadius: '8px', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center', 
-                  marginRight: '16px' 
-                }}>
-                  <span style={{ fontSize: '24px' }}>📦</span>
+              <div className="flex items-start">
+                <div className="shrink-0 w-12 h-12 bg-[#F3E5F5] rounded-lg flex items-center justify-center mr-4">
+                  <span className="text-2xl">📦</span>
                 </div>
-                <div style={{ flex: 1 }}>
-                  <h3 style={{ margin: '0 0 6px 0', fontSize: '16px', fontWeight: 600, color: '#1a1a1a' }}>
+                <div className="flex-1">
+                  <h3 className="m-0 mb-1.5 text-base font-semibold text-[#1a1a1a]">
                     CLZ Music Web Import
                   </h3>
-                  <p style={{ margin: 0, fontSize: '14px', color: '#666' }}>
+                  <p className="m-0 text-sm text-[#666]">
                     Import your collection from CLZ Music Web CSV/XML export
                   </p>
                 </div>
@@ -233,44 +104,17 @@ export default function ImportSelectionModal({
             {/* Enrich Existing */}
             <button
               onClick={() => onSelectImportType('enrich')}
-              style={{
-                width: '100%',
-                textAlign: 'left',
-                background: 'white',
-                border: '2px solid #D8D8D8',
-                borderRadius: '6px',
-                padding: '20px',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = '#4FC3F7';
-                e.currentTarget.style.background = '#F0F9FF';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = '#D8D8D8';
-                e.currentTarget.style.background = 'white';
-              }}
+              className="w-full text-left bg-white border-2 border-[#D8D8D8] rounded-md p-5 cursor-pointer transition-all duration-200 hover:border-[#4FC3F7] hover:bg-[#F0F9FF] group"
             >
-              <div style={{ display: 'flex', alignItems: 'start' }}>
-                <div style={{ 
-                  flexShrink: 0, 
-                  width: '48px', 
-                  height: '48px', 
-                  background: '#FFF3E0', 
-                  borderRadius: '8px', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center', 
-                  marginRight: '16px' 
-                }}>
-                  <span style={{ fontSize: '24px' }}>⚡</span>
+              <div className="flex items-start">
+                <div className="shrink-0 w-12 h-12 bg-[#FFF3E0] rounded-lg flex items-center justify-center mr-4">
+                  <span className="text-2xl">⚡</span>
                 </div>
-                <div style={{ flex: 1 }}>
-                  <h3 style={{ margin: '0 0 6px 0', fontSize: '16px', fontWeight: 600, color: '#1a1a1a' }}>
+                <div className="flex-1">
+                  <h3 className="m-0 mb-1.5 text-base font-semibold text-[#1a1a1a]">
                     Enrich Existing Albums
                   </h3>
-                  <p style={{ margin: 0, fontSize: '14px', color: '#666' }}>
+                  <p className="m-0 text-sm text-[#666]">
                     Add missing metadata to existing albums using Discogs
                   </p>
                 </div>
