@@ -10,7 +10,6 @@ import {
   type Track,
 } from 'lib/conflictDetection';
 import { supabase } from 'lib/supabaseClient';
-import styles from '../EditCollection.module.css';
 
 interface ConflictResolutionModalProps {
   conflicts: FieldConflict[];
@@ -174,27 +173,27 @@ export default function ConflictResolutionModal({
   };
 
   return (
-    <div className={styles.duplicatesWrapper}>
-      <div className={styles.duplicatesNav}>
-        <button onClick={onCancel} className={styles.duplicatesBackButton}>
+    <div className="fixed inset-0 bg-white z-[30000] flex flex-col overflow-hidden">
+      <div className="bg-[#2C2C2C] h-[50px] px-5 flex items-center gap-4 shrink-0">
+        <button onClick={onCancel} className="bg-transparent border-none text-white text-sm cursor-pointer p-2 flex items-center hover:opacity-80">
           ◀ Back
         </button>
-        <h1 className={styles.duplicatesTitle}>Resolve Import Conflicts</h1>
+        <h1 className="text-base font-semibold text-white leading-none m-0 p-0">Resolve Import Conflicts</h1>
       </div>
 
-      <div className={styles.duplicatesToolbar}>
-        <div className={styles.duplicatesToolbarLabel}>
+      <div className="bg-[#2C2C2C] text-white h-[56px] px-5 flex items-center gap-3 shrink-0 border-b border-[#444]">
+        <div className="text-sm text-white whitespace-nowrap">
           {conflicts.length} conflicts found across {Object.keys(groupedConflicts).length} albums
         </div>
-        <div className={styles.duplicatesToolbarSpacer} />
-        <button onClick={onComplete} className={styles.duplicatesFindButton}>
+        <div className="flex-1" />
+        <button onClick={onComplete} className="bg-[#4FC3F7] text-white border-none px-4 py-1.5 text-sm font-medium cursor-pointer rounded hover:bg-[#29B6F6]">
           Complete
         </button>
       </div>
 
-      <div className={styles.duplicatesContent}>
-        <div className={styles.duplicatesTableWrapper}>
-          <table className={styles.duplicatesTable}>
+      <div className="flex-1 overflow-y-auto bg-white relative">
+        <div className="p-0">
+          <table className="w-full border-collapse text-[13px]">
             <tbody>
               {Object.entries(groupedConflicts).map(([albumKey, albumConflicts], groupIdx) => {
                 const isExpanded = expandedGroups.has(albumKey);
@@ -203,17 +202,17 @@ export default function ConflictResolutionModal({
                 return (
                   <React.Fragment key={albumKey}>
                     {/* Album Group Header */}
-                    <tr className={styles.duplicatesGroupRow}>
-                      <td colSpan={8} className={styles.duplicatesGroupCell}>
-                        <div className={styles.duplicatesGroupHeader}>
+                    <tr className="bg-[#e5e7eb]">
+                      <td colSpan={8} className="p-0">
+                        <div className="flex items-center justify-between px-3 py-2.5">
                           <button
                             onClick={() => toggleGroupExpanded(albumKey)}
-                            className={styles.duplicatesCollapseButton}
+                            className="bg-transparent border-none text-[#666] text-xs cursor-pointer p-1 flex items-center justify-center w-5 h-5 shrink-0 hover:text-black"
                           >
                             {isExpanded ? '−' : '+'}
                           </button>
-                          <div className={styles.duplicatesGroupName}>{albumKey}</div>
-                          <div className={styles.duplicatesGroupActions}>
+                          <div className="font-bold text-black flex-1 ml-1">{albumKey}</div>
+                          <div className="text-sm text-gray-600">
                             {albumConflicts.length} field{albumConflicts.length !== 1 ? 's' : ''} in conflict
                           </div>
                         </div>
@@ -223,27 +222,27 @@ export default function ConflictResolutionModal({
                     {isExpanded && (
                       <>
                         {/* Identifying Data Header Row */}
-                        <tr className={styles.duplicatesTableHeaderRow}>
-                          <th className={styles.duplicatesTableHeaderCell}>Artist</th>
-                          <th className={styles.duplicatesTableHeaderCell}>Title</th>
-                          <th className={styles.duplicatesTableHeaderCell}>Format</th>
-                          <th className={styles.duplicatesTableHeaderCell}>Barcode</th>
-                          <th className={styles.duplicatesTableHeaderCell}>Cat No</th>
-                          <th className={styles.duplicatesTableHeaderCell}>Country</th>
-                          <th className={styles.duplicatesTableHeaderCell}>Year</th>
-                          <th className={styles.duplicatesTableHeaderCell}>Labels</th>
+                        <tr className="bg-[#f3f4f6]">
+                          <th className="px-3 py-2.5 text-left font-bold text-black border-x border-l-black border-r-black border-b border-b-gray-200">Artist</th>
+                          <th className="px-3 py-2.5 text-left font-bold text-black border-x border-l-black border-r-black border-b border-b-gray-200">Title</th>
+                          <th className="px-3 py-2.5 text-left font-bold text-black border-x border-l-black border-r-black border-b border-b-gray-200">Format</th>
+                          <th className="px-3 py-2.5 text-left font-bold text-black border-x border-l-black border-r-black border-b border-b-gray-200">Barcode</th>
+                          <th className="px-3 py-2.5 text-left font-bold text-black border-x border-l-black border-r-black border-b border-b-gray-200">Cat No</th>
+                          <th className="px-3 py-2.5 text-left font-bold text-black border-x border-l-black border-r-black border-b border-b-gray-200">Country</th>
+                          <th className="px-3 py-2.5 text-left font-bold text-black border-x border-l-black border-r-black border-b border-b-gray-200">Year</th>
+                          <th className="px-3 py-2.5 text-left font-bold text-black border-x border-l-black border-r-black border-b border-b-gray-200">Labels</th>
                         </tr>
 
                         {/* Identifying Data Values Row */}
-                        <tr className={styles.duplicatesAlbumRow}>
-                          <td className={styles.duplicatesTableCell}>{firstConflict.artist}</td>
-                          <td className={styles.duplicatesTableCell}>{firstConflict.title}</td>
-                          <td className={styles.duplicatesTableCell}>{firstConflict.format}</td>
-                          <td className={styles.duplicatesTableCell}>{firstConflict.barcode || '—'}</td>
-                          <td className={styles.duplicatesTableCell}>{firstConflict.cat_no || '—'}</td>
-                          <td className={styles.duplicatesTableCell}>{firstConflict.country || '—'}</td>
-                          <td className={styles.duplicatesTableCell}>{firstConflict.year || '—'}</td>
-                          <td className={styles.duplicatesTableCell}>
+                        <tr className="bg-white">
+                          <td className="px-3 py-2 border border-black text-black bg-white align-top">{firstConflict.artist}</td>
+                          <td className="px-3 py-2 border border-black text-black bg-white align-top">{firstConflict.title}</td>
+                          <td className="px-3 py-2 border border-black text-black bg-white align-top">{firstConflict.format}</td>
+                          <td className="px-3 py-2 border border-black text-black bg-white align-top">{firstConflict.barcode || '—'}</td>
+                          <td className="px-3 py-2 border border-black text-black bg-white align-top">{firstConflict.cat_no || '—'}</td>
+                          <td className="px-3 py-2 border border-black text-black bg-white align-top">{firstConflict.country || '—'}</td>
+                          <td className="px-3 py-2 border border-black text-black bg-white align-top">{firstConflict.year || '—'}</td>
+                          <td className="px-3 py-2 border border-black text-black bg-white align-top">
                             {firstConflict.labels.length > 0 ? firstConflict.labels.join(', ') : '—'}
                           </td>
                         </tr>
@@ -258,63 +257,51 @@ export default function ConflictResolutionModal({
                           return (
                             <React.Fragment key={conflictId}>
                               {/* Field Name Row */}
-                              <tr className={styles.duplicatesAlbumRow}>
-                                <td colSpan={8} className={styles.duplicatesTableCell}>
+                              <tr className="bg-white">
+                                <td colSpan={8} className="px-3 py-2 border border-black text-black bg-white align-top">
                                   <strong>Field: {getFieldDisplayName(conflict.field_name)}</strong>
                                 </td>
                               </tr>
 
                               {/* Content Comparison Row */}
-                              <tr className={styles.duplicatesAlbumRow}>
-                                <td colSpan={4} className={styles.duplicatesTableCell}>
-                                  <div style={{ fontWeight: 600, marginBottom: '8px', color: '#374151' }}>
+                              <tr className="bg-white">
+                                <td colSpan={4} className="px-3 py-2 border border-black text-black bg-white align-top">
+                                  <div className="font-semibold mb-2 text-gray-700">
                                     Current Database Value
                                   </div>
-                                  <div style={{ padding: '8px', backgroundColor: '#f9fafb', borderRadius: '4px' }}>
+                                  <div className="p-2 bg-gray-50 rounded">
                                     {renderValue(conflict.current_value)}
                                   </div>
                                 </td>
-                                <td colSpan={4} className={styles.duplicatesTableCell}>
-                                  <div style={{ fontWeight: 600, marginBottom: '8px', color: '#374151' }}>
+                                <td colSpan={4} className="px-3 py-2 border border-black text-black bg-white align-top">
+                                  <div className="font-semibold mb-2 text-gray-700">
                                     New {source === 'clz' ? 'CLZ' : 'Discogs'} Value
                                   </div>
-                                  <div style={{ padding: '8px', backgroundColor: '#f9fafb', borderRadius: '4px' }}>
+                                  <div className="p-2 bg-gray-50 rounded">
                                     {renderValue(conflict.new_value)}
                                   </div>
                                 </td>
                               </tr>
 
                               {/* Decision Row */}
-                              <tr className={styles.duplicatesAlbumRow}>
-                                <td colSpan={8} className={styles.duplicatesTableCell}>
-                                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center', padding: '8px 0' }}>
+                              <tr className="bg-white">
+                                <td colSpan={8} className="px-3 py-2 border border-black text-black bg-white align-top">
+                                  <div className="flex gap-3 items-center py-2">
                                     <button
                                       onClick={() => handleResolutionChange(conflictId, 'current')}
                                       disabled={isApplied}
-                                      style={{
-                                        padding: '8px 16px',
-                                        backgroundColor: resolution === 'current' ? '#E3F2FD' : 'white',
-                                        border: '1px solid #000',
-                                        borderRadius: '4px',
-                                        cursor: isApplied ? 'not-allowed' : 'pointer',
-                                        fontWeight: resolution === 'current' ? 600 : 400,
-                                        opacity: isApplied ? 0.5 : 1,
-                                      }}
+                                      className={`px-4 py-2 border border-black rounded text-sm cursor-pointer transition-opacity ${
+                                        resolution === 'current' ? 'bg-[#E3F2FD] font-semibold' : 'bg-white font-normal'
+                                      } ${isApplied ? 'opacity-50 cursor-not-allowed' : ''}`}
                                     >
                                       Keep Existing
                                     </button>
                                     <button
                                       onClick={() => handleResolutionChange(conflictId, 'new')}
                                       disabled={isApplied}
-                                      style={{
-                                        padding: '8px 16px',
-                                        backgroundColor: resolution === 'new' ? '#E3F2FD' : 'white',
-                                        border: '1px solid #000',
-                                        borderRadius: '4px',
-                                        cursor: isApplied ? 'not-allowed' : 'pointer',
-                                        fontWeight: resolution === 'new' ? 600 : 400,
-                                        opacity: isApplied ? 0.5 : 1,
-                                      }}
+                                      className={`px-4 py-2 border border-black rounded text-sm cursor-pointer transition-opacity ${
+                                        resolution === 'new' ? 'bg-[#E3F2FD] font-semibold' : 'bg-white font-normal'
+                                      } ${isApplied ? 'opacity-50 cursor-not-allowed' : ''}`}
                                     >
                                       Replace with New
                                     </button>
@@ -322,24 +309,18 @@ export default function ConflictResolutionModal({
                                       <button
                                         onClick={() => handleResolutionChange(conflictId, 'merge')}
                                         disabled={isApplied}
-                                        style={{
-                                          padding: '8px 16px',
-                                          backgroundColor: resolution === 'merge' ? '#E3F2FD' : 'white',
-                                          border: '1px solid #000',
-                                          borderRadius: '4px',
-                                          cursor: isApplied ? 'not-allowed' : 'pointer',
-                                          fontWeight: resolution === 'merge' ? 600 : 400,
-                                          opacity: isApplied ? 0.5 : 1,
-                                        }}
+                                        className={`px-4 py-2 border border-black rounded text-sm cursor-pointer transition-opacity ${
+                                          resolution === 'merge' ? 'bg-[#E3F2FD] font-semibold' : 'bg-white font-normal'
+                                        } ${isApplied ? 'opacity-50 cursor-not-allowed' : ''}`}
                                       >
                                         Merge Data
                                       </button>
                                     )}
-                                    <div style={{ marginLeft: 'auto' }}>
+                                    <div className="ml-auto">
                                       <button
                                         onClick={() => handleApplyConflict(conflict)}
                                         disabled={isApplied || isProcessing}
-                                        className={styles.duplicatesKeepButton}
+                                        className="bg-[#4FC3F7] text-white border-none px-3 py-1.5 text-[13px] font-medium cursor-pointer rounded hover:bg-[#29B6F6] disabled:opacity-60 disabled:cursor-not-allowed"
                                       >
                                         {isApplied ? 'Applied' : 'Apply'}
                                       </button>
@@ -355,7 +336,7 @@ export default function ConflictResolutionModal({
 
                     {/* Spacer Row */}
                     {groupIdx < Object.keys(groupedConflicts).length - 1 && (
-                      <tr className={styles.duplicatesSeparator}>
+                      <tr className="h-2 bg-[#f3f4f6]">
                         <td colSpan={8}></td>
                       </tr>
                     )}

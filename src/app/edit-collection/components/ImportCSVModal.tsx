@@ -11,94 +11,39 @@ export default function ImportCSVModal({ isOpen, onClose }: ImportCSVModalProps)
   if (!isOpen) return null;
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 30000,
-    }}>
-      <div style={{
-        backgroundColor: 'white',
-        borderRadius: '8px',
-        width: '600px',
-        maxHeight: '90vh',
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-      }}>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[30000]">
+      <div className="bg-white rounded-lg w-[600px] max-h-[90vh] flex flex-col overflow-hidden">
         {/* Header */}
-        <div style={{
-          padding: '16px 20px',
-          borderBottom: '1px solid #e5e7eb',
-          backgroundColor: '#10b981',
-          color: 'white',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}>
-          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '600' }}>
+        <div className="px-5 py-4 border-b border-gray-200 bg-emerald-500 text-white flex justify-between items-center">
+          <h2 className="m-0 text-lg font-semibold">
             Import from CSV
           </h2>
           <button
             onClick={onClose}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'white',
-              fontSize: '24px',
-              cursor: 'pointer',
-              padding: 0,
-            }}
+            className="bg-none border-none text-white text-2xl cursor-pointer p-0 hover:text-white/80"
           >
             ×
           </button>
         </div>
 
         {/* Content */}
-        <div style={{ flex: 1, overflow: 'auto', padding: '20px' }}>
-          <div style={{
-            padding: '20px',
-            backgroundColor: '#fef3c7',
-            border: '1px solid #fbbf24',
-            borderRadius: '6px',
-            textAlign: 'center',
-          }}>
-            <div style={{ fontSize: '48px', marginBottom: '12px' }}>🚧</div>
-            <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: '600', color: '#92400e' }}>
+        <div className="flex-1 overflow-auto p-5">
+          <div className="p-5 bg-amber-50 border border-amber-300 rounded-md text-center">
+            <div className="text-5xl mb-3">🚧</div>
+            <h3 className="m-0 mb-4 text-lg font-semibold text-amber-800">
               Coming Soon
             </h3>
-            <p style={{ margin: 0, fontSize: '14px', color: '#92400e' }}>
+            <p className="m-0 text-sm text-amber-800">
               CSV import functionality is under development.
             </p>
           </div>
         </div>
 
         {/* Footer */}
-        <div style={{
-          padding: '16px 20px',
-          borderTop: '1px solid #e5e7eb',
-          display: 'flex',
-          justifyContent: 'flex-end',
-          gap: '12px',
-        }}>
+        <div className="px-5 py-4 border-t border-gray-200 flex justify-end gap-3">
           <button
             onClick={onClose}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: '#10b981',
-              border: 'none',
-              borderRadius: '4px',
-              fontSize: '14px',
-              fontWeight: '600',
-              cursor: 'pointer',
-              color: 'white',
-            }}
+            className="px-4 py-2 bg-emerald-500 border-none rounded text-sm font-semibold cursor-pointer text-white hover:bg-emerald-600"
           >
             Close
           </button>

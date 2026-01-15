@@ -5,7 +5,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import { type ExtendedFieldConflict } from './ImportEnrichModal';
 import { SERVICE_ICONS } from 'lib/enrichment-data-mapping';
-import styles from '../EditCollection.module.css';
 
 interface EnrichmentReviewModalProps {
   conflicts: ExtendedFieldConflict[];
@@ -43,48 +42,35 @@ function ImageGridSelector({
   label: string;
   color: 'green' | 'blue';
 }) {
-  const labelColor = color === 'green' ? '#047857' : '#1d4ed8';
-  const borderColor = color === 'green' ? '#10b981' : '#3b82f6';
+  const isGreen = color === 'green';
+  const borderColor = isGreen ? 'border-[#10b981]' : 'border-[#3b82f6]';
+  const bgColor = isGreen ? 'bg-[#f0fdf4]' : 'bg-[#eff6ff]';
+  const labelColor = isGreen ? 'text-[#047857]' : 'text-[#1d4ed8]';
+  const labelBg = isGreen ? 'bg-[#047857]' : 'bg-[#1d4ed8]';
+  const borderSelected = isGreen ? 'border-[#047857]' : 'border-[#1d4ed8]';
 
   return (
-    <div style={{ 
-      border: `2px solid ${borderColor}`, 
-      borderRadius: '8px', 
-      padding: '12px',
-      backgroundColor: color === 'green' ? '#f0fdf4' : '#eff6ff'
-    }}>
-      <div style={{ 
-        fontSize: '11px', fontWeight: '700', color: labelColor, 
-        marginBottom: '8px', textTransform: 'uppercase', display: 'flex', justifyContent: 'space-between' 
-      }}>
+    <div className={`border-2 rounded-lg p-3 ${borderColor} ${bgColor}`}>
+      <div className={`text-[11px] font-bold uppercase mb-2 flex justify-between ${labelColor}`}>
         <span>{label} ({images.length})</span>
         <span>{Array.from(selectedImages).filter(img => images.includes(img)).length} Selected</span>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: '8px' }}>
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(80px,1fr))] gap-2">
         {images.map((url, idx) => {
           const isSelected = selectedImages.has(url);
           return (
             <div 
               key={`${idx}-${url}`} 
               onClick={() => onToggle(url)}
-              style={{ 
-                position: 'relative', 
-                aspectRatio: '1', 
-                borderRadius: '4px', 
-                overflow: 'hidden', 
-                cursor: 'pointer',
-                border: isSelected ? `3px solid ${labelColor}` : '1px solid #d1d5db',
-                opacity: isSelected ? 1 : 0.6
-              }}
+              className={`relative aspect-square rounded overflow-hidden cursor-pointer border ${
+                isSelected ? `border-[3px] ${borderSelected} opacity-100` : 'border-gray-300 opacity-60'
+              }`}
             >
               <Image src={url} alt="" fill style={{ objectFit: 'cover' }} unoptimized />
               {isSelected && (
-                <div style={{ 
-                  position: 'absolute', top: '2px', right: '2px', 
-                  background: labelColor, color: 'white', borderRadius: '50%', 
-                  width: '16px', height: '16px', fontSize: '10px', 
-                  display: 'flex', alignItems: 'center', justifyContent: 'center' 
-                }}>✓</div>
+                <div className={`absolute top-0.5 right-0.5 text-white rounded-full w-4 h-4 text-[10px] flex items-center justify-center ${labelBg}`}>
+                  ✓
+                </div>
               )}
             </div>
           );
@@ -108,42 +94,32 @@ function ArrayChipSelector({
   label: string;
   color: 'green' | 'blue';
 }) {
-  const labelColor = color === 'green' ? '#047857' : '#1d4ed8';
-  const bgColor = color === 'green' ? '#f0fdf4' : '#eff6ff';
-  const borderColor = color === 'green' ? '#10b981' : '#3b82f6';
+  const isGreen = color === 'green';
+  const borderColor = isGreen ? 'border-[#10b981]' : 'border-[#3b82f6]';
+  const bgColor = isGreen ? 'bg-[#f0fdf4]' : 'bg-[#eff6ff]';
+  const labelColor = isGreen ? 'text-[#047857]' : 'text-[#1d4ed8]';
+  
+  // Dynamic styles for chips
+  const activeBg = isGreen ? 'bg-[#047857]' : 'bg-[#1d4ed8]';
+  const activeBorder = isGreen ? 'border-[#047857]' : 'border-[#1d4ed8]';
 
   return (
-    <div style={{ 
-      padding: '12px', 
-      borderRadius: '8px', 
-      border: `2px solid ${borderColor}`, 
-      backgroundColor: bgColor, 
-      flex: 1,
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '8px'
-    }}>
-      <div style={{ fontSize: '11px', fontWeight: '700', color: labelColor, textTransform: 'uppercase' }}>
+    <div className={`p-3 rounded-lg border-2 flex flex-col gap-2 flex-1 ${borderColor} ${bgColor}`}>
+      <div className={`text-[11px] font-bold uppercase ${labelColor}`}>
         {label}
       </div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+      <div className="flex flex-wrap gap-1.5">
         {items.map((item, idx) => {
           const isSelected = selectedItems.has(item);
           return (
             <button
               key={`${idx}-${item}`}
               onClick={() => onToggle(item)}
-              style={{
-                padding: '4px 10px',
-                borderRadius: '16px',
-                fontSize: '12px',
-                cursor: 'pointer',
-                border: '1px solid',
-                borderColor: isSelected ? labelColor : '#d1d5db',
-                backgroundColor: isSelected ? labelColor : 'white',
-                color: isSelected ? 'white' : '#374151',
-                transition: 'all 0.1s'
-              }}
+              className={`px-2.5 py-1 rounded-2xl text-xs cursor-pointer border transition-all ${
+                isSelected 
+                  ? `${activeBg} ${activeBorder} text-white` 
+                  : 'bg-white border-gray-300 text-gray-700'
+              }`}
             >
               {isSelected ? '✓ ' : ''}{item}
             </button>
@@ -177,67 +153,51 @@ function ConflictValue({
     if (isImageUrl(value)) setIsImage(true);
   }, [value]);
 
-  const borderColor = isSelected ? (color === 'green' ? '#10b981' : '#3b82f6') : '#e5e7eb';
-  const bgColor = isSelected ? (color === 'green' ? '#f0fdf4' : '#eff6ff') : 'white';
-  const labelColor = color === 'green' ? '#047857' : '#1d4ed8';
-
-  const baseStyle = {
-    padding: '12px',
-    borderRadius: '8px',
-    border: `2px solid ${borderColor}`,
-    backgroundColor: bgColor,
-    cursor: 'pointer',
-    transition: 'all 0.2s',
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '8px',
-    position: 'relative' as const,
-    height: '100%',
-    minWidth: '0',
-    flex: 1
-  };
-
-  const headerStyle = {
-    fontSize: '11px',
-    fontWeight: '700',
-    color: labelColor,
-    textTransform: 'uppercase' as const,
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: '6px'
-  };
+  const isGreen = color === 'green';
+  const borderColor = isSelected 
+    ? (isGreen ? 'border-[#10b981]' : 'border-[#3b82f6]') 
+    : 'border-gray-200';
+  const bgColor = isSelected 
+    ? (isGreen ? 'bg-[#f0fdf4]' : 'bg-[#eff6ff]') 
+    : 'bg-white';
+  const labelColor = isGreen ? 'text-[#047857]' : 'text-[#1d4ed8]';
 
   // Helper to get icon
   const getIcon = (lbl: string) => {
-    // Check if label matches a known service key (case-insensitive)
     const key = Object.keys(SERVICE_ICONS).find(k => lbl.toLowerCase().includes(k.toLowerCase()));
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return key ? (SERVICE_ICONS as any)[key] : null;
   };
 
+  const ContentWrapper = ({ children }: { children: React.ReactNode }) => (
+    <div 
+      onClick={onClick} 
+      className={`p-3 rounded-lg border-2 cursor-pointer transition-all duration-200 flex flex-col gap-2 relative h-full min-w-0 flex-1 ${borderColor} ${bgColor}`}
+    >
+      <div className={`text-[11px] font-bold uppercase flex justify-between items-center gap-1.5 ${labelColor}`}>
+        <div className="flex items-center gap-1">
+           <span>{getIcon(label)}</span>
+           <span>{label} {isImage && dimensions && `(${dimensions.w} x ${dimensions.h} px)`}</span>
+        </div>
+        {isMultiSelect ? (
+          <input 
+            type="checkbox" 
+            checked={isSelected} 
+            readOnly 
+            className="cursor-pointer w-4 h-4 z-50 relative accent-blue-500"
+          />
+        ) : (
+          isSelected && <span className="z-50 relative">✓ SELECTED</span>
+        )}
+      </div>
+      {children}
+    </div>
+  );
+
   if (isImage && typeof value === 'string') {
     return (
-    <div onClick={onClick} style={baseStyle}>
-       <div style={headerStyle}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-             <span>{getIcon(label)}</span>
-             <span>{label} {dimensions && `(${dimensions.w} x ${dimensions.h} px)`}</span>
-          </div>
-          {isMultiSelect ? (
-            <input 
-              type="checkbox" 
-              checked={isSelected} 
-              readOnly 
-              style={{ 
-                cursor: 'pointer', width: '18px', height: '18px', zIndex: 50, position: 'relative', accentColor: '#3b82f6'
-              }} 
-            />
-          ) : (
-            isSelected && <span style={{ zIndex: 50, position: 'relative' }}>✓ SELECTED</span>
-          )}
-        </div>
-        <div style={{ position: 'relative', width: '100%', aspectRatio: '1', backgroundColor: '#f3f4f6', borderRadius: '4px', overflow: 'hidden' }}>
+      <ContentWrapper>
+        <div className="relative w-full aspect-square bg-gray-100 rounded overflow-hidden">
           <Image 
             src={value} 
             alt={label} 
@@ -248,7 +208,7 @@ function ConflictValue({
             onError={() => setIsImage(false)}
           />
         </div>
-      </div>
+      </ContentWrapper>
     );
   }
 
@@ -257,36 +217,11 @@ function ConflictValue({
     : String(value ?? '');
 
   return (
-    <div onClick={onClick} style={baseStyle}>
-      <div style={headerStyle}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-           <span>{getIcon(label)}</span>
-           <span>{label}</span>
-        </div>
-        {isMultiSelect ? (
-          <input 
-            type="checkbox" 
-            checked={isSelected} 
-            readOnly 
-            style={{ 
-              cursor: 'pointer', width: '18px', height: '18px', zIndex: 50, position: 'relative'
-            }} 
-          />
-        ) : (
-          isSelected && <span style={{ zIndex: 50, position: 'relative' }}>✓ SELECTED</span>
-        )}
-      </div>
-      <div style={{ 
-        fontSize: '13px', 
-        whiteSpace: 'pre-wrap', 
-        wordBreak: 'break-word',
-        fontStyle: value ? 'normal' : 'italic',
-        lineHeight: '1.5',
-        marginTop: '4px'
-      }}>
+    <ContentWrapper>
+      <div className={`text-[13px] whitespace-pre-wrap break-words leading-relaxed mt-1 ${value ? 'not-italic' : 'italic'}`}>
         {value ? displayValue : 'Empty / None'}
       </div>
-    </div>
+    </ContentWrapper>
   );
 }
 
@@ -399,31 +334,22 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
   const totalChanges = Object.keys(groupedConflicts).length;
 
   return (
-    <div className={styles.importModalContainer}>
-      <div className={styles.importModalContent}>
-      <div className={styles.importModalInner} style={{ 
-        borderRadius: '12px', 
-        width: '1000px', 
-        maxWidth: '95vw', 
-        maxHeight: '90vh', 
-        display: 'flex', 
-        flexDirection: 'column', 
-        overflow: 'hidden', 
-        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' 
-      }}>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[30000]">
+      <div className="flex-1 overflow-auto p-5 h-full flex justify-center items-center">
+      <div className="bg-white rounded-xl w-[1000px] max-w-[95vw] max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
         
         {/* HEADER */}
-        <div className={styles.importModalHeader} style={{ borderBottom: '1px solid #e5e7eb' }}>
+        <div className="flex justify-between items-center p-5 border-b border-gray-200 bg-white">
           <div>
-            <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '700' }}>
+            <h3 className="m-0 text-xl font-bold">
               Review Enrichment Data
             </h3>
-            <div style={{ fontSize: '14px', color: '#6b7280', marginTop: '4px' }}>
+            <div className="text-sm text-gray-500 mt-1">
               {totalChanges} album{totalChanges !== 1 ? 's' : ''} with conflicting data found
             </div>
           </div>
           
-          <div style={{ display: 'flex', gap: '12px' }}>
+          <div className="flex gap-3">
             {/* RESTORED: Finalize All Button */}
             <button 
               onClick={() => {
@@ -436,41 +362,41 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
                 });
                 setFinalizedFields(newFinalized);
               }}
-              style={{ padding: '8px 16px', fontSize: '13px', fontWeight: '600', color: '#7c3aed', backgroundColor: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: '6px', cursor: 'pointer' }}
+              className="px-4 py-2 text-[13px] font-semibold text-violet-700 bg-violet-50 border border-violet-200 rounded-md cursor-pointer hover:bg-violet-100"
             >
               Finalize All (Static Fields)
             </button>
-            <button onClick={handleSelectAllCurrent} style={{ padding: '8px 16px', fontSize: '13px', fontWeight: '600', color: '#047857', backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '6px', cursor: 'pointer' }}>
+            <button onClick={handleSelectAllCurrent} className="px-4 py-2 text-[13px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md cursor-pointer hover:bg-emerald-100">
               Keep Current
             </button>
-            <button onClick={handleSelectAllNew} style={{ padding: '8px 16px', fontSize: '13px', fontWeight: '600', color: '#1d4ed8', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', cursor: 'pointer' }}>
+            <button onClick={handleSelectAllNew} className="px-4 py-2 text-[13px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-md cursor-pointer hover:bg-blue-100">
               Use All New Data
             </button>
           </div>
         </div>
 
         {/* LIST CONTENT */}
-        <div style={{ flex: 1, overflowY: 'auto', backgroundColor: '#f9fafb', padding: '24px' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <div className="flex-1 overflow-y-auto bg-gray-50 p-6">
+          <div className="flex flex-col gap-6">
             {Object.values(groupedConflicts).map((group, idx) => {
               const albumInfo = group[0];
               
               return (
-                <div key={idx} className={styles.importEnrichCard} style={{ padding: 0, overflow: 'hidden' }}>
+                <div key={idx} className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
                   
                   {/* ALBUM CONTEXT HEADER */}
-                  <div style={{ padding: '12px 16px', borderBottom: '1px solid #e5e7eb', display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
-                    <div style={{ fontWeight: '700', fontSize: '15px', marginRight: 'auto' }}>
+                  <div className="p-4 border-b border-gray-200 flex gap-4 items-center flex-wrap bg-gray-50/50">
+                    <div className="font-bold text-[15px] mr-auto">
                       {albumInfo.artist} - {albumInfo.title}
                     </div>
-                    <div style={{ display: 'flex', gap: '8px', fontSize: '12px' }}>
-                      {albumInfo.format && <span style={{ padding: '2px 8px', borderRadius: '4px', backgroundColor: '#e5e7eb', color: '#374151', border: '1px solid #d1d5db' }}>{albumInfo.format}</span>}
-                      {albumInfo.year && <span style={{ padding: '2px 8px', borderRadius: '4px', backgroundColor: '#e5e7eb', color: '#374151', border: '1px solid #d1d5db' }}>{albumInfo.year}</span>}
+                    <div className="flex gap-2 text-xs">
+                      {albumInfo.format && <span className="px-2 py-0.5 rounded bg-gray-200 text-gray-700 border border-gray-300">{albumInfo.format}</span>}
+                      {albumInfo.year && <span className="px-2 py-0.5 rounded bg-gray-200 text-gray-700 border border-gray-300">{albumInfo.year}</span>}
                     </div>
                   </div>
 
                   {/* CONFLICT ROWS */}
-                  <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div className="p-4 flex flex-col gap-6">
                     {group.map((conflict) => {
                       const key = `${conflict.album_id}-${conflict.field_name}`;
                       const selected = resolutions[key] || { value: conflict.current_value, source: 'current' };
@@ -478,46 +404,47 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
                       
                       return (
                         <div key={key}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                              <div style={{ fontSize: '12px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase' }}>
+                          <div className="flex justify-between items-center mb-2">
+                            <div className="flex items-center gap-3">
+                              <div className="text-xs font-bold text-gray-600 uppercase">
                                 {conflict.field_name.replace(/_/g, ' ')}
                               </div>
                               {/* RESTORED: Action Bar for merging text fields OR Gallery Mode for images */}
                               {isImageArrayField ? (
-                                <span style={{ fontSize: '10px', color: '#6b7280', background: '#f3f4f6', padding: '2px 6px', borderRadius: '4px' }}>
+                                <span className="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">
                                   GALLERY MODE: Click images to Keep/Reject
                                 </span>
                               ) : (
                                 ['genres', 'styles', 'musicians', 'credits', 'producers', 'tags'].includes(conflict.field_name) && (
-                                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                  <div className="flex gap-2 items-center">
                                     <button 
                                       onClick={() => handleResolve(conflict, conflict.current_value, 'current')}
-                                      style={{ padding: '2px 8px', fontSize: '10px', borderRadius: '4px', backgroundColor: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', fontWeight: 'bold', cursor: 'pointer' }}
+                                      className="px-2 py-0.5 text-[10px] rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold cursor-pointer hover:bg-emerald-100"
                                     >
                                       KEEP CURRENT ONLY
                                     </button>
-                                    <div style={{ padding: '2px 8px', fontSize: '10px', borderRadius: '4px', backgroundColor: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', fontWeight: 'bold' }}>
+                                    <div className="px-2 py-0.5 text-[10px] rounded bg-blue-50 text-blue-700 border border-blue-200 font-bold">
                                       {selected.selectedSources?.length || 0} SOURCES SELECTED TO MERGE
                                     </div>
                                   </div>
                                 )
                               )}
                             </div>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '12px', color: '#6b7280' }}>
+                            <label className="flex items-center gap-1.5 cursor-pointer text-xs text-gray-500 select-none">
                               <input 
                                 type="checkbox" 
                                 checked={finalizedFields[key] || false}
                                 onChange={(e) => setFinalizedFields(prev => ({ ...prev, [key]: e.target.checked }))}
+                                className="accent-blue-600"
                               />
                               Mark as Finalized
                             </label>
                           </div>
 
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px', alignItems: 'stretch' }}>
+                          <div className="grid grid-cols-[1fr_2fr] gap-4 items-stretch">
                             
                             {/* CURRENT VALUE */}
-                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            <div className="flex flex-col">
                                 {isImageArrayField && Array.isArray(conflict.current_value) ? (
                                   <ImageGridSelector 
                                     label="Current Gallery"
@@ -547,7 +474,7 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
                             </div>
 
                             {/* NEW CANDIDATES */}
-                            <div style={{ display: 'grid', gridTemplateColumns: isImageArrayField ? '1fr' : 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px' }}>
+                            <div className={`grid gap-3 ${isImageArrayField ? 'grid-cols-1' : 'grid-cols-[repeat(auto-fill,minmax(200px,1fr))]'}`}>
                                 {conflict.candidates ? (
                                     Object.entries(conflict.candidates).map(([source, val]) => (
                                         isImageArrayField && Array.isArray(val) ? (
@@ -613,12 +540,11 @@ export default function EnrichmentReviewModal({ conflicts, onComplete, onCancel 
         </div>
 
         {/* FOOTER */}
-        <div className={styles.importButtonContainer} style={{ padding: '20px 24px', borderTop: '1px solid #e5e7eb', justifyContent: 'flex-end' }}>
-          <button onClick={onCancel} className={styles.importCancelButton}>Cancel</button>
+        <div className="p-5 border-t border-gray-200 flex justify-end gap-3 bg-white">
+          <button onClick={onCancel} className="px-6 py-2 bg-white border-2 border-gray-300 rounded text-sm font-medium cursor-pointer text-gray-700 hover:bg-gray-50">Cancel</button>
           <button 
             onClick={() => onComplete(resolutions as Record<string, { value: unknown, source: string }>, finalizedFields)}
-            className={styles.importConfirmButton}
-            style={{ backgroundColor: '#f59e0b', cursor: 'pointer', fontWeight: '700' }}
+            className="px-6 py-2 bg-amber-500 text-white border-none rounded text-sm font-bold cursor-pointer hover:bg-amber-600 shadow-sm"
           >
             Save Changes
           </button>
