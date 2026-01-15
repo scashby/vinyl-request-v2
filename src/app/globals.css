@@ -43,3 +43,22 @@ body {
 .theme-dark h3 {
   color: #ffffff;
 }
+
+/* 5. LEGACY COMPONENTS (Ported from global.css) */
+@layer components {
+  .card {
+    @apply bg-[#1b1e25] text-[#f2f2f2] p-6 mb-6 rounded-md shadow-md border-l-[3px] border-[#5c5c5c];
+  }
+  
+  .card h2 {
+    @apply text-xl text-[#f2f2f2] mb-2;
+  }
+  
+  .card p {
+    @apply text-[#b0b0b0] text-[0.95rem];
+  }
+
+  .button {
+    @apply bg-[#383838] text-[#f0f0f0] border border-[#555] px-4 py-2 rounded font-semibold transition-colors mt-4 cursor-pointer hover:bg-[#444];
+  }
+}
