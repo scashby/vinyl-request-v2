@@ -125,18 +125,7 @@ export default function AlbumSuggestionBox({
   if (compact && !isOpen) {
     return (
       <div 
-        style={{
-          background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
-          color: 'white',
-          padding: '12px 20px',
-          borderRadius: 8,
-          textAlign: 'center',
-          cursor: 'pointer',
-          transition: 'all 0.3s ease',
-          fontSize: 14,
-          fontWeight: 600,
-          boxShadow: '0 2px 4px rgba(59, 130, 246, 0.2)'
-        }}
+        className="bg-gradient-to-br from-blue-500 to-blue-700 text-white px-5 py-3 rounded-lg text-center cursor-pointer transition-all duration-300 text-sm font-bold shadow-sm hover:shadow-md hover:scale-[1.02]"
         onClick={handleOpen}
       >
         💡 Suggest an Album
@@ -147,22 +136,14 @@ export default function AlbumSuggestionBox({
   if (!isOpen) {
     return (
       <div 
-        style={{
-          background: 'rgba(59, 130, 246, 0.1)',
-          border: '2px dashed #3b82f6',
-          borderRadius: 12,
-          padding: 20,
-          textAlign: 'center',
-          cursor: 'pointer',
-          transition: 'all 0.3s ease'
-        }}
+        className="bg-blue-50 border-2 border-dashed border-blue-500 rounded-xl p-5 text-center cursor-pointer transition-all duration-300 hover:bg-blue-100"
         onClick={handleOpen}
       >
-        <div style={{ fontSize: 24, marginBottom: 8 }}>💡</div>
-        <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4, color: '#3b82f6' }}>
+        <div className="text-2xl mb-2">💡</div>
+        <div className="text-base font-bold mb-1 text-blue-500">
           {getContextMessage()}
         </div>
-        <div style={{ fontSize: 14, color: '#6b7280' }}>
+        <div className="text-sm text-gray-500">
           Click to suggest • Optional Venmo contributions welcome
         </div>
       </div>
@@ -171,38 +152,23 @@ export default function AlbumSuggestionBox({
 
   if (submitted) {
     return (
-      <div style={{
-        background: 'linear-gradient(135deg, #10b981, #047857)',
-        color: 'white',
-        borderRadius: 12,
-        padding: 24,
-        textAlign: 'center'
-      }}>
-        <div style={{ fontSize: 32, marginBottom: 12 }}>🎉</div>
-        <h3 style={{ fontSize: 18, margin: '0 0 8px 0' }}>
+      <div className="bg-gradient-to-br from-emerald-500 to-emerald-700 text-white rounded-xl p-6 text-center shadow-lg">
+        <div className="text-4xl mb-3">🎉</div>
+        <h3 className="text-lg font-bold m-0 mb-2">
           Suggestion Submitted!
         </h3>
-        <p style={{ fontSize: 14, margin: '0 0 16px 0', opacity: 0.9 }}>
+        <p className="text-sm m-0 mb-4 opacity-90">
           Thanks for suggesting &ldquo;{suggestion.artist} - {suggestion.album}&rdquo;
           {eventId && eventTitle && ` for ${eventTitle}`}
         </p>
         
         {suggestion.contributionAmount && (
-          <div style={{ marginBottom: 16 }}>
+          <div className="mb-4">
             <a
               href={getVenmoUrl()}
               target="_blank"
               rel="noopener noreferrer"
-              style={{
-                background: '#00d4ff',
-                color: '#000',
-                padding: '10px 20px',
-                borderRadius: 8,
-                textDecoration: 'none',
-                fontSize: 14,
-                fontWeight: 'bold',
-                display: 'inline-block'
-              }}
+              className="bg-[#00d4ff] text-black px-5 py-2.5 rounded-lg no-underline text-sm font-bold inline-block hover:brightness-110 transition-all"
             >
               💸 Contribute ${suggestion.contributionAmount} on Venmo
             </a>
@@ -211,15 +177,7 @@ export default function AlbumSuggestionBox({
         
         <button
           onClick={handleClose}
-          style={{
-            background: 'rgba(255, 255, 255, 0.2)',
-            color: 'white',
-            border: 'none',
-            borderRadius: 6,
-            padding: '8px 16px',
-            cursor: 'pointer',
-            fontSize: 14
-          }}
+          className="bg-white/20 text-white border-none rounded-md px-4 py-2 cursor-pointer text-sm hover:bg-white/30 transition-colors"
         >
           Close
         </button>
@@ -228,65 +186,37 @@ export default function AlbumSuggestionBox({
   }
 
   return (
-    <div style={{
-      background: '#fff',
-      border: '2px solid #e5e7eb',
-      borderRadius: 12,
-      padding: 24,
-      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
-      color: '#222',
-      marginBottom: 16
-    }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <h3 style={{ fontSize: 18, margin: 0, fontWeight: 'bold' }}>
+    <div className="bg-white border-2 border-gray-200 rounded-xl p-6 shadow-md text-gray-800 mb-4">
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-lg font-bold m-0">
           💡 Suggest an Album
         </h3>
         <button
           onClick={handleClose}
-          style={{
-            background: 'none',
-            border: 'none',
-            fontSize: 18,
-            cursor: 'pointer',
-            color: '#6b7280'
-          }}
+          className="bg-transparent border-none text-lg cursor-pointer text-gray-500 hover:text-gray-700"
         >
           ✕
         </button>
       </div>
 
-      <p style={{ fontSize: 14, color: '#6b7280', marginBottom: 20 }}>
+      <p className="text-sm text-gray-500 mb-5">
         {getContextMessage()}
       </p>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
         <input
           type="text"
           value={suggestion.artist}
           onChange={e => setSuggestion(prev => ({ ...prev, artist: e.target.value }))}
           placeholder="Artist Name"
-          style={{
-            padding: '10px 12px',
-            border: '1px solid #d1d5db',
-            borderRadius: 6,
-            fontSize: 14,
-            outline: 'none',
-            width: '100%'
-          }}
+          className="w-full p-2.5 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
         />
         <input
           type="text"
           value={suggestion.album}
           onChange={e => setSuggestion(prev => ({ ...prev, album: e.target.value }))}
           placeholder="Album Title"
-          style={{
-            padding: '10px 12px',
-            border: '1px solid #d1d5db',
-            borderRadius: 6,
-            fontSize: 14,
-            outline: 'none',
-            width: '100%'
-          }}
+          className="w-full p-2.5 border border-gray-300 rounded-md text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
         />
       </div>
 
@@ -295,33 +225,18 @@ export default function AlbumSuggestionBox({
         onChange={e => setSuggestion(prev => ({ ...prev, reason: e.target.value }))}
         placeholder="Why should we add this album? (optional)"
         rows={2}
-        style={{
-          width: '100%',
-          padding: '10px 12px',
-          border: '1px solid #d1d5db',
-          borderRadius: 6,
-          fontSize: 14,
-          marginBottom: 16,
-          resize: 'none',
-          outline: 'none'
-        }}
+        className="w-full p-2.5 border border-gray-300 rounded-md text-sm mb-4 resize-none outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
       />
 
-      <div style={{ 
-        background: '#f0f9ff', 
-        border: '1px solid #0369a1', 
-        borderRadius: 8, 
-        padding: 16,
-        marginBottom: 16 
-      }}>
-        <div style={{ fontSize: 14, fontWeight: 'bold', marginBottom: 8, color: '#0c4a6e' }}>
+      <div className="bg-sky-50 border border-sky-600 rounded-lg p-4 mb-4">
+        <div className="text-sm font-bold mb-2 text-sky-900">
           💸 Optional Contribution via Venmo
         </div>
-        <div style={{ fontSize: 12, color: '#0369a1', marginBottom: 12 }}>
+        <div className="text-xs text-sky-700 mb-3">
           Help fund album purchases! Venmo: @deadwaxdialogues
         </div>
         
-        <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 12, alignItems: 'center' }}>
+        <div className="grid grid-cols-[120px_1fr] gap-3 items-center">
           <input
             type="number"
             value={suggestion.contributionAmount}
@@ -329,21 +244,15 @@ export default function AlbumSuggestionBox({
             placeholder="10.00"
             min="1"
             step="0.01"
-            style={{
-              padding: '8px 10px',
-              border: '1px solid #bfdbfe',
-              borderRadius: 4,
-              fontSize: 14,
-              outline: 'none'
-            }}
+            className="p-2 border border-blue-200 rounded text-sm outline-none focus:border-blue-500"
           />
-          <div style={{ fontSize: 12, color: '#0369a1' }}>
+          <div className="text-xs text-sky-700">
             Enter amount (optional) - you&rsquo;ll get a Venmo link after submitting
           </div>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
         <div>
           <input
             type="text"
@@ -351,14 +260,7 @@ export default function AlbumSuggestionBox({
             onChange={e => setSuggestion(prev => ({ ...prev, contributorName: e.target.value }))}
             placeholder="Your Name (required) *"
             required
-            style={{
-              padding: '8px 10px',
-              border: '2px solid #d1d5db',
-              borderRadius: 4,
-              fontSize: 12,
-              outline: 'none',
-              width: '100%'
-            }}
+            className="w-full p-2 border-2 border-gray-300 rounded text-xs outline-none focus:border-blue-500"
           />
         </div>
         <div>
@@ -368,69 +270,36 @@ export default function AlbumSuggestionBox({
             onChange={e => setSuggestion(prev => ({ ...prev, contributorEmail: e.target.value }))}
             placeholder="Your Email (required) *"
             required
-            style={{
-              padding: '8px 10px',
-              border: '2px solid #d1d5db',
-              borderRadius: 4,
-              fontSize: 12,
-              outline: 'none',
-              width: '100%'
-            }}
+            className="w-full p-2 border-2 border-gray-300 rounded text-xs outline-none focus:border-blue-500"
           />
         </div>
       </div>
 
-      <div style={{ 
-        fontSize: 11, 
-        color: '#6b7280', 
-        marginBottom: 16,
-        fontStyle: 'italic'
-      }}>
+      <div className="text-[11px] text-gray-500 mb-4 italic">
         * Required so we can let you know when we get the album!
       </div>
 
       {error && (
-        <div style={{
-          background: '#fef2f2',
-          border: '1px solid #fca5a5',
-          color: '#dc2626',
-          borderRadius: 6,
-          padding: 8,
-          fontSize: 12,
-          marginBottom: 12
-        }}>
+        <div className="bg-red-50 border border-red-300 text-red-600 rounded-md p-2 text-xs mb-3">
           {error}
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+      <div className="flex gap-3 justify-end">
         <button
           onClick={handleClose}
-          style={{
-            background: '#f3f4f6',
-            color: '#374151',
-            border: '1px solid #d1d5db',
-            borderRadius: 6,
-            padding: '8px 16px',
-            cursor: 'pointer',
-            fontSize: 14
-          }}
+          className="bg-gray-100 text-gray-700 border border-gray-300 rounded-md px-4 py-2 cursor-pointer text-sm hover:bg-gray-200 transition-colors"
         >
           Cancel
         </button>
         <button
           onClick={handleSubmit}
           disabled={submitting}
-          style={{
-            background: submitting ? '#9ca3af' : '#3b82f6',
-            color: 'white',
-            border: 'none',
-            borderRadius: 6,
-            padding: '8px 16px',
-            cursor: submitting ? 'not-allowed' : 'pointer',
-            fontSize: 14,
-            fontWeight: 'bold'
-          }}
+          className={`px-4 py-2 border-none rounded-md text-sm font-bold text-white transition-colors ${
+            submitting 
+              ? 'bg-gray-400 cursor-not-allowed' 
+              : 'bg-blue-500 cursor-pointer hover:bg-blue-600'
+          }`}
         >
           {submitting ? 'Submitting...' : 'Submit Suggestion'}
         </button>
