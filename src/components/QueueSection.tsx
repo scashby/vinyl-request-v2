@@ -6,7 +6,6 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { supabase } from 'src/lib/supabaseClient';
-import "styles/queue.css";
 
 interface Album {
   id: string | number;
@@ -164,127 +163,115 @@ export default function QueueSection({ eventId }: QueueSectionProps) {
   };
 
   return (
-    <div className="queue-wrapper">
-      <h3>View the queue</h3>
+    <div className="mt-8 bg-slate-950 text-white p-1 rounded-xl border border-slate-800 overflow-hidden shadow-2xl">
+      <div className="p-4 bg-slate-900/50 border-b border-slate-800">
+        <h3 className="text-lg font-bold text-white m-0">Current Queue</h3>
+      </div>
+      
       {queue.length === 0 ? (
-        <div style={{
-          background: "rgba(32,32,48,0.9)",
-          borderRadius: 10,
-          padding: 32,
-          textAlign: "center",
-          color: "#fff",
-          margin: "32px auto",
-          fontSize: 18,
-          fontWeight: 500,
-          maxWidth: 550
-        }}>
-          The queue is empty. <br />Be the first to <span style={{ color: "#9333ea" }}>add {queueType === 'track' ? 'a track' : queueType === 'album' ? 'an album' : 'an album side'}</span> to get started!
+        <div className="text-center py-12 px-4 bg-slate-900/30">
+          <div className="inline-block p-4 rounded-full bg-slate-800 mb-4 text-3xl">💿</div>
+          <p className="text-lg text-gray-300 font-medium mb-1">The queue is empty.</p>
+          <p className="text-gray-500">Be the first to <span className="text-purple-400 font-bold">add {queueType === 'track' ? 'a track' : queueType === 'album' ? 'an album' : 'an album side'}</span> to get started!</p>
         </div>
       ) : (
-        <table className="queue-table">
-          <colgroup>
-            <col style={{ width: "50px" }} />
-            <col style={{ width: "60px" }} />
-            <col />
-            {queueType === 'side' && <col style={{ width: "60px" }} />}
-            {queueType === 'track' && (
-              <>
-                <col style={{ width: "100px" }} />
-                <col style={{ width: "80px" }} />
-              </>
-            )}
-            <col style={{ width: "60px" }} />
-            <col style={{ width: "80px" }} />
-          </colgroup>
-          <thead>
-            <tr>
-              <th>#</th>
-              <th></th>
-              <th>{queueType === 'track' ? 'Track / Artist' : 'Album / Artist'}</th>
-              {queueType === 'side' && <th>Side</th>}
-              {queueType === 'track' && (
-                <>
-                  <th>Track #</th>
-                  <th>Duration</th>
-                </>
-              )}
-              <th>&#x1F44D;</th>
-              <th>Votes</th>
-            </tr>
-          </thead>
-          <tbody>
-            {queue.map((item: QueueItem) => {
-              const disabled =
-                voting[item.id] ||
-                (typeof window !== "undefined" &&
-                  !!localStorage.getItem(getVoteKey(eventId, item.id)));
-              return (
-                <tr key={item.id}>
-                  <td className="queue-index">{item.index}</td>
-                  <td>
-                    <Image
-                      src={item.album.image_url || "/images/placeholder.png"}
-                      alt={item.album.title || ""}
-                      className="queue-cover"
-                      width={64}
-                      height={64}
-                      style={{ cursor: "pointer", objectFit: "cover" }}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-slate-800">
+                <th className="p-4 text-center w-12">#</th>
+                <th className="p-4 w-16"></th>
+                <th className="p-4">{queueType === 'track' ? 'Track / Artist' : 'Album / Artist'}</th>
+                {queueType === 'side' && <th className="p-4 text-center w-20">Side</th>}
+                {queueType === 'track' && (
+                  <>
+                    <th className="p-4 text-center w-24">Track #</th>
+                    <th className="p-4 text-center w-24">Duration</th>
+                  </>
+                )}
+                <th className="p-4 text-center w-16">Vote</th>
+                <th className="p-4 text-right w-24">Count</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800">
+              {queue.map((item: QueueItem) => {
+                const disabled =
+                  voting[item.id] ||
+                  (typeof window !== "undefined" &&
+                    !!localStorage.getItem(getVoteKey(eventId, item.id)));
+                return (
+                  <tr key={item.id} className="hover:bg-white/5 transition-colors group">
+                    <td className="p-4 text-center text-sm font-medium text-gray-600 group-hover:text-gray-400">{item.index}</td>
+                    <td className="p-4 pl-0">
+                      <Image
+                        src={item.album.image_url || "/images/placeholder.png"}
+                        alt={item.album.title || ""}
+                        className="rounded bg-slate-800 object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                        width={48}
+                        height={48}
+                        onClick={() => goToAlbum(item.album.id)}
+                        unoptimized
+                      />
+                    </td>
+                    <td
+                      className="p-4 cursor-pointer"
                       onClick={() => goToAlbum(item.album.id)}
-                      unoptimized
-                    />
-                  </td>
-                  <td
-                    className="queue-meta"
-                    style={{ cursor: "pointer" }}
-                    onClick={() => goToAlbum(item.album.id)}
-                  >
-                    <div className="queue-title">{getDisplayTitle(item)}</div>
-                    <div className="queue-artist">{item.album.artist}</div>
-                  </td>
-                  {queueType === 'side' && (
-                    <td className="queue-side">{item.side}</td>
-                  )}
-                  {queueType === 'track' && (
-                    <>
-                      <td style={{ textAlign: 'center', fontSize: '14px' }}>
-                        {item.track_number || '--'}
-                      </td>
-                      <td style={{ textAlign: 'center', fontSize: '14px' }}>
-                        {item.track_duration || '--:--'}
-                      </td>
-                    </>
-                  )}
-                  <td className="queue-plus">
-                    <button
-                      className="queue-plus-btn"
-                      disabled={disabled}
-                      title={
-                        typeof window !== "undefined" &&
-                        localStorage.getItem(getVoteKey(eventId, item.id))
-                          ? "Already voted"
-                          : "Vote for this entry"
-                      }
-                      onClick={() => handleUpvote(item.id)}
-                      style={{
-                        fontSize: 22,
-                        color: voting[item.id] ? "#ccc" : "#2563eb",
-                        cursor: voting[item.id] ? "not-allowed" : "pointer",
-                        background: "none",
-                        border: "none",
-                      }}
                     >
-                      ＋
-                    </button>
-                  </td>
-                  <td className="queue-votes">
-                    <span className="queue-heart">♥</span>
-                    <span className="queue-count">x{item.votes}</span>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                      <div className="font-bold text-blue-400 hover:text-blue-300 hover:underline mb-0.5 line-clamp-1">
+                        {getDisplayTitle(item)}
+                      </div>
+                      <div className="text-sm text-gray-400 font-medium uppercase tracking-wide line-clamp-1">
+                        {item.album.artist}
+                      </div>
+                    </td>
+                    {queueType === 'side' && (
+                      <td className="p-4 text-center">
+                        <span className="inline-block px-2.5 py-1 rounded bg-slate-800 text-gray-300 text-xs font-bold border border-slate-700">
+                          {item.side}
+                        </span>
+                      </td>
+                    )}
+                    {queueType === 'track' && (
+                      <>
+                        <td className="p-4 text-center text-sm text-gray-500">
+                          {item.track_number || '--'}
+                        </td>
+                        <td className="p-4 text-center text-sm text-gray-500 font-mono">
+                          {item.track_duration || '--:--'}
+                        </td>
+                      </>
+                    )}
+                    <td className="p-4 text-center">
+                      <button
+                        className={`w-8 h-8 flex items-center justify-center rounded-lg font-bold transition-all ${
+                          disabled 
+                            ? 'bg-slate-800 text-gray-600 cursor-not-allowed' 
+                            : 'bg-blue-600 text-white hover:bg-blue-500 hover:scale-110 active:scale-95 shadow-lg shadow-blue-900/30'
+                        }`}
+                        disabled={disabled}
+                        title={
+                          typeof window !== "undefined" &&
+                          localStorage.getItem(getVoteKey(eventId, item.id))
+                            ? "Already voted"
+                            : "Vote for this entry"
+                        }
+                        onClick={() => handleUpvote(item.id)}
+                      >
+                        ＋
+                      </button>
+                    </td>
+                    <td className="p-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <span className="text-red-500 text-lg">♥</span>
+                        <span className="text-lg font-bold text-white tabular-nums">{item.votes}</span>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
